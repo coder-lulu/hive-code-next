@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "2308828f6763e96bd396b36cb80659323820fa67",
+  "sourceProductSha": "3ac68e9ed6a226bb89c295ec82ae809d1d5d20f4",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -801,6 +801,27 @@
       ]
     },
     {
+      "path": ".github/workflows/mobile.yml",
+      "base": {
+        "mode": "100644",
+        "sha": "8835c6876b3dc40179512c979b63273de6717f7b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "78047f09d2e56118dfb3b3c495db431c7d2d6f49"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "78047f09d2e56118dfb3b3c495db431c7d2d6f49"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e279d54b6ec00018f8be9e7d81f17329faddd9ca"
+      },
+      "reason": "Add the real shared journal source domain to both existing workflow event path lists so mobile validation is triggered when that shared input changes; retain the other workflow fields.",
+      "regressionTests": ["config/scripts/mobile-launch-contract-workflow.test.mjs"]
+    },
+    {
       "path": ".github/workflows/node-server-tests.yml",
       "base": null,
       "product": {
@@ -839,10 +860,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "234b47cf0f6a7d0f8511f302f67c7dffbc7fd42b"
+        "sha": "32bac52574cfd32729d57981065f2d57986d1648"
       },
-      "reason": "The consolidated preflight and both static/native consumers use the exact owned Node 24.18.0 pin; do not let a moving major version invalidate current source/type/test evidence.",
-      "regressionTests": ["config/scripts/pr-workflow-parallelism.test.mjs"]
+      "reason": "Register the real native Windows process-termination owner in the existing Windows boundary argv; preserve the classifier, preflight dependency chain and other mandatory owners.",
+      "regressionTests": [
+        "config/scripts/pr-code-change-workflow.test.mjs",
+        "config/scripts/win32-test-lane-registration.test.mjs"
+      ]
     },
     {
       "path": ".github/workflows/relay-windows-process-tree.yml",
@@ -3051,6 +3075,42 @@
       "regressionTests": ["config/scripts/ensure-native-runtime.test.mjs"]
     },
     {
+      "path": "config/scripts/headless-detector-compiler-cache.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "9ef4d5cb6b5de1a221e4b37640363089a1f96652"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "9ef4d5cb6b5de1a221e4b37640363089a1f96652"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "ea9cd21f200cbe7668450d6d1f919f56bb444594"
+      },
+      "reason": "Windows directory symlink activation failed with EPERM. Use a real junction for the validated package directory on Windows, retaining directory symlinks elsewhere and all archive/inventory/key checks.",
+      "regressionTests": ["config/scripts/headless-detector-compiler-cache.test.mjs"]
+    },
+    {
+      "path": "config/scripts/headless-detector-compiler-cache.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "484807159a750cf9847d5096f42d3464728e2a1d"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "484807159a750cf9847d5096f42d3464728e2a1d"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a9aba2f8f309fe54c351efba0c0d2df9d3a7984d"
+      },
+      "reason": "Exercise a genuine malicious junction at the exact package path and require its lstat identity/inventory refusal. The successful real build captures only its uniquely copied compiler service, stops that exact module, awaits actual captured child close, and then performs the original temporary-directory removal.",
+      "regressionTests": ["config/scripts/headless-detector-compiler-cache.test.mjs"]
+    },
+    {
       "path": "config/scripts/hivecloud-release-workflow-contract.test.mjs",
       "base": null,
       "product": {
@@ -3064,6 +3124,21 @@
       },
       "reason": "Check the actual packageManager and owned toolchain instead of an obsolete literal pnpm pin; keep all signing, version, source identity, reservation and publication assertions. Resource dependency ordering is tested against live workflows.",
       "regressionTests": ["config/scripts/hivecloud-release-workflow-contract.test.mjs"]
+    },
+    {
+      "path": "config/scripts/hivecode-windows-hardware-signing-workflow.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "82f83830e4c8735152c2e0d8210790d65353220f"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "c708323be7c17b7483f01069d45b10e57ad9e65c"
+      },
+      "reason": "The workflow now also requires the Orcad template and both relay addon architectures. Check their exact values independently while retaining the original signing-environment names and signer command checks.",
+      "regressionTests": ["config/scripts/hivecode-windows-hardware-signing-workflow.test.mjs"]
     },
     {
       "path": "config/scripts/hourly-preflight-workflow.test.mjs",
@@ -3175,6 +3250,21 @@
       "regressionTests": ["config/scripts/managed-data-account-runtime.test.ts"]
     },
     {
+      "path": "config/scripts/managed-pi-cloud-host.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "c6505b164e1bae398947e388db6f93c63fb19fac"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "8761c55f7547199619601b08867861af89f53896"
+      },
+      "reason": "Open one real public JournalHostDatabase with empty legacy input and share it with the real record store and Cloud/Pi host. Finally await exact host close and close that exact DB even on setup/close failures; keep real pack disposal, auth/proof and canary assertions.",
+      "regressionTests": ["config/scripts/managed-pi-cloud-host.test.ts"]
+    },
+    {
       "path": "config/scripts/managed-pi-execution-host.test.ts",
       "reason": "Use the maintained journal-backed record-store test facade for open/reopen and actual persisted-row readback; preserve the actual owned Pi child, lease, recovery and authorization assertions without reviving a JSON product store.",
       "regressionTests": ["config/scripts/managed-pi-execution-host.test.ts"],
@@ -3188,6 +3278,42 @@
         "sha": "4716f821b466612c3f1be55e53a57840a0435839"
       },
       "upstream": null
+    },
+    {
+      "path": "config/scripts/mobile-react-version-contract.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "90b48bb6d02dd557ebcae240ffb3681e0d834980"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "4cc4b6a4469eb0fcae26bac1e912555df21fd99f"
+      },
+      "reason": "The current declaration uses a tilde-patch @types/react version. Accept only exact or tilde strict SemVer and compare captured major/minor to real React; runtime and renderer/DOM version checks remain exact.",
+      "regressionTests": ["config/scripts/mobile-react-version-contract.test.mjs"]
+    },
+    {
+      "path": "config/scripts/mobile-web-app-handoff-grants-render.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "abc3bd013a4bb96169a4782229a1c5b4abeeed26"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "52f69dce8fa24e1bde482450a4dc3c7b8592eca8"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "abc3bd013a4bb96169a4782229a1c5b4abeeed26"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "be5019a0d5565fe336d34278ed0e00ec9a606ea9"
+      },
+      "reason": "Activate this isolated owner’s actual headless target page before its existing navigation. W8 independently ran all ten unchanged cases successfully; this is Handoff-only evidence, not a Stack or formal candidate pass.",
+      "regressionTests": ["config/scripts/mobile-web-app-handoff-grants-render.test.mjs"]
     },
     {
       "path": "config/scripts/mobile-web-app-held-press-render.test.mjs",
@@ -3206,6 +3332,42 @@
         "mode": "100644",
         "sha": "279378f70637bb4314f1dc8162e91b7dab3ac55b"
       }
+    },
+    {
+      "path": "config/scripts/mobile-web-app-stack-transition-render.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "4420d32acfafe5319c1bf276d9e72e6ca0110240"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "4420d32acfafe5319c1bf276d9e72e6ca0110240"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "0bb97cd0fdf53bd91b9d492dc02e61bf300a0fd8"
+      },
+      "reason": "Close actual current-engine browser contexts in afterEach even after a failed assertion. Preserve original fourteen cases, engines, samples, interruption oracle and budgets. W8 controlled activation still has one real failed case; cleanup is not a proven transition repair.",
+      "regressionTests": ["config/scripts/mobile-web-app-stack-transition-render.test.mjs"]
+    },
+    {
+      "path": "config/scripts/moved-code-normalization-budget.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "cd2e729608c41552aea3930efb9d298c2e137203"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "cd2e729608c41552aea3930efb9d298c2e137203"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "29cabdbbf498b32ae0b71768e4d50ab94237bb3b"
+      },
+      "reason": "The parser fixture supplied only a hunk although the actual normalization API consumes a complete Git patch. Supply an independent full diff/header/path/hunk at the same call site; retain the new-call rejection.",
+      "regressionTests": ["config/scripts/moved-code-normalization-budget.test.mjs"]
     },
     {
       "path": "config/scripts/node-server-change-scope.test.mjs",
@@ -3280,6 +3442,27 @@
       "regressionTests": ["config/scripts/orcad-windows-prebuild-workflow.test.mjs"]
     },
     {
+      "path": "config/scripts/orchestration-skill-guidance.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "2ed4288e2236624efcf5606c9b5fcd111a6c99c9"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "c7e11982068c2af14884ae78b48d392e5f311822"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "522249fe5a4c6952816728d52e34da3d4c6ab176"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "466a6a8abb7cbe28a960a79bf92fac5bf2405a3a"
+      },
+      "reason": "The current dispatch recipe explicitly requires a dispatch-capability argument. The oracle now requires the exact documented placeholder instead of forbidding it; this does not grant a capability or alter the runtime authority checks.",
+      "regressionTests": ["config/scripts/orchestration-skill-guidance.test.mjs"]
+    },
+    {
       "path": "config/scripts/package-linux-formats.mjs",
       "base": {
         "mode": "100644",
@@ -3322,6 +3505,24 @@
       "regressionTests": ["config/scripts/package-linux-formats.test.mjs"]
     },
     {
+      "path": "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "2dd82ad5d261215889ab876d5ab4e5d50767c2bb"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "2dd82ad5d261215889ab876d5ab4e5d50767c2bb"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "401956f8dfc43cfd0d64a61b6bf94e9f0529ec1e"
+      },
+      "reason": "Require shared unit work for the two mobile source fixtures and no shared work for docs/cloud fixtures, preserving the original negative route and prerequisite checks.",
+      "regressionTests": ["config/scripts/pr-auxiliary-preflight-admission.test.mjs"]
+    },
+    {
       "path": "config/scripts/pr-checks-skip-wiring.test.mjs",
       "base": null,
       "product": {
@@ -3357,10 +3558,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "8bec9c72c7cab8c704f4bd0cb4c00b7bfc97d628"
+        "sha": "a78088118591902a89791276597dba1463931ee0"
       },
-      "reason": "Route both owned cross-version preparation changes and upstream daemon/runtime-launcher protocol ratchets through the real cross-version CI gate, retaining fail-closed empty-diff handling.",
-      "regressionTests": ["config/scripts/pr-code-change-scope.test.mjs"]
+      "reason": "Add the existing real Windows process-termination owner to mandatory classifier admission so its changed inputs select the Windows validation lane; preserve the rest of the safety and path policies.",
+      "regressionTests": [
+        "config/scripts/pr-code-change-scope.test.mjs",
+        "config/scripts/win32-test-lane-registration.test.mjs"
+      ]
     },
     {
       "path": "config/scripts/pr-code-change-scope.test.mjs",
@@ -3386,6 +3590,21 @@
         "config/scripts/pr-code-change-scope.test.mjs",
         "config/scripts/pr-e2e-restart-survival-routing.test.mjs"
       ]
+    },
+    {
+      "path": "config/scripts/pr-code-change-workflow.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "bb1412bb77e96200d66fa963829ba4a3e858c400"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "03f072fa02c32cbe8aac48bb0e6c1c1d3d98576d"
+      },
+      "reason": "Align independent workflow assertions with the merged single preflight job and its exact selected/prior-success guards, real classifier outputs and native cache/plan order; retain mandatory downstream success gates instead of expecting removed job names.",
+      "regressionTests": ["config/scripts/pr-code-change-workflow.test.mjs"]
     },
     {
       "path": "config/scripts/pr-e2e-gate-contract.test.mjs",
@@ -3433,6 +3652,24 @@
       ]
     },
     {
+      "path": "config/scripts/pr-preflight-gates.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "4be1aa2b740cb9ab7d61d773072448047732ecf4"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "4be1aa2b740cb9ab7d61d773072448047732ecf4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "173b36123a124ad70113efa4f75e8fe68ceb0e2b"
+      },
+      "reason": "The merged policy pins Node 24.18.0 and selects shared typecheck for mobile changes. Update the independent expected values while retaining other preflight positive/negative admission conditions.",
+      "regressionTests": ["config/scripts/pr-preflight-gates.test.mjs"]
+    },
+    {
       "path": "config/scripts/pr-workflow-parallelism.test.mjs",
       "base": {
         "mode": "100644",
@@ -3463,13 +3700,12 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "07e38b0ad3cb068da29c52593da8f9cbbac0d14d"
+        "sha": "114564b9757bf3debf7e52962bc1dd74f79e86b0"
       },
-      "reason": "Add eight individually verified immutable upstream baseline pins required by the new actual historical compatibility journeys. Preserve prior pins and stable v1.4.186 baseline; acquire only missing exact objects without fetching or creating release tags or changing refs.",
+      "reason": "Make exact e705 object acquisition mandatory in CI without local tag dependence; keep generic v1.4.186 unchanged.",
       "regressionTests": [
         "config/scripts/prepare-cross-version-baselines.test.mjs",
-        "tests/e2e/cross-version-wire/qoder-registration-downgrade.unit.test.ts",
-        "tests/e2e/cross-version-wire/session-search-agent-set-downgrade.unit.test.ts"
+        "config/scripts/upstream-sync-checkpoint-execution.test.mjs"
       ]
     },
     {
@@ -3642,6 +3878,39 @@
       },
       "reason": "Preserve the six original actual inline qualified-tag policy cases and add rejection of the superseded module/unused checkout. No release semantics, repository guard or tag interpretation is relaxed.",
       "regressionTests": ["config/scripts/release-policy.test.mjs"]
+    },
+    {
+      "path": "config/scripts/release-tag-pattern-census.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "b42a424a36f320e581d6b2c9a15a687d0f987fc6"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "b42a424a36f320e581d6b2c9a15a687d0f987fc6"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6c4abdc572b3f3ce92e5d414243ef586aa397125"
+      },
+      "reason": "Use POSIX repo-relative identities so Windows traversal binds exact census proof keys. Execute real release-policy withdrawal/edited-warning and HiveCloud unsupported-SemVer/fetch-zero rejection mechanisms instead of inventing tag acceptance; retain existing inventory and proof mechanisms.",
+      "regressionTests": ["config/scripts/release-tag-pattern-census.test.mjs"]
+    },
+    {
+      "path": "config/scripts/upstream-sync-checkpoint-execution.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "b20562bb58702b6af9f3362f934a4c643ea1f6e4"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "9b939dd0fdf7ab60d5b706882d9d630bcc0cb19e"
+      },
+      "reason": "Keep independent complete ordered commit oracle and two exact verification calls per unique commit (17 unique,34 calls).",
+      "regressionTests": ["config/scripts/upstream-sync-checkpoint-execution.test.mjs"]
     },
     {
       "path": "config/scripts/windows-process-tree-creation-time.cjs",
@@ -6630,6 +6899,27 @@
       ]
     },
     {
+      "path": "src/cli/help.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "8fc3b073faf949b51d3ed5aa7a083f40c6d7e208"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "88bfa730e5ed390dc60d7401815d98204fbd7530"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "eafe975327193c973b69ddb9cfc018be4d522df4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a85510c8dbf252c7855d81723b176dd4a63e5874"
+      },
+      "reason": "K7 kept M root help two-provider wording despite merged real four-provider account specs/handlers. R8 changes exactly four root discovery rows, restoring U semantic text with HiveCode identity. Real select/rm handlers and host-local remote-flag rejection remain unchanged.",
+      "regressionTests": ["src/cli/index.test.ts"]
+    },
+    {
       "path": "src/cli/index.test.ts",
       "base": {
         "mode": "100644",
@@ -6645,9 +6935,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "b4cb21e7b094c5ef685f2c8e9edf750b1efe88cb"
+        "sha": "ae6e1d5239bdb3ab2601ccf97cf8a588bbd0c05b"
       },
-      "reason": "新增多provider账户help断言使用Hive产品入口，不改业务断言",
+      "reason": "Extend exact help discovery assertions for the real current four-provider account select/remove surface while retaining original generic add/list checks and command collision coverage.",
       "regressionTests": ["src/cli/index.test.ts"]
     },
     {
@@ -7010,6 +7300,24 @@
       "regressionTests": ["src/main/agent-hooks/local-tmux-managed-pty.test.ts"]
     },
     {
+      "path": "src/main/ai-vault/antigravity-ide-history.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "3a10b67c7b4fa88b0f987129701db0fed10bed26"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "3a10b67c7b4fa88b0f987129701db0fed10bed26"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3bdfdf845f6e884939006e133a645d4a8b9a5ed2"
+      },
+      "reason": "Expect the full transcript reference path in its actual escaped command representation. Preserve original prompt-interactive requirement, absence of --conversation and all history identity/content assertions. The Antigravity transcript-reference prompt intentionally contains a JSON-quoted full path before shell quoting. Independent built-in JSON serialization reflects the literal command representation on Windows. The original --prompt-interactive requirement, absence of --conversation, origin/host identity, full transcript selection, metadata bounds and workspace refusals remain.",
+      "regressionTests": ["src/main/ai-vault/antigravity-ide-history.test.ts"]
+    },
+    {
       "path": "src/main/ai-vault/local-log-tail-reader.ts",
       "base": {
         "mode": "100644",
@@ -7052,6 +7360,24 @@
       "regressionTests": ["src/main/ai-vault/opencode-wsl-runtime-preparation.test.ts"]
     },
     {
+      "path": "src/main/ai-vault/session-scanner-jcode-parser.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "d97bf4dad52ca7e0b98d46eeb84fff8dc2140e6a"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "d97bf4dad52ca7e0b98d46eeb84fff8dc2140e6a"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "dad1529ee6fb214690b5c73d4d6e803535d47346"
+      },
+      "reason": "Use independent full cmd/POSIX literals for the actual native resume shell grammar instead of a POSIX-only substring. Preserve full session id, cwd, actual file parse/content/model/token/hidden-envelope/partial JSON assertions. The resume check strengthens a POSIX substring into independent complete literal cmd/POSIX commands including /repo cwd and the exact session id; it does not call any product command helper to construct the oracle. Actual parser output/model/messages/injected-envelope/malformed-JSON/title/token assertions remain.",
+      "regressionTests": ["src/main/ai-vault/session-scanner-jcode-parser.test.ts"]
+    },
+    {
       "path": "src/main/antigravity/native-credential-backend.ts",
       "base": null,
       "product": {
@@ -7086,6 +7412,24 @@
       },
       "reason": "Replace unavailable private Docs PNG/JPEG and retired Orca tray filename with existing public product PNG/JPEG/tray assets. Correct dimension oracle to actual headers. Original zero extra image copy, exact digest/byte length, 12 frame/ack sequence, pooled/offset independence, refused sends and timer-release assertions remain. Final centralized brand-boundary repair: Resolve the same real 22x14 PNG through the existing PRODUCT_CONFIG.slug adapter; retain byte digest, pooled/offset ownership, refused-send and acknowledgement assertions without a scattered product literal.",
       "regressionTests": ["src/main/browser/browser-screencast-live-frame-allocation.test.ts"]
+    },
+    {
+      "path": "src/main/browser/doc-preview-response-allocation.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "58c43323bc5227924be4000fc835832f2027a513"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "58c43323bc5227924be4000fc835832f2027a513"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "90371f267f0f4ea5fc29be2563d3b37b529557de"
+      },
+      "reason": "The old watercolor asset is absent from the current product. Use the actual product-logo bytes as the second real binary fixture, retaining full digest and byte-length allocation checks.",
+      "regressionTests": ["src/main/browser/doc-preview-response-allocation.test.ts"]
     },
     {
       "path": "src/main/claude/claude-agent-sdk-exit-proof.ts",
@@ -7180,6 +7524,24 @@
         "mode": "100644",
         "sha": "bba2991957890b481c873c40ecfab841c57ee816"
       }
+    },
+    {
+      "path": "src/main/claude/claude-informational-row.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "e41b71e1a2c1eb28128733bbe2ef2e23692840c1"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e41b71e1a2c1eb28128733bbe2ef2e23692840c1"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6237694079a631192b997637220e7c923c7a38e8"
+      },
+      "reason": "Track actual journals/translators; real translator dispose flushes/stops collaborators, all journals.close drain admitted operations, then exact root database close and original rm.",
+      "regressionTests": ["src/main/claude/claude-informational-row.test.ts"]
     },
     {
       "path": "src/main/claude/claude-real-cli-windows-close-diagnostics.test-fixture.ts",
@@ -7339,7 +7701,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "bb6a7e2e5020d687e56d9db89083ac379b0431b1"
+        "sha": "97cf2602bc3b7fa5ad4793ca2ce16c112506cd79"
       },
       "upstream": {
         "mode": "100644",
@@ -7514,6 +7876,24 @@
       "regressionTests": ["src/main/codex-accounts/runtime-home-wsl-session-bridge.test.ts"]
     },
     {
+      "path": "src/main/codex/codex-collab-call-delegation.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "dbc116802e41176779214987562a140f7ef7dc66"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "dbc116802e41176779214987562a140f7ef7dc66"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "0e1b6e34d4275f87d84aaa2813463f8e4b648946"
+      },
+      "reason": "Use registered APP_DISPLAY_NAME for exact journal truncation marker. Preserve bounded description regex, retained prompt, helper ids and complete actual adapter delegation/supersession oracles. The same journal truncation prefix uses APP_DISPLAY_NAME. Real adapter frame projection, bounded description regex, retained prompt, exact helper ids, complete delegation results and supersession/refusal checks remain unchanged.",
+      "regressionTests": ["src/main/codex/codex-collab-call-delegation.test.ts"]
+    },
+    {
       "path": "src/main/codex/codex-home-paths.test.ts",
       "base": {
         "mode": "100644",
@@ -7604,6 +7984,24 @@
         "src/main/codex/codex-trust-config-concurrent-launch.test.ts",
         "src/main/codex/hook-service-wsl-runtime.test.ts"
       ]
+    },
+    {
+      "path": "src/main/codex/codex-provider-retry-idle-sweep.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "0e3e8385685efc01c228388758eeedc8d8e67dc8"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "0e3e8385685efc01c228388758eeedc8d8e67dc8"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "8058024f39c5685e00a616184e7275f630efeb3d"
+      },
+      "reason": "Existing await flushAllStreamedEvents invokes real host teardown, disposes conversation delivery/idle sweep, awaits stopLeaseRenewal, drains attaches, evicts owned sessions, flushes sinks and closes journals. Only after successful completion, close exact root DB then original rm. Real host idle sweep, lease renewal, attach queue, session journals and admitted event sinks",
+      "regressionTests": ["src/main/codex/codex-provider-retry-idle-sweep.test.ts"]
     },
     {
       "path": "src/main/codex/codex-real-home-hook-install.ts",
@@ -7820,6 +8218,42 @@
       ]
     },
     {
+      "path": "src/main/git/create-event-repo-probe.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "2bd993f0be160579336d2fa6a86f031fbb8002ae"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "2bd993f0be160579336d2fa6a86f031fbb8002ae"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "5d4774eb1c1054b59685dbc6f68edf9f8d45ad73"
+      },
+      "reason": "Native Windows stat does not expose POSIX chmod execution bits. Scope requested POSIX modes to only the two exact owned Linux hook fixtures and delegate every other stat to the real filesystem; preserve the production execute-bit predicate and Windows cases.",
+      "regressionTests": ["src/main/git/create-event-repo-probe.test.ts"]
+    },
+    {
+      "path": "src/main/git/repo-detection-batching.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "7d9340dcc9ffcb6f37a4617209683e5b4417ca84"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "7d9340dcc9ffcb6f37a4617209683e5b4417ca84"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "ddf4d1f0b8ac9ea4b5b74a36d0f5e6b5a6631880"
+      },
+      "reason": "Use native realpath for actual Windows fixture roots and exact expected repo paths; represent the bare root in the API’s complete slash-normalized form, retaining batching/count/root identity checks.",
+      "regressionTests": ["src/main/git/repo-detection-batching.test.ts"]
+    },
+    {
       "path": "src/main/git/repo-ref-maintenance-real-git.test.ts",
       "reason": "Batch only the 64 real fixture blob writes using documented stdin-paths, prove distinct SHA/content through real cat-file, retain 64 independent real packs and all production threshold/bitmap/incremental/read assertions.",
       "regressionTests": [
@@ -7895,6 +8329,81 @@
       ]
     },
     {
+      "path": "src/main/git/worktree-mutation-route-invalidation.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "351a24a1c98d59da0ead1f791dfd48ce58378c48"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "48db913311416c6791371d9ce84b95fb394ccc37"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "48db913311416c6791371d9ce84b95fb394ccc37"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "7deaa60931138518ee11b5e52d96a2de0f8a574c"
+      },
+      "reason": "Include exact existing product Windows -c core.longpaths=true prefix in full reset argv while preserving commit tip, target cwd/owning WSL distro and every routing invalidation case. The full last reset argv includes exactly existing Windows -c core.longpaths=true for C:\\ws\\.orca-preparing\\wt. M/U/K7 share the same helper, which is based on cwd and skips true WSL UNC paths. WSL distro, owning cwd, exact materialization tip, rev-parse and all route invalidation/refusal cases remain.",
+      "regressionTests": ["src/main/git/worktree-mutation-route-invalidation.test.ts"]
+    },
+    {
+      "path": "src/main/git/worktree-preparation-add.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "f96db71aebb2341c51421b9459090204e01243b0"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "f96db71aebb2341c51421b9459090204e01243b0"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "158098fd818c25cf1be58efe48e8fc27e7df84b5"
+      },
+      "reason": "Include the real Windows -c core.longpaths=true prefix in the exact atomic marker creation argv; keep the original exclusive marker and ownership assertions.",
+      "regressionTests": ["src/main/git/worktree-preparation-add.test.ts"]
+    },
+    {
+      "path": "src/main/git/worktree-preparation-discard-real-git.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "90fb41af1c8e21196ffff1a03f8653bd3b745fd6"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "90fb41af1c8e21196ffff1a03f8653bd3b745fd6"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "b63a14038ba95b9dd704e42add4a8cc0f2a73d5d"
+      },
+      "reason": "Expect the native Git command prefix and prove complete backlink target identity before replacing its exact Git-written bytes. Preserve atomic ownership/registration refusal and all full-path oracles; do not suffix-match foreign targets.",
+      "regressionTests": ["src/main/git/worktree-preparation-discard-real-git.test.ts"]
+    },
+    {
+      "path": "src/main/git/worktree-preparation-fallback-cleanup-real-git.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "2f2e7b05590e463b9cb2de5e56c1a37fc46c644d"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "2f2e7b05590e463b9cb2de5e56c1a37fc46c644d"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a7b5ee62f219cc4067bba28e484a4ed9e36619fc"
+      },
+      "reason": "Parse the real Git porcelain into complete worktree path entries and compare exact native-separator-normalized target identity instead of a raw Windows path substring. Preserve competing marker contents, no-reset/no-remove refusal and all fallback cleanup safety assertions.",
+      "regressionTests": ["src/main/git/worktree-preparation-fallback-cleanup-real-git.test.ts"]
+    },
+    {
       "path": "src/main/git/worktree-preparation-lock-real-git.test.ts",
       "base": null,
       "product": {
@@ -7929,6 +8438,60 @@
       },
       "reason": "The four actual failures are exact CRLF versus LF content mismatches after checkout. Only the private test-created repository gets core.autocrlf=input before initial add/commit; fetched-tip, checkout-hook cardinality, competing lock, racing claim, exact content and reset-count assertions remain unchanged.",
       "regressionTests": ["src/main/git/worktree-preparation-tip-refresh-real-git.test.ts"]
+    },
+    {
+      "path": "src/main/git/worktree-preparation-tip-refresh.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "0e377e1bc77d5e2babfb0b45b67d48885795e5b8"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "0e377e1bc77d5e2babfb0b45b67d48885795e5b8"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "0ee7c94910d47def6163a661f28f63ca19959f7b"
+      },
+      "reason": "Include the real Windows longpaths prefix in the complete reset argv while retaining the exact new tip, working directory and existing branch-refresh assertions.",
+      "regressionTests": ["src/main/git/worktree-preparation-tip-refresh.test.ts"]
+    },
+    {
+      "path": "src/main/git/worktree-removal-real-git.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "2df5f7fa46a1197e9b88c318ad87d6e0ea8a242e"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "2df5f7fa46a1197e9b88c318ad87d6e0ea8a242e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e53b83fcc238dde581d445825d9c6a92ea7a759f"
+      },
+      "reason": "Git-for-Windows strips a literal /.git suffix from the malformed registration. Verify the original complete backlink target and then append that literal suffix, preserving marker content, branch identity and strict prune/refusal assertions.",
+      "regressionTests": ["src/main/git/worktree-removal-real-git.test.ts"]
+    },
+    {
+      "path": "src/main/git/worktree-safety-real-git.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "7a31e2dfc5f1299572cd86226149a258a057b6d7"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "7a31e2dfc5f1299572cd86226149a258a057b6d7"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "5ab67f82d9b8974b0833ac185c54400513f7794d"
+      },
+      "reason": "Require complete real-Git registration path equality with native separator represented as /, including both old-porcelain ownership finds. Preserve unpublished commit objects, no implicit force, explicit force success, actual admin-lock metadata, Unicode refs and deletion races. Whole real-Git porcelain path entries are compared after converting only the native separator; both old-porcelain ownership finds use the same complete path identity. Real binary/relay calls, unpublished commit objects, no implicit force, actual admin metadata, explicit force success, Unicode refs and deletion race proofs remain unchanged.",
+      "regressionTests": ["src/main/git/worktree-safety-real-git.test.ts"]
     },
     {
       "path": "src/main/hive-runtime-cloud/hive-account-runtime-transport.ts",
@@ -7973,6 +8536,160 @@
       ]
     },
     {
+      "path": "src/main/ipc/filesystem/filesystem-write-handlers.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "07d4de5b56a9c723d24e9300b0ca45fdcc0eb39c"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "ff614b8d35abc25cb025d14221df8e7be6c77f31"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "ff614b8d35abc25cb025d14221df8e7be6c77f31"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "eb1280d51de1bd672b4440a38ef1128f8db81091"
+      },
+      "reason": "Registers the default three real placeholder IPC routes beside existing file mutations.",
+      "regressionTests": [
+        "src/main/ipc/filesystem/untitled-placeholder-handlers.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx"
+      ]
+    },
+    {
+      "path": "src/main/ipc/filesystem/untitled-placeholder-handlers.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "e0f09d15266833fafef78545cf2e2a10c88a0fe2"
+      },
+      "reason": "Twelve desktop boundary cases use actual host/resolver and owned wx files; preserve owner-loss, changed authorization, EEXIST and operational-error refusal.",
+      "regressionTests": [
+        "src/main/ipc/filesystem/untitled-placeholder-handlers.test.ts",
+        "src/shared/untitled-placeholder-retention.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/filesystem/untitled-placeholder-handlers.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "63373cb3e44c718959aeea0dd9d8f3c758336db8"
+      },
+      "reason": "Binds leases to actual sender lifetime, reauthorizes exact provider/path/generation before and after await, releases successful stale tokens, and permits ordinary wx only for the strict pre-open typed no-location result.",
+      "regressionTests": [
+        "src/main/ipc/filesystem/untitled-placeholder-handlers.test.ts",
+        "src/shared/untitled-placeholder-retention.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/hive-runtime-cloud.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "9dc3ec048a723bfb23b69efec9b1d727e047a08e"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "2efda290760ca180dbc7265a7af421bb23334bf7"
+      },
+      "reason": "Supply the required current ownership epoch in valid display-name requests and add explicit missing/null/noninteger/unsafe epoch rejection fixtures. Preserve device, display-version, authorization and invalid-request checks.",
+      "regressionTests": ["src/main/ipc/hive-runtime-cloud.test.ts"]
+    },
+    {
+      "path": "src/main/ipc/markdown-documents.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "b23f5748cb4a10e6b8b8c2f1823a030785cc2221"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "698935b1f627eafb54d64a81c25ea6c2731be775"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "698935b1f627eafb54d64a81c25ea6c2731be775"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4766188d61e41ddb3232867dc08fdc0845fbd4ab"
+      },
+      "reason": "Keep parent-prefix segments inside the root and reject actual traversal outside the resolved root with full-object assertions. Add the default outside-relative regression without weakening remote POSIX backslash semantics.",
+      "regressionTests": ["src/main/ipc/markdown-documents.test.ts"]
+    },
+    {
+      "path": "src/main/ipc/markdown-documents.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "3977999b9affb749e5b981570a611cb3dbfb43f7"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "1f457dba97e1c389bdf3e8090e519519da4b915f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "1f457dba97e1c389bdf3e8090e519519da4b915f"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "83f1eb1d806afab70554b68ec4053b6bd16048de"
+      },
+      "reason": "The unresolved POSIX root spelling on native Windows hid actual parent traversal. Normalize local paths against the resolved root before relative-boundary checks, retaining strict containment and the separate remote POSIX literal-backslash contract.",
+      "regressionTests": ["src/main/ipc/markdown-documents.test.ts"]
+    },
+    {
+      "path": "src/main/ipc/preflight-command-exec.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "63c2b35aceb49ee73c3cc1a490f29fa774d8d202"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "5e571b18613ab3fce6278bfd3541a953cae9109d"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "5e571b18613ab3fce6278bfd3541a953cae9109d"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "1e94ee4970ba8af4a9d63131814e2ffc9a137f03"
+      },
+      "reason": "The POSIX binary fixture runs with Darwin policy while node:path remains native. Build exact native absolute PATH entries and binary paths for the relative-directory probe; retain the broken-first candidate and actual execution assertions.",
+      "regressionTests": ["src/main/ipc/preflight-command-exec.test.ts"]
+    },
+    {
+      "path": "src/main/ipc/pty-spawn-env-terminal-basics.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "bed6953e2b125a39ebadeaf0b693ee6b39a868e4"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "5f0df6c70c14803d32ea6695a10442684a0f6bc3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "d530a9cd19471cf7b9bac0f340fb871ba9730da9"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "383360fa38c20ab8a2e48f5f3c0d133f6cde13b5"
+      },
+      "reason": "Process.platform spoofing selects Darwin policy but does not change node:path. Expect the full native user-data CLI/bin path while retaining exact PATH and all terminal/basic execution cases.",
+      "regressionTests": ["src/main/ipc/pty-spawn-env-terminal-basics.test.ts"]
+    },
+    {
       "path": "src/main/ipc/pty/runtime/spawn-commit.ts",
       "base": {
         "mode": "100644",
@@ -7997,6 +8714,24 @@
       ]
     },
     {
+      "path": "src/main/ipc/qoder-desktop-execution-host.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "9d5955d983551f2ddfc73d3fd9e0f992e58321c6"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "9d5955d983551f2ddfc73d3fd9e0f992e58321c6"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "f507a263cc2bf4b16728b9e799f921b48d47e1cd"
+      },
+      "reason": "Capture physical platform before beforeEach mock for exact native cwd expectation; keep base agentCommand/full captured plan assertions.",
+      "regressionTests": ["src/main/ipc/qoder-desktop-execution-host.test.ts"]
+    },
+    {
       "path": "src/main/ipc/runtime-environment-pairing-verification.ts",
       "base": {
         "mode": "100644",
@@ -8012,13 +8747,10 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "ae3747b6a08a46f6e72976b0bc16e5d1a66221dd"
+        "sha": "a7ebdb3315148dbf9d714609142498f124002466"
       },
-      "reason": "沿唯一当前protocol native client capability集合替换已撤销Electron常量caller；保留Hive account authorization、strict v2 E2EE与paired能力绑定，不新造compat别名。",
-      "regressionTests": [
-        "src/main/hive-runtime-cloud/hive-account-runtime-transport.test.ts",
-        "src/shared/remote-pairing-verification.test.ts"
-      ]
+      "reason": "Restore full current Electron pairing capability contract; preserve original test and reject eight-capability oracle.",
+      "regressionTests": ["src/main/ipc/runtime-environments-pairing.test.ts"]
     },
     {
       "path": "src/main/ipc/runtime-environments-subscription-lifecycle.test.ts",
@@ -8277,6 +9009,26 @@
       },
       "reason": "保留Hive错误copy测试并追加no-legacy journal恢复契约依赖",
       "regressionTests": ["src/main/native-chat/agent-session-journal/journal-open-failure.test.ts"]
+    },
+    {
+      "path": "src/main/native-chat/agent-session-journal/journal-payload-bounds-retention.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "08a8f92cbee3ceee8f1d058da6b639a826169a27"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "08a8f92cbee3ceee8f1d058da6b639a826169a27"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2ae7b9e7270cc934598e1bf6fbdd49191a02e555"
+      },
+      "reason": "Replace the literal upstream product name with the registered APP_DISPLAY_NAME in the same complete independent expected sentence; preserve the actual message/protocol/content assertions shown in the exact diff.",
+      "regressionTests": [
+        "src/main/native-chat/agent-session-journal/journal-payload-bounds-retention.test.ts"
+      ]
     },
     {
       "path": "src/main/native-chat/agent-session-journal/journal-per-session-import.test.ts",
@@ -9136,6 +9888,29 @@
       ]
     },
     {
+      "path": "src/main/native-chat/agent-session-wire/structured-agent-session-recovery-resolution.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "8e3be9d1f3d7b227aeb2e3d4b2881d6c5c847e1b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "17a30817d39915cc827d765a4f39c77fd175dbd6"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "8e3be9d1f3d7b227aeb2e3d4b2881d6c5c847e1b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "9dfad384a2cc0639768f3502504cd1fa52a0742b"
+      },
+      "reason": "Close the exact owned test journal database before genuine restart/reopen boundaries and before original root removal. Keep actual persisted recovery operations and refusal assertions; no global database close.",
+      "regressionTests": [
+        "src/main/native-chat/agent-session-wire/structured-agent-session-recovery-resolution.test.ts"
+      ]
+    },
+    {
       "path": "src/main/native-chat/agent-session-wire/structured-agent-session-refusal-retry.test.ts",
       "base": {
         "mode": "100644",
@@ -9176,6 +9951,29 @@
       "reason": "Standalone store/host share the test-registry database. Adapter close and host.flushAllStreamedEvents drain/retire conversations, but do not close the registry-owned JournalHostDatabase before rm.",
       "regressionTests": [
         "src/main/native-chat/agent-session-wire/structured-agent-session-repeat-press.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/agent-session-wire/structured-agent-session-resolved-append.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "d3c15de933c7fe2501b77078cc42c2434e1203ff"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a2e843378a54d29c6a287b883182c18f5fb1a3a8"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "a2e843378a54d29c6a287b883182c18f5fb1a3a8"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "9db967af28a86b08a396e7c676cbae67a9b7161c"
+      },
+      "reason": "Each bound deferred sink hands admitted operations to the real journal synchronously; all original tests await deferred.drained(). The original journal.close/drain now precedes closing both exact root and scratch-session-1 registry connections. The helper already awaited and drained scratch journal writes; its legacy per-chat Database closes in finally.",
+      "regressionTests": [
+        "src/main/native-chat/agent-session-wire/structured-agent-session-resolved-append.test.ts"
       ]
     },
     {
@@ -9727,6 +10525,63 @@
       ]
     },
     {
+      "path": "src/main/opencode-usage/cache-write-accounting.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "883f0cf3f57f918dd6839d7fb65e9e1ccececbe8"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "883f0cf3f57f918dd6839d7fb65e9e1ccececbe8"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "7ba0e8dcdd7a4f2fbf3db80d7565cd93f0e7d6ad"
+      },
+      "reason": "Use native realpath for the real temporary cache bucket fixture so Windows spelling agrees with the producer’s physical path; retain real accounting operations and assertions.",
+      "regressionTests": ["src/main/opencode-usage/cache-write-accounting.test.ts"]
+    },
+    {
+      "path": "src/main/opencode/hook-service.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "2375cf02fd48f44082ee74c5badfee726ca300a7"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "9944d5269feadc0518605abc2e8a39f3fb94df2c"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "482df3671f72417a8723a46e0583502fc85d198e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "1a7e19369581a1185eb99b9ba072d8cdc3b9bdf0"
+      },
+      "reason": "Legacy repair installs both server and required TUI companion. Require exact sorted two-entry inventory and inspect real companion setup; preserve original full server-source equality, both overwrite passes, no-mtime-rewrite and original user/plugin safety cases. Only the late/overwritten legacy repair case upgrades to an exact sorted two-entry server/TUI directory inventory and reads the actual TUI file for setupLegacyOpenCodeTui. Both original overwrite passes and full server source equality remain. Production refresh writes the TUI companion before the server; existing mtime/no-overwrite/user-plugin/ACL/symlink and real installed-module checks remain exact.",
+      "regressionTests": ["src/main/opencode/hook-service.test.ts"]
+    },
+    {
+      "path": "src/main/opencode/opencode-pty-launch.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "854882d287f30f2da84da335f82016b6e502666f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "854882d287f30f2da84da335f82016b6e502666f"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "d46b83238e10995c81cad70ea0d403f6b94d02c1"
+      },
+      "reason": "Use the actual native PATH/WSLENV representation in the WSL plugin-selection fixture while retaining the full guest-probe, plugin API and execution-host launch assertions.",
+      "regressionTests": ["src/main/opencode/opencode-pty-launch.test.ts"]
+    },
+    {
       "path": "src/main/orcad/node-pty-prebuilt-slot.test.ts",
       "base": {
         "mode": "100644",
@@ -9763,9 +10618,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "38d7752083619be425c7f5c437fef27476189086"
+        "sha": "3aba8244f0d2df3a655ad6bece7a5219417a9deb"
       },
-      "reason": "回归U shared fixed Node runtime slot，并保留Hive产品missing/error copy",
+      "reason": "Require the same complete missing-runtime-reference refusal using the registered APP_DISPLAY_NAME; keep actual spawn-not-called and bundled runtime handoff assertions.",
       "regressionTests": ["src/main/orcad/orcad-bundled-runtime.test.ts"]
     },
     {
@@ -9945,6 +10800,30 @@
       "regressionTests": ["src/main/product/product-updater-network-boundary.test.ts"]
     },
     {
+      "path": "src/main/providers/filesystem-provider-contract.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "ae4a59eb7bbc908a42dd4f14a8f4a1067efb91d8"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "ae4a59eb7bbc908a42dd4f14a8f4a1067efb91d8"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "ae4a59eb7bbc908a42dd4f14a8f4a1067efb91d8"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6607a5eadf70ff73d3e0b63083e5b75a6b95aa98"
+      },
+      "reason": "Adds typed create/discard/release capability with nullable creation and truthful discard; missing capability grants no lease.",
+      "regressionTests": [
+        "src/relay/untitled-placeholder-transport.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
+      ]
+    },
+    {
       "path": "src/main/providers/local-pty-spawn-environment.ts",
       "base": {
         "mode": "100644",
@@ -9966,6 +10845,27 @@
       "regressionTests": ["src/main/ipc/pty/managed-data-account-spawn-environment.test.ts"]
     },
     {
+      "path": "src/main/providers/ssh-filesystem-provider.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "f688d2789b1cf472ce9ab3401f7f1a6ba6491b91"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "f688d2789b1cf472ce9ab3401f7f1a6ba6491b91"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "f688d2789b1cf472ce9ab3401f7f1a6ba6491b91"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "28eda92a8ac6cb28318dbe63279f9de356112c3e"
+      },
+      "reason": "Composes the actual SSH placeholder transport and drains exact retained tokens on provider disposal.",
+      "regressionTests": ["src/relay/untitled-placeholder-transport.test.ts"]
+    },
+    {
       "path": "src/main/providers/ssh-git-provider.ts",
       "base": {
         "mode": "100644",
@@ -9985,6 +10885,18 @@
       },
       "reason": "Replace only the static user-visible product label with APP_DISPLAY_NAME; updater static CLI example uses PRIMARY_CLI_COMMAND. Completed foreign messages, interpolated paths/PIDs/refusal details, endpoints, wire/persisted identifiers, compatibility spellings, account/cleanup/update authority and branch conditions remain unchanged.",
       "regressionTests": ["src/main/providers/ssh-review-draft-context.test.ts"]
+    },
+    {
+      "path": "src/main/providers/ssh-untitled-placeholder-transport.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "a9424ac32a66cf21cab621a55ce266df490bfabf"
+      },
+      "reason": "Uses shared strict wire schemas, exact owner/token tracking, disposal cleanup and only numeric method-not-found ordinary fallback.",
+      "regressionTests": ["src/relay/untitled-placeholder-transport.test.ts"]
     },
     {
       "path": "src/main/proxy-guarded-fetch-call-site-audit.test.ts",
@@ -10027,6 +10939,27 @@
       },
       "reason": "按U最终WSL-only preflight范围重建测试，所有packaged/native/absolute path/invalidlauncher断言保持，canonical产品launcher为Hive",
       "regressionTests": ["src/main/pty/codex-shell-launch-preflight.test.ts"]
+    },
+    {
+      "path": "src/main/qoder/hook-service.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "fbb7d4058c017795d8097c6a1f65e1a1ed5fbad3"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "24d5e9b7ac978c541afd9e9f7b96ad9da2e05515"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "24d5e9b7ac978c541afd9e9f7b96ad9da2e05515"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6d3eb1565e86bd3b365bd311f1534bc69019b1b8"
+      },
+      "reason": "Read the actual Windows .cmd or POSIX .sh hook artifact selected by the producer, retaining exact real hook content and service assertions.",
+      "regressionTests": ["src/main/qoder/hook-service.test.ts"]
     },
     {
       "path": "src/main/rate-limits/antigravity-usage-fetcher.ts",
@@ -10138,6 +11071,48 @@
       "regressionTests": ["src/main/runtime/agent-session-conversation-clear-commit.test.ts"]
     },
     {
+      "path": "src/main/runtime/agent-session-conversation-name-store.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "07c1345f8da4f32baffbe4a900a183677a752037"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "07c1345f8da4f32baffbe4a900a183677a752037"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "07c1345f8da4f32baffbe4a900a183677a752037"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "136977c8b05295b19b6020c875100634f349f5f5"
+      },
+      "reason": "Exact close before both original real reloads, then final exact close before original rm. All name store reservation/mutation/rejection promises are awaited",
+      "regressionTests": ["src/main/runtime/agent-session-conversation-name-store.test.ts"]
+    },
+    {
+      "path": "src/main/runtime/agent-session-death-evidence-persistence.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "9904ca7994f4cb43e54026454a4b3d8de1fcc4ff"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "9904ca7994f4cb43e54026454a4b3d8de1fcc4ff"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "9904ca7994f4cb43e54026454a4b3d8de1fcc4ff"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3ef4aa0317e303c9108e74e334507cc35e133a31"
+      },
+      "reason": "Close the exact fixture directory’s real journal database before the original removal, retaining persisted death-evidence behavior and all original proof checks.",
+      "regressionTests": ["src/main/runtime/agent-session-death-evidence-persistence.test.ts"]
+    },
+    {
       "path": "src/main/runtime/agent-session-hive-state-rows.ts",
       "base": null,
       "product": {
@@ -10157,6 +11132,48 @@
         "src/main/runtime/agent-session-store-transactions.test.ts",
         "src/main/tasks/task-execution-store.test.ts"
       ]
+    },
+    {
+      "path": "src/main/runtime/agent-session-launch-env-admission.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "6cb9a576078f3171d14642fdcafd28ee9cbdb47d"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "6cb9a576078f3171d14642fdcafd28ee9cbdb47d"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "6cb9a576078f3171d14642fdcafd28ee9cbdb47d"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "58d328b7dce12bdf13ed6dd156196e45481d0e09"
+      },
+      "reason": "Every reserveOwner/read/reopen or expected rejection is awaited; no background producer. Exact close then original rm.",
+      "regressionTests": ["src/main/runtime/agent-session-launch-env-admission.test.ts"]
+    },
+    {
+      "path": "src/main/runtime/agent-session-lease-renewal.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "ec636a96eed5e3aba0c4b942e9fbd0e5055c48f9"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "ec636a96eed5e3aba0c4b942e9fbd0e5055c48f9"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "ec636a96eed5e3aba0c4b942e9fbd0e5055c48f9"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "41884ea0868f255f319b924be36fe4359721f84b"
+      },
+      "reason": "All reserveOwner, commitProcessIdentity, proveOwner, evictProvenDeadOwner, renewLeases (including expected rejections), persisted reads and reopened store construction are awaited. No async host/background producer exists. Original Promise.all concurrency and rm options preserved; exact registry close before each rm.",
+      "regressionTests": ["src/main/runtime/agent-session-lease-renewal.test.ts"]
     },
     {
       "path": "src/main/runtime/agent-session-legacy-record-import.test.ts",
@@ -10196,6 +11213,27 @@
         "src/main/runtime/agent-session-legacy-record-import.test.ts",
         "src/main/runtime/agent-session-record-store.test.ts"
       ]
+    },
+    {
+      "path": "src/main/runtime/agent-session-record-options.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "58385e292726ef527b52aa5ba3ef3f67fdc82ad3"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "58385e292726ef527b52aa5ba3ef3f67fdc82ad3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "58385e292726ef527b52aa5ba3ef3f67fdc82ad3"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3b5042fb40b766c6f9f60a8813b9fce9a6841289"
+      },
+      "reason": "All readNativeSessionOptions adapters and actual store reservation/process/proof/reopen calls are awaited; no background producer. Exact close then original rm; hydration-only cases open no DB.",
+      "regressionTests": ["src/main/runtime/agent-session-record-options.test.ts"]
     },
     {
       "path": "src/main/runtime/agent-session-record-rows.ts",
@@ -10362,6 +11400,27 @@
       "regressionTests": ["src/main/runtime/agent-session-record-unsupported-schema.test.ts"]
     },
     {
+      "path": "src/main/runtime/agent-session-released-reservation-replay.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "e5f54265dcb7bed3a31eb8cfc4fc7dde4e8d9b02"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "71eb6eb3a1dc19afbc29e363a8e447d0d64b10e3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e5f54265dcb7bed3a31eb8cfc4fc7dde4e8d9b02"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "66cb88340ca3b81df1cc5384dd13a1e5bad94e93"
+      },
+      "reason": "Awaited original store mutations/reconciliation before exact restart close; new actual DB connection opened for each original restart; final exact close before original rm.",
+      "regressionTests": ["src/main/runtime/agent-session-released-reservation-replay.test.ts"]
+    },
+    {
       "path": "src/main/runtime/agent-session-store-contract.ts",
       "base": null,
       "product": {
@@ -10456,6 +11515,27 @@
       ]
     },
     {
+      "path": "src/main/runtime/agent-session-unsaved-creation-supersession.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "31e473fb5e6668d2bbd2452a89118cc0a0341f06"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "31e473fb5e6668d2bbd2452a89118cc0a0341f06"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "31e473fb5e6668d2bbd2452a89118cc0a0341f06"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a02f5825142426a7dedb15d3faa21371badbb668"
+      },
+      "reason": "restart awaits eviction, exact close then genuinely reopened store, original reconciliation; last case teardown exact close then original rm. Every reserve/process/proof/eviction/reconciliation operation is awaited; no background host",
+      "regressionTests": ["src/main/runtime/agent-session-unsaved-creation-supersession.test.ts"]
+    },
+    {
       "path": "src/main/runtime/agent-state-rules/agent-state-rules-live-update.test.ts",
       "base": null,
       "product": {
@@ -10494,6 +11574,27 @@
       "regressionTests": [
         "src/main/runtime/agent-state-rules/agent-state-rules-live-update.test.ts"
       ]
+    },
+    {
+      "path": "src/main/runtime/automation-change-publication.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "a63d56efb9b0eb5c3f581b9743f66e95fbf832d2"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a63d56efb9b0eb5c3f581b9743f66e95fbf832d2"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "a63d56efb9b0eb5c3f581b9743f66e95fbf832d2"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "22502f0150ca241a383d803ecff602408c24d82e"
+      },
+      "reason": "Allocate the existing real runtime/store setup to the default beforeEach lifecycle, retaining the original thirty-second case body, per-case reset and publication assertions; settle pending setup before original teardown. This setup/body allocation change is explicit.",
+      "regressionTests": ["src/main/runtime/automation-change-publication.test.ts"]
     },
     {
       "path": "src/main/runtime/claude-structured-session-integration.test.ts",
@@ -10626,6 +11727,30 @@
       ]
     },
     {
+      "path": "src/main/runtime/orca-runtime-on-client-disconnected.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "805d07e0b5055dcd128d40b060b314d7be504e2d"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "805d07e0b5055dcd128d40b060b314d7be504e2d"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "805d07e0b5055dcd128d40b060b314d7be504e2d"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "f6a4e3a215bb6c58c1e34d268e6b84302db8e152"
+      },
+      "reason": "Releases only the disconnected runtime client placeholder ownership alongside existing client cleanup.",
+      "regressionTests": [
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/relay/untitled-placeholder-transport.test.ts"
+      ]
+    },
+    {
       "path": "src/main/runtime/orca-runtime-tests/terminal-spawn-dispatch.spec.ts",
       "base": {
         "mode": "100644",
@@ -10666,6 +11791,27 @@
         "src/main/runtime/orca-runtime.test.ts",
         "src/main/runtime/runtime-failed-local-worktree-removal.test.ts"
       ]
+    },
+    {
+      "path": "src/main/runtime/orchestration-message-delivery-identity.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "21c8a64f56a0f8a80c357c87632e732753bebb14"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "1f13ad657dd27d8c198271567638d1818b95caa0"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "d5dd60788af94d40fd5fabe06f7c554249a30b39"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4f7b0d8fc295d0aa4883f2d064211c7e8471b551"
+      },
+      "reason": "Built CLI fixture omitted methods, causing actual RuntimeRpcState to consume ALL_RPC_METHODS and hit this owner’s deliberate sentinel. Its constructor/start preceded try, leaving the already-created real orchestration database live on failure; original rm then reported EPERM. Explicit current ORCHESTRATION_METHODS; try covers all setup after actual DB creation including server construction/start and original CLI assertions. Optional exact server reference is assigned only after constructor succeeds. Finally awaits real stop; nested finally releases exact DB even if stop rejects. Original exact owned-directory afterEach deletion is unchanged. The built CLI status preflight now uses the real existing STATUS_METHODS registry only in its explicit server fixture. Keep the default ALL_RPC sentinel and all five original cases, database/replay/count oracles and deadlines; report real stdout/stderr on exit failures. No fake status or CLI preflight downgrade.",
+      "regressionTests": ["src/main/runtime/orchestration-message-delivery-identity.test.ts"]
     },
     {
       "path": "src/main/runtime/orchestration/agent-facing-parity.test.ts",
@@ -11061,6 +12207,53 @@
       "regressionTests": ["src/main/runtime/rpc/methods/ai-vault.test.ts"]
     },
     {
+      "path": "src/main/runtime/rpc/methods/files-mutation-methods.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "eb734d5c8d6afb9d611d76eaeaa1ca9eb2febce2"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "eb734d5c8d6afb9d611d76eaeaa1ca9eb2febce2"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "eb734d5c8d6afb9d611d76eaeaa1ca9eb2febce2"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "df7050a16c036f3139940e51d2f7e8290a12c7d4"
+      },
+      "reason": "Exposes three authenticated mutation commands, deriving caller owner from actual context and checking cancellation before and after asynchronous operations.",
+      "regressionTests": [
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+        "src/renderer/src/web/web-preload-api-filesystem.test.ts",
+        "src/relay/untitled-placeholder-transport.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/runtime/rpc/methods/orchestration-worker-mode-opacity.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "9531e0f468b2835ca7d4fb7a7db173cbbf147f04"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "eaaf7d6f4aad4aa94e3407b4d85d57ecf3a9f4fe"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "eaaf7d6f4aad4aa94e3407b4d85d57ecf3a9f4fe"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "c030a5e4873bdb1017e5975d044bd1834c2075f4"
+      },
+      "reason": "Replace the literal upstream product name with the registered APP_DISPLAY_NAME in the same complete independent expected sentence; preserve the actual message/protocol/content assertions shown in the exact diff.",
+      "regressionTests": ["src/main/runtime/rpc/methods/orchestration-worker-mode-opacity.test.ts"]
+    },
+    {
       "path": "src/main/runtime/rpc/methods/orchestration/caller-show.ts",
       "base": null,
       "product": {
@@ -11386,6 +12579,27 @@
       "regressionTests": ["src/main/runtime/rpc/orchestration-session-caller.test.ts"]
     },
     {
+      "path": "src/main/runtime/rpc/orchestration-session-recipient.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "f8f2de266d480f6b8eccfd246a4ed39ccea70103"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "415ff42ba3227ca428b70d9a931ef1298fa5b3d1"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "415ff42ba3227ca428b70d9a931ef1298fa5b3d1"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "f8ceba9a05fdb1f038399e6d67298535e4e41311"
+      },
+      "reason": "Replace the literal upstream product name with the registered APP_DISPLAY_NAME in the same complete independent expected sentence; preserve the actual message/protocol/content assertions shown in the exact diff.",
+      "regressionTests": ["src/main/runtime/rpc/orchestration-session-recipient.test.ts"]
+    },
+    {
       "path": "src/main/runtime/rpc/rpc-recording-pin-guard.test.ts",
       "reason": "Own all original thirty-five Node/Git pin cases; only rebase imports and the two import.meta repository-root paths.",
       "regressionTests": ["src/main/runtime/rpc/rpc-recording-pin-guard.test.ts"],
@@ -11423,6 +12637,139 @@
         "src/main/runtime/rpc/dispatcher-authorization.test.ts",
         "src/main/runtime/rpc/orchestration-session-caller.test.ts",
         "src/main/runtime/rpc/streaming.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-file-command-surface.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "554eed008a39a92e4a677884d554a2c923fb98e0"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "554eed008a39a92e4a677884d554a2c923fb98e0"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "554eed008a39a92e4a677884d554a2c923fb98e0"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "fc384e56e2dcc9d9454199430bdb83ee41f297fe"
+      },
+      "reason": "Installs the typed placeholder command surface and exact releaseClient lifecycle entry.",
+      "regressionTests": [
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-file-commands-write-file-explorer-file.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "92a356f987aa0c01b2fb973c1dda7bed88340d3c"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "92a356f987aa0c01b2fb973c1dda7bed88340d3c"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "92a356f987aa0c01b2fb973c1dda7bed88340d3c"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "d3b52b09755865a1645d0524b86a48e0f04d577f"
+      },
+      "reason": "Delegates to the strict current host commands while injecting the existing ordinary file creation callback, retaining permission and provider generation contracts.",
+      "regressionTests": [
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/renderer/src/runtime/runtime-file-client-mutation-ownership.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc/runtime-rpc-account-dispatch.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "037befd6247d6b9892354e1b0c1883a35ba1970e"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "4b86d627d960ad4492fc66a620685ed57f6295a8"
+      },
+      "reason": "Releases exact connection-scoped leases after aborting that account socket requests; does not collapse all device sockets.",
+      "regressionTests": [
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/relay/untitled-placeholder-transport.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc/runtime-rpc-cloud-dispatch.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "60fb0f409f2c006ccc01825d654c1ef840538467"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "40326e22dd2deca0fab745682c580534508061f2"
+      },
+      "reason": "Releases exact cloud connection ownership beside request abort and existing disconnect cleanup.",
+      "regressionTests": [
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/relay/untitled-placeholder-transport.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc/runtime-rpc-lifecycle.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "9cfe31251b6ecc7012fca24be808715d082efe3d"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "151ad75e1abc3bf28a9ce17126ddbb85507c45d5"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "9cfe31251b6ecc7012fca24be808715d082efe3d"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "5cc2fac528b13554f4f8af3475eda768546c84d5"
+      },
+      "reason": "Adds exact socket-close release after aborting outstanding requests, keeping existing connection lifecycle.",
+      "regressionTests": [
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/relay/untitled-placeholder-transport.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-rpc/runtime-rpc-mobile-method-allowlist.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "d544dc6720b088e82f068d95fa0a50ec605693f4"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a254657407be36e8a2f8c1e7c46dc3fd31e2d4f5"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "d544dc6720b088e82f068d95fa0a50ec605693f4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "44629466bf1ff8f9b67efe7fe28295628c975250"
+      },
+      "reason": "Admits only the three named editor mutation routes through the existing authenticated mobile capability boundary.",
+      "regressionTests": [
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+        "src/renderer/src/runtime/runtime-file-client-mutation-ownership.test.ts",
+        "src/renderer/src/web/web-preload-api-filesystem.test.ts"
       ]
     },
     {
@@ -11471,6 +12818,36 @@
       "regressionTests": [
         "src/main/ipc/pty-pane-materialization-race.test.ts",
         "src/main/runtime/orca-runtime.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "8bec3b29e4090eec4967cf0d73e7a3a5cf53ba4a"
+      },
+      "reason": "Thirteen actual local host/resolver/wx command cases retain owner, path, provider swap, authorization and error-class negative assertions.",
+      "regressionTests": [
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/shared/untitled-placeholder-retention.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-untitled-placeholder-commands.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "3e990aa7c8890ceda38e23104e7c5ba737ca85f9"
+      },
+      "reason": "Registers owner map before first await, revalidates map/provider/path/pinned host after awaits, drains old provider exactly before replacement, and allows strict no-location ordinary creation without a fake token.",
+      "regressionTests": [
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/shared/untitled-placeholder-retention.test.ts"
       ]
     },
     {
@@ -11852,6 +13229,24 @@
       ]
     },
     {
+      "path": "src/main/ssh/ssh-relay-runtime-self-test.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "475c38f4d3e2b7a0c6945394a8ac76bd2d94e6b3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "475c38f4d3e2b7a0c6945394a8ac76bd2d94e6b3"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "fdec1337448c5c4e37f5f2b0704fe8ec2530ff11"
+      },
+      "reason": "Windows uses installed Git Bash with actual directory noexec and real POSIX kill -ILL runtime surrogate; positive nonce/cwd uses actual Node. Non-Windows keeps chmod0644 and native Node SIGILL. No fake exit/report, skip or budget increase.",
+      "regressionTests": ["src/main/ssh/ssh-relay-runtime-self-test.test.ts"]
+    },
+    {
       "path": "src/main/ssh/ssh-relay-runtime-step-plan.ts",
       "base": null,
       "product": {
@@ -12015,14 +13410,11 @@
     },
     {
       "path": "src/main/startup/codex-launch-during-real-home-grant.test.ts",
-      "reason": "Compare both decoded project headers with the existing TOML parser instead of comparing a Windows path with escaped source text; retain grant timing, managed hooks, trust count and approval oracles.",
-      "regressionTests": [
-        "src/main/startup/codex-launch-during-real-home-grant.test.ts",
-        "src/main/codex/config-toml-trust-project.test.ts"
-      ],
+      "reason": "Return the real native canonical fixture path so the protected real-home grant and actual launch cwd compare complete physical identities on Windows.",
+      "regressionTests": ["src/main/startup/codex-launch-during-real-home-grant.test.ts"],
       "result": {
         "mode": "100644",
-        "sha": "2da0f3a36bba6ad89fb21389fbc9aabd0bc55a3f"
+        "sha": "35f384754f70249536779cf0bca616237183c67d"
       },
       "base": null,
       "product": {
@@ -12135,6 +13527,96 @@
       ]
     },
     {
+      "path": "src/main/tasks/task-agent-launch-port.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "a19db0b94b6a2c2250ec6aae01635b98b1865ae8"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "54f726af99dc0bf1d0d9d0aa471c436cec9b2553"
+      },
+      "reason": "All original real admit/mkdir/symlink/replay/refusal promises await; no async host producer; original mock reset, exact close then original rm.",
+      "regressionTests": ["src/main/tasks/task-agent-launch-port.test.ts"]
+    },
+    {
+      "path": "src/main/tasks/task-artifact-index.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "e8bc466b44ba801fae44c277effd8e64bc0ac2f8"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "e245ba601863fa6a8537bacaa14e6e0f0c7a6a77"
+      },
+      "reason": "Close exact fixture-root database before original rm after awaited persistence; no global close, host drain, retry or swallowed error.",
+      "regressionTests": ["src/main/tasks/task-artifact-index.test.ts"]
+    },
+    {
+      "path": "src/main/tasks/task-authorization-monitor.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "0e0f9a9dcc1b9f54e30fe2552a35e4b8bfaf78e7"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "2d2b18c58bc2a52e0da772fb544d058eb3d3286a"
+      },
+      "reason": "Await real monitor close first, then exact-owned journal close before the original rm. Preserve real grant revocation, admitted execution selection and exact unsubscribe-once oracle. Original monitor.close is awaited before exact-owned journal close and original rm. The actual monitor closes its timer, unsubscribes once and awaits its in-flight check; the DB utility closes only the directory registry entry. The admitted execution, real grant revocation, forbidden-state checks and unsubscribe-once oracle remain unchanged.",
+      "regressionTests": ["src/main/tasks/task-authorization-monitor.test.ts"]
+    },
+    {
+      "path": "src/main/tasks/task-codex-evidence.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "f4a10568032585fbe724af78b81f9c099bb94084"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "b516dfae1e6e2d12ed31cc3a369fcd86b109ce88"
+      },
+      "reason": "All fixture writes/collect/stop promises awaited in original paths, artifact reader closes handles in finally; keep original mock reset, exact close then original rm. Real store admit, fixture filesystem writes, artifact collect and evidence stop promises; original provider/host collaborators are mocks",
+      "regressionTests": ["src/main/tasks/task-codex-evidence.test.ts"]
+    },
+    {
+      "path": "src/main/tasks/task-execution-host.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "16ef774d38d5cd704a2c4f60e000376fecc6adfc"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "eabb38bdc6267b77e418dfb939b9c4486142bc30"
+      },
+      "reason": "Await the four exact fixture-owned TaskExecutionHost drains, close only this case’s real journal database, then original removal; preserve all twenty-three execution/admission cases and partial-setup ownership.",
+      "regressionTests": ["src/main/tasks/task-execution-host.test.ts"]
+    },
+    {
+      "path": "src/main/tasks/task-execution-prestart-cancel.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "12b2601657b5dbdb7f22e1b4804aa82d5f4c619c"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "d76dcac9563c7c2c4ac6a91d54c0740b9a77f026"
+      },
+      "reason": "Track this fixture’s actual TaskExecutionHost, await its drain, close this exact journal database, then perform the original removal. Keep prestart cancellation/authorization assertions and do not drain unknown hosts.",
+      "regressionTests": ["src/main/tasks/task-execution-prestart-cancel.test.ts"]
+    },
+    {
       "path": "src/main/tasks/task-execution-store.test.ts",
       "base": null,
       "product": {
@@ -12180,6 +13662,21 @@
       "regressionTests": ["src/main/tasks/task-launch-authority-race.test.ts"]
     },
     {
+      "path": "src/main/tasks/task-settlement-replay.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "911fc7b0307cf9ec0083e83420ebe6b702f11c4e"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "a55f3a3a555996bda24939a3992f45bf0d24d5eb"
+      },
+      "reason": "Both settlement promises complete via original Promise.all, the original conflict rejection is awaited, and the new fresh-reopen settlement is awaited. Exact close before genuine reopen and again before original rm.",
+      "regressionTests": ["src/main/tasks/task-settlement-replay.test.ts"]
+    },
+    {
       "path": "src/main/text-generation/source-control-agent-failure.ts",
       "base": {
         "mode": "100644",
@@ -12199,6 +13696,24 @@
       },
       "reason": "保留Hive品牌并追加OpenCode生成失败解析",
       "regressionTests": ["src/main/network/macos-tailscale-dns-probe-admission.test.ts"]
+    },
+    {
+      "path": "src/main/updater-agent-state-rules-release.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "880f46c1087828eb85e1c627449878436667b95f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "880f46c1087828eb85e1c627449878436667b95f"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4b9000a22c4dd51a9e14c507384196fdee009c40"
+      },
+      "reason": "Use the current product-session fetch seam and an explicit real GitHub source fixture; supply response text consumed by the real parser. Retain agent-state exclusion and release selection checks instead of bypassing the producer.",
+      "regressionTests": ["src/main/updater-agent-state-rules-release.test.ts"]
     },
     {
       "path": "src/main/updater-electron-test-types.ts",
@@ -12287,6 +13802,27 @@
       ]
     },
     {
+      "path": "src/main/updater.check-preflight.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "6b2618aad05dc84303235390af589cdb0022cf1d"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "f64b76f385ecf71fe77d7c34589143c3b7721462"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "5e1476e8fb9f0359ed15d1c2312849c425dc46ed"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "728c7e882287fffb3f5ce67f9faa721157ca46cc"
+      },
+      "reason": "prove immediate installation authority while pending, and epoch revocation after actual new feed commit; retain original assertion timing",
+      "regressionTests": ["src/main/updater.check-preflight.test.ts"]
+    },
+    {
       "path": "src/main/updater.mac-install.test.ts",
       "base": {
         "mode": "100644",
@@ -12329,6 +13865,21 @@
       "regressionTests": ["src/main/updater.prerelease-fallback.test.ts"]
     },
     {
+      "path": "src/main/updater.product-feed-policy.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "143b4ed90abaca30284fbf9e66c8f7c09f502c4d"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "b16d98863861e595ea917bf5049b37c9be8448d2"
+      },
+      "reason": "Exercise real control-plane parser/artifact and manifest chain through public updater operations; reject late success and fallback effects while accepted install continues",
+      "regressionTests": ["src/main/updater.product-feed-policy.test.ts"]
+    },
+    {
       "path": "src/main/updater.ts",
       "base": {
         "mode": "100644",
@@ -12344,10 +13895,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "9a5f156ebfb5d624b08c2c01f0a5f1eacff5f275"
+        "sha": "5f600bfc797170b73ca4d0e58d1395eaf582ed80"
       },
-      "reason": "吸收U Mac多实例check、before-quit preflight、已排队check不能重指feed，同时保持Hive完整network/candidate authority与原更新API Final candidate repair: Replace only the static user-visible product label with APP_DISPLAY_NAME; updater static CLI example uses PRIMARY_CLI_COMMAND. Completed foreign messages, interpolated paths/PIDs/refusal details, endpoints, wire/persisted identifiers, compatibility spellings, account/cleanup/update authority and branch conditions remain unchanged.",
-      "regressionTests": ["src/main/updater.mac-install.test.ts"]
+      "reason": "Re-prove canceled/superseded control-plane result before publishing global policy, cache or feed authority retain current verified download only during background preflight",
+      "regressionTests": [
+        "src/main/updater.check-preflight.test.ts",
+        "src/main/updater.product-feed-policy.test.ts"
+      ]
     },
     {
       "path": "src/main/updater/updater-download-install.ts",
@@ -12441,6 +13995,27 @@
       },
       "reason": "The actual window service subscribes to remote-worktree notification clearing. Initialize that existing notification mock; preserve the original subscription/order/teardown assertions. 吸收U更多窗口服务注册顺序/SSH catalog notifier真实assertions",
       "regressionTests": ["src/main/window/attach-main-window-services.test.ts"]
+    },
+    {
+      "path": "src/main/window/clipboard-image-temp-file.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "71ca0804c0ef8259e3e6d01c39250bdc32cd704e"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "e6fdd9f900b631bfc4e64c13b11710f72521726e"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e6fdd9f900b631bfc4e64c13b11710f72521726e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "15496fb0b2b0b42a4629ceb3f6a0e711a57c86bc"
+      },
+      "reason": "Make the mocked temp root a native absolute path and require its complete separator-delimited prefix, preserving actual clipboard file content and owned temp placement assertions.",
+      "regressionTests": ["src/main/window/clipboard-image-temp-file.test.ts"]
     },
     {
       "path": "src/main/window/clipboard-image-temp-file.ts",
@@ -12689,6 +14264,54 @@
       "regressionTests": ["src/shared/browser-grab-types.test.ts"]
     },
     {
+      "path": "src/preload/api/filesystem-api.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "d8b74cd9304341869181fc0859ee8329f5f03beb"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "07230ae04ff1fcf10cd216bc6d0bc4f9470be5c9"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "07230ae04ff1fcf10cd216bc6d0bc4f9470be5c9"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3d38c556b4795d616481af1ab5bac10d6c822db8"
+      },
+      "reason": "Adds typed optional older-host capability and current mutation expectations; string/null does not fabricate lease ownership.",
+      "regressionTests": [
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+        "src/renderer/src/web/web-preload-api-filesystem.test.ts"
+      ]
+    },
+    {
+      "path": "src/preload/api/fs-bridge.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "d58dd17ff8f92c9a169356f0671858901b67266e"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "aeea9b07fd011a6052b27eafcb636912551065b5"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "aeea9b07fd011a6052b27eafcb636912551065b5"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "38b43f5b5a4cb90760a7cd1ead567a8619e19874"
+      },
+      "reason": "Forwards the three desktop IPC calls with exact path/token/expectation arguments.",
+      "regressionTests": [
+        "src/main/ipc/filesystem/untitled-placeholder-handlers.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
+      ]
+    },
+    {
       "path": "src/relay/ai-vault-transcript-stream.ts",
       "base": {
         "mode": "100644",
@@ -12711,6 +14334,69 @@
         "src/main/ai-vault/antigravity-index-file-admission.test.ts",
         "src/main/native-chat/wsl-transcript-fs-security.test.ts"
       ]
+    },
+    {
+      "path": "src/relay/dispatcher-contract.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "23c62431d2c1381907ebcf6760c0524dc004a05c"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "23c62431d2c1381907ebcf6760c0524dc004a05c"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "23c62431d2c1381907ebcf6760c0524dc004a05c"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "61bad65fd497fdd9a20793d59c60a421b6035e55"
+      },
+      "reason": "Represents authenticated client generation separately from request cancellation and tracks response settlement for exact ownership cleanup.",
+      "regressionTests": ["src/relay/untitled-placeholder-transport.test.ts"]
+    },
+    {
+      "path": "src/relay/dispatcher-rpc-routing.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "a6e6c24190ccc44ae2c6a25732489b99069eb874"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a6e6c24190ccc44ae2c6a25732489b99069eb874"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "a6e6c24190ccc44ae2c6a25732489b99069eb874"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "248c25e4452275baa03aa42295d8850ed99d2c74"
+      },
+      "reason": "Propagates actual client generation and abort context, with exact once undelivered-response failure cleanup.",
+      "regressionTests": ["src/relay/untitled-placeholder-transport.test.ts"]
+    },
+    {
+      "path": "src/relay/fs-handler.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "36765721ef332c45285c523a9022f2bd3e7d1f47"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "36765721ef332c45285c523a9022f2bd3e7d1f47"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "36765721ef332c45285c523a9022f2bd3e7d1f47"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e1d9efabeca3ac95c9d7918e2a19207f41896b77"
+      },
+      "reason": "Installs real relay placeholder request handling and precise dispose lifecycle.",
+      "regressionTests": ["src/relay/untitled-placeholder-transport.test.ts"]
     },
     {
       "path": "src/relay/git-handler-remote-sync.test.ts",
@@ -12761,6 +14447,27 @@
       }
     },
     {
+      "path": "src/relay/opencode-hook-selection.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "336db284a476de04e68225301d394a3a8c35c1b8"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "5d65a15f26984a6fa95d15abd2114a57fb3c756e"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "0650662762c9b31cfb00c93e586cd29089b46ebf"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4c7db403fc7781a180e0fe70fceda055f360093e"
+      },
+      "reason": "Scope POSIX semantics only to Windows shell fixture spawn; restore exact platform in finally; preserve real parser/files and all other physical-platform cases.",
+      "regressionTests": ["src/relay/opencode-hook-selection.test.ts"]
+    },
+    {
       "path": "src/relay/subprocess.test.ts",
       "reason": "Seed a genuinely incomplete local node-pty package so the missing-install repair fixture cannot resolve an ancestor product dependency when diagnostic artifacts live under logs; preserve actual unavailability, same-process repair and mint-sequence assertions.",
       "regressionTests": ["src/relay/subprocess.test.ts"],
@@ -12780,6 +14487,38 @@
         "mode": "100644",
         "sha": "8aac4aa801b6cfb473bcb3cdaa66f97f71890495"
       }
+    },
+    {
+      "path": "src/relay/untitled-placeholder-requests.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "f991a9a3812c1c97978cc35568f90b96e7d69b4d"
+      },
+      "reason": "Partitions actual authenticated client/incarnation/principal ownership, rechecks current scope, releases cancelled or undelivered leases, and gates wx fallback on the shared typed pre-open result.",
+      "regressionTests": [
+        "src/relay/untitled-placeholder-transport.test.ts",
+        "src/shared/untitled-placeholder-retention.test.ts",
+        "src/shared/untitled-placeholder-recovery-directory.test.ts"
+      ]
+    },
+    {
+      "path": "src/relay/untitled-placeholder-transport.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "0f9e7b36bff83c211e730fca68cf71306cdff94e"
+      },
+      "reason": "Forty-six cases preserve transport authentication/generation/cancellation/current-session/error assertions, with selected actual dispatcher, host, Git and wx cases.",
+      "regressionTests": [
+        "src/relay/untitled-placeholder-transport.test.ts",
+        "src/shared/untitled-placeholder-retention.test.ts",
+        "src/shared/untitled-placeholder-recovery-directory.test.ts"
+      ]
     },
     {
       "path": "src/relay/windows-port-scan.win32.test.ts",
@@ -13039,6 +14778,43 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/editor/IpynbCellEditor.external-sync.test.tsx",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "d53b24baf9be5bb25fd8f7d8889d6ad9316dad60"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "d53b24baf9be5bb25fd8f7d8889d6ad9316dad60"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "77b8b1f8e5802e99cea1035431bc1e4705d9cd72"
+      },
+      "reason": "Require the real editor model’s EOL convention for the same complete updated Markdown, preserving external sync and dirty-state assertions on Windows.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/IpynbCellEditor.external-sync.test.tsx"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/ReviewNotesSendMenuContent.locale-switch.test.tsx",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "e945ac958b4a4a705e4599d77998d009c14a824d"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "8fe1ac7ceef6afba0ab9d749517a15586faca5c5"
+      },
+      "reason": "Provide the real selector’s current unifiedTabsByWorktree fixture field, retaining locale-switch/menu assertions and production selector behavior.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/ReviewNotesSendMenuContent.locale-switch.test.tsx"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/editor/ReviewNotesSendMenuContent.test.tsx",
       "base": {
         "mode": "100644",
@@ -13081,6 +14857,161 @@
       "regressionTests": ["src/renderer/src/components/editor/ReviewNotesSendMenuContent.test.tsx"]
     },
     {
+      "path": "src/renderer/src/components/editor/discard-editor-file-changes.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "bc77df8b2f0740dc9204b3af67f679940dbeb126"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "bc77df8b2f0740dc9204b3af67f679940dbeb126"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "bc77df8b2f0740dc9204b3af67f679940dbeb126"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "88d26305f73bbb94c906285ad6bf1db8af27e37c"
+      },
+      "reason": "Restores M empty-placeholder removal through real lease discard after quiesce; protects new draft, owner changes and invalid tokens, and reports actual recovery paths before refusing close.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-cleanup-safety.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-autosave-controller-test-fixture.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "3843b3d6a4c23c71118d2ac2a81e95d422a845de"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "4bb93ede79034f60455af1470d1b873632918b19"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "4bb93ede79034f60455af1470d1b873632918b19"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "943c05cae71099b3daa5f0677d3669c6f55856c9"
+      },
+      "reason": "Maintains real editor slice/store and controlled file boundary fixture with current placeholder methods.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx",
+        "src/renderer/src/components/editor/editor-autosave-controller.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-autosave-controller.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "78e83706e5202941edda8d407c6a2e2495da0607"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "78e83706e5202941edda8d407c6a2e2495da0607"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "78e83706e5202941edda8d407c6a2e2495da0607"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "292e1695ed354ac7279c5224697971ac841bd762"
+      },
+      "reason": "Retains thirteen controller cases including claimed rich-editor/quiesce failure refusal and successful settlement behavior.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-autosave-controller.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-autosave.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-autosave-controller.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "fc558e6361494cc27679fb444dc01e98f8e857f3"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "fc558e6361494cc27679fb444dc01e98f8e857f3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "fc558e6361494cc27679fb444dc01e98f8e857f3"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6db7b61c985d06f96fe6c6f1398121a2eb78518b"
+      },
+      "reason": "Captures operation provenance before SaveClose awaits and revalidates the same actual owner authority and full context before closing; keeps replacement draft and migration guards.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-autosave-controller.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-autosave.test.ts",
+        "src/renderer/src/components/editor/editor-autosave-conflict-flow.test.ts",
+        "src/renderer/src/components/editor/restored-editor-owner-save-lifecycle.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-autosave.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "c647fbfb77930a964518a1ce6d7d69fe6d09ba3a"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "e2f7a304e4a355339e97b8b6b5bc19eae762f1d6"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e2f7a304e4a355339e97b8b6b5bc19eae762f1d6"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e89d1827f3f8e7144b28e31898e99310419a14a2"
+      },
+      "reason": "Propagates claimed quiesce failure without clearing unsaved content; preserves existing no-controller and mounted save paths.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-autosave.test.ts",
+        "src/renderer/src/components/editor/editor-autosave-controller.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-save-queue.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "b5a0281470d3e76d3849103e73aac08f1de1163d"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "ded2b320663a79a802098d72ab777d19ec52963f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "ded2b320663a79a802098d72ab777d19ec52963f"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2a07c016ca130095a2079cb2ae34637faf9da5cd"
+      },
+      "reason": "Snapshots original owner authority once; refuses stale queued identity; only an actual successful write followed by current same-owner validation and exact T-to-undefined consumption marks already pending same-file/provenance/token requests. This preserves legitimate sequential saves without allowing arbitrary token loss, new tokens or owner changes. Exact prior-token release and quiesce draft retention remain.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-autosave-controller.test.ts",
+        "src/renderer/src/components/editor/editor-autosave-conflict-flow.test.ts",
+        "src/renderer/src/components/editor/restored-editor-owner-save-lifecycle.test.ts"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/editor/editor-untitled-cleanup-safety.test.ts",
       "base": null,
       "product": {
@@ -13101,6 +15032,37 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "b12d7992268420165cbcaf636c5d9a820ee1fc68"
+      },
+      "reason": "Three cases prove precise old token release on successful rekey and draft/token preservation on stale or collision refusal.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts",
+        "src/renderer/src/store/slices/editor-rekey-open-files.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/editor-untitled-placeholder.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "058ca951e5273ee54d38034e2a00144c06a210c7"
+      },
+      "reason": "Reuses the existing editor placeholder module for a queue-local pending request set. Track is synchronous; guarded consumption marks only registered matching id/path/worktree/runtime/provenance/token requests. A future request does not inherit the exception; forget/finally and dispose clear stored request references. Existing exact-owner public release helper remains unchanged.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
       "base": {
         "mode": "100644",
@@ -13116,14 +15078,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "d026e616334100ea4b42f1073614fb6e2bc18e6a"
+        "sha": "361be1533b54fe6eb37b855e9c0f4a5f403dd5ee"
       },
-      "reason": "Maintain save, autosave, discard, in-flight write and external-writer behavior assertions; preserved placeholders and background writes remain on disk and reopenable.",
+      "reason": "Preserves the original current sixteen save/discard/safety cases; retains sixteen actual-store authority-only combinations, stale new-token/provenance refusal and actual host write/release/Don’tSave coupling, and adds one legitimate sequential-save positive. Fixture initializes actual captured runtime owner and explicitly chooses present/absent provenance, so no old local owner contaminates the missing-provenance premise. All35 passed with original30s body/60s hook.",
       "regressionTests": [
-        "src/renderer/src/components/editor/editor-untitled-cleanup-safety.test.ts",
         "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
-        "src/renderer/src/store/slices/editor-close-file-cleanup.test.ts",
-        "src/main/runtime/rpc/methods/files.test.ts"
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx",
+        "src/shared/untitled-placeholder-retention.test.ts"
       ]
     },
     {
@@ -13147,6 +15108,31 @@
       "reason": "Assert the actual Monaco EOL while preserving the exact undo content contract.",
       "regressionTests": [
         "src/renderer/src/components/editor/monaco-content-sync.undo-history.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/editor/useUntitledFileRename.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "9b36ff18c5d0d4790c452b7b23aacdbcd359bada"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "9b36ff18c5d0d4790c452b7b23aacdbcd359bada"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "9b36ff18c5d0d4790c452b7b23aacdbcd359bada"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "019423f4a09a1538bc074181b8097c564d2bd1c0"
+      },
+      "reason": "Same-path save consumes exact token; actual moved path uses existing atomic rekey and old-owner release without deleting user content.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts",
+        "src/renderer/src/store/slices/editor-rekey-open-files.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts"
       ]
     },
     {
@@ -13456,6 +15442,106 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/native-chat/structured-agent-session-message-projection.older-host.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "7cc13a0a4eb64b44f0385cccecf0f1d60d86a9f7"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "7cc13a0a4eb64b44f0385cccecf0f1d60d86a9f7"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "64e5d0c24f23dbb4dc546c42d1fc43361da90e09"
+      },
+      "reason": "Replace the literal upstream product name with the registered APP_DISPLAY_NAME in the same complete independent expected sentence; preserve the actual message/protocol/content assertions shown in the exact diff.",
+      "regressionTests": [
+        "src/renderer/src/components/native-chat/structured-agent-session-message-projection.older-host.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/structured-agent-session-message-projection.recorded-copy.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "84e10ca18b7b1f6dced98f7a0cb824e81ff32d27"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "84e10ca18b7b1f6dced98f7a0cb824e81ff32d27"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "baf1caf3780640bbab06cb043af6321fd64c829a"
+      },
+      "reason": "U added a literal upstream product sentence. K7 producer and English catalog correctly use current product branding, while this owner retained U exact bytes. Oracle now keeps the full independent sentence and inserts only the real product name.",
+      "regressionTests": [
+        "src/renderer/src/components/native-chat/structured-agent-session-message-projection.recorded-copy.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/structured-agent-session-message-projection.rejected-in-place.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "4e7577052256851dfad6b420c20f05b3aeb9074f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "4e7577052256851dfad6b420c20f05b3aeb9074f"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "958fed510cbeba366f07081cf308b2450e439c90"
+      },
+      "reason": "Use APP_DISPLAY_NAME for three complete restart messages; preserve host history positioning, retained records/outbox replacement, no retry/no sending/cancelled row and all cases. Only three complete host-restart sentences use APP_DISPLAY_NAME. Exact unsent/in-place row identity, host-row takeover, journal position, outbox release, notices and absence of retry controls remain. Failure copy brands the noun; no rejection fact or retry policy changes.",
+      "regressionTests": [
+        "src/renderer/src/components/native-chat/structured-agent-session-message-projection.rejected-in-place.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/structured-child-records-switch.test.tsx",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "a5b4b911793cf3c873b9547d5e9473d56f1b2b9b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "a5b4b911793cf3c873b9547d5e9473d56f1b2b9b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2bc2e73352a8322bf306bb65b1888aa2527e562f"
+      },
+      "reason": "Bind the parent fixture to its actual local execution host so the real child switch contract receives a valid owner; retain all child identity and switch assertions.",
+      "regressionTests": [
+        "src/renderer/src/components/native-chat/structured-child-records-switch.test.tsx"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/native-chat/use-structured-agent-session-outbox-relaunch-hold.test.tsx",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "c40123377ea2502e6d0d7d34faab90457940002e"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "c40123377ea2502e6d0d7d34faab90457940002e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "ade47eb3ad669888e1ecfa8809a916b56b6a5d8d"
+      },
+      "reason": "Replace the literal upstream product name with the registered APP_DISPLAY_NAME in the same complete independent expected sentence; preserve the actual message/protocol/content assertions shown in the exact diff.",
+      "regressionTests": [
+        "src/renderer/src/components/native-chat/use-structured-agent-session-outbox-relaunch-hold.test.tsx"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/native-chat/use-structured-agent-session-outbox.rejected-reply.test.tsx",
       "base": null,
       "product": {
@@ -13519,6 +15605,26 @@
       "reason": "Destructure activeProjectKey/projectLabelByKey directly from the existing memoized project context. Remove only one-use object aliases; retain the same memo dependencies, host-qualified session scope, filtering, search, resume and rendering behavior.",
       "regressionTests": [
         "src/renderer/src/components/right-sidebar/AiVaultPanel.legacy-filter.test.tsx"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/right-sidebar/source-control-discard-localization.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "39b1b9e4048a6c1a9f775702eb8f8190e50ce947"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "39b1b9e4048a6c1a9f775702eb8f8190e50ce947"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "18a53faff92bff662766eb031751d9704e67b192"
+      },
+      "reason": "Require independent exact complete staged/unstaged discard sentences in all six locales rather than repeating English for translated catalogs; preserve destructive-action distinctions and original cases.",
+      "regressionTests": [
+        "src/renderer/src/components/right-sidebar/source-control-discard-localization.test.ts"
       ]
     },
     {
@@ -13617,6 +15723,27 @@
       },
       "reason": "Preserve current Hive identity/account authorization UI; do not resurrect removed upstream provider/legacy account screen. Host-owned provider accounts must use current provider settings.",
       "regressionTests": ["src/renderer/src/components/settings/AccountsPane.test.tsx"]
+    },
+    {
+      "path": "src/renderer/src/components/settings/AgentsPane.test.tsx",
+      "base": {
+        "mode": "100644",
+        "sha": "b3a282a72e0c3c78796c8c22b99f8adc8b850e91"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "1b28825ff22b070d40ba0684fd63e96191e86e4b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "25cebb04b0d951c01320b6a06488584f19a04b5c"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "c1360435a188ab9a2efdca601b180f88a2830306"
+      },
+      "reason": "Use the registered APP_DISPLAY_NAME in the complete Linux lid-close sentence, preserving the original Windows/Darwin/Linux platform policy checks and actual pane behavior.",
+      "regressionTests": ["src/renderer/src/components/settings/AgentsPane.test.tsx"]
     },
     {
       "path": "src/renderer/src/components/settings/ExperimentalPane.test.tsx",
@@ -13779,6 +15906,21 @@
       "regressionTests": [
         "src/renderer/src/components/settings/accounts-host-owned-sections.test.tsx"
       ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/accounts-pane-overview.test.tsx",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "68999cd4855f5cafac3b118c1de8d4edc8eba6d6"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "0303c17752fa022b3dbf5d9babde12ce5c0a044f"
+      },
+      "reason": "Scoped public preload getStatus apiKeyConfigured=false fixture, preserving real credential child/full guidance; restore previous window.api descriptor after mandatory cleanup.",
+      "regressionTests": ["src/renderer/src/components/settings/accounts-pane-overview.test.tsx"]
     },
     {
       "path": "src/renderer/src/components/settings/accounts-pane-overview.tsx",
@@ -14253,11 +16395,32 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "ba103863cbea867510b888797b94c2babd19689a"
+        "sha": "cc84554edf2ac0c8afbe13f679b13874a92e2039"
       },
-      "reason": "Keep Hive project-surface navigation and user-open history while passing exact execution host, rather than dropping the current Home/projects integration.",
+      "reason": "Only revealInSidebar:false is added to the existing fallback activation options. U keyboard delegates to sidebar-worktree-activation, which passes that option. Actual activation opts type accepts boolean and guards reveal on !==false. Host-qualified routing/navigationIntent/project-context routing/scroll/focus/modal/overlay logic remains exact.",
       "regressionTests": [
+        "src/renderer/src/components/sidebar/worktree-list/navigation/use-keyboard.focus.test.tsx",
         "src/renderer/src/components/sidebar/worktree-list/navigation/use-keyboard.host-identity.test.tsx"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/status-bar/resource-manager-exit-render-budget.test.tsx",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "0a014eb73d66b11c59084ddaab2a21781af23ec3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "0a014eb73d66b11c59084ddaab2a21781af23ec3"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "291b1c9f1a75960a7cbde22fd529417fff7d602b"
+      },
+      "reason": "Complete the mocked i18n resource API with getResourceBundle while retaining the real render subscription/budget checks and original event inputs.",
+      "regressionTests": [
+        "src/renderer/src/components/status-bar/resource-manager-exit-render-budget.test.tsx"
       ]
     },
     {
@@ -14384,6 +16547,27 @@
       },
       "reason": "Carry floating-panel border geometry through the new item facade; pinned actions are already owned by itemActions.",
       "regressionTests": ["src/renderer/src/components/tab-bar/TabBarItemRow.test.tsx"]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/TerminalErrorToast.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "47483c0538cc4c7573d1a9564e1be87c166599ab"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "d4fcf9c6791c2615bba5c7cb3b63c523ecf42eee"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "924c26230e18b38b48d422679482ea5e49d259c0"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "514130e28a87c5b2925f4c03a5d5ea46736e4e23"
+      },
+      "reason": "Use registered APP_DISPLAY_NAME in exact branded messages. The mixed-error action case now supplies its own real support-link state and checks the precise href as well as the original issue label; the suite-wide null-support fixture and negative cases remain unchanged. Use registered APP_DISPLAY_NAME in complete messages. Supply the mixed-error action case own support link and assert its exact href as well as original issue label; retain null-support suite fixture and original negative cases. Four complete/partial branded error sentences use the existing product identity constant; all semantic words and caller paths remain exact. The mixed-error issue case supplies a real support-link state and adds exact href equality while preserving the issue label. K7 already owns the hoisted availability mock and per-case reset; no rendered component is replaced.",
+      "regressionTests": ["src/renderer/src/components/terminal-pane/TerminalErrorToast.test.ts"]
     },
     {
       "path": "src/renderer/src/components/terminal-pane/codex-shared-server-banner.test.tsx",
@@ -14563,6 +16747,54 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/terminal/useTerminalSaveDialog.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "66600e8ac44d62a47a6c814075e5c886b0b52803"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "66600e8ac44d62a47a6c814075e5c886b0b52803"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "66600e8ac44d62a47a6c814075e5c886b0b52803"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "5eed11ab36931cef90cca5fd0723a66b001e960d"
+      },
+      "reason": "Keeps floating-editor original public dialog actions and retains dialog on truthful discard failure.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/use-terminal-editor-close-dialog-actions.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "2caf32af0ef526e234a01d076e98c64004461bde"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "2caf32af0ef526e234a01d076e98c64004461bde"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "2caf32af0ef526e234a01d076e98c64004461bde"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "722b9a993f5796c23b946b3afed7ac4199fac147"
+      },
+      "reason": "Keeps main-editor dialog flow and close queue intact when quiesce or discard fails.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts"
+      ]
+    },
+    {
       "path": "src/renderer/src/hooks/settings-navigation-remote-sections.ts",
       "base": {
         "mode": "100644",
@@ -14623,6 +16855,51 @@
         "src/renderer/src/hooks/use-delayed-status.test.tsx",
         "src/renderer/src/lib/delayed-status.test.ts"
       ]
+    },
+    {
+      "path": "src/renderer/src/hooks/use-terminal-quick-command-hosts.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "28483b4ecb16e17b4550b4792cdc17b91b5d0bb9"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "52a786ad638ae7df5582567815fc30bad28bfb7b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "28483b4ecb16e17b4550b4792cdc17b91b5d0bb9"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6a8431c4ec4f06bd06b7bc127156e41b6dd0f33b"
+      },
+      "reason": "Uses the existing one useAppStore/useShallow selector to select settings/runtime environments plus both actual typed account/ownership references. Same pure selectExecutionHostDisplayLabels receives the identical four inputs that the removed four-subscription hook supplied. Memo dependencies include all four and hosts still depends on hostLabels. Existing immutable publishAccountRuntimeDirectory/set local ownership creates selected reference updates, so enabled labels refresh; original loading/generation/effects remain exact.",
+      "regressionTests": [
+        "src/renderer/src/hooks/use-terminal-quick-command-hosts.test.ts",
+        "src/renderer/src/lib/execution-host-display-label.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/hooks/useGlobalFileDrop.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "15b22854d9a7e45b758c6b9f31a027f3fb557cfb"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "0f166006b5705fcc188c42c912910f1ac7744df5"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "975401dc0e3748c36a483f5cd0e8b716f1c2a066"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "5aa9920165cf625590823b70dc134bd4e16290b4"
+      },
+      "reason": "Use APP_DISPLAY_NAME in both exact singular/plural temp-copy failure messages; preserve full permission-denied/timeout descriptions, metadata-only rejection and real host ownership assertions. Only two complete singular/plural copy-failure titles change to the registered brand. Permission-denied and timeout guidance, metadata-only rejection, limits, no leaked secret and real local/runtime/SSH ownership assertions remain exact.",
+      "regressionTests": ["src/renderer/src/hooks/useGlobalFileDrop.test.ts"]
     },
     {
       "path": "src/renderer/src/hooks/useSettingsNavigationMetadata.ts",
@@ -14704,12 +16981,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "31a1d8432001f4698c257675d16b427c5d31a2e7"
+        "sha": "3b256440d4d96efad2cc8c91b5d69e1355c8e77c"
       },
-      "reason": "Three-way key merge preserving Hive keys and independent translations, adding new effective keys and updating meaning-changing runtime notices; no upstream skill installer material imported.",
+      "reason": "Retains full en staged/discard descriptions and adds three distinct truthful editor preservation/recovery/failure messages, preserving actual path interpolation.",
       "regressionTests": [
-        "config/scripts/verify-localization-catalogs.mjs",
-        "config/scripts/verify-localization-extraction.mjs"
+        "src/renderer/src/components/right-sidebar/source-control-discard-localization.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx"
       ]
     },
     {
@@ -14728,12 +17006,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "4e7702e06b14cc63078f555ef7cdaf2fb436f513"
+        "sha": "f248c26e00fba1a2ddcb4c863d2a63bc537b9b3b"
       },
-      "reason": "Three-way key merge preserving Hive keys and independent translations, adding new effective keys and updating meaning-changing runtime notices; no upstream skill installer material imported.",
+      "reason": "Retains full es staged/discard descriptions and adds three distinct truthful editor preservation/recovery/failure messages, preserving actual path interpolation.",
       "regressionTests": [
-        "config/scripts/verify-localization-catalogs.mjs",
-        "config/scripts/verify-localization-extraction.mjs"
+        "src/renderer/src/components/right-sidebar/source-control-discard-localization.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx"
       ]
     },
     {
@@ -14752,12 +17031,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "65d27f0ee782499e0d3f13faee080df380f73f62"
+        "sha": "3d71353124221906bb13c1f40a47b3b562bb8fc7"
       },
-      "reason": "Three-way key merge preserving Hive keys and independent translations, adding new effective keys and updating meaning-changing runtime notices; no upstream skill installer material imported.",
+      "reason": "Retains full fr staged/discard descriptions and adds three distinct truthful editor preservation/recovery/failure messages, preserving actual path interpolation.",
       "regressionTests": [
-        "config/scripts/verify-localization-catalogs.mjs",
-        "config/scripts/verify-localization-extraction.mjs"
+        "src/renderer/src/components/right-sidebar/source-control-discard-localization.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx"
       ]
     },
     {
@@ -14776,12 +17056,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "92bcbcd3e2713e8b12eeeeef161a0664bd91b97c"
+        "sha": "22069d53627c89c51d07657815b23d4884a42c98"
       },
-      "reason": "Three-way key merge preserving Hive keys and independent translations, adding new effective keys and updating meaning-changing runtime notices; no upstream skill installer material imported.",
+      "reason": "Retains full ja staged/discard descriptions and adds three distinct truthful editor preservation/recovery/failure messages, preserving actual path interpolation.",
       "regressionTests": [
-        "config/scripts/verify-localization-catalogs.mjs",
-        "config/scripts/verify-localization-extraction.mjs"
+        "src/renderer/src/components/right-sidebar/source-control-discard-localization.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx"
       ]
     },
     {
@@ -14800,12 +17081,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "bbccf51a35e570ab3a3d3540e4804141f02715bf"
+        "sha": "c91e1731ec731bee03a39e5a14e8f35cab8bf5d5"
       },
-      "reason": "Three-way key merge preserving Hive keys and independent translations, adding new effective keys and updating meaning-changing runtime notices; no upstream skill installer material imported.",
+      "reason": "Retains full ko staged/discard descriptions and adds three distinct truthful editor preservation/recovery/failure messages, preserving actual path interpolation.",
       "regressionTests": [
-        "config/scripts/verify-localization-catalogs.mjs",
-        "config/scripts/verify-localization-extraction.mjs"
+        "src/renderer/src/components/right-sidebar/source-control-discard-localization.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx"
       ]
     },
     {
@@ -14824,13 +17106,29 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "b5cb96ac9ead108342f78e65255eba5aa4f67b86"
+        "sha": "9b0e87ad9ede8e9ed058f89246f4993051f0ebb1"
       },
-      "reason": "Three-way key merge preserving Hive keys and independent translations, adding new effective keys and updating meaning-changing runtime notices; no upstream skill installer material imported.",
+      "reason": "Retains full zh staged/discard descriptions and adds three distinct truthful editor preservation/recovery/failure messages, preserving actual path interpolation.",
       "regressionTests": [
-        "config/scripts/verify-localization-catalogs.mjs",
-        "config/scripts/verify-localization-extraction.mjs"
+        "src/renderer/src/components/right-sidebar/source-control-discard-localization.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx"
       ]
+    },
+    {
+      "path": "src/renderer/src/i18n/ui-formatting.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "3fd38cb51d736694b5cba26f0d425edf4ef522cf"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "204348cf268f724aeca955a5cef1467c32b45e80"
+      },
+      "reason": "Keep upstream medium date/long time/timezone format with product-localized cached formatter. Update the two independent Intl oracles to the exact combined contract. Retain both original cases, real en/fr switching, declared plugin fr-FR locale, fractional numbers and invalid-date rejection. Retain upstream medium date/long time/timezone and product cached Intl locale switching; two independent en/fr and declared plugin fr-FR oracles follow that combined contract. Invalid dates/fractional count assertions unchanged. Only the two Git-history Intl option objects change: upstream medium date/long time preserves the time-zone disambiguation, while M/K7 localized catalog continues real en/fr and declared plugin fr-FR switching. Other UI dates, fractional counts, invalid dates and locale restoration remain exact.",
+      "regressionTests": ["src/renderer/src/i18n/ui-formatting.test.ts"]
     },
     {
       "path": "src/renderer/src/lib/agent-catalog-entries-secondary.ts",
@@ -14930,6 +17228,48 @@
       "regressionTests": ["src/renderer/src/lib/agent-launch-caller-routing.test.ts"]
     },
     {
+      "path": "src/renderer/src/lib/agent-launch-route-input.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "34aeb4a96ed4af13c8f28b37aefa79bca00c41c2"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "ab82deb25da16f3b9f1e019c9d38c142df69aab7"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "b78a9c127408bb4ccdc646ddd063f65b48bcf00e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "54519c66f34f942b5d261e854af7e1233e746d90"
+      },
+      "reason": "Retain the existing thirty-five route cases and add exact SSH owner/preflight/transcript assertions for explicit-workspace precedence; keep all original cases, inputs and budgets.",
+      "regressionTests": ["src/renderer/src/lib/agent-launch-route-input.test.ts"]
+    },
+    {
+      "path": "src/renderer/src/lib/agent-launch-route-input.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "9e46494fa0c0359e8329f8fa5f60d7fd8717824a"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "3cf3170c415f3b689c4f741f3132862f4b642817"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "1d23ef6c2130068f7eb6da1ad6b179beb45ac43c"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "95a5cfc165ad5e6d29332bcf37e064b5af47f85d"
+      },
+      "reason": "Restore M explicit-workspace execution-host precedence before the unqualified U owner facade. Preserve SSH ownership/null capabilities, structured target mapping and unqualified ambiguity refusal.",
+      "regressionTests": ["src/renderer/src/lib/agent-launch-route-input.test.ts"]
+    },
+    {
       "path": "src/renderer/src/lib/agent-status.ts",
       "base": {
         "mode": "100644",
@@ -14970,6 +17310,54 @@
       },
       "reason": "Preserve negative partition-warning regression; skipped cookies alone are not partition evidence.",
       "regressionTests": ["src/renderer/src/lib/browser-cookie-import-toast.test.ts"]
+    },
+    {
+      "path": "src/renderer/src/lib/create-untitled-markdown.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "403df38192e7cf020fdaef20c9b4ddeb4e4f4081"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "403df38192e7cf020fdaef20c9b4ddeb4e4f4081"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "403df38192e7cf020fdaef20c9b4ddeb4e4f4081"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "31bd0c924c36f4a3a59112a0b2d7b474c0770656"
+      },
+      "reason": "Seven cases use current host string replies, separate true method-not-found fallback, and preserve original MAX100 EEXIST, template and SSH assertions.",
+      "regressionTests": [
+        "src/renderer/src/lib/create-untitled-markdown.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/create-untitled-markdown.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "01c4b7f9a2853f8f285fc1df07299472ef6e2175"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "01c4b7f9a2853f8f285fc1df07299472ef6e2175"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "01c4b7f9a2853f8f285fc1df07299472ef6e2175"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "b69b69fffdfa4f345bae251d71d29f8031d36688"
+      },
+      "reason": "Default blank notes acquire real transient lease or truthful null ordinary create; preserves collision code/message and original MAX100 retries and templates.",
+      "regressionTests": [
+        "src/renderer/src/lib/create-untitled-markdown.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
+      ]
     },
     {
       "path": "src/renderer/src/lib/delayed-status.test.ts",
@@ -15348,9 +17736,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "3d805fc4f7dee208c552f79be39e885454e291e7"
+        "sha": "118327e4bea282a10157d170bc892f87e6b92e18"
       },
-      "reason": "Keep backend pane authority and delayed creation handoff regressions; upstream deletion must not remove Hive-specific owned behavior.",
+      "reason": "The current producer mounts a backend-owned startup in the background after a workspace switch. Require exact background mount and activateCreatedTabs:false, and refuse foreground reveal, retaining the original startup ownership flag.",
       "regressionTests": ["src/renderer/src/lib/worktree-creation-flow.test.ts"]
     },
     {
@@ -15551,6 +17939,37 @@
       "regressionTests": ["src/renderer/src/runtime/runtime-file-range-client.test.ts"]
     },
     {
+      "path": "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "eb7e2f3791e906ccf9225486433d9dc32c43872e"
+      },
+      "reason": "Thirty-one actual compatibility/admission boundary cases independently assert current token/null replies, strict method-not-found fallback, malformed reply refusal and full discard records.",
+      "regressionTests": [
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+        "src/renderer/src/runtime/runtime-file-client-mutation-ownership.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-untitled-placeholder-client.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "b5283675640609db90b7c4fee7e54946ff7ec4ca"
+      },
+      "reason": "Parses local and runtime creation/discard replies with shared schemas and uses existing actual ownership admission; ordinary downgrade is only actual method_not_found, never EACCES or unknown.",
+      "regressionTests": [
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+        "src/renderer/src/runtime/runtime-file-client-mutation-ownership.test.ts",
+        "src/renderer/src/web/web-preload-api-filesystem.test.ts"
+      ]
+    },
+    {
       "path": "src/renderer/src/runtime/web-session-tabs-sync/apply-preparation-browser.ts",
       "base": {
         "mode": "100644",
@@ -15618,14 +18037,38 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "82e5d3740c689ff752a142bfe63d22a809c56a33"
+        "sha": "ebaaf78ea3f4c232933cd174313d180ca6d9ae9f"
       },
-      "reason": "Return current cleanup result and preserve Untitled close history; remove all automatic filesystem calls without altering mirrored host notification or unified close routing.",
+      "reason": "Releases exact live lease, preserves ordinary blanks via maintained cleanup rules, and excludes reopen/cleanup only for truthful confirmed placeholder removal.",
       "regressionTests": [
-        "src/renderer/src/components/editor/editor-untitled-cleanup-safety.test.ts",
         "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
-        "src/renderer/src/store/slices/editor-close-file-cleanup.test.ts",
-        "src/main/runtime/rpc/methods/files.test.ts"
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx",
+        "src/renderer/src/components/editor/editor-untitled-cleanup-safety.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/editor/actions/open-file-mutations.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "2d69a7a6261acf05c92943121ae2ba3c24f14b4f"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "853a14e77fef8a0d159a5be44837acc45223c8fe"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "853a14e77fef8a0d159a5be44837acc45223c8fe"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e7d30b7d683db7efcc13a9ab92acc52ee9d3934b"
+      },
+      "reason": "Adds explicit live lease consumption which disables blank cleanup only after successful save or approved rekey.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts"
       ]
     },
     {
@@ -15644,14 +18087,36 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "c4d60c399031dd645e17250899ead076244a5342"
+        "sha": "a0d972705980222e82c23979113fbecbaebdf914"
       },
-      "reason": "Return current cleanup results, remove automatic stat/delete, and reuse one per-owner reopen capture for selected-worktree and no-selection close-all; retain markdown-preview exclusion and MRU/group position.",
+      "reason": "Bulk close releases exact tokens and strips transient token authority from reopen snapshots.",
       "regressionTests": [
-        "src/renderer/src/components/editor/editor-untitled-cleanup-safety.test.ts",
         "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
-        "src/renderer/src/store/slices/editor-close-file-cleanup.test.ts",
-        "src/main/runtime/rpc/methods/files.test.ts"
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/editor/actions/rekey-open-files-action.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "451a8fc3cf3373226b03b7ec6e683aa52dc9f319"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "451a8fc3cf3373226b03b7ec6e683aa52dc9f319"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "451a8fc3cf3373226b03b7ec6e683aa52dc9f319"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "0165901745612e7845d7e2dd6d36f838375d9d73"
+      },
+      "reason": "Preserves atomic stale/collision checks and drafts, drops moved-path token, and releases only the original exact source owner after successful migration.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts",
+        "src/renderer/src/store/slices/editor-rekey-open-files.test.ts"
       ]
     },
     {
@@ -15696,14 +18161,38 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "9af979d3934c7b6b75d75dd8fda9796bdc39375e"
+        "sha": "6a6945cb323eeb8ae6db4380ea8354992134274a"
       },
-      "reason": "Current closeFile returns preservation result or undefined; closeAllFiles returns an array. No void compatibility alias or parallel old/new contract.",
+      "reason": "Types explicit lease consumption and confirmed-removal close options without persisting authority.",
       "regressionTests": [
-        "src/renderer/src/components/editor/editor-untitled-cleanup-safety.test.ts",
         "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
-        "src/renderer/src/store/slices/editor-close-file-cleanup.test.ts",
-        "src/main/runtime/rpc/methods/files.test.ts"
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-dont-save-dialogs.test.tsx"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/editor/types/open-file.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "8ad085cd933aec86050fe911e0b79344c3d79fff"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "0f096127b291693ddc02ab41bfaf5fa44b716d45"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "0f096127b291693ddc02ab41bfaf5fa44b716d45"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "1ae6701ad941ae9bccf6286b7a26aa95a5bbe464"
+      },
+      "reason": "Allows transient token only on live OpenFile and explicitly omits it from closed snapshots.",
+      "regressionTests": [
+        "src/renderer/src/components/editor/editor-untitled-save-lifecycle.test.ts",
+        "src/renderer/src/components/editor/editor-untitled-placeholder-rekey.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
       ]
     },
     {
@@ -15772,6 +18261,46 @@
         "src/renderer/src/web/web-preload-api-settings.test.ts",
         "src/renderer/src/web/web-zcode-plan-settings.test.ts"
       ]
+    },
+    {
+      "path": "src/renderer/src/web/web-file-mutation-methods.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "262b7e30fc953240e18ddc03f4ebe24ef75acfc0"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "262b7e30fc953240e18ddc03f4ebe24ef75acfc0"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "262b7e30fc953240e18ddc03f4ebe24ef75acfc0"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2b43f5de880a03f9abb3f95a20ea19c793b5684d"
+      },
+      "reason": "Routes placeholder methods through actual current web session, worktree and SSH generation mutation context; renderer validates returned schemas.",
+      "regressionTests": [
+        "src/renderer/src/web/web-preload-api-filesystem.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+        "src/renderer/src/runtime/runtime-file-client-mutation-ownership.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-upstream-adaptations.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "564a01a9f5c29fff25bd7811c0057b4ed07bc930"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "12d8848a1f4234ef072ba4dc6bfef313171349b8"
+      },
+      "reason": "Use an independent complete twenty-four-agent history literal and both real search capabilities; preserve the original query, limit, status, options and security assertions.",
+      "regressionTests": ["src/renderer/src/web/web-preload-upstream-adaptations.test.ts"]
     },
     {
       "path": "src/renderer/src/web/web-runtime-client-capabilities.ts",
@@ -16275,6 +18804,27 @@
       ]
     },
     {
+      "path": "src/shared/remote-runtime-shared-control-connection.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "acd804e1f99fe84b73e0655b5c4b412dd0457ba0"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "7cf33852e8c85d68efc19193a1a57a37b7471c56"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "acd804e1f99fe84b73e0655b5c4b412dd0457ba0"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "48fd4d39401e9a0875199d8d59d9304e1863d4aa"
+      },
+      "reason": "Add exactly upstream child-views capability at its defined place in the complete ordered auth-frame list. Preserve v2 message/transcript/device token, single authenticated socket, exact RPC order and all negative/memory/reconnect/security cases. The independently enumerated complete ordered authentication-frame capability list adds exactly U's child-views capability after row-stop. No product capability helper is used in the oracle. v2 frame, transcript hash, device token, one authenticated socket, request order and all authority/memory/reconnect/security-negative cases remain unchanged.",
+      "regressionTests": ["src/shared/remote-runtime-shared-control-connection.test.ts"]
+    },
+    {
       "path": "src/shared/resolve-tui-agent-config.ts",
       "base": null,
       "product": {
@@ -16291,6 +18841,56 @@
         "src/shared/tui-agent-config.test.ts",
         "src/shared/tui-agent-launch-command-pick-flags.test.ts",
         "src/shared/tui-agent-launch-defaults.test.ts"
+      ]
+    },
+    {
+      "path": "src/shared/rpc-contract/files-mutation-params.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "a2fbc120b20f55fab1a817c464672c16898fdcd4"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a2fbc120b20f55fab1a817c464672c16898fdcd4"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "a2fbc120b20f55fab1a817c464672c16898fdcd4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "c41592a600995de1e63edcaf7a8607c8dcee6748"
+      },
+      "reason": "Adds three exact parameter schemas with nonempty bounded lease and existing mutation owner/generation expectations.",
+      "regressionTests": [
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/renderer/src/web/web-preload-api-filesystem.test.ts"
+      ]
+    },
+    {
+      "path": "src/shared/rpc-contract/rpc-params-catalog.generated.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "45946679ab7f156d1b7679db8142b1436321edd3"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "c8a2684a258d997b658e453ee8f13452f8a9363b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "d6d81433e8e089782b1b1cb073290af3220f54b7"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "b6f52e1cd3c35c8e16bef5e34e97825fdf140fd4"
+      },
+      "reason": "Official generated catalog includes the three strict current RPC parameter contracts.",
+      "regressionTests": [
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/renderer/src/web/web-preload-api-filesystem.test.ts"
       ]
     },
     {
@@ -16671,6 +19271,24 @@
       ]
     },
     {
+      "path": "src/shared/tmux-host-attachment-probe.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "f78c214a66ca23c597792cc852ac683fd041ce60"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "f78c214a66ca23c597792cc852ac683fd041ce60"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4e02bdca56dd2cedf20c6ba26a9d05ec5fbcc456"
+      },
+      "reason": "Exercise genuine Linux/Darwin policy fixtures with complete bounded ps argv and restore the physical platform, plus native Windows refusal without tmux/ps. Current .js dynamic imports satisfy the TypeScript resolution contract; the earlier three-case pass predates that import edit and current revision runtime remains not-run.",
+      "regressionTests": ["src/shared/tmux-host-attachment-probe.test.ts"]
+    },
+    {
       "path": "src/shared/tui-agent-config.ts",
       "base": {
         "mode": "100644",
@@ -16715,6 +19333,130 @@
       },
       "reason": "保留Hive agent入口并追加U JCode，不导入skill installer provider table",
       "regressionTests": ["src/shared/tui-agent-selection.test.ts"]
+    },
+    {
+      "path": "src/shared/untitled-placeholder-creation-error.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "65537aa74ba2dfb1cb87839d58165361b9fa74b0"
+      },
+      "reason": "Authorizes ordinary fallback only for the real resolver typed terminal class at resolve-location/not-attempted/no-manifest; preserves actual EEXIST and all owner/path/ACL/open-stage refusals.",
+      "regressionTests": [
+        "src/shared/untitled-placeholder-retention.test.ts",
+        "src/main/ipc/filesystem/untitled-placeholder-handlers.test.ts",
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/relay/untitled-placeholder-transport.test.ts"
+      ]
+    },
+    {
+      "path": "src/shared/untitled-placeholder-lease-close.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "b940b9d2c680b7330ff2a6413e0601c38068cbcf"
+      },
+      "reason": "Attempts both exact descriptors, preserves failed lease references, and throws typed actual recovery paths plus a cross-IPC readable message.",
+      "regressionTests": ["src/shared/untitled-placeholder-retention.test.ts"]
+    },
+    {
+      "path": "src/shared/untitled-placeholder-recovery-directory.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "89ff387d3addab14235080ade305294859e8df5f"
+      },
+      "reason": "Eight actual Git/root cases cover late FD bytes excluded from git add -A, linked worktree, custom committable Gitdir, other-repo .git ancestor, ACL and unavailable root boundaries.",
+      "regressionTests": [
+        "src/shared/untitled-placeholder-recovery-directory.test.ts",
+        "src/shared/untitled-placeholder-retention.test.ts"
+      ]
+    },
+    {
+      "path": "src/shared/untitled-placeholder-recovery-directory.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "9d2d51e59e9b7179a73d07cb4db1c4475abd376b"
+      },
+      "reason": "Chooses actual private same-volume app recovery root or proven noncommittable Git admin metadata, creates/validates permissions and identity, and distinguishes typed terminal no-location from operational errors.",
+      "regressionTests": [
+        "src/shared/untitled-placeholder-recovery-directory.test.ts",
+        "src/shared/untitled-placeholder-retention.test.ts",
+        "src/main/ipc/filesystem/untitled-placeholder-handlers.test.ts",
+        "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
+        "src/relay/untitled-placeholder-transport.test.ts"
+      ]
+    },
+    {
+      "path": "src/shared/untitled-placeholder-retention-types.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "59d2cadf91b1289d46e66cc2cd5f39d84bd5d348"
+      },
+      "reason": "Defines truthful lease, discard, stage/outcome, unavailable and real payload/manifest recovery contracts, without reconstituted restart authority.",
+      "regressionTests": [
+        "src/shared/untitled-placeholder-retention.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts",
+        "src/relay/untitled-placeholder-transport.test.ts"
+      ]
+    },
+    {
+      "path": "src/shared/untitled-placeholder-retention.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "0dd6d61314ae80f9d515d5bcfd3a2a01f1835e65"
+      },
+      "reason": "Forty-seven genuine FD/filesystem cases retain deterministic race, private ACL, origin/late-write, no-overwrite restore, owner revocation, exact close fault and strict fallback negatives.",
+      "regressionTests": [
+        "src/shared/untitled-placeholder-retention.test.ts",
+        "src/shared/untitled-placeholder-recovery-directory.test.ts"
+      ]
+    },
+    {
+      "path": "src/shared/untitled-placeholder-retention.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "6ef870027aed33971fbb895cead20d7e9739a4dd"
+      },
+      "reason": "Owns live wx origin FD, durable private manifests, same-device capture, actual fstat/lstat empty identity proof, no permanent payload removal, no-overwrite restoration and owner revocation guards.",
+      "regressionTests": [
+        "src/shared/untitled-placeholder-retention.test.ts",
+        "src/shared/untitled-placeholder-recovery-directory.test.ts",
+        "src/relay/untitled-placeholder-transport.test.ts"
+      ]
+    },
+    {
+      "path": "src/shared/untitled-placeholder-wire-contract.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "3a3401ef286791b8e42f7fc0d6530fdaecb5d391"
+      },
+      "reason": "Shares Zod token min1/max256/nullable and strict full discard union between actual SSH and renderer transports.",
+      "regressionTests": [
+        "src/relay/untitled-placeholder-transport.test.ts",
+        "src/renderer/src/runtime/runtime-untitled-placeholder-client.test.ts"
+      ]
     },
     {
       "path": "tests/e2e/codex-child-approval-activity-row.unit.test.ts",
@@ -16770,11 +19512,31 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "d51e6dfe46b92bfc8f8181d9b96fb7e23a1bbd07"
+        "sha": "166dbba3e0f58596101a860ec00fac5f2164b14e"
       },
-      "reason": "Keep owned unproven lease and recovery downgrade safety against fixed upstream release objects; no product history/ref assumptions.",
+      "reason": "Open the actual current journal-backed store through its public test harness, export real committed rows into a separately owned old-parser fixture, and prove current journal bytes stay unchanged through all old transactions. Close the exact current database; no fabricated store/admission.",
       "regressionTests": [
         "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts"
+      ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-agent-session-send.unit.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "5d79753797e089e7329db1ccdf59a9517f7b2680"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "5d79753797e089e7329db1ccdf59a9517f7b2680"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "95f685d6c1d089983cbc346d1a264cc3055a346e"
+      },
+      "reason": "Use an advertised and published feature-bearing release, retaining plain/queued cases and positive/wrong-fingerprint admission checks.",
+      "regressionTests": [
+        "tests/e2e/cross-version-wire/cross-version-agent-session-send.unit.test.ts"
       ]
     },
     {
@@ -16934,9 +19696,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "d5ecce3ffdddc881e3884f296a867d6819084a7a"
+        "sha": "c00232fefa89141c2e399af892d007123dbe5fb0"
       },
-      "reason": "Keep logs-scoped isolation fixture and exact legacy checkout exclusion without excluding nested active same-name source.",
+      "reason": "Remove the blanket .cross-version-checkouts basename exclusion so real nested active checkout sources are inspected; preserve all original expected active paths and isolation violation strings.",
       "regressionTests": ["tests/e2e/e2e-worker-env-isolation.unit.test.ts"]
     },
     {
