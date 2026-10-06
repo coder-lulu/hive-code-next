@@ -89,6 +89,25 @@ afterEach(() => {
 })
 
 describe('case stage admission, observation and account boundaries', () => {
+  it('reloads business progress after a terminal native observation before polling stops', async () => {
+    api.getWorkflowCaseRuns.mockResolvedValueOnce([workflowCaseRun(view, 'running')])
+    await mount()
+    expect(reload).toHaveBeenCalledWith(view.id)
+    reload.mockClear()
+    const original = current.runs[0]
+    api.getWorkflowCaseRuns.mockResolvedValueOnce([{ ...original, status: 'succeeded' }])
+    await act(async () => {
+      await current.refresh()
+    })
+    expect(current.runs[0].status).toBe('succeeded')
+    expect(reload).toHaveBeenCalledOnce()
+    expect(reload).toHaveBeenCalledWith(view.id)
+  })
+  it('keeps an empty initial run observation from rereading or changing the selected Case', async () => {
+    await mount()
+    expect(current.runs).toEqual([])
+    expect(reload).not.toHaveBeenCalled()
+  })
   it('admits one exact assigned stage for simultaneous clicks and reloads real case revisions', async () => {
     await mount()
     const pending = deferredWorkbenchValue<HiveWorkflowCaseRun>()

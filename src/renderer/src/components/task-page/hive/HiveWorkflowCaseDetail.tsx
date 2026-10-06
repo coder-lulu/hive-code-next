@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import type { HiveWorkflowCaseView } from '../../../../../shared/hive-workflow-cases'
 import { HiveWorkflowCaseRuns } from './HiveWorkflowCaseRuns'
+import { HiveWorkflowCaseEvidence } from './HiveWorkflowCaseEvidence'
 import type { HiveWorkflowCaseRunsModel } from './use-hive-workflow-case-runs'
 
 export function HiveWorkflowCaseDetail({
@@ -87,6 +88,7 @@ export function HiveWorkflowCaseDetail({
           })}
         </ol>
       </div>
+      <HiveWorkflowCaseEvidence view={view} model={runs} />
       <HiveWorkflowCaseRuns view={view} model={runs} scopeLabel={scopeLabel} />
     </section>
   )

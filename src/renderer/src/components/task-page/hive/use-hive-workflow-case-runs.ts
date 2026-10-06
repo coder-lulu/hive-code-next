@@ -112,22 +112,29 @@ export function useHiveWorkflowCaseRuns(
       ...workflowCaseRequestStatus(request, selected, runs)
     }))
   }, [])
-  const refresh = useCallback(
-    () =>
-      act(
-        'observe',
-        async (selected) =>
-          readWorkflowCaseRuns(
-            await window.api.hiveTasks.getWorkflowCaseRuns({
-              projectId: selected.binding.scope.projectRef,
-              caseId: selected.id
-            }),
-            selected
-          ),
-        (runs) => receiveRuns(mergeObservedWorkflowCaseRuns(observedRuns.current, runs))
-      ),
-    [act, receiveRuns]
-  )
+  const refresh = useCallback(async () => {
+    const selected = context.current.view
+    const epoch = generation.current
+    const observed = await act(
+      'observe',
+      async (selected) =>
+        readWorkflowCaseRuns(
+          await window.api.hiveTasks.getWorkflowCaseRuns({
+            projectId: selected.binding.scope.projectRef,
+            caseId: selected.id
+          }),
+          selected
+        ),
+      (runs) => receiveRuns(mergeObservedWorkflowCaseRuns(observedRuns.current, runs))
+    )
+    return observed &&
+      observedRuns.current.length > 0 &&
+      selected &&
+      generation.current === epoch &&
+      context.current.view === selected
+      ? context.current.reloadCase(selected.id)
+      : observed
+  }, [act, receiveRuns])
   useEffect(() => {
     const admissions = requests.current
     const caseHistories = histories.current
@@ -221,7 +228,6 @@ export function useHiveWorkflowCaseRuns(
         return false
       }
       const existing = requests.current.get(scope)
-      const epoch = generation.current
       const payload = existing?.input ?? createWorkflowCaseStartRequest(selected)
       requests.current.set(scope, existing ?? { input: payload })
       const admitted = await act(
@@ -245,11 +251,8 @@ export function useHiveWorkflowCaseRuns(
           )
         }
       )
-      if (admitted && mounted.current && generation.current === epoch) {
-        await context.current.reloadCase(view.id)
-        if (mounted.current && generation.current === epoch) {
-          await refresh()
-        }
+      if (admitted) {
+        await refresh()
       }
       return admitted
     },
@@ -261,7 +264,6 @@ export function useHiveWorkflowCaseRuns(
       ) {
         return false
       }
-      const epoch = generation.current
       const cancelled = await act(
         'cancel',
         async () =>
@@ -276,7 +278,7 @@ export function useHiveWorkflowCaseRuns(
             )
           )
       )
-      if (cancelled && mounted.current && generation.current === epoch) {
+      if (cancelled) {
         await refresh()
       }
       return cancelled

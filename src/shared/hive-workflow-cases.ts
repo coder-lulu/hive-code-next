@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { HiveWorkflowCaseExecutionNoticeSchema } from './hive-workflow-case-execution-notices'
 import { HiveWorkbenchObjectIdInputSchema } from './hive-team-workbench'
 import { HiveWorkflowSnapshotSchema } from './hive-task-workflows'
 import {
@@ -87,6 +88,7 @@ export const HiveWorkflowCaseViewSchema = CaseSummary.extend({
   team: WorkflowTeamBindingSchema,
   handoffs: boundedTaskCollection(WorkflowHandoffSchema, 96),
   reviews: boundedTaskCollection(WorkflowReviewSchema, 96),
+  executionNotices: boundedTaskCollection(HiveWorkflowCaseExecutionNoticeSchema, 96),
   stageTasks: boundedTaskCollection(HiveWorkflowStageTaskSchema, WORKFLOW_STAGE_LIMITS.stages, 4),
   executionAvailability: z.discriminatedUnion('available', [
     z.strictObject({
@@ -133,6 +135,15 @@ export const HiveWorkflowCaseViewSchema = CaseSummary.extend({
     )
   }
   const handoffs = new Map(view.handoffs.map((item) => [item.handoffRef, item]))
+  if (
+    new Set(view.executionNotices.map((item) => item.eventRef)).size !==
+      view.executionNotices.length ||
+    new Set(view.executionNotices.map((item) => item.causeRunId)).size !==
+      view.executionNotices.length ||
+    view.executionNotices.some((item) => !stages.has(item.stageRef))
+  ) {
+    context.addIssue({ code: 'custom', message: 'workflow_case_execution_notice_mismatch' })
+  }
   if (
     handoffs.size !== view.handoffs.length ||
     new Set(view.handoffs.map((item) => `${item.stageRef}:${item.producer.task.attempt}`)).size !==

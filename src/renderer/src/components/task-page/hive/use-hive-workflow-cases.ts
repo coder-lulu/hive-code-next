@@ -178,7 +178,7 @@ export function useHiveWorkflowCases(
       }))
     },
     select: (caseId: string) => {
-      if (!state.items.some((item) => item.id === caseId)) {
+      if (state.view?.id !== caseId && !state.items.some((item) => item.id === caseId)) {
         return Promise.resolve(false)
       }
       const query = HiveWorkflowCaseReadQuerySchema.parse({ projectId: team.project.id, caseId })

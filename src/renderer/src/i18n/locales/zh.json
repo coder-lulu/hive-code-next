@@ -1,7 +1,7 @@
 {
   "hiveWorkflowCases": {
     "title": "功能需求",
-    "description": "基于已保存的流程提交需求，查看已分配任务并执行产品需求首阶段。暂不支持四个职责间的自动交接。",
+    "description": "基于已保存的标准四阶段流程提交需求，启动产品阶段后，由团队自动交接开发、独立测试和发布准备。",
     "newRequirement": "提交功能需求",
     "submit": "提交需求",
     "submitted": "需求已提交。",
@@ -24,12 +24,42 @@
     "executionUnavailable": "确认 Docker Linux 执行环境可用后，才能启动阶段。",
     "execution": {
       "title": "阶段执行",
-      "scope": "使用已分配员工执行当前需求的产品需求首阶段。暂不支持四个职责间的自动交接。",
+      "scope": "标准四阶段流程启动产品阶段后，团队自动交接开发、独立测试和发布准备。",
+      "attempt": "第 {{attempt}} 次尝试",
       "start": "启动当前阶段",
       "resume": "恢复当前阶段",
       "uncertain": "启动结果尚未确认。重试启动会复用同一请求，继续刷新可查看运行状态。",
       "empty": "当前需求还没有阶段运行。",
       "artifactTruncated": "预览仅显示前 262,144 个字符。"
+    },
+    "evidence": {
+      "title": "团队成果与审批",
+      "empty": "当前需求尚无交接报告或测试审批。",
+      "handoffs": "阶段交接记录",
+      "handoff": "{{producer}} → {{consumer}}",
+      "reviews": "测试审批记录",
+      "review": "独立测试审批",
+      "codeVersion": "开发代码版本：{{version}}",
+      "readReport": "查看原报告",
+      "readRoleReport": "查看{{role}}第 {{attempt}} 次尝试的原报告",
+      "reportUnavailable": "未加载匹配的原运行或该运行的报告不可用，刷新阶段执行后再查看。",
+      "runUnavailable": "原运行未加载",
+      "notices": "阶段暂停记录",
+      "noticesHelp": "以下为历史记录，当前执行状态见阶段运行列表。",
+      "notice": "{{role}}：{{reason}}",
+      "decisions": {
+        "approved": "测试通过",
+        "changes_requested": "需要修改",
+        "rejected": "未通过"
+      },
+      "reasons": {
+        "native_not_started": "执行宿主未启动该运行",
+        "deadline_exceeded": "需求执行期限已到",
+        "attempts_exhausted": "已达到阶段尝试次数上限",
+        "context_unavailable": "阶段所需成果不可用",
+        "input_limit": "阶段输入超过长度上限",
+        "unsupported_graph": "当前流程结构不支持自动执行"
+      }
     },
     "caseStatuses": {
       "open": "未完结",
@@ -62,7 +92,7 @@
   },
   "hiveWorkflow": {
     "title": "工程交付流程",
-    "description": "配置交付阶段与验收标准，保存后生成流程版本。确认 Docker Linux 执行环境可用后，可执行需求的产品需求首阶段；暂不支持四个职责间的自动交接。",
+    "description": "配置交付阶段与验收标准，保存后生成流程版本。确认 Docker Linux 执行环境可用后，团队可按标准四阶段流程自动执行产品、开发、独立测试和发布准备。发布准备不执行部署。",
     "refresh": "刷新流程",
     "newWorkflow": "新建流程",
     "chooseWorkflow": "选择流程",
@@ -175,8 +205,8 @@
     "teamHelp": "每个职责对应独立员工，首期执行配置使用 Codex。",
     "saveTeam": "保存员工配置",
     "teamSaved": "AI 员工配置已保存。",
-    "teamNotConfigured": "保存四个员工完成团队配置后，可提交需求并执行产品需求首阶段。暂不支持四个职责间的自动交接。",
-    "executionUnavailable": "阶段执行需要已确认可用的 Docker Linux 环境。目前仅支持需求的产品需求首阶段，暂不支持四个职责间的自动交接。",
+    "teamNotConfigured": "保存四个员工完成团队配置后，可提交需求并启动标准四阶段流程。",
+    "executionUnavailable": "确认 Docker Linux 执行环境可用后，才能启动团队的标准四阶段流程。",
     "signIn": "使用有权限的账号登录 HiveCloud、连接当前电脑后刷新。",
     "invalidWorkspace": "所选工作区不可用。选择已有的本机工作区后重试。",
     "clientUnavailable": "当前客户端无法访问本机团队工作台。请在已连接的电脑上打开 HiveCode。",

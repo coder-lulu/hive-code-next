@@ -39,7 +39,7 @@ export function HiveWorkflowCaseRuns({
           <p className="break-words text-xs text-muted-foreground">{scopeLabel}</p>
           <p className="text-xs text-muted-foreground">
             {t('hiveWorkflowCases.execution.scope', {
-              defaultValue: '执行当前需求的第一阶段，使用已分配的员工。'
+              defaultValue: '启动产品阶段后，团队自动交接开发、独立测试和发布准备。'
             })}
           </p>
         </div>
@@ -113,6 +113,9 @@ export function HiveWorkflowCaseRuns({
                   {t(`hiveWorkflow.roles.${run.role}`)}
                 </p>
                 <p className="break-words text-xs text-muted-foreground">{run.title}</p>
+                <p className="text-xs text-muted-foreground">
+                  {t('hiveWorkflowCases.execution.attempt', { attempt: run.task.attempt })}
+                </p>
               </div>
               <Badge variant="secondary">{t(`hiveTasks.status.${run.status}`)}</Badge>
             </div>

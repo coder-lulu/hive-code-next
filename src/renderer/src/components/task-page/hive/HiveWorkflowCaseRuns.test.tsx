@@ -81,7 +81,7 @@ describe('execution within the actual requirement detail', () => {
     api.startWorkflowCase.mockReturnValue(pending.promise)
     await mount()
     expect(container.textContent).toContain('Example team / Desktop project')
-    expect(container.textContent).toContain('执行当前需求的第一阶段')
+    expect(container.textContent).toContain('团队自动交接开发、独立测试和发布准备')
     expect(container.querySelectorAll('[data-workflow-stage-task]')).toHaveLength(4)
     expect(button('启动当前阶段').disabled).toBe(false)
     await act(async () => {

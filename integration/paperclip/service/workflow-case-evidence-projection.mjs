@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { z } from 'zod'
+import { readWorkflowCaseExecutionNotices } from './workflow-case-execution-notice-projection.mjs'
 import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import { WorkflowNativeOutcomeAssetSchema } from '../../../src/shared/task-workflow/workflow-native-outcome.ts'
 import {
@@ -163,6 +164,7 @@ export async function readWorkflowCaseEvidence(db, accountId, view) {
   const evidence = await readWorkflowCaseConsumedEvidence(db, accountId, view)
   return {
     handoffs: evidence.flatMap((item) => (item.handoff ? [item.handoff] : [])),
-    reviews: evidence.flatMap((item) => (item.review ? [item.review] : []))
+    reviews: evidence.flatMap((item) => (item.review ? [item.review] : [])),
+    executionNotices: await readWorkflowCaseExecutionNotices(db, accountId, view, evidence)
   }
 }

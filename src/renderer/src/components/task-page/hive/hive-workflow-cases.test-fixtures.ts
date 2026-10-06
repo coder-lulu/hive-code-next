@@ -58,6 +58,7 @@ export function workflowCaseView(
     }),
     handoffs: [],
     reviews: [],
+    executionNotices: [],
     executionAvailability: { available: false, reason: 'EXECUTION_ISOLATION_UNAVAILABLE' }
   })
 }

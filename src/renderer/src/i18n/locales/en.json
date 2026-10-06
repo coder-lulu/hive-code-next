@@ -1,7 +1,7 @@
 {
   "hiveWorkflowCases": {
     "title": "Feature requests",
-    "description": "Submit requirements using a saved workflow, inspect the assigned tasks and run the initial product requirements stage. Automatic handoffs between the four roles are not supported yet.",
+    "description": "Submit requirements using a saved standard four-stage workflow. Start the product stage, then the team hands off development, independent testing and release preparation automatically.",
     "newRequirement": "New feature request",
     "submit": "Submit requirements",
     "submitted": "Requirements submitted.",
@@ -24,12 +24,42 @@
     "executionUnavailable": "Stage execution is unavailable until a Docker Linux execution environment is verified.",
     "execution": {
       "title": "Stage execution",
-      "scope": "Run the initial product requirements stage with its assigned employee. Automatic handoffs between the four roles are not supported yet.",
+      "scope": "In a standard four-stage workflow, start the product stage, then the team hands off development, independent testing and release preparation automatically.",
+      "attempt": "Attempt {{attempt}}",
       "start": "Start current stage",
       "resume": "Resume current stage",
       "uncertain": "The start result is unconfirmed. Retrying reuses the same request; refresh to check the run status.",
       "empty": "This request has no stage runs yet.",
       "artifactTruncated": "Preview shows only the first 262,144 characters."
+    },
+    "evidence": {
+      "title": "Team results and reviews",
+      "empty": "This request has no handoff reports or test reviews yet.",
+      "handoffs": "Stage handoff history",
+      "handoff": "{{producer}} → {{consumer}}",
+      "reviews": "Test review history",
+      "review": "Independent test review",
+      "codeVersion": "Development code version: {{version}}",
+      "readReport": "Read original report",
+      "readRoleReport": "Read the original report from {{role}}, attempt {{attempt}}",
+      "reportUnavailable": "The matching original run is not loaded or its report is unavailable. Refresh stage execution to check again.",
+      "runUnavailable": "Original run not loaded",
+      "notices": "Stage pause history",
+      "noticesHelp": "These are historical records. See the stage run list for current execution status.",
+      "notice": "{{role}}: {{reason}}",
+      "decisions": {
+        "approved": "Tests approved",
+        "changes_requested": "Changes requested",
+        "rejected": "Rejected"
+      },
+      "reasons": {
+        "native_not_started": "The execution host did not start this run",
+        "deadline_exceeded": "The request execution deadline was reached",
+        "attempts_exhausted": "The stage attempt limit was reached",
+        "context_unavailable": "Required stage results are unavailable",
+        "input_limit": "The stage input exceeds its size limit",
+        "unsupported_graph": "This workflow structure does not support automatic execution"
+      }
     },
     "caseStatuses": {
       "open": "Open",
@@ -62,7 +92,7 @@
   },
   "hiveWorkflow": {
     "title": "Delivery workflows",
-    "description": "Configure delivery stages and acceptance criteria. Saving creates a workflow version. Requests can run the initial product requirements stage in a verified Docker Linux environment; automatic handoffs between the four roles are not supported yet.",
+    "description": "Configure delivery stages and acceptance criteria. Saving creates a workflow version. In a verified Docker Linux environment, the team can automatically run the standard four stages: product, development, independent testing and release preparation. Release preparation does not deploy changes.",
     "refresh": "Refresh workflows",
     "newWorkflow": "New workflow",
     "chooseWorkflow": "Choose a workflow",
@@ -175,8 +205,8 @@
     "teamHelp": "Each role has its own employee. This initial execution profile uses Codex.",
     "saveTeam": "Save employees",
     "teamSaved": "AI employees saved.",
-    "teamNotConfigured": "Save the four employees to finish team setup, then submit a request to run the initial product requirements stage. Automatic handoffs between the four roles are not supported yet.",
-    "executionUnavailable": "Stage execution requires a verified Docker Linux environment. Requests currently support only the initial product requirements stage; automatic handoffs between the four roles are not supported yet.",
+    "teamNotConfigured": "Save the four employees to finish team setup, then submit a request to start the standard four-stage workflow.",
+    "executionUnavailable": "A verified Docker Linux execution environment is required to start the team's standard four-stage workflow.",
     "signIn": "Sign in to HiveCloud with an authorized account, connect this computer, then refresh.",
     "invalidWorkspace": "The selected workspace is unavailable. Choose an existing local workspace and retry.",
     "clientUnavailable": "This client cannot access the local team workbench. Open HiveCode on the connected computer.",

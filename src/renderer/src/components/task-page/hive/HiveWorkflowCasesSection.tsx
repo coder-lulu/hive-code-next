@@ -68,7 +68,7 @@ export function HiveWorkflowCasesSection({
             size="sm"
             disabled={model.busy || runs.busy}
             onClick={() => {
-              void model.refresh()
+              void model.refresh().then((loaded) => loaded && runs.refresh())
             }}
           >
             <RefreshCw />
