@@ -98,7 +98,7 @@ export async function commandEvidenceFixture(status: 'succeeded' | 'failed' = 's
   await mkdir(admitted.record.workspace.executionPath)
   await store.tasks.beginDispatch(command, TASK_TEST_NOW, () => undefined)
   await store.tasks.bindLaunch(
-    command,
+    store.tasks.get(command)!,
     {
       worktreeId: admitted.record.workspace.workspaceId,
       outcome: { kind: 'structured', sessionId: COMMAND_SESSION, handle: 'worker:command' },

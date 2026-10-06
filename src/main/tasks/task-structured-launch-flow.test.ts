@@ -161,7 +161,7 @@ describe('Task source through the original replay/create/attach path', () => {
     expect(f.attach).toHaveBeenCalledOnce()
     expect(f.runtime.resolveStructuredAgentSessionCreateIntent).toHaveBeenCalledOnce()
     expect(f.store.tasks.get(f.command)).toEqual(bound)
-    await f.store.tasks.bindLaunch(f.command, result, Date.now())
+    await f.store.tasks.bindLaunch(f.store.tasks.get(f.command)!, result, Date.now())
     expect(f.store.tasks.get(f.command)?.dispatch).toBe('bound')
     expect(f.runtime.createTerminal).not.toHaveBeenCalled()
   })

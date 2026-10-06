@@ -1,5 +1,6 @@
 import type { TaskExecutionRecord } from './task-execution-record'
 import type { TaskExecutionPersistence } from './task-execution-store'
+import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
 
 export async function recoverPersistedTaskExecution(options: {
   store: Pick<TaskExecutionPersistence, 'recoverLaunch' | 'markUnknown'>
@@ -21,7 +22,7 @@ export async function recoverPersistedTaskExecution(options: {
     try {
       if (options.launchFingerprint !== null) {
         await options.store.recoverLaunch(
-          current.command,
+          current,
           options.launchFingerprint,
           options.now(),
           options.validate
@@ -32,7 +33,11 @@ export async function recoverPersistedTaskExecution(options: {
     }
     current = options.read()
     if (current.dispatch === 'dispatching') {
-      await options.store.markUnknown(current.command, options.now(), options.validate)
+      const expected = current
+      await options.store.markUnknown(current.command, options.now(), (latest) => {
+        assertTaskExecutionSnapshotCurrent(expected, latest)
+        options.validate()
+      })
     }
   }
   try {

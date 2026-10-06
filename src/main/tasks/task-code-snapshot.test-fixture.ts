@@ -52,7 +52,7 @@ export async function codeSnapshotFixture(
     validate: () => undefined
   })
   await store.tasks.beginDispatch(command, TASK_TEST_NOW, () => undefined)
-  await store.tasks.bindLaunch(command, TASK_TEST_LAUNCH, TASK_TEST_NOW)
+  await store.tasks.bindLaunch(store.tasks.get(command)!, TASK_TEST_LAUNCH, TASK_TEST_NOW)
   const settled = await store.tasks.settle(
     command,
     {

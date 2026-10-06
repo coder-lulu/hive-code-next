@@ -107,7 +107,7 @@ export async function artifactReadFixture(
     () => undefined
   )
   await store.tasks.bindLaunch(
-    command,
+    store.tasks.get(command)!,
     {
       worktreeId: workspace.workspaceId,
       outcome: {

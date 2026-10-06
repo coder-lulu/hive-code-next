@@ -57,6 +57,10 @@ export async function collectTaskExecutionSettlement(
     }
     return current
   }
+  const validateSnapshot = (latest: TaskExecutionRecord) => {
+    assertTaskExecutionSnapshotCurrent(initial, latest)
+    validate()
+  }
   let record = readCurrent()
   if (!record || record.result) {
     return
@@ -83,7 +87,7 @@ export async function collectTaskExecutionSettlement(
   }
   const candidate = Candidate.safeParse(rawCandidate)
   if (!record.cancellationKey && (readFailed || (rawCandidate !== null && !candidate.success))) {
-    await deps.store.markUnknown(record.command, now(), validate)
+    await deps.store.markUnknown(record.command, now(), validateSnapshot)
     return
   }
   if (!record.cancellationKey && !candidate.success) {
@@ -93,7 +97,7 @@ export async function collectTaskExecutionSettlement(
   validate()
   const proof = await settleBeforeDeadline(() => deps.stop(stopping), null, deadline)
   if (!proof || !proofMatches(record, proof)) {
-    await deps.store.markUnknown(record.command, now(), validate)
+    await deps.store.markUnknown(record.command, now(), validateSnapshot)
     return
   }
   const current = readCurrent()
@@ -101,7 +105,7 @@ export async function collectTaskExecutionSettlement(
     return
   }
   if (!current.cancellationKey && proof.evidenceKind !== 'stopped') {
-    await deps.store.markUnknown(record.command, now(), validate)
+    await deps.store.markUnknown(record.command, now(), validateSnapshot)
     return
   }
   const succeeded = candidate.success ? candidate.data : null

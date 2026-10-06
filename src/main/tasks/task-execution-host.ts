@@ -73,11 +73,7 @@ export class TaskExecutionHost {
   ): Promise<void> {
     return recoverPersistedTaskExecution({
       store: this.deps.store,
-      read: () =>
-        this.requireRecord(
-          { ...record.command, commandFingerprint: record.commandFingerprint },
-          caller
-        ),
+      read: () => this.requireSnapshot(record, caller),
       isLaunching: (fingerprint) => this.launches.has(fingerprint),
       now: this.now,
       validate: () => assertTaskAuthorizationCurrent(() => caller.assertCurrent?.()),
@@ -91,10 +87,7 @@ export class TaskExecutionHost {
   /** Persist revocation before slow collection; this never proves that the writer stopped. */
   async fenceRevokedExecution(record: TaskExecutionRecord, caller: TaskExecutionCaller) {
     assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
-    const current = this.requireRecord(
-      { ...record.command, commandFingerprint: record.commandFingerprint },
-      caller
-    )
+    const current = this.requireSnapshot(record, caller)
     if (current.result) {
       return
     }
@@ -102,18 +95,18 @@ export class TaskExecutionHost {
       current.command,
       `revoked:${current.commandFingerprint}`,
       this.now(),
-      () => assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
+      (latest) => {
+        assertTaskExecutionSnapshotCurrent(record, latest)
+        assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
+      }
     )
   }
 
   /** Private Runtime cleanup; a revoked caller cannot authorize another transport operation. */
   async cancelRevokedExecution(record: TaskExecutionRecord, caller: TaskExecutionCaller) {
     await this.fenceRevokedExecution(record, caller)
-    const current = this.requireRecord(
-      { ...record.command, commandFingerprint: record.commandFingerprint },
-      caller
-    )
-    await this.settle(current, () => assertTaskAuthorizationCurrent(() => caller.assertCurrent?.()))
+    this.requireSnapshot(record, caller)
+    await this.settle(record, () => assertTaskAuthorizationCurrent(() => caller.assertCurrent?.()))
   }
 
   async start(value: unknown, caller: TaskExecutionCaller) {
@@ -218,7 +211,10 @@ export class TaskExecutionHost {
       command,
       command.idempotencyKey,
       this.now(),
-      authorization.assertCurrent
+      (latest) => {
+        assertTaskExecutionSnapshotCurrent(record, latest)
+        authorization.assertCurrent()
+      }
     )
     await this.settle(record, authorization.assertCurrent, authorization.input)
     assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
@@ -278,6 +274,15 @@ export class TaskExecutionHost {
     return record
   }
 
+  private requireSnapshot(expected: TaskExecutionRecord, caller: TaskExecutionCaller) {
+    const current = this.requireRecord(
+      { ...expected.command, commandFingerprint: expected.commandFingerprint },
+      caller
+    )
+    assertTaskExecutionSnapshotCurrent(expected, current)
+    return current
+  }
+
   private async dispatch(record: TaskExecutionRecord, authorization: TaskExecutionAuthorization) {
     try {
       const dispatch = await prepareTaskExecutionLaunchAuthorization(
@@ -287,11 +292,16 @@ export class TaskExecutionHost {
       )
       if (dispatch) {
         const launch = await this.deps.launch(dispatch.record, dispatch.authorization)
-        await this.deps.store.bindLaunch(record.command, launch, this.now())
+        await this.deps.store.bindLaunch(record, launch, this.now())
       }
     } catch (error) {
       await this.deps.store
-        .markUnknown(record.command, this.now(), () => undefined, taskDispatchFailureSummary(error))
+        .markUnknown(
+          record.command,
+          this.now(),
+          (latest) => assertTaskExecutionSnapshotCurrent(record, latest),
+          taskDispatchFailureSummary(error)
+        )
         .catch(() => undefined)
     }
   }
@@ -323,7 +333,7 @@ export class TaskExecutionHost {
           current.dispatch === 'dispatching' &&
           input !== undefined
         ) {
-          await this.deps.settleCancelledBeforeReservation?.(record, input, () => {
+          await this.deps.settleCancelledDispatch?.(record, input, () => {
             validate()
             if (this.launches.has(key)) {
               return refuseTaskExecution('OUTCOME_UNKNOWN')

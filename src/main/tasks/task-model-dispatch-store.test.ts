@@ -86,7 +86,11 @@ describe('model dispatch in the original durable Task transaction', () => {
     expect(next.record.revision).toBe(fixture.task.revision + 2)
   })
   it('allows the original running bound Task', async () => {
-    await fixture.store.tasks.bindLaunch(fixture.command, fixture.launch, TASK_TEST_NOW)
+    await fixture.store.tasks.bindLaunch(
+      fixture.store.tasks.get(fixture.command)!,
+      fixture.launch,
+      TASK_TEST_NOW
+    )
     const before = fixture.store.tasks.get(fixture.command)
     const result = await fixture.reserve()
     expect(result.record.status).toBe('running')

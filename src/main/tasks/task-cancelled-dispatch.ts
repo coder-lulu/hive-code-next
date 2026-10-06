@@ -9,19 +9,65 @@ import {
 import type { AgentSessionStoreState } from '../runtime/agent-session-store-contract'
 import { TaskExecutionRecordSchema, type TaskExecutionRecord } from './task-execution-record'
 import { taskCancelledResult } from './task-cancelled-result'
-import type { TaskExecutionPersistence } from './task-execution-store'
+import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
+import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
+import { createTaskDockerBoundary } from './task-docker-boundary'
+import { refuseTaskExecution } from './task-execution-error'
 import { taskAgentLaunchParams } from './task-agent-launch-params'
 import { TASK_ENFORCEMENT_CAPABILITY } from '../../shared/task-execution/task-execution-primitives'
 import { isTaskDockerEnforcementPolicy } from './task-docker-enforcement'
 
-export function createTaskCancelledDispatchSettlement(store: TaskExecutionPersistence) {
+export function createTaskCancelledDispatchSettlement(store: AgentSessionRecordStore) {
   return async (record: TaskExecutionRecord, input: string, validate: () => void) => {
-    await store.settleCancelledCodexDispatch(
+    await store.tasks.settleCancelledCodexDispatch(
       record,
       computeAgentLaunchFingerprint(taskAgentLaunchParams(record, input, 'codex')),
       Date.now,
       validate
     )
+    const expected = store.tasks.get(record.command)
+    if (
+      !expected ||
+      expected.result ||
+      !expected.cancellationKey ||
+      expected.dispatch !== 'dispatching' ||
+      expected.launch ||
+      Object.hasOwn(expected, 'modelDispatchAttempts') ||
+      !expected.structuredBinding ||
+      !expected.dockerIdentity
+    ) {
+      return
+    }
+    assertTaskExecutionSnapshotCurrent(record, expected)
+    const session = store.getRecord(expected.structuredBinding.sessionId)
+    if (
+      !session ||
+      session.lease.claimStatus !== 'reserved' ||
+      session.lease.ownerProcess ||
+      session.providerHandleChain.length
+    ) {
+      return
+    }
+    const expectedSession = structuredClone(session)
+    validate()
+    const boundary = createTaskDockerBoundary({
+      ...expected.dockerIdentity,
+      record: expected,
+      recoveryIdentity: expected.dockerIdentity,
+      assertCurrent: () => refuseTaskExecution('FORBIDDEN')
+    })
+    const evidence = await boundary.proveNeverStarted()
+    validate()
+    if (evidence) {
+      await store.tasks.settleCancelledDockerPrestart(
+        record,
+        expected,
+        expectedSession,
+        evidence,
+        Date.now,
+        validate
+      )
+    }
   }
 }
 

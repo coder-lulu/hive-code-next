@@ -56,7 +56,12 @@ const succeeded = (): AgentSessionOperationOutcome => ({
   launch: TASK_TEST_LAUNCH
 })
 const recover = () =>
-  store.tasks.recoverLaunch(command(), fingerprint, TASK_TEST_NOW, () => undefined)
+  store.tasks.recoverLaunch(
+    store.tasks.get(command())!,
+    fingerprint,
+    TASK_TEST_NOW,
+    () => undefined
+  )
 function delayWrite(fail = false) {
   const write = durableWrite.writeTempFileDurable
   let release!: () => void
@@ -249,7 +254,12 @@ describe('persistent task recovery evidence', () => {
     await operation(succeeded())
     const before = store.tasks.get(command())
     await expect(
-      store.tasks.recoverLaunch(command(), 'changed-launch', TASK_TEST_NOW, () => undefined)
+      store.tasks.recoverLaunch(
+        store.tasks.get(command())!,
+        'changed-launch',
+        TASK_TEST_NOW,
+        () => undefined
+      )
     ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
     expect(store.tasks.get(command())).toEqual(before)
   })
@@ -267,7 +277,7 @@ describe('persistent task recovery evidence', () => {
     await dispatched()
     await operation(succeeded())
     await expect(
-      store.tasks.recoverLaunch(command(), fingerprint, TASK_TEST_NOW, () => {
+      store.tasks.recoverLaunch(store.tasks.get(command())!, fingerprint, TASK_TEST_NOW, () => {
         throw new Error('host closed')
       })
     ).rejects.toThrow('host closed')

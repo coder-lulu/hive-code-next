@@ -18,11 +18,15 @@ import type { TaskExecutionDispatchAuthorization } from './task-execution-ports'
 import { prepareTaskDispatch } from './task-dispatch-authorization'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
-const admittedBoundaries = new WeakSet<ReturnType<typeof createTaskDockerBoundary>>()
+type ConnectionBoundary = Pick<
+  ReturnType<typeof createTaskDockerBoundary>,
+  'prepare' | 'inspect' | 'stop'
+>
+const admittedBoundaries = new WeakSet<ConnectionBoundary>()
 
 /** The existing stdio connection is a transport; only the Docker host proves all writers stopped. */
 export async function openTaskDockerCodexConnection(options: {
-  boundary: ReturnType<typeof createTaskDockerBoundary>
+  boundary: ConnectionBoundary
   handlers?: CodexAppServerConnectionHandlers
   open?: typeof openCodexAppServerConnection
   modelChannel?: TaskModelChannel

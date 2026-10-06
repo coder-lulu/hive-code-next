@@ -34,7 +34,7 @@ async function fixture() {
     validate: () => undefined
   })
   await store.tasks.beginDispatch(command, TASK_TEST_NOW, () => undefined)
-  await store.tasks.bindLaunch(command, TASK_TEST_LAUNCH, TASK_TEST_NOW)
+  await store.tasks.bindLaunch(store.tasks.get(command)!, TASK_TEST_LAUNCH, TASK_TEST_NOW)
   const running = store.tasks.get(command)!
   await writeFile(join(workspace.executionPath, 'report.md'), 'versioned outcome')
   await writeFile(

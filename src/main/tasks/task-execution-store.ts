@@ -22,6 +22,9 @@ import {
 import { bindTaskLaunch } from './task-launch-binding'
 import { settleCancelledTaskCodexDispatch } from './task-cancelled-dispatch'
 import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
+import type { TaskDockerNeverStartedEvidence } from './task-docker-boundary'
+import { settleCancelledTaskDockerPrestart } from './task-cancelled-docker-prestart'
 import { assertTaskCodexSessionBinding } from './task-codex-session-binding'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { hasTaskSessionBinding } from './task-session-association'
@@ -84,15 +87,47 @@ export class TaskExecutionPersistence {
     })
   }
 
+  settleCancelledDockerPrestart(
+    authorized: TaskExecutionRecord,
+    expected: TaskExecutionRecord,
+    session: AgentSessionRecord,
+    evidence: TaskDockerNeverStartedEvidence,
+    readNow: () => number,
+    validate: () => void
+  ) {
+    return this.update(
+      authorized.command,
+      (record, now) => {
+        validate()
+        assertTaskExecutionSnapshotCurrent(authorized, record)
+        assertTaskExecutionSnapshotCurrent(expected, record)
+        return settleCancelledTaskDockerPrestart(
+          this.transactions.state,
+          record,
+          authorized,
+          expected,
+          session,
+          evidence,
+          now
+        )
+      },
+      readNow
+    )
+  }
+
   admit(input: TaskExecutionAdmission) {
     return this.transactions.transact(() => admitTaskExecution(this.transactions.state, input))
   }
 
-  async beginDispatch(identity: Identity, now: number, validate: () => void) {
+  async beginDispatch(
+    identity: Identity,
+    now: number,
+    validate: (record: TaskExecutionRecord) => void
+  ) {
     return this.update(
       identity,
       (record) => {
-        validate()
+        validate(record)
         if (this.transactions.state.taskRecoveryBlocked) {
           return refuseTaskExecution('OUTCOME_UNKNOWN')
         }
@@ -110,8 +145,15 @@ export class TaskExecutionPersistence {
     )
   }
 
-  bindLaunch(identity: Identity, launch: AgentLaunchResult, now: number) {
-    return this.update(identity, (record) => bindTaskLaunch(record, launch), now)
+  bindLaunch(expected: TaskExecutionRecord, launch: AgentLaunchResult, now: number) {
+    return this.update(
+      expected.command,
+      (record) => {
+        assertTaskExecutionSnapshotCurrent(expected, record)
+        return bindTaskLaunch(record, launch)
+      },
+      now
+    )
   }
 
   async reserveModelDispatch(binding: TaskStructuredBinding, now: number, validate: () => void) {
@@ -196,10 +238,16 @@ export class TaskExecutionPersistence {
     )
   }
 
-  recoverLaunch(identity: Identity, fingerprint: string, now: number, validate: () => void) {
+  recoverLaunch(
+    expected: TaskExecutionRecord,
+    fingerprint: string,
+    now: number,
+    validate: () => void
+  ) {
     return this.update(
-      identity,
+      expected.command,
       (record) => {
+        assertTaskExecutionSnapshotCurrent(expected, record)
         validate()
         if (record.dispatch !== 'dispatching' || record.result) {
           return null
@@ -228,12 +276,12 @@ export class TaskExecutionPersistence {
     identity: Identity,
     cancellationKey: string,
     now: number,
-    validate: () => void
+    validate: (record: TaskExecutionRecord) => void
   ) {
     return this.update(
       identity,
       (record) => {
-        validate()
+        validate(record)
         if (record.result || record.cancellationKey) {
           return null
         }
@@ -246,13 +294,13 @@ export class TaskExecutionPersistence {
   markUnknown(
     identity: Identity,
     now: number,
-    validate: () => void = () => undefined,
+    validate: (record: TaskExecutionRecord) => void = () => undefined,
     summary?: string
   ) {
     return this.update(
       identity,
       (record) => {
-        validate()
+        validate(record)
         return record.result ||
           (record.status === 'outcome_unknown' &&
             (!summary || record.events.at(-1)?.summary === summary))

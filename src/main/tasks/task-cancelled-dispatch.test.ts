@@ -272,7 +272,7 @@ describe('original host cancellation before durable Codex reservation', () => {
         await replaceTaskEpoch(start)
         return null
       },
-      settleCancelledBeforeReservation: proof
+      settleCancelledDispatch: proof
     })
     const record = store.tasks.get(start)!
     const query = {
@@ -359,7 +359,7 @@ describe('original host cancellation before durable Codex reservation', () => {
         await writeFile(testAgentSessionStoreFilePath(directory), JSON.stringify(primary), 'utf8')
         return null
       },
-      settleCancelledBeforeReservation: proof
+      settleCancelledDispatch: proof
     })
     const query = {
       ...Object.fromEntries(
@@ -545,7 +545,7 @@ describe('original host cancellation before durable Codex reservation', () => {
       },
       collect: async () => null,
       stop: async () => null,
-      settleCancelledBeforeReservation: proof
+      settleCancelledDispatch: proof
     })
     const record = store.tasks.get(start)!
     const observation = await host.reconcile(
@@ -611,7 +611,7 @@ describe('original host cancellation before durable Codex reservation', () => {
       },
       collect: async () => null,
       stop: async () => null,
-      settleCancelledBeforeReservation: proof
+      settleCancelledDispatch: proof
     })
     await host.start(start, TASK_TEST_CALLER)
     await entered

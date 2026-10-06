@@ -73,7 +73,7 @@ export async function workflowCodeInputFixture(status: 'succeeded' | 'failed' = 
   })
   await store.tasks.beginDispatch(command, TASK_TEST_NOW, () => undefined)
   await store.tasks.bindLaunch(
-    command,
+    store.tasks.get(command)!,
     {
       worktreeId: 'folder:developer',
       outcome: { kind: 'structured', sessionId: 'session:developer', handle: 'worker:developer' },

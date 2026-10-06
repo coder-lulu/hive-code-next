@@ -87,7 +87,7 @@ describe('original controlled Runtime delivery handoff', () => {
     })
     const acquired = await acquireOwner(f.flow, f.record)
     await f.store.tasks.bindLaunch(
-      f.command,
+      f.store.tasks.get(f.command)!,
       {
         worktreeId: record.workspace.workspaceId,
         outcome: {

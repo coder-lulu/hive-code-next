@@ -66,31 +66,41 @@ export async function executePaperclipTask(
       await refreshQuery()
     }
     ports.assertCurrent?.()
-    // Runtime owns collection; a recovered dispatcher only reads the committed event stream.
-    if (purpose === 'execute') {
-      await ports.client.reconcile(query)
+    const readPages = async () => {
+      let observation: TaskExecutionObservation
+      do {
+        if (renew) {
+          await refreshQuery()
+        }
+        ports.assertCurrent?.()
+        observation = await ports.client.observe({
+          ...query,
+          kind: 'execution.observe',
+          afterSequence: cursor,
+          limit: 32
+        })
+        ports.assertCurrent?.()
+        await ports.onObservation?.(observation)
+        cursor = observation.cursor
+        if (ports.waitTimeoutMs === undefined) {
+          deadline = Math.min(
+            deadline,
+            taskExecutionDeadline({ accepted: observation.accepted, command: binding?.command })
+          )
+        }
+      } while (observation.result && cursor < observation.lastSequence)
+      return observation
     }
-    let observation: TaskExecutionObservation
-    do {
+    let observation = await readPages()
+    // Admission is committed while the original host still owns its pending launch.
+    if (purpose === 'execute' && !observation.result && observation.status !== 'accepted') {
       if (renew) {
         await refreshQuery()
       }
-      observation = await ports.client.observe({
-        ...query,
-        kind: 'execution.observe',
-        afterSequence: cursor,
-        limit: 32
-      })
       ports.assertCurrent?.()
-      await ports.onObservation?.(observation)
-      cursor = observation.cursor
-      if (ports.waitTimeoutMs === undefined) {
-        deadline = Math.min(
-          deadline,
-          taskExecutionDeadline({ accepted: observation.accepted, command: binding?.command })
-        )
-      }
-    } while (observation.result && cursor < observation.lastSequence)
+      await ports.client.reconcile(query)
+      observation = await readPages()
+    }
     return observation
   }
   const requestCancellation = (
@@ -247,7 +257,7 @@ export async function executePaperclipTask(
         }
       : paperclipTaskErrorResult('OUTCOME_UNKNOWN', binding, true, true)
   } catch (error) {
-    if (dispatched && binding && query) {
+    if (purpose === 'execute' && dispatched && binding && query) {
       await requestCancellation('shutdown', false)
       const observation = await readObservation(false).catch(() => null)
       if (observation?.result) {

@@ -153,7 +153,7 @@ export async function createTaskModelDispatchFixture(directory: string, options:
     now: TASK_TEST_NOW
   })
   if (options.bound) {
-    await store.tasks.bindLaunch(fixture.command, fixture.launch, TASK_TEST_NOW)
+    await store.tasks.bindLaunch(store.tasks.get(fixture.command)!, fixture.launch, TASK_TEST_NOW)
   }
   const task = store.tasks.get(fixture.command)
   if (!task?.structuredBinding) {

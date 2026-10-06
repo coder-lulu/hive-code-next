@@ -101,7 +101,7 @@ export async function workflowOutcomeFixture(
     () => undefined
   )
   await store.tasks.bindLaunch(
-    command,
+    store.tasks.get(command)!,
     {
       worktreeId: workspace.workspaceId,
       outcome: { kind: 'structured', sessionId: 'session:outcome', handle: 'worker:outcome' },

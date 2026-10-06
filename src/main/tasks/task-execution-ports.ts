@@ -60,7 +60,7 @@ export type TaskExecutionHostDependencies = {
   ) => Promise<AgentLaunchResult>
   stop: (record: TaskExecutionRecord) => Promise<TaskExecutionStopEvidence | null>
   /** Private original Codex host port; no transport can supply a prelaunch verdict. */
-  settleCancelledBeforeReservation?: (
+  settleCancelledDispatch?: (
     record: TaskExecutionRecord,
     input: string,
     validate: () => void

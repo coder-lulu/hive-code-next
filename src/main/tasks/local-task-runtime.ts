@@ -199,7 +199,7 @@ export async function startLocalTaskRuntime(options: {
       collectCommands: evidence.collectCommands
     }),
     store: resources.store.tasks,
-    settleCancelledBeforeReservation: createTaskCancelledDispatchSettlement(resources.store.tasks),
+    settleCancelledDispatch: createTaskCancelledDispatchSettlement(resources.store),
     capabilities,
     authorizeEnforcement: enforcement.authorize,
     resolveStart: (query) => issuer.resolveGrant(query.authorizationRef)?.command ?? null,

@@ -67,7 +67,7 @@ export async function outcomeAccessFixture(commandCount = 0) {
   })
   await store.tasks.beginDispatch(command, TASK_TEST_NOW, () => undefined)
   await store.tasks.bindLaunch(
-    command,
+    store.tasks.get(command)!,
     {
       worktreeId: workspace.workspaceId,
       outcome: {

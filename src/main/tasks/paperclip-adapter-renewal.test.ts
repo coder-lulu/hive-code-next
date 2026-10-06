@@ -61,7 +61,10 @@ describe('long-running Paperclip task authorization', () => {
   })
   it('renews only authorization and keeps waiting for the original execution result', async () => {
     const { current, expire } = await expiringFixture()
-    current.context.onLog = vi.fn(async () => {
+    current.context.onLog = vi.fn(async (_stream, data) => {
+      if (!data.endsWith(' running\n')) {
+        return
+      }
       expire()
       current.deps.collect = vi.fn(async () => ({
         outcomeRef: 'outcome:test',
@@ -86,7 +89,10 @@ describe('long-running Paperclip task authorization', () => {
   })
   it('renews expired authorization before forwarding operator cancellation', async () => {
     const { current, expire } = await expiringFixture()
-    current.context.onLog = vi.fn(async () => {
+    current.context.onLog = vi.fn(async (_stream, data) => {
+      if (!data.endsWith(' running\n')) {
+        return
+      }
       expire()
       current.controller.abort()
     })
@@ -98,7 +104,10 @@ describe('long-running Paperclip task authorization', () => {
   })
   it('refuses changed immutable input under a reused declared fingerprint during renewal', async () => {
     const { current, expire } = await expiringFixture()
-    current.context.onLog = vi.fn(async () => {
+    current.context.onLog = vi.fn(async (_stream, data) => {
+      if (!data.endsWith(' running\n')) {
+        return
+      }
       expire()
       current.ports.resolveBinding = vi.fn(async () => ({
         ...current.binding,

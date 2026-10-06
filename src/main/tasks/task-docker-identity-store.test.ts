@@ -491,7 +491,11 @@ describe('Docker identity checkpoints in the original Task transaction', () => {
       const beforeDispatch = await admission(phase !== 'not_dispatched')
       const pending = dockerIdentity(beforeDispatch)
       if (phase === 'running') {
-        await store.tasks.bindLaunch(taskCommand(), TASK_TEST_LAUNCH, TASK_TEST_NOW)
+        await store.tasks.bindLaunch(
+          store.tasks.get(taskCommand())!,
+          TASK_TEST_LAUNCH,
+          TASK_TEST_NOW
+        )
       }
       if (phase === 'unknown') {
         await store.tasks.markUnknown(taskCommand(), TASK_TEST_NOW)

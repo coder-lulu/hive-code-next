@@ -4,6 +4,7 @@ import type { TaskExecutionRecord } from './task-execution-record'
 import type { TaskExecutionPersistence } from './task-execution-store'
 import { refuseTaskExecution } from './task-execution-error'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
 
 export function assertTaskExecutionDispatchCurrent(
   authorization: TaskExecutionAuthorization
@@ -20,9 +21,10 @@ export async function prepareTaskExecutionLaunchAuthorization(
   record: TaskExecutionRecord,
   authorization: TaskExecutionAuthorization
 ) {
-  const dispatch = await context.store.beginDispatch(record.command, context.now(), () =>
+  const dispatch = await context.store.beginDispatch(record.command, context.now(), (current) => {
+    assertTaskExecutionSnapshotCurrent(record, current)
     assertTaskExecutionDispatchCurrent(authorization)
-  )
+  })
   if (!dispatch.changed) {
     return null
   }

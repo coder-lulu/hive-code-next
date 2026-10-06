@@ -1,6 +1,6 @@
 import { lstatSync, statSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { isDeepStrictEqual } from 'node:util'
+import { isDeepStrictEqual as same } from 'node:util'
 import { runProcess, type ProcessResult } from '../../shared/child-process/run-process'
 import { RetryableProcessExitProof } from '../../shared/child-process/retryable-process-exit-proof'
 import { taskDockerConfiguration, type TaskDockerRecord } from './task-docker-configuration'
@@ -36,6 +36,12 @@ export type TaskDockerPrepared = {
   }
   assertCurrent: () => void
 }
+export type TaskDockerNeverStartedEvidence = {
+  containerId: string
+  observedAt: number
+}
+const DAEMON_FORMAT =
+  '{"ID":{{json .ID}},"OSType":{{json .OSType}},"Architecture":{{json .Architecture}},"ServerVersion":{{json .ServerVersion}}}'
 
 export function createTaskDockerBoundary(options: {
   dockerPath: string
@@ -60,8 +66,7 @@ export function createTaskDockerBoundary(options: {
   const exitProof = new RetryableProcessExitProof()
   let containerId = recovery?.containerId ?? null
   let imageEnv: Record<string, string> | null = null
-  let daemon: ReturnType<typeof taskDockerDaemon> | null =
-    options.expectedDaemon ?? recovery?.daemon ?? null
+  let daemon: TaskDockerDaemonIdentity | null = options.expectedDaemon ?? recovery?.daemon ?? null
   let createAttempted = false
   let stopping = recovery !== null
   let pendingCheckpointed = false
@@ -122,20 +127,11 @@ export function createTaskDockerBoundary(options: {
     if (!current && !daemon) {
       refuseTaskExecution('OUTCOME_UNKNOWN')
     }
-    const observed = taskDockerDaemon(
-      await invoke(
-        [
-          'info',
-          '--format',
-          '{"ID":{{json .ID}},"OSType":{{json .OSType}},"Architecture":{{json .Architecture}},"ServerVersion":{{json .ServerVersion}}}'
-        ],
-        current
-      )
-    )
+    const observed = taskDockerDaemon(await invoke(['info', '--format', DAEMON_FORMAT], current))
     if (
       daemon &&
       (current
-        ? !isDeepStrictEqual(daemon, observed)
+        ? !same(daemon, observed)
         : daemon.ID !== observed.ID ||
           daemon.OSType !== observed.OSType ||
           daemon.Architecture !== observed.Architecture)
@@ -155,11 +151,12 @@ export function createTaskDockerBoundary(options: {
     }
     return imageEnv
   }
-  async function inspectOwned(current: boolean) {
-    const env = current ? await requireImage(true) : null
+  async function inspectOwned(current: boolean, fullValidation = false) {
+    const env = current || fullValidation ? await requireImage(current) : null
     await requireDaemon(current)
     const target = containerId ?? config.name
     const reply = await invoke(['container', 'inspect', target], current)
+    const observedAt = Date.now()
     await requireDaemon(current)
     const missing = [
       `Error: No such object: ${target}`,
@@ -176,13 +173,11 @@ export function createTaskDockerBoundary(options: {
     ) {
       return null
     }
-    const found = !current
-      ? taskDockerCleanupContainer(reply, config, containerId)
-      : env
-        ? taskDockerContainer(reply, config, env, containerId)
-        : refuseTaskExecution('OUTCOME_UNKNOWN')
+    const found = env
+      ? taskDockerContainer(reply, config, env, containerId)
+      : taskDockerCleanupContainer(reply, config, containerId)
     containerId = found.Id
-    return found
+    return { ...found, observedAt }
   }
   async function checkpoint(id: string | null): Promise<void> {
     assertCurrent()
@@ -253,24 +248,29 @@ export function createTaskDockerBoundary(options: {
     }
   }
   return {
+    async proveNeverStarted(): Promise<TaskDockerNeverStartedEvidence | null> {
+      try {
+        const first = recovery && same(daemon, recovery.daemon) && (await inspectOwned(false, true))
+        const after = first && taskDockerNeverStarted(first) && (await inspectOwned(false, true))
+        return after && taskDockerNeverStarted(after)
+          ? { containerId: after.Id, observedAt: after.observedAt }
+          : null
+      } catch {
+        return null
+      }
+    },
     prepare(): Promise<TaskDockerPrepared> {
       if (preparing) {
         return preparing
       }
       const attempt = prepareContainer()
       preparing = attempt
-      void attempt.then(
-        () => {
-          if (preparing === attempt) {
-            preparing = null
-          }
-        },
-        () => {
-          if (preparing === attempt) {
-            preparing = null
-          }
+      const clear = () => {
+        if (preparing === attempt) {
+          preparing = null
         }
-      )
+      }
+      void attempt.then(clear, clear)
       return attempt
     },
     async inspect(): Promise<'live' | 'unverifiable' | 'exited'> {
