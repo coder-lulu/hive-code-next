@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Debugger } from 'electron'
 import { describe, expect, it, vi } from 'vitest'
+import { PRODUCT_CONFIG } from '../../shared/brand'
 import {
   decodeBrowserScreencastFrame,
   type BrowserScreencastFormat
@@ -138,7 +139,9 @@ describe('live screencast image allocation', () => {
 
   it('owns pooled and offset images through refused sends and keeps encoded bytes independent', async () => {
     vi.useFakeTimers()
-    const bytes = readFileSync(resolve('resources/tray/hivecode-menu-barTemplate.png'))
+    const bytes = readFileSync(
+      resolve('resources', 'tray', `${PRODUCT_CONFIG.slug}-menu-barTemplate.png`)
+    )
     const data = bytes.toString('base64')
     const expectedDigest = digest(bytes)
     const pooled = Buffer.from(data, 'base64')

@@ -21,7 +21,12 @@
 import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { describeCensusDiff, runLengthDecode, runLengthEncode } from './readiness-census-baseline'
+import {
+  censusBaselineFileName,
+  describeCensusDiff,
+  runLengthDecode,
+  runLengthEncode
+} from './readiness-census-baseline'
 import { CENSUS_AGENTS } from './readiness-census-synthetic-matrix'
 import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import {
@@ -71,7 +76,7 @@ describe('readiness census coverage', () => {
     const subjects = [
       ...CENSUS_PANES.map(censusPaneSubject),
       ...CENSUS_AGENTS.map((agent) => `synthetic/${agent}`)
-    ].map((subject) => `${subject.replaceAll('/', '--')}.json`)
+    ].map(censusBaselineFileName)
     const stored = readdirSync(join(__dirname, '__fixtures__', 'readiness-census'))
     expect(stored.toSorted()).toEqual(subjects.toSorted())
   })

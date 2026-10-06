@@ -1,5 +1,6 @@
 // Part of the readiness census; readiness-census.test.ts documents it and how to regenerate.
 import { describe, expect, it } from 'vitest'
+import { PRODUCT_CONFIG } from '../../shared/brand'
 import { checkCensusCases } from './readiness-census-baseline'
 import { useCensusEnvironment } from './readiness-census-pane-probe'
 import {
@@ -17,7 +18,7 @@ describe('readiness census: synthetic evidence matrix', () => {
     }
     const diff = checkCensusCases(
       `synthetic/${agent}`,
-      `${agent}: title x first-party status on a painted screen; screen x foreground under the titles that leave the low lanes open; dialog order x title. Each read clocked and clockless.`,
+      `${agent === PRODUCT_CONFIG.slug ? 'registered product agent' : agent}: title x first-party status on a painted screen; screen x foreground under the titles that leave the low lanes open; dialog order x title. Each read clocked and clockless.`,
       observations
     )
     expect(diff).toBe('')

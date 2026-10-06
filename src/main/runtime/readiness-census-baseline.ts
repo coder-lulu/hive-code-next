@@ -1,6 +1,7 @@
 // The committed readiness census: run-length-encoded verdicts per frame, compared or rewritten.
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { PRODUCT_CONFIG } from '../../shared/brand'
 
 const UPDATE_CENSUS_ENV = 'UPDATE_READINESS_CENSUS'
 const BASELINE_DIR = join(__dirname, '__fixtures__', 'readiness-census')
@@ -47,8 +48,14 @@ export function runLengthDecode(lines: readonly string[]): string[] {
   return values
 }
 
+export function censusBaselineFileName(subject: string): string {
+  const storedSubject =
+    subject === `synthetic/${PRODUCT_CONFIG.slug}` ? 'synthetic/product-agent' : subject
+  return `${storedSubject.replaceAll('/', '--')}.json`
+}
+
 function baselinePath(subject: string): string {
-  return join(BASELINE_DIR, `${subject.replaceAll('/', '--')}.json`)
+  return join(BASELINE_DIR, censusBaselineFileName(subject))
 }
 
 /** Readable per-index differences, grouped into runs so a shifted lane reads as one line. */

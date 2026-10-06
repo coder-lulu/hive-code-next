@@ -1,5 +1,5 @@
 {
-  "description": "hivecode: title x first-party status on a painted screen; screen x foreground under the titles that leave the low lanes open; dialog order x title. Each read clocked and clockless.",
+  "description": "registered product agent: title x first-party status on a painted screen; screen x foreground under the titles that leave the low lanes open; dialog order x title. Each read clocked and clockless.",
   "cases": {
     "title=working-spinner status=none screen=present fg=agent clock=clocked": "now=working edge=working quiet=working wait=pending",
     "title=working-spinner status=none screen=present fg=agent clock=clockless": "verdict=working wait=pending",
