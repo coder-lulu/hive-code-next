@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "af6fc00321ebbfedb5d61fe73d63904187bf9107",
+  "sourceProductSha": "2308828f6763e96bd396b36cb80659323820fa67",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -7074,7 +7074,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "10643db43615659ca3071db76fffefd2dc508dfb"
+        "sha": "454a20159a1e885a664a5cc1ef8dabeee1647b68"
       },
       "upstream": {
         "mode": "100644",
@@ -7347,9 +7347,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "bb6a7e2e5020d687e56d9db89083ac379b0431b1"
+        "sha": "97cf2602bc3b7fa5ad4793ca2ce16c112506cd79"
       },
-      "reason": "保留Hive bundled assets断言并使用既有runProcess边界 Final candidate repair: Compile the unchanged full CLI configuration into a fresh installed fixture. Apply the actual tracked production !out exclusions to genuine ASAR generation, assert no emitted test payload enters the archive, and await the public returned writer before archive stat and real installed CLI invalid-PR refusal. Register exact-owned mandatory cleanup onTestFinished, using the project existing 60s hook budget; body retains original30s, compiler60s and installedCLI10s. Cleanup errors still fail the owner; cleanup is no longer squeezed into remaining body time. Keep all15 original case identities/7 existing Windows skips. Actual fixture uses prescribed os.tmpdir rather than watched repository logs to isolate the running GUI archive cache; diagnostic artifacts remain project logs. No cached compiler output, mock, compiler scope reduction, GUI termination or archive suffix change.",
+      "reason": "保留Hive bundled assets断言并使用既有runProcess边界 Final candidate repair: Compile the unchanged full CLI configuration into a fresh installed fixture. Apply the actual tracked production !out exclusions to genuine ASAR generation, assert no emitted test payload enters the archive, and await the public returned writer before archive stat and real installed CLI invalid-PR refusal. Register exact-owned mandatory cleanup onTestFinished, using the project existing 60s hook budget; body retains original30s, compiler60s and installedCLI10s. Cleanup errors still fail the owner; cleanup is no longer squeezed into remaining body time. Keep all15 original case identities/7 existing Windows skips. Actual fixture uses prescribed os.tmpdir rather than watched repository logs to isolate the running GUI archive cache; diagnostic artifacts remain project logs. No cached compiler output, mock, compiler scope reduction, GUI termination or archive suffix change. Final typed public ASAR option repair: Call the installed ASAR public listPackage API with its required typed isPack:false option. The implementation takes the same plain-path branch as omitted options. Move the same real full-source compiler/copy/ASAR producer into the existing default 60s beforeAll hook; wait for setup producers before mandatory exact-owned afterAll cleanup. Preserve all 15 case names and assertions, original 7 skips, compile child 60s, installed CLI child 10s and test body 30s. Setup now has its separate 60s default hook budget instead of sharing the former 30s body; no reduced compile scope or fake fixture.",
       "regressionTests": ["src/main/cli/packaged-cli-assets.test.ts"]
     },
     {
@@ -10080,10 +10080,7 @@
     {
       "path": "src/main/runtime/__fixtures__/readiness-census/synthetic--hivecode.json",
       "base": null,
-      "product": {
-        "mode": "100644",
-        "sha": "e263486d20aa837fdabb97640dc091f7e0a0c9b3"
-      },
+      "product": null,
       "upstream": null,
       "result": null,
       "reason": "Record the registered Hive agent with the existing real synthetic census producer and exact Hive case, rather than copying another provider baseline. Original 45 provider fixtures remain byte-identical and the normal complete 46-provider owner passed. Final centralized brand-boundary repair: Remove the branded physical filename after moving its genuine current Hive observations to synthetic--product-agent.json; this is a reviewed rename, no census case or agent deletion.",
@@ -10101,7 +10098,10 @@
     {
       "path": "src/main/runtime/__fixtures__/readiness-census/synthetic--product-agent.json",
       "base": null,
-      "product": null,
+      "product": {
+        "mode": "100644",
+        "sha": "fa1e88436e240362797f741307bd7c3c7080c928"
+      },
       "upstream": null,
       "result": {
         "mode": "100644",
@@ -10756,7 +10756,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "5625466ac27c9c8d2db467114c6883ee6d35adc1"
+        "sha": "393ee993a1e67fac6988e6b4fb9e97ebed7621a6"
       },
       "upstream": {
         "mode": "100644",
@@ -10783,7 +10783,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "eeae0da57acfb183732d147ccae29893fa2652d7"
+        "sha": "4cbf575890ce90daad05a831775def50afe8f159"
       },
       "upstream": {
         "mode": "100644",
@@ -10810,7 +10810,7 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "9a11abe7e186504afa5a278c974b8bcbe7a5bb1e"
+        "sha": "e1adbed858c41c6412dfe21e47a39e49f357eaa4"
       },
       "upstream": {
         "mode": "100644",
