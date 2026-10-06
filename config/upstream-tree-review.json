@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "22e6db1eccdf7850839f47b081442845aa7129a7",
+  "sourceProductSha": "498783ad149d54dae7244c25c8c4f8471f7f5bc0",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -8552,14 +8552,14 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "e0f09d15266833fafef78545cf2e2a10c88a0fe2"
+        "sha": "c3d64354185b1f88e416aae8bdb656d3af990c2b"
       },
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "e0f09d15266833fafef78545cf2e2a10c88a0fe2"
+        "sha": "c3d64354185b1f88e416aae8bdb656d3af990c2b"
       },
-      "reason": "Twelve desktop boundary cases use actual host/resolver and owned wx files; preserve owner-loss, changed authorization, EEXIST and operational-error refusal.",
+      "reason": "Twelve desktop boundary cases use actual host/resolver and owned wx files; preserve owner-loss, changed authorization, EEXIST and operational-error refusal.\nFinal full-lint maintenance repair: Replace the broad object fixture parameter with the existing SshMutationExpectation owner and the only optional leaseToken override used by these original cases. Actual TypeScript 6.0.3 emitted runtime JavaScript remains byte-identical; all 12 original assertions and budgets are unchanged.",
       "regressionTests": [
         "src/main/ipc/filesystem/untitled-placeholder-handlers.test.ts",
         "src/shared/untitled-placeholder-retention.test.ts"
@@ -12840,14 +12840,14 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "3e990aa7c8890ceda38e23104e7c5ba737ca85f9"
+        "sha": "0d2660ed497361bb1a8c3b580de7cfbe4c8e8dec"
       },
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "3e990aa7c8890ceda38e23104e7c5ba737ca85f9"
+        "sha": "0d2660ed497361bb1a8c3b580de7cfbe4c8e8dec"
       },
-      "reason": "Registers owner map before first await, revalidates map/provider/path/pinned host after awaits, drains old provider exactly before replacement, and allows strict no-location ordinary creation without a fake token.",
+      "reason": "Registers owner map before first await, revalidates map/provider/path/pinned host after awaits, drains old provider exactly before replacement, and allows strict no-location ordinary creation without a fake token.\nFinal full-lint maintenance repair: Normalize both optional provider release values with Promise.resolve before the original Promise.all. Keep synchronous invocation and throw ordering, aggregation/rejection, owner-map mutation and authority revalidation unchanged. The optional provider contract remains unchanged. Full original root lint passed; the 25 original local authority/fallback cases passed. Remote aggregation branches are statically reviewed, not claimed as directly exercised by those 25 cases.",
       "regressionTests": [
         "src/main/runtime/runtime-untitled-placeholder-commands.test.ts",
         "src/shared/untitled-placeholder-retention.test.ts"

@@ -10,6 +10,7 @@ import {
 } from '../../../shared/untitled-placeholder-recovery-directory'
 import { registerUntitledPlaceholderHandlers } from './untitled-placeholder-handlers'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
+import type { SshMutationExpectation } from '../../../shared/ssh-types'
 
 const ports = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
@@ -55,7 +56,7 @@ function destroy(): void {
 
 async function invoke(
   channel = 'fs:createUntitledPlaceholder',
-  args: object = {}
+  args: SshMutationExpectation & { leaseToken?: string } = {}
 ): Promise<unknown> {
   const handler = ports.handlers.get(channel)
   if (!handler) {

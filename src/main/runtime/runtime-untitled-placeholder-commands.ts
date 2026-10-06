@@ -107,9 +107,11 @@ export class RuntimeUntitledPlaceholderCommands {
       const previous = record
       await Promise.all(
         [...previous.tokens].map((token) =>
-          previous.provider
-            ? previous.provider.releaseUntitledPlaceholder?.(target.owner, token)
-            : this.untitledPlaceholderRetention.release(target.owner, token)
+          Promise.resolve(
+            previous.provider
+              ? previous.provider.releaseUntitledPlaceholder?.(target.owner, token)
+              : this.untitledPlaceholderRetention.release(target.owner, token)
+          )
         )
       )
       await assertCurrent()
@@ -219,7 +221,7 @@ export class RuntimeUntitledPlaceholderCommands {
       const release = record.provider
         ? Promise.all(
             [...record.tokens].map((token) =>
-              record.provider?.releaseUntitledPlaceholder?.(owner, token)
+              Promise.resolve(record.provider?.releaseUntitledPlaceholder?.(owner, token))
             )
           )
         : this.untitledPlaceholderRetention.releaseOwner(owner)
