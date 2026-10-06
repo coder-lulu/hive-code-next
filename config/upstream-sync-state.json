@@ -3,15 +3,15 @@
   "upstream": "stablyai/orca",
   "targetBranch": "hivecode/main-next",
   "initialAuditCompleted": true,
-  "lastReviewedUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
+  "lastReviewedUpstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "pendingShas": ["90801e2deb5debc51e2018ec178255ab2fe1748a"],
   "lastAudit": {
     "mode": "incremental",
-    "baseSha": "c5fc0c6f269096a5cc205119b30fa8e345ada027",
-    "inclusionHeadSha": "a47681d1a15a9e32b6b67aee92ec6f7336609693",
-    "productSha": "691d99d36aca0a4322544d8db47549cd7fedbcc7",
-    "commitCount": 123,
-    "generatedAt": "2026-10-01T05:00:45.254Z",
+    "baseSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
+    "inclusionHeadSha": "369281bb34232039bfa6abd66c351086f060cdb4",
+    "productSha": "78727398b1a99dfcc376ccdd837c621a69d3cbe9",
+    "commitCount": 533,
+    "generatedAt": "2026-10-06T02:09:24.856Z",
     "activation": "Effective after boundary review, exact-candidate gates and fast-forward product publication"
   }
 }
