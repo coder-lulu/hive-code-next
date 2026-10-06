@@ -3898,21 +3898,6 @@
       "regressionTests": ["config/scripts/release-tag-pattern-census.test.mjs"]
     },
     {
-      "path": "config/scripts/upstream-sync-checkpoint-execution.test.mjs",
-      "base": null,
-      "product": {
-        "mode": "100644",
-        "sha": "b20562bb58702b6af9f3362f934a4c643ea1f6e4"
-      },
-      "upstream": null,
-      "result": {
-        "mode": "100644",
-        "sha": "9b939dd0fdf7ab60d5b706882d9d630bcc0cb19e"
-      },
-      "reason": "Keep independent complete ordered commit oracle and two exact verification calls per unique commit (17 unique,34 calls).",
-      "regressionTests": ["config/scripts/upstream-sync-checkpoint-execution.test.mjs"]
-    },
-    {
       "path": "config/scripts/windows-process-tree-creation-time.cjs",
       "reason": "Require the compiled current addon to expose both creation-time ownership and the same-HANDLE native operation; stale binaries explicitly fail the existing runtime capability probe.",
       "regressionTests": [
