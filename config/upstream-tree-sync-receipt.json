@@ -4,11 +4,11 @@
   "upstream": "stablyai/orca",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
-  "targetSha": "0165a2e8d7b301bea825173a6f4e6eb2f60d51ac",
+  "targetSha": "f1d14f671dd50c4c62b1adaaa4ee5b1f761de5a7",
   "baseTreeSha": "be3b3b0bd31532f0ab6a545744d7420848311b21",
   "upstreamTreeSha": "307815385c4bf005b093cf0115b73d9490720548",
-  "targetTreeSha": "2458eb8743cce666b4aade5addd1962b7c0d88a1",
-  "mergedTreeSha": "41f9489746eaaf13a7defd40179b321e052343d4",
+  "targetTreeSha": "74680a329d6213cf4ee85d6a18f48ed38bd0290c",
+  "mergedTreeSha": "898638fe829468b107441004b71f867ed644207d",
   "docs": {
     "path": "docs",
     "mode": "160000",
@@ -405,7 +405,7 @@
     }
   },
   "review": {
-    "frozenReviewBlobSha": "6fdde541fea145f5c0b3fdd24a865afea6962257",
+    "frozenReviewBlobSha": "6dc5d3567192ac4dd4bff7b7b6770a0d45208aa1",
     "conflictPaths": [
       ".github/workflows/adhoc-mac-build.yml",
       ".github/workflows/agent-state-rules-publish.yml",
@@ -712,6 +712,7 @@
       "src/main/native-chat/agent-session-wire/structured-conversation-command.ts",
       "src/main/notifications/notification-delivery-service.test.ts",
       "src/main/opencode-usage/cache-write-accounting.test.ts",
+      "src/main/opencode/opencode-go-api-key-store.test.ts",
       "src/main/opencode/opencode-pty-launch.test.ts",
       "src/main/orcad/orcad-bundled-runtime.test.ts",
       "src/main/orcad/orcad-bundled-runtime.ts",
@@ -1883,7 +1884,9 @@
       "tests/e2e/structured-chat-owner-status-activation.unit.test.ts",
       "tests/e2e/worktree-lineage-state.ts",
       "src/renderer/src/components/terminal-pane/terminal-pane-store-subscription-budget.test.tsx",
-      "src/main/ai-vault/antigravity-index-file-admission.test.ts"
+      "src/main/ai-vault/antigravity-index-file-admission.test.ts",
+      "src/main/opencode/opencode-go-api-key-store.test.ts",
+      "config/scripts/orca-dev-bin.test.mjs"
     ]
   },
   "absorbedUpstreamShas": [
