@@ -12,6 +12,7 @@ export const HiveTaskCreateSchema = z.strictObject({
 export type HiveTaskCreate = z.infer<typeof HiveTaskCreateSchema>
 export type HiveTaskView = {
   id: string
+  runId: string
   title: string
   status:
     | 'pending'
@@ -29,6 +30,6 @@ export type HiveTasksApi = HiveTeamWorkbenchApi &
   HiveWorkflowCasesApi & {
     list(): Promise<HiveTaskView[]>
     create(input: HiveTaskCreate): Promise<HiveTaskView>
-    cancel(taskId: string): Promise<HiveTaskView>
-    artifact(taskId: string, artifactRef: string): Promise<HiveTaskArtifact>
+    cancel(taskId: string, runId: string): Promise<HiveTaskView>
+    artifact(taskId: string, runId: string, artifactRef: string): Promise<HiveTaskArtifact>
   }

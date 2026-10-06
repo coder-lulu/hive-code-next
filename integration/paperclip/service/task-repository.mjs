@@ -20,19 +20,23 @@ const digest = canonicalAgentSessionDigest
 
 /** Business state lives in the pinned Paperclip tables, with one transactional receipt per run. */
 export function createTaskRepository(sql) {
-  const read = async (db, accountId, taskId, lock = false) => {
-    requireTaskRepositoryScope(accountId, taskId)
+  const read = async (db, accountId, taskId, runId, lock = false) => {
+    requireTaskRepositoryScope(accountId, taskId, runId)
     const rows = lock
       ? await db`SELECT i.*, b.run_id, b.binding, b.result_receipt,
           (b.cancel_requested OR h.context_snapshot->'externalExecutionControl'->'cancel' IS NOT NULL) AS cancel_requested,b.workspace_selector,
-          a.agent_id, h.execution_stage, h.driver_kind, h.status AS run_status FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id
-          JOIN heartbeat_runs h ON h.id=b.run_id
-          JOIN hive_task_accounts a ON a.account_id=b.account_id WHERE b.account_id=${accountId} AND i.id=${taskId} FOR UPDATE OF i,b`
+          h.agent_id, h.execution_stage, h.driver_kind, h.status AS run_status FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id
+          JOIN heartbeat_runs h ON h.id=b.run_id AND h.company_id=i.company_id
+          JOIN hive_task_accounts a ON a.account_id=b.account_id AND a.company_id=i.company_id AND a.agent_id=h.agent_id
+          JOIN agents g ON g.id=h.agent_id AND g.company_id=i.company_id
+          WHERE b.account_id=${accountId} AND i.id=${taskId} AND b.run_id=${runId} FOR UPDATE OF i,b`
       : await db`SELECT i.*, b.run_id, b.binding, b.result_receipt,
           (b.cancel_requested OR h.context_snapshot->'externalExecutionControl'->'cancel' IS NOT NULL) AS cancel_requested,b.workspace_selector,
-          a.agent_id, h.execution_stage, h.driver_kind, h.status AS run_status FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id
-          JOIN heartbeat_runs h ON h.id=b.run_id
-          JOIN hive_task_accounts a ON a.account_id=b.account_id WHERE b.account_id=${accountId} AND i.id=${taskId}`
+          h.agent_id, h.execution_stage, h.driver_kind, h.status AS run_status FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id
+          JOIN heartbeat_runs h ON h.id=b.run_id AND h.company_id=i.company_id
+          JOIN hive_task_accounts a ON a.account_id=b.account_id AND a.company_id=i.company_id AND a.agent_id=h.agent_id
+          JOIN agents g ON g.id=h.agent_id AND g.company_id=i.company_id
+          WHERE b.account_id=${accountId} AND i.id=${taskId} AND b.run_id=${runId}`
     if (!rows[0]) {
       refuse('FORBIDDEN')
     }
@@ -44,14 +48,15 @@ export function createTaskRepository(sql) {
       coalesce(context_snapshot->'externalExecutionControl','{}'::jsonb)||jsonb_build_object(${kind}::text,
         coalesce(context_snapshot->'externalExecutionControl'->${kind}::text,
           jsonb_build_object('requestedAt',clock_timestamp(),'reason',${reason}::text))))
-    WHERE id=${task.run_id} AND company_id=${task.company_id} AND driver_kind='hive_runtime' RETURNING id`
+    WHERE id=${task.run_id} AND company_id=${task.company_id} AND agent_id=${task.agent_id}
+      AND driver_kind='hive_runtime' RETURNING id`
     if (!rows.length) {
       refuse('REVISION_CONFLICT')
     }
   }
-  const settle = async (db, accountId, taskId, rawReceipt, token) => {
+  const settle = async (db, accountId, taskId, runId, rawReceipt, token) => {
     const receipt = TaskExecutionResultSchema.parse(rawReceipt)
-    const task = await read(db, accountId, taskId, true)
+    const task = await read(db, accountId, taskId, runId, true)
     const binding = assertTaskReceiptIdentity(task, receipt)
     if (task.result_receipt) {
       if (digest(task.result_receipt) !== digest(receipt)) {
@@ -80,7 +85,7 @@ export function createTaskRepository(sql) {
         : receipt.status === 'cancelled'
           ? 'cancelled'
           : 'blocked'
-    await db`UPDATE hive_task_bindings SET result_receipt=${sql.json(receipt)} WHERE task_id=${task.id}`
+    await db`UPDATE hive_task_bindings SET result_receipt=${sql.json(receipt)} WHERE account_id=${accountId} AND task_id=${task.id} AND run_id=${runId}`
     await db`UPDATE issues SET status=${status},status_version=status_version+1,checkout_run_id=NULL,
       execution_run_id=NULL,execution_agent_name_key=NULL,execution_locked_at=NULL,updated_at=now() WHERE id=${task.id}`
     const cancelled = receipt.status === 'cancelled'
@@ -92,11 +97,12 @@ export function createTaskRepository(sql) {
       error_code=CASE WHEN ${cancelled}::boolean THEN
         coalesce(context_snapshot->'externalExecutionControl'->'cancel'->>'errorCode','cancelled') ELSE error_code END,
       execution_stage='settled',exit_code=${receipt.status === 'succeeded' ? 0 : receipt.status === 'failed' ? 1 : null}
-      WHERE id=${task.run_id} AND company_id=${task.company_id} AND driver_kind='hive_runtime' RETURNING id`
+      WHERE id=${task.run_id} AND company_id=${task.company_id} AND agent_id=${task.agent_id}
+        AND driver_kind='hive_runtime' RETURNING id`
     if (!runs.length) {
       refuse('REVISION_CONFLICT')
     }
-    const settled = await read(db, accountId, taskId)
+    const settled = await read(db, accountId, taskId, runId)
     if (token !== undefined) {
       await requireCurrentTaskDelivery(db, accountId, settled, token)
     }
@@ -114,12 +120,12 @@ export function createTaskRepository(sql) {
         await db`SELECT pg_advisory_xact_lock(hashtextextended(${accountId}, 0))`
         const fingerprint = digest(input)
         const previous =
-          await db`SELECT task_id, input_fingerprint FROM hive_task_bindings WHERE account_id=${accountId} AND request_id=${input.requestId}`
+          await db`SELECT task_id, run_id, input_fingerprint FROM hive_task_bindings WHERE account_id=${accountId} AND request_id=${input.requestId}`
         if (previous[0]) {
           if (previous[0].input_fingerprint !== fingerprint) {
             refuse('IDEMPOTENCY_CONFLICT')
           }
-          return read(db, accountId, previous[0].task_id)
+          return read(db, accountId, previous[0].task_id, previous[0].run_id)
         }
         let account = (await db`SELECT * FROM hive_task_accounts WHERE account_id=${accountId}`)[0]
         if (!account) {
@@ -140,20 +146,22 @@ export function createTaskRepository(sql) {
           VALUES(${taskId},${account.company_id},${input.title},${input.input},'todo',${account.agent_id},${counter.issue_counter},${`${counter.issue_prefix}-${counter.issue_counter}`},${runId})`
         await db`INSERT INTO hive_task_bindings(task_id,account_id,run_id,request_id,input_fingerprint,workspace_selector)
           VALUES(${taskId},${accountId},${runId},${input.requestId},${fingerprint},${input.workspaceSelector})`
-        return read(db, accountId, taskId)
+        return read(db, accountId, taskId, runId)
       })
     },
-    read: (accountId, taskId) => read(sql, accountId, taskId),
+    read: (accountId, taskId, runId) => read(sql, accountId, taskId, runId),
     async list(accountId) {
       requireTaskRepositoryScope(accountId)
       return sql`SELECT i.id,i.title,i.status,i.status_version,b.run_id,
         (b.cancel_requested OR h.context_snapshot->'externalExecutionControl'->'cancel' IS NOT NULL) AS cancel_requested,h.execution_stage,
         CASE WHEN b.result_receipt IS NULL THEN NULL ELSE jsonb_build_object(
           'status',b.result_receipt->'status','artifactRefs',b.result_receipt->'artifactRefs') END AS result_receipt
-        FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id JOIN heartbeat_runs h ON h.id=b.run_id
-        WHERE b.account_id=${accountId} ORDER BY i.created_at DESC LIMIT 100`
+        FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id JOIN heartbeat_runs h ON h.id=b.run_id AND h.company_id=i.company_id
+        JOIN hive_task_accounts a ON a.account_id=b.account_id AND a.company_id=i.company_id AND a.agent_id=h.agent_id
+        JOIN agents g ON g.id=h.agent_id AND g.company_id=i.company_id
+        WHERE b.account_id=${accountId} ORDER BY h.created_at DESC,h.id DESC LIMIT 100`
     },
-    async bind(accountId, taskId, rawBinding) {
+    async bind(accountId, taskId, runId, rawBinding) {
       const binding = HiveRuntimeAdapterBinding.parse(rawBinding)
       if (
         binding.command.ownerScope.kind !== 'personalTenant' ||
@@ -165,7 +173,7 @@ export function createTaskRepository(sql) {
         refuse('FORBIDDEN')
       }
       return sql.begin(async (db) => {
-        const task = await read(db, accountId, taskId, true)
+        const task = await read(db, accountId, taskId, runId, true)
         if (task.binding) {
           const immutable = (value) => ({
             ...value,
@@ -177,6 +185,8 @@ export function createTaskRepository(sql) {
           return task
         }
         if (
+          task.execution_run_id !== runId ||
+          (task.checkout_run_id !== null && task.checkout_run_id !== runId) ||
           binding.paperclipCompanyId !== task.company_id ||
           binding.paperclipAgentId !== task.agent_id ||
           binding.command.task.taskId !== task.id ||
@@ -186,14 +196,14 @@ export function createTaskRepository(sql) {
         ) {
           refuse('REVISION_CONFLICT')
         }
-        await db`UPDATE hive_task_bindings SET binding=${sql.json(binding)} WHERE task_id=${task.id}`
+        await db`UPDATE hive_task_bindings SET binding=${sql.json(binding)} WHERE account_id=${accountId} AND task_id=${task.id} AND run_id=${runId}`
         await db`UPDATE issues SET checkout_run_id=${task.run_id},execution_locked_at=now(),status='in_progress',status_version=status_version+1 WHERE id=${task.id}`
-        return read(db, accountId, taskId)
+        return read(db, accountId, taskId, runId)
       })
     },
-    async claimDispatch(accountId, taskId, token) {
+    async claimDispatch(accountId, taskId, runId, token) {
       return sql.begin(async (db) => {
-        const task = await read(db, accountId, taskId, true)
+        const task = await read(db, accountId, taskId, runId, true)
         if (task.result_receipt) {
           return task
         }
@@ -201,33 +211,46 @@ export function createTaskRepository(sql) {
           refuse('REVISION_CONFLICT')
         }
         await requireTaskDeliveryWriter(db, accountId, task, token)
+        if (
+          task.checkout_run_id !== runId ||
+          task.execution_run_id !== runId ||
+          Number(task.status_version) !== Number(task.binding.command.task.taskRevision) + 1
+        ) {
+          refuse('REVISION_CONFLICT')
+        }
         const [run] = await db`SELECT status FROM heartbeat_runs WHERE id=${task.run_id} FOR UPDATE`
         if (run.status !== 'queued') {
           refuse('OUTCOME_UNKNOWN')
         }
-        await db`UPDATE heartbeat_runs SET status='running',started_at=now(),execution_stage='hive_dispatch' WHERE id=${task.run_id}`
+        const dispatched =
+          await db`UPDATE heartbeat_runs SET status='running',started_at=now(),execution_stage='hive_dispatch'
+          WHERE id=${runId} AND company_id=${task.company_id} AND agent_id=${task.agent_id}
+            AND driver_kind='hive_runtime' AND status='queued' RETURNING id`
+        if (!dispatched.length) {
+          refuse('REVISION_CONFLICT')
+        }
         if (token !== undefined) {
           await requireCurrentTaskDelivery(db, accountId, task, token)
         }
         return task
       })
     },
-    async cancel(accountId, taskId, expected) {
+    async cancel(accountId, taskId, runId, expected) {
       return sql.begin(async (db) => {
-        const task = await read(db, accountId, taskId, true)
+        const task = await read(db, accountId, taskId, runId, true)
         requireExternalTaskScope(task, expected)
         if (task.result_receipt) {
           return task
         }
-        await db`UPDATE hive_task_bindings SET cancel_requested=true WHERE task_id=${taskId}`
+        await db`UPDATE hive_task_bindings SET cancel_requested=true WHERE account_id=${accountId} AND task_id=${taskId} AND run_id=${runId}`
         await persistIntent(db, task, 'cancel', 'user_requested')
         // Retain checkout and business status until the Runtime supplies stopped/not-started proof.
-        return read(db, accountId, taskId)
+        return read(db, accountId, taskId, runId)
       })
     },
-    async drain(accountId, taskId, expected) {
+    async drain(accountId, taskId, runId, expected) {
       return sql.begin(async (db) => {
-        const task = await read(db, accountId, taskId, true)
+        const task = await read(db, accountId, taskId, runId, true)
         requireExternalTaskScope(task, expected)
         if (!task.result_receipt) {
           await persistIntent(db, task, 'drain', 'delivery_shutdown')
@@ -235,17 +258,28 @@ export function createTaskRepository(sql) {
         return task
       })
     },
-    async settle(accountId, taskId, rawReceipt, token) {
-      requireTaskRepositoryScope(accountId, taskId)
+    async settle(accountId, taskId, runId, rawReceipt, token) {
+      requireTaskRepositoryScope(accountId, taskId, runId)
       const receipt = TaskExecutionResultSchema.parse(rawReceipt)
-      return sql.begin((db) => settle(db, accountId, taskId, receipt, token))
+      return sql.begin((db) => settle(db, accountId, taskId, runId, receipt, token))
     },
-    async unknown(accountId, taskId, token) {
+    async unknown(accountId, taskId, runId, token) {
       return sql.begin(async (db) => {
-        const task = await read(db, accountId, taskId, true)
+        const task = await read(db, accountId, taskId, runId, true)
         if (!task.result_receipt) {
           await requireTaskDeliveryWriter(db, accountId, task, token)
-          await db`UPDATE heartbeat_runs SET execution_stage='outcome_unknown' WHERE id=${task.run_id} AND status='running'`
+          const marked = await db`UPDATE heartbeat_runs SET execution_stage='outcome_unknown'
+            WHERE id=${runId} AND company_id=${task.company_id} AND agent_id=${task.agent_id}
+              AND driver_kind='hive_runtime' AND status='running' RETURNING id`
+          if (!marked.length) {
+            // A same-scope non-running run is a no-op; changed identity cannot accept this writer.
+            const current = await db`SELECT id FROM heartbeat_runs
+              WHERE id=${runId} AND company_id=${task.company_id} AND agent_id=${task.agent_id}
+                AND driver_kind='hive_runtime' FOR SHARE`
+            if (!current.length) {
+              refuse('REVISION_CONFLICT')
+            }
+          }
           if (token !== undefined) {
             await requireCurrentTaskDelivery(db, accountId, task, token)
           }

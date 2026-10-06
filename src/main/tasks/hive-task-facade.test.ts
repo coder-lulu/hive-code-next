@@ -1,5 +1,5 @@
-import { randomUUID } from 'node:crypto'
-import { rm, writeFile } from 'node:fs/promises'
+import { createHash, randomUUID } from 'node:crypto'
+import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createHiveTaskFacade } from './hive-task-facade'
@@ -56,9 +56,10 @@ async function fixture() {
     command: taskCommand(),
     commandFingerprint: 'a'.repeat(64)
   }))
+  const artifactDirectory = join(directory, 'artifacts')
   const facade = createHiveTaskFacade({
     descriptorPath,
-    artifacts: new TaskArtifactIndex(join(directory, 'artifacts')),
+    artifacts: new TaskArtifactIndex(artifactDirectory),
     issuer: { issue },
     currentAccount: () => account,
     assertCurrent: () => undefined,
@@ -75,6 +76,7 @@ async function fixture() {
     input,
     request,
     requestFactory,
+    artifactDirectory,
     setAccount: (value: typeof account) => {
       account = value
     }
@@ -86,8 +88,8 @@ describe('authenticated Hive task Facade', () => {
     const result = await f.facade.create(f.input)
     expect(f.request.mock.calls.map(([path]) => path)).toEqual([
       '/hive/tasks',
-      `/hive/tasks/${f.task.id}/binding`,
-      `/hive/tasks/${f.task.id}/dispatch`
+      `/hive/tasks/${f.task.id}/runs/${f.task.run_id}/binding`,
+      `/hive/tasks/${f.task.id}/runs/${f.task.run_id}/dispatch`
     ])
     expect(f.issue).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -99,7 +101,13 @@ describe('authenticated Hive task Facade', () => {
         })
       })
     )
-    expect(result).toEqual({ id: f.task.id, title: 'Report', status: 'pending', artifactRefs: [] })
+    expect(result).toEqual({
+      id: f.task.id,
+      runId: f.task.run_id,
+      title: 'Report',
+      status: 'pending',
+      artifactRefs: []
+    })
     expect(f.requestFactory).toHaveBeenCalledWith(
       expect.objectContaining({ headers: { 'X-Hive-Account-Id': 'test-account' } })
     )
@@ -122,8 +130,100 @@ describe('authenticated Hive task Facade', () => {
   })
   it('rejects artifact references absent from the committed task receipt', async () => {
     const f = await fixture()
-    await expect(f.facade.artifact(f.task.id, `artifact:${'a'.repeat(64)}`)).rejects.toThrow(
-      'FORBIDDEN'
+    await expect(
+      f.facade.artifact(f.task.id, f.task.run_id, `artifact:${'a'.repeat(64)}`)
+    ).rejects.toThrow('FORBIDDEN')
+    expect(f.request).toHaveBeenCalledWith(
+      `/hive/tasks/${f.task.id}/runs/${f.task.run_id}`,
+      undefined
+    )
+  })
+  it('projects the run that belongs to each list row', async () => {
+    const f = await fixture()
+    const nextRun = randomUUID()
+    f.request.mockResolvedValue([f.task, { ...f.task, run_id: nextRun }])
+    expect((await f.facade.list()).map(({ runId }) => runId)).toEqual([f.task.run_id, nextRun])
+  })
+  it('addresses a cancellation to the displayed run, even after another attempt exists', async () => {
+    const f = await fixture()
+    const result = await f.facade.cancel(f.task.id, f.task.run_id)
+    expect(f.request).toHaveBeenCalledWith(
+      `/hive/tasks/${f.task.id}/runs/${f.task.run_id}/cancel`,
+      {}
+    )
+    expect(result.runId).toBe(f.task.run_id)
+    expect(f.issue).not.toHaveBeenCalled()
+  })
+  it('rejects another run returned for cancellation or artifact authorization', async () => {
+    const f = await fixture()
+    f.request.mockResolvedValue({ ...f.task, run_id: randomUUID() })
+    await expect(f.facade.cancel(f.task.id, f.task.run_id)).rejects.toThrow('REVISION_CONFLICT')
+    await expect(f.facade.artifact(f.task.id, f.task.run_id, 'artifact:test')).rejects.toThrow(
+      'REVISION_CONFLICT'
+    )
+  })
+  it.each(['id', 'run_id'])(
+    'refuses to dispatch when binding returns another %s',
+    async (field) => {
+      const f = await fixture()
+      f.request.mockResolvedValueOnce(f.task).mockResolvedValueOnce({
+        ...f.task,
+        [field]: randomUUID()
+      })
+      await expect(f.facade.create(f.input)).rejects.toThrow('REVISION_CONFLICT')
+      expect(f.request).toHaveBeenCalledTimes(2)
+    }
+  )
+  it('rejects malformed run identifiers before requesting a task', async () => {
+    const f = await fixture()
+    await expect(f.facade.cancel(f.task.id, 'not-a-run')).rejects.toThrow()
+    await expect(f.facade.artifact(f.task.id, 'not-a-run', 'artifact:test')).rejects.toThrow()
+    expect(f.request).not.toHaveBeenCalled()
+  })
+  it('reads a historical run artifact from its own committed receipt', async () => {
+    const f = await fixture()
+    const hash = (value: string) => createHash('sha256').update(value).digest('hex')
+    const text = 'Historical run result'
+    const artifactId = hash('historical-artifact')
+    const artifactRef = `artifact:${artifactId}`
+    const outcomeId = hash('historical-outcome')
+    await mkdir(f.artifactDirectory)
+    await writeFile(join(f.artifactDirectory, artifactId), text)
+    await writeFile(
+      join(f.artifactDirectory, `outcome-${outcomeId}.json`),
+      JSON.stringify({ artifacts: [{ ref: artifactRef, name: 'report.md', digest: hash(text) }] })
+    )
+    const command = taskCommand()
+    const receipt = {
+      protocolVersion: 1,
+      runtimeRecordId: command.runtimeRecordId,
+      ownershipEpoch: command.ownershipEpoch,
+      executionId: command.executionId,
+      executionEpoch: command.executionEpoch,
+      commandFingerprint: 'a'.repeat(64),
+      recordedAt: '2026-10-06T00:00:00.000Z',
+      kind: 'execution.result',
+      receiptId: 'receipt:historical',
+      outcomeRef: `outcome:${outcomeId}`,
+      artifactRefs: [artifactRef],
+      usageFactRefs: [],
+      status: 'succeeded',
+      stopProof: {
+        proofRef: 'proof:historical',
+        evidenceKind: 'stopped',
+        managedToolsSettled: true,
+        writersFenced: true,
+        recordedAt: '2026-10-06T00:00:00.000Z'
+      }
+    }
+    f.request.mockResolvedValue({ ...f.task, result_receipt: receipt })
+    expect(await f.facade.artifact(f.task.id, f.task.run_id, artifactRef)).toEqual({
+      name: 'report.md',
+      text
+    })
+    expect(f.request).toHaveBeenCalledWith(
+      `/hive/tasks/${f.task.id}/runs/${f.task.run_id}`,
+      undefined
     )
   })
 })

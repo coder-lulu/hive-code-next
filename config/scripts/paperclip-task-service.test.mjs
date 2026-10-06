@@ -18,13 +18,13 @@ describe('Paperclip dispatch concurrency', () => {
         })
     )
     const dispatch = createTaskDispatch({ read })
-    const first = dispatch.start('account', 'task'),
-      second = dispatch.start('account', 'task')
+    const first = dispatch.start('account', 'task', 'run'),
+      second = dispatch.start('account', 'task', 'run')
     expect(read).toHaveBeenCalledTimes(1)
     release({ result_receipt: { status: 'cancelled' } })
     await Promise.all([first, second])
     await dispatch.close()
-    await expect(dispatch.start('account', 'task')).rejects.toThrow('SERVICE_UNAVAILABLE')
+    await expect(dispatch.start('account', 'task', 'run')).rejects.toThrow('SERVICE_UNAVAILABLE')
   })
 })
 
@@ -84,6 +84,39 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
       expect(response.status).toBe(201)
       return { input, task: response.body }
     }
+    it('rejects ambiguous Issue-only paths and a different run without changing the original run', async () => {
+      const { task } = await create()
+      const before = await repository.read(account, task.id, task.run_id)
+      for (const path of [
+        `/hive/tasks/${task.id}`,
+        `/hive/tasks/${task.id}/cancel`,
+        `/hive/tasks/${task.id}/runs/${randomUUID()}`,
+        `/hive/tasks/${task.id}/runs/${randomUUID()}/cancel`
+      ]) {
+        expect((await request(path, path.endsWith('/cancel') ? {} : undefined)).status).toBe(403)
+      }
+      expect(await repository.read(account, task.id, task.run_id)).toEqual(before)
+    })
+    it('returns and cancels the exact seeded run and replays the original create request', async () => {
+      const { input, task } = await create()
+      const runId = randomUUID()
+      await sql.begin(async (db) => {
+        await db`INSERT INTO heartbeat_runs(id,company_id,agent_id,status,invocation_source,driver_kind)
+          VALUES(${runId},${task.company_id},${task.agent_id},'queued','on_demand','hive_runtime')`
+        await db`INSERT INTO hive_task_bindings(task_id,account_id,run_id,request_id,input_fingerprint,workspace_selector)
+          VALUES(${task.id},${account},${runId},${randomUUID()},'synthetic-second-run',${input.workspaceSelector})`
+      })
+      const oldPath = `/hive/tasks/${task.id}/runs/${task.run_id}`
+      const nextPath = `/hive/tasks/${task.id}/runs/${runId}`
+      expect((await request(oldPath)).body.run_id).toBe(task.run_id)
+      expect((await request(nextPath)).body.run_id).toBe(runId)
+      expect((await request(`${nextPath}/cancel`, {})).status).toBe(202)
+      expect((await request(oldPath)).body.cancel_requested).toBe(false)
+      expect((await request(nextPath)).body.cancel_requested).toBe(true)
+      const replay = await request('/hive/tasks', input)
+      expect(replay.status).toBe(201)
+      expect(replay.body.run_id).toBe(task.run_id)
+    })
     const bindingFor = (task) => {
       const command = taskCommand({
         runtimeRecordId: 'runtime:p1-contract',
@@ -124,7 +157,9 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
     it('denies cross-account reads and all non-Hive endpoints before DB side effects', async () => {
       const { task } = await create()
       const [before] = await sql`SELECT count(*)::int AS count FROM agents`
-      expect((await request(`/hive/tasks/${task.id}`, undefined, foreign)).status).toBe(403)
+      expect(
+        (await request(`/hive/tasks/${task.id}/runs/${task.run_id}`, undefined, foreign)).status
+      ).toBe(403)
       for (const path of [
         '/api/agents',
         '/api/companies/test/skills',
@@ -170,10 +205,15 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
       ]
       for (const command of commands) {
         expect(
-          (await request(`/hive/tasks/${task.id}/binding`, { ...binding, command })).status
+          (
+            await request(`/hive/tasks/${task.id}/runs/${task.run_id}/binding`, {
+              ...binding,
+              command
+            })
+          ).status
         ).toBe(403)
       }
-      const row = await repository.read(account, task.id)
+      const row = await repository.read(account, task.id, task.run_id)
       expect(row.binding).toBeNull()
       expect(row.checkout_run_id).toBeNull()
       expect(row.status).toBe('todo')
@@ -183,34 +223,36 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
         binding = bindingFor(task)
       expect(
         (
-          await request(`/hive/tasks/${task.id}/binding`, {
+          await request(`/hive/tasks/${task.id}/runs/${task.run_id}/binding`, {
             ...binding,
             paperclipAgentId: randomUUID()
           })
         ).status
       ).toBe(409)
-      expect((await request(`/hive/tasks/${task.id}/binding`, binding)).status).toBe(200)
+      expect(
+        (await request(`/hive/tasks/${task.id}/runs/${task.run_id}/binding`, binding)).status
+      ).toBe(200)
       expect(
         (
-          await request(`/hive/tasks/${task.id}/binding`, {
+          await request(`/hive/tasks/${task.id}/runs/${task.run_id}/binding`, {
             ...binding,
             command: { ...binding.command, expiresAt: new Date(Date.now() + 120_000).toISOString() }
           })
         ).status
       ).toBe(200)
-      const stored = await repository.read(account, task.id)
+      const stored = await repository.read(account, task.id, task.run_id)
       expect(Number(stored.status_version)).toBe(1)
       expect(stored.checkout_run_id).toBe(task.run_id)
     })
     it('does not let a stale unknown observation overwrite a terminal run after a row-lock wait', async () => {
       const { task } = await create(),
         binding = bindingFor(task)
-      await repository.bind(account, task.id, binding)
-      await repository.claimDispatch(account, task.id)
+      await repository.bind(account, task.id, task.run_id, binding)
+      await repository.claimDispatch(account, task.id, task.run_id)
       let marking = Promise.resolve()
       await sql.begin(async (db) => {
         await db`SELECT id FROM heartbeat_runs WHERE id=${task.run_id} FOR UPDATE`
-        marking = repository.unknown(account, task.id)
+        marking = repository.unknown(account, task.id, task.run_id)
         await vi.waitFor(
           async () => {
             const [waiting] = await sql`SELECT count(*)::int AS count FROM pg_stat_activity
@@ -228,9 +270,9 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
     it('holds cancellation until a matching stop receipt and settles duplicates exactly once', async () => {
       const { task } = await create(),
         binding = bindingFor(task)
-      await repository.bind(account, task.id, binding)
-      await repository.claimDispatch(account, task.id)
-      const cancelled = await repository.cancel(account, task.id)
+      await repository.bind(account, task.id, task.run_id, binding)
+      await repository.claimDispatch(account, task.id, task.run_id)
+      const cancelled = await repository.cancel(account, task.id, task.run_id)
       expect(cancelled.result_receipt).toBeNull()
       expect(cancelled.checkout_run_id).toBe(task.run_id)
       const command = binding.command,
@@ -258,10 +300,13 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
         }
       }
       await expect(
-        repository.settle(account, task.id, { ...receipt, executionId: 'execution:foreign' })
+        repository.settle(account, task.id, task.run_id, {
+          ...receipt,
+          executionId: 'execution:foreign'
+        })
       ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
       const settled = await Promise.all(
-        Array.from({ length: 6 }, () => repository.settle(account, task.id, receipt))
+        Array.from({ length: 6 }, () => repository.settle(account, task.id, task.run_id, receipt))
       )
       expect(
         settled.every(
@@ -272,7 +317,7 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
         )
       ).toBe(true)
       await expect(
-        repository.settle(account, task.id, { ...receipt, receiptId: 'receipt:other' })
+        repository.settle(account, task.id, task.run_id, { ...receipt, receiptId: 'receipt:other' })
       ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
       const [run] =
         await sql`SELECT status,execution_stage FROM heartbeat_runs WHERE id=${task.run_id}`

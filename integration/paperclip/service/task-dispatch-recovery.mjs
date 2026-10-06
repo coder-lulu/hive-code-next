@@ -27,7 +27,7 @@ export function createTaskDispatchRecovery({ repository, createClient, recover, 
           Array.from({ length: Math.min(4, tasks.length) }, async () => {
             while (index < tasks.length && !stopped && !isClosed()) {
               const task = tasks[index++]
-              await recover(owner.accountId, task.id).catch(() => {})
+              await recover(owner.accountId, task.id, task.run_id).catch(() => {})
             }
           })
         )

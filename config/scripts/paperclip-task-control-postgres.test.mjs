@@ -60,11 +60,17 @@ describe.skipIf(!configPath)('real PostgreSQL external controller identity', () 
         }
         await h.sql`UPDATE hive_task_bindings SET binding=${h.sql.json(binding)} WHERE task_id=${context.task.id}`
       }
-      const before = await h.snapshot(context)
+      // Administrative fixture evidence remains readable when the public ownership JOIN refuses
+      // corrupted scope. It does not grant the service authority to act on these rows.
+      const persisted =
+        () => h.sql`SELECT to_jsonb(i) AS issue,to_jsonb(b) AS binding,to_jsonb(r) AS run
+        FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id JOIN heartbeat_runs r ON r.id=b.run_id
+        WHERE b.account_id=${context.accountId} AND b.task_id=${context.task.id} AND b.run_id=${context.task.run_id}`
+      const before = await persisted()
       await expect(
         h.repository.resolveExternalExecution(context.task.company_id, context.task.run_id)
       ).rejects.toThrow()
-      expect(await h.snapshot(context)).toEqual(before)
+      expect(await persisted()).toEqual(before)
     }
   )
 
@@ -74,7 +80,7 @@ describe.skipIf(!configPath)('real PostgreSQL external controller identity', () 
       const context = await h.newTask(),
         before = await h.snapshot(context)
       await expect(
-        h.repository[action](context.accountId, context.task.id, {
+        h.repository[action](context.accountId, context.task.id, context.task.run_id, {
           companyId: context.task.company_id,
           runId: randomUUID()
         })
@@ -94,7 +100,11 @@ describe.skipIf(!configPath)('real PostgreSQL external controller identity', () 
       await h.sql.begin(async (db) => {
         const [session] = await db`SELECT pg_backend_pid() AS pid`
         await db`SELECT id FROM heartbeat_runs WHERE id=${context.task.run_id} FOR UPDATE`
-        pending = h.repository[action](context.accountId, context.task.id).then(
+        pending = h.repository[action](
+          context.accountId,
+          context.task.id,
+          context.task.run_id
+        ).then(
           () => null,
           (error) => error
         )

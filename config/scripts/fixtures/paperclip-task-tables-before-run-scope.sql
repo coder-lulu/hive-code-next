@@ -4,25 +4,23 @@ CREATE TABLE IF NOT EXISTS hive_task_accounts (
   agent_id uuid NOT NULL UNIQUE REFERENCES agents(id)
 );
 CREATE TABLE IF NOT EXISTS hive_task_bindings (
-  task_id uuid NOT NULL REFERENCES issues(id),
-  account_id text NOT NULL,
-  run_id uuid PRIMARY KEY REFERENCES heartbeat_runs(id),
+  task_id uuid PRIMARY KEY REFERENCES issues(id),
+  account_id text NOT NULL REFERENCES hive_task_accounts(account_id),
+  run_id uuid NOT NULL UNIQUE REFERENCES heartbeat_runs(id),
   request_id text NOT NULL,
   input_fingerprint text NOT NULL,
   workspace_selector text NOT NULL,
   binding jsonb,
   result_receipt jsonb,
   cancel_requested boolean NOT NULL DEFAULT false,
-  UNIQUE(account_id, request_id),
-  CONSTRAINT hive_task_bindings_scope_run_key UNIQUE(task_id,account_id,run_id)
+  UNIQUE(account_id, request_id)
 );
 CREATE INDEX IF NOT EXISTS hive_task_bindings_recovery_idx
-  ON hive_task_bindings(account_id,run_id) WHERE binding IS NOT NULL AND result_receipt IS NULL;
-
+  ON hive_task_bindings(account_id,task_id) WHERE binding IS NOT NULL AND result_receipt IS NULL;
 CREATE TABLE IF NOT EXISTS hive_task_deliveries (
-  task_id uuid NOT NULL,
-  account_id text NOT NULL,
-  run_id uuid PRIMARY KEY REFERENCES heartbeat_runs(id),
+  task_id uuid PRIMARY KEY REFERENCES hive_task_bindings(task_id),
+  account_id text NOT NULL REFERENCES hive_task_accounts(account_id),
+  run_id uuid NOT NULL UNIQUE REFERENCES heartbeat_runs(id),
   protocol_version integer NOT NULL CHECK (protocol_version=1),
   runtime_record_id text NOT NULL,
   ownership_epoch bigint NOT NULL CHECK (ownership_epoch BETWEEN 1 AND 9007199254740991),
@@ -49,11 +47,9 @@ CREATE TABLE IF NOT EXISTS hive_task_deliveries (
   CHECK ((terminal_sequence IS NULL) = (terminal_hash IS NULL)),
   CHECK (terminal_hash IS NULL OR terminal_hash ~ '^[0-9a-f]{64}$'),
   CHECK (terminal_sequence IS NULL OR terminal_sequence BETWEEN 1 AND last_sequence),
-  FOREIGN KEY(task_id,account_id,run_id) REFERENCES hive_task_bindings(task_id,account_id,run_id),
   UNIQUE(task_id,account_id,run_id),
   UNIQUE(task_id,account_id,run_id,runtime_record_id,ownership_epoch,execution_id,execution_epoch,command_fingerprint)
 );
-
 CREATE TABLE IF NOT EXISTS hive_task_delivery_claim_receipts (
   lease_ref text PRIMARY KEY,
   account_id text NOT NULL,
@@ -63,10 +59,9 @@ CREATE TABLE IF NOT EXISTS hive_task_delivery_claim_receipts (
   request_hash text NOT NULL CHECK (request_hash ~ '^[0-9a-f]{64}$'),
   receipt_hash text NOT NULL CHECK (receipt_hash ~ '^[0-9a-f]{64}$'),
   receipt jsonb NOT NULL,
-  CONSTRAINT hive_task_delivery_claim_receipts_run_generation_key UNIQUE(run_id,generation),
+  UNIQUE(task_id,generation),
   FOREIGN KEY(task_id,account_id,run_id) REFERENCES hive_task_deliveries(task_id,account_id,run_id)
 );
-
 CREATE TABLE IF NOT EXISTS hive_task_event_inbox (
   task_id uuid NOT NULL,
   account_id text NOT NULL,

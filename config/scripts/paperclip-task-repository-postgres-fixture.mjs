@@ -97,6 +97,12 @@ export async function createPostgresTaskHarness(configPath) {
         'utf8'
       )
     )
+    await sql.unsafe(
+      await readFile(
+        new URL('../../integration/paperclip/service/task-run-migration.sql', import.meta.url),
+        'utf8'
+      )
+    )
   } catch (error) {
     await sql.end({ timeout: 5 })
     throw error
@@ -133,7 +139,7 @@ export async function createPostgresTaskHarness(configPath) {
       command,
       commandFingerprint: computeTaskExecutionFingerprint(command, 'trusted-local:runtime')
     }
-    const task = await repository.bind(accountId, created.id, binding)
+    const task = await repository.bind(accountId, created.id, created.run_id, binding)
     const identity = Object.fromEntries(
       ['protocolVersion', 'runtimeRecordId', 'ownershipEpoch', 'executionId', 'executionEpoch'].map(
         (key) => [key, command[key]]
@@ -200,7 +206,7 @@ export async function createPostgresTaskHarness(configPath) {
     }
   }
   async function snapshot(context) {
-    const task = await repository.read(context.accountId, context.task.id)
+    const task = await repository.read(context.accountId, context.task.id, context.task.run_id)
     const [delivery] = await sql`SELECT *,expires_at<=clock_timestamp() AS expired,
       takeover_after<=clock_timestamp() AS takeover_expired FROM hive_task_deliveries
       WHERE account_id=${context.accountId} AND task_id=${context.task.id} AND run_id=${context.task.run_id}`

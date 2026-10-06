@@ -146,7 +146,7 @@ function fixture(replies = []) {
 describe('durable task delivery ownership', () => {
   it('claims one bound execution using DB time without changing Paperclip execution state', async () => {
     const f = fixture([[task], [], [], [row()], []])
-    const result = await f.repository.claimDelivery(accountId, taskId, initial)
+    const result = await f.repository.claimDelivery(accountId, taskId, runId, initial)
     expect(result).toMatchObject({
       accountId,
       companyId,
@@ -180,7 +180,7 @@ describe('durable task delivery ownership', () => {
     async (leaseMs) => {
       const f = fixture()
       await expect(
-        f.repository.claimDelivery(accountId, taskId, { ...initial, leaseMs })
+        f.repository.claimDelivery(accountId, taskId, runId, { ...initial, leaseMs })
       ).rejects.toThrow()
       expect(f.calls).toHaveLength(0)
     }
@@ -189,14 +189,14 @@ describe('durable task delivery ownership', () => {
   it('does not accept an input flag as a Runtime revocation proof', async () => {
     const f = fixture()
     await expect(
-      f.repository.claimDelivery(accountId, taskId, { ...initial, hostProof: true })
+      f.repository.claimDelivery(accountId, taskId, runId, { ...initial, hostProof: true })
     ).rejects.toThrow()
     expect(f.calls).toHaveLength(0)
   })
 
   it('replays an expired claim without extending or reactivating the same lease reference', async () => {
     const f = fixture([[task], [claimHistory()]])
-    const result = await f.repository.claimDelivery(accountId, taskId, initial)
+    const result = await f.repository.claimDelivery(accountId, taskId, runId, initial)
     expect(result.generation).toBe(1)
     expect(result.expiresAt).toBe('2026-10-04T00:00:30.000Z')
     expect(result.serverNow).toBe('2026-10-04T00:05:00.000Z')
@@ -208,7 +208,7 @@ describe('durable task delivery ownership', () => {
     async (change) => {
       const f = fixture([[task], [claimHistory()]])
       await expect(
-        f.repository.claimDelivery(accountId, taskId, { ...initial, ...change })
+        f.repository.claimDelivery(accountId, taskId, runId, { ...initial, ...change })
       ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
       expect(f.writes()).toHaveLength(0)
     }
@@ -216,7 +216,7 @@ describe('durable task delivery ownership', () => {
 
   it('replays the original generation after a newer owner took over without consulting the live lease', async () => {
     const f = fixture([[task], [claimHistory()]])
-    expect(await f.repository.claimDelivery(accountId, taskId, initial)).toMatchObject({
+    expect(await f.repository.claimDelivery(accountId, taskId, runId, initial)).toMatchObject({
       generation: 1,
       leaseRef: initial.leaseRef,
       expiresAt: receipt().expiresAt,
@@ -229,7 +229,7 @@ describe('durable task delivery ownership', () => {
 
   it('does not reconstruct a missing claim receipt for the same live lease reference', async () => {
     const f = fixture([[task], [], [row()]])
-    await expect(f.repository.claimDelivery(accountId, taskId, initial)).rejects.toThrow(
+    await expect(f.repository.claimDelivery(accountId, taskId, runId, initial)).rejects.toThrow(
       'OUTCOME_UNKNOWN'
     )
     expect(f.writes()).toHaveLength(0)
@@ -240,7 +240,7 @@ describe('durable task delivery ownership', () => {
       [task],
       [claimHistory(initial, receipt(), { receipt_hash: 'f'.repeat(64) })]
     ])
-    await expect(f.repository.claimDelivery(accountId, taskId, initial)).rejects.toThrow(
+    await expect(f.repository.claimDelivery(accountId, taskId, runId, initial)).rejects.toThrow(
       'IDEMPOTENCY_CONFLICT'
     )
     expect(f.writes()).toHaveLength(0)
@@ -254,7 +254,7 @@ describe('durable task delivery ownership', () => {
       leaseMs: 30_000
     }
     const f = fixture([[task], [], [row()], []])
-    await expect(f.repository.claimDelivery(accountId, taskId, next)).rejects.toThrow(
+    await expect(f.repository.claimDelivery(accountId, taskId, runId, next)).rejects.toThrow(
       'OUTCOME_UNKNOWN'
     )
     const update = f.writes()[0]
@@ -286,7 +286,7 @@ describe('durable task delivery ownership', () => {
       last_sequence: '7'
     })
     const f = fixture([[{ ...task, cancel_requested: true }], [], [expired], [transferred], []])
-    expect(await f.repository.claimDelivery(accountId, taskId, next)).toMatchObject({
+    expect(await f.repository.claimDelivery(accountId, taskId, runId, next)).toMatchObject({
       ownerId: next.ownerId,
       generation: 2,
       cursor: 7
@@ -302,7 +302,7 @@ describe('durable task delivery ownership', () => {
   it('rejects a stale expected generation before attempting a takeover', async () => {
     const f = fixture([[task], [], [row({ generation: '3' })]])
     await expect(
-      f.repository.claimDelivery(accountId, taskId, {
+      f.repository.claimDelivery(accountId, taskId, runId, {
         ...initial,
         leaseRef: 'delivery:new',
         expectedGeneration: 1
@@ -326,10 +326,12 @@ describe('durable task delivery ownership', () => {
       claim_kind: 'recovery'
     })
     const f = fixture([[task], [], [row()], [recovered], []])
-    expect(await f.repository.claimRecoveryDelivery(accountId, taskId, input)).toMatchObject({
-      generation: 2,
-      leaseRef: input.leaseRef
-    })
+    expect(await f.repository.claimRecoveryDelivery(accountId, taskId, runId, input)).toMatchObject(
+      {
+        generation: 2,
+        leaseRef: input.leaseRef
+      }
+    )
     expect(f.writes()[0].text).toContain('generation=? AND lease_ref=? AND command_fingerprint=?')
     expect(f.writes()[0].values).toContain(binding.commandFingerprint)
     expect(f.writes()[0].text).not.toContain('expires_at<=')
@@ -338,7 +340,7 @@ describe('durable task delivery ownership', () => {
   it('rejects a recovery handshake for another execution fingerprint', async () => {
     const f = fixture([[task]])
     await expect(
-      f.repository.claimRecoveryDelivery(accountId, taskId, {
+      f.repository.claimRecoveryDelivery(accountId, taskId, runId, {
         ...initial,
         commandFingerprint: 'f'.repeat(64)
       })
@@ -349,14 +351,16 @@ describe('durable task delivery ownership', () => {
   it('renews only an unexpired matching owner, generation and lease reference', async () => {
     const f = fixture([[task], [row({ expires_at: new Date('2026-10-04T00:01:00.000Z') })]])
     expect(
-      (await f.repository.renewDelivery(accountId, taskId, { ...token, leaseMs: 30_000 })).expiresAt
+      (await f.repository.renewDelivery(accountId, taskId, runId, { ...token, leaseMs: 30_000 }))
+        .expiresAt
     ).toBe('2026-10-04T00:01:00.000Z')
     expect(f.writes()[0].text).toContain(
       'owner_id=? AND lease_ref=? AND generation=? AND expires_at>lease_clock.server_now'
     )
-    expect(f.writes()[0].values.slice(-5)).toEqual([
+    expect(f.writes()[0].values.slice(-6)).toEqual([
       accountId,
       taskId,
+      runId,
       token.ownerId,
       token.leaseRef,
       token.generation
@@ -366,7 +370,7 @@ describe('durable task delivery ownership', () => {
   it('cannot renew an expired or fenced lease', async () => {
     const f = fixture([[task], []])
     await expect(
-      f.repository.renewDelivery(accountId, taskId, { ...token, leaseMs: 30_000 })
+      f.repository.renewDelivery(accountId, taskId, runId, { ...token, leaseMs: 30_000 })
     ).rejects.toThrow('OUTCOME_UNKNOWN')
     expect(f.transactions).toEqual(['begin', 'rollback'])
   })
@@ -378,14 +382,14 @@ describe('durable task delivery ownership', () => {
     })
     const expired = { ...renewed, server_now: new Date('2026-10-04T00:00:25.000Z') }
     const f = fixture([[task], [renewed], [task], [], [expired], []])
-    await f.repository.renewDelivery(accountId, taskId, { ...token, leaseMs: 1000 })
+    await f.repository.renewDelivery(accountId, taskId, runId, { ...token, leaseMs: 1000 })
     const next = {
       ownerId: 'gateway:next',
       leaseRef: 'delivery:next',
       expectedGeneration: 1,
       leaseMs: 30_000
     }
-    await expect(f.repository.claimDelivery(accountId, taskId, next)).rejects.toThrow(
+    await expect(f.repository.claimDelivery(accountId, taskId, runId, next)).rejects.toThrow(
       'OUTCOME_UNKNOWN'
     )
     expect(f.writes()[0].text).toContain(
@@ -398,7 +402,7 @@ describe('durable task delivery ownership', () => {
   it('releases only the lease and retains the original execution and task checkout', async () => {
     const released = row({ expires_at: new Date('2026-10-04T00:00:00.000Z') })
     const f = fixture([[{ ...task, cancel_requested: true }], [released]])
-    expect((await f.repository.releaseDelivery(accountId, taskId, token)).generation).toBe(1)
+    expect((await f.repository.releaseDelivery(accountId, taskId, runId, token)).generation).toBe(1)
     expect(f.writes()).toHaveLength(1)
     expect(f.writes()[0].text).toContain('SET expires_at=LEAST(expires_at,clock_timestamp())')
     expect(f.writes()[0].text).toContain('owner_id=? AND lease_ref=? AND generation=?')
@@ -408,7 +412,7 @@ describe('durable task delivery ownership', () => {
 
   it('rejects release by a stale delivery owner', async () => {
     const f = fixture([[task], []])
-    await expect(f.repository.releaseDelivery(accountId, taskId, token)).rejects.toThrow(
+    await expect(f.repository.releaseDelivery(accountId, taskId, runId, token)).rejects.toThrow(
       'OUTCOME_UNKNOWN'
     )
   })
@@ -419,14 +423,14 @@ describe('durable task delivery ownership', () => {
       server_now: new Date('2026-10-04T00:00:10.000Z')
     })
     const f = fixture([[task], [released], [task], [], [released], []])
-    await f.repository.releaseDelivery(accountId, taskId, token)
+    await f.repository.releaseDelivery(accountId, taskId, runId, token)
     const next = {
       ownerId: 'gateway:next',
       leaseRef: 'delivery:next',
       expectedGeneration: 1,
       leaseMs: 30_000
     }
-    await expect(f.repository.claimDelivery(accountId, taskId, next)).rejects.toThrow(
+    await expect(f.repository.claimDelivery(accountId, taskId, runId, next)).rejects.toThrow(
       'OUTCOME_UNKNOWN'
     )
     expect(f.writes()[0].text).not.toContain('takeover_after=')
@@ -477,22 +481,26 @@ describe('durable task delivery ownership', () => {
     const tasks = [task, { ...task, id: randomUUID() }]
     const f = fixture([tasks])
     const page = await f.repository.listRecoverableRuns(accountId, { limit: 1 })
-    expect(page).toEqual({ items: [task], nextCursor: task.id })
+    expect(page).toEqual({ items: [task], nextCursor: task.run_id })
     expect(f.calls[0].text).toContain('b.binding IS NOT NULL AND b.result_receipt IS NULL')
-    expect(f.calls[0].text).toContain('ORDER BY b.task_id ASC LIMIT ?')
+    expect(f.calls[0].text).toContain('ORDER BY b.run_id ASC LIMIT ?')
     expect(f.calls[0].values).toEqual([accountId, null, null, 2])
     expect(f.writes()).toHaveLength(0)
   })
 
   it('requires a current token before advancing a leased run from queued to running', async () => {
     const f = fixture([[task], [{ task_id: taskId }]])
-    await expect(f.repository.claimDispatch(accountId, taskId)).rejects.toThrow('OUTCOME_UNKNOWN')
+    await expect(f.repository.claimDispatch(accountId, taskId, runId)).rejects.toThrow(
+      'OUTCOME_UNKNOWN'
+    )
     expect(f.writes()).toHaveLength(0)
   })
 
   it('does not let a stale owner mark the new owner execution unknown', async () => {
     const f = fixture([[task], []])
-    await expect(f.repository.unknown(accountId, taskId, token)).rejects.toThrow('OUTCOME_UNKNOWN')
+    await expect(f.repository.unknown(accountId, taskId, runId, token)).rejects.toThrow(
+      'OUTCOME_UNKNOWN'
+    )
     expect(f.writes()).toHaveLength(0)
   })
 
@@ -510,7 +518,7 @@ describe('durable task delivery ownership', () => {
     expect(ddl).toContain('CHECK (last_sequence BETWEEN event_cursor AND 9007199254740991)')
     expect(ddl).toContain('CHECK (takeover_after>=expires_at)')
     expect(ddl).toContain('CREATE TABLE IF NOT EXISTS hive_task_delivery_claim_receipts')
-    expect(ddl).toContain('UNIQUE(task_id,generation)')
+    expect(ddl).toContain('UNIQUE(run_id,generation)')
     expect(ddl).toContain(
       'FOREIGN KEY(task_id,account_id,run_id) REFERENCES hive_task_deliveries(task_id,account_id,run_id)'
     )

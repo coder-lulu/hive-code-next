@@ -125,12 +125,12 @@ export function useHiveTasks(open: boolean) {
         () => window.api.hiveTasks.create(input),
         () => undefined
       ),
-    cancel: (id: string) =>
+    cancel: (id: string, runId: string) =>
       act(
-        () => window.api.hiveTasks.cancel(id),
+        () => window.api.hiveTasks.cancel(id, runId),
         () => undefined
       ),
-    readArtifact: (id: string, ref: string) =>
-      act(() => window.api.hiveTasks.artifact(id, ref), setArtifact)
+    readArtifact: (id: string, runId: string, ref: string) =>
+      act(() => window.api.hiveTasks.artifact(id, runId, ref), setArtifact)
   }
 }

@@ -45,8 +45,10 @@ export function registerHiveTaskHandlers() {
   }
   bind('list', (facade) => facade.list())
   bind('create', (facade, input: HiveTaskCreate) => facade.create(input))
-  bind('cancel', (facade, id: string) => facade.cancel(id))
-  bind('artifact', (facade, id: string, ref: string) => facade.artifact(id, ref))
+  bind('cancel', (facade, id: string, runId: string) => facade.cancel(id, runId))
+  bind('artifact', (facade, id: string, runId: string, ref: string) =>
+    facade.artifact(id, runId, ref)
+  )
   bind('listCompanies', (facade, query?: HiveWorkbenchPageQuery) => facade.listCompanies(query))
   bind('createCompany', (facade, input: HiveWorkbenchCompanyCreate) => facade.createCompany(input))
   bind('listProjects', (facade, query: HiveWorkbenchProjectsQuery) => facade.listProjects(query))

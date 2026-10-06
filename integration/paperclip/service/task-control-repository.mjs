@@ -27,7 +27,7 @@ export function createTaskControlRepository(sql, read) {
         refuse('FORBIDDEN')
       }
       const row = rows[0]
-      const task = await read(sql, row.account_id, row.task_id)
+      const task = await read(sql, row.account_id, row.task_id, runId)
       requireExternalTaskScope(task, { companyId, runId })
       taskDeliveryBinding(task)
       return { accountId: row.account_id, taskId: row.task_id, companyId, runId }

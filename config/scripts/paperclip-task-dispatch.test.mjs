@@ -83,11 +83,11 @@ async function context() {
   const repository = {
     read: vi.fn(async () => ({ ...task })),
     getCurrentDelivery: vi.fn(async () => delivery),
-    claimDelivery: vi.fn(async (_account, _task, claim) => {
+    claimDelivery: vi.fn(async (_account, _task, _run, claim) => {
       order.push('claim')
       return makeProof(claim)
     }),
-    claimRecoveryDelivery: vi.fn(async (_account, _task, claim) => {
+    claimRecoveryDelivery: vi.fn(async (_account, _task, _run, claim) => {
       order.push('recovery-claim')
       const { commandFingerprint: _fingerprint, ...input } = claim
       return makeProof(input)
@@ -109,7 +109,7 @@ async function context() {
     settle: vi.fn(async () => {
       throw new Error('Direct settlement is forbidden')
     }),
-    consumeObservation: vi.fn(async (_account, _id, token, observation) => {
+    consumeObservation: vi.fn(async (_account, _id, _run, token, observation) => {
       expect(token).toMatchObject({
         ownerId: delivery.ownerId,
         leaseRef: delivery.leaseRef,
@@ -164,7 +164,7 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
     current.repository.read.mockImplementationOnce(() => hold.promise)
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
     expect(dispatch.control).toBeTypeOf('function')
-    const starting = dispatch.start(current.accountId, current.task.id)
+    const starting = dispatch.start(current.accountId, current.task.id, current.task.run_id)
     await dispatch.control(current.accountId, current.task.id, 'drain', {
       companyId: current.task.company_id,
       runId: current.task.run_id
@@ -172,7 +172,7 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
     hold.resolve(current.task)
     await starting
     await dispatch.recover()
-    await dispatch.start(current.accountId, current.task.id)
+    await dispatch.start(current.accountId, current.task.id, current.task.run_id)
     expect(current.repository.claimDelivery).not.toHaveBeenCalled()
     expect(current.repository.claimDispatch).not.toHaveBeenCalled()
     expect(current.runtime.deps.launch).not.toHaveBeenCalled()
@@ -181,13 +181,13 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
   it('keeps a drained observer detached until an explicit recovery of that original run', async () => {
     const current = await context()
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    await dispatch.start(current.accountId, current.task.id)
+    await dispatch.start(current.accountId, current.task.id, current.task.run_id)
     await vi.waitFor(() => expect(current.runtime.deps.launch).toHaveBeenCalledOnce())
     const scope = { companyId: current.task.company_id, runId: current.task.run_id }
     await dispatch.control(current.accountId, current.task.id, 'drain', scope)
     await vi.waitFor(() => expect(current.repository.releaseDelivery).toHaveBeenCalledOnce())
     await dispatch.recover()
-    await dispatch.start(current.accountId, current.task.id)
+    await dispatch.start(current.accountId, current.task.id, current.task.run_id)
     expect(current.repository.claimRecoveryDelivery).not.toHaveBeenCalled()
     expect(current.runtime.deps.stop).not.toHaveBeenCalled()
     await dispatch.control(current.accountId, current.task.id, 'recover', scope)
@@ -199,7 +199,7 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
   it('delivers cancellation of a drained run without restarting its provider', async () => {
     const current = await context()
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    await dispatch.start(current.accountId, current.task.id)
+    await dispatch.start(current.accountId, current.task.id, current.task.run_id)
     await vi.waitFor(() => expect(current.runtime.deps.launch).toHaveBeenCalledOnce())
     const scope = { companyId: current.task.company_id, runId: current.task.run_id }
     await dispatch.control(current.accountId, current.task.id, 'drain', scope)
@@ -241,7 +241,7 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
   it('hands delivery off on shutdown while retaining the live Runtime and its original slot', async () => {
     const current = await context()
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    await dispatch.start(current.accountId, current.task.id)
+    await dispatch.start(current.accountId, current.task.id, current.task.run_id)
     await vi.waitFor(() => expect(current.runtime.deps.launch).toHaveBeenCalledOnce())
     await dispatch.close()
     expect(current.repository.cancel).not.toHaveBeenCalled()
@@ -264,7 +264,7 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
     const hold = deferred()
     current.repository.read.mockImplementationOnce(() => hold.promise)
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    const starting = dispatch.start(current.accountId, current.task.id)
+    const starting = dispatch.start(current.accountId, current.task.id, current.task.run_id)
     const closing = dispatch.close()
     hold.resolve(current.task)
     await Promise.all([starting, closing])
@@ -283,8 +283,8 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
     }))
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
     await Promise.all([
-      dispatch.start(current.accountId, current.task.id),
-      dispatch.start(current.accountId, current.task.id)
+      dispatch.start(current.accountId, current.task.id, current.task.run_id),
+      dispatch.start(current.accountId, current.task.id, current.task.run_id)
     ])
     await vi.waitFor(() => expect(current.task.result_receipt?.status).toBe('succeeded'))
     await vi.waitFor(() => expect(current.repository.releaseDelivery).toHaveBeenCalledOnce())
@@ -292,6 +292,7 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
     expect(current.repository.claimDispatch).toHaveBeenCalledWith(
       current.accountId,
       current.task.id,
+      current.task.run_id,
       expect.objectContaining({ generation: 1 })
     )
     expect(current.order.indexOf('claim')).toBeLessThan(current.order.indexOf('dispatch'))
@@ -337,7 +338,7 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
       expiresAt: new Date(Date.now() - 1000).toISOString()
     }))
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    await dispatch.start(current.accountId, current.task.id)
+    await dispatch.start(current.accountId, current.task.id, current.task.run_id)
     await vi.waitFor(() => expect(current.task.result_receipt?.status).toBe('succeeded'))
     expect(current.order.indexOf('binding:recover')).toBeLessThan(
       current.order.indexOf('recovery-claim')
@@ -359,12 +360,12 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
       throw new Error('Committed response lost')
     })
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    await dispatch.start(current.accountId, current.task.id)
+    await dispatch.start(current.accountId, current.task.id, current.task.run_id)
     await vi.waitFor(() => expect(current.repository.releaseDelivery).toHaveBeenCalledOnce())
     expect(current.task.result_receipt?.status).toBe('succeeded')
     expect(current.repository.consumeObservation).toHaveBeenCalledTimes(2)
-    expect(current.repository.consumeObservation.mock.calls[0][3]).toEqual(
-      current.repository.consumeObservation.mock.calls[1][3]
+    expect(current.repository.consumeObservation.mock.calls[0][4]).toEqual(
+      current.repository.consumeObservation.mock.calls[1][4]
     )
     expect(current.runtime.deps.launch).toHaveBeenCalledOnce()
     expect(current.repository.settle).not.toHaveBeenCalled()
@@ -373,9 +374,9 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
     const current = await context()
     current.makeProof({ ownerId: 'gateway:live', leaseRef: 'lease:live', expectedGeneration: 0 })
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    await expect(dispatch.start(current.accountId, current.task.id)).rejects.toThrow(
-      'OUTCOME_UNKNOWN'
-    )
+    await expect(
+      dispatch.start(current.accountId, current.task.id, current.task.run_id)
+    ).rejects.toThrow('OUTCOME_UNKNOWN')
     expect(current.order).toEqual([])
     expect(current.repository.claimRecoveryDelivery).not.toHaveBeenCalled()
     expect(current.runtime.deps.launch).not.toHaveBeenCalled()
@@ -395,7 +396,7 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
       expectedGeneration: 0
     })
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    await dispatch.cancel(current.accountId, current.task.id)
+    await dispatch.cancel(current.accountId, current.task.id, current.task.run_id)
     await vi.waitFor(() => expect(current.task.result_receipt?.status).toBe('cancelled'))
     expect(current.runtime.deps.launch).toHaveBeenCalledOnce()
     expect(current.runtime.deps.stop).toHaveBeenCalledOnce()
@@ -405,7 +406,9 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
     const current = await context()
     current.owner.accountId = 'account:foreign'
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    await expect(dispatch.start(current.accountId, current.task.id)).rejects.toThrow('FORBIDDEN')
+    await expect(
+      dispatch.start(current.accountId, current.task.id, current.task.run_id)
+    ).rejects.toThrow('FORBIDDEN')
     expect(current.order).toEqual([])
     expect(current.runtime.deps.launch).not.toHaveBeenCalled()
   })
@@ -419,9 +422,9 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
       }
     }))
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
-    await expect(dispatch.start(current.accountId, current.task.id)).rejects.toThrow(
-      'Runtime unavailable'
-    )
+    await expect(
+      dispatch.start(current.accountId, current.task.id, current.task.run_id)
+    ).rejects.toThrow('Runtime unavailable')
     expect(current.repository.claimRecoveryDelivery).not.toHaveBeenCalled()
     expect(current.repository.claimDispatch).not.toHaveBeenCalled()
   })

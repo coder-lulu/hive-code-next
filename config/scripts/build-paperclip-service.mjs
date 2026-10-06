@@ -78,6 +78,7 @@ await cp(join(source, 'packages/db/src/migrations'), join(output, 'migrations'),
 await canonicalizePaperclipMigrationFiles(join(output, 'migrations'))
 for (const tableFile of [
   'task-tables.sql',
+  'task-run-migration.sql',
   'team-workbench-tables.sql',
   'workflow-definition-tables.sql',
   'workflow-case-tables.sql'

@@ -16,6 +16,6 @@ export const hiveTasksApi: HiveTasksApi = {
   getWorkflowCase: (query) => ipcRenderer.invoke('hiveTasks:getWorkflowCase', query),
   list: () => ipcRenderer.invoke('hiveTasks:list'),
   create: (input) => ipcRenderer.invoke('hiveTasks:create', input),
-  cancel: (id) => ipcRenderer.invoke('hiveTasks:cancel', id),
-  artifact: (id, ref) => ipcRenderer.invoke('hiveTasks:artifact', id, ref)
+  cancel: (id, runId) => ipcRenderer.invoke('hiveTasks:cancel', id, runId),
+  artifact: (id, runId, ref) => ipcRenderer.invoke('hiveTasks:artifact', id, runId, ref)
 }

@@ -21,6 +21,10 @@ Windows 开发服务在宿主 Node 中运行，以使用与原生 Runtime 相同
 
 开放 `GET /hive/health`、`/hive/tasks` 下的创建、列表、读取、绑定、派发和取消，以及 `/hive/workbench` 公司、项目、员工配置和流程定义操作。全部要求专用服务凭据、精确 loopback Host，拒绝浏览器 Origin/Sec-Fetch；业务请求还要求由受信 Hive Facade 提供当前账户。Renderer 无法提交绑定或服务凭据。
 
+`/hive/tasks` 的列表每条记录代表一个真实运行，返回 `run_id`；同一 Issue 的历史运行分别保留。读取和修改使用 `/hive/tasks/{taskId}/runs/{runId}`，绑定、派发和取消在此路径后追加 `/binding`、`/dispatch`、`/cancel`。不含运行 ID 的任务路径拒绝访问。Main、IPC 和界面同时携带原列表项的运行 ID，取消及成果读取不会重新选择最新尝试。创建请求重放精确返回原运行。
+
+绑定、delivery 和 claim receipt 使用运行主键及完整任务/账户/运行外键；服务启动在建表后事务执行 `task-run-migration.sql`，升级已有约束并保留历史数据。恢复分页游标为运行 ID；未知、取消待确认和交接仍保留原执行槽，只有完整终态与 checkout/revision 校验通过才能结算。
+
 核心观察控制另使用 `POST /hive/external-execution/{companyId}/{runId}`，只接受 `recover`、`cancel`、`drain` action，不接受账户 header、binding、命令或执行参数。服务从真实数据库绑定解析账户及任务；受理回执仅表示保留执行，不能据此声明重连、完成或停止。取消和交接先保存意图；无法联系 Runtime 时返回不可用并保留活动槽。Paperclip fork 的两处 heartbeat 装配通过 `HIVE_PAPERCLIP_EXTERNAL_EXECUTION_DESCRIPTOR` 读取同一私有服务描述符，该变量不进入 Agent。详见[恢复切点和当前验收缺口](../patches/failure-matrix.md)。
 
 创建请求按账户和 requestId 幂等。业务任务先提交，再发行独立目录和 durable binding，最后派发。绑定只允许当前个人受信 Codex profile，不接受团队、不可信任务、新增资源快照或其他 executor。成果/取消使用 Runtime 完整终态回执，在 PostgreSQL 事务中检查 task revision、run checkout、execution identity 和指纹；重复回执只结算一次。未知结果与仅收到取消请求时仍保留 checkout。

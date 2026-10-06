@@ -197,6 +197,7 @@ describe('task execution inbox and transactional business settlement', () => {
     const result = await f.repository.consumeObservation(
       accountId,
       taskId,
+      runId,
       token,
       observation([first], null, { lastSequence: 2, status: 'running' })
     )
@@ -222,7 +223,7 @@ describe('task execution inbox and transactional business settlement', () => {
     async (value) => {
       const f = fixture([[task], [delivery()]])
       await expect(
-        f.repository.consumeObservation(accountId, taskId, token, value)
+        f.repository.consumeObservation(accountId, taskId, runId, token, value)
       ).rejects.toThrow('SEQUENCE_GAP')
       expect(f.writes()).toHaveLength(0)
       expect(f.transactions).toEqual(['begin', 'rollback'])
@@ -235,6 +236,7 @@ describe('task execution inbox and transactional business settlement', () => {
       f.repository.consumeObservation(
         accountId,
         taskId,
+        runId,
         token,
         observation([event(1, 'accepted'), event(3, 'running')])
       )
@@ -254,7 +256,7 @@ describe('task execution inbox and transactional business settlement', () => {
       [delivery(1)]
     ])
     expect(
-      await f.repository.consumeObservation(accountId, taskId, token, observation([first]))
+      await f.repository.consumeObservation(accountId, taskId, runId, token, observation([first]))
     ).toMatchObject({ cursor: 1, needsReplay: false })
     expect(f.businessWrites()).toHaveLength(0)
     expect(f.calls[3].values).toEqual([
@@ -280,7 +282,7 @@ describe('task execution inbox and transactional business settlement', () => {
       [{ payload_hash: digest(original), payload: original }]
     ])
     await expect(
-      f.repository.consumeObservation(accountId, taskId, token, observation([changed]))
+      f.repository.consumeObservation(accountId, taskId, runId, token, observation([changed]))
     ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
     expect(f.writes()).toHaveLength(1)
     expect(f.writes()[0].text).not.toContain('DO UPDATE')
@@ -296,7 +298,7 @@ describe('task execution inbox and transactional business settlement', () => {
       [{ payload_hash: digest(first), payload: { ...first, summary: 'corrupted' } }]
     ])
     await expect(
-      f.repository.consumeObservation(accountId, taskId, token, observation([first]))
+      f.repository.consumeObservation(accountId, taskId, runId, token, observation([first]))
     ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
     expect(f.businessWrites()).toHaveLength(0)
   })
@@ -305,7 +307,7 @@ describe('task execution inbox and transactional business settlement', () => {
     const first = event(1, 'accepted')
     const f = fixture([[task], [delivery(1)], [{ payload_hash: digest(first) }]])
     await expect(
-      f.repository.consumeObservation(accountId, taskId, token, observation([first]))
+      f.repository.consumeObservation(accountId, taskId, runId, token, observation([first]))
     ).rejects.toThrow('OUTCOME_UNKNOWN')
     expect(f.transactions).toEqual(['begin', 'rollback'])
   })
@@ -320,7 +322,7 @@ describe('task execution inbox and transactional business settlement', () => {
     }
     const f = fixture([[task]])
     await expect(
-      f.repository.consumeObservation(accountId, taskId, token, foreign)
+      f.repository.consumeObservation(accountId, taskId, runId, token, foreign)
     ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
     expect(f.writes()).toHaveLength(0)
   })
@@ -330,16 +332,22 @@ describe('task execution inbox and transactional business settlement', () => {
     const value = observation([event(1, 'accepted')], null, {
       accepted: { ...accepted, writeFence: accepted.writeFence + 1 }
     })
-    await expect(f.repository.consumeObservation(accountId, taskId, token, value)).rejects.toThrow(
-      'IDEMPOTENCY_CONFLICT'
-    )
+    await expect(
+      f.repository.consumeObservation(accountId, taskId, runId, token, value)
+    ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
     expect(f.writes()).toHaveLength(0)
   })
 
   it('rejects a stale owner before persisting any received event', async () => {
     const f = fixture([[task], []])
     await expect(
-      f.repository.consumeObservation(accountId, taskId, token, observation([event(1, 'accepted')]))
+      f.repository.consumeObservation(
+        accountId,
+        taskId,
+        runId,
+        token,
+        observation([event(1, 'accepted')])
+      )
     ).rejects.toThrow('OUTCOME_UNKNOWN')
     expect(f.writes()).toHaveLength(0)
   })
@@ -348,7 +356,7 @@ describe('task execution inbox and transactional business settlement', () => {
     const first = event(1, 'accepted')
     const f = fixture([[task], [delivery()], [{ payload_hash: digest(first) }], []])
     await expect(
-      f.repository.consumeObservation(accountId, taskId, token, observation([first]))
+      f.repository.consumeObservation(accountId, taskId, runId, token, observation([first]))
     ).rejects.toThrow('OUTCOME_UNKNOWN')
     expect(f.businessWrites()).toHaveLength(0)
     expect(f.transactions).toEqual(['begin', 'rollback'])
@@ -372,6 +380,7 @@ describe('task execution inbox and transactional business settlement', () => {
     const result = await f.repository.consumeObservation(
       accountId,
       taskId,
+      runId,
       token,
       observation([first], receipt, { lastSequence: 3 })
     )
@@ -387,6 +396,7 @@ describe('task execution inbox and transactional business settlement', () => {
     const result = await f.repository.consumeObservation(
       accountId,
       taskId,
+      runId,
       token,
       observation(events, receipt)
     )
@@ -418,7 +428,13 @@ describe('task execution inbox and transactional business settlement', () => {
     const events = [event(2, 'running'), event(3, 'succeeded')]
     const f = fixture(terminalReplies(events, pending))
     expect(
-      await f.repository.consumeObservation(accountId, taskId, token, observation(events, receipt))
+      await f.repository.consumeObservation(
+        accountId,
+        taskId,
+        runId,
+        token,
+        observation(events, receipt)
+      )
     ).toMatchObject({ cursor: 3, settled: true })
     expect(f.sql.begin).toHaveBeenCalledTimes(1)
     expect(f.remaining()).toBe(0)
@@ -437,6 +453,7 @@ describe('task execution inbox and transactional business settlement', () => {
       f.repository.consumeObservation(
         accountId,
         taskId,
+        runId,
         token,
         observation([event(2, 'succeeded')], changed)
       )
@@ -456,6 +473,7 @@ describe('task execution inbox and transactional business settlement', () => {
       f.repository.consumeObservation(
         accountId,
         taskId,
+        runId,
         token,
         observation([event(2, 'running'), event(3, 'succeeded')], receipt)
       )
@@ -469,7 +487,7 @@ describe('task execution inbox and transactional business settlement', () => {
     const replies = terminalReplies(events, delivery(), changed).slice(0, 6)
     const f = fixture(replies)
     await expect(
-      f.repository.consumeObservation(accountId, taskId, token, observation(events, changed))
+      f.repository.consumeObservation(accountId, taskId, runId, token, observation(events, changed))
     ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
     expect(f.businessWrites()).toHaveLength(0)
     expect(f.transactions).toEqual(['begin', 'rollback'])
@@ -480,7 +498,7 @@ describe('task execution inbox and transactional business settlement', () => {
     const replies = terminalReplies(events).slice(0, -2).concat([[]])
     const f = fixture(replies)
     await expect(
-      f.repository.consumeObservation(accountId, taskId, token, observation(events, receipt))
+      f.repository.consumeObservation(accountId, taskId, runId, token, observation(events, receipt))
     ).rejects.toThrow('OUTCOME_UNKNOWN')
     expect(f.businessWrites()).toHaveLength(3)
     expect(f.transactions).toEqual(['begin', 'rollback'])
@@ -495,7 +513,7 @@ describe('task execution inbox and transactional business settlement', () => {
       terminal_hash: digest(receipt)
     })
     const f = fixture([[task], [pending]])
-    await expect(f.repository.settle(accountId, taskId, receipt, token)).rejects.toThrow(
+    await expect(f.repository.settle(accountId, taskId, runId, receipt, token)).rejects.toThrow(
       'OUTCOME_UNKNOWN'
     )
     expect(f.writes()).toHaveLength(0)
@@ -503,7 +521,7 @@ describe('task execution inbox and transactional business settlement', () => {
 
   it('replays a committed business receipt after response loss without any lease renewal or write', async () => {
     const f = fixture([[settledTask]])
-    expect(await f.repository.settle(accountId, taskId, receipt)).toEqual(settledTask)
+    expect(await f.repository.settle(accountId, taskId, runId, receipt)).toEqual(settledTask)
     expect(f.writes()).toHaveLength(0)
     expect(f.calls).toHaveLength(1)
   })
@@ -511,14 +529,14 @@ describe('task execution inbox and transactional business settlement', () => {
   it('rejects a conflicting replay of the committed business receipt', async () => {
     const f = fixture([[settledTask]])
     await expect(
-      f.repository.settle(accountId, taskId, { ...receipt, receiptId: 'result:other' })
+      f.repository.settle(accountId, taskId, runId, { ...receipt, receiptId: 'result:other' })
     ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
     expect(f.writes()).toHaveLength(0)
   })
 
   it('settles an existing unleased binding using the same Paperclip transaction and source receipt', async () => {
     const f = fixture([[task], [], [], [], [{ id: runId }], [settledTask]])
-    expect(await f.repository.settle(accountId, taskId, receipt)).toEqual(settledTask)
+    expect(await f.repository.settle(accountId, taskId, runId, receipt)).toEqual(settledTask)
     expect(f.businessWrites()).toHaveLength(3)
     expect(f.sql.begin).toHaveBeenCalledTimes(1)
     expect(f.remaining()).toBe(0)

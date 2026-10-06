@@ -41,6 +41,7 @@ const sql = postgres(databaseUrl, { max: 4, onnotice: () => {} })
 await reconcilePaperclipMigrationHashes(sql, new URL('./migrations', import.meta.url))
 await applyPendingMigrations(databaseUrl)
 await sql.unsafe(await readFile(new URL('./task-tables.sql', import.meta.url), 'utf8'))
+await sql.unsafe(await readFile(new URL('./task-run-migration.sql', import.meta.url), 'utf8'))
 await sql.unsafe(await readFile(new URL('./team-workbench-tables.sql', import.meta.url), 'utf8'))
 await sql.unsafe(
   await readFile(new URL('./workflow-definition-tables.sql', import.meta.url), 'utf8')
@@ -102,7 +103,7 @@ const server = createServer(async (request, response) => {
       return
     }
     const route = request.url?.match(
-      /^\/hive\/tasks(?:\/([0-9a-f-]{36})(?:\/(binding|dispatch|cancel))?)?$/
+      /^\/hive\/tasks(?:\/([0-9a-f-]{36})\/runs\/([0-9a-f-]{36})(?:\/(binding|dispatch|cancel))?)?$/
     )
     const workbench = WORKBENCH_PATHS.includes(request.url)
     if (!route && !workbench && !control) {
@@ -110,12 +111,13 @@ const server = createServer(async (request, response) => {
       return
     }
     const taskId = route?.[1],
-      action = route?.[2]
+      runId = route?.[2],
+      action = route?.[3]
     if (!workbench && !control && request.method === 'GET' && !action) {
       send(
         response,
         200,
-        taskId ? await repository.read(accountId, taskId) : await repository.list(accountId)
+        taskId ? await repository.read(accountId, taskId, runId) : await repository.list(accountId)
       )
       return
     }
@@ -164,19 +166,19 @@ const server = createServer(async (request, response) => {
       return
     }
     if (taskId && action === 'binding') {
-      send(response, 200, await repository.bind(accountId, taskId, body))
+      send(response, 200, await repository.bind(accountId, taskId, runId, body))
       return
     }
     if (taskId && action === 'dispatch') {
       Empty.parse(body)
-      await dispatch.start(accountId, taskId)
+      await dispatch.start(accountId, taskId, runId)
       send(response, 202, { accepted: true })
       return
     }
     if (taskId && action === 'cancel') {
       Empty.parse(body)
-      const result = await repository.cancel(accountId, taskId)
-      void dispatch.cancel(accountId, taskId).catch(() => {})
+      const result = await repository.cancel(accountId, taskId, runId)
+      void dispatch.cancel(accountId, taskId, runId).catch(() => {})
       send(response, 202, result)
       return
     }

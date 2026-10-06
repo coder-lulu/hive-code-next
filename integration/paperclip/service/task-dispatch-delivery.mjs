@@ -92,7 +92,7 @@ export function createTaskDispatchDelivery({
     if (monotonicNow() < nextCancellationCheck) {
       return
     }
-    const current = await repository.read(accountId, task.id)
+    const current = await repository.read(accountId, task.id, task.run_id)
     assertCurrent()
     if (current.cancel_requested) {
       abort.abort()
@@ -108,7 +108,10 @@ export function createTaskDispatchDelivery({
         renewal = (async () => {
           assertCurrent()
           const startedAt = monotonicNow()
-          const current = await repository.renewDelivery(accountId, task.id, { ...token, leaseMs })
+          const current = await repository.renewDelivery(accountId, task.id, task.run_id, {
+            ...token,
+            leaseMs
+          })
           if (disposed || terminal) {
             return
           }
@@ -151,6 +154,7 @@ export function createTaskDispatchDelivery({
             const consumed = await repository.consumeObservation(
               accountId,
               task.id,
+              task.run_id,
               token,
               observation
             )
@@ -187,7 +191,7 @@ export function createTaskDispatchDelivery({
             task,
             await client.binding(task.company_id, task.run_id, 'recover')
           )
-          await repository.releaseDelivery(accountId, task.id, token)
+          await repository.releaseDelivery(accountId, task.id, task.run_id, token)
         } catch {
           /* Another owner or an unavailable Runtime keeps recovery unresolved. */
         }

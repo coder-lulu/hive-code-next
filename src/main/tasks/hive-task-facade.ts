@@ -44,6 +44,7 @@ type Projection = Omit<TaskRow, 'result_receipt'> & {
 function project(row: Projection): HiveTaskView {
   return {
     id: row.id,
+    runId: row.run_id,
     title: row.title,
     status:
       row.result_receipt?.status ??
@@ -56,6 +57,14 @@ function project(row: Projection): HiveTaskView {
             : 'pending'),
     artifactRefs: row.result_receipt?.artifactRefs ?? []
   }
+}
+
+function parseTaskRun(value: unknown, id: string, runId: string): TaskRow {
+  const task = Task.parse(value)
+  if (task.id !== id || task.run_id !== runId) {
+    return refuseTaskExecution('REVISION_CONFLICT')
+  }
+  return task
 }
 
 /** Only the authenticated desktop Facade may turn a business task into a Runtime binding. */
@@ -78,7 +87,8 @@ export function createHiveTaskFacade(options: {
     getTeam: workbench.getTeam,
     validateWorkspace: options.validateWorkspace
   })
-  const taskPath = (id: string) => `/hive/tasks/${z.string().uuid().parse(id)}`
+  const taskPath = (id: string, runId: string) =>
+    `/hive/tasks/${z.string().uuid().parse(id)}/runs/${z.string().uuid().parse(runId)}`
   return {
     ...workbench,
     ...workflows,
@@ -130,17 +140,24 @@ export function createHiveTaskFacade(options: {
       })
       workspace.assertCurrent()
       caller.assertCurrent()
-      const bound = Task.parse(await caller.request(`${taskPath(task.id)}/binding`, binding))
-      await caller.request(`${taskPath(task.id)}/dispatch`, {})
+      const path = taskPath(task.id, task.run_id)
+      const bound = parseTaskRun(
+        await caller.request(`${path}/binding`, binding),
+        task.id,
+        task.run_id
+      )
+      await caller.request(`${path}/dispatch`, {})
       return project(bound)
     },
-    async cancel(id) {
+    async cancel(id, runId) {
+      const path = taskPath(id, runId)
       const caller = await context()
-      return project(Task.parse(await caller.request(`${taskPath(id)}/cancel`, {})))
+      return project(parseTaskRun(await caller.request(`${path}/cancel`, {}), id, runId))
     },
-    async artifact(id, ref) {
+    async artifact(id, runId, ref) {
+      const path = taskPath(id, runId)
       const caller = await context()
-      const task = Task.parse(await caller.request(taskPath(id)))
+      const task = parseTaskRun(await caller.request(path), id, runId)
       if (!task.result_receipt?.artifactRefs.includes(ref) || !task.result_receipt.outcomeRef) {
         return refuseTaskExecution('FORBIDDEN')
       }

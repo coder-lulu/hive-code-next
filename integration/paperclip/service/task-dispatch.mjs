@@ -33,8 +33,8 @@ export function createTaskDispatch(repository, options = {}) {
       refuse('FORBIDDEN')
     }
   }
-  const resumeDrained = async (accountId, taskId) => {
-    const key = JSON.stringify([accountId, taskId])
+  const resumeDrained = async (accountId, taskId, runId) => {
+    const key = JSON.stringify([accountId, taskId, runId])
     const flight = flights.get(key)
     if (!flight?.deliveryDrained) {
       return
@@ -46,28 +46,28 @@ export function createTaskDispatch(repository, options = {}) {
   }
   const lifecycle = createExternalExecutionLifecycle({
     persistIntent: (run, intent) =>
-      repository[intent.kind](run.accountId, run.taskId, scopeFor(run)),
+      repository[intent.kind](run.accountId, run.taskId, run.id, scopeFor(run)),
     onUnavailable(run) {
       run.unavailable = true
     },
     port: {
       async recover(run) {
         if (run.explicitRecovery) {
-          await resumeDrained(run.accountId, run.taskId)
+          await resumeDrained(run.accountId, run.taskId, run.id)
         }
-        await reserve(run.accountId, run.taskId, true, scopeFor(run))
+        await reserve(run.accountId, run.taskId, run.id, true, scopeFor(run))
       },
       async cancel(run) {
-        await resumeDrained(run.accountId, run.taskId)
-        const flight = flights.get(JSON.stringify([run.accountId, run.taskId]))
+        await resumeDrained(run.accountId, run.taskId, run.id)
+        const flight = flights.get(JSON.stringify([run.accountId, run.taskId, run.id]))
         if (flight) {
           flight.abort.abort()
         } else {
-          await reserve(run.accountId, run.taskId, true, scopeFor(run))
+          await reserve(run.accountId, run.taskId, run.id, true, scopeFor(run))
         }
       },
       async drain(run) {
-        const key = JSON.stringify([run.accountId, run.taskId])
+        const key = JSON.stringify([run.accountId, run.taskId, run.id])
         let flight = flights.get(key)
         if (!flight) {
           if (flights.size >= 32) {
@@ -76,6 +76,7 @@ export function createTaskDispatch(repository, options = {}) {
           flight = {
             accountId: run.accountId,
             taskId: run.taskId,
+            runId: run.id,
             abort: new AbortController(),
             ready: Promise.resolve(),
             promise: null,
@@ -92,12 +93,13 @@ export function createTaskDispatch(repository, options = {}) {
   const retain = async (
     accountId,
     taskId,
+    runId,
     action,
     reason = 'delivery_shutdown',
     expected,
     explicitRecovery = false
   ) => {
-    const task = await repository.read(accountId, taskId)
+    const task = await repository.read(accountId, taskId, runId)
     requireScope(task, expected)
     const run = { ...externalRun(accountId, task), explicitRecovery }
     if (!(await lifecycle[action](run, reason))) {
@@ -107,13 +109,13 @@ export function createTaskDispatch(repository, options = {}) {
       refuse('SERVICE_UNAVAILABLE')
     }
   }
-  const reserve = (accountId, taskId, recoveryOnly = false, expected) => {
+  const reserve = (accountId, taskId, runId, recoveryOnly = false, expected) => {
     if (closed) {
       return Promise.reject(
         Object.assign(new Error('SERVICE_UNAVAILABLE'), { code: 'SERVICE_UNAVAILABLE' })
       )
     }
-    const key = JSON.stringify([accountId, taskId])
+    const key = JSON.stringify([accountId, taskId, runId])
     if (flights.has(key)) {
       return flights.get(key).ready
     }
@@ -125,6 +127,7 @@ export function createTaskDispatch(repository, options = {}) {
     const flight = {
       accountId,
       taskId,
+      runId,
       abort: new AbortController(),
       ready: null,
       promise: null,
@@ -138,7 +141,7 @@ export function createTaskDispatch(repository, options = {}) {
       }
     }
     flight.ready = (async () => {
-      const task = await repository.read(accountId, taskId)
+      const task = await repository.read(accountId, taskId, runId)
       requireScope(task, expected)
       if (task.result_receipt) {
         forget()
@@ -204,11 +207,11 @@ export function createTaskDispatch(repository, options = {}) {
         leaseMs: 30_000
       }
       const proof = recovering
-        ? await repository.claimRecoveryDelivery(accountId, taskId, {
+        ? await repository.claimRecoveryDelivery(accountId, taskId, runId, {
             ...claim,
             commandFingerprint: task.binding.commandFingerprint
           })
-        : await repository.claimDelivery(accountId, taskId, claim)
+        : await repository.claimDelivery(accountId, taskId, runId, claim)
       const token = {
         ownerId: proof.ownerId,
         leaseRef: proof.leaseRef,
@@ -234,7 +237,7 @@ export function createTaskDispatch(repository, options = {}) {
           return
         }
         if (!recovering) {
-          await repository.claimDispatch(accountId, taskId, token)
+          await repository.claimDispatch(accountId, taskId, runId, token)
         }
         if (closed || flight.deliveryDrained) {
           await lifecycle.drain(externalRun(accountId, task), 'delivery_shutdown')
@@ -249,11 +252,11 @@ export function createTaskDispatch(repository, options = {}) {
       flight.promise = (async () => {
         try {
           await flight.delivery.run()
-          if (!(await repository.read(accountId, taskId)).result_receipt) {
-            await repository.unknown(accountId, taskId, token)
+          if (!(await repository.read(accountId, taskId, runId)).result_receipt) {
+            await repository.unknown(accountId, taskId, runId, token)
           }
         } catch {
-          await repository.unknown(accountId, taskId, token).catch(() => {})
+          await repository.unknown(accountId, taskId, runId, token).catch(() => {})
         } finally {
           await flight.delivery.close()
           forget()
@@ -269,11 +272,11 @@ export function createTaskDispatch(repository, options = {}) {
   const recovery = createTaskDispatchRecovery({
     repository,
     createClient,
-    recover: (account, id) => retain(account, id, 'recover'),
+    recover: (account, id, runId) => retain(account, id, runId, 'recover'),
     isClosed: () => closed
   })
   return {
-    start: (accountId, taskId) => reserve(accountId, taskId),
+    start: (accountId, taskId, runId) => reserve(accountId, taskId, runId),
     recover: recovery.check,
     startRecovery: recovery.start,
     async control(accountId, taskId, action, expected) {
@@ -284,10 +287,18 @@ export function createTaskDispatch(repository, options = {}) {
       ) {
         refuse('FORBIDDEN')
       }
-      await retain(accountId, taskId, action, 'core_control', expected, action === 'recover')
+      await retain(
+        accountId,
+        taskId,
+        expected.runId,
+        action,
+        'core_control',
+        expected,
+        action === 'recover'
+      )
     },
-    async cancel(accountId, taskId) {
-      await retain(accountId, taskId, 'cancel', 'user_requested')
+    async cancel(accountId, taskId, runId) {
+      await retain(accountId, taskId, runId, 'cancel', 'user_requested')
     },
     close() {
       if (closing) {
@@ -300,7 +311,7 @@ export function createTaskDispatch(repository, options = {}) {
         const results = await Promise.allSettled(
           current.map(async (flight) => {
             try {
-              await retain(flight.accountId, flight.taskId, 'drain')
+              await retain(flight.accountId, flight.taskId, flight.runId, 'drain')
             } finally {
               await flight.delivery?.close()
               await flight.ready
