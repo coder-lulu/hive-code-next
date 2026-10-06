@@ -4,11 +4,11 @@
   "upstream": "stablyai/orca",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
-  "targetSha": "d5f40dc7ae9dffd60cb8561a9dfc2e334d83555c",
+  "targetSha": "0165a2e8d7b301bea825173a6f4e6eb2f60d51ac",
   "baseTreeSha": "be3b3b0bd31532f0ab6a545744d7420848311b21",
   "upstreamTreeSha": "307815385c4bf005b093cf0115b73d9490720548",
-  "targetTreeSha": "88172aa68956421ec08b652f36cfa756652705c2",
-  "mergedTreeSha": "2046cba28206d077c98a149a6e108338b332df8f",
+  "targetTreeSha": "2458eb8743cce666b4aade5addd1962b7c0d88a1",
+  "mergedTreeSha": "41f9489746eaaf13a7defd40179b321e052343d4",
   "docs": {
     "path": "docs",
     "mode": "160000",
@@ -405,7 +405,7 @@
     }
   },
   "review": {
-    "frozenReviewBlobSha": "167b85261e4a937675a9e56a36958ba359f20c34",
+    "frozenReviewBlobSha": "6fdde541fea145f5c0b3fdd24a865afea6962257",
     "conflictPaths": [
       ".github/workflows/adhoc-mac-build.yml",
       ".github/workflows/agent-state-rules-publish.yml",
@@ -603,6 +603,7 @@
       "src/main/__fixtures__/shell-wrapper-snapshots/relay-bash-rcfile.txt",
       "src/main/agent-hooks/local-tmux-managed-pty.test.ts",
       "src/main/ai-vault/antigravity-ide-history.test.ts",
+      "src/main/ai-vault/antigravity-index-file-admission.test.ts",
       "src/main/ai-vault/local-log-tail-reader.ts",
       "src/main/ai-vault/opencode-wsl-runtime-preparation.ts",
       "src/main/ai-vault/session-scanner-jcode-parser.test.ts",
@@ -1880,7 +1881,9 @@
       "tests/e2e/plugin-demo.spec.ts",
       "tests/e2e/ssh-docker-relay-perf.spec.ts",
       "tests/e2e/structured-chat-owner-status-activation.unit.test.ts",
-      "tests/e2e/worktree-lineage-state.ts"
+      "tests/e2e/worktree-lineage-state.ts",
+      "src/renderer/src/components/terminal-pane/terminal-pane-store-subscription-budget.test.tsx",
+      "src/main/ai-vault/antigravity-index-file-admission.test.ts"
     ]
   },
   "absorbedUpstreamShas": [
