@@ -68,6 +68,8 @@ type Category =
   | 'network'
   | 'unavailable'
   | 'unknown'
+const responseReasons = ['content_type', 'content_encoding', 'missing_body'] as const
+type ResponseReason = (typeof responseReasons)[number]
 export type TaskFailureDiagnostic = Readonly<{
   phase: Phase
   category: Category
@@ -75,6 +77,7 @@ export type TaskFailureDiagnostic = Readonly<{
   causeCode?: Code
   httpStatus?: number
   networkCode?: string
+  responseReason?: ResponseReason
 }>
 const trustedFailures = new WeakSet<TaskFailureError>()
 
@@ -131,7 +134,13 @@ function category(code: string, networkCode?: string, httpStatus?: number): Cate
 export class TaskFailureError extends Error {
   readonly diagnostic: TaskFailureDiagnostic
 
-  constructor(error: unknown, phase: Phase, fallback: Code, httpStatus?: number) {
+  constructor(
+    error: unknown,
+    phase: Phase,
+    fallback: Code,
+    httpStatus?: number,
+    responseReason?: ResponseReason
+  ) {
     const safeFallback = isCode(fallback) ? fallback : 'OUTCOME_UNKNOWN'
     let code: Code = safeFallback
     let causeCode: Code | undefined
@@ -167,7 +176,14 @@ export class TaskFailureError extends Error {
       code,
       ...(causeCode && causeCode !== code ? { causeCode } : {}),
       ...(status !== undefined ? { httpStatus: status } : {}),
-      ...(networkCode ? { networkCode } : {})
+      ...(networkCode ? { networkCode } : {}),
+      ...(phase === 'response' &&
+      code === 'TASK_MODEL_STREAM_REFUSED' &&
+      status === 200 &&
+      responseReason &&
+      responseReasons.includes(responseReason)
+        ? { responseReason }
+        : {})
     })
     trustedFailures.add(this)
     this.stack = code
@@ -179,7 +195,8 @@ export function taskFailure(
   error: unknown,
   phase: Phase,
   fallback: Code,
-  httpStatus?: number
+  httpStatus?: number,
+  responseReason?: ResponseReason
 ): TaskFailureError {
   try {
     if (error instanceof TaskFailureError && trustedFailures.has(error)) {
@@ -188,7 +205,7 @@ export function taskFailure(
   } catch {
     /* Even a hostile prototype trap cannot prevent safe cleanup. */
   }
-  return new TaskFailureError(error, phase, fallback, httpStatus)
+  return new TaskFailureError(error, phase, fallback, httpStatus, responseReason)
 }
 export function taskFailureSummary(
   source: 'model' | 'authorization',

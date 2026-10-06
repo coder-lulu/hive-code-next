@@ -95,7 +95,7 @@ describe('model broker fencing and disposal', () => {
       } else if (kind === 'url') {
         Object.defineProperty(response.reply, 'url', { value: 'https://unapproved.test' })
       } else {
-        response.reply.headers.set(kind, kind === 'content-type' ? 'application/json' : 'gzip')
+        response.reply.headers.set(kind, kind === 'content-type' ? 'application/json' : 'unknown')
       }
       const f = fixture({ request: async () => response.reply })
       await expect(f.channel.start(modelStartParams())).rejects.toThrow(/^TASK_MODEL_/)

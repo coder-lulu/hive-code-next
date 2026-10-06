@@ -4,6 +4,26 @@ import { abortTaskModelWait } from './task-model-broker-io'
 import { taskFailure } from './task-failure-diagnostic'
 
 const RESPONSES_URL = 'https://chatgpt.com/backend-api/codex/responses'
+const FETCH_DECODED_CODINGS = new Set(['gzip', 'x-gzip', 'deflate', 'br'])
+
+function decodedContentEncoding(value: string | null): boolean {
+  if (value === null) {
+    return true
+  }
+  if (value.length > 128) {
+    return false
+  }
+  const codings = value
+    .toLowerCase()
+    .split(',')
+    .map((coding) => coding.trim())
+  // Fetch retains the coding header after decoding; mixed identity/unknown chains stay raw.
+  return (
+    codings.length <= 5 &&
+    ((codings.length === 1 && codings[0] === 'identity') ||
+      codings.every((coding) => FETCH_DECODED_CODINGS.has(coding)))
+  )
+}
 
 export type TaskModelAuthScope = Readonly<{
   codexHome: string
@@ -124,15 +144,20 @@ export async function openTaskModelUpstream(options: {
         reply.status
       )
     }
+    const contentType = reply.headers.get('content-type') ?? ''
     if (
-      !/^text\/event-stream(?:\s*;\s*charset=utf-8)?$/i.test(
-        reply.headers.get('content-type') ?? ''
-      ) ||
-      (reply.headers.has('content-encoding') &&
-        reply.headers.get('content-encoding') !== 'identity') ||
-      !reply.body
+      contentType.length > 128 ||
+      !/^text\/event-stream(?:[ \t]*;[ \t]*charset[ \t]*=[ \t]*(?:utf-8|"utf-8"))?[ \t]*$/i.test(
+        contentType
+      )
     ) {
-      throw new Error('TASK_MODEL_STREAM_REFUSED')
+      throw taskFailure(undefined, phase, 'TASK_MODEL_STREAM_REFUSED', 200, 'content_type')
+    }
+    if (!decodedContentEncoding(reply.headers.get('content-encoding'))) {
+      throw taskFailure(undefined, phase, 'TASK_MODEL_STREAM_REFUSED', 200, 'content_encoding')
+    }
+    if (!reply.body) {
+      throw taskFailure(undefined, phase, 'TASK_MODEL_STREAM_REFUSED', 200, 'missing_body')
     }
     return reply.body.getReader()
   } catch (error) {

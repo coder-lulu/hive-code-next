@@ -20,7 +20,7 @@ import {
 let directory: string
 const channels: ReturnType<typeof createTaskCodexModelChannel>[] = []
 beforeEach(async () => {
-  const root = resolve('logs/paperclip-development/p3/task-model-failure-diagnostics/writer/tmp')
+  const root = resolve('logs/paperclip-development/p3/task-model-response-validation/writer/tmp')
   await mkdir(root, { recursive: true })
   directory = await mkdtemp(join(root, 'channel-'))
   vi.spyOn(Date, 'now').mockReturnValue(TASK_TEST_NOW)
@@ -100,6 +100,27 @@ async function fixture() {
 }
 
 describe('controlled Codex production model channel', () => {
+  it('persists only the finite original response guard reason', async () => {
+    const f = await fixture()
+    f.request.mockResolvedValue(
+      new Response('private response body secret', {
+        headers: {
+          'content-type': 'application/private-token-secret',
+          'content-encoding': 'private-token-secret'
+        }
+      })
+    )
+    await expect(f.channel.start(requestParams())).rejects.toThrow('TASK_MODEL_STREAM_REFUSED')
+    await f.channel.close()
+    const task = (await readPersistedTestAgentSessionStore(directory)).taskExecutions[f.owner.key]
+    expect(task.events.at(-1)?.summary).toBe(
+      'Task model failure: {"phase":"response","category":"protocol","code":"TASK_MODEL_STREAM_REFUSED","httpStatus":200,"responseReason":"content_type"}'
+    )
+    expect(JSON.stringify(task.events)).not.toContain('secret')
+    expect(task.result).toBeNull()
+    expect(task.modelDispatchAttempts).toBe(1)
+    expect(task.status).toBe(f.owner.task.status)
+  })
   it('persists the safe HTTP cause in the original Task for owner observation after cleanup', async () => {
     const f = await fixture()
     const session = f.owner.store.getRecord(f.owner.binding.sessionId)
