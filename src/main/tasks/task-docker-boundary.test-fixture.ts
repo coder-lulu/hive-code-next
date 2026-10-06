@@ -37,8 +37,9 @@ export function result(stdout = '', code = 0, stderr = ''): ProcessResult {
   return { code, stdout, stderr, signal: null, timedOut: false, outputTruncated: false }
 }
 
-export async function taskDockerFixture() {
-  const directory = resolve('logs/paperclip-development/p3/host-qualification/boundary')
+export async function taskDockerFixture(
+  directory = resolve('logs/paperclip-development/p3/host-qualification/boundary')
+) {
   await mkdir(directory, { recursive: true })
   const root = await mkdtemp(resolve(directory, 'fixture-'))
   roots.push(root)

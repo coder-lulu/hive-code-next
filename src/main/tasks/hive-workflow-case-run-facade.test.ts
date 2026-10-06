@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { canonicalAgentSessionDigest as digest } from '../../shared/agent-session-mutation-envelope'
 import { workflowCaseFixture } from '../../shared/hive-workflow-cases.test-fixture'
 import { hiveWorkflowStagePrompt } from '../../shared/hive-workflow-stage-prompt'
+import { hiveWorkflowStageContext } from '../../shared/hive-workflow-stage-context'
 import type { HiveWorkflowCaseRun } from '../../shared/hive-workflow-case-runs'
 import { createHiveWorkflowCaseRunFacade } from './hive-workflow-case-run-facade'
 import { TaskExecutionError } from './task-execution-error'
@@ -47,7 +48,8 @@ function fixture() {
     input: prompt,
     inputDigest: createHash('sha256').update(JSON.stringify(prompt)).digest('hex'),
     workspaceSelector: f.team.project.workspaceSelector,
-    executionDeadlineAt: new Date(Date.now() + 60_000).toISOString()
+    executionDeadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    workflowContext: hiveWorkflowStageContext(f.view, task.stageRef)
   }
   let current = true,
     workspaceCurrent = true,
@@ -154,7 +156,8 @@ describe('authenticated workflow run dispatch through the original Task binding'
       workspaceSelector: f.team.project.workspaceSelector,
       input: f.prompt,
       executionMode: 'enforced_autonomous',
-      executionDeadlineAt: f.admission().executionDeadlineAt
+      executionDeadlineAt: f.admission().executionDeadlineAt,
+      workflowContext: f.admission().workflowContext
     })
     expect(f.request.mock.calls.map(([path]) => path)).toEqual([
       '/hive/workbench/cases/start',
@@ -193,7 +196,10 @@ describe('authenticated workflow run dispatch through the original Task binding'
     'digest',
     'workspace',
     'prompt',
-    'request'
+    'request',
+    'context-role',
+    'context-workflow',
+    'context-employee'
   ] as const)('rejects swapped private admission %s before binding', async (boundary) => {
     const f = fixture(),
       admission = structuredClone(f.admission())
@@ -217,6 +223,15 @@ describe('authenticated workflow run dispatch through the original Task binding'
     }
     if (boundary === 'request') {
       admission.requestId = randomUUID()
+    }
+    if (boundary === 'context-role') {
+      admission.workflowContext.role = 'developer'
+    }
+    if (boundary === 'context-workflow') {
+      admission.workflowContext.binding.workflowRunRef = randomUUID()
+    }
+    if (boundary === 'context-employee') {
+      admission.workflowContext.employeeRef = randomUUID()
     }
     if (boundary === 'prompt') {
       admission.input = 'Changed instruction'

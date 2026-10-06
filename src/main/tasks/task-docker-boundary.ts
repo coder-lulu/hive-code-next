@@ -14,6 +14,7 @@ import {
 } from './task-docker-inspection'
 import { refuseTaskExecution } from './task-execution-error'
 import { assertTaskDirectoryIdentity } from './task-managed-copy'
+import { assertTaskOutputWorkspace } from './task-output-workspace'
 import type { TaskExecutionDispatchAuthorization } from './task-execution-ports'
 import { prepareTaskDispatch } from './task-dispatch-authorization'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
@@ -68,6 +69,9 @@ export function createTaskDockerBoundary(options: {
 
   function assertWorkspace(): void {
     assertTaskDirectoryIdentity(config.workspace.executionPath, config.workspace.directoryIdentity)
+    if (config.codeReadOnly) {
+      assertTaskOutputWorkspace(config.workspace)
+    }
   }
   function assertCurrent(): void {
     if (stopping) {

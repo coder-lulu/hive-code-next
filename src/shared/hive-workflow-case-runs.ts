@@ -8,6 +8,7 @@ import {
   TaskTimestamp
 } from './task-execution/task-execution-primitives'
 import { WorkflowRoleSchema } from './task-workflow/workflow-bindings'
+import { WorkflowExecutionContextSchema } from './task-workflow/workflow-execution-context'
 
 export const HiveWorkflowCaseStartSchema = z.strictObject({
   requestId: HiveWorkbenchObjectIdInputSchema,
@@ -71,7 +72,8 @@ export const HiveWorkflowCaseRunAdmissionSchema = z.strictObject({
   input: z.string().min(1).max(128_000),
   inputDigest: TaskDigest,
   workspaceSelector: z.string().min(1).max(512),
-  executionDeadlineAt: TaskTimestamp
+  executionDeadlineAt: TaskTimestamp,
+  workflowContext: WorkflowExecutionContextSchema.optional()
 })
 
 export type HiveWorkflowCaseStart = z.infer<typeof HiveWorkflowCaseStartSchema>

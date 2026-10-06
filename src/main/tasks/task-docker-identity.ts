@@ -38,7 +38,8 @@ export const TaskDockerIdentitySchema = z.strictObject({
       .max(16)
       .regex(/^[1-9][0-9]*$/),
     'io.hive.task.command-fingerprint': TaskDigest,
-    'io.hive.task.workspace': TaskDigest
+    'io.hive.task.workspace': TaskDigest,
+    'io.hive.task.outputs': TaskDigest.optional()
   }),
   daemon: TaskDockerDaemonSchema,
   containerId: z
@@ -53,6 +54,7 @@ export function taskDockerBinding(record: TaskDockerRecord) {
   const { runtimeRecordId, ownershipEpoch, executionId, executionEpoch } = record.command
   const digest = (value: unknown) =>
     createHash('sha256').update(JSON.stringify(value)).digest('hex')
+  const output = record.workspace.outputDirectory
   return {
     name: `hive-task-${digest([runtimeRecordId, ownershipEpoch, executionId, executionEpoch, record.commandFingerprint])}`,
     labels: Object.freeze({
@@ -65,7 +67,8 @@ export function taskDockerBinding(record: TaskDockerRecord) {
         record.workspace.workspaceId,
         record.workspace.executionPath,
         record.workspace.directoryIdentity
-      ])
+      ]),
+      ...(output ? { 'io.hive.task.outputs': digest([output.path, output.directoryIdentity]) } : {})
     })
   }
 }
@@ -77,6 +80,8 @@ export function taskDockerIdentityMatchesRecord(
   const binding = taskDockerBinding(record)
   return (
     !!record.workspace.directoryIdentity &&
+    (record.command.workflowContext?.role === 'tester') ===
+      Boolean(record.workspace.outputDirectory) &&
     identity.name === binding.name &&
     isDeepStrictEqual(identity.labels, binding.labels)
   )

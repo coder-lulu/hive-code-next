@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isAbsolute } from 'node:path'
 import { isAgentLaunchResult, type AgentLaunchResult } from '../../shared/agent-launch-intent'
 import { deriveAgentLaunchChildOperationId } from '../../shared/agent-launch-operation'
 import {
@@ -41,7 +42,17 @@ export const TaskExecutionWorkspaceSchema = z.strictObject({
   executionPath: z.string().min(1).max(4096),
   isolation: z.enum(['managed_worktree', 'managed_copy']),
   // Missing original evidence remains readable but cannot authorize workspace recovery.
-  directoryIdentity: TaskWorkspaceDirectoryIdentitySchema.optional()
+  directoryIdentity: TaskWorkspaceDirectoryIdentitySchema.optional(),
+  outputDirectory: z
+    .strictObject({
+      path: z
+        .string()
+        .min(1)
+        .max(4096)
+        .refine((path) => isAbsolute(path) && !/[,\0\r\n]/.test(path)),
+      directoryIdentity: TaskWorkspaceDirectoryIdentitySchema
+    })
+    .optional()
 })
 
 export const TaskExecutionRecordSchema = z
@@ -67,6 +78,10 @@ export const TaskExecutionRecordSchema = z
     const receipts = [record.accepted, ...record.events, ...(record.result ? [record.result] : [])]
     const binding = record.structuredBinding
     if (
+      (record.command.workflowContext?.role === 'tester') !==
+        Boolean(record.workspace.outputDirectory) ||
+      (Object.hasOwn(record.workspace, 'outputDirectory') &&
+        record.workspace.outputDirectory === undefined) ||
       fingerprint !== record.commandFingerprint ||
       (Object.hasOwn(record, 'structuredBinding') && binding === undefined) ||
       (Object.hasOwn(record, 'modelDispatchAttempts') &&

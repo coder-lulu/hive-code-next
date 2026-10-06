@@ -19,6 +19,7 @@ import {
   TASK_DOCKER_ENFORCEMENT_POLICY,
   TASK_DOCKER_ENFORCEMENT_REVISION
 } from './task-docker-enforcement'
+import { prepareTaskOutputWorkspace, assertTaskOutputWorkspace } from './task-output-workspace'
 
 type BindingPreparationOptions = ConstructorParameters<typeof LocalTaskBindingIssuer>[0] & {
   requireOwner(): { account: HiveRuntimeCloudAuthorization; runtime: LocalTaskRuntimeOwner }
@@ -70,14 +71,23 @@ export async function prepareLocalTaskBinding(
     throw error
   }
   const source = await options.resolveSource(input.workspaceSelector)
-  const copy = await createTaskManagedCopy({
-    source: source.path,
-    directory: join(options.directory, 'workspaces'),
-    assertCurrent: () => {
-      assertOwner()
-      assertTaskAuthorizationCurrent(() => source.assertCurrent())
-    }
-  })
+  const assertSource = () => {
+    assertOwner()
+    assertTaskAuthorizationCurrent(() => source.assertCurrent())
+  }
+  const workspaceDirectory = join(options.directory, 'workspaces')
+  const copy = input.workflowContext?.codeInput
+    ? await (options.restoreCodeInput?.(input, workspaceDirectory, assertSource) ??
+        refuseTaskExecution('CAPABILITY_UNAVAILABLE'))
+    : await createTaskManagedCopy({
+        source: source.path,
+        directory: workspaceDirectory,
+        assertCurrent: assertSource
+      })
+  const output =
+    input.workflowContext?.role === 'tester'
+      ? await prepareTaskOutputWorkspace({ workspace: copy, assertCurrent: assertSource })
+      : null
   assertOwner()
   const registered = await options.registerWorkspace(copy.executionPath)
   const assertCurrent = () => {
@@ -87,6 +97,9 @@ export async function prepareLocalTaskBinding(
     }
     assertTaskAuthorizationCurrent(() => source.assertCurrent())
     assertTaskAuthorizationCurrent(() => copy.assertCurrent())
+    if (output) {
+      assertTaskAuthorizationCurrent(() => output.assertCurrent())
+    }
     assertTaskAuthorizationCurrent(() => registered.assertCurrent())
   }
   assertCurrent()
@@ -96,7 +109,8 @@ export async function prepareLocalTaskBinding(
     canonicalPath: copy.canonicalPath,
     executionPath: copy.executionPath,
     isolation: 'managed_copy',
-    directoryIdentity: copy.directoryIdentity
+    directoryIdentity: copy.directoryIdentity,
+    ...(output ? { outputDirectory: output.outputDirectory } : {})
   }
   const command = TaskExecutionStartSchema.parse({
     protocolVersion: 1,
@@ -138,6 +152,7 @@ export async function prepareLocalTaskBinding(
     ...(input.executionDeadlineAt === undefined
       ? {}
       : { executionDeadlineAt: input.executionDeadlineAt }),
+    ...(input.workflowContext ? { workflowContext: input.workflowContext } : {}),
     requiredCapabilities: enforcement ? [TASK_ENFORCEMENT_CAPABILITY] : []
   })
   if (enforcement) {
@@ -187,6 +202,9 @@ export async function prepareLocalTaskBinding(
     assertWorkspaceCurrent: () => {
       assertTaskAuthorizationCurrent(() => options.assertCurrent?.())
       assertTaskDirectoryIdentity(workspace.executionPath, workspace.directoryIdentity)
+      if (command.workflowContext?.role === 'tester') {
+        assertTaskOutputWorkspace(workspace)
+      }
       assertTaskAuthorizationCurrent(() => recoveryProof.assertCurrent())
     },
     accountId: owner.account.accountId,

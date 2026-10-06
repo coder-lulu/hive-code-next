@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { workflowCaseFixture } from '../../shared/hive-workflow-cases.test-fixture'
 import { canonicalAgentSessionDigest as digest } from '../../shared/agent-session-mutation-envelope'
 import { hiveWorkflowStagePrompt } from '../../shared/hive-workflow-stage-prompt'
+import { hiveWorkflowStageContext } from '../../shared/hive-workflow-stage-context'
 import { prepareWorkflowCaseCancellation } from './hive-workflow-case-cancellation'
 import { taskCommand } from './task-execution.test-fixture'
 
@@ -46,7 +47,8 @@ function fixture() {
     definitionDigest: f.view.definitionDigest,
     projectBindingRevision: f.view.projectBindingRevision,
     workspaceSelector: f.team.project.workspaceSelector,
-    executionDeadlineAt: new Date(Date.now() + 60_000).toISOString()
+    executionDeadlineAt: new Date(Date.now() + 60_000).toISOString(),
+    workflowContext: hiveWorkflowStageContext(f.view, fixed.stageRef)
   }
   const request = vi.fn(async (path: string): Promise<unknown> =>
     path.endsWith('/run-read')
@@ -103,7 +105,8 @@ describe('cancellation before a workflow binding exists', () => {
         task: f.admission.run.task,
         input: f.admission.input,
         executionMode: 'enforced_autonomous',
-        executionDeadlineAt: f.admission.executionDeadlineAt
+        executionDeadlineAt: f.admission.executionDeadlineAt,
+        workflowContext: f.admission.workflowContext
       })
     )
   })

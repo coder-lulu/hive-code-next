@@ -1,6 +1,6 @@
 import { join } from 'node:path'
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
-import { lstatSync, realpathSync } from 'node:fs'
+import { realpathSync } from 'node:fs'
 import { createHash } from 'node:crypto'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -29,10 +29,11 @@ import { refuseTaskExecution } from './task-execution-error'
 import { createHiveTaskFacade } from './hive-task-facade'
 import { TaskArtifactIndex } from './task-artifact-index'
 import { installTaskAuthorizationMonitor } from './task-authorization-monitor'
-import { taskLaunchPathKey } from './task-launch-workspace'
-import { assertTaskDirectoryIdentity } from './task-managed-copy'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { createLocalTaskDockerEnforcement } from './task-docker-enforcement-runtime'
+import { TaskCodeSnapshotStore } from './task-code-snapshot'
+import { createWorkflowTaskCodeRestorer } from './task-workflow-code-input'
+import { restoreLocalTaskWorkspace } from './local-task-workspace-recovery'
 
 /** One task service assembled from the existing account, Runtime, record store and Codex host. */
 export async function startLocalTaskRuntime(options: {
@@ -98,6 +99,7 @@ export async function startLocalTaskRuntime(options: {
     currentRuntime,
     assertCurrent
   })
+  const snapshots = new TaskCodeSnapshotStore(join(directory, 'artifacts'))
   const issuer = new LocalTaskBindingIssuer({
     directory,
     operationCallerKey: 'trusted-local:runtime',
@@ -106,31 +108,19 @@ export async function startLocalTaskRuntime(options: {
     assertCurrent,
     resolveEnforcement: enforcement.probe,
     resolveSource: resolveWorkspaceSource,
+    restoreCodeInput: createWorkflowTaskCodeRestorer({
+      snapshots,
+      currentRuntime,
+      resolveSource: resolveWorkspaceSource,
+      operationCallerKey: 'trusted-local:runtime',
+      readExecution: (identity) => resources.store.tasks.get(identity)
+    }),
     readExecution: (command) => resources.store.tasks.get(command),
-    restoreWorkspace: async (workspace) => {
-      if (!workspace.workspaceId.startsWith('folder:')) {
-        return refuseTaskExecution('FORBIDDEN')
-      }
-      const id = workspace.workspaceId.slice('folder:'.length)
-      const expected = realpathSync(workspace.executionPath)
-      const guard = () => {
-        assertCurrent()
-        assertTaskDirectoryIdentity(workspace.executionPath, workspace.directoryIdentity)
-        const current = options.store.getFolderWorkspace(id)
-        if (
-          !current ||
-          current.isArchived ||
-          current.connectionId ||
-          lstatSync(workspace.executionPath).isSymbolicLink() ||
-          taskLaunchPathKey(realpathSync(current.folderPath)) !== taskLaunchPathKey(expected) ||
-          taskLaunchPathKey(expected) !== taskLaunchPathKey(workspace.executionPath)
-        ) {
-          return refuseTaskExecution('FORBIDDEN')
-        }
-      }
-      guard()
-      return { assertCurrent: guard }
-    },
+    restoreWorkspace: async (workspace) =>
+      restoreLocalTaskWorkspace(workspace, {
+        assertCurrent,
+        getFolderWorkspace: (id) => options.store.getFolderWorkspace(id)
+      }),
     registerWorkspace: async (path) => {
       assertCurrent()
       const workspace = await options.store.runDurableMutation(() => {
@@ -199,6 +189,7 @@ export async function startLocalTaskRuntime(options: {
   }
   const evidence = createTaskCodexEvidence(join(directory, 'artifacts'))
   const host = new TaskExecutionHost({
+    evidenceTimeoutMs: 30_000,
     store: resources.store.tasks,
     capabilities,
     authorizeEnforcement: enforcement.authorize,

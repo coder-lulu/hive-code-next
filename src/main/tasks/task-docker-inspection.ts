@@ -1,9 +1,7 @@
 import { isDeepStrictEqual } from 'node:util'
-import { isAbsolute } from 'node:path'
 import { z } from 'zod'
 import type { ProcessResult } from '../../shared/child-process/run-process'
 import { refuseTaskExecution } from './task-execution-error'
-import { taskLaunchPathKey } from './task-launch-workspace'
 import { TaskDockerDaemonSchema } from './task-docker-identity'
 import {
   TASK_DOCKER_TMPFS,
@@ -11,6 +9,11 @@ import {
   taskDockerImageEnvironment,
   type TaskDockerConfiguration
 } from './task-docker-configuration'
+import {
+  assertTaskDockerMounts,
+  TaskDockerGuestMountSchema,
+  TaskDockerHostMountSchema
+} from './task-docker-mounts'
 
 const EnvSchema = z.array(z.string().max(1024)).max(32)
 const Empty = z.union([z.null(), z.array(z.never()).length(0), z.strictObject({})]).optional()
@@ -19,37 +22,6 @@ const ImageSchema = z.object({
   Os: z.literal('linux'),
   Architecture: z.literal('amd64'),
   Config: z.object({ Env: EnvSchema, Labels: Empty, Volumes: Empty, ExposedPorts: Empty })
-})
-const SourcePath = z
-  .string()
-  .min(1)
-  .max(4096)
-  .refine((path) => isAbsolute(path) && !/[,\0\r\n]/.test(path))
-const MountSchema = z.strictObject({
-  Type: z.literal('bind'),
-  Source: SourcePath,
-  Destination: z.literal('/workspace'),
-  RW: z.literal(true),
-  Propagation: z.literal('rprivate'),
-  Name: z.literal('').optional(),
-  Driver: z.literal('').optional(),
-  Mode: z.enum(['', 'rw']).optional()
-})
-const HostMountSchema = z.strictObject({
-  Type: z.literal('bind'),
-  Source: SourcePath,
-  Target: z.literal('/workspace'),
-  ReadOnly: z.literal(false).optional(),
-  Consistency: z.literal('').optional(),
-  BindOptions: z
-    .strictObject({
-      Propagation: z.enum(['', 'rprivate']).optional(),
-      NonRecursive: z.literal(false).optional(),
-      CreateMountpoint: z.literal(false).optional(),
-      ReadOnlyNonRecursive: z.literal(false).optional(),
-      ReadOnlyForceRecursive: z.literal(false).optional()
-    })
-    .optional()
 })
 const ContainerSchema = z.object({
   Id: z
@@ -99,7 +71,7 @@ const ContainerSchema = z.object({
     AutoRemove: z.literal(false),
     RestartPolicy: z.strictObject({ Name: z.literal('no'), MaximumRetryCount: z.literal(0) }),
     Binds: Empty,
-    Mounts: z.tuple([HostMountSchema]),
+    Mounts: z.array(TaskDockerHostMountSchema).min(1).max(2),
     Tmpfs: z.record(z.string(), z.string()),
     PortBindings: Empty,
     PublishAllPorts: z.literal(false),
@@ -131,7 +103,7 @@ const ContainerSchema = z.object({
     OomKillDisable: z.union([z.literal(false), z.null()]).optional(),
     Ulimits: Empty
   }),
-  Mounts: z.tuple([MountSchema]),
+  Mounts: z.array(TaskDockerGuestMountSchema).min(1).max(2),
   NetworkSettings: z.object({
     Networks: z.strictObject({
       none: z.object({
@@ -222,14 +194,11 @@ function assertContainerIdentity(
     container.Name !== `/${expected.name}` ||
     container.Image !== expected.imageId ||
     container.Config.Image !== expected.imageId ||
-    !isDeepStrictEqual(container.Config.Labels, expected.labels) ||
-    taskLaunchPathKey(container.Mounts[0].Source) !==
-      taskLaunchPathKey(expected.workspace.executionPath) ||
-    taskLaunchPathKey(container.HostConfig.Mounts[0].Source) !==
-      taskLaunchPathKey(expected.workspace.executionPath)
+    !isDeepStrictEqual(container.Config.Labels, expected.labels)
   ) {
     refuseTaskExecution('FORBIDDEN')
   }
+  assertTaskDockerMounts(container, expected)
 }
 /** Mutable limits and current host paths may revoke launch; they cannot revoke
  * termination of this captured original container. This never admits a launch. */

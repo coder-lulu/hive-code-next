@@ -19,7 +19,8 @@ export const WorkflowRunInputSchema = HiveWorkflowCaseRunAdmissionSchema.pick({
   definitionDigest: true,
   projectBindingRevision: true,
   workspaceSelector: true,
-  executionDeadlineAt: true
+  executionDeadlineAt: true,
+  workflowContext: true
 }).extend({
   caseId: z.string().uuid(),
   stageRef: z.string().min(1).max(160),
@@ -49,10 +50,23 @@ export async function readWorkflowCaseRun(db, accountId, taskId, runId) {
     input.inputDigest !== digest(input.input) ||
     input.startRequest.requestId !== binding.request_id ||
     input.startRequest.projectId !== scope.projectId ||
+    (input.workflowContext &&
+      (digest(input.workflowContext.binding) !==
+        digest({
+          scope: { companyRef: scope.companyId, projectRef: scope.projectId },
+          workflowRef: scope.workflowId,
+          workflowRevision: scope.workflowRevision,
+          workflowRunRef: scope.caseId
+        }) ||
+        input.workflowContext.stageRef !== scope.stageRef ||
+        input.workflowContext.role !== scope.role ||
+        input.workflowContext.employeeRef !== scope.employeeRef ||
+        input.workflowContext.definitionDigest !== scope.definitionDigest)) ||
     binding.input_fingerprint !== digest({ operation: 'cases.start', input: input.startRequest }) ||
     (task.binding &&
       (digest(task.binding.command.task) !== digest(input.task) ||
-        task.binding.command.executionDeadlineAt !== input.executionDeadlineAt))
+        task.binding.command.executionDeadlineAt !== input.executionDeadlineAt ||
+        digest(task.binding.command.workflowContext ?? {}) !== digest(input.workflowContext ?? {})))
   ) {
     refuse('REVISION_CONFLICT')
   }

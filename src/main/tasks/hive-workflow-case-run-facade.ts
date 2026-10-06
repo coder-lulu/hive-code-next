@@ -12,6 +12,7 @@ import {
   type HiveWorkflowCaseView
 } from '../../shared/hive-workflow-cases'
 import { hiveWorkflowStagePrompt } from '../../shared/hive-workflow-stage-prompt'
+import { hiveWorkflowStageContext } from '../../shared/hive-workflow-stage-context'
 import type { LocalTaskBindingIssuer } from './local-task-binding-issuer'
 import {
   assertHiveWorkbenchCompanyOwner,
@@ -109,6 +110,9 @@ export function createHiveWorkflowCaseRunFacade(options: {
         admission.definitionDigest !== view.definitionDigest ||
         admission.projectBindingRevision !== view.projectBindingRevision ||
         admission.workspaceSelector !== selector ||
+        (admission.workflowContext &&
+          digest(admission.workflowContext) !==
+            digest(hiveWorkflowStageContext(view, input.stageRef))) ||
         admission.inputDigest !==
           createHash('sha256').update(JSON.stringify(admission.input)).digest('hex') ||
         (!admission.replayed && admission.input !== hiveWorkflowStagePrompt(view, input.stageRef))
@@ -128,7 +132,8 @@ export function createHiveWorkflowCaseRunFacade(options: {
         workspaceSelector: selector,
         input: admission.input,
         executionMode: 'enforced_autonomous',
-        executionDeadlineAt: admission.executionDeadlineAt
+        executionDeadlineAt: admission.executionDeadlineAt,
+        workflowContext: admission.workflowContext
       })
       assertCurrent()
       return admission.run

@@ -7,6 +7,7 @@ import { readNodeFileHandleWithinLimit } from '../../shared/node-bounded-file-re
 import { taskLaunchPathKey } from './task-launch-workspace'
 import { refuseTaskExecution } from './task-execution-error'
 import type { TaskExecutionRecord } from './task-execution-record'
+import { assertTaskOutputWorkspace } from './task-output-workspace'
 
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
 const Manifest = z.strictObject({
@@ -78,10 +79,20 @@ export class TaskArtifactIndex {
   constructor(private readonly directory: string) {}
 
   async collect(record: TaskExecutionRecord, turnOutcome: 'success' | 'failure') {
+    const tester = record.command.workflowContext?.role === 'tester'
+    const assertSource = () => {
+      if (tester) {
+        assertTaskOutputWorkspace(record.workspace)
+      }
+    }
+    assertSource()
+    const source = tester
+      ? (record.workspace.outputDirectory?.path ?? refuseTaskExecution('OUTCOME_UNKNOWN'))
+      : record.workspace.executionPath
     let contents: Buffer
     try {
       contents = await readTaskArtifactFile(
-        record.workspace.executionPath,
+        source,
         taskResultManifestName(record.commandFingerprint),
         16 * 1024
       )
@@ -104,6 +115,7 @@ export class TaskArtifactIndex {
       }
     }
     const manifest = Manifest.parse(JSON.parse(contents.toString('utf8')))
+    assertSource()
     if (
       manifest.executionId !== record.command.executionId ||
       manifest.commandFingerprint !== record.commandFingerprint
@@ -114,7 +126,9 @@ export class TaskArtifactIndex {
     const artifacts: { ref: string; name: string; digest: string }[] = []
     await mkdir(this.directory, { recursive: true, mode: 0o700 })
     for (const name of new Set(manifest.artifacts)) {
-      const data = await readTaskArtifactFile(record.workspace.executionPath, name, 8 * 1024 * 1024)
+      assertSource()
+      const data = await readTaskArtifactFile(source, name, 8 * 1024 * 1024)
+      assertSource()
       const digest = hash(data)
       const id = hash(JSON.stringify([record.commandFingerprint, name, digest]))
       const destination = join(this.directory, id)

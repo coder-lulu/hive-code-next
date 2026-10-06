@@ -3,6 +3,7 @@ import type { HiveTaskRequestContext, HiveTaskWorkspaceProof } from './hive-team
 import type { LocalTaskBindingIssuer } from './local-task-binding-issuer'
 import { hiveTaskRunPath, parseHiveTaskRun } from './hive-task-service-row'
 import { refuseTaskExecution } from './task-execution-error'
+import type { WorkflowExecutionContext } from '../../shared/task-workflow/workflow-execution-context'
 
 /** Personal and workflow admissions share the original binding, then the original dispatcher. */
 export async function bindAndDispatchHiveTask(options: {
@@ -16,6 +17,7 @@ export async function bindAndDispatchHiveTask(options: {
   input: string
   executionMode?: 'enforced_autonomous'
   executionDeadlineAt?: string
+  workflowContext?: WorkflowExecutionContext
   action?: 'cancel'
 }) {
   const assertCurrent = () => {
@@ -30,7 +32,8 @@ export async function bindAndDispatchHiveTask(options: {
     workspaceSelector: options.workspaceSelector,
     input: options.input,
     ...(options.executionMode ? { executionMode: options.executionMode } : {}),
-    ...(options.executionDeadlineAt ? { executionDeadlineAt: options.executionDeadlineAt } : {})
+    ...(options.executionDeadlineAt ? { executionDeadlineAt: options.executionDeadlineAt } : {}),
+    ...(options.workflowContext ? { workflowContext: options.workflowContext } : {})
   })
   assertCurrent()
   const path = hiveTaskRunPath(options.task.taskId, options.task.runId)

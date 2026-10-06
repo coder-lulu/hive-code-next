@@ -8,11 +8,12 @@ import {
 import { refuseTaskExecution } from './task-execution-error'
 import { TaskExecutionWorkspaceSchema, type TaskExecutionRecord } from './task-execution-record'
 import { taskDockerBinding } from './task-docker-identity'
+import { WorkflowExecutionContextSchema } from '../../shared/task-workflow/workflow-execution-context'
 
 export type TaskDockerRecord = Pick<TaskExecutionRecord, 'workspace' | 'commandFingerprint'> & {
   command: Pick<
     TaskExecutionRecord['command'],
-    'runtimeRecordId' | 'ownershipEpoch' | 'executionId' | 'executionEpoch'
+    'runtimeRecordId' | 'ownershipEpoch' | 'executionId' | 'executionEpoch' | 'workflowContext'
   >
 }
 
@@ -82,10 +83,16 @@ export function taskDockerConfiguration(options: {
     commandFingerprint: options.record.commandFingerprint
   })
   const workspace = TaskExecutionWorkspaceSchema.safeParse(options.record.workspace)
+  const workflow = WorkflowExecutionContextSchema.optional().safeParse(
+    options.record.command.workflowContext
+  )
+  const codeReadOnly = workflow.success && workflow.data?.role === 'tester'
   if (
     !binding.success ||
     !workspace.success ||
     !workspace.data.directoryIdentity ||
+    !workflow.success ||
+    codeReadOnly !== Boolean(workspace.data.outputDirectory) ||
     options.imageId.length !== 71 ||
     !options.imageId.startsWith('sha256:') ||
     !TaskDigest.safeParse(options.imageId.slice(7)).success ||
@@ -99,7 +106,7 @@ export function taskDockerConfiguration(options: {
   const cli = taskDockerCliConfiguration(options)
   const { name, labels } = taskDockerBinding({
     ...binding.data,
-    command: binding.data,
+    command: { ...binding.data, workflowContext: workflow.data },
     workspace: workspace.data
   })
   const configDirectory = join(dirname(workspace.data.executionPath), `.${name}-docker-empty`)
@@ -127,8 +134,18 @@ export function taskDockerConfiguration(options: {
     '--entrypoint=/usr/local/bin/node',
     '--workdir=/workspace',
     '--mount',
-    `type=bind,source=${workspace.data.executionPath},target=/workspace,bind-propagation=rprivate`
+    `type=bind,source=${workspace.data.executionPath},target=/workspace,${codeReadOnly ? 'readonly,' : ''}bind-propagation=rprivate`
   ]
+  if (workspace.data.outputDirectory) {
+    const path = workspace.data.outputDirectory.path
+    if (
+      dirname(path) !== dirname(workspace.data.executionPath) ||
+      path === workspace.data.executionPath
+    ) {
+      return refuseTaskExecution('INVALID_REQUEST')
+    }
+    createArgs.push('--mount', `type=bind,source=${path},target=/outputs,bind-propagation=rprivate`)
+  }
   for (const [key, value] of Object.entries(TASK_DOCKER_SAFE_ENV)) {
     createArgs.push('--env', `${key}=${value}`)
   }
@@ -142,6 +159,7 @@ export function taskDockerConfiguration(options: {
   return Object.freeze({
     ...options,
     workspace: workspace.data,
+    codeReadOnly,
     name,
     labels,
     cliEnv: cli.cliEnv,

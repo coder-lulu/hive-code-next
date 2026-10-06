@@ -64,6 +64,7 @@ export async function prepareWorkflowCaseCancellation(options: {
     input: admission.input,
     executionMode: 'enforced_autonomous',
     executionDeadlineAt: admission.executionDeadlineAt,
+    workflowContext: admission.workflowContext,
     action: 'cancel'
   })
 }

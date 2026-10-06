@@ -17,6 +17,8 @@ import { refuseTaskExecution } from './task-execution-error'
 import { taskLaunchPathKey } from './task-launch-workspace'
 import { assertTaskDirectoryIdentity } from './task-managed-copy'
 import { isTaskDockerEnforcementPolicy } from './task-docker-enforcement'
+import { WorkflowExecutionContextSchema } from '../../shared/task-workflow/workflow-execution-context'
+import { assertTaskOutputWorkspace } from './task-output-workspace'
 
 export const LocalTaskBindingInputSchema = z
   .strictObject({
@@ -26,7 +28,8 @@ export const LocalTaskBindingInputSchema = z
     workspaceSelector: z.string().min(1).max(512),
     input: z.string().min(1).max(128_000),
     executionMode: z.literal('enforced_autonomous').optional(),
-    executionDeadlineAt: TaskTimestamp.optional()
+    executionDeadlineAt: TaskTimestamp.optional(),
+    workflowContext: WorkflowExecutionContextSchema.optional()
   })
   .refine(
     (input) =>
@@ -40,6 +43,15 @@ export const LocalTaskBindingInputSchema = z
   .refine(
     (input) => input.task.spaceId === input.paperclipCompanyId,
     'Task company does not match its binding.'
+  )
+  .refine(
+    (input) =>
+      !input.workflowContext ||
+      (input.executionMode === 'enforced_autonomous' &&
+        input.executionDeadlineAt !== undefined &&
+        input.workflowContext.binding.scope.companyRef === input.paperclipCompanyId &&
+        input.workflowContext.employeeRef === input.paperclipAgentId),
+    'Workflow input must match its controlled company and employee binding.'
   )
 export type LocalTaskBindingInput = z.infer<typeof LocalTaskBindingInputSchema>
 const Fingerprint = z.string().regex(/^[a-f0-9]{64}$/)
@@ -147,6 +159,8 @@ export async function readLocalTaskBinding(options: {
       canonicalAgentSessionDigest(stored.binding.command.task) ||
     stored.binding.command.inputRef !== `input:${digest(intent.input.input)}` ||
     intent.input.executionDeadlineAt !== stored.binding.command.executionDeadlineAt ||
+    canonicalAgentSessionDigest(intent.input.workflowContext ?? {}) !==
+      canonicalAgentSessionDigest(stored.binding.command.workflowContext ?? {}) ||
     stored.binding.command.ownerScope.kind !== 'personalTenant' ||
     stored.binding.command.ownerScope.tenantRef !== accountRef ||
     stored.binding.command.executionAccountRef !== accountRef ||
@@ -172,6 +186,9 @@ export async function readLocalTaskBinding(options: {
     bindingFile.assertCurrent()
     intentFile.assertCurrent()
     assertTaskDirectoryIdentity(stored.workspace.executionPath, stored.workspace.directoryIdentity)
+    if (stored.binding.command.workflowContext?.role === 'tester') {
+      assertTaskOutputWorkspace(stored.workspace)
+    }
   }
   assertCurrent()
   return { ...stored, key: options.key, input: intent.input, assertCurrent }

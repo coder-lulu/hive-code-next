@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-publication'
 import type { LocalTaskGrant } from './local-task-authority'
 import {
   HiveRuntimeBindingPurposeSchema,
@@ -11,11 +10,12 @@ import { prepareLocalTaskBinding } from './local-task-binding-preparation'
 import { pruneTaskBindings, type BindingEntry as Entry } from './local-task-binding-retention'
 import { refuseTaskExecution, TaskExecutionError } from './task-execution-error'
 import { taskCodexResultInstructions } from './task-codex-evidence'
-import type { TaskExecutionRecord, TaskExecutionWorkspace } from './task-execution-record'
+import type { TaskExecutionRecord } from './task-execution-record'
 import { computeAgentLaunchFingerprint } from '../../shared/agent-launch-operation'
 import { taskAgentLaunchParams } from './task-agent-launch-params'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
-import type { TaskDockerEnforcement } from './task-docker-enforcement'
+import type { LocalTaskBindingIssuerOptions } from './local-task-binding-options'
+import { restoreTaskWorkflowCopyGuard } from './task-workflow-copy-guard'
 import {
   LocalTaskBindingInputSchema as Input,
   localTaskBindingKey,
@@ -24,11 +24,7 @@ import {
 } from './local-task-binding-file'
 
 export type { LocalTaskBindingInput } from './local-task-binding-file'
-export type LocalTaskRuntimeOwner = Readonly<{
-  runtimeRecordId: string
-  ownershipEpoch: number
-  accountId: string
-}>
+export type { LocalTaskRuntimeOwner } from './local-task-binding-options'
 const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 
 /** Only the authenticated Facade calls issue; an adapter/config cannot mint a grant. */
@@ -42,21 +38,7 @@ export class LocalTaskBindingIssuer {
   private readonly recoveryFlights = new Map<string, Promise<Entry>>()
   private readonly executionEntries = new Map<string, Entry>()
   private closed = false
-  constructor(
-    private readonly options: {
-      directory: string
-      operationCallerKey: string
-      currentAccount: () => HiveRuntimeCloudAuthorization | null
-      currentRuntime: () => LocalTaskRuntimeOwner | null
-      resolveSource: (selector: string) => Promise<{ path: string; assertCurrent: () => void }>
-      registerWorkspace(path: string): Promise<{ workspaceId: string; assertCurrent: () => void }>
-      readExecution(command: TaskExecutionRecord['command']): TaskExecutionRecord | null
-      restoreWorkspace(workspace: TaskExecutionWorkspace): Promise<{ assertCurrent(): void }>
-      resolveEnforcement?: () => Promise<TaskDockerEnforcement>
-      assertCurrent?: () => void
-      now?: () => number
-    }
-  ) {}
+  constructor(private readonly options: LocalTaskBindingIssuerOptions) {}
 
   resolveGrant = (ref: string) => (this.closed ? null : (this.grants.get(ref) ?? null))
 
@@ -248,6 +230,15 @@ export class LocalTaskBindingIssuer {
       assertTaskAuthorizationCurrent(() => stored.assertCurrent())
       assertTaskAuthorizationCurrent(() => proof.assertCurrent())
     }
+    const code = await restoreTaskWorkflowCopyGuard(
+      stored.workspace,
+      stored.binding.command,
+      assertWorkspaceCurrent
+    ).catch(() => ({
+      assertCurrent() {
+        return refuseTaskExecution('OUTCOME_UNKNOWN')
+      }
+    }))
     const assertExecutionCurrent = () => {
       const current = this.requireOwner()
       if (
@@ -260,6 +251,7 @@ export class LocalTaskBindingIssuer {
         return refuseTaskExecution('FORBIDDEN')
       }
       assertWorkspaceCurrent()
+      code?.assertCurrent()
     }
     assertWorkspaceCurrent()
     if (this.closed) {

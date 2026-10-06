@@ -8,6 +8,7 @@ import {
 } from '../../../src/shared/hive-workflow-case-runs.ts'
 import { HiveWorkflowCaseReadQuerySchema } from '../../../src/shared/hive-workflow-cases.ts'
 import { hiveWorkflowStagePrompt } from '../../../src/shared/hive-workflow-stage-prompt.ts'
+import { hiveWorkflowStageContext } from '../../../src/shared/hive-workflow-stage-context.ts'
 import {
   refuseWorkbench as refuse,
   workbenchOwnerReferences
@@ -43,7 +44,8 @@ export function createWorkflowCaseRunRepository(sql) {
           input: record.input.input,
           inputDigest: record.input.inputDigest,
           workspaceSelector: record.input.workspaceSelector,
-          executionDeadlineAt: record.input.executionDeadlineAt
+          executionDeadlineAt: record.input.executionDeadlineAt,
+          workflowContext: record.input.workflowContext
         })
       })
     },
@@ -76,7 +78,8 @@ export function createWorkflowCaseRunRepository(sql) {
             input: record.input.input,
             inputDigest: record.input.inputDigest,
             workspaceSelector: record.input.workspaceSelector,
-            executionDeadlineAt: record.input.executionDeadlineAt
+            executionDeadlineAt: record.input.executionDeadlineAt,
+            workflowContext: record.input.workflowContext
           })
         }
         if (previous) {
@@ -151,7 +154,8 @@ export function createWorkflowCaseRunRepository(sql) {
           input: prompt,
           inputDigest: digest(prompt),
           workspaceSelector: project.workspaceSelector,
-          executionDeadlineAt
+          executionDeadlineAt,
+          workflowContext: hiveWorkflowStageContext(view, stage.stageRef)
         })
         await db`INSERT INTO heartbeat_runs(id,company_id,agent_id,status,invocation_source,driver_kind)
           VALUES(${runId},${project.companyId},${fixed.employeeRef},'queued','on_demand','hive_runtime')`

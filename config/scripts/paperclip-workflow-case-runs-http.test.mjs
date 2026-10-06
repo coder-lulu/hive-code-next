@@ -166,6 +166,7 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
         workspaceRef: f.view.team.project.hiveWorkspaceRef,
         inputRef: `input:${admission.inputDigest}`,
         executionDeadlineAt: admission.executionDeadlineAt,
+        workflowContext: admission.workflowContext,
         executionPolicy: {
           trustMode: 'enforced_autonomous',
           executionPolicyRef: 'docker-local-linux',

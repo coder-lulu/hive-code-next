@@ -190,6 +190,8 @@ export function createTaskRepository(sql) {
           if (
             digest(record.run.task) !== digest(binding.command.task) ||
             binding.command.executionDeadlineAt !== record.input.executionDeadlineAt ||
+            digest(binding.command.workflowContext ?? {}) !==
+              digest(record.input.workflowContext ?? {}) ||
             binding.command.inputRef !== `input:${record.input.inputDigest}`
           ) {
             refuse('REVISION_CONFLICT')
