@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge'
 import type { HiveWorkflowCaseView } from '../../../../../shared/hive-workflow-cases'
 import { HiveWorkflowCaseRuns } from './HiveWorkflowCaseRuns'
 import { HiveWorkflowCaseEvidence } from './HiveWorkflowCaseEvidence'
+import { HiveWorkflowCaseCode } from './HiveWorkflowCaseCode'
 import type { HiveWorkflowCaseRunsModel } from './use-hive-workflow-case-runs'
 
 export function HiveWorkflowCaseDetail({
@@ -89,6 +90,7 @@ export function HiveWorkflowCaseDetail({
         </ol>
       </div>
       <HiveWorkflowCaseEvidence view={view} model={runs} />
+      <HiveWorkflowCaseCode view={view} />
       <HiveWorkflowCaseRuns view={view} model={runs} scopeLabel={scopeLabel} />
     </section>
   )

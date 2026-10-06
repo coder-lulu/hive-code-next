@@ -10,6 +10,7 @@ type FacadeOptions = Parameters<typeof createHiveTaskFacade>[0]
 export function createLocalTaskFacadeAssembly(options: {
   directory: string
   artifacts: FacadeOptions['artifacts']
+  codeInspection: FacadeOptions['codeInspection']
   issuer: FacadeOptions['issuer']
   enforcement: FacadeOptions['enforcement']
   currentAccount: FacadeOptions['currentAccount']
@@ -20,6 +21,7 @@ export function createLocalTaskFacadeAssembly(options: {
   const service = createHiveTaskFacade({
     descriptorPath: join(options.directory, 'paperclip.json'),
     artifacts: options.artifacts,
+    codeInspection: options.codeInspection,
     issuer: options.issuer,
     enforcement: options.enforcement,
     currentAccount: options.currentAccount,

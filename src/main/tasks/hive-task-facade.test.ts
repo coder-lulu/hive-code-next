@@ -59,6 +59,7 @@ async function fixture() {
   const artifactDirectory = join(directory, 'artifacts')
   const { facade } = createHiveTaskFacade({
     descriptorPath,
+    codeInspection: null,
     artifacts: new TaskArtifactIndex(artifactDirectory),
     issuer: { issue },
     currentAccount: () => account,

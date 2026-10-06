@@ -22,11 +22,16 @@ import { createHiveWorkflowCaseFacade } from './hive-workflow-case-facade'
 import { createHiveWorkflowCaseRunFacade } from './hive-workflow-case-run-facade'
 import { bindAndDispatchHiveTask } from './hive-task-run-dispatch'
 import { prepareWorkflowCaseCancellation } from './hive-workflow-case-cancellation'
+import {
+  createHiveWorkflowCaseCodeFacade,
+  type HiveWorkflowCaseCodeSource
+} from './hive-workflow-case-code-facade'
 
 /** Only the authenticated desktop Facade may turn a business task into a Runtime binding. */
 export function createHiveTaskFacade(options: {
   descriptorPath: string
   artifacts: TaskArtifactIndex
+  codeInspection: HiveWorkflowCaseCodeSource | null
   issuer: Pick<LocalTaskBindingIssuer, 'issue'>
   currentAccount: () => HiveRuntimeCloudAuthorization | null
   validateWorkspace: (selector: string) => Promise<HiveTaskWorkspaceProof>
@@ -65,6 +70,11 @@ export function createHiveTaskFacade(options: {
     ...workbench,
     ...workflows,
     ...cases,
+    ...createHiveWorkflowCaseCodeFacade({
+      context,
+      getWorkflowCase: cases.getWorkflowCase,
+      source: options.codeInspection
+    }),
     ...runs.facade,
     async list() {
       const caller = await context()

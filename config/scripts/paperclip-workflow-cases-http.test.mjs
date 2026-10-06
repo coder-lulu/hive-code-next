@@ -125,6 +125,7 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
       }
       return createHiveTaskFacade({
         descriptorPath,
+        codeInspection: null,
         artifacts: new TaskArtifactIndex(artifactsDirectory),
         issuer: {
           issue() {

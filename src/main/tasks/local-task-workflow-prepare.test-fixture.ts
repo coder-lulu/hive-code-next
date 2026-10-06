@@ -202,6 +202,7 @@ export async function workflowPrepareFixture() {
   const assembly = createLocalTaskFacadeAssembly({
     directory,
     artifacts: new TaskArtifactIndex(join(directory, 'artifacts')),
+    codeInspection: null,
     issuer,
     currentAccount: () => account,
     currentRuntime: () => owner,

@@ -2,7 +2,7 @@ import { chmodSync, lstatSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, realpath, rename, rm, writeFile } from 'node:fs/promises'
 import { join, resolve, relative, isAbsolute, sep } from 'node:path'
 import { canonicalAgentSessionDigest as digest } from '../../shared/agent-session-mutation-envelope'
-import { readTaskArtifactFile, taskResultManifestName } from './task-artifact-index'
+import { taskResultManifestName } from './task-artifact-index'
 import { createTaskManagedCopy, assertTaskDirectoryIdentity } from './task-managed-copy'
 import type { TaskExecutionRecord } from './task-execution-record'
 import { refuseTaskExecution } from './task-execution-error'
@@ -11,7 +11,6 @@ import { taskCodeSnapshotProducer } from './task-code-snapshot-producer'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import {
   TaskCodeSnapshotManifestSchema as Snapshot,
-  TaskCodeSnapshotVersionSchema as CodeVersion,
   type TaskCodeSnapshotVersion
 } from './task-code-snapshot-manifest'
 import {
@@ -20,23 +19,22 @@ import {
   taskCodeTreeDigest,
   TASK_CODE_SNAPSHOT_LIMITS
 } from './task-code-snapshot-tree'
+import {
+  readTaskCodeSnapshotSource,
+  taskCodeSnapshotFileIdentity as fileIdentity
+} from './task-code-snapshot-source'
+import {
+  inspectTaskCodeSnapshotPage,
+  inspectTaskCodeSnapshotFile
+} from './task-code-snapshot-inspection'
+import type {
+  HiveWorkflowCaseCodePageQuery,
+  HiveWorkflowCaseCodePage,
+  HiveWorkflowCaseCodeFileQuery,
+  HiveWorkflowCaseCodeFile
+} from '../../shared/hive-workflow-case-code'
 
 export type { TaskCodeSnapshotVersion } from './task-code-snapshot-manifest'
-const fileIdentity = (path: string) => {
-  const stat = lstatSync(path, { bigint: true })
-  if (stat.isSymbolicLink()) {
-    refuseTaskExecution('FORBIDDEN')
-  }
-  return [
-    stat.dev,
-    stat.ino,
-    stat.birthtimeNs,
-    stat.size,
-    stat.mtimeNs,
-    stat.ctimeNs,
-    stat.nlink
-  ].join(':')
-}
 const inside = (root: string, path: string) => {
   const suffix = relative(root, path)
   return suffix !== '' && !isAbsolute(suffix) && suffix !== '..' && !suffix.startsWith(`..${sep}`)
@@ -166,70 +164,35 @@ export class TaskCodeSnapshotStore {
     }
   }
 
-  private async source(
+  private source(
     versionValue: unknown,
     expected: TaskExecutionRecord,
     assertAuthorizationCurrent: () => void
   ) {
-    assertTaskAuthorizationCurrent(assertAuthorizationCurrent)
-    const parsed = CodeVersion.safeParse(versionValue)
-    if (!parsed.success) {
-      refuseTaskExecution('FORBIDDEN')
-    }
-    const version = parsed.data
-    const producer = taskCodeSnapshotProducer(expected)
-    if (version.snapshot.artifactRef !== `artifact:${version.snapshot.digest}`) {
-      refuseTaskExecution('FORBIDDEN')
-    }
-    const directory = join(this.directory, version.snapshot.digest)
-    const data = await readTaskArtifactFile(
-      directory,
-      'manifest.json',
-      TASK_CODE_SNAPSHOT_LIMITS.fileBytes
+    return readTaskCodeSnapshotSource(
+      this.directory,
+      versionValue,
+      expected,
+      assertAuthorizationCurrent
     )
-    if (taskCodeBytesDigest(data) !== version.snapshot.digest) {
-      refuseTaskExecution('OUTCOME_UNKNOWN')
-    }
-    const decoded = Snapshot.safeParse(JSON.parse(data.toString('utf8')))
-    if (!decoded.success) {
-      refuseTaskExecution('OUTCOME_UNKNOWN')
-    }
-    const manifest = decoded.data
-    if (
-      digest(manifest.producer) !== digest(producer) ||
-      manifest.omissions.runtimeManifest !== taskResultManifestName(producer.commandFingerprint)
-    ) {
-      refuseTaskExecution('FORBIDDEN')
-    }
-    if (taskCodeTreeDigest(manifest.tree) !== version.treeDigest) {
-      refuseTaskExecution('OUTCOME_UNKNOWN')
-    }
-    const path = join(directory, 'tree')
-    const directoryIdentity = fileIdentity(directory),
-      manifestIdentity = fileIdentity(join(directory, 'manifest.json'))
-    const treeIdentity = fileIdentity(path).split(':').slice(0, 3).join(':')
-    const assertCurrent = () => {
-      assertTaskAuthorizationCurrent(assertAuthorizationCurrent)
-      if (
-        fileIdentity(directory) !== directoryIdentity ||
-        fileIdentity(join(directory, 'manifest.json')) !== manifestIdentity ||
-        fileIdentity(path).split(':').slice(0, 3).join(':') !== treeIdentity
-      ) {
-        refuseTaskExecution('FORBIDDEN')
-      }
-    }
-    assertCurrent()
-    const verified = await readTaskCodeTree(path, assertCurrent)
-    if (taskCodeTreeDigest(verified.tree) !== version.treeDigest) {
-      refuseTaskExecution('OUTCOME_UNKNOWN')
-    }
-    return {
-      path,
-      manifest,
-      version,
-      assertIdentity: assertCurrent,
-      assertCurrent: verified.assertUnchanged
-    }
+  }
+
+  getCodePage(
+    version: unknown,
+    expected: TaskExecutionRecord,
+    query: HiveWorkflowCaseCodePageQuery,
+    guard: () => void
+  ): Promise<HiveWorkflowCaseCodePage> {
+    return inspectTaskCodeSnapshotPage(() => this.source(version, expected, guard), query, guard)
+  }
+
+  getCodeFile(
+    version: unknown,
+    expected: TaskExecutionRecord,
+    query: HiveWorkflowCaseCodeFileQuery,
+    guard: () => void
+  ): Promise<HiveWorkflowCaseCodeFile> {
+    return inspectTaskCodeSnapshotFile(() => this.source(version, expected, guard), query, guard)
   }
 
   async readSource(

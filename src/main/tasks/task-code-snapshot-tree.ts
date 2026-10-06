@@ -1,73 +1,21 @@
 import { createHash } from 'node:crypto'
 import { lstatSync } from 'node:fs'
 import { lstat, opendir, realpath } from 'node:fs/promises'
-import { isAbsolute, join } from 'node:path'
-import { z } from 'zod'
+import { join } from 'node:path'
 import { canonicalAgentSessionDigest } from '../../shared/agent-session-mutation-envelope'
 import {
-  TaskDigest,
-  boundedTaskCollection
-} from '../../shared/task-execution/task-execution-primitives'
+  TASK_CODE_SNAPSHOT_LIMITS,
+  TaskCodeSnapshotPathSchema as Path,
+  TaskCodeSnapshotTreeSchema,
+  type TaskCodeSnapshotTree
+} from '../../shared/task-workflow/workflow-code-snapshot-tree'
+export { TASK_CODE_SNAPSHOT_LIMITS, TaskCodeSnapshotTreeSchema }
+export type { TaskCodeSnapshotTree }
 import { readTaskArtifactFile } from './task-artifact-index'
 import { taskLaunchPathKey } from './task-launch-workspace'
 import { refuseTaskExecution } from './task-execution-error'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
-export const TASK_CODE_SNAPSHOT_LIMITS = Object.freeze({
-  fileBytes: 8 * 1024 * 1024,
-  totalBytes: 256 * 1024 * 1024,
-  entries: 20_000,
-  depth: 64
-})
-const Path = z
-  .string()
-  .min(1)
-  .max(4096)
-  .refine(
-    (value) =>
-      !isAbsolute(value) &&
-      !/[\\:\0]/.test(value) &&
-      value.split('/').every((part) => part && part !== '.' && part !== '..')
-  )
-export const TaskCodeSnapshotTreeSchema = z
-  .strictObject({
-    directories: boundedTaskCollection(Path, TASK_CODE_SNAPSHOT_LIMITS.entries),
-    files: boundedTaskCollection(
-      z.strictObject({
-        path: Path,
-        size: z.number().int().min(0).max(TASK_CODE_SNAPSHOT_LIMITS.fileBytes),
-        digest: TaskDigest,
-        executableBits: z
-          .number()
-          .int()
-          .min(0)
-          .max(0o111)
-          .refine((value) => (value & ~0o111) === 0)
-      }),
-      TASK_CODE_SNAPSHOT_LIMITS.entries
-    )
-  })
-  .superRefine((tree, context) => {
-    const paths = [...tree.directories, ...tree.files.map((file) => file.path)]
-    const directories = new Set(tree.directories)
-    const invalid =
-      paths.length > TASK_CODE_SNAPSHOT_LIMITS.entries ||
-      new Set(paths).size !== paths.length ||
-      tree.files.reduce((total, file) => total + file.size, 0) >
-        TASK_CODE_SNAPSHOT_LIMITS.totalBytes ||
-      tree.directories.some((path) => path.split('/').length > TASK_CODE_SNAPSHOT_LIMITS.depth) ||
-      paths.some((path) =>
-        path
-          .split('/')
-          .slice(0, -1)
-          .some((_, index, parts) => !directories.has(parts.slice(0, index + 1).join('/')))
-      ) ||
-      tree.files.some((file) => file.path.split('/').length > TASK_CODE_SNAPSHOT_LIMITS.depth + 1)
-    if (invalid) {
-      context.addIssue({ code: 'custom', message: 'Invalid bounded complete code tree.' })
-    }
-  })
-export type TaskCodeSnapshotTree = z.infer<typeof TaskCodeSnapshotTreeSchema>
 export type TaskCodeSnapshotOmissions = { directories: readonly string[]; runtimeManifest: string }
 export const taskCodeBytesDigest = (data: Buffer) => createHash('sha256').update(data).digest('hex')
 export const taskCodeTreeDigest = (tree: TaskCodeSnapshotTree) => canonicalAgentSessionDigest(tree)

@@ -61,6 +61,31 @@
         "unsupported_graph": "当前流程结构不支持自动执行"
       }
     },
+    "code": {
+      "title": "只读代码成果",
+      "description": "查看已交接的固定开发代码及文件内容。",
+      "empty": "当前需求暂无已交接的开发代码。",
+      "chooseVersion": "选择开发交接版本",
+      "versionLabel": "开发 · 第 {{attempt}} 次尝试 · {{version}}",
+      "fixedVersion": "固定代码版本：{{version}}",
+      "snapshotUnavailable": "所选成果没有可查看的固定代码快照。",
+      "loadFiles": "查看文件／返回首页",
+      "nextPage": "下一页文件",
+      "page": "第 {{number}} 页 · 本页 {{count}} 个文件",
+      "emptyFiles": "该代码快照没有文件。",
+      "fileSize": "{{size}} 字节",
+      "fileDigest": "文件摘要：{{digest}}",
+      "executableBits": "可执行权限位：{{bits}}",
+      "previewUnavailable": {
+        "binary": "此文件为二进制或不支持的文本编码，显示文件元数据。",
+        "too_large": "文件超过 256 KiB 文本预览上限，显示文件元数据。"
+      },
+      "errors": {
+        "forbidden": "当前账号或会话无法读取此代码成果，私密预览已清除。",
+        "invalidResponse": "无法核实此代码版本或文件，刷新后重试。",
+        "unavailable": "代码成果不可用，重新读取文件列表后重试。"
+      }
+    },
     "caseStatuses": {
       "open": "未完结",
       "done": "已完成",

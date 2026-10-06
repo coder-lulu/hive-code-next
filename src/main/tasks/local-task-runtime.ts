@@ -225,6 +225,7 @@ export async function startLocalTaskRuntime(options: {
   const facadeService = createLocalTaskFacadeAssembly({
     directory,
     artifacts,
+    codeInspection: { snapshots, readExecution: (identity) => resources.store.tasks.get(identity) },
     issuer,
     enforcement: enforcement.current,
     currentAccount: () => options.account.getRuntimeCloudAuthorization(),

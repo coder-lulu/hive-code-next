@@ -6,8 +6,10 @@ import { taskCommand, TASK_TEST_LAUNCH, TASK_TEST_NOW } from './task-execution.t
 import { taskExecutionIdentity } from './task-execution-record'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
 
-export async function codeSnapshotFixture(status: 'succeeded' | 'failed' = 'succeeded') {
-  const evidence = resolve('logs/paperclip-development/p3/role-handoffs/code-snapshot/tmp')
+export async function codeSnapshotFixture(
+  status: 'succeeded' | 'failed' = 'succeeded',
+  evidence = resolve('logs/paperclip-development/p3/role-handoffs/code-snapshot/tmp')
+) {
   await mkdir(evidence, { recursive: true })
   const root = await mkdtemp(join(evidence, 'snapshot-'))
   const project = join(root, 'project')

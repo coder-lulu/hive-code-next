@@ -4,6 +4,10 @@ import { isTrustedUIRenderer } from './ui'
 import type { HiveTaskCreate, HiveTasksApi } from '../../shared/hive-tasks'
 import type { HiveWorkflowCaseStart } from '../../shared/hive-workflow-case-runs'
 import type {
+  HiveWorkflowCaseCodePageQuery,
+  HiveWorkflowCaseCodeFileQuery
+} from '../../shared/hive-workflow-case-code'
+import type {
   HiveWorkbenchCompanyCreate,
   HiveWorkbenchPageQuery,
   HiveWorkbenchProjectCreate,
@@ -73,5 +77,11 @@ export function registerHiveTaskHandlers() {
   )
   bind('getWorkflowCaseRuns', (facade, query: HiveWorkflowCaseReadQuery) =>
     facade.getWorkflowCaseRuns(query)
+  )
+  bind('getWorkflowCaseCodePage', (facade, query: HiveWorkflowCaseCodePageQuery) =>
+    facade.getWorkflowCaseCodePage(query)
+  )
+  bind('getWorkflowCaseCodeFile', (facade, query: HiveWorkflowCaseCodeFileQuery) =>
+    facade.getWorkflowCaseCodeFile(query)
   )
 }

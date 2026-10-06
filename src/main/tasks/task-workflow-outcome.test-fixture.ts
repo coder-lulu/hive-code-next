@@ -6,6 +6,8 @@ import {
   syntheticWorkflowStageContext
 } from '../../shared/hive-workflow-cases.test-fixture'
 import type { WorkflowExecutionContext } from '../../shared/task-workflow/workflow-execution-context'
+import type { HiveWorkflowCaseView } from '../../shared/hive-workflow-cases'
+import type { TaskRef } from '../../shared/task-execution/task-execution-primitives'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
 import { createTaskManagedCopy } from './task-managed-copy'
 import { taskCommand, TASK_TEST_NOW } from './task-execution.test-fixture'
@@ -17,15 +19,21 @@ export async function workflowOutcomeFixture(
   options: {
     status?: 'succeeded' | 'failed'
     context?: WorkflowExecutionContext
+    caseView?: HiveWorkflowCaseView
+    task?: TaskRef
+    operationCallerKey?: string
+    evidenceRoot?: string
   } = {}
 ) {
-  const parent = resolve('logs/paperclip-development/p3/case-outcomes/outcome-assets/tmp')
+  const parent =
+    options.evidenceRoot ??
+    resolve('logs/paperclip-development/p3/case-outcomes/outcome-assets/tmp')
   await mkdir(parent, { recursive: true })
   const root = await mkdtemp(join(parent, 'outcome-')),
     project = join(root, 'project')
   await mkdir(project)
   await writeFile(join(project, 'app.js'), 'export const value = 1\n')
-  const view = workflowCaseFixture('outcome-owner').view,
+  const view = options.caseView ?? workflowCaseFixture('outcome-owner').view,
     stage = view.stageTasks.find((item) => item.role === 'developer')!,
     context = options.context ?? syntheticWorkflowStageContext(view, stage.stageRef)
   const copy = await createTaskManagedCopy({
@@ -38,7 +46,8 @@ export async function workflowOutcomeFixture(
       ownerScope: view.team.company.ownerScope,
       executionAccountRef: view.team.company.ownerAccountRef,
       executionId: `execution:${randomUUID()}`,
-      task: {
+      ...(options.caseView ? { workspaceRef: options.caseView.team.project.hiveWorkspaceRef } : {}),
+      task: options.task ?? {
         spaceId: context.binding.scope.companyRef,
         taskId: `task:${randomUUID()}`,
         runId: `run:${randomUUID()}`,
@@ -65,7 +74,7 @@ export async function workflowOutcomeFixture(
   const admitted = await store.tasks.admit({
     command,
     workspace,
-    operationCallerKey: 'service:local-test',
+    operationCallerKey: options.operationCallerKey ?? 'service:local-test',
     now: TASK_TEST_NOW,
     validate: () => undefined
   })

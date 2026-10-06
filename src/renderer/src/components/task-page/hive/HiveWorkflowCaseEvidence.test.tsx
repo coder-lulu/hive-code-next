@@ -9,7 +9,7 @@ import { HiveWorkflowCaseEvidence } from './HiveWorkflowCaseEvidence'
 import type { HiveWorkflowCaseRunsModel } from './use-hive-workflow-case-runs'
 import { emptyWorkflowCaseRunsState } from './hive-workflow-case-run-state'
 import { workflowCaseEvidenceFixture } from './hive-workflow-case-evidence.test-fixtures'
-import { workbenchId } from './hive-workbench.test-fixtures'
+import { workbenchId, workbenchAccountState } from './hive-workbench.test-fixtures'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -61,6 +61,15 @@ function reportButton(selector: string) {
   return button
 }
 beforeEach(() => {
+  Object.defineProperty(window, 'api', {
+    configurable: true,
+    value: {
+      hiveAccount: {
+        getState: vi.fn().mockResolvedValue(workbenchAccountState()),
+        onStateChanged: () => () => {}
+      }
+    }
+  })
   readArtifact.mockReset().mockResolvedValue(true)
   refresh.mockReset().mockResolvedValue(true)
   container = document.createElement('div')

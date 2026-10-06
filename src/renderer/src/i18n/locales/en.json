@@ -61,6 +61,31 @@
         "unsupported_graph": "This workflow structure does not support automatic execution"
       }
     },
+    "code": {
+      "title": "Read-only code results",
+      "description": "Inspect fixed development code and file contents from accepted handoffs.",
+      "empty": "This request has no accepted development code yet.",
+      "chooseVersion": "Choose a development handoff",
+      "versionLabel": "Development · Attempt {{attempt}} · {{version}}",
+      "fixedVersion": "Fixed code version: {{version}}",
+      "snapshotUnavailable": "The selected result has no readable fixed code snapshot.",
+      "loadFiles": "View files / First page",
+      "nextPage": "Next file page",
+      "page": "Page {{number}} · {{count}} files on this page",
+      "emptyFiles": "This code snapshot has no files.",
+      "fileSize": "{{size}} bytes",
+      "fileDigest": "File digest: {{digest}}",
+      "executableBits": "Executable permission bits: {{bits}}",
+      "previewUnavailable": {
+        "binary": "This file is binary or uses an unsupported text encoding. File metadata is shown.",
+        "too_large": "This file exceeds the 256 KiB text preview limit. File metadata is shown."
+      },
+      "errors": {
+        "forbidden": "This account or session cannot read the code result. Private preview data has been cleared.",
+        "invalidResponse": "The code version or file could not be verified. Refresh and retry.",
+        "unavailable": "The code result is unavailable. Reload the file list and retry."
+      }
+    },
     "caseStatuses": {
       "open": "Open",
       "done": "Completed",
