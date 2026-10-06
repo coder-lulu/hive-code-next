@@ -1,8 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import {
-  createExternalExecutionLifecycle,
-  isExternalExecutionRun
-} from '@hive-paperclip-external-execution'
+import { isExternalExecutionRun } from '@hive-paperclip-external-execution'
 import { createLocalTaskAdapterClient } from '../../../src/main/tasks/paperclip-runtime-adapter.ts'
 import {
   createTaskDispatchDelivery,
@@ -11,6 +8,8 @@ import {
 } from './task-dispatch-delivery.mjs'
 import { refuseTaskRepository as refuse } from './task-delivery-repository.mjs'
 import { createTaskDispatchRecovery } from './task-dispatch-recovery.mjs'
+import { createTaskDispatchControl } from './task-dispatch-control.mjs'
+import { HiveWorkflowCaseRunReadSchema } from '../../../src/shared/hive-workflow-case-runs.ts'
 
 /** Durable claims own delivery, while the Runtime retains the original process and workspace claim. */
 export function createTaskDispatch(repository, options = {}) {
@@ -19,96 +18,11 @@ export function createTaskDispatch(repository, options = {}) {
   const flights = new Map()
   let closed = false,
     closing
-  const externalRun = (accountId, task) => ({
-    id: task.run_id,
-    companyId: task.company_id,
-    driverKind: task.driver_kind,
-    status: task.run_status,
-    accountId,
-    taskId: task.id
+  const { externalRun, requireScope, lifecycle, retain } = createTaskDispatchControl({
+    repository,
+    flights,
+    reserve: (...args) => reserve(...args)
   })
-  const scopeFor = (run) => ({ companyId: run.companyId, runId: run.id })
-  const requireScope = (task, expected) => {
-    if (expected && (task.company_id !== expected.companyId || task.run_id !== expected.runId)) {
-      refuse('FORBIDDEN')
-    }
-  }
-  const resumeDrained = async (accountId, taskId, runId) => {
-    const key = JSON.stringify([accountId, taskId, runId])
-    const flight = flights.get(key)
-    if (!flight?.deliveryDrained) {
-      return
-    }
-    await Promise.allSettled([flight.ready, flight.promise])
-    if (flights.get(key) === flight) {
-      flights.delete(key)
-    }
-  }
-  const lifecycle = createExternalExecutionLifecycle({
-    persistIntent: (run, intent) =>
-      repository[intent.kind](run.accountId, run.taskId, run.id, scopeFor(run)),
-    onUnavailable(run) {
-      run.unavailable = true
-    },
-    port: {
-      async recover(run) {
-        if (run.explicitRecovery) {
-          await resumeDrained(run.accountId, run.taskId, run.id)
-        }
-        await reserve(run.accountId, run.taskId, run.id, true, scopeFor(run))
-      },
-      async cancel(run) {
-        await resumeDrained(run.accountId, run.taskId, run.id)
-        const flight = flights.get(JSON.stringify([run.accountId, run.taskId, run.id]))
-        if (flight) {
-          flight.abort.abort()
-        } else {
-          await reserve(run.accountId, run.taskId, run.id, true, scopeFor(run))
-        }
-      },
-      async drain(run) {
-        const key = JSON.stringify([run.accountId, run.taskId, run.id])
-        let flight = flights.get(key)
-        if (!flight) {
-          if (flights.size >= 32) {
-            refuse('CAPACITY_EXCEEDED')
-          }
-          flight = {
-            accountId: run.accountId,
-            taskId: run.taskId,
-            runId: run.id,
-            abort: new AbortController(),
-            ready: Promise.resolve(),
-            promise: null,
-            delivery: null
-          }
-          flights.set(key, flight)
-        }
-        // Keep the bounded delivery entry until explicit recovery; this is not a process stop.
-        flight.deliveryDrained = true
-        await flight.delivery?.close()
-      }
-    }
-  })
-  const retain = async (
-    accountId,
-    taskId,
-    runId,
-    action,
-    reason = 'delivery_shutdown',
-    expected,
-    explicitRecovery = false
-  ) => {
-    const task = await repository.read(accountId, taskId, runId)
-    requireScope(task, expected)
-    const run = { ...externalRun(accountId, task), explicitRecovery }
-    if (!(await lifecycle[action](run, reason))) {
-      refuse('FORBIDDEN')
-    }
-    if (run.unavailable) {
-      refuse('SERVICE_UNAVAILABLE')
-    }
-  }
   const reserve = (accountId, taskId, runId, recoveryOnly = false, expected) => {
     if (closed) {
       return Promise.reject(
@@ -141,7 +55,7 @@ export function createTaskDispatch(repository, options = {}) {
       }
     }
     flight.ready = (async () => {
-      const task = await repository.read(accountId, taskId, runId)
+      let task = await repository.read(accountId, taskId, runId)
       requireScope(task, expected)
       if (task.result_receipt) {
         forget()
@@ -152,19 +66,52 @@ export function createTaskDispatch(repository, options = {}) {
         forget()
         return
       }
+      const bridge = await createClient()
+      const owner = await bridge.owner()
+      if (owner.accountId !== accountId) {
+        refuse('FORBIDDEN')
+      }
+      if (!task.binding) {
+        if (
+          recoveryOnly ||
+          task.run_scope?.kind !== 'workbenchCase' ||
+          task.run_status !== 'queued' ||
+          task.cancel_requested ||
+          task.execution_stage === 'outcome_unknown' ||
+          flight.abort.signal.aborted
+        ) {
+          refuse('REVISION_CONFLICT')
+        }
+        const refs = HiveWorkflowCaseRunReadSchema.parse({
+          projectId: task.run_scope.projectId,
+          caseId: task.run_scope.caseId,
+          taskId: task.id,
+          runId: task.run_id
+        })
+        await bridge.prepareCaseRun(refs)
+        const current = await bridge.owner()
+        if (
+          current.accountId !== owner.accountId ||
+          current.runtimeRecordId !== owner.runtimeRecordId ||
+          current.ownershipEpoch !== owner.ownershipEpoch
+        ) {
+          refuse('FORBIDDEN')
+        }
+        task = await repository.read(accountId, taskId, runId)
+        requireScope(task, expected)
+      }
       if (!task.binding) {
         refuse('REVISION_CONFLICT')
       }
       if (!isExternalExecutionRun(externalRun(accountId, task))) {
         refuse('FORBIDDEN')
       }
-      const bridge = await createClient()
-      const owner = await bridge.owner()
-      if (
-        owner.accountId !== accountId ||
-        owner.runtimeRecordId !== task.binding.command.runtimeRecordId
-      ) {
+      if (owner.runtimeRecordId !== task.binding.command.runtimeRecordId) {
         refuse('FORBIDDEN')
+      }
+      if (task.result_receipt) {
+        forget()
+        return
       }
       const previous = await repository.getCurrentDelivery(accountId, task.company_id, task.run_id)
       if (recoveryOnly && !previous && task.run_status === 'queued' && !task.cancel_requested) {
@@ -193,6 +140,12 @@ export function createTaskDispatch(repository, options = {}) {
         )
       } else if (owner.ownershipEpoch !== task.binding.command.ownershipEpoch) {
         refuse('FORBIDDEN')
+      }
+      if (!recovering && task.run_scope.kind === 'workbenchCase') {
+        requireTaskDispatchBinding(
+          task,
+          await bridge.binding(task.company_id, task.run_id, 'execute')
+        )
       }
       if (closed || flight.deliveryDrained) {
         await lifecycle.drain(externalRun(accountId, task), 'delivery_shutdown')
@@ -273,6 +226,7 @@ export function createTaskDispatch(repository, options = {}) {
     repository,
     createClient,
     recover: (account, id, runId) => retain(account, id, runId, 'recover'),
+    start: (account, id, runId) => reserve(account, id, runId),
     isClosed: () => closed
   })
   return {

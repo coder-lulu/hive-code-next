@@ -15,6 +15,8 @@ import {
   WorkflowTeamBindingSchema
 } from './task-workflow/workflow-bindings'
 import { WORKFLOW_STAGE_LIMITS } from './task-workflow/workflow-definition'
+import { WorkflowHandoffSchema, WorkflowReviewSchema } from './task-workflow/workflow-evidence'
+import { canonicalAgentSessionDigest as digest } from './agent-session-mutation-envelope'
 
 const ObjectId = z.string().uuid()
 const Title = z.string().trim().min(1).max(240)
@@ -83,6 +85,8 @@ export const HiveWorkflowCaseViewSchema = CaseSummary.extend({
   originTaskId: ObjectId,
   workflow: HiveWorkflowSnapshotSchema,
   team: WorkflowTeamBindingSchema,
+  handoffs: boundedTaskCollection(WorkflowHandoffSchema, 96),
+  reviews: boundedTaskCollection(WorkflowReviewSchema, 96),
   stageTasks: boundedTaskCollection(HiveWorkflowStageTaskSchema, WORKFLOW_STAGE_LIMITS.stages, 4),
   executionAvailability: z.discriminatedUnion('available', [
     z.strictObject({
@@ -112,6 +116,62 @@ export const HiveWorkflowCaseViewSchema = CaseSummary.extend({
   const stages = new Map(definition.stages.map((stage) => [stage.stageRef, stage]))
   const employees = new Map(team.employees.map((employee) => [employee.role, employee]))
   const taskIds = new Set(view.stageTasks.map((task) => task.taskId))
+  const executionMatches = (
+    stageRef: string,
+    execution: z.infer<typeof WorkflowHandoffSchema>['producer']
+  ) => {
+    const task = view.stageTasks.find((item) => item.stageRef === stageRef)
+    const stage = stages.get(stageRef)
+    return (
+      task?.employeeRef === execution.employeeRef &&
+      task.role === execution.role &&
+      task.taskId === execution.task.taskId &&
+      execution.task.spaceId === scope.companyRef &&
+      ObjectId.safeParse(execution.task.runId).success &&
+      stage !== undefined &&
+      execution.task.attempt <= stage.maxAttempts
+    )
+  }
+  const handoffs = new Map(view.handoffs.map((item) => [item.handoffRef, item]))
+  if (
+    handoffs.size !== view.handoffs.length ||
+    new Set(view.handoffs.map((item) => `${item.stageRef}:${item.producer.task.attempt}`)).size !==
+      view.handoffs.length ||
+    new Set(view.reviews.map((item) => item.reviewRef)).size !== view.reviews.length ||
+    new Set(view.reviews.map((item) => item.reviewer.task.runId)).size !== view.reviews.length ||
+    view.handoffs.some((handoff) => {
+      const consumer = view.stageTasks.find((item) => item.stageRef === handoff.consumer.stageRef)
+      return (
+        digest(handoff.binding) !== digest(binding) ||
+        !executionMatches(handoff.stageRef, handoff.producer) ||
+        consumer?.role !== handoff.consumer.role ||
+        consumer.employeeRef !== handoff.consumer.employeeRef ||
+        handoff.audienceScope.employeeRefs.some(
+          (ref) => !team.employees.some((employee) => employee.employeeRef === ref)
+        ) ||
+        handoff.dependencyVersions.some((dependency) => {
+          const subject = handoffs.get(dependency.handoffRef)
+          return (
+            subject?.stageRef !== dependency.stageRef ||
+            digest(subject.artifact) !== digest(dependency.artifact)
+          )
+        })
+      )
+    }) ||
+    view.reviews.some((review) => {
+      const subject = handoffs.get(review.subjectHandoffRef)
+      return (
+        digest(review.binding) !== digest(binding) ||
+        !executionMatches(review.stageRef, review.reviewer) ||
+        !subject ||
+        subject.producer.role !== 'developer' ||
+        digest(review.artifact) !== digest(subject.artifact) ||
+        digest({ value: review.codeVersion }) !== digest({ value: subject.codeVersion })
+      )
+    })
+  ) {
+    context.addIssue({ code: 'custom', message: 'workflow_case_evidence_mismatch' })
+  }
   if (
     view.stageTasks.length !== stages.size ||
     new Set(view.stageTasks.map((task) => task.stageRef)).size !== stages.size ||

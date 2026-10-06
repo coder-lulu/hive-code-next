@@ -6,6 +6,7 @@ import { WorkflowTeamBindingSchema } from '../../../src/shared/task-workflow/wor
 import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import { readWorkflowDefinitionRevision } from './workflow-definition-repository.mjs'
 import { refuseWorkbench, workbenchOwnerReferences } from './team-workbench-repository-records.mjs'
+import { readWorkflowCaseEvidence } from './workflow-case-evidence-projection.mjs'
 
 function stored(schema, value) {
   const parsed = schema.safeParse(value)
@@ -168,7 +169,7 @@ export async function readWorkflowCaseView(db, accountId, project, caseId, expec
     return refuseWorkbench('REVISION_CONFLICT')
   }
   const byStage = new Map(tasks.map((task) => [task.stage_ref, task]))
-  return stored(HiveWorkflowCaseViewSchema, {
+  const view = {
     ...summary,
     requirement: origin.description,
     originTaskId: origin.id,
@@ -186,5 +187,9 @@ export async function readWorkflowCaseView(db, accountId, project, caseId, expec
       }
     }),
     executionAvailability: { available: false, reason: 'EXECUTION_ISOLATION_UNAVAILABLE' }
+  }
+  return stored(HiveWorkflowCaseViewSchema, {
+    ...view,
+    ...(await readWorkflowCaseEvidence(db, accountId, view))
   })
 }

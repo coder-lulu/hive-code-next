@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { workflowCaseFixture } from '../../shared/hive-workflow-cases.test-fixture'
-import { hiveWorkflowStageContext } from '../../shared/hive-workflow-stage-context'
+import {
+  workflowCaseFixture,
+  syntheticWorkflowStageContext
+} from '../../shared/hive-workflow-cases.test-fixture'
 import type { WorkflowExecutionContext } from '../../shared/task-workflow/workflow-execution-context'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
 import { createTaskManagedCopy } from './task-managed-copy'
@@ -25,7 +27,7 @@ export async function workflowOutcomeFixture(
   await writeFile(join(project, 'app.js'), 'export const value = 1\n')
   const view = workflowCaseFixture('outcome-owner').view,
     stage = view.stageTasks.find((item) => item.role === 'developer')!,
-    context = options.context ?? hiveWorkflowStageContext(view, stage.stageRef)
+    context = options.context ?? syntheticWorkflowStageContext(view, stage.stageRef)
   const copy = await createTaskManagedCopy({
     source: project,
     directory: join(root, 'workspaces'),

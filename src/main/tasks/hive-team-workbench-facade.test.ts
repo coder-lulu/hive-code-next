@@ -110,7 +110,7 @@ async function fixture(companyId = randomUUID(), projectId = randomUUID()) {
     descriptorPath,
     JSON.stringify({ baseUrl: 'http://127.0.0.1:1234', secret: 'x'.repeat(43) })
   )
-  const facade = createHiveTaskFacade({
+  const { facade } = createHiveTaskFacade({
     descriptorPath,
     artifacts: new TaskArtifactIndex(join(directory, 'artifacts')),
     issuer: { issue: vi.fn() },

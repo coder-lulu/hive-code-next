@@ -1,6 +1,7 @@
 import { canonicalAgentSessionDigest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import { TaskExecutionObservationSchema } from '../../../src/shared/task-execution/task-execution-observation.ts'
 import { TaskExecutionResultSchema } from '../../../src/shared/task-execution/task-execution-receipts.ts'
+import { WorkflowNativeDeliverySchema } from '../../../src/shared/task-workflow/workflow-native-delivery.ts'
 import {
   TaskDeliveryToken,
   assertTaskReceiptIdentity,
@@ -39,10 +40,21 @@ async function recordInboxEvent(db, accountId, task, event, cursor) {
 /** Inbox, continuous cursor and business settlement commit together; this method never starts execution. */
 export function createTaskInboxRepository(sql, { read, settle }) {
   return {
-    async consumeObservation(accountId, taskId, runId, rawToken, rawObservation) {
+    async consumeObservation(
+      accountId,
+      taskId,
+      runId,
+      rawToken,
+      rawObservation,
+      rawNativeDelivery
+    ) {
       requireTaskRepositoryScope(accountId, taskId, runId)
       const token = TaskDeliveryToken.parse(rawToken)
       const observation = TaskExecutionObservationSchema.parse(rawObservation)
+      const nativeDelivery =
+        rawNativeDelivery === undefined
+          ? undefined
+          : WorkflowNativeDeliverySchema.parse(rawNativeDelivery)
       return sql.begin(async (db) => {
         let task = await read(db, accountId, taskId, runId, true)
         const binding = assertTaskReceiptIdentity(task, observation)
@@ -125,7 +137,7 @@ export function createTaskInboxRepository(sql, { read, settle }) {
           ) {
             refuseTaskRepository('IDEMPOTENCY_CONFLICT')
           }
-          task = await settle(db, accountId, taskId, runId, terminalReceipt, token)
+          task = await settle(db, accountId, taskId, runId, terminalReceipt, token, nativeDelivery)
         }
         // Expiry while SQL was waiting rolls back the inbox and all result projections.
         await requireCurrentTaskDelivery(db, accountId, task, token)

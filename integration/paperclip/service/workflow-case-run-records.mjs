@@ -25,7 +25,8 @@ export const WorkflowRunInputSchema = HiveWorkflowCaseRunAdmissionSchema.pick({
   caseId: z.string().uuid(),
   stageRef: z.string().min(1).max(160),
   task: TaskRefSchema,
-  startRequest: HiveWorkflowCaseStartSchema
+  startRequest: HiveWorkflowCaseStartSchema,
+  causeRunId: z.string().uuid().optional()
 })
 
 export async function readWorkflowCaseRun(db, accountId, taskId, runId) {
@@ -50,6 +51,8 @@ export async function readWorkflowCaseRun(db, accountId, taskId, runId) {
     input.inputDigest !== digest(input.input) ||
     input.startRequest.requestId !== binding.request_id ||
     input.startRequest.projectId !== scope.projectId ||
+    (input.causeRunId &&
+      (input.causeRunId === runId || input.startRequest.requestId !== input.causeRunId)) ||
     (input.workflowContext &&
       (digest(input.workflowContext.binding) !==
         digest({
@@ -100,8 +103,47 @@ export async function readWorkflowCaseRun(db, accountId, taskId, runId) {
   }
 }
 
+export function workflowCaseRunAdmission(record, replayed = false) {
+  return HiveWorkflowCaseRunAdmissionSchema.parse({
+    requestId: record.requestId,
+    payloadFingerprint: record.payloadFingerprint,
+    replayed,
+    run: record.run,
+    definitionDigest: record.input.definitionDigest,
+    projectBindingRevision: record.input.projectBindingRevision,
+    input: record.input.input,
+    inputDigest: record.input.inputDigest,
+    workspaceSelector: record.input.workspaceSelector,
+    executionDeadlineAt: record.input.executionDeadlineAt,
+    workflowContext: record.input.workflowContext
+  })
+}
+
 export async function requireWorkflowCase(db, accountId, query, write = false) {
   const { project } = await requireWorkbenchProject(db, accountId, query.projectId, write)
   const view = await readWorkflowCaseView(db, accountId, project, query.caseId)
   return { project, view }
+}
+
+export async function requireWorkflowCaseRunDispatch(db, accountId, task) {
+  if (task.run_scope.kind !== 'workbenchCase') {
+    return
+  }
+  const scope = task.run_scope
+  const record = await readWorkflowCaseRun(db, accountId, task.id, task.run_id)
+  const { view } = await requireWorkflowCase(db, accountId, {
+    projectId: scope.projectId,
+    caseId: scope.caseId
+  })
+  const [clock] = await db`SELECT clock_timestamp() AS now`
+  if (
+    task.cancel_requested ||
+    record.run.status !== 'pending' ||
+    view.terminalKind !== null ||
+    view.currentStageRef !== scope.stageRef ||
+    view.revision !== record.run.startRequest.expectedCaseRevision ||
+    clock.now.getTime() >= Date.parse(record.input.executionDeadlineAt)
+  ) {
+    refuse('REVISION_CONFLICT')
+  }
 }

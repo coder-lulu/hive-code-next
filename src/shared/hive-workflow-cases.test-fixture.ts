@@ -3,6 +3,8 @@ import { canonicalAgentSessionDigest } from './agent-session-mutation-envelope'
 import type { HiveWorkbenchTeam } from './hive-team-workbench'
 import { HiveWorkflowCaseCreateSchema, HiveWorkflowCaseViewSchema } from './hive-workflow-cases'
 import { workflowTestVectors } from './task-workflow/workflow.test-fixture'
+import { WorkflowExecutionContextSchema } from './task-workflow/workflow-execution-context'
+import type { HiveWorkflowCaseView } from './hive-workflow-cases'
 
 export function workflowCaseFixture(accountId = 'workflow-case-owner') {
   const companyId = randomUUID(),
@@ -78,6 +80,8 @@ export function workflowCaseFixture(accountId = 'workflow-case-owner') {
     originTaskId: randomUUID(),
     workflow,
     team: binding,
+    handoffs: [],
+    reviews: [],
     stageTasks: definition.stages.map((stage) => ({
       stageRef: stage.stageRef,
       taskId: randomUUID(),
@@ -94,8 +98,24 @@ export function workflowCaseFixture(accountId = 'workflow-case-owner') {
     workflow: _workflow,
     team: _team,
     stageTasks: _tasks,
+    handoffs: _handoffs,
+    reviews: _reviews,
     executionAvailability: _availability,
     ...summary
   } = view
   return { input, view, summary, team, workflow }
+}
+
+/** Isolated native library fixtures do not claim that a business Case accepted dependencies. */
+export function syntheticWorkflowStageContext(view: HiveWorkflowCaseView, stageRef: string) {
+  const task = view.stageTasks.find((item) => item.stageRef === stageRef)
+  return WorkflowExecutionContextSchema.parse({
+    kind: 'workflow.execution-context',
+    binding: view.binding,
+    definitionDigest: view.definitionDigest,
+    stageRef,
+    employeeRef: task?.employeeRef,
+    role: task?.role,
+    handoffRefs: []
+  })
 }

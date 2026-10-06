@@ -6,6 +6,7 @@ import {
 } from './hive-workflow-case-runs'
 import { workflowCaseFixture } from './hive-workflow-cases.test-fixture'
 import { hiveWorkflowStagePrompt } from './hive-workflow-stage-prompt'
+import { canonicalAgentSessionDigest } from './agent-session-mutation-envelope'
 
 describe('workflow stage start contract', () => {
   it('accepts only a bounded revision-checked business request', () => {
@@ -32,6 +33,11 @@ describe('workflow stage start contract', () => {
     f.view.requirement = '需'.repeat(48_000)
     const stage = f.view.workflow.definition.stages[0]
     stage.acceptanceCriteria = Array.from({ length: 16 }, () => '验'.repeat(2048))
+    f.view.workflow.definitionDigest = canonicalAgentSessionDigest({
+      name: f.view.workflow.name,
+      definition: f.view.workflow.definition
+    })
+    f.view.definitionDigest = f.view.workflow.definitionDigest
     const input = hiveWorkflowStagePrompt(f.view, stage.stageRef)
     expect(input).toContain(f.view.requirement)
     expect(input).toContain(stage.acceptanceCriteria.join('\n'))

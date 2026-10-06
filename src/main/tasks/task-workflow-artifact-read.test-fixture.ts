@@ -2,8 +2,10 @@ import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { vi } from 'vitest'
-import { workflowCaseFixture } from '../../shared/hive-workflow-cases.test-fixture'
-import { hiveWorkflowStageContext } from '../../shared/hive-workflow-stage-context'
+import {
+  workflowCaseFixture,
+  syntheticWorkflowStageContext
+} from '../../shared/hive-workflow-cases.test-fixture'
 import { agentJournalItemKey } from '../../shared/agent-session-journal-item-key'
 import { WorkflowCommandEvidenceSchema } from '../../shared/task-workflow/workflow-command-evidence'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
@@ -58,7 +60,7 @@ export async function artifactReadFixture(
       attempt: 1,
       taskRevision: '1'
     },
-    workflowContext: hiveWorkflowStageContext(view, stage.stageRef),
+    workflowContext: syntheticWorkflowStageContext(view, stage.stageRef),
     executionDeadlineAt: new Date(TASK_TEST_NOW + 60_000).toISOString(),
     executionPolicy: {
       trustMode: 'enforced_autonomous',

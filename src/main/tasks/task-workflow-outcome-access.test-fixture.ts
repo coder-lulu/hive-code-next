@@ -2,8 +2,10 @@ import { createHash } from 'node:crypto'
 import { mkdir, mkdtemp } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { vi } from 'vitest'
-import { workflowCaseFixture } from '../../shared/hive-workflow-cases.test-fixture'
-import { hiveWorkflowStageContext } from '../../shared/hive-workflow-stage-context'
+import {
+  workflowCaseFixture,
+  syntheticWorkflowStageContext
+} from '../../shared/hive-workflow-cases.test-fixture'
 import { WorkflowCommandEvidenceSchema } from '../../shared/task-workflow/workflow-command-evidence'
 import {
   WorkflowNativeOutcomeAssetSchema,
@@ -45,7 +47,7 @@ export async function outcomeAccessFixture(commandCount = 0) {
       attempt: 1,
       taskRevision: '1'
     },
-    workflowContext: hiveWorkflowStageContext(f.view, stage.stageRef),
+    workflowContext: syntheticWorkflowStageContext(f.view, stage.stageRef),
     executionDeadlineAt: new Date(TASK_TEST_NOW + 60_000).toISOString(),
     executionPolicy: {
       trustMode: 'enforced_autonomous',

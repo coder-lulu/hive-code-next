@@ -1,3 +1,4 @@
+import { createTaskDispatchRecoveryRepository } from './task-dispatch-recovery-repository.mjs'
 import { z } from 'zod'
 import { canonicalAgentSessionDigest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import { HiveRuntimeAdapterBinding } from '../../../src/main/tasks/paperclip-adapter-contract.ts'
@@ -18,10 +19,6 @@ const Claim = z.strictObject({
 })
 const RecoveryClaim = Claim.extend({ commandFingerprint: TaskDigest })
 const Renewal = TaskDeliveryToken.extend({ leaseMs: LeaseDuration })
-const Page = z.strictObject({
-  after: z.string().uuid().optional(),
-  limit: z.number().int().min(1).max(100).default(32)
-})
 export const refuseTaskRepository = (code) => {
   throw Object.assign(new Error(code), { code })
 }
@@ -301,42 +298,6 @@ export function createTaskDeliveryRepository(sql, read, resolve) {
         return row ? deliveryFromRow(row, accountId, task) : null
       })
     },
-    async listRecoverableRuns(accountId, rawQuery = {}) {
-      requireTaskRepositoryScope(accountId)
-      const query = Page.parse(rawQuery)
-      return sql.begin(async (db) => {
-        const rows = await db`SELECT i.id,i.company_id,h.agent_id,b.run_id,b.binding,r.case_id,
-          (b.cancel_requested OR h.context_snapshot->'externalExecutionControl'->'cancel' IS NOT NULL) AS cancel_requested,
-          h.status AS run_status,h.execution_stage,d.generation,d.lease_ref,d.owner_id,d.expires_at
-        FROM hive_task_bindings b JOIN issues i ON i.id=b.task_id
-        JOIN heartbeat_runs h ON h.id=b.run_id AND h.company_id=i.company_id
-        JOIN agents g ON g.id=h.agent_id AND g.company_id=i.company_id
-        LEFT JOIN hive_task_accounts a ON a.account_id=b.account_id
-        LEFT JOIN hive_workflow_case_stage_issues r ON r.issue_id=i.id
-        LEFT JOIN hive_task_deliveries d ON d.task_id=b.task_id AND d.account_id=b.account_id AND d.run_id=b.run_id
-        WHERE b.account_id=${accountId} AND b.binding IS NOT NULL AND b.result_receipt IS NULL
-          AND (r.case_id IS NOT NULL OR (a.company_id=i.company_id AND a.agent_id=h.agent_id))
-          AND h.driver_kind='hive_runtime' AND (${query.after ?? null}::uuid IS NULL OR b.run_id>${query.after ?? null}::uuid)
-        ORDER BY b.run_id ASC LIMIT ${query.limit + 1}`
-        const items = rows.slice(0, query.limit)
-        for (const [index, candidate] of items.entries()) {
-          const task =
-            candidate.case_id == null
-              ? candidate
-              : await read(db, accountId, candidate.id, candidate.run_id)
-          taskDeliveryBinding(task)
-          items[index] = {
-            ...candidate,
-            company_id: task.company_id,
-            agent_id: task.agent_id,
-            binding: task.binding,
-            cancel_requested: task.cancel_requested,
-            run_status: task.run_status,
-            execution_stage: task.execution_stage
-          }
-        }
-        return { items, nextCursor: rows.length > query.limit ? items.at(-1).run_id : null }
-      })
-    }
+    ...createTaskDispatchRecoveryRepository(sql, read)
   }
 }

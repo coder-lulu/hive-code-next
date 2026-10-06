@@ -41,6 +41,7 @@ async function context() {
     agent_id: agentId,
     run_id: runId,
     driver_kind: 'hive_runtime',
+    run_scope: { kind: 'personal' },
     binding: runtime.binding,
     cancel_requested: false,
     result_receipt: null,
@@ -486,6 +487,7 @@ describe('delivery lifetime and recovery scanner', () => {
       repository: current.repository,
       createClient: current.createClient,
       recover,
+      start: vi.fn(),
       isClosed: () => false
     })
     const first = scanner.check(),
@@ -527,6 +529,7 @@ describe('delivery lifetime and recovery scanner', () => {
       repository: current.repository,
       createClient: current.createClient,
       recover,
+      start: vi.fn(),
       isClosed: () => false
     })
     await scanner.check()
@@ -540,6 +543,7 @@ describe('delivery lifetime and recovery scanner', () => {
       repository: current.repository,
       createClient: current.createClient,
       recover: vi.fn(),
+      start: vi.fn(),
       isClosed: () => false
     })
     scanner.start()

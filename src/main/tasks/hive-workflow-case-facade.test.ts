@@ -51,7 +51,7 @@ async function fixture() {
       }
     }
   }))
-  const facade = createHiveTaskFacade({
+  const { facade } = createHiveTaskFacade({
     descriptorPath,
     artifacts: new TaskArtifactIndex(join(directory, 'artifacts')),
     issuer,

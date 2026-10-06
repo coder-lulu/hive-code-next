@@ -9,6 +9,7 @@ import {
   TaskDeliveryTokenSchema
 } from '../../shared/task-execution/task-command-delivery'
 import { WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES } from '../../shared/task-workflow/workflow-native-outcome'
+import { HiveWorkflowCaseRunReadSchema } from '../../shared/hive-workflow-case-runs'
 
 export const TASK_TRANSPORT_MAX_BYTES = 64 * 1024
 const errorStatus = (code: TaskExecutionError['code']) =>
@@ -64,6 +65,7 @@ export async function startLocalTaskTransport(options: {
   authenticate: (bearer: string) => TaskExecutionCaller | null
   capabilities: (caller: TaskExecutionCaller) => unknown
   currentOwner?: (caller: TaskExecutionCaller) => unknown
+  prepareCaseRun?: (refs: unknown, caller: TaskExecutionCaller) => Promise<unknown>
   resolveBinding?: (
     companyId: string,
     runId: string,
@@ -176,6 +178,36 @@ export async function startLocalTaskTransport(options: {
         const binding = await options.resolveBinding(companyId.data, runId.data, purpose, caller)
         caller.assertCurrent?.()
         send(response, 200, binding)
+        return
+      }
+      if (request.url === '/execution/workflow-prepare' && request.method === 'POST') {
+        if (
+          !/^application\/json(?:;\s*charset=utf-8)?$/i.test(request.headers['content-type'] ?? '')
+        ) {
+          throw new TaskExecutionError('INVALID_REQUEST')
+        }
+        const refs = HiveWorkflowCaseRunReadSchema.safeParse(await readTaskCommand(request))
+        if (!refs.success) {
+          throw new TaskExecutionError('INVALID_REQUEST')
+        }
+        caller.assertCurrent?.()
+        if (!options.prepareCaseRun) {
+          throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
+        }
+        const result = HiveWorkflowCaseRunReadSchema.safeParse(
+          await options.prepareCaseRun(refs.data, caller)
+        )
+        caller.assertCurrent?.()
+        if (
+          !result.success ||
+          refs.data.projectId !== result.data.projectId ||
+          refs.data.caseId !== result.data.caseId ||
+          refs.data.taskId !== result.data.taskId ||
+          refs.data.runId !== result.data.runId
+        ) {
+          throw new TaskExecutionError('OUTCOME_UNKNOWN')
+        }
+        send(response, 200, result.data)
         return
       }
       const routes = {

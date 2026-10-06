@@ -33,7 +33,7 @@ export function createHiveTaskFacade(options: {
   enforcement?: () => Promise<{ assertCurrent(): void }>
   assertCurrent(): void
   request?: typeof createLocalTaskRequest
-}): HiveTasksApi {
+}) {
   const context = createHiveTaskServiceContext(options)
   const workbench = createHiveTeamWorkbenchFacade({
     context,
@@ -52,19 +52,20 @@ export function createHiveTaskFacade(options: {
     validateWorkspace: options.validateWorkspace,
     enforcement: options.enforcement
   })
-  return {
+  const runs = createHiveWorkflowCaseRunFacade({
+    context,
+    getWorkflowCase: cases.getWorkflowCase,
+    workspaceSelector: async (projectId) =>
+      (await workbench.getTeam(projectId)).project.workspaceSelector,
+    validateWorkspace: options.validateWorkspace,
+    issuer: options.issuer,
+    enforcement: options.enforcement
+  })
+  const facade: HiveTasksApi = {
     ...workbench,
     ...workflows,
     ...cases,
-    ...createHiveWorkflowCaseRunFacade({
-      context,
-      getWorkflowCase: cases.getWorkflowCase,
-      workspaceSelector: async (projectId) =>
-        (await workbench.getTeam(projectId)).project.workspaceSelector,
-      validateWorkspace: options.validateWorkspace,
-      issuer: options.issuer,
-      enforcement: options.enforcement
-    }),
+    ...runs.facade,
     async list() {
       const caller = await context()
       return z
@@ -146,4 +147,5 @@ export function createHiveTaskFacade(options: {
       return artifact
     }
   }
+  return { facade, prepareCaseRun: runs.prepareCaseRun }
 }

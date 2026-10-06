@@ -1,7 +1,6 @@
 import { join } from 'node:path'
 import { mkdir, unlink, writeFile } from 'node:fs/promises'
 import { realpathSync } from 'node:fs'
-import { createHash } from 'node:crypto'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { HiveAccountService } from '../hive-account/hive-account-service'
@@ -26,7 +25,7 @@ import { startLocalTaskTransport } from './local-task-transport'
 import { createTaskAgentLaunchPort } from './task-agent-launch-port'
 import { createTaskCodexEvidence } from './task-codex-evidence'
 import { refuseTaskExecution } from './task-execution-error'
-import { createHiveTaskFacade } from './hive-task-facade'
+import { createLocalTaskFacadeAssembly } from './local-task-facade-assembly'
 import { TaskArtifactIndex } from './task-artifact-index'
 import { TaskWorkflowOutcomeStore } from './task-workflow-outcome-store'
 import { installTaskAuthorizationMonitor } from './task-authorization-monitor'
@@ -223,10 +222,21 @@ export async function startLocalTaskRuntime(options: {
   })
   const credential = createLocalTaskServiceCredential('trusted-local:runtime')
   await issuer.restoreBindings(await resources.store.tasks.readActive(assertCurrent))
+  const facadeService = createLocalTaskFacadeAssembly({
+    directory,
+    artifacts,
+    issuer,
+    enforcement: enforcement.current,
+    currentAccount: () => options.account.getRuntimeCloudAuthorization(),
+    currentRuntime,
+    assertCurrent,
+    resolveWorkspaceSource
+  })
   const transport = await startLocalTaskTransport({
     host,
     capabilities,
     currentOwner: currentRuntime,
+    prepareCaseRun: facadeService.prepareCaseRun,
     authenticate: credential.authenticate,
     resolveBinding: (companyId, runId, purpose, caller) =>
       issuer.resolveBinding(companyId, runId, caller.operationCallerKey, purpose)
@@ -267,21 +277,7 @@ export async function startLocalTaskRuntime(options: {
     descriptorPath,
     issuer,
     host,
-    facade: createHiveTaskFacade({
-      descriptorPath: join(directory, 'paperclip.json'),
-      artifacts,
-      issuer,
-      enforcement: enforcement.current,
-      currentAccount: () => options.account.getRuntimeCloudAuthorization(),
-      assertCurrent,
-      validateWorkspace: async (selector) => {
-        const source = await resolveWorkspaceSource(selector)
-        return {
-          workspaceRef: `workspace:${createHash('sha256').update(JSON.stringify(source.path)).digest('hex')}`,
-          assertCurrent: source.assertCurrent
-        }
-      }
-    }),
+    facade: facadeService.facade,
     close() {
       closed = true
       closing ??= (async () => {

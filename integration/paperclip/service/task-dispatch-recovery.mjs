@@ -1,5 +1,5 @@
 /** Scan only the account currently authenticated by this Runtime, with bounded pages and claims. */
-export function createTaskDispatchRecovery({ repository, createClient, recover, isClosed }) {
+export function createTaskDispatchRecovery({ repository, createClient, recover, start, isClosed }) {
   let flight,
     timer,
     stopped = false,
@@ -17,17 +17,32 @@ export function createTaskDispatchRecovery({ repository, createClient, recover, 
           return
         }
         const page = await repository.listRecoverableRuns(owner.accountId, { after, limit: 32 })
-        const tasks = page.items.filter(
-          (task) =>
-            task.binding.command.runtimeRecordId === owner.runtimeRecordId &&
-            (task.generation != null || task.run_status !== 'queued' || task.cancel_requested)
+        const awaitingStart = (task) =>
+          task.binding &&
+          task.run_scope?.kind === 'workbenchCase' &&
+          task.generation == null &&
+          task.run_status === 'queued' &&
+          !task.cancel_requested &&
+          task.execution_stage !== 'outcome_unknown'
+        const tasks = page.items.filter((task) =>
+          task.binding
+            ? task.binding.command.runtimeRecordId === owner.runtimeRecordId &&
+              (awaitingStart(task) ||
+                task.generation != null ||
+                task.run_status !== 'queued' ||
+                task.cancel_requested)
+            : Boolean(task.prepareRefs) && task.run_status === 'queued' && !task.cancel_requested
         )
         let index = 0
         await Promise.allSettled(
           Array.from({ length: Math.min(4, tasks.length) }, async () => {
             while (index < tasks.length && !stopped && !isClosed()) {
               const task = tasks[index++]
-              await recover(owner.accountId, task.id, task.run_id).catch(() => {})
+              await (task.binding && !awaitingStart(task) ? recover : start)(
+                owner.accountId,
+                task.id,
+                task.run_id
+              ).catch(() => {})
             }
           })
         )

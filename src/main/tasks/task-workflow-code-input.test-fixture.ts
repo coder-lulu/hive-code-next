@@ -1,8 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { workflowCaseFixture } from '../../shared/hive-workflow-cases.test-fixture'
-import { hiveWorkflowStageContext } from '../../shared/hive-workflow-stage-context'
+import {
+  workflowCaseFixture,
+  syntheticWorkflowStageContext
+} from '../../shared/hive-workflow-cases.test-fixture'
 import { WorkflowExecutionContextSchema } from '../../shared/task-workflow/workflow-execution-context'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
 import { createTaskManagedCopy } from './task-managed-copy'
@@ -47,7 +49,7 @@ export async function workflowCodeInputFixture(status: 'succeeded' | 'failed' = 
       attempt: 1,
       taskRevision: '1'
     },
-    workflowContext: hiveWorkflowStageContext(f.view, developer.stageRef),
+    workflowContext: syntheticWorkflowStageContext(f.view, developer.stageRef),
     executionPolicy: {
       trustMode: 'enforced_autonomous',
       executionPolicyRef: 'docker-local-linux',

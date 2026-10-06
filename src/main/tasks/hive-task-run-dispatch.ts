@@ -6,7 +6,7 @@ import { refuseTaskExecution } from './task-execution-error'
 import type { WorkflowExecutionContext } from '../../shared/task-workflow/workflow-execution-context'
 
 /** Personal and workflow admissions share the original binding, then the original dispatcher. */
-export async function bindAndDispatchHiveTask(options: {
+export async function bindHiveTask(options: {
   caller: HiveTaskRequestContext
   issuer: Pick<LocalTaskBindingIssuer, 'issue'>
   workspace: HiveTaskWorkspaceProof
@@ -19,6 +19,7 @@ export async function bindAndDispatchHiveTask(options: {
   executionDeadlineAt?: string
   workflowContext?: WorkflowExecutionContext
   action?: 'cancel'
+  assertCommitCurrent?: () => Promise<void>
 }) {
   const assertCurrent = () => {
     options.workspace.assertCurrent()
@@ -36,6 +37,8 @@ export async function bindAndDispatchHiveTask(options: {
     ...(options.workflowContext ? { workflowContext: options.workflowContext } : {})
   })
   assertCurrent()
+  await options.assertCommitCurrent?.()
+  assertCurrent()
   const path = hiveTaskRunPath(options.task.taskId, options.task.runId)
   const bound = parseHiveTaskRun(
     await options.caller.request(`${path}/binding`, binding),
@@ -46,9 +49,21 @@ export async function bindAndDispatchHiveTask(options: {
   if (bound.company_id !== options.companyId || bound.agent_id !== options.employeeRef) {
     return refuseTaskExecution('REVISION_CONFLICT')
   }
+  return bound
+}
+
+/** Personal and workflow admissions bind durably before entering the original dispatcher. */
+export async function bindAndDispatchHiveTask(options: Parameters<typeof bindHiveTask>[0]) {
+  const bound = await bindHiveTask(options)
   if (options.action !== 'cancel') {
-    await options.caller.request(`${path}/dispatch`, {})
+    options.workspace.assertCurrent()
+    options.caller.assertCurrent()
+    await options.caller.request(
+      `${hiveTaskRunPath(options.task.taskId, options.task.runId)}/dispatch`,
+      {}
+    )
   }
-  assertCurrent()
+  options.workspace.assertCurrent()
+  options.caller.assertCurrent()
   return bound
 }

@@ -30,6 +30,7 @@ import {
 } from '../../shared/task-workflow/workflow-native-outcome'
 import { WorkflowCommandEvidenceSchema } from '../../shared/task-workflow/workflow-command-evidence'
 import { WorkflowNativeArtifactSchema } from '../../shared/task-workflow/workflow-native-artifact'
+import { HiveWorkflowCaseRunReadSchema } from '../../shared/hive-workflow-case-runs'
 
 type Identity = Pick<
   TaskExecutionStart,
@@ -70,6 +71,26 @@ export class LocalTaskClient {
       throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
     }
     return parsed.data
+  }
+
+  async prepareCaseRun(value: unknown) {
+    const query = HiveWorkflowCaseRunReadSchema.safeParse(value)
+    if (!query.success) {
+      throw new TaskExecutionError('INVALID_REQUEST')
+    }
+    const reply = HiveWorkflowCaseRunReadSchema.safeParse(
+      await this.request('/execution/workflow-prepare', query.data)
+    )
+    if (
+      !reply.success ||
+      query.data.projectId !== reply.data.projectId ||
+      query.data.caseId !== reply.data.caseId ||
+      query.data.taskId !== reply.data.taskId ||
+      query.data.runId !== reply.data.runId
+    ) {
+      throw new TaskExecutionError('OUTCOME_UNKNOWN')
+    }
+    return reply.data
   }
 
   async owner() {

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+export { admitWorkflowCaseStageInTransaction } from './workflow-case-stage-admission.mjs'
 import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import {
   HiveWorkflowCaseStartSchema,

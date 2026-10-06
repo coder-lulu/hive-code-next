@@ -57,7 +57,7 @@ async function fixture() {
     commandFingerprint: 'a'.repeat(64)
   }))
   const artifactDirectory = join(directory, 'artifacts')
-  const facade = createHiveTaskFacade({
+  const { facade } = createHiveTaskFacade({
     descriptorPath,
     artifacts: new TaskArtifactIndex(artifactDirectory),
     issuer: { issue },
@@ -191,7 +191,10 @@ describe('authenticated Hive task Facade', () => {
     await writeFile(join(f.artifactDirectory, artifactId), text)
     await writeFile(
       join(f.artifactDirectory, `outcome-${outcomeId}.json`),
-      JSON.stringify({ artifacts: [{ ref: artifactRef, name: 'report.md', digest: hash(text) }] })
+      JSON.stringify({
+        status: 'succeeded',
+        artifacts: [{ ref: artifactRef, name: 'report.md', digest: hash(text) }]
+      })
     )
     const command = taskCommand()
     const receipt = {

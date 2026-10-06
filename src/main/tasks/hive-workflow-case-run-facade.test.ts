@@ -128,7 +128,7 @@ function fixture() {
     request,
     enforcement,
     options,
-    facade: createHiveWorkflowCaseRunFacade(options),
+    facade: createHiveWorkflowCaseRunFacade(options).facade,
     setAdmission(value: typeof admission) {
       admission = value
     },
@@ -183,9 +183,10 @@ describe('authenticated workflow run dispatch through the original Task binding'
     expect(f.request).not.toHaveBeenCalled()
     expect(f.issuer.issue).not.toHaveBeenCalled()
     await expect(
-      createHiveWorkflowCaseRunFacade({ ...f.options, enforcement: undefined }).startWorkflowCase(
-        f.input
-      )
+      createHiveWorkflowCaseRunFacade({
+        ...f.options,
+        enforcement: undefined
+      }).facade.startWorkflowCase(f.input)
     ).rejects.toThrow('CAPABILITY_UNAVAILABLE')
   })
   it.each([

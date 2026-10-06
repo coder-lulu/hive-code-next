@@ -13,7 +13,11 @@ import {
 import { createTaskInboxRepository } from './task-inbox-repository.mjs'
 import { createTaskRunScopeReader } from './task-run-scope.mjs'
 import { requireWorkflowIssueCheckout } from './workflow-issue-checkout.mjs'
-import { readWorkflowCaseRun } from './workflow-case-run-records.mjs'
+import {
+  readWorkflowCaseRun,
+  requireWorkflowCaseRunDispatch
+} from './workflow-case-run-records.mjs'
+import { consumeWorkflowCaseOutcome } from './workflow-case-outcome-consumer.mjs'
 import {
   createTaskControlRepository,
   requireExternalTaskScope
@@ -36,7 +40,7 @@ export function createTaskRepository(sql) {
       refuse('REVISION_CONFLICT')
     }
   }
-  const settle = async (db, accountId, taskId, runId, rawReceipt, token) => {
+  const settle = async (db, accountId, taskId, runId, rawReceipt, token, nativeDelivery) => {
     const receipt = TaskExecutionResultSchema.parse(rawReceipt)
     const task = await read(db, accountId, taskId, runId, true)
     const binding = assertTaskReceiptIdentity(task, receipt)
@@ -84,6 +88,7 @@ export function createTaskRepository(sql) {
     if (!runs.length) {
       refuse('REVISION_CONFLICT')
     }
+    await consumeWorkflowCaseOutcome(db, accountId, task, receipt, nativeDelivery)
     const settled = await read(db, accountId, taskId, runId)
     if (token !== undefined) {
       await requireCurrentTaskDelivery(db, accountId, settled, token)
@@ -222,6 +227,7 @@ export function createTaskRepository(sql) {
           refuse('REVISION_CONFLICT')
         }
         await requireTaskDeliveryWriter(db, accountId, task, token)
+        await requireWorkflowCaseRunDispatch(db, accountId, task)
         if (
           task.checkout_run_id !== runId ||
           task.execution_run_id !== runId ||

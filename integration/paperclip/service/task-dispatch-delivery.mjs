@@ -4,6 +4,7 @@ import { computeTaskExecutionFingerprint } from '../../../src/shared/task-execut
 import { TaskDeliveryProofSchema } from '../../../src/shared/task-execution/task-command-delivery.ts'
 import { canonicalAgentSessionDigest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import { refuseTaskRepository as refuse } from './task-delivery-repository.mjs'
+import { readWorkflowNativeDelivery } from './workflow-native-delivery.mjs'
 
 export function requireTaskDispatchBinding(task, value) {
   const binding = HiveRuntimeAdapterBinding.parse(value)
@@ -151,12 +152,24 @@ export function createTaskDispatchDelivery({
           await checkCancellation()
           const hash = canonicalAgentSessionDigest(observation)
           if (hash !== lastObservationHash) {
+            const nativeDelivery = await readWorkflowNativeDelivery({
+              client,
+              task,
+              observation,
+              assertCurrent,
+              resolveBinding: async () =>
+                requireTaskDispatchBinding(
+                  task,
+                  await client.binding(task.company_id, task.run_id, 'recover')
+                )
+            })
             const consumed = await repository.consumeObservation(
               accountId,
               task.id,
               task.run_id,
               token,
-              observation
+              observation,
+              nativeDelivery
             )
             terminal = consumed.settled
             lastObservationHash = hash

@@ -517,7 +517,13 @@ describe('durable task delivery ownership', () => {
     const f = fixture([tasks])
     const page = await f.repository.listRecoverableRuns(accountId, { limit: 1 })
     expect(page).toEqual({ items: [task], nextCursor: task.run_id })
-    expect(f.calls[0].text).toContain('b.binding IS NOT NULL AND b.result_receipt IS NULL')
+    expect(f.calls[0].text).toContain('b.result_receipt IS NULL')
+    expect(f.calls[0].text).toContain(
+      '(b.binding IS NOT NULL OR (r.case_id IS NOT NULL AND b.workflow_input IS NOT NULL'
+    )
+    expect(f.calls[0].text).toContain(
+      "h.status='queued' AND h.execution_stage IS NULL AND NOT b.cancel_requested"
+    )
     expect(f.calls[0].text).toContain('ORDER BY b.run_id ASC LIMIT ?')
     expect(f.calls[0].values).toEqual([accountId, null, null, 2])
     expect(f.writes()).toHaveLength(0)

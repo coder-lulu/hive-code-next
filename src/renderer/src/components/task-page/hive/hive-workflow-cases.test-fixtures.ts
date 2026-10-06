@@ -56,6 +56,8 @@ export function workflowCaseView(
         status: index ? 'backlog' : 'todo'
       }
     }),
+    handoffs: [],
+    reviews: [],
     executionAvailability: { available: false, reason: 'EXECUTION_ISOLATION_UNAVAILABLE' }
   })
 }
