@@ -17,7 +17,7 @@ import { promisify } from 'node:util'
 import { finished } from 'node:stream/promises'
 import { fileURLToPath } from 'node:url'
 import { createPackageWithOptions, listPackage, statFile } from '@electron/asar'
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { runProcess } from '../../shared/child-process/run-process'
 
@@ -54,6 +54,72 @@ const unixLauncherFixtures = [
 ] as const
 
 describe('packaged CLI assets', () => {
+  let fixtureRoot = ''
+  let fixtureArchive = ''
+  let fixtureSetup: Promise<void> | undefined
+
+  beforeAll(async () => {
+    fixtureSetup = (async () => {
+      const root = await mkdtemp(join(tmpdir(), 'orca-cli-gitlab-package-'))
+      fixtureRoot = root
+      const projectDir = fileURLToPath(new URL('../../../', import.meta.url))
+      const source = join(root, 'app-source')
+      const archive = join(root, 'resources', 'app.asar')
+      fixtureArchive = archive
+      const compile = await runProcess({
+        program: process.execPath,
+        args: [
+          join(projectDir, 'node_modules', 'typescript', 'bin', 'tsc'),
+          '-p',
+          join(projectDir, 'config', 'tsconfig.cli.json'),
+          '--outDir',
+          join(source, 'out'),
+          '--composite',
+          'false',
+          '--incremental',
+          'false'
+        ],
+        cwd: projectDir,
+        timeoutMs: 60_000
+      })
+      expect(compile.code, compile.stdout + compile.stderr).toBe(0)
+      await mkdir(dirname(archive), { recursive: true })
+      await writeFile(join(source, 'out', 'package.json'), JSON.stringify({ type: 'commonjs' }))
+      for (const name of ['zod', 'tweetnacl']) {
+        await cp(
+          join(projectDir, 'node_modules', name),
+          join(root, 'resources', 'node_modules', name),
+          {
+            recursive: true,
+            dereference: true
+          }
+        )
+      }
+      // Match the shipped output exclusions, then wait for the returned archive
+      // writer to close before reading the archive or deleting the fixture.
+      const archiveStream = await createPackageWithOptions(source, archive, {
+        unpack: `{${builderConfig.asarUnpack?.map((pattern) => join(source, pattern).split(sep).join('/')).join(',')}}`,
+        globOptions: {
+          ignore: builderConfig.files
+            ?.filter((pattern) => pattern.startsWith('!out/'))
+            .map((pattern) => join(source, pattern.slice(1)).split(sep).join('/'))
+        }
+      })
+      await finished(archiveStream)
+    })()
+    await fixtureSetup
+  })
+
+  afterAll(async () => {
+    // Wait for producers to settle before removing the exact owned fixture.
+    if (fixtureSetup) {
+      await Promise.allSettled([fixtureSetup])
+    }
+    if (fixtureRoot) {
+      await rm(fixtureRoot, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
+    }
+  })
+
   it('ships embedded skill guides with the CLI instead of source Markdown', () => {
     // Why: `skills get` must work from the packaged CLI without falling back to
     // authoring-only files that do not exist in installed applications.
@@ -61,57 +127,13 @@ describe('packaged CLI assets', () => {
     expect(builderConfig.files).toContain('!skill-guides{,/**/*}')
   })
 
-  it('loads worktree link validation from the installed CLI', async ({ onTestFinished }) => {
-    const root = await mkdtemp(join(tmpdir(), 'orca-cli-gitlab-package-'))
-    // Teardown has its own hook deadline and still runs when the test fails.
-    onTestFinished(async () => {
-      await rm(root, { recursive: true, force: true, maxRetries: 3, retryDelay: 100 })
-    })
-    const projectDir = fileURLToPath(new URL('../../../', import.meta.url))
-    const source = join(root, 'app-source')
-    const archive = join(root, 'resources', 'app.asar')
-    const compile = await runProcess({
-      program: process.execPath,
-      args: [
-        join(projectDir, 'node_modules', 'typescript', 'bin', 'tsc'),
-        '-p',
-        join(projectDir, 'config', 'tsconfig.cli.json'),
-        '--outDir',
-        join(source, 'out'),
-        '--composite',
-        'false',
-        '--incremental',
-        'false'
-      ],
-      cwd: projectDir,
-      timeoutMs: 60_000
-    })
-    expect(compile.code, compile.stdout + compile.stderr).toBe(0)
-    await mkdir(dirname(archive), { recursive: true })
-    await writeFile(join(source, 'out', 'package.json'), JSON.stringify({ type: 'commonjs' }))
-    for (const name of ['zod', 'tweetnacl']) {
-      await cp(
-        join(projectDir, 'node_modules', name),
-        join(root, 'resources', 'node_modules', name),
-        {
-          recursive: true,
-          dereference: true
-        }
-      )
-    }
-    // Match the shipped output exclusions, then wait for the returned archive
-    // writer to close before reading the archive or deleting the fixture.
-    const archiveStream = await createPackageWithOptions(source, archive, {
-      unpack: `{${builderConfig.asarUnpack?.map((pattern) => join(source, pattern).split(sep).join('/')).join(',')}}`,
-      globOptions: {
-        ignore: builderConfig.files
-          ?.filter((pattern) => pattern.startsWith('!out/'))
-          .map((pattern) => join(source, pattern.slice(1)).split(sep).join('/'))
-      }
-    })
-    await finished(archiveStream)
+  it('loads worktree link validation from the installed CLI', async () => {
+    const root = fixtureRoot
+    const archive = fixtureArchive
     expect(builderConfig.files).toContain('!out/**/*.test.js')
-    expect(listPackage(archive).some((file) => file.endsWith('.test.js'))).toBe(false)
+    expect(listPackage(archive, { isPack: false }).some((file) => file.endsWith('.test.js'))).toBe(
+      false
+    )
     expect(statFile(archive, join('out', 'cli', 'index.js')).unpacked).toBe(true)
     const result = await runProcess({
       program: process.execPath,

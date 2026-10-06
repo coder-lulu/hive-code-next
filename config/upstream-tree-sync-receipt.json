@@ -4,11 +4,11 @@
   "upstream": "stablyai/orca",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
-  "targetSha": "fad8945e491780674942dded882ecdde8dfea2a7",
+  "targetSha": "78727398b1a99dfcc376ccdd837c621a69d3cbe9",
   "baseTreeSha": "be3b3b0bd31532f0ab6a545744d7420848311b21",
   "upstreamTreeSha": "307815385c4bf005b093cf0115b73d9490720548",
-  "targetTreeSha": "4667b77ea1b9e6d1114347476f0e6236a7ef1002",
-  "mergedTreeSha": "af8b94c318da0c65989a8edcbbbdf05861fe242c",
+  "targetTreeSha": "51cf5a333ed5a0c85cbb6f5e20371916aef9dd9f",
+  "mergedTreeSha": "9fa005f6a527f885bee7909f4c3d553862e1c9f7",
   "docs": {
     "path": "docs",
     "mode": "160000",
@@ -405,7 +405,7 @@
     }
   },
   "review": {
-    "frozenReviewBlobSha": "3d2a39dddb75597c430d8219b715a6ccce233a0a",
+    "frozenReviewBlobSha": "6d46e84e761c21dbcae998c151ca6daa23a558fb",
     "conflictPaths": [
       ".github/workflows/adhoc-mac-build.yml",
       ".github/workflows/agent-state-rules-publish.yml",
@@ -713,6 +713,9 @@
       "src/main/runtime/orchestration/orchestration-party.ts",
       "src/main/runtime/orchestration/preamble.test.ts",
       "src/main/runtime/orchestration/preamble.ts",
+      "src/main/runtime/readiness-census-baseline.ts",
+      "src/main/runtime/readiness-census-synthetic.test.ts",
+      "src/main/runtime/readiness-census.test.ts",
       "src/main/runtime/rpc/e2ee-channel.test.ts",
       "src/main/runtime/rpc/methods/accounts.ts",
       "src/main/runtime/rpc/methods/ai-vault.test.ts",
