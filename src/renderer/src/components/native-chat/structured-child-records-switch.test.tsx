@@ -86,6 +86,7 @@ const MINUTE = 60_000
 const tab = {
   id: 'structured-tab-1',
   worktreeId: 'wt-1',
+  executionHostId: 'local',
   groupId: 'group-1',
   contentType: 'agent-session',
   entityId: 'session-1',

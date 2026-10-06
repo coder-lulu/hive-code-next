@@ -1,3 +1,4 @@
+import { releaseEditorUntitledPlaceholder } from '@/components/editor/editor-untitled-placeholder'
 import type { EditorGet, EditorSet } from '../types/editor-set-get'
 import type { EditorSlice } from '../types/editor-slice'
 import { getRecentlyClosedTabPosition, pushRecentlyClosedTabKind } from '../../recently-closed-tabs'
@@ -12,11 +13,14 @@ export function createCloseFileAction(
   get: EditorGet
 ): Pick<EditorSlice, 'closeFile'> {
   return {
-    closeFile: (fileId) => {
+    closeFile: (fileId, options) => {
       const preClose = get().openFiles.find((f) => f.id === fileId)
       // Why: also check editorDrafts — isDirty is set by a debounced callback, so a draft can exist before isDirty flushes; a draft means the user typed something.
       const hasDraft = !!get().editorDrafts[fileId]
-      const cleanupResult = getUntitledFileCleanupResult(preClose, hasDraft)
+      releaseEditorUntitledPlaceholder(get(), preClose)
+      const cleanupResult = options?.excludeFromRecentlyClosed
+        ? undefined
+        : getUntitledFileCleanupResult(preClose, hasDraft)
 
       // Why: mirrored tabs are host-owned, so the host must close its copy or its next snapshot re-mirrors the file and the tab reopens.
       notifyHostOfMirroredEditorClose(get(), preClose?.worktreeId, fileId)
@@ -133,11 +137,17 @@ export function createCloseFileAction(
         let nextRecentlyClosedKinds = s.recentlyClosedTabKindsByWorktree
         const wtRecent = closedFile?.worktreeId
         // Preserved untitled files remain reopenable; markdown previews are ephemeral.
-        if (closedFile && wtRecent && closedFile.mode !== 'markdown-preview') {
+        if (
+          closedFile &&
+          wtRecent &&
+          closedFile.mode !== 'markdown-preview' &&
+          !options?.excludeFromRecentlyClosed
+        ) {
           const {
             id: _id,
             isDirty: _dirty,
             mirroredFromRuntimeSession: _mirrored,
+            untitledPlaceholderLeaseToken: _lease,
             ...snap
           } = closedFile
           const stack = s.recentlyClosedEditorTabsByWorktree[wtRecent] ?? []

@@ -12,7 +12,7 @@ import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime-client'
 import { APP_DISPLAY_NAME, applyProductBranding } from '../../shared/brand'
 import { redactRuntimeEnvironment } from '../../shared/runtime-environments'
 import type { RuntimeStatus } from '../../shared/runtime-types'
-import { NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/protocol-version'
+import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/electron-remote-runtime-client-capabilities'
 
 type VerifyAndAddRuntimeEnvironmentArgs = {
   name: string
@@ -45,7 +45,7 @@ export async function verifyAndAddRuntimeEnvironmentFromPairingCode(
       15_000,
       undefined,
       undefined,
-      NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES
+      ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES
     )
     if (!response.ok) {
       return {

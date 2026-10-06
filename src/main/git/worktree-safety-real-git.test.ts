@@ -1,7 +1,7 @@
 import { execFile } from 'node:child_process'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { promisify } from 'node:util'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { GitCapabilityCache } from '../../shared/git-capability-cache'
@@ -149,7 +149,11 @@ describe('worktree safety with the real Git binary', () => {
             )
       await expect(remove(false)).rejects.toThrow(/submodules cannot be moved or removed/)
       expect((await git(['cat-file', '-t', local], sub)).stdout.trim()).toBe('commit')
-      expect((await git(['worktree', 'list', '--porcelain'])).stdout).toContain(checkout)
+      expect(
+        parseWorktreeList((await git(['worktree', 'list', '--porcelain'])).stdout).map(
+          (entry) => entry.path
+        )
+      ).toContain(checkout.split(sep).join('/'))
       await expect(remove(true)).resolves.toEqual({})
       await expect(readFile(join(checkout, '.git'))).rejects.toThrow()
     },
@@ -184,15 +188,17 @@ describe('worktree safety with the real Git binary', () => {
         host === 'native'
           ? await readWorktreeList(repo)
           : await readRelayWorktreeList((args, cwd) => runner(args, { cwd }), repo, capabilities)
-      const prepared = entries.find((entry) => entry.path === checkout)
+      const prepared = entries.find((entry) => entry.path === checkout.split(sep).join('/'))
       expect(prepared).toMatchObject({ locked: true, lockReason: reason })
       expect(prepared && isWorktreeCreatePreparation(prepared)).toBe(true)
       await rm(checkout, { recursive: true })
       const annotated = await annotateWorktreeLocksFromAdmin(repo, parseWorktreeList(oldList))
-      expect(annotated.find((entry) => entry.path === checkout)).toMatchObject({
-        locked: true,
-        lockReason: reason
-      })
+      expect(annotated.find((entry) => entry.path === checkout.split(sep).join('/'))).toMatchObject(
+        {
+          locked: true,
+          lockReason: reason
+        }
+      )
     },
     90_000
   )

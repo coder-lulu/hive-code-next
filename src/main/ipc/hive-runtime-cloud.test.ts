@@ -57,13 +57,15 @@ describe('Hive Runtime Cloud IPC', () => {
       electronMocks.handlers.get('hiveRuntimeCloud:updateDisplayName')?.(undefined, {
         runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
         cloudDisplayName: ' Cafe\u0301 ',
-        expectedCloudDisplayNameVersion: 4
+        expectedCloudDisplayNameVersion: 4,
+        expectedOwnershipEpoch: 6
       })
     ).resolves.toEqual({ status: 'READY' })
     expect(updateDisplayName).toHaveBeenCalledWith({
       runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
       cloudDisplayName: 'Café',
-      expectedCloudDisplayNameVersion: 4
+      expectedCloudDisplayNameVersion: 4,
+      expectedOwnershipEpoch: 6
     })
   })
 
@@ -73,22 +75,26 @@ describe('Hive Runtime Cloud IPC', () => {
     {
       runtimeRecordId: 'not-a-uuid',
       cloudDisplayName: 'Desk',
-      expectedCloudDisplayNameVersion: 1
+      expectedCloudDisplayNameVersion: 1,
+      expectedOwnershipEpoch: 6
     },
     {
       runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
       cloudDisplayName: 'Desk\ud800',
-      expectedCloudDisplayNameVersion: 1
+      expectedCloudDisplayNameVersion: 1,
+      expectedOwnershipEpoch: 6
     },
     {
       runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
       cloudDisplayName: 'Desk',
-      expectedCloudDisplayNameVersion: 0
+      expectedCloudDisplayNameVersion: 0,
+      expectedOwnershipEpoch: 6
     },
     {
       runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
       cloudDisplayName: null,
       expectedCloudDisplayNameVersion: 1,
+      expectedOwnershipEpoch: 6,
       accountId: 'forged'
     }
   ])('rejects malformed Runtime display-name input %#', (value) => {
@@ -96,6 +102,20 @@ describe('Hive Runtime Cloud IPC', () => {
       'Invalid Runtime display-name request'
     )
   })
+
+  it.each([undefined, null, 0, -1, 1.5, '6', Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects a missing or invalid Runtime ownership epoch %#',
+    (expectedOwnershipEpoch) => {
+      expect(() =>
+        requireHiveRuntimeDisplayNameUpdateRequest({
+          runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000',
+          cloudDisplayName: 'Desk',
+          expectedCloudDisplayNameVersion: 1,
+          ...(expectedOwnershipEpoch === undefined ? {} : { expectedOwnershipEpoch })
+        })
+      ).toThrow('Invalid Runtime display-name request')
+    }
+  )
 
   it('validates and binds a local Runtime claim to the renderer account', async () => {
     const claimLocalRuntime = vi.fn(

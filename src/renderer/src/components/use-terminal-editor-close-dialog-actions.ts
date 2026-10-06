@@ -105,7 +105,13 @@ export function useTerminalEditorCloseDialogActions(
     isClosingRef.current = true
     const fileId = saveDialogFileId
     setSaveDialogFileId(null)
-    await discardEditorFileChangesAndClose(fileId)
+    try {
+      await discardEditorFileChangesAndClose(fileId)
+    } catch {
+      setSaveDialogFileId(fileId)
+      releaseCloseDialogGuardAfterDebounce()
+      return
+    }
     pendingEditorCloseQueueRef.current = pendingEditorCloseQueueRef.current.filter(
       (id) => id !== fileId
     )

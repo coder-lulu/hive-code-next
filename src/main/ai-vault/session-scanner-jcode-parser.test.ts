@@ -60,7 +60,11 @@ describe('parseJcodeSessionFile', () => {
       { role: 'user', text: 'fix the bug', timestamp: null },
       { role: 'assistant', text: 'done', timestamp: null }
     ])
-    expect(session?.resumeCommand).toContain("jcode --resume 'session_badger_123'")
+    expect(session?.resumeCommand).toBe(
+      process.platform === 'win32'
+        ? 'cmd /d /s /c "cd /d ""/repo"" && jcode --resume ""session_badger_123"""'
+        : "cd '/repo' && jcode --resume 'session_badger_123'"
+    )
   })
 
   it('skips a malformed (partially written) session doc', async () => {

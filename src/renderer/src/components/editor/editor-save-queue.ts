@@ -2,8 +2,12 @@ import type { StoreApi } from 'zustand'
 import type { AppState } from '@/store'
 import type { OpenFile } from '@/store/slices/editor'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
+import { releaseRuntimeUntitledPlaceholder } from '@/runtime/runtime-untitled-placeholder-client'
 import { writeRuntimeFile } from '@/runtime/runtime-file-client'
-import { getEditorFileOperationContext } from '@/lib/editor-file-operation-owner'
+import {
+  captureEditorFileOperationProvenance,
+  getEditorFileOperationContext
+} from '@/lib/editor-file-operation-owner'
 import {
   canAutoSaveOpenFile,
   isAutosaveSuspendedForFile,
@@ -20,6 +24,7 @@ import {
 import { getDiskBaselineSignature } from './diff-content-signature'
 import { trackExternalChangeConflictAction } from './editor-external-change-telemetry'
 import { editorTabFileAccess } from '@/lib/local-file-access'
+import { createQueuedEditorUntitledPlaceholderRequests } from './editor-untitled-placeholder'
 
 export type AppStoreApi = Pick<StoreApi<AppState>, 'getState' | 'subscribe'>
 
@@ -42,6 +47,7 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
   const autoSaveScheduledContent = new Map<string, string>()
   const saveQueue = new Map<string, Promise<void>>()
   const saveGeneration = new Map<string, number>()
+  const placeholderRequests = createQueuedEditorUntitledPlaceholderRequests()
 
   const clearAutoSaveTimer = (fileId: string): void => {
     const timerId = autoSaveTimers.get(fileId)
@@ -63,7 +69,22 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
   ): Promise<void> => {
     clearAutoSaveTimer(file.id)
     const queuedGeneration = saveGeneration.get(file.id) ?? 0
+    let operationProvenance: ReturnType<typeof captureEditorFileOperationProvenance> | undefined
+    let provenanceFailure: unknown
+    try {
+      operationProvenance =
+        file.operationProvenance ??
+        captureEditorFileOperationProvenance(
+          store.getState(),
+          file.worktreeId,
+          file.runtimeEnvironmentId,
+          file.runtimeEnvironmentId !== undefined
+        )
+    } catch (error) {
+      provenanceFailure = error
+    }
 
+    const placeholderRequest = placeholderRequests.track(file)
     const previousSave = saveQueue.get(file.id) ?? Promise.resolve()
     const queuedSave = previousSave
       .catch(() => undefined)
@@ -77,6 +98,7 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
         if (!liveFile) {
           return
         }
+        placeholderRequests.assertCurrent(placeholderRequest, liveFile)
         if (liveFile.csvPreviewOnly === true) {
           throw new Error('Large CSV previews are read-only.')
         }
@@ -102,7 +124,14 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
         const worktree = liveFile.worktreeId
           ? findWorktreeById(state.worktreesByRepo ?? {}, liveFile.worktreeId)
           : null
-        const fileContext = getEditorFileOperationContext(state, liveFile, worktree?.path ?? null)
+        if (!operationProvenance) {
+          throw provenanceFailure
+        }
+        const fileContext = getEditorFileOperationContext(
+          state,
+          { ...liveFile, operationProvenance },
+          worktree?.path ?? null
+        )
         const connectionId = fileContext.connectionId
         // Why: stamp before writing so useEditorExternalWatch ignores our own fs:changed echo (editor-self-write-registry).
         recordSelfWrite(
@@ -126,10 +155,65 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
           throw error
         }
 
-        if ((saveGeneration.get(file.id) ?? 0) !== queuedGeneration) {
+        const token = liveFile.untitledPlaceholderLeaseToken
+        if (token) {
+          void releaseRuntimeUntitledPlaceholder(fileContext, liveFile.filePath, token).catch(
+            (error) => console.warn('Failed to release saved untitled placeholder lease', error)
+          )
+        }
+        const current = store.getState()
+        const currentFile = current.openFiles.find((entry) => entry.id === file.id)
+        if (
+          !currentFile ||
+          currentFile.untitledPlaceholderLeaseToken !== token ||
+          currentFile.filePath !== liveFile.filePath ||
+          currentFile.operationProvenance !== liveFile.operationProvenance ||
+          currentFile.worktreeId !== liveFile.worktreeId ||
+          currentFile.runtimeEnvironmentId !== liveFile.runtimeEnvironmentId
+        ) {
           return
         }
-
+        const interrupted =
+          (saveGeneration.get(file.id) ?? 0) !== queuedGeneration ||
+          currentFile.pendingOwnerMigration === true
+        try {
+          const currentWorktree = findWorktreeById(
+            current.worktreesByRepo ?? {},
+            currentFile.worktreeId
+          )
+          const currentContext = getEditorFileOperationContext(
+            current,
+            { ...currentFile, operationProvenance },
+            currentWorktree?.path ?? null
+          )
+          if (
+            currentContext.worktreePath !== fileContext.worktreePath ||
+            currentContext.connectionId !== fileContext.connectionId ||
+            currentContext.expectedExecutionHostId !== fileContext.expectedExecutionHostId ||
+            currentContext.expectedSshTargetId !== fileContext.expectedSshTargetId ||
+            currentContext.expectedSshConnectionGeneration !==
+              fileContext.expectedSshConnectionGeneration ||
+            currentContext.settings?.activeRuntimeEnvironmentId !==
+              fileContext.settings?.activeRuntimeEnvironmentId
+          ) {
+            throw new Error('The file owner changed while saving. Its edits were kept.')
+          }
+        } catch (error) {
+          if (interrupted) {
+            return
+          }
+          throw error
+        }
+        if (token) {
+          current.clearUntitledPlaceholderLease(file.id)
+          placeholderRequests.recordConsumption(
+            currentFile,
+            store.getState().openFiles.find((entry) => entry.id === file.id)
+          )
+        }
+        if (interrupted) {
+          return
+        }
         const nextState = store.getState()
         const currentDraft = nextState.editorDrafts[file.id]
         const stillDirty = currentDraft !== undefined && currentDraft !== contentToSave
@@ -156,6 +240,7 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
 
     let trackedSave: Promise<void>
     trackedSave = queuedSave.finally(() => {
+      placeholderRequests.forget(placeholderRequest)
       if (saveQueue.get(file.id) === trackedSave) {
         saveQueue.delete(file.id)
       }
@@ -233,6 +318,7 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
     autoSaveScheduledContent.clear()
     saveQueue.clear()
     saveGeneration.clear()
+    placeholderRequests.clear()
   }
 
   return {

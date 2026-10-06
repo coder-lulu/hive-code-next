@@ -1,12 +1,16 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeAll, expect, test } from 'vitest'
 import { resolveStructuredSessionRecovery } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-recovery-resolution'
-import { AgentSessionRecordStore } from '../../../src/main/runtime/agent-session-record-store'
+import type { AgentSessionRecordStore } from '../../../src/main/runtime/agent-session-record-store'
+import {
+  openTestAgentSessionRecordStore,
+  readPersistedTestAgentSessionStoreText
+} from '../../../src/main/runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
 import { agentSessionStorePath } from '../../../src/main/runtime/agent-session-record-store-file'
-import { agentSessionStoreBackupPath } from '../../../src/main/runtime/agent-session-record-store-write'
 import {
   importReleaseCheckoutModule,
   materializeReleaseCheckout,
@@ -74,7 +78,7 @@ test('an older build reads the unproven owner but refuses to rewrite the newer s
   const directory = mkdtempSync(join(tmpdir(), 'orca-unproven-release-downgrade-'))
   try {
     // An unknown owner may still be running; recovery cannot convert uncertainty into release.
-    const store = await AgentSessionRecordStore.open({ directory, hostId: 'local' })
+    const store = await openTestAgentSessionRecordStore(directory)
     const reserved = await store.reserveOwner(reserveRequest(null, 'spawn-a', 1))
     const fence = reserved.record.lease.runtimeFence
     await store.commitProcessIdentity({
@@ -111,15 +115,20 @@ test('an older build reads the unproven owner but refuses to rewrite the newer s
     )
     expect(store.getRecord(SESSION)?.lease).toEqual(retainedLease)
 
-    // Hive's v4 store is readable by this v2 release, but no old transaction may rewrite it.
-    const filePath = agentSessionStorePath(directory)
+    // The real old parser reads committed journal rows without downgrading the product profile.
+    const journalBefore = await readPersistedTestAgentSessionStoreText(directory)
+    const readerDirectory = join(directory, 'older-record-reader')
+    mkdirSync(readerDirectory, { mode: 0o700 })
+    const filePath = agentSessionStorePath(readerDirectory)
+    writeFileSync(filePath, journalBefore)
+    writeFileSync(`${filePath}.bak`, journalBefore)
     const readPersistedStore = () => [
       readFileSync(filePath, 'utf8'),
-      readFileSync(agentSessionStoreBackupPath(filePath), 'utf8')
+      readFileSync(`${filePath}.bak`, 'utf8')
     ]
     const persistedBefore = readPersistedStore()
     expect(JSON.parse(persistedBefore[0])).toMatchObject({ schemaVersion: 4 })
-    const old = await OldStore.open({ directory, hostId: 'local' })
+    const old = await OldStore.open({ directory: readerDirectory, hostId: 'local' })
     expect(old.readOnly).toBe(true)
     expect(old.isSessionUnreadable(SESSION)).toBe(false)
     expect(old.getRecord(SESSION)?.lease).toMatchObject({
@@ -131,6 +140,7 @@ test('an older build reads the unproven owner but refuses to rewrite the newer s
     })
     const loadedLease = structuredClone(old.getRecord(SESSION)?.lease)
     expect(readPersistedStore()).toEqual(persistedBefore)
+    expect(await readPersistedTestAgentSessionStoreText(directory)).toBe(journalBefore)
     await expect(
       old.reconcileOnRestart({
         probe: async () => ({ outcome: 'indeterminate', reason: 'no start time' }),
@@ -139,12 +149,15 @@ test('an older build reads the unproven owner but refuses to rewrite the newer s
     ).rejects.toThrow('agent_session_legacy_required')
     expect(old.getRecord(SESSION)?.lease).toEqual(loadedLease)
     expect(readPersistedStore()).toEqual(persistedBefore)
+    expect(await readPersistedTestAgentSessionStoreText(directory)).toBe(journalBefore)
     await expect(old.reserveOwner(reserveRequest(fence, 'spawn-c', 3))).rejects.toThrow(
       'agent_session_legacy_required'
     )
     expect(old.getRecord(SESSION)?.lease).toEqual(loadedLease)
     expect(readPersistedStore()).toEqual(persistedBefore)
+    expect(await readPersistedTestAgentSessionStoreText(directory)).toBe(journalBefore)
   } finally {
+    closeTestJournalHostDatabase(directory)
     rmSync(directory, { recursive: true, force: true })
   }
 })

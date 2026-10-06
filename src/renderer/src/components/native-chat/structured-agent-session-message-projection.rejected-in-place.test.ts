@@ -2,6 +2,7 @@
 // marked not sent, from the host's own history: a crash can lose the outbox, never the host's row.
 
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import type {
   AgentJournalRenderItem,
   AgentJournalSubmission
@@ -177,7 +178,7 @@ describe('a message the host accepted and then rejected, on the desktop', () => 
     )
 
     const notice = notices.get(agentJournalSubmissionKey('lost'))
-    expect(notice?.text).toBe('Orca restarted before this message was sent.')
+    expect(notice?.text).toBe(`${APP_DISPLAY_NAME} restarted before this message was sent.`)
     expect(notice?.onRetry).toBeUndefined()
     expect([...notices.keys()]).toEqual([agentJournalSubmissionKey('lost')])
   })
@@ -339,7 +340,7 @@ describe("one row per rejected message, the host's once it records the rejection
       [],
       new Set(['held'])
     ).get(heldRow.id)
-    expect(notice?.text).toBe('Orca restarted before this message was sent.')
+    expect(notice?.text).toBe(`${APP_DISPLAY_NAME} restarted before this message was sent.`)
     expect(notice?.onRetry).toBeUndefined()
   })
 
@@ -368,7 +369,7 @@ describe("one row per rejected message, the host's once it records the rejection
       )
       // In the host's words, with no control.
       expect([...notices]).toEqual([
-        [hostRow.id, { text: 'Orca restarted before this message was sent.' }]
+        [hostRow.id, { text: `${APP_DISPLAY_NAME} restarted before this message was sent.` }]
       ])
     }
   })

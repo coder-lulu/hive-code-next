@@ -18,6 +18,10 @@ export const FileMutationOpen = FileOpen.extend({
   expectedSshConnectionGeneration: z.number().int().nonnegative().optional()
 })
 
+export const FileUntitledPlaceholderLease = FileMutationOpen.extend({
+  leaseToken: z.string().min(1).max(256)
+})
+
 // Why: write content must be a real string. Coercing a missing/non-string value
 // to '' silently truncated the target file to empty instead of erroring. An
 // explicit '' is still accepted (writing an empty file is legitimate).

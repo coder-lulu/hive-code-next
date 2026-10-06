@@ -1,3 +1,4 @@
+import { releaseEditorUntitledPlaceholder } from '@/components/editor/editor-untitled-placeholder'
 import type { EditorGet, EditorSet } from '../types/editor-set-get'
 import type { EditorSlice } from '../types/editor-slice'
 import {
@@ -49,6 +50,7 @@ export function createRecentlyClosedEditorTabs(
       })
       // Why: close-all bypasses closeFile, so notify mirrored host-owned editors here or the next host snapshot reopens them.
       for (const file of closingFiles) {
+        releaseEditorUntitledPlaceholder(state, file)
         notifyHostOfMirroredEditorClose(state, file.worktreeId, file.id)
       }
 
@@ -92,6 +94,7 @@ export function createRecentlyClosedEditorTabs(
               id: _id,
               isDirty: _dirty,
               mirroredFromRuntimeSession: _mirrored,
+              untitledPlaceholderLeaseToken: _lease,
               ...snap
             } = file
             const position = positionIndex.positionFor(file.id)

@@ -2,6 +2,7 @@ import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { agentJournalSubmissionKey } from '../../shared/agent-session-journal-item-key'
 import { createTaskCodexEvidence } from './task-codex-evidence'
 import { taskResultManifestName } from './task-artifact-index'
@@ -27,10 +28,12 @@ let directory = ''
 afterEach(async () => {
   vi.resetAllMocks()
   if (directory) {
+    closeTestJournalHostDatabase(directory)
     await rm(directory, { recursive: true, force: true })
   }
 })
 async function fixture() {
+  directory = ''
   directory = await taskTestDirectory()
   const store = await openTestAgentSessionRecordStore(directory)
   const record = (

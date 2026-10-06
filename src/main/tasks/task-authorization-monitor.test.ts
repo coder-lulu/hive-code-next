@@ -1,6 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { installTaskAuthorizationMonitor } from './task-authorization-monitor'
 import {
   taskCommand,
@@ -15,6 +16,7 @@ let monitor: ReturnType<typeof installTaskAuthorizationMonitor> | undefined
 afterEach(async () => {
   await monitor?.close()
   if (directory) {
+    await closeTestJournalHostDatabase(directory)
     await rm(directory, { recursive: true, force: true })
   }
 })

@@ -55,7 +55,11 @@ export function useTerminalSaveDialog({
       return
     }
 
-    await discardEditorFileChangesAndClose(saveDialogFileId)
+    try {
+      await discardEditorFileChangesAndClose(saveDialogFileId)
+    } catch {
+      return
+    }
     setSaveDialogFileId(null)
   }, [saveDialogFileId])
 

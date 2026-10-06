@@ -301,7 +301,7 @@ describe('active notebook cell external reload', () => {
       expect.objectContaining({ wordWrap: 'on' })
     )
     expect(widgetCalls.layout).toHaveBeenCalled()
-    expect(model.getValue()).toBe('**Updated**\n\nParagraph')
+    expect(model.getValue()).toBe(`**Updated**${model.getEOL()}${model.getEOL()}Paragraph`)
     expect(onDirtyStateHint).not.toHaveBeenCalled()
     expect(onContentChange).not.toHaveBeenCalled()
   })

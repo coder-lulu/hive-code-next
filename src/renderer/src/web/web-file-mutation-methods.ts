@@ -1,4 +1,5 @@
 import type { PreloadApi } from '../../../preload/api-types'
+import type { UntitledPlaceholderDiscardResult } from '../../../shared/untitled-placeholder-retention-types'
 import { parseExecutionHostId } from '../../../shared/execution-host'
 import type { SshConnectionState, SshMutationExpectation } from '../../../shared/ssh-types'
 import type { Worktree } from '../../../shared/worktree/types'
@@ -9,7 +10,15 @@ const SSH_OWNER_CHANGED_MESSAGE =
 
 type WebFileMutationMethod = Pick<
   NonNullable<PreloadApi['fs']>,
-  'writeFile' | 'createFile' | 'createDir' | 'rename' | 'copy' | 'deletePath'
+  | 'writeFile'
+  | 'createFile'
+  | 'createDir'
+  | 'rename'
+  | 'copy'
+  | 'deletePath'
+  | 'createUntitledPlaceholder'
+  | 'discardUntitledPlaceholder'
+  | 'releaseUntitledPlaceholder'
 >
 
 type ResolvedWebRuntimeFile = {
@@ -72,10 +81,10 @@ export function createWebFileMutationMethods(
     method: string,
     file: ResolvedWebRuntimeFile,
     params: Record<string, unknown>
-  ): Promise<void> => {
+  ): Promise<unknown> => {
     await session.assertMutationSupported()
     const provenance = await captureWebFileMutationProvenance(file, session.getSshState)
-    await session.callRuntimeResult(method, {
+    return session.callRuntimeResult(method, {
       worktree: toRuntimeWorktreeSelector(file.worktree.id),
       ...params,
       ...provenance
@@ -92,6 +101,29 @@ export function createWebFileMutationMethods(
       const session = dependencies.captureSession()
       const file = await session.resolveFilePath(filePath)
       await callMutation(session, 'files.createFile', file, { relativePath: file.relativePath })
+    },
+    createUntitledPlaceholder: async ({ filePath }) => {
+      const session = dependencies.captureSession()
+      const file = await session.resolveFilePath(filePath)
+      return (await callMutation(session, 'files.createUntitledPlaceholder', file, {
+        relativePath: file.relativePath
+      })) as string | null
+    },
+    discardUntitledPlaceholder: async ({ filePath, leaseToken }) => {
+      const session = dependencies.captureSession()
+      const file = await session.resolveFilePath(filePath)
+      return (await callMutation(session, 'files.discardUntitledPlaceholder', file, {
+        relativePath: file.relativePath,
+        leaseToken
+      })) as UntitledPlaceholderDiscardResult
+    },
+    releaseUntitledPlaceholder: async ({ filePath, leaseToken }) => {
+      const session = dependencies.captureSession()
+      const file = await session.resolveFilePath(filePath)
+      await callMutation(session, 'files.releaseUntitledPlaceholder', file, {
+        relativePath: file.relativePath,
+        leaseToken
+      })
     },
     createDir: async ({ dirPath }) => {
       const session = dependencies.captureSession()

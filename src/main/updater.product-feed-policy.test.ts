@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { HiveCloudUpdateDecision } from './product/hivecloud-update-check'
 import type { ProductUpdateSource } from './updater-test-harness'
 
 const {
@@ -243,4 +244,166 @@ describe('updater product feed policy', () => {
       url: 'https://github.com/stablyai/orca/releases/download/v1.0.60'
     })
   })
+
+  it.each(['decision', 'error'] as const)(
+    'preserves accepted HiveCloud installation after a canceled preflight %s',
+    async (outcome) => {
+      vi.useFakeTimers()
+      vi.stubGlobal('process', { ...process, platform: 'win32', arch: 'x64' })
+      productUpdateSourceState.value = {
+        channel: 'stable',
+        feedUrl: 'https://updates.hivekernel.example/hive/v1/updates/desktop/',
+        github: null,
+        provider: 'hivecloud'
+      }
+      const artifact = {
+        packageFormat: 'nsis',
+        architecture: 'x64',
+        distributionType: 'direct',
+        downloadUrl:
+          'https://updates.hivekernel.example/hive/v1/update-artifacts/4f1f7c54-06f2-4a22-b4a9-26c9c9b0c3f5/download',
+        storeUrl: null,
+        sha256: 'a'.repeat(64),
+        sha512: 'b'.repeat(128),
+        size: 123
+      }
+      const stagedDecision: HiveCloudUpdateDecision = {
+        hasUpdate: true,
+        updateRequired: false,
+        blockReason: null,
+        currentBuild: 1,
+        minimumSupportedBuild: null,
+        artifact,
+        latest: {
+          versionName: '1.0.61',
+          buildNumber: 2,
+          releaseNotes: 'staged decision',
+          mandatory: false,
+          publishedAt: '2026-08-30T00:00:00Z',
+          artifact
+        }
+      }
+      const lateDecision: HiveCloudUpdateDecision = {
+        ...stagedDecision,
+        updateRequired: true,
+        minimumSupportedBuild: 3,
+        latest: {
+          versionName: '1.0.71',
+          buildNumber: 3,
+          mandatory: true,
+          releaseNotes: 'late decision',
+          publishedAt: '2026-08-30T00:00:00Z',
+          artifact
+        }
+      }
+      const cacheDecision = vi.fn()
+      const readCachedDecision = vi.fn(() => lateDecision)
+      vi.doMock('../shared/product-update-source', () => ({
+        ...moduleFactories.productUpdateSource(),
+        resolveProductUpdateCheckSource: () => ({
+          endpoint: 'https://updates.hivekernel.example/hive/v1/updates/check',
+          channel: 'stable'
+        })
+      }))
+      vi.doMock('./product/hivecloud-update-cache', () => ({
+        cacheMandatoryHiveCloudDecision: cacheDecision,
+        readCachedMandatoryHiveCloudDecision: readCachedDecision
+      }))
+      const decisionRequest = vi.spyOn(
+        await import('./product/hivecloud-update-check'),
+        'fetchHiveCloudUpdateDecision'
+      )
+      try {
+        let resolvePendingCheck: (response: Response) => void = () => {}
+        let rejectPendingCheck: (error: Error) => void = () => {}
+        const pendingCheck = new Promise<Response>((resolve, reject) => {
+          resolvePendingCheck = resolve
+          rejectPendingCheck = reject
+        })
+        let checkRequests = 0
+        fetchProductUpdateManifestMock.mockImplementation((input: unknown) => {
+          const url = new URL(String(input))
+          if (url.pathname === '/hive/v1/updates/check') {
+            expect(url.searchParams.get('currentBuild')).toBe('1')
+            expect(url.searchParams.get('platform')).toBe('windows')
+            expect(url.searchParams.get('architecture')).toBe('x64')
+            checkRequests += 1
+            return checkRequests === 1 ? Response.json(stagedDecision) : pendingCheck
+          }
+          expect(url.href).toBe(
+            'https://updates.hivekernel.example/hive/v1/updates/desktop/stable/windows/x64/latest.yml'
+          )
+          return new Response(
+            `version: 1.0.61\npath: ${artifact.downloadUrl}\nsha512: ${artifact.sha512}\nfiles:\n  - url: ${artifact.downloadUrl}\n    sha512: ${artifact.sha512}\n    size: ${artifact.size}\n`
+          )
+        })
+        autoUpdaterMock.checkForUpdates.mockImplementation(() => {
+          autoUpdaterMock.emit('checking-for-update')
+          queueMicrotask(() => autoUpdaterMock.emit('update-available', { version: '1.0.61' }))
+          return Promise.resolve(undefined)
+        })
+        autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+        const onBeforeQuit = vi.fn().mockResolvedValue(undefined)
+        const send = vi.fn()
+        const updater = await import('./updater')
+        updater.setupAutoUpdater({ webContents: { send } } as never, {
+          getLastUpdateCheckAt: () => Date.now(),
+          onBeforeQuit,
+          onBeforeQuitFailure: 'abort'
+        })
+        updater.checkForUpdatesFromMenu()
+        await vi.waitFor(() =>
+          expect(updater.getUpdateStatus()).toEqual(
+            expect.objectContaining({ state: 'available', version: '1.0.61' })
+          )
+        )
+        expect(cacheDecision).toHaveBeenCalledOnce()
+        expect(cacheDecision).toHaveBeenLastCalledWith(stagedDecision)
+        updater.downloadUpdate()
+        autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
+        const downloadedStatus = updater.getUpdateStatus()
+        expect(downloadedStatus).toEqual(
+          expect.objectContaining({
+            state: 'downloaded',
+            version: '1.0.61',
+            latestBuild: 2,
+            releaseNotes: 'staged decision'
+          })
+        )
+        const feedCalls = autoUpdaterMock.setFeedURL.mock.calls.length
+        updater.checkForUpdates()
+        await vi.waitFor(() => expect(decisionRequest).toHaveBeenCalledTimes(2))
+        const pendingDecision = decisionRequest.mock.results.at(-1)?.value
+        expect(updater.quitAndInstall()).toBe(true)
+
+        if (outcome === 'decision') {
+          resolvePendingCheck(Response.json(lateDecision))
+          await expect(pendingDecision).resolves.toEqual(lateDecision)
+        } else {
+          rejectPendingCheck(new Error('control-plane offline'))
+          await expect(pendingDecision).rejects.toThrow('control-plane offline')
+        }
+        await vi.advanceTimersByTimeAsync(0)
+
+        expect(cacheDecision).toHaveBeenCalledOnce()
+        expect(readCachedDecision).not.toHaveBeenCalled()
+        expect(autoUpdaterMock.setFeedURL).toHaveBeenCalledTimes(feedCalls)
+        expect(fetchProductUpdateManifestMock).toHaveBeenCalledTimes(3)
+        expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledOnce()
+        expect(fetchNewerReleaseTagsMock).not.toHaveBeenCalled()
+        expect(updater.getUpdateStatus()).toEqual(downloadedStatus)
+        expect(onBeforeQuit).not.toHaveBeenCalled()
+
+        await vi.advanceTimersByTimeAsync(100)
+        expect(onBeforeQuit).toHaveBeenCalledOnce()
+        expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledOnce()
+        expect(autoUpdaterMock.quitAndInstall).toHaveBeenCalledWith(false, true)
+        expect(send).not.toHaveBeenCalledWith('updater:quitAndInstallAborted')
+      } finally {
+        decisionRequest.mockRestore()
+        vi.doMock('../shared/product-update-source', () => moduleFactories.productUpdateSource())
+        vi.doUnmock('./product/hivecloud-update-cache')
+      }
+    }
+  )
 })

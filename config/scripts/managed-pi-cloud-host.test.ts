@@ -12,6 +12,7 @@ import { parseHiveAiTextGrantRequest } from '../../src/shared/hive-ai-text-grant
 import { canonicalHiveAiTextRequest } from '../../src/shared/hive-ai-text-request'
 import { sha256 } from '../../src/main/hive-runtime-cloud/hive-runtime-cloud-proof-core'
 import { JournalHostDatabase } from '../../src/main/native-chat/agent-session-journal/journal-host-database'
+import { NO_LEGACY_JOURNAL_RECORDS } from '../../src/main/native-chat/agent-session-journal/journal-database'
 
 const transport = vi.hoisted(() => ({ fetch: vi.fn() }))
 vi.mock('../../src/main/network/http-client', () => ({ getMainHttpClient: () => transport }))
@@ -39,157 +40,166 @@ it.each([
   'assembles actual Pi, Cloud clients and journal: %s terminal=%s',
   async (protocol, terminal) => {
     const directory = await mkdtemp(join(root, 'session-'))
-    const store = await AgentSessionRecordStore.open({ directory, hostId: 'local' })
-    const journalDatabase = JournalHostDatabase.open(directory)
-    const keys = generateKeyPairSync('ed25519')
-    const runtime = controlCommand.runtime
-    const identity = {
-      schemaVersion: 1 as const,
-      runtimeInstanceId: runtime.runtimeInstanceId,
-      createdAt: 1,
-      privateKeyPkcs8: keys.privateKey.export({ type: 'pkcs8', format: 'der' }).toString('base64'),
-      publicKey: keys.publicKey
-        .export({ type: 'spki', format: 'der' })
-        .subarray(-32)
-        .toString('base64url')
-    }
-    const scope = {
-      ...controlOwner,
-      projectScope: 'folder:project',
-      workspaceKind: 'folder' as const
-    }
-    let authorized = true
-    const assertCurrent = () => {
-      if (!authorized) {
-        throw new Error('hive_agent_forbidden')
+    let journalDatabase: JournalHostDatabase | undefined
+    let owner: HiveAgentCloudHost | undefined
+    try {
+      journalDatabase = JournalHostDatabase.openWith(directory, NO_LEGACY_JOURNAL_RECORDS)
+      const store = AgentSessionRecordStore.open({ journalDatabase, hostId: 'local' })
+      const keys = generateKeyPairSync('ed25519')
+      const runtime = controlCommand.runtime
+      const identity = {
+        schemaVersion: 1 as const,
+        runtimeInstanceId: runtime.runtimeInstanceId,
+        createdAt: 1,
+        privateKeyPkcs8: keys.privateKey
+          .export({ type: 'pkcs8', format: 'der' })
+          .toString('base64'),
+        publicKey: keys.publicKey
+          .export({ type: 'spki', format: 'der' })
+          .subarray(-32)
+          .toString('base64url')
       }
-    }
-    const principal = () =>
-      authorized
-        ? {
-            ...scope,
-            kind: 'local' as const,
-            expiry: Date.now() + 60000,
-            allowedMethods: Object.keys(HIVE_AGENT_METHODS),
-            toolScopes: [],
-            eligibilityRevision: 1
-          }
-        : null
-    const authorization = {
-      accountId: scope.accountId,
-      authorityId: 'authority',
-      accessToken: 'native-secret-canary',
-      sessionGeneration: 1,
-      sessionExpiresAt: Date.now() + 120000
-    }
-    const commands: ReturnType<typeof parseHiveAiTextGrantRequest>[] = []
-    transport.fetch.mockReset()
-    transport.fetch.mockImplementation(async (url: string, init: RequestInit) => {
-      expect(init.method).toBe('POST')
-      const headers = new Headers(init.headers)
-      expect(headers.get('authorization')).toBe('Bearer native-secret-canary')
-      expect(headers.get('x-hive-ai-proof')).toBeTruthy()
-      if (url === 'https://cloud.test/hive/v1/ai/inferences/status') {
-        const command = commands[0]
-        return Response.json({
-          contract: 'hive-ai-text-control-v1',
-          requestId: command.request.requestId,
-          generationId: command.request.generationId,
-          modelId: command.request.modelId,
-          protocol: command.request.protocol,
+      const scope = {
+        ...controlOwner,
+        projectScope: 'folder:project',
+        workspaceKind: 'folder' as const
+      }
+      let authorized = true
+      const assertCurrent = () => {
+        if (!authorized) {
+          throw new Error('hive_agent_forbidden')
+        }
+      }
+      const principal = () =>
+        authorized
+          ? {
+              ...scope,
+              kind: 'local' as const,
+              expiry: Date.now() + 60000,
+              allowedMethods: Object.keys(HIVE_AGENT_METHODS),
+              toolScopes: [],
+              eligibilityRevision: 1
+            }
+          : null
+      const authorization = {
+        accountId: scope.accountId,
+        authorityId: 'authority',
+        accessToken: 'native-secret-canary',
+        sessionGeneration: 1,
+        sessionExpiresAt: Date.now() + 120000
+      }
+      const commands: ReturnType<typeof parseHiveAiTextGrantRequest>[] = []
+      transport.fetch.mockReset()
+      transport.fetch.mockImplementation(async (url: string, init: RequestInit) => {
+        expect(init.method).toBe('POST')
+        const headers = new Headers(init.headers)
+        expect(headers.get('authorization')).toBe('Bearer native-secret-canary')
+        expect(headers.get('x-hive-ai-proof')).toBeTruthy()
+        if (url === 'https://cloud.test/hive/v1/ai/inferences/status') {
+          const command = commands[0]
+          return Response.json({
+            contract: 'hive-ai-text-control-v1',
+            requestId: command.request.requestId,
+            generationId: command.request.generationId,
+            modelId: command.request.modelId,
+            protocol: command.request.protocol,
+            state: 'COMPLETED',
+            createdAt: new Date().toISOString(),
+            execution: {
+              gatewayRequestId: 'a'.repeat(24),
+              status: 'COMPLETED',
+              reason: 'TERMINAL',
+              usage: null
+            }
+          })
+        }
+        const command = parseHiveAiTextGrantRequest(JSON.parse(String(init.body)))
+        commands.push(command)
+        const { messages: _, ...content } = command.request
+        if (url === 'https://cloud.test/hive/v1/ai/grants') {
+          return Response.json({
+            requestId: content.requestId,
+            grant: {
+              claims: {
+                domain: 'hive-ai-text-grant/v1',
+                issuer: 'hive-ai-authority',
+                audience: 'hive-ai-edge',
+                authorityId: 'authority',
+                algorithm: 'Ed25519',
+                grant: {
+                  grantId: randomUUID(),
+                  owner: controlOwner,
+                  binding: {
+                    ...content,
+                    runtime,
+                    projectScope: scope.projectScope,
+                    ...command.pack,
+                    requestHash: sha256(canonicalHiveAiTextRequest(command.request)),
+                    credentialFence: 'c'.repeat(64),
+                    gatewayRevision: 1
+                  },
+                  eligibilityRevision: 1,
+                  nonce: randomUUID(),
+                  issuedAt: new Date(Date.now() - 1000).toISOString(),
+                  expiresAt: new Date(Date.now() + 60000).toISOString()
+                }
+              },
+              signature: 'A'.repeat(86)
+            }
+          })
+        }
+        expect(url).toBe('https://cloud.test/hive/v1/ai/inferences')
+        expect(headers.get('x-hive-ai-grant')).toBeTruthy()
+        const text = {
+          type: 'text',
+          requestId: content.requestId,
+          sequence: 1,
+          text: '组合验证 🐝'
+        }
+        const result = {
+          type: 'result',
+          requestId: content.requestId,
+          sequence: 2,
+          replay: false,
           state: 'COMPLETED',
-          createdAt: new Date().toISOString(),
           execution: {
             gatewayRequestId: 'a'.repeat(24),
             status: 'COMPLETED',
             reason: 'TERMINAL',
             usage: null
           }
-        })
-      }
-      const command = parseHiveAiTextGrantRequest(JSON.parse(String(init.body)))
-      commands.push(command)
-      const { messages: _, ...content } = command.request
-      if (url === 'https://cloud.test/hive/v1/ai/grants') {
-        return Response.json({
-          requestId: content.requestId,
-          grant: {
-            claims: {
-              domain: 'hive-ai-text-grant/v1',
-              issuer: 'hive-ai-authority',
-              audience: 'hive-ai-edge',
-              authorityId: 'authority',
-              algorithm: 'Ed25519',
-              grant: {
-                grantId: randomUUID(),
-                owner: controlOwner,
-                binding: {
-                  ...content,
-                  runtime,
-                  projectScope: scope.projectScope,
-                  ...command.pack,
-                  requestHash: sha256(canonicalHiveAiTextRequest(command.request)),
-                  credentialFence: 'c'.repeat(64),
-                  gatewayRevision: 1
-                },
-                eligibilityRevision: 1,
-                nonce: randomUUID(),
-                issuedAt: new Date(Date.now() - 1000).toISOString(),
-                expiresAt: new Date(Date.now() + 60000).toISOString()
-              }
-            },
-            signature: 'A'.repeat(86)
+        }
+        return new Response(
+          [text, ...(terminal ? [result] : [])]
+            .map((event) => `data:${JSON.stringify(event)}\n\n`)
+            .join(''),
+          {
+            headers: { 'Content-Type': 'text/event-stream' }
           }
-        })
-      }
-      expect(url).toBe('https://cloud.test/hive/v1/ai/inferences')
-      expect(headers.get('x-hive-ai-grant')).toBeTruthy()
-      const text = { type: 'text', requestId: content.requestId, sequence: 1, text: '组合验证 🐝' }
-      const result = {
-        type: 'result',
-        requestId: content.requestId,
-        sequence: 2,
-        replay: false,
-        state: 'COMPLETED',
-        execution: {
-          gatewayRequestId: 'a'.repeat(24),
-          status: 'COMPLETED',
-          reason: 'TERMINAL',
-          usage: null
-        }
-      }
-      return new Response(
-        [text, ...(terminal ? [result] : [])]
-          .map((event) => `data:${JSON.stringify(event)}\n\n`)
-          .join(''),
-        {
-          headers: { 'Content-Type': 'text/event-stream' }
-        }
-      )
-    })
-    const owner = new HiveAgentCloudHost({
-      resources: {
-        store,
-        journalDatabase,
-        stateDirectory: directory,
-        claimKeyId: 'cloud-host-test',
-        assertCurrent
-      },
-      pack,
-      origin: 'https://cloud.test',
-      runtimeRecordId: runtime.runtimeRecordId,
-      account: { getRuntimeCloudAuthorization: () => (authorized ? authorization : null) },
-      presence: {
-        getCurrentLeaseContext: () => ({ authorityId: 'authority', identity, tuple: runtime })
-      },
-      scopeFor: (entry) => ({ ...scope, sessionId: entry.aggregate.session.sessionId }),
-      assertAuthorized: assertCurrent,
-      principalForSession: principal,
-      eligibilityRevision: () => 1,
-      assertOrigin: assertCurrent,
-      resolveModel: async (selection) => ({ selection, assertCurrent })
-    })
-    try {
+        )
+      })
+      owner = new HiveAgentCloudHost({
+        resources: {
+          store,
+          journalDatabase,
+          stateDirectory: directory,
+          claimKeyId: 'cloud-host-test',
+          assertCurrent
+        },
+        pack,
+        origin: 'https://cloud.test',
+        runtimeRecordId: runtime.runtimeRecordId,
+        account: { getRuntimeCloudAuthorization: () => (authorized ? authorization : null) },
+        presence: {
+          getCurrentLeaseContext: () => ({ authorityId: 'authority', identity, tuple: runtime })
+        },
+        scopeFor: (entry) => ({ ...scope, sessionId: entry.aggregate.session.sessionId }),
+        assertAuthorized: assertCurrent,
+        principalForSession: principal,
+        eligibilityRevision: () => 1,
+        assertOrigin: assertCurrent,
+        resolveModel: async (selection) => ({ selection, assertCurrent })
+      })
       const host = await owner.open()
       const sessionId = `ha-session:${randomUUID()}`
       const operationId = () => `${Date.now()}-${randomUUID().replaceAll('-', '')}`
@@ -242,8 +252,11 @@ it.each([
         ok: false
       })
     } finally {
-      await owner.close()
-      journalDatabase.close()
+      try {
+        await owner?.close()
+      } finally {
+        journalDatabase?.close()
+      }
     }
   },
   30000

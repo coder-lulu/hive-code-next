@@ -6,6 +6,7 @@
 
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 
 import { AGENT_SESSION_ACCEPTED_SEND_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import type { AgentSessionWireRefusalCode } from '../../../../shared/agent-session-wire'
@@ -37,8 +38,7 @@ const SESSION = 'session-1'
 const LOCAL_TARGET = { kind: 'local' } as const
 // Read back from storage, the cause may have cleared since (the user updated Orca, say).
 const NOT_SENT_WORDS = 'Your message was not sent.'
-const NEWER_ORCA_WORDS =
-  'Chats were saved by a newer Orca. Your message was not sent. Update Orca to keep using them.'
+const NEWER_ORCA_WORDS = `Chats were saved by a newer ${APP_DISPLAY_NAME}. Your message was not sent. Update ${APP_DISPLAY_NAME} to keep using them.`
 
 type SendRequest = {
   body?: { blocks?: { text?: string }[] }
@@ -58,7 +58,7 @@ function newerOrcaRefusal() {
     ok: false,
     refusal: {
       code: 'agent_session_journal_unreadable',
-      message: 'Chats were saved by a newer Orca. Update Orca to keep using them.',
+      message: `Chats were saved by a newer ${APP_DISPLAY_NAME}. Update ${APP_DISPLAY_NAME} to keep using them.`,
       details: { reason: 'journalWrittenByNewerOrca' }
     }
   }
@@ -475,7 +475,7 @@ describe('a message whose send could not be saved before it went out', () => {
 // says so; only the user's Retry sends it, under a new id.
 describe('a held message whose id expired', () => {
   const DAY = 24 * 60 * 60 * 1000
-  const EXPIRED_WORDS = "Orca couldn't confirm what happened. Check the chat."
+  const EXPIRED_WORDS = `${APP_DISPLAY_NAME} couldn't confirm what happened. Check the chat.`
 
   function expired() {
     return {

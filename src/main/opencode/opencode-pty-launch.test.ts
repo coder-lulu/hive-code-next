@@ -309,7 +309,7 @@ describe('execution-host OpenCode launch preparation', () => {
 
   it('forwards WSL plugin selection through WSLENV after a guest probe', async () => {
     probe.mockResolvedValue(getOpenCodeCliCapabilities('1.1.23'))
-    const env = { KEEP: '1' }
+    const env = { KEEP: '1', WSLENV: 'KEEP/u' }
     const result = await prepare({
       command: 'opencode',
       agent: 'opencode',
@@ -320,8 +320,9 @@ describe('execution-host OpenCode launch preparation', () => {
     })
     expect(result).toMatchObject({
       ORCA_OPENCODE_PLUGIN_API: 'v1',
-      WSLENV: 'ORCA_OPENCODE_PLUGIN_API'
+      WSLENV: 'KEEP/u:ORCA_OPENCODE_PLUGIN_API'
     })
+    expect(env).toEqual({ KEEP: '1', WSLENV: 'KEEP/u' })
     expect(probe).toHaveBeenCalledWith(expect.objectContaining({ wsl: { distro: 'Ubuntu' } }))
   })
 

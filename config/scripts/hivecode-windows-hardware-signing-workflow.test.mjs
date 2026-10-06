@@ -52,17 +52,25 @@ describe('HiveCode Windows hardware signing workflow', () => {
     const workflow = parse(readFileSync(workflowPath, 'utf8'))
     const env = workflow.jobs['build-and-sign'].env
 
+    const signingEnvironmentNames = [
+      'HIVECODE_WINDOWS_EXPECTED_SIGNERS',
+      'HIVECODE_WINDOWS_EXPECTED_THUMBPRINTS',
+      'HIVECODE_WINDOWS_POWERSHELL_EXECUTABLE',
+      'HIVECODE_WINDOWS_SIGNING_ARGUMENTS',
+      'HIVECODE_WINDOWS_SIGNING_EXECUTABLE',
+      'HIVECODE_WINDOWS_SIGNING_TIMEOUT_MS'
+    ]
     expect(Object.keys(env).sort()).toEqual(
       [
-        'HIVECODE_WINDOWS_EXPECTED_SIGNERS',
-        'HIVECODE_WINDOWS_EXPECTED_THUMBPRINTS',
-        'HIVECODE_WINDOWS_POWERSHELL_EXECUTABLE',
-        'HIVECODE_WINDOWS_SIGNING_ARGUMENTS',
-        'HIVECODE_WINDOWS_SIGNING_EXECUTABLE',
-        'HIVECODE_WINDOWS_SIGNING_TIMEOUT_MS'
+        ...signingEnvironmentNames,
+        'ORCA_REQUIRE_ORCAD_TEMPLATE',
+        'ORCA_REQUIRE_RELAY_NATIVE_ADDONS'
       ].sort()
     )
-    for (const value of Object.values(env)) {
+    expect(env.ORCA_REQUIRE_ORCAD_TEMPLATE).toBe('1')
+    expect(env.ORCA_REQUIRE_RELAY_NATIVE_ADDONS).toBe('x64,arm64')
+    for (const name of signingEnvironmentNames) {
+      const value = env[name]
       expect(value).toMatch(/^\$\{\{ vars\./u)
       expect(value).not.toContain('secrets.')
     }

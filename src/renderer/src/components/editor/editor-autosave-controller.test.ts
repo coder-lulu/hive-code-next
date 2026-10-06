@@ -511,6 +511,45 @@ describe('attachEditorAutosaveController', () => {
     }
   })
 
+  it('rejects quiescence when the mounted editor cannot flush its unsaved draft', async () => {
+    const writeFile = vi.fn().mockResolvedValue(undefined)
+    const eventTarget = new EventTarget()
+    vi.stubGlobal('window', {
+      addEventListener: eventTarget.addEventListener.bind(eventTarget),
+      removeEventListener: eventTarget.removeEventListener.bind(eventTarget),
+      dispatchEvent: eventTarget.dispatchEvent.bind(eventTarget),
+      setTimeout: globalThis.setTimeout.bind(globalThis),
+      clearTimeout: globalThis.clearTimeout.bind(globalThis),
+      api: { fs: { writeFile } }
+    } satisfies WindowStub)
+    const store = createEditorStore()
+    store.getState().openFile({
+      filePath: '/repo/file.md',
+      relativePath: 'file.md',
+      worktreeId: 'wt-1',
+      language: 'markdown',
+      mode: 'edit'
+    })
+    store.getState().setEditorDraft('/repo/file.md', 'unsaved content')
+    store.getState().markFileDirty('/repo/file.md', true)
+    const unregisterFlush = registerPendingEditorFlush('/repo/file.md', () => {
+      throw new Error('Pending editor serialization failed')
+    })
+    const cleanup = attachEditorAutosaveController(store)
+    try {
+      await expect(requestEditorSaveQuiesce({ fileId: '/repo/file.md' })).rejects.toThrow(
+        'Pending editor serialization failed'
+      )
+      expect(writeFile).not.toHaveBeenCalled()
+      expect(store.getState().openFiles).toHaveLength(1)
+      expect(store.getState().openFiles[0]?.isDirty).toBe(true)
+      expect(store.getState().editorDrafts['/repo/file.md']).toBe('unsaved content')
+    } finally {
+      cleanup()
+      unregisterFlush()
+    }
+  })
+
   it('drops an autosave already queued when owner migration starts', async () => {
     let releaseFirstWrite!: () => void
     const firstWrite = new Promise<void>((resolve) => {

@@ -5,8 +5,7 @@ import { parse } from 'yaml'
 const projectDir = resolve(import.meta.dirname, '../..')
 const prWorkflow = parse(readFileSync(join(projectDir, '.github/workflows/pr.yml'), 'utf8'))
 const expensiveJobs = [
-  'static_analysis',
-  'typecheck',
+  'preflight',
   'git_compatibility',
   'codex_index_heal_contract',
   'xterm_patch_sync',
@@ -17,6 +16,11 @@ const expensiveJobs = [
   'managed_hook_node18',
   'package',
   'package_windows'
+]
+const classifierJobs = [
+  'static_analysis',
+  'typecheck',
+  ...expensiveJobs.filter((jobName) => jobName !== 'preflight')
 ]
 
 describe('PR Checks skip wiring', () => {
@@ -50,25 +54,35 @@ describe('PR Checks skip wiring', () => {
     expect(prWorkflow.jobs.code_paths.outputs.should_run).toBe(
       '${{ steps.filter.outputs.should_run }}'
     )
-    for (const jobName of ['native_cache_changed', ...expensiveJobs]) {
+    for (const jobName of classifierJobs) {
       expect(prWorkflow.jobs.code_paths.outputs[jobName], jobName).toBe(
         `\${{ steps.readiness.outputs.reused != 'true' && steps.filter.outputs.${jobName} }}`
       )
     }
+    expect(prWorkflow.jobs.code_paths.outputs.native_cache_changed).toBeUndefined()
   })
 
   it('gives static analysis the mobile types its type-aware pass resolves', () => {
     expect(prWorkflow.jobs.code_paths.outputs.mobile_dependencies).toBe(
       '${{ steps.filter.outputs.mobile_dependencies }}'
     )
-    const steps = prWorkflow.jobs.static_analysis.steps
+    const steps = prWorkflow.jobs.preflight.steps
     const install = steps.findIndex(
       (step) => step.uses === './.github/actions/install-mobile-dependencies'
     )
     const gate = steps.findIndex((step) => step.name === 'Enforce changed-code quality')
     expect(install).toBeGreaterThan(-1)
     expect(install).toBeLessThan(gate)
-    expect(steps[install].if).toBe("needs.code_paths.outputs.mobile_dependencies == 'true'")
+    expect(steps[install].if).toBe(
+      "needs.code_paths.outputs.static_analysis == 'true' && needs.code_paths.outputs.mobile_dependencies == 'true'"
+    )
+    expect(steps[gate].env.PREFLIGHT_PHASE_SELECTED).toBe(
+      "${{ needs.code_paths.outputs.static_analysis == 'true' }}"
+    )
+    expect(steps[gate].env.PREFLIGHT_PRIOR_SUCCESS).toBe("${{ job.status == 'success' }}")
+    expect(steps[gate].run).toContain(
+      'if [ "$PREFLIGHT_PHASE_SELECTED" != true ] || [ "$PREFLIGHT_PRIOR_SUCCESS" != true ]; then exit 0; fi'
+    )
     // The install itself moved into the action the packaging jobs share; assert it there so
     // this job cannot keep the step while the action stops installing anything.
     const action = parse(
@@ -95,41 +109,61 @@ describe('PR Checks skip wiring', () => {
   })
 
   it('gates each expensive job on its classifier and cache prerequisite', () => {
-    for (const jobName of expensiveJobs.filter((jobName) => jobName !== 'test')) {
-      expect(prWorkflow.jobs[jobName].needs, jobName).toEqual(
-        ['package', 'package_windows'].includes(jobName)
-          ? ['code_paths', 'static_analysis', 'typecheck']
-          : ['code_paths']
-      )
+    for (const jobName of expensiveJobs.filter(
+      (jobName) => jobName !== 'preflight' && jobName !== 'test'
+    )) {
+      expect(prWorkflow.jobs[jobName].needs, jobName).toEqual(['code_paths', 'preflight'])
       expect(prWorkflow.jobs[jobName].if, jobName).toBe(
-        `needs.code_paths.outputs.${jobName} == 'true'`
+        ['package', 'package_windows'].includes(jobName)
+          ? `needs.code_paths.outputs.${jobName} == 'true'`
+          : `!cancelled() && needs.code_paths.result == 'success' && needs.code_paths.outputs.${jobName} == 'true' && needs.preflight.result == 'success'`
       )
     }
-    expect(prWorkflow.jobs.test.needs).toEqual([
-      'code_paths',
-      'unit_plan',
-      'test_native_cache',
-      'static_analysis',
-      'typecheck'
-    ])
-    // Planning is deliberately NOT behind the static-analysis gate: it consumes nothing those
-    // jobs produce, so gating it only made the shards queue behind it. It still has to succeed
-    // before the shards run, or the matrix would expand from an empty assignment.
-    expect(prWorkflow.jobs.unit_plan.needs).toEqual(['code_paths'])
-    expect(prWorkflow.jobs.unit_plan.if).toBe("needs.code_paths.outputs.test == 'true'")
-    expect(prWorkflow.jobs.test.if).toContain("needs.unit_plan.result == 'success'")
-    expect(prWorkflow.jobs.test.if).toContain("needs.code_paths.outputs.test == 'true'")
-    expect(prWorkflow.jobs.test.if).toContain("needs.test_native_cache.result == 'success'")
-    expect(prWorkflow.jobs.test.if).toContain("needs.test_native_cache.result == 'skipped'")
-    expect(prWorkflow.jobs.test_native_cache.needs).toEqual(['code_paths'])
-    expect(prWorkflow.jobs.test_native_cache.if).toBe(
-      "needs.code_paths.outputs.native_cache_changed == 'true'"
+    const preflight = prWorkflow.jobs.preflight
+    expect(preflight.needs).toEqual(['code_paths'])
+    expect(preflight.if).toBe(
+      "needs.code_paths.outputs.static_analysis == 'true' || needs.code_paths.outputs.typecheck == 'true'"
     )
-    expect(prWorkflow.jobs.test_native_cache.strategy).toBeUndefined()
-    const primerInstall = prWorkflow.jobs.test_native_cache.steps.find(
+    expect(prWorkflow.jobs.test.needs).toEqual(['code_paths', 'preflight'])
+    expect(prWorkflow.jobs.test.if).toContain('!cancelled()')
+    expect(prWorkflow.jobs.test.if).toContain("needs.code_paths.outputs.test == 'true'")
+    expect(prWorkflow.jobs.test.if).toContain("needs.preflight.result == 'success'")
+    const steps = preflight.steps
+    const plan = steps.findIndex((step) => step.name === 'Plan unit selection')
+    const typecheck = steps.findIndex((step) => step.run === 'pnpm run typecheck')
+    const wait = steps.findIndex((step) => step.wait === 'unit-plan')
+    expect(plan).toBeGreaterThan(-1)
+    expect(plan).toBeLessThan(typecheck)
+    expect(wait).toBeGreaterThan(typecheck)
+    expect(steps[plan].id).toBe('unit-plan')
+    expect(steps[plan].if).toBe('!cancelled()')
+    expect(steps[plan].background).toBe(true)
+    expect(steps[plan].env.PREFLIGHT_PHASE_SELECTED).toBe(
+      "${{ needs.code_paths.outputs.typecheck == 'true' }}"
+    )
+    expect(steps[plan].env.PREFLIGHT_PRIOR_SUCCESS).toBe("${{ job.status == 'success' }}")
+    expect(steps[plan].run).toContain(
+      'if [ "$PREFLIGHT_PHASE_SELECTED" != true ] || [ "$PREFLIGHT_PRIOR_SUCCESS" != true ]; then exit 0; fi'
+    )
+    expect(steps[plan].run).toContain('node config/scripts/ci-unit-plan.mjs')
+    expect(preflight.outputs.shards).toBe('${{ steps.unit-plan.outputs.shards }}')
+    expect(prWorkflow.jobs.test.with.shards).toBe('${{ needs.preflight.outputs.shards }}')
+    for (const jobName of ['static_analysis', 'typecheck', 'unit_plan', 'test_native_cache']) {
+      expect(prWorkflow.jobs[jobName], jobName).toBeUndefined()
+    }
+    expect(preflight.strategy).toBeUndefined()
+    const primerInstalls = steps.filter(
       (step) => step.uses === './.github/actions/install-node-dependencies'
     )
-    expect(primerInstall.with['node-version']).toBe('24.18.0')
+    expect(primerInstalls).toHaveLength(2)
+    expect(primerInstalls.map((step) => step.if)).toEqual([
+      "needs.code_paths.outputs.mobile_dependencies != 'true'",
+      "needs.code_paths.outputs.mobile_dependencies == 'true'"
+    ])
+    for (const install of primerInstalls) {
+      expect(install.with['node-version']).toBe('24.18.0')
+      expect(install.with['native-runtime']).toBe('node')
+    }
   })
 
   it('skips e2e detection on docs-only PRs without dropping the draft gate', () => {
@@ -155,7 +189,11 @@ describe('PR Checks skip wiring', () => {
         continue
       }
       const envVar = `${job.replaceAll('-', '_').toUpperCase()}_SHOULD_RUN`
-      expect(verifyStep.env[envVar]).toBe(`\${{ needs.code_paths.outputs.${job} }}`)
+      expect(verifyStep.env[envVar]).toBe(
+        job === 'preflight'
+          ? "${{ needs.code_paths.outputs.static_analysis == 'true' || needs.code_paths.outputs.typecheck == 'true' }}"
+          : `\${{ needs.code_paths.outputs.${job} }}`
+      )
       expect(verifyStep.run).toContain(`"$${envVar}"`)
     }
   })

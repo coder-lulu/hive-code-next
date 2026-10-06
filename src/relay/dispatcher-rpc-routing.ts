@@ -106,6 +106,7 @@ export abstract class RelayDispatcherRpcRouting extends RelayDispatcherFrameCode
       clientId: client.id,
       isStale: () =>
         client.generation !== gen || !this.clients.has(client.id) || abortController.signal.aborted,
+      isClientStale: () => client.generation !== gen || !this.clients.has(client.id),
       signal: abortController.signal,
       sessionIdentity: client.sessionIdentity,
       onResponseSettled: (handler) => {
@@ -180,6 +181,7 @@ export abstract class RelayDispatcherRpcRouting extends RelayDispatcherFrameCode
       handler(notif.params ?? {}, {
         clientId: client.id,
         isStale: () => client.generation !== gen || !this.clients.has(client.id),
+        isClientStale: () => client.generation !== gen || !this.clients.has(client.id),
         sessionIdentity: client.sessionIdentity,
         onResponseSettled: () => {
           throw new Error('Notifications do not have response publication fences')

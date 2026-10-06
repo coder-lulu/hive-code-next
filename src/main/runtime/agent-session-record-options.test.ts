@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 import { readNativeSessionOptions } from '../native-chat/agent-session-wire/structured-agent-session-option-restoration'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { openTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
 
 const NOW = 1_800_000_000_000
@@ -10,11 +11,15 @@ const SESSION = 'session-options'
 let directory: string
 
 beforeEach(async () => {
+  directory = ''
   directory = await mkdtemp(join(tmpdir(), 'orca-agent-session-options-'))
 })
 
 afterEach(async () => {
-  await rm(directory, { recursive: true, force: true })
+  if (directory) {
+    closeTestJournalHostDatabase(directory)
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 it('fails option hydration before ownership can be proved', async () => {

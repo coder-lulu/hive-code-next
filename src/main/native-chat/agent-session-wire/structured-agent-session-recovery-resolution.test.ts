@@ -10,6 +10,7 @@ import {
 } from '../../runtime/agent-session-older-build-lease.test-fixture'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
 import { supervisedPosixLaunch } from '../../codex/codex-app-server-posix-supervisor'
 import {
   resolveStructuredSessionRecovery,
@@ -23,6 +24,9 @@ const roots: string[] = []
 let operations = 0
 
 afterEach(async () => {
+  for (const root of roots) {
+    closeTestJournalHostDatabase(root)
+  }
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
@@ -250,8 +254,10 @@ describe('structured session recovery resolution', () => {
     const directory = await newStoreDirectory()
     await liveOwner(await openStore(directory))
     await writeOlderBuildLease(directory, SESSION, { runtimeKind: 'tui' })
+    closeTestJournalHostDatabase(directory)
     await (await openStore(directory)).reconcileOnRestart({ probe: async () => MATCHED, now: NOW })
     // A fresh load of what that restart persisted, as any later or older build reads it.
+    closeTestJournalHostDatabase(directory)
     const store = await openStore(directory)
     await store.reconcileOnRestart({ probe: async () => MATCHED, now: NOW })
     const stopOwnerProcess = vi.fn()
@@ -286,6 +292,7 @@ describe('structured session recovery resolution', () => {
     const directory = await newStoreDirectory()
     await reserve(await openStore(directory))
     await writeOlderBuildLease(directory, SESSION, { runtimeKind: 'tui' })
+    closeTestJournalHostDatabase(directory)
     const store = await openStore(directory)
     await store.reconcileOnRestart({
       probe: async () => ({ outcome: 'indeterminate', reason: 'no scan' }),

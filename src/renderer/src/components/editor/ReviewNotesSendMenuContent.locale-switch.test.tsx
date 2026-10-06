@@ -92,6 +92,7 @@ describe('mounted notes send menu language changes', () => {
         agentStatusEpoch: 0,
         agentStatusByPaneKey: { [paneKey]: entry },
         tabsByWorktree: { wt: [tab] },
+        unifiedTabsByWorktree: {},
         terminalLayoutsByTabId: {
           tab: {
             root: { type: 'leaf', leafId },

@@ -3635,7 +3635,10 @@
         },
         "useRichMarkdownReviewData": {
           "f9d2acd6b0": "Todas las notas no enviadas"
-        }
+        },
+        "untitledPlaceholderPreserved": "Este host no puede eliminar de forma segura el archivo vacío. El archivo se ha conservado.",
+        "untitledPlaceholderRecovery": "El archivo se ha conservado para su recuperación. Recupérelo desde {{path}}.",
+        "untitledDiscardFailed": "No se pudieron descartar los cambios de este archivo. Se han conservado."
       },
       "emulator": {
         "pane": {

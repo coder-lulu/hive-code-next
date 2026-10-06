@@ -56,7 +56,12 @@ describe('prepared checkout fetched tip materialization', () => {
       signal
     })
     expect(mocks.git).toHaveBeenLastCalledWith(
-      ['reset', '--hard', NEW],
+      [
+        ...(process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : []),
+        'reset',
+        '--hard',
+        NEW
+      ],
       expect.objectContaining({
         cwd: '/prepared',
         wslDistro: 'Ubuntu',

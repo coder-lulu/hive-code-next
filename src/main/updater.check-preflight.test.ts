@@ -98,7 +98,7 @@ describe('updater', () => {
 
     checkForUpdates()
     await vi.waitFor(() => expect(fetchNewerReleaseTagsMock).toHaveBeenCalledTimes(2))
-    quitAndInstall()
+    expect(quitAndInstall()).toBe(true)
     await vi.advanceTimersByTimeAsync(100)
     expect(onBeforeQuit).toHaveBeenCalledOnce()
     resolveQueuedTags({ tags: ['v1.0.71'], state: 'ready' })
@@ -125,6 +125,76 @@ describe('updater', () => {
       percent: 0,
       version: '1.0.61'
     })
+  })
+
+  it('revokes the staged target when a background check commits a new feed', async () => {
+    vi.useFakeTimers()
+    let resolveQueuedTags: (value: { tags: string[]; state: 'ready' }) => void = () => {}
+    fetchNewerReleaseTagsMock
+      .mockResolvedValueOnce({ tags: ['v1.0.61'], state: 'ready' })
+      .mockImplementationOnce(
+        () =>
+          new Promise<{ tags: string[]; state: 'ready' }>((resolve) => {
+            resolveQueuedTags = resolve
+          })
+      )
+    autoUpdaterMock.checkForUpdates
+      .mockResolvedValueOnce(undefined)
+      .mockImplementationOnce(() => new Promise(() => {}))
+    autoUpdaterMock.downloadUpdate.mockResolvedValue([])
+    const onBeforeQuit = vi.fn()
+    const send = vi.fn()
+    const {
+      setupAutoUpdater,
+      checkForUpdatesFromMenu,
+      checkForUpdates,
+      downloadUpdate,
+      quitAndInstall,
+      getUpdateStatus
+    } = await loadUpdaterModule()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The updater reads only webContents.send from this window fixture.
+    setupAutoUpdater({ webContents: { send } } as never, {
+      getLastUpdateCheckAt: () => Date.now(),
+      onBeforeQuit
+    })
+    checkForUpdatesFromMenu()
+    await vi.waitFor(() => expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledOnce())
+    autoUpdaterMock.emit('checking-for-update')
+    autoUpdaterMock.emit('update-available', { version: '1.0.61' })
+    await vi.advanceTimersByTimeAsync(0)
+    downloadUpdate()
+    autoUpdaterMock.emit('update-downloaded', { version: '1.0.61' })
+    const nativeReady = nativeUpdaterMock.on.mock.calls.find(
+      ([event]) => event === 'update-downloaded'
+    )?.[1]
+    if (typeof nativeReady === 'function') {
+      nativeReady()
+    }
+    expect(getUpdateStatus()).toEqual(
+      expect.objectContaining({ state: 'downloaded', version: '1.0.61' })
+    )
+
+    checkForUpdates()
+    await vi.waitFor(() => expect(fetchNewerReleaseTagsMock).toHaveBeenCalledTimes(2))
+    expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: 'https://github.com/stablyai/orca/releases/download/v1.0.61'
+    })
+    resolveQueuedTags({ tags: ['v1.0.71'], state: 'ready' })
+    await vi.waitFor(() => expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(2))
+    expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
+      provider: 'generic',
+      url: 'https://github.com/stablyai/orca/releases/download/v1.0.71'
+    })
+    expect(getUpdateStatus()).toEqual(
+      expect.objectContaining({ state: 'downloaded', version: '1.0.61' })
+    )
+
+    expect(quitAndInstall()).toBe(false)
+    await vi.advanceTimersByTimeAsync(100)
+    expect(send).toHaveBeenCalledWith('updater:quitAndInstallAborted')
+    expect(onBeforeQuit).not.toHaveBeenCalled()
+    expect(autoUpdaterMock.quitAndInstall).not.toHaveBeenCalled()
   })
 
   it('ignores stale updater events while a new check is still in feed preflight', async () => {

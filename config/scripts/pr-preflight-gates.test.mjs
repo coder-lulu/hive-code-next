@@ -21,7 +21,7 @@ it('shares one setup and runs the unchanged compiler after static checks finish'
   expect(installs).toHaveLength(2)
   for (const install of installs) {
     expect(install.with['native-runtime']).toBe('node')
-    expect(install.with['node-version']).toBe('24')
+    expect(install.with['node-version']).toBe('24.18.0')
     expect(install.with['persist-native-cache']).not.toBe('false')
   }
   expect(steps[0].with['fetch-depth']).toBeGreaterThanOrEqual(2)
@@ -229,7 +229,7 @@ it.each([
   {
     changed: ['mobile/src/App.tsx'],
     static_analysis: true,
-    typecheck: false,
+    typecheck: true,
     mobile_dependencies: true
   },
   {

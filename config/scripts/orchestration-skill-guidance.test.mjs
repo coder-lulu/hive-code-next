@@ -329,7 +329,7 @@ describe('owned orchestration references', () => {
 
     for (const recipe of [heartbeat, workerDone]) {
       expect(recipe).toContain('--from <worker_handle>')
-      expect(recipe).not.toContain('--dispatch-capability')
+      expect(recipe).toContain('--dispatch-capability <capability>')
       expect(recipe).toContain('--task-id <task_id> --dispatch-id <dispatch_id>')
     }
     expect(workerDone).not.toContain('--files-modified')

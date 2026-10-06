@@ -87,7 +87,9 @@ describe('bundled Orca runtime handoff', () => {
 
   it('refuses a slot without its runtime reference', () => {
     fixture.exists.mockImplementation((path) => !path.endsWith(ORCAD_NODE_RUNTIME_MARKER_FILENAME))
-    expect(() => handoffToBundledOrcad()).toThrow('bundled Orca runtime reference is missing')
+    expect(() => handoffToBundledOrcad()).toThrow(
+      `bundled ${APP_DISPLAY_NAME} runtime reference is missing`
+    )
     expect(fixture.spawn).not.toHaveBeenCalled()
   })
 

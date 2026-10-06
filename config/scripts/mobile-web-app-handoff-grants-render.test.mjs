@@ -101,6 +101,7 @@ async function openHostRoute(
   }
 ) {
   const page = await browser.newPage({ viewport })
+  await page.bringToFront()
   await page.addInitScript(installShellDouble, {
     version: bridgeVersion,
     sessionId: SHELL_SESSION_ID,

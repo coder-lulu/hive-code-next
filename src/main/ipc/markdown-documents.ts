@@ -40,12 +40,12 @@ function rootRelativePath(rootPath: string, filePath: string): string | null {
   const resolvedFile = resolve(filePath)
   const relativePath = relative(resolvedRoot, resolvedFile)
   if (
-    !isSafeRelativePath(normalizeRelativePath(relativePath, rootPath)) ||
+    !isSafeRelativePath(normalizeRelativePath(relativePath, resolvedRoot)) ||
     isAbsolute(relativePath)
   ) {
     return null
   }
-  return normalizeRelativePath(relativePath, rootPath)
+  return normalizeRelativePath(relativePath, resolvedRoot)
 }
 
 export function fileDocumentFromFilePath(
@@ -59,7 +59,7 @@ export function fileDocumentFromFilePath(
     rootRelativePath(rootPath, filePath) ??
     (options.outsideRootRelativePath === 'basename'
       ? basename
-      : normalizeRelativePath(relative(rootPath, filePath), rootPath))
+      : normalizeRelativePath(relative(rootPath, filePath), resolve(rootPath)))
   return {
     filePath,
     relativePath,

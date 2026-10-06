@@ -168,6 +168,10 @@ describe('buildAgentLaunchRouteInput', () => {
     expect(mocks.getConnectionIdFromState).not.toHaveBeenCalled()
     expect(mocks.getLocalProjectExecutionRuntimeContext).not.toHaveBeenCalled()
     expect(routeFor(appStore, args)).not.toBe('structured-native-chat')
+    expect(input.hostCapabilities).toBeNull()
+    expect(structuredFeasibleFor(appStore, args)).toBe(false)
+    expect(mocks.readLocalRuntimeCapabilitiesOrUnknown).not.toHaveBeenCalled()
+    expect(mocks.getLocalRepoProjectExecutionRuntimeContext).not.toHaveBeenCalled()
   })
 
   it.each(['manual', 'yolo'] as const)(

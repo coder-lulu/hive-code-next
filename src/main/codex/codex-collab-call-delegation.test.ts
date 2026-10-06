@@ -3,6 +3,7 @@
 // so the rows the real adapter publishes must read as a delegation to the helper they name.
 
 import { describe, expect, it } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { codexCollabRowAgentIds } from '../../shared/codex-collab-agent-tools'
 import { projectNativeChatTranscript } from '../../shared/native-chat-transcript-projection'
 import type { NativeChatMessage } from '../../shared/native-chat-types'
@@ -108,7 +109,7 @@ describe("a Codex default-mode collab call row as the parent's delegation", () =
     const input = row?.kind === 'tool-call' ? row.input : undefined
     expect(input).toMatchObject({
       description: expect.stringMatching(/^Review lane a\. x+…$/),
-      prompt: expect.stringContaining('[Orca: output truncated')
+      prompt: expect.stringContaining(`[${APP_DISPLAY_NAME}: output truncated`)
     })
     expect(codexCollabRowAgentIds(input)).toEqual([HELPER])
     expect(await newestRunDelegation(longSpawn)).toEqual({ kind: 'call', agentId: HELPER })

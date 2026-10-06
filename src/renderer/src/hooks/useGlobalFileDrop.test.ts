@@ -124,12 +124,15 @@ describe('shouldUploadRemoteEditorFileDrop', () => {
         pathCount: 1,
         commonReason: 'permission-denied'
       })
-    ).toEqual({ description: 'Permission denied.', title: "Orca couldn't copy 1 dropped file." })
+    ).toEqual({
+      description: 'Permission denied.',
+      title: `${APP_DISPLAY_NAME} couldn't copy 1 dropped file.`
+    })
     expect(
       getNativeFileDropRejectionMessage({ ...rejection, pathCount: 2, commonReason: 'timed-out' })
     ).toEqual({
       description: 'Copying took too long. Try the drop again.',
-      title: "Orca couldn't copy 2 dropped files."
+      title: `${APP_DISPLAY_NAME} couldn't copy 2 dropped files.`
     })
     expect(getNativeFileDropRejectionMessage({ ...rejection, pathCount: 2 }).description).toBe(
       'Try the drop again.'

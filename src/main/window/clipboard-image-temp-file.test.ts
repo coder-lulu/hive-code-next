@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import path from 'node:path'
 
 const { writeFileMock, getPathMock, writeFileBase64Mock } = vi.hoisted(() => ({
   writeFileMock: vi.fn(),
@@ -22,13 +23,14 @@ import { saveClipboardImageBufferAsTempFile } from './clipboard-image-temp-file'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  getPathMock.mockReturnValue(path.resolve('/var/folders/ab/T'))
 })
 
 describe('saveClipboardImageBufferAsTempFile', () => {
   it('writes the pasted image to the local temp folder', async () => {
     const savedPath = await saveClipboardImageBufferAsTempFile(Buffer.from([1, 2, 3]))
 
-    expect(savedPath.startsWith('/var/folders/ab/T')).toBe(true)
+    expect(savedPath.startsWith(path.resolve('/var/folders/ab/T') + path.sep)).toBe(true)
     expect(writeFileMock).toHaveBeenCalledWith(savedPath, Buffer.from([1, 2, 3]))
   })
 

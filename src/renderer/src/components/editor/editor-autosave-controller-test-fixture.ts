@@ -13,6 +13,8 @@ export type FakeEditorDisk = {
     writeFile: ReturnType<typeof vi.fn>
     deletePath: ReturnType<typeof vi.fn>
     stat: ReturnType<typeof vi.fn>
+    discardUntitledPlaceholder: ReturnType<typeof vi.fn>
+    releaseUntitledPlaceholder: ReturnType<typeof vi.fn>
   }
 }
 
@@ -28,6 +30,28 @@ export function createFakeEditorDisk(initialFiles: Record<string, string> = {}):
       deletePath: vi.fn(async ({ targetPath }: { targetPath: string }) => {
         files.delete(targetPath)
       }),
+      releaseUntitledPlaceholder: vi.fn(async () => {}),
+      discardUntitledPlaceholder: vi.fn(
+        async ({ filePath, leaseToken }: { filePath: string; leaseToken: string }) => {
+          if (leaseToken !== `fixture-origin:${filePath}`) {
+            return { status: 'unavailable', reason: 'lease-unavailable' }
+          }
+          if (files.get(filePath) !== '') {
+            return { status: 'preserved', reason: 'not-empty' }
+          }
+          files.delete(filePath)
+          return {
+            status: 'removed-placeholder',
+            recovery: {
+              id: 'fixture',
+              originalPath: filePath,
+              retainedPath: '/recovery/fixture',
+              manifestPath: '/recovery/fixture.json',
+              restoredToOriginalPath: false
+            }
+          }
+        }
+      ),
       stat: vi.fn(async ({ filePath }: { filePath: string }) => {
         const content = files.get(filePath)
         if (content === undefined) {
@@ -110,7 +134,8 @@ export function createUntitledNoteStore(fileName: string): StoreApi<AppState> {
     worktreeId: 'wt-1',
     language: 'markdown',
     mode: 'edit',
-    isUntitled: true
+    isUntitled: true,
+    untitledPlaceholderLeaseToken: `fixture-origin:/repo/${fileName}`
   })
   return store
 }

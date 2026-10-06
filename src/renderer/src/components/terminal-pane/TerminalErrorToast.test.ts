@@ -441,7 +441,7 @@ describe('TerminalErrorToast folder workspace path errors', () => {
 
     expect(humanized).not.toContain('folder_workspace_path_missing')
     expect(humanized).toBe(
-      "Error invoking remote method 'pty:spawn': Error: Orca cannot find /Users/me/ara_company. Remove and re-import the folder."
+      `Error invoking remote method 'pty:spawn': Error: ${APP_DISPLAY_NAME} cannot find /Users/me/ara_company. Remove and re-import the folder.`
     )
   })
 
@@ -463,13 +463,14 @@ describe('TerminalErrorToast folder workspace path errors', () => {
 
     const toast = view.container.querySelector('[data-terminal-error-toast]')
     expect(toast?.textContent).toContain(
-      'Orca cannot tell which SSH connection owns this folder scope.'
+      `${APP_DISPLAY_NAME} cannot tell which SSH connection owns this folder scope.`
     )
     expect(toast?.textContent).not.toContain('folder_workspace_connection_ambiguous')
     expect(toast?.querySelector('a')).toBeNull()
   })
 
   it('keeps the issue link when an unrelated error shares the toast', () => {
+    environmentMocks.supportLink = 'https://support.example.test/report'
     const view = render(
       React.createElement(TerminalErrorToast, {
         error: [MISSING_FOLDER_ERROR, 'Failed to spawn shell "/bin/zsh": boom'].join('\n'),
@@ -478,8 +479,9 @@ describe('TerminalErrorToast folder workspace path errors', () => {
     )
 
     const toast = view.container.querySelector('[data-terminal-error-toast]')
-    expect(toast?.textContent).toContain('Orca cannot find /Users/me/ara_company')
+    expect(toast?.textContent).toContain(`${APP_DISPLAY_NAME} cannot find /Users/me/ara_company`)
     expect(toast?.querySelector('a')?.textContent).toBe('file an issue')
+    expect(toast?.querySelector('a')?.getAttribute('href')).toBe(environmentMocks.supportLink)
   })
 
   it('does not ask the user to file an issue for a folder they can fix', () => {
@@ -491,7 +493,7 @@ describe('TerminalErrorToast folder workspace path errors', () => {
     )
 
     const toast = view.container.querySelector('[data-terminal-error-toast]')
-    expect(toast?.textContent).toContain('Orca cannot find /Users/me/ara_company')
+    expect(toast?.textContent).toContain(`${APP_DISPLAY_NAME} cannot find /Users/me/ara_company`)
     expect(toast?.textContent).not.toContain('folder_workspace_path_missing')
     expect(toast?.textContent).not.toContain('If this persists')
     expect(toast?.querySelector('a')).toBeNull()

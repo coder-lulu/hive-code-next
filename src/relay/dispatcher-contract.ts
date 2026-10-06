@@ -10,6 +10,8 @@ import type { DispatcherClientWriter, SinkWriteSettlement } from './dispatcher-c
 export type RequestContext = {
   clientId: number
   isStale: () => boolean
+  /** Client incarnation only; cancelling one request does not revoke sibling resources. */
+  isClientStale?: () => boolean
   signal?: AbortSignal
   sessionIdentity?: RelayClientSessionIdentity
   onResponseSettled?: (handler: (result: SinkWriteSettlement) => void) => void

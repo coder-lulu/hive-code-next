@@ -106,6 +106,9 @@ export const fsApi = {
   createFile: (
     args: { filePath: string; connectionId?: string } & SshMutationExpectation
   ): Promise<void> => ipcRenderer.invoke('fs:createFile', args),
+  createUntitledPlaceholder: (args) => ipcRenderer.invoke('fs:createUntitledPlaceholder', args),
+  discardUntitledPlaceholder: (args) => ipcRenderer.invoke('fs:discardUntitledPlaceholder', args),
+  releaseUntitledPlaceholder: (args) => ipcRenderer.invoke('fs:releaseUntitledPlaceholder', args),
   createDir: (
     args: { dirPath: string; connectionId?: string } & SshMutationExpectation
   ): Promise<void> => ipcRenderer.invoke('fs:createDir', args),

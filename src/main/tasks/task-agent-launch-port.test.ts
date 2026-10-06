@@ -2,6 +2,7 @@ import { mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { rpcContext, runtimeStub } from '../runtime/rpc/methods/agent-launch.test-fixture'
 import {
   AGENT_LAUNCH_RUNTIME_CAPABILITY,
@@ -24,11 +25,13 @@ let directory: string | undefined
 afterEach(async () => {
   replay.mockReset()
   if (directory) {
+    closeTestJournalHostDatabase(directory)
     await rm(directory, { recursive: true, force: true })
   }
 })
 
 async function fixture() {
+  directory = undefined
   directory = await taskTestDirectory()
   const store = await openTestAgentSessionRecordStore(directory)
   const record = (

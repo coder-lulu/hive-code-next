@@ -1,4 +1,5 @@
 import { ipcMain, shell } from 'electron'
+import { registerUntitledPlaceholderHandlers } from './untitled-placeholder-handlers'
 import { lstat, writeFile } from 'node:fs/promises'
 import type { SshMutationExpectation } from '../../../shared/ssh-types'
 import { assertSshMutationExpectation } from '../../ssh/ssh-connection-generation'
@@ -16,6 +17,7 @@ import { assertLocalWriteTargetIsRegularFile } from './local-regular-file-read'
 
 export function registerFilesystemWriteHandlers(context: FilesystemHandlerContext): void {
   const { store } = context
+  registerUntitledPlaceholderHandlers(context)
 
   ipcMain.handle(
     'fs:writeFile',

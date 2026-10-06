@@ -3635,7 +3635,10 @@
         },
         "useRichMarkdownReviewData": {
           "f9d2acd6b0": "Toutes les notes non envoyées"
-        }
+        },
+        "untitledPlaceholderPreserved": "Cet hôte ne peut pas supprimer le fichier vide en toute sécurité. Le fichier a été conservé.",
+        "untitledPlaceholderRecovery": "Le fichier a été conservé pour récupération. Récupérez-le depuis {{path}}.",
+        "untitledDiscardFailed": "Impossible d’abandonner les modifications de ce fichier. Elles ont été conservées."
       },
       "emulator": {
         "pane": {
@@ -20264,8 +20267,8 @@
   },
   "sourceControl": {
     "discard": {
-      "restoreStagedVersionDescription": "Cela restaurera la dernière version intermédiaire et annulera la suppression. Cela ne peut pas être annulé.",
-      "unstagedChangesDescription": "Cela annulera les modifications non planifiées apportées à ce fichier. Cela ne peut pas être annulé."
+      "restoreStagedVersionDescription": "Cela restaurera la dernière version indexée et annulera la suppression. Cela ne peut pas être annulé.",
+      "unstagedChangesDescription": "Cela annulera les modifications non indexées apportées à ce fichier. Cela ne peut pas être annulé."
     },
     "unlinkedPr": {
       "status": "PR #{{number}} dissociée"

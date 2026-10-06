@@ -9,10 +9,10 @@ import {
   type ExecutionHostId
 } from '../../../shared/execution-host'
 import { selectExecutionHostDisplayLabels } from '@/lib/execution-host-display-label'
-import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
 import { buildExecutionHostRegistry } from '../../../shared/execution-host-registry'
 import type { PublicKnownRuntimeEnvironment } from '../../../shared/runtime-environments'
 import { useAppStore } from '@/store'
+import type { AppState } from '@/store/types'
 import type {
   RuntimeTerminalQuickCommands,
   TerminalQuickCommandHostsSlice
@@ -49,7 +49,7 @@ type TerminalQuickCommandHostState = {
   remoteState: RuntimeTerminalQuickCommands | undefined
   runtimeEnvironments: readonly PublicKnownRuntimeEnvironment[]
   settings: GlobalSettings | null
-}
+} & Partial<Pick<AppState, 'accountRuntimeDirectory' | 'localRuntimeOwnership'>>
 
 const EMPTY_RUNTIME_ENVIRONMENTS: readonly PublicKnownRuntimeEnvironment[] = []
 const DISABLED_TERMINAL_QUICK_COMMAND_HOSTS: TerminalQuickCommandHost[] = []
@@ -132,7 +132,9 @@ export function useTerminalQuickCommandHosts(
     remoteHostId,
     remoteState,
     runtimeEnvironments,
-    settings
+    settings,
+    accountRuntimeDirectory,
+    localRuntimeOwnership
   } = useAppStore(
     useShallow((state): TerminalQuickCommandHostState => {
       if (!enabled) {
@@ -154,7 +156,9 @@ export function useTerminalQuickCommandHosts(
           ? state.runtimeTerminalQuickCommands.get(remoteEnvironmentId)
           : undefined,
         runtimeEnvironments: state.runtimeEnvironments,
-        settings: state.settings
+        settings: state.settings,
+        accountRuntimeDirectory: state.accountRuntimeDirectory,
+        localRuntimeOwnership: state.localRuntimeOwnership
       }
     })
   )
@@ -185,7 +189,16 @@ export function useTerminalQuickCommandHosts(
     remoteState.error
   )
 
-  const hostLabels = useExecutionHostDisplayLabels()
+  const hostLabels = useMemo(
+    () =>
+      selectExecutionHostDisplayLabels({
+        settings,
+        runtimeEnvironments,
+        accountRuntimeDirectory,
+        localRuntimeOwnership
+      }),
+    [settings, runtimeEnvironments, accountRuntimeDirectory, localRuntimeOwnership]
+  )
   const hosts = useMemo(() => {
     if (!enabled) {
       return DISABLED_TERMINAL_QUICK_COMMAND_HOSTS

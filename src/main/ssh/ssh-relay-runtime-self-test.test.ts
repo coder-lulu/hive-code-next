@@ -1,10 +1,11 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runProcessSync } from '../../shared/child-process/run-process'
 import { NODE_RUNTIME_PIN } from '../../shared/node-runtime-pin'
 import { RELAY_RUNTIME_SELF_TEST_PREFIX } from '../../shared/relay-runtime-self-test-report'
+import { resolveGitBashPath } from '../git-bash'
 import type { SshConnection } from './ssh-connection'
 import { execCommand } from './ssh-relay-deploy-helpers'
 import { SSH_EXEC_TIMEOUT_CODE } from './ssh-relay-exec-command'
@@ -33,7 +34,22 @@ afterEach(() => {
 })
 
 function sh(command: string): string {
-  return runProcessSync({ program: '/bin/sh', args: ['-c', command], timeoutMs: 30_000 }).stdout
+  let program = '/bin/sh'
+  if (process.platform === 'win32') {
+    const bash = resolveGitBashPath()
+    if (!bash) {
+      throw new Error('Git Bash is required for the real POSIX self-test fixtures')
+    }
+    program = join(dirname(bash), 'sh.exe')
+    if (!existsSync(program)) {
+      throw new Error(`Git Bash POSIX shell is unavailable: ${program}`)
+    }
+  }
+  return runProcessSync({ program, args: ['-c', command], timeoutMs: 30_000 }).stdout
+}
+
+function shellPath(path: string): string {
+  return process.platform === 'win32' ? path.replace(/\\/g, '/') : path
 }
 
 function report(nonce: string, fields: Record<string, unknown>): string {
@@ -122,10 +138,14 @@ describe('self-test commands on a real shell', () => {
     const root = stage()
     const node = join(root, 'node')
     writeFileSync(node, `#!/bin/sh\necho v${NODE_RUNTIME_PIN.version}\n`, { mode: 0o755 })
-    expect(evaluatePinnedRuntimeVersion(sh(pinnedRuntimeVersionCommand(node)))).toBeNull()
+    expect(
+      evaluatePinnedRuntimeVersion(sh(pinnedRuntimeVersionCommand(shellPath(node))))
+    ).toBeNull()
 
     writeFileSync(node, '#!/bin/sh\necho v18.20.0\n', { mode: 0o755 })
-    expect(evaluatePinnedRuntimeVersion(sh(pinnedRuntimeVersionCommand(node)))).toMatchObject({
+    expect(
+      evaluatePinnedRuntimeVersion(sh(pinnedRuntimeVersionCommand(shellPath(node))))
+    ).toMatchObject({
       verdict: 'failed'
     })
   })
@@ -133,8 +153,15 @@ describe('self-test commands on a real shell', () => {
   it('reports a non-executable runtime as noexec from the shell exit status', () => {
     const root = stage()
     const node = join(root, 'node')
-    writeFileSync(node, '#!/bin/sh\necho v0\n', { mode: 0o644 })
-    expect(evaluatePinnedRuntimeVersion(sh(pinnedRuntimeVersionCommand(node)))).toMatchObject({
+    if (process.platform === 'win32') {
+      // MSYS executes mode-0644 scripts; a directory gives a real shell noexec refusal instead.
+      mkdirSync(node)
+    } else {
+      writeFileSync(node, '#!/bin/sh\necho v0\n', { mode: 0o644 })
+    }
+    expect(
+      evaluatePinnedRuntimeVersion(sh(pinnedRuntimeVersionCommand(shellPath(node))))
+    ).toMatchObject({
       verdict: 'refused',
       refusal: 'noexec'
     })
@@ -149,7 +176,9 @@ describe('self-test commands on a real shell', () => {
       `const i = process.argv.indexOf('--orca-runtime-selftest');\n` +
         `console.log(${JSON.stringify(RELAY_RUNTIME_SELF_TEST_PREFIX)} + JSON.stringify({nonce: process.argv[i + 1], ok: true, cwd: process.cwd()}))\n`
     )
-    const output = sh(relayRuntimeSelfTestCommand(relayDir, process.execPath, 'nonce-1'))
+    const output = sh(
+      relayRuntimeSelfTestCommand(shellPath(relayDir), shellPath(process.execPath), 'nonce-1')
+    )
     const verdict = evaluateRelayRuntimeSelfTest(output, 'nonce-1')
     expect(verdict.verdict).toBe('passed')
     expect(evaluateRelayRuntimeSelfTest(output, 'other-nonce').verdict).toBe('failed')
@@ -158,7 +187,13 @@ describe('self-test commands on a real shell', () => {
   it('classifies a relay process killed by SIGILL', () => {
     const root = stage()
     writeFileSync(join(root, 'relay.js'), "process.kill(process.pid, 'SIGILL')\n")
-    const output = sh(relayRuntimeSelfTestCommand(root, process.execPath, 'n'))
+    let runtime = process.execPath
+    if (process.platform === 'win32') {
+      // Windows Node has no SIGILL; this POSIX runtime receives the actual signal in MSYS.
+      runtime = join(root, 'signal-runtime')
+      writeFileSync(runtime, '#!/bin/sh\nkill -ILL $$\n', { mode: 0o755 })
+    }
+    const output = sh(relayRuntimeSelfTestCommand(shellPath(root), shellPath(runtime), 'n'))
     expect(evaluateRelayRuntimeSelfTest(output, 'n')).toMatchObject({
       verdict: 'refused',
       refusal: 'illegal_instruction'

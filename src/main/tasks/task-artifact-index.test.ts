@@ -8,6 +8,7 @@ import {
   TASK_TEST_NOW
 } from './task-execution.test-fixture'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import {
   readTaskArtifactFile,
   TaskArtifactIndex,
@@ -17,6 +18,7 @@ import {
 let root = ''
 afterEach(async () => {
   if (root) {
+    closeTestJournalHostDatabase(root)
     await rm(root, { recursive: true, force: true })
   }
 })

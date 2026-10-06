@@ -1,5 +1,6 @@
 import { pathsExistOnRelay } from './fs-path-existence'
 import { tmpdir } from 'node:os'
+import { RelayUntitledPlaceholderRequests } from './untitled-placeholder-requests'
 import type { RelayDispatcher, RequestContext } from './dispatcher'
 import type { RelayContext } from './context'
 // Why: RelayContext is accepted in the constructor for protocol back-compat
@@ -46,6 +47,7 @@ import {
 } from '../shared/doc-preview-file-access'
 
 export class FsHandler {
+  private readonly placeholderRequests: RelayUntitledPlaceholderRequests
   private dispatcher: RelayDispatcher
   private watchRegistry: RelayFilesystemWatchRegistry
   private streamRegistry = new RelayStreamRegistry()
@@ -64,6 +66,7 @@ export class FsHandler {
   ) {
     this.responseStreams = responseStreams
     this.dispatcher = dispatcher
+    this.placeholderRequests = new RelayUntitledPlaceholderRequests(dispatcher)
     this.watchRegistry = new RelayFilesystemWatchRegistry(dispatcher, watcherPool)
     this.registerHandlers()
     this.dispatcher.onClientDetached?.(() => {
@@ -265,8 +268,8 @@ export class FsHandler {
     return scanWorkspaceSpaceDirectory(rootPath, context)
   }
 
-  dispose(): void {
+  async dispose(): Promise<void> {
     this.watchRegistry.dispose()
-    void this.streamRegistry.disposeAll()
+    await Promise.all([this.streamRegistry.disposeAll(), this.placeholderRequests.dispose()])
   }
 }

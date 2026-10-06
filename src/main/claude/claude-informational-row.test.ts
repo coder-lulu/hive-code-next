@@ -6,7 +6,10 @@ import type { AgentSessionJournalIdentity } from '../../shared/agent-session-jou
 import { openAgentSessionJournal } from '../native-chat/agent-session-journal/journal-store-factory'
 import { createDeferredStructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
 import { createClaudeJournalTranslator } from './claude-structured-journal-translation'
-import { openTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { testEventSinkLogging } from '../native-chat/agent-session-wire/structured-agent-session-logger-test-support'
 
 const IDENTITY: AgentSessionJournalIdentity = {
@@ -33,13 +36,27 @@ function informational(
 }
 
 let root = ''
+const journalsForCleanup = new Set<Awaited<ReturnType<typeof openAgentSessionJournal>>>()
+const translatorsForCleanup = new Set<ReturnType<typeof createClaudeJournalTranslator>>()
 
 beforeEach(async () => {
+  root = ''
+  journalsForCleanup.clear()
+  translatorsForCleanup.clear()
   root = await mkdtemp(join(tmpdir(), 'orca-claude-informational-'))
 })
 
 afterEach(async () => {
-  await rm(root, { recursive: true, force: true })
+  for (const translator of translatorsForCleanup) {
+    translator.dispose()
+  }
+  for (const journal of journalsForCleanup) {
+    await journal.close()
+  }
+  if (root) {
+    closeTestJournalHostDatabase(root)
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 async function itemsFor(frames: Record<string, unknown>[]) {
@@ -49,9 +66,11 @@ async function itemsFor(frames: Record<string, unknown>[]) {
     now: () => 1_700_000_000_000,
     mintEpoch: () => 'epoch-1'
   })
+  journalsForCleanup.add(journal)
   const deferred = createDeferredStructuredAgentSessionEventSink(testEventSinkLogging())
   deferred.bind({ journal, fence: 1, publish: vi.fn() })
   const translator = createClaudeJournalTranslator({ sink: deferred.sink, fallbackIdPrefix: '1' })
+  translatorsForCleanup.add(translator)
   for (const frame of frames) {
     translator.handle({ type: 'message', sessionId: 'orca-session', message: frame })
     await deferred.drained()

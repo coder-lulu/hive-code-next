@@ -99,7 +99,14 @@ describe('worktree removal against the real Git binary', () => {
     const markerPath = join(worktreePath, '.git')
     const marker = await readFile(markerPath, 'utf8')
     const adminPath = marker.trim().replace(/^gitdir: /, '')
-    await writeFile(join(adminPath, 'gitdir'), `${join(markerPath, '.git')}\n`)
+    const registrationPath = join(adminPath, 'gitdir')
+    const registrationBefore = await readFile(registrationPath, 'utf8')
+    expect(registrationBefore.endsWith('\n')).toBe(true)
+    await expect(realpath(registrationBefore.slice(0, -1))).resolves.toBe(
+      await realpath(markerPath)
+    )
+    // Git strips a literal /.git suffix from this backlink, including on Windows.
+    await writeFile(registrationPath, `${registrationBefore.slice(0, -1)}/.git\n`)
     await writeFile(join(worktreePath, 'untracked.txt'), 'keep this work\n')
 
     await expect(
@@ -115,7 +122,14 @@ describe('worktree removal against the real Git binary', () => {
     const markerPath = join(worktreePath, '.git')
     const marker = await readFile(markerPath, 'utf8')
     const adminPath = marker.trim().replace(/^gitdir: /, '')
-    await writeFile(join(adminPath, 'gitdir'), `${join(markerPath, '.git')}\n`)
+    const registrationPath = join(adminPath, 'gitdir')
+    const registrationBefore = await readFile(registrationPath, 'utf8')
+    expect(registrationBefore.endsWith('\n')).toBe(true)
+    await expect(realpath(registrationBefore.slice(0, -1))).resolves.toBe(
+      await realpath(markerPath)
+    )
+    // Preserve Git's own path spelling so this fixture really names the existing .git file.
+    await writeFile(registrationPath, `${registrationBefore.slice(0, -1)}/.git\n`)
     await writeFile(join(worktreePath, 'untracked.txt'), 'keep this work\n')
     const row = (await listWorktreesStrict(repoPath)).find((entry) =>
       areWorktreePathsEqual(entry.path, markerPath)

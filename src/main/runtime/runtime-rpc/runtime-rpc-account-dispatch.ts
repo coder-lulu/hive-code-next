@@ -97,6 +97,7 @@ export class RuntimeRpcAccountDispatch extends RuntimeRpcCloudDispatch {
       }
       closed = true
       this.abortWebSocketDispatches(connection.ws)
+      this.runtime.releaseUntitledPlaceholdersForClient?.(connection.connectionId)
       try {
         this.runtime.cleanupSubscriptionsForConnection(connection.connectionId)
       } finally {

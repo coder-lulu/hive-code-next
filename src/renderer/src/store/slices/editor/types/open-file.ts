@@ -120,6 +120,8 @@ export type OpenFile = {
   isUntitled?: boolean // true for files created via "New Markdown" that haven't been renamed yet
   // Why: templated New Markdown files have real content at creation, unlike blank placeholders that can be discarded.
   deleteUntouchedOnClose?: boolean
+  /** Live creation-origin host authority; never persisted or copied into mirrored session tabs. */
+  untitledPlaceholderLeaseToken?: string
   // Why: external delete/rename of an open file keeps the tab (strikethrough label); 'changed' = rewritten on disk under unsaved edits → changed-on-disk banner (#7265).
   externalMutation?: 'deleted' | 'renamed' | 'changed'
   /** Signature of the disk content this tab's edits are based on; persisted so a restore detects a changed-on-disk conflict before autosave clobbers an agent write. */
@@ -160,7 +162,7 @@ export type EditorViewMode = 'edit' | 'changes'
 // Why: omit mirroredFromRuntimeSession so a user-reopened tab isn't treated as host-owned and culled by the next web session sync.
 export type ClosedEditorTabSnapshot = Omit<
   OpenFile,
-  'id' | 'isDirty' | 'mirroredFromRuntimeSession'
+  'id' | 'isDirty' | 'mirroredFromRuntimeSession' | 'untitledPlaceholderLeaseToken'
 > & {
   reopenId?: string
   position?: RecentlyClosedTabPosition

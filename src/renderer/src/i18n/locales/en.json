@@ -3658,7 +3658,10 @@
         },
         "useRichMarkdownReviewData": {
           "f9d2acd6b0": "All unsent notes"
-        }
+        },
+        "untitledPlaceholderPreserved": "This host cannot safely remove the blank file. The file was preserved.",
+        "untitledPlaceholderRecovery": "The file was retained for recovery. Recover it from {{path}}.",
+        "untitledDiscardFailed": "Could not discard this file. Its edits were kept."
       },
       "emulator": {
         "pane": {

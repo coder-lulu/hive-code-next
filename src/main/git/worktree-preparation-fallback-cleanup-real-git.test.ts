@@ -1,8 +1,9 @@
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { parseWorktreeList } from '../../shared/git-worktree-porcelain-parser'
 import { createWorktreePreparationLockReason } from '../../shared/worktree/create-preparation'
 import { clearGitCapabilityStateForTests, getLocalGitCapabilityCache } from './git-capability-state'
 import * as runner from './runner'
@@ -98,9 +99,11 @@ it.each([
   expect(removeOptions).not.toHaveProperty('signal')
   expect(spy.mock.calls.some(([args]) => args.includes('reset'))).toBe(false)
   expect(existsSync(prepared)).toBe(false)
-  expect((await run(['worktree', 'list', '--porcelain'], { cwd: repo })).stdout).not.toContain(
-    prepared
-  )
+  expect(
+    parseWorktreeList((await run(['worktree', 'list', '--porcelain'], { cwd: repo })).stdout).map(
+      (worktree) => worktree.path
+    )
+  ).not.toContain(prepared.split(sep).join('/'))
 })
 
 it.each(['first', 'cached'])(
@@ -133,9 +136,11 @@ it.each(['first', 'cached'])(
     expect(spy.mock.calls.some(([args]) => args.includes('remove') || args.includes('reset'))).toBe(
       false
     )
-    expect((await run(['worktree', 'list', '--porcelain'], { cwd: repo })).stdout).toContain(
-      prepared
-    )
+    expect(
+      parseWorktreeList((await run(['worktree', 'list', '--porcelain'], { cwd: repo })).stdout).map(
+        (worktree) => worktree.path
+      )
+    ).toContain(prepared.split(sep).join('/'))
   }
 )
 
@@ -178,9 +183,11 @@ it.each(['first', 'cached'])(
       'preserve after cleanup attempt\n'
     )
     expect(spy.mock.calls.some(([args]) => args.includes('reset'))).toBe(false)
-    expect((await run(['worktree', 'list', '--porcelain'], { cwd: repo })).stdout).toContain(
-      prepared
-    )
+    expect(
+      parseWorktreeList((await run(['worktree', 'list', '--porcelain'], { cwd: repo })).stdout).map(
+        (worktree) => worktree.path
+      )
+    ).toContain(prepared.split(sep).join('/'))
   }
 )
 
@@ -203,5 +210,9 @@ it('preserves a pre-existing empty target if its cached fallback lock-path probe
   expect(spy.mock.calls.some(([args]) => args.includes('remove') || args.includes('reset'))).toBe(
     false
   )
-  expect((await run(['worktree', 'list', '--porcelain'], { cwd: repo })).stdout).toContain(prepared)
+  expect(
+    parseWorktreeList((await run(['worktree', 'list', '--porcelain'], { cwd: repo })).stdout).map(
+      (worktree) => worktree.path
+    )
+  ).toContain(prepared.split(sep).join('/'))
 })

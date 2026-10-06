@@ -109,6 +109,7 @@ export function useWorktreeListKeyboardNavigation(args: {
       } else {
         const activated = activateAndRevealWorktree(nextWorktree.id, {
           navigationIntent: 'user-open',
+          revealInSidebar: false,
           ...(nextWorktree.hostId ? { executionHostId: nextWorktree.hostId } : {})
         })
 

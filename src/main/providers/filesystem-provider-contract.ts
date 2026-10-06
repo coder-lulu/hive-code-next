@@ -6,6 +6,7 @@ import type {
 } from '../../shared/doc-preview-file-access'
 import type { DirEntry, FsChangeEvent } from '../../shared/filesystem-entry-types'
 import type { WorkspaceSpaceDirectoryScanResult } from '../../shared/workspace-space-types'
+import type { UntitledPlaceholderDiscardResult } from '../../shared/untitled-placeholder-retention-types'
 
 export type FileStat = {
   size: number
@@ -91,6 +92,13 @@ export type IFilesystemProvider = {
   stat(filePath: string): Promise<FileStat>
   lstat?(filePath: string): Promise<FileStat>
   deletePath(targetPath: string, recursive?: boolean): Promise<void>
+  createUntitledPlaceholder?(filePath: string, ownerKey: string): Promise<string | null>
+  discardUntitledPlaceholder?(
+    filePath: string,
+    ownerKey: string,
+    leaseToken: string
+  ): Promise<UntitledPlaceholderDiscardResult>
+  releaseUntitledPlaceholder?(ownerKey: string, leaseToken: string): Promise<void>
   createFile(filePath: string): Promise<void>
   createDir(dirPath: string): Promise<void>
   createDirNoClobber(dirPath: string): Promise<void>

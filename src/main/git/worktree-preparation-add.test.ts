@@ -52,6 +52,7 @@ it('asks Git to create the exact marker atomically and only verifies its ownersh
   await expect(prepare('/prepared', options)).resolves.toBe('/atomic-lock')
   expect(mocks.git).toHaveBeenCalledExactlyOnceWith(
     [
+      ...(process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : []),
       'worktree',
       'add',
       '--detach',

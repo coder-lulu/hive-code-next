@@ -120,13 +120,13 @@ describe.each(routes)('%s preflight admission', (jobName, changedFile) => {
 })
 
 it.each([
-  { files: ['README.md'] },
-  { files: ['mobile/src/App.tsx'] },
-  { files: ['mobile/package.json'] },
-  { files: ['cloud/apps/relay/src/index.ts'] }
-])('does not add preflight consumers to a no-unit diff: $files', ({ files }) => {
+  { files: ['README.md'], sharedUnitWork: false },
+  { files: ['mobile/src/App.tsx'], sharedUnitWork: true },
+  { files: ['mobile/package.json'], sharedUnitWork: true },
+  { files: ['cloud/apps/relay/src/index.ts'], sharedUnitWork: false }
+])('does not add preflight consumers to a no-unit diff: $files', ({ files, sharedUnitWork }) => {
   const outputs = routedOutputs(files, 'false')
-  expect(outputs.test).toBe('false')
+  expect(outputs.test).toBe(String(sharedUnitWork))
   for (const [name] of routes) {
     expect(outputs[name], name).toBe('false')
   }
@@ -137,7 +137,7 @@ it('keeps the mobile-only bundle job in the first wave', () => {
   expect(mobile.needs).toEqual(['code_paths'])
   expect(mobile.if).toBe("needs.code_paths.outputs.mobile_web_app == 'true'")
   expect(classifyPrJobs(['mobile/src/App.tsx'])).toMatchObject({
-    test: false,
+    test: true,
     mobile_web_app: true
   })
 })

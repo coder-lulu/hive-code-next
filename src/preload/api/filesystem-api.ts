@@ -1,3 +1,4 @@
+import type { UntitledPlaceholderDiscardResult } from '../../shared/untitled-placeholder-retention-types'
 import type { PathExistenceResult } from '../../shared/path-existence-batch'
 import type { RuntimeFileReadChunkResult } from '../../shared/runtime-types'
 import type { SearchOptions, SearchResult } from '../../shared/code-search-types'
@@ -106,6 +107,15 @@ export type FilesystemApi = {
         filePath: string
         connectionId?: string
       } & SshMutationExpectation
+    ) => Promise<void>
+    createUntitledPlaceholder?: (
+      args: { filePath: string; connectionId?: string } & SshMutationExpectation
+    ) => Promise<string | null>
+    discardUntitledPlaceholder?: (
+      args: { filePath: string; connectionId?: string; leaseToken: string } & SshMutationExpectation
+    ) => Promise<UntitledPlaceholderDiscardResult>
+    releaseUntitledPlaceholder?: (
+      args: { filePath: string; connectionId?: string; leaseToken: string } & SshMutationExpectation
     ) => Promise<void>
     createDir: (
       args: { dirPath: string; connectionId?: string } & SshMutationExpectation

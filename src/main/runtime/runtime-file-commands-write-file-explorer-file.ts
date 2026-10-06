@@ -1,4 +1,5 @@
 // @ts-nocheck -- mechanically split class members.
+import { RuntimeUntitledPlaceholderCommands } from './runtime-untitled-placeholder-commands'
 import { RuntimeFileCommandsWithReadFileExplorerPreview } from './runtime-file-commands-read-file-explorer-preview'
 import { assertRuntimeFileMutationExpectation } from './runtime-file-commands-mobile-file-list-limit'
 import { requireRuntimeFileProvider } from './runtime-file-command-target'
@@ -12,6 +13,29 @@ import {
 } from './runtime-file-commands-terminal-file-paths'
 
 export class RuntimeFileCommandsWithWriteFileExplorerFile extends RuntimeFileCommandsWithReadFileExplorerPreview {
+  private readonly untitledPlaceholders = new RuntimeUntitledPlaceholderCommands({
+    getRuntimeId: () => this.host.getRuntimeId(),
+    requireStore: () => this.host.requireStore(),
+    resolveFileExplorerPath: (worktree, relativePath) =>
+      this.resolveFileExplorerPath(worktree, relativePath),
+    createFileExplorerFile: (...args) => this.createFileExplorerFile(...args)
+  })
+
+  createUntitledPlaceholder = (
+    ...args: Parameters<RuntimeUntitledPlaceholderCommands['createUntitledPlaceholder']>
+  ) => this.untitledPlaceholders.createUntitledPlaceholder(...args)
+
+  discardUntitledPlaceholder = (
+    ...args: Parameters<RuntimeUntitledPlaceholderCommands['discardUntitledPlaceholder']>
+  ) => this.untitledPlaceholders.discardUntitledPlaceholder(...args)
+
+  releaseUntitledPlaceholder = (
+    ...args: Parameters<RuntimeUntitledPlaceholderCommands['releaseUntitledPlaceholder']>
+  ) => this.untitledPlaceholders.releaseUntitledPlaceholder(...args)
+
+  releaseUntitledPlaceholdersForClient = (clientId: string): void =>
+    this.untitledPlaceholders.releaseUntitledPlaceholdersForClient(clientId)
+
   async writeFileExplorerFile(
     worktreeSelector: string,
     relativePath: string,

@@ -370,7 +370,7 @@ describe('AgentsPane', () => {
       "Lid-close behavior follows this device's power settings."
     )
     expect(getAgentAwakeLidNote('X11; Linux x86_64')).toBe(
-      'Orca also asks this device to stay awake when the lid is closed, subject to its power policy.'
+      `${APP_DISPLAY_NAME} also asks this device to stay awake when the lid is closed, subject to its power policy.`
     )
   })
 

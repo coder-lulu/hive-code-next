@@ -75,7 +75,10 @@ export type EditorFilesSlice = {
   ) => void
   makePreviewFilePermanent: (fileId: string, tabId?: string) => void
   pinFile: (fileId: string, tabId?: string) => void
-  closeFile: (fileId: string) => UntitledFileCleanupResult | undefined
+  closeFile: (
+    fileId: string,
+    options?: { excludeFromRecentlyClosed?: boolean }
+  ) => UntitledFileCleanupResult | undefined
   closeAllFiles: () => UntitledFileCleanupResult[]
   /** Most recently closed editor tabs per worktree (for Cmd/Ctrl+Shift+T). */
   recentlyClosedEditorTabsByWorktree: Record<string, ClosedEditorTabSnapshot[]>
@@ -97,6 +100,7 @@ export type EditorFilesSlice = {
   }) => RekeyOpenFilesResult
   setRestoredEditorOwnerMigrationPending: (fileId: string, pending: boolean) => boolean
   reparentRestoredEditorFileOwner: (args: RestoredEditorOwnerMigration) => RestoredEditorOwnerResult
+  clearUntitledPlaceholderLease: (fileId: string) => void
   clearUntitled: (fileId: string) => void
   openDiff: (
     worktreeId: string,

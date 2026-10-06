@@ -1,18 +1,22 @@
+import childProcess from 'node:child_process'
 import {
   appendFileSync,
   cpSync,
   existsSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync
 } from 'node:fs'
+import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
 import {
   activateCompilerCache,
@@ -23,7 +27,19 @@ import { collectNodeServerInputs } from './node-server-change-scope.mjs'
 import { runProcessSync } from './script-child-process.mjs'
 
 const temporary = []
-afterEach(() => {
+const privateCompilers = []
+afterEach(async () => {
+  for (const { compiler, services } of privateCompilers.splice(0)) {
+    await compiler.stop()
+    for (const service of services) {
+      if (!service.closed) {
+        await service.drain
+      }
+      if (service.error) {
+        throw service.error
+      }
+    }
+  }
   for (const dir of temporary.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }
@@ -68,7 +84,52 @@ it('separates policy, Node, platform and architecture identities with the same a
 
 it('activates only the actual compiler packages and preserves import graph behavior', async () => {
   const { root, identity } = fixture()
-  expect(await activateCompilerCache({ root, identity })).toEqual({ available: true })
+  const binary = realpathSync.native(
+    join(
+      identity.path,
+      'node_modules',
+      `@esbuild/${process.platform}-${process.arch}`,
+      process.platform === 'win32' ? 'esbuild.exe' : 'bin/esbuild'
+    )
+  )
+  const services = []
+  const spawn = childProcess.spawn.bind(childProcess)
+  const observer = vi.spyOn(childProcess, 'spawn').mockImplementation((command, ...args) => {
+    const child = spawn(command, ...args)
+    if (existsSync(command) && realpathSync.native(command) === binary) {
+      const service = { closed: false, error: null, drain: null }
+      service.drain = new Promise((resolve) => {
+        child.once('error', (error) => {
+          service.error = error
+          resolve()
+        })
+        child.once('close', () => {
+          service.closed = true
+          resolve()
+        })
+      })
+      services.push(service)
+    }
+    return child
+  })
+  let activation
+  try {
+    activation = await activateCompilerCache({ root, identity })
+  } finally {
+    observer.mockRestore()
+  }
+  for (const service of services) {
+    if (service.error) {
+      throw service.error
+    }
+  }
+  expect(activation).toEqual({ available: true })
+  expect(services).toHaveLength(1)
+  const require = createRequire(join(root, 'package.json'))
+  expect(realpathSync.native(require.resolve('esbuild'))).toBe(
+    realpathSync.native(join(identity.path, 'node_modules', 'esbuild', 'lib', 'main.js'))
+  )
+  privateCompilers.push({ compiler: require('esbuild'), services })
   expect(readdirSync(join(root, 'node_modules')).sort()).toEqual(['@esbuild', 'esbuild'])
   for (const name of [
     'node-server-change-scope',
@@ -132,12 +193,21 @@ it.each(['modified', 'missing', 'extra', 'symlink', 'malformed'])(
     }
     if (kind === 'symlink') {
       rmSync(compiler)
-      symlinkSync(join(root, 'package.json'), compiler)
+      if (process.platform === 'win32') {
+        symlinkSync(root, compiler, 'junction')
+      } else {
+        symlinkSync(join(root, 'package.json'), compiler)
+      }
+      expect(lstatSync(compiler).isSymbolicLink()).toBe(true)
     }
     if (kind === 'malformed') {
       writeFileSync(join(identity.path, 'manifest.json'), '{')
     }
-    expect((await activateCompilerCache({ root, identity })).available).toBe(false)
+    const result = await activateCompilerCache({ root, identity })
+    expect(result.available).toBe(false)
+    if (kind === 'symlink') {
+      expect(result.reason).toBe('Error: Compiler cache contains a symlink')
+    }
     expect(existsSync(join(root, 'node_modules'))).toBe(false)
   }
 )

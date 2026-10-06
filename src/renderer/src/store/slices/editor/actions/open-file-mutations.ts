@@ -17,6 +17,7 @@ export function createOpenFileMutations(
   | 'setPendingDiskBaselineVerification'
   | 'setPendingLiveDiskVerification'
   | 'clearSelfMoveEcho'
+  | 'clearUntitledPlaceholderLease'
   | 'clearUntitled'
 > {
   return {
@@ -190,6 +191,18 @@ export function createOpenFileMutations(
           )
         }
       }),
+    clearUntitledPlaceholderLease: (fileId) =>
+      set((s) => ({
+        openFiles: s.openFiles.map((f) =>
+          f.id === fileId
+            ? {
+                ...f,
+                untitledPlaceholderLeaseToken: undefined,
+                ...(f.isUntitled ? { deleteUntouchedOnClose: false } : {})
+              }
+            : f
+        )
+      })),
     clearUntitled: (fileId) =>
       set((s) => ({
         openFiles: s.openFiles.map((f) => (f.id === fileId ? { ...f, isUntitled: undefined } : f))

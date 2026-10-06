@@ -21,6 +21,10 @@ type RuntimeFileCommandName =
   | 'writeFileExplorerFileBase64'
   | 'writeFileExplorerFileBase64Chunk'
   | 'createFileExplorerFile'
+  | 'createUntitledPlaceholder'
+  | 'discardUntitledPlaceholder'
+  | 'releaseUntitledPlaceholder'
+  | 'releaseUntitledPlaceholdersForClient'
   | 'createFileExplorerDir'
   | 'createFileExplorerDirNoClobber'
   | 'commitFileExplorerUpload'
@@ -60,6 +64,11 @@ export function installRuntimeFileCommandSurface(
     writeFileExplorerFileBase64: commands.writeFileExplorerFileBase64.bind(commands),
     writeFileExplorerFileBase64Chunk: commands.writeFileExplorerFileBase64Chunk.bind(commands),
     createFileExplorerFile: commands.createFileExplorerFile.bind(commands),
+    createUntitledPlaceholder: commands.createUntitledPlaceholder.bind(commands),
+    discardUntitledPlaceholder: commands.discardUntitledPlaceholder.bind(commands),
+    releaseUntitledPlaceholder: commands.releaseUntitledPlaceholder.bind(commands),
+    releaseUntitledPlaceholdersForClient:
+      commands.releaseUntitledPlaceholdersForClient.bind(commands),
     createFileExplorerDir: commands.createFileExplorerDir.bind(commands),
     createFileExplorerDirNoClobber: commands.createFileExplorerDirNoClobber.bind(commands),
     commitFileExplorerUpload: commands.commitFileExplorerUpload.bind(commands),

@@ -9,6 +9,7 @@ import {
 } from '../../shared/agent-session-record.test-fixture'
 import type { AgentSessionFailedAcquisitionSettlement } from './agent-session-acquisition-failure-settlement'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import {
   openTestAgentSessionRecordStore,
   seedTestAgentSessionRecordStore
@@ -42,6 +43,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })
 

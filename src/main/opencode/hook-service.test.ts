@@ -277,7 +277,13 @@ describe('OpenCodeHookService buildPtyEnv / clearPty round-trip', () => {
       writeFileSync(path, stale)
       service.refreshLegacySharedPlugin()
       expect(readFileSync(path, 'utf8')).toBe(getOpenCodePluginSource())
-      expect(readdirSync(join(path, '..'))).toEqual(['orca-opencode-status.js'])
+      expect(readdirSync(join(path, '..')).sort()).toEqual([
+        'orca-opencode-status-tui',
+        'orca-opencode-status.js'
+      ])
+      expect(
+        readFileSync(join(path, '..', 'orca-opencode-status-tui', 'tui.js'), 'utf8')
+      ).toContain('tui: setupLegacyOpenCodeTui')
     }
   })
 

@@ -31,7 +31,7 @@ it('updates cached dates throughout the UI after switching languages', async () 
       new Intl.DateTimeFormat(locale, timeOptions).format(timestamp)
     )
     expect(formatGitHistoryTimestamp(timestamp)).toBe(
-      new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(timestamp)
+      new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'long' }).format(timestamp)
     )
     expect(getWorkspaceSpaceScanDateTimeLabel(timestamp)).toBe(
       new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(timestamp)
@@ -51,7 +51,7 @@ it('formats plugin dates and fractional counts using the declared locale', async
   await i18n.changeLanguage(resourceLanguage)
   const timestamp = Date.UTC(2026, 9, 3, 13, 24)
   expect(formatGitHistoryTimestamp(timestamp)).toBe(
-    new Intl.DateTimeFormat('fr-FR', { month: 'short', day: 'numeric' }).format(timestamp)
+    new Intl.DateTimeFormat('fr-FR', { dateStyle: 'medium', timeStyle: 'long' }).format(timestamp)
   )
   expect(formatAutomationTokens(123.5)).toBe(new Intl.NumberFormat('fr-FR').format(123.5))
   expect(formatSessionTime('invalid date')).toBe('invalid date')

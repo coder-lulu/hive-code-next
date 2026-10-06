@@ -3,7 +3,7 @@
 import '@testing-library/jest-dom/vitest'
 import React from 'react'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 
@@ -17,6 +17,7 @@ vi.mock('./CursorAccountsSection', () => ({
   CursorAccountsSection: () => <div>Cursor usage</div>
 }))
 vi.mock('@/i18n/i18n', () => ({
+  i18n: { language: 'en', getResourceBundle: () => undefined },
   getIntlLocale: () => 'en-US',
   translate: (_key: string, fallback: string, values?: Record<string, string | number>) =>
     Object.entries(values ?? {}).reduce(
@@ -100,7 +101,33 @@ function createModel(): AccountsPaneSectionModel {
 }
 
 describe('AccountsPaneOverview', () => {
-  afterEach(cleanup)
+  let previousApiDescriptor: PropertyDescriptor | undefined
+
+  beforeEach(() => {
+    previousApiDescriptor = Object.getOwnPropertyDescriptor(window, 'api')
+    Object.defineProperty(window, 'api', {
+      configurable: true,
+      value: {
+        ...window.api,
+        opencodeGoCredentials: {
+          ...window.api?.opencodeGoCredentials,
+          getStatus: vi.fn(async () => ({ apiKeyConfigured: false }))
+        }
+      }
+    })
+  })
+
+  afterEach(() => {
+    try {
+      cleanup()
+    } finally {
+      if (previousApiDescriptor) {
+        Object.defineProperty(window, 'api', previousApiDescriptor)
+      } else {
+        Reflect.deleteProperty(window, 'api')
+      }
+    }
+  })
 
   it('opens the provider drawer with the system default and only counts added accounts', () => {
     const model = createModel()

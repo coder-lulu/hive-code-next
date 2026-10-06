@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 
 const {
   callMock,
@@ -130,7 +131,7 @@ describe('command aliases dispatch to the canonical handler', () => {
     await main(['worktree', 'rm', '--worktree', 'id:wt-1'], '/tmp/repo')
 
     expect(logSpy).toHaveBeenCalledWith(
-      'removed: true\nOrca is still deleting the checkout in the background.'
+      `removed: true\n${APP_DISPLAY_NAME} is still deleting the checkout in the background.`
     )
   })
 
@@ -478,6 +479,12 @@ describe('hive root help', () => {
     )
     expect(logSpy.mock.calls.flat().join('\n')).toContain(
       'account list              List managed agent accounts on this HiveCode host'
+    )
+    expect(logSpy.mock.calls.flat().join('\n')).toContain(
+      'account select            Select an OpenCode or Devin account for new launches'
+    )
+    expect(logSpy.mock.calls.flat().join('\n')).toContain(
+      'account rm                Remove an OpenCode or Devin account and its private data'
     )
     logSpy.mockRestore()
   })

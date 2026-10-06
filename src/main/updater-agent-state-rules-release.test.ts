@@ -11,6 +11,22 @@ const { netFetchMock, netRequestMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({ net: { fetch: netFetchMock, request: netRequestMock } }))
+vi.mock('./product/product-updater-session', () => ({
+  fetchWithProductUpdaterSession: netFetchMock
+}))
+vi.mock('../shared/product-update-source', () => ({
+  resolveProductUpdateSource: () => ({
+    provider: 'github',
+    channel: 'stable',
+    feedUrl: 'https://github.com/stablyai/orca/releases/latest/download',
+    github: {
+      repo: 'stablyai/orca',
+      atomFeedUrl: 'https://github.com/stablyai/orca/releases.atom',
+      releasesDownloadBase: 'https://github.com/stablyai/orca/releases/download',
+      releasesApiUrl: 'https://api.github.com/repos/stablyai/orca/releases'
+    }
+  })
+}))
 vi.mock('./updater-release-api-token', () => ({
   resolveReleaseApiToken: async () => null,
   rejectReleaseApiToken: () => {}
@@ -99,11 +115,11 @@ describe('agent state rules releases and the app updater', () => {
       ok: true,
       status: 200,
       headers: new Headers(),
-      json: () =>
+      text: () =>
         Promise.resolve([
           ...RULES_TAGS.map((tag) => apiRelease(tag, ['agent-state-rules.json'])),
           ...APP_TAGS.map((tag) => apiRelease(tag, APP_ASSETS))
-        ])
+        ]).then((releases) => JSON.stringify(releases))
     })
     const builds = await listReleaseBuilds(channel, 'darwin')
     expect(builds.map((build) => build.tag).filter((tag) => RULES_TAGS.includes(tag))).toEqual([])

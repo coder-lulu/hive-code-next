@@ -22,6 +22,7 @@ on:
       - 'src/main/runtime/orca-runtime.ts'
       - 'src/main/runtime/agent-session-*.ts'
       - 'src/main/native-chat/agent-session-wire/**'
+      - 'src/main/native-chat/agent-session-journal/**'
       # Why: this job holds the only checks that load the Fastfile, so edits to
       # it or to the release workflow it guards must re-run them.
       - '.github/workflows/mobile.yml'
@@ -49,6 +50,7 @@ on:
       - 'src/main/runtime/orca-runtime.ts'
       - 'src/main/runtime/agent-session-*.ts'
       - 'src/main/native-chat/agent-session-wire/**'
+      - 'src/main/native-chat/agent-session-journal/**'
       - '.github/workflows/mobile.yml'
 
 concurrency:

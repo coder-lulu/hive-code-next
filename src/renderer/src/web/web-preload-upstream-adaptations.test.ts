@@ -44,7 +44,38 @@ describe('active web preload upstream adaptations', () => {
     const result = await api.aiVault.searchSessions({ query: 'needle' }, 'runtime:owning-host')
     expect(call).toHaveBeenCalledWith(
       'aiVault.searchSessions',
-      { query: 'needle', limit: 20 },
+      {
+        query: 'needle',
+        limit: 20,
+        supportedAgents: [
+          'claude',
+          'codebuddy',
+          'qoder',
+          'codex',
+          'hermes',
+          'pi',
+          'omp',
+          'prime-agent',
+          'cursor',
+          'gemini',
+          'antigravity',
+          'rovo',
+          'copilot',
+          'opencode',
+          'opencode2',
+          'zcode',
+          'grok',
+          'openclaw',
+          'devin',
+          'droid',
+          'cline',
+          'kimi',
+          'muse',
+          'jcode'
+        ],
+        supportsQoderHistory: true,
+        supportsJcodeHistory: true
+      },
       { timeoutMs: undefined }
     )
     expect(result).toMatchObject({ kind: 'results', hits: [{ source: { presence: 'present' } }] })

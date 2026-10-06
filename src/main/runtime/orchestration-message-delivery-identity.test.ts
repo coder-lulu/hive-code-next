@@ -10,6 +10,7 @@ import { OrcaRuntimeService } from './orca-runtime'
 import { OrchestrationDb } from './orchestration/db'
 import { RpcDispatcher } from './rpc/dispatcher'
 import { ORCHESTRATION_METHODS } from './rpc/methods/orchestration'
+import { STATUS_METHODS } from './rpc/methods/status'
 import { OrcaRuntimeRpcServer } from './runtime-rpc'
 
 vi.mock('electron', () => ({
@@ -442,38 +443,45 @@ describe('STA-4325 message and delivery identity', () => {
       const userDataPath = mkdtempSync(join(tmpdir(), 'orca-sta-4325-cli-'))
       temporaryDirectories.push(userDataPath)
       const db = new OrchestrationDb(join(userDataPath, 'orchestration.db'))
-      const runtime = new OrcaRuntimeService()
-      runtime.setOrchestrationDb(db)
-      vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
-        handle === TERMINAL_HANDLE ? PANE_KEY : null
-      )
-      const run = db.createRun({
-        objective: 'STA-4325 built CLI',
-        coordinatorHandle: TERMINAL_HANDLE,
-        coordinatorPaneKey: PANE_KEY
-      })
-      const status = db.insertMessage({
-        from: 'term_worker',
-        to: TERMINAL_HANDLE,
-        subject: 'direct status',
-        type: 'status',
-        runId: run.id,
-        deliveryContract: 'current_delivery'
-      })
-      const done = db.insertMessage({
-        from: 'term_worker',
-        to: `run:${run.id}`,
-        subject: 'canonical done',
-        type: 'worker_done',
-        runId: run.id,
-        deliveryContract: 'current_delivery'
-      })
-      const server = new OrcaRuntimeRpcServer({ runtime, userDataPath })
-      await server.start()
-
+      let server: OrcaRuntimeRpcServer | undefined
       try {
+        const runtime = new OrcaRuntimeService()
+        runtime.setOrchestrationDb(db)
+        vi.spyOn(runtime, 'getTerminalPaneKey').mockImplementation((handle) =>
+          handle === TERMINAL_HANDLE ? PANE_KEY : null
+        )
+        const run = db.createRun({
+          objective: 'STA-4325 built CLI',
+          coordinatorHandle: TERMINAL_HANDLE,
+          coordinatorPaneKey: PANE_KEY
+        })
+        const status = db.insertMessage({
+          from: 'term_worker',
+          to: TERMINAL_HANDLE,
+          subject: 'direct status',
+          type: 'status',
+          runId: run.id,
+          deliveryContract: 'current_delivery'
+        })
+        const done = db.insertMessage({
+          from: 'term_worker',
+          to: `run:${run.id}`,
+          subject: 'canonical done',
+          type: 'worker_done',
+          runId: run.id,
+          deliveryContract: 'current_delivery'
+        })
+        server = new OrcaRuntimeRpcServer({
+          runtime,
+          userDataPath,
+          methods: [...ORCHESTRATION_METHODS, ...STATUS_METHODS]
+        })
+        await server.start()
+
         const first = await runBuiltCli(userDataPath, ['orchestration', 'check', '--json'])
-        expect(first.exitCode, first.stderr).toBe(0)
+        expect(first.exitCode, JSON.stringify({ stdout: first.stdout, stderr: first.stderr })).toBe(
+          0
+        )
         const firstPayload = JSON.parse(first.stdout) as { result: CheckResult }
         expect(firstPayload.result).toMatchObject({ runId: run.id, count: 2, replayed: false })
         expect(firstPayload.result.messages.map((message) => message.id)).toEqual([
@@ -511,8 +519,11 @@ describe('STA-4325 message and delivery identity', () => {
         expect(db.getMessageById(status.id)?.read).toBe(1)
         expect(db.getMessageById(done.id)?.read).toBe(1)
       } finally {
-        await server.stop()
-        db.close()
+        try {
+          await server?.stop()
+        } finally {
+          db.close()
+        }
       }
     },
     30_000

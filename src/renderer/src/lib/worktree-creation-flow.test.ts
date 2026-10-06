@@ -70,6 +70,10 @@ vi.mock('@/lib/workspace-activation-terminal-focus', () => ({
   queueWorkspaceActivationTerminalFocus: vi.fn()
 }))
 
+vi.mock('@/lib/worktree-creation-background-mount', () => ({
+  mountCreatedWorktreeStartupTabsInBackground: vi.fn()
+}))
+
 vi.mock('@/lib/new-workspace', () => ({
   ensureAgentStartupInTerminal: vi.fn()
 }))
@@ -89,6 +93,7 @@ import { toast } from 'sonner'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { ensureWorktreeHasInitialTerminal } from '@/lib/worktree-initial-terminal-seeding'
 import { queueWorkspaceActivationTerminalFocus } from '@/lib/workspace-activation-terminal-focus'
+import { mountCreatedWorktreeStartupTabsInBackground } from '@/lib/worktree-creation-background-mount'
 import { ensureAgentStartupInTerminal } from '@/lib/new-workspace'
 import {
   beginBackgroundWorktreePreparation,
@@ -330,7 +335,7 @@ describe('staged background worktree creation', () => {
     })
   })
 
-  it('reveals a backend-owned startup after the user switches workspaces', async () => {
+  it('mounts a backend-owned startup in the background after the user switches workspaces', async () => {
     let resolveCreate!: (result: {
       worktree: { id: string; repoId: string }
       startupTerminal: { tabId: string; spawned: true }
@@ -354,13 +359,19 @@ describe('staged background worktree creation', () => {
       worktree: { id: 'wt-1', repoId: 'repo-1' },
       startupTerminal: { tabId: 'agent-tab', spawned: true }
     })
-    await flushAsyncWorktreeCreation()
+    await vi.waitFor(() => expect(store.removePendingWorktreeCreation).toHaveBeenCalled())
 
-    expect(activateAndRevealWorktree).toHaveBeenCalledWith('wt-1', {
-      sidebarRevealBehavior: 'auto',
-      backendStartupTerminalSpawned: true
-    })
-    expect(ensureWorktreeHasInitialTerminal).not.toHaveBeenCalled()
+    expect(activateAndRevealWorktree).not.toHaveBeenCalled()
+    expect(ensureWorktreeHasInitialTerminal).toHaveBeenCalledExactlyOnceWith(
+      store,
+      'wt-1',
+      undefined,
+      undefined,
+      undefined,
+      undefined,
+      { activateCreatedTabs: false, backendStartupTerminalSpawned: true }
+    )
+    expect(mountCreatedWorktreeStartupTabsInBackground).toHaveBeenCalledExactlyOnceWith('wt-1')
     expect(store.removePendingWorktreeCreation).toHaveBeenCalledWith('creation-1', {
       cleanupVm: false
     })

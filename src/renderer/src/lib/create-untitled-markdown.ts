@@ -5,6 +5,7 @@ import {
   runtimePathExists,
   writeRuntimeFile
 } from '../runtime/runtime-file-client'
+import { createRuntimeUntitledPlaceholder } from '../runtime/runtime-untitled-placeholder-client'
 import { detectLanguage } from './language-detect'
 import {
   applyMarkdownTemplatePlaceholders,
@@ -24,6 +25,7 @@ export type UntitledMarkdownFileInfo = {
   language: string
   isUntitled: true
   deleteUntouchedOnClose?: boolean
+  untitledPlaceholderLeaseToken?: string
   mode: 'edit'
   operationProvenance?: EditorFileOperationProvenance
 }
@@ -92,7 +94,13 @@ export async function createUntitledMarkdownFile(
 
     try {
       assertCurrent()
-      await createRuntimePath(context, filePath, 'file')
+      let untitledPlaceholderLeaseToken: string | undefined
+      if (templateContent === null) {
+        untitledPlaceholderLeaseToken =
+          (await createRuntimeUntitledPlaceholder(context, filePath)) ?? undefined
+      } else {
+        await createRuntimePath(context, filePath, 'file')
+      }
       if (templateContent !== null) {
         try {
           assertCurrent()
@@ -118,6 +126,7 @@ export async function createUntitledMarkdownFile(
         worktreeId,
         language: detectLanguage(fileName),
         isUntitled: true,
+        ...(untitledPlaceholderLeaseToken ? { untitledPlaceholderLeaseToken } : {}),
         deleteUntouchedOnClose: templateContent === null ? undefined : false,
         operationProvenance: options.operationProvenance,
         mode: 'edit'

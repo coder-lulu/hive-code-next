@@ -9,6 +9,7 @@ import type {
   AgentJournalSubmission
 } from '../../../../shared/agent-session-journal-types'
 import type { AgentSessionHistoryPage } from '../../../../shared/agent-session-wire'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import { DISPATCH_REJECTED_HOST_RESTARTED } from '../../../../shared/structured-agent-session-dispatch-rejection'
 import { reconcileStructuredAgentSessionOutboxWithQueue } from '../../../../shared/structured-agent-session-draft-hand-off'
 import { createStructuredAgentSessionOutboxEntry } from '../../../../shared/structured-agent-session-outbox'
@@ -138,7 +139,7 @@ it("keeps the outbox copy of a rejected message whose row is outside the window,
     [],
     new Set()
   ).get(MESSAGE_ID)
-  expect(notice).toEqual({ text: 'Orca restarted before this message was sent.' })
+  expect(notice).toEqual({ text: `${APP_DISPLAY_NAME} restarted before this message was sent.` })
 
   // Paging back loads the row: the outbox lets go, and the host's row is the one drawn.
   state = reduceStructuredAgentSession(state, {

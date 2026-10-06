@@ -44,7 +44,7 @@ vi.mock('@/components/ui/tooltip', () => ({
   TooltipTrigger: ({ children }: { children: ReactNode }) => children
 }))
 vi.mock('@/i18n/i18n', () => ({
-  i18n: { language: 'en' },
+  i18n: { language: 'en', getResourceBundle: () => undefined },
   translate: (_key: string, fallback: string, values?: Record<string, string>) =>
     values
       ? Object.entries(values).reduce(

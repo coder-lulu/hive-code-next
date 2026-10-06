@@ -3635,7 +3635,10 @@
         },
         "useRichMarkdownReviewData": {
           "f9d2acd6b0": "所有未发送的笔记"
-        }
+        },
+        "untitledPlaceholderPreserved": "此主机无法安全移除空白文件，文件已保留。",
+        "untitledPlaceholderRecovery": "文件已保留以供恢复，请从 {{path}} 取回。",
+        "untitledDiscardFailed": "无法丢弃此文件的更改，编辑内容已保留。"
       },
       "emulator": {
         "pane": {

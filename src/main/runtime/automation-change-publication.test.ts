@@ -119,16 +119,25 @@ async function makeRuntime() {
   return { store, runtime, published }
 }
 
-beforeEach(() => {
+let runtimeFixture: Awaited<ReturnType<typeof makeRuntime>>
+let runtimeSetup: Promise<Awaited<ReturnType<typeof makeRuntime>>> | undefined
+
+beforeEach(async () => {
+  runtimeSetup = undefined
   testState.dir = mkdtempSync(join(tmpdir(), 'automation-publish-'))
   // Why: the store resolves orca-data.json through the app environment, so the
   // suite's fixture directory must be what `userData` answers with.
   installFakeAppEnvironment({
     getPath: (name) => (name === 'userData' ? testState.dir : tmpdir())
   })
+  runtimeSetup = makeRuntime()
+  runtimeFixture = await runtimeSetup
 })
 
 afterEach(async () => {
+  if (runtimeSetup) {
+    await Promise.allSettled([runtimeSetup])
+  }
   await closeTestStores()
   rmSync(testState.dir, { recursive: true, force: true })
 })
@@ -137,7 +146,7 @@ describe('scoped automationsChanged publication', () => {
   it.each(['update', 'delete'] as const)(
     'waits for durable %s before publishing success',
     async (operation) => {
-      const { store, runtime, published } = await makeRuntime()
+      const { store, runtime, published } = runtimeFixture
       const gate = Promise.withResolvers<void>()
       vi.spyOn(store, 'flushPendingOrThrowAsync').mockReturnValue(gate.promise)
       const pending =
@@ -153,7 +162,7 @@ describe('scoped automationsChanged publication', () => {
   )
 
   it('rejects a failed durable definition write without publishing success', async () => {
-    const { store, runtime, published } = await makeRuntime()
+    const { store, runtime, published } = runtimeFixture
     vi.spyOn(store, 'flushPendingOrThrowAsync').mockRejectedValue(new Error('disk full'))
     await expect(runtime.updateAutomation('local-1', { name: 'Changed' })).rejects.toThrow(
       'disk full'
@@ -162,7 +171,7 @@ describe('scoped automationsChanged publication', () => {
   })
 
   it('names the host a delete removed a row from', async () => {
-    const { runtime, published } = await makeRuntime()
+    const { runtime, published } = runtimeFixture
     await runtime.deleteAutomation('ssh-1-a', {
       selector: { kind: 'ssh', targetId: 'ssh-1', targetGeneration: 7 }
     })
@@ -172,13 +181,13 @@ describe('scoped automationsChanged publication', () => {
   })
 
   it('names the orphan bucket when an unowned row is deleted', async () => {
-    const { runtime, published } = await makeRuntime()
+    const { runtime, published } = runtimeFixture
     await runtime.deleteAutomation('orphan-1', { selector: { kind: 'orphan' } })
     expect(published).toEqual([{ reason: 'definition', selector: { kind: 'orphan' } }])
   })
 
   it('publishes source and destination when an update moves a record between hosts', async () => {
-    const { runtime, published, store } = await makeRuntime()
+    const { runtime, published, store } = runtimeFixture
     await runtime.updateAutomation(
       'local-1',
       { repo: 'repo-ssh' },
@@ -198,7 +207,7 @@ describe('scoped automationsChanged publication', () => {
   })
 
   it('publishes one event when an update leaves the record on the same host', async () => {
-    const { runtime, published } = await makeRuntime()
+    const { runtime, published } = runtimeFixture
     await runtime.updateAutomation(
       'local-1',
       { enabled: false },
@@ -211,7 +220,7 @@ describe('scoped automationsChanged publication', () => {
   // elsewhere would never hear about the row it is still rendering. The publication has to
   // degrade to one unscoped authority event rather than name only the stale source.
   it('degrades to an unscoped event when the store cannot name the destination', async () => {
-    const { store, runtime, published } = await makeRuntime()
+    const { store, runtime, published } = runtimeFixture
     const selector = store.automationChangeSelector.bind(store)
     let updated = false
     vi.spyOn(store, 'automationChangeSelector').mockImplementation((id: string) =>

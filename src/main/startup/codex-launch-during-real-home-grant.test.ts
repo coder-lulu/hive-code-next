@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs'
 import type * as Os from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -150,7 +150,7 @@ function workspaceDirs(): string[] {
   return ['one', 'two'].map((name) => {
     const path = join(homes.tmpHome, name)
     mkdirSync(path, { recursive: true })
-    return path
+    return realpathSync.native(path)
   })
 }
 

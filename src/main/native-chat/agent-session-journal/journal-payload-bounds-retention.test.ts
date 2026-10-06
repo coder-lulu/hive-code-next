@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import type { AgentJournalBoundedPayload } from '../../../shared/agent-session-journal-types'
 import { codexItemBody } from '../../codex/codex-structured-item-translation'
 import {
@@ -36,7 +37,7 @@ function expectPreviousBounds(payload: string, inlineHeadBytes: number): void {
   expect(boundInlineText(payload, limits)).toEqual({
     bounded: previous,
     text: previous.truncated
-      ? `${previous.head}\n[Orca: output truncated — ${previous.byteLength} bytes total, digest ${previous.digest.slice(0, 12)}]`
+      ? `${previous.head}\n[${APP_DISPLAY_NAME}: output truncated — ${previous.byteLength} bytes total, digest ${previous.digest.slice(0, 12)}]`
       : payload
   })
 }

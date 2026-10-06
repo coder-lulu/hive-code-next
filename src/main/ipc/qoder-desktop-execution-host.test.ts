@@ -15,6 +15,8 @@ import type { FolderWorkspace } from '../../shared/folder-workspace-types'
 import { buildAgentResumeStartupPlan } from '../../shared/tui-agent-startup'
 import type { PtySpawnIpcArgs } from './pty/ipc/spawn-types'
 
+const REAL_PLATFORM = process.platform
+
 vi.mock('./preflight-command-exec', () => ({ isCommandOnPath: vi.fn() }))
 vi.mock('./local-agent-install-dir-detection', () => ({
   detectCommandsInInstallDirs: () => new Set()
@@ -160,7 +162,7 @@ describe('desktop Qoder execution-host selection', () => {
     expect(providerSpawn).toHaveBeenCalledWith(
       expect.objectContaining({
         command: "qoder '--resume' 'session with spaces'",
-        cwd: process.cwd(),
+        cwd: REAL_PLATFORM === 'win32' ? process.cwd().replaceAll('\\', '/') : process.cwd(),
         worktreeId: 'folder:review-folder'
       })
     )

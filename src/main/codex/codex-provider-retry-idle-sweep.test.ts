@@ -17,7 +17,10 @@ import {
   resetHostTestOperationIds
 } from '../native-chat/agent-session-wire/structured-agent-session-host-test-data'
 import { createCodexJournalTranslator } from './codex-structured-journal-translation'
-import { openTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 
 const SWEEP_MS = 5
@@ -25,6 +28,7 @@ const RETRY_GAP_MS = 10 * 60_000
 
 let root: string
 let host: StructuredAgentSessionHost
+let hostForCleanup: StructuredAgentSessionHost | undefined
 let sink: StructuredAgentSessionEventSink | null
 let closeSession: Mock<NonNullable<StructuredAgentSessionAdapter['closeSession']>>
 let clock: number
@@ -47,6 +51,8 @@ function waitOutSeveralSweeps(): Promise<void> {
 }
 
 beforeEach(async () => {
+  root = ''
+  hostForCleanup = undefined
   root = await mkdtemp(join(tmpdir(), 'orca-codex-retry-sweep-'))
   resetHostTestOperationIds()
   sink = null
@@ -85,11 +91,17 @@ beforeEach(async () => {
     idleSweep: { intervalMs: SWEEP_MS, idleMs: STRUCTURED_AGENT_SESSION_IDLE_MS },
     now: () => clock
   })
+  hostForCleanup = host
 })
 
 afterEach(async () => {
-  await host.flushAllStreamedEvents()
-  await rm(root, { recursive: true, force: true })
+  if (hostForCleanup) {
+    await hostForCleanup.flushAllStreamedEvents()
+  }
+  if (root) {
+    closeTestJournalHostDatabase(root)
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 describe('a Codex reconnecting a dropped stream', () => {

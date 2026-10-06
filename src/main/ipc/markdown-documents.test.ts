@@ -57,4 +57,13 @@ describe('markdownDocumentFromFilePath', () => {
       name: 'file'
     })
   })
+
+  it('normalizes an outside-root local relative path in the native filesystem namespace', () => {
+    expect(markdownDocumentFromFilePath('/workspace', '/workspace-other/file.md')).toEqual({
+      filePath: '/workspace-other/file.md',
+      relativePath: '../workspace-other/file.md',
+      basename: 'file.md',
+      name: 'file'
+    })
+  })
 })

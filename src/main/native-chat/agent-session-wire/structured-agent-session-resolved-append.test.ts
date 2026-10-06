@@ -10,6 +10,7 @@ import type {
 } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import { openJournalOwingImport } from '../agent-session-journal/journal-owed-import-test-support'
+import { closeTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
 import {
   createDeferredStructuredAgentSessionEventSink,
   type StructuredAgentSessionEventTarget,
@@ -33,8 +34,11 @@ function textOf(body: AgentJournalItemBody | undefined): string {
 
 let root = ''
 let journal: AgentSessionJournal
+let journalForCleanup: AgentSessionJournal | undefined
 
 beforeEach(async () => {
+  root = ''
+  journalForCleanup = undefined
   root = await mkdtemp(join(tmpdir(), 'orca-resolved-append-'))
   // Its copy owed, so every write handed over waits in the queue: a resolver that read at submit
   // would read the row before the revisions ahead of it had landed.
@@ -48,11 +52,18 @@ beforeEach(async () => {
       providerHandle: { kind: 'codex', threadId: 'thread-1' }
     }
   }))
+  journalForCleanup = journal
 })
 
 afterEach(async () => {
-  await journal.close()
-  await rm(root, { recursive: true, force: true })
+  if (journalForCleanup) {
+    await journalForCleanup.close()
+  }
+  if (root) {
+    closeTestJournalHostDatabase(join(root, 'scratch-session-1'))
+    closeTestJournalHostDatabase(root)
+    await rm(root, { recursive: true, force: true })
+  }
 })
 
 /** The real journal: each resolved write reads the fold at its own place in the write queue. */

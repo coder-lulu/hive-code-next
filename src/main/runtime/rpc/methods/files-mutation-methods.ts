@@ -1,9 +1,11 @@
 import { defineMethod } from '../core'
+import type { RpcContext } from '../core'
 import {
   FileCommitUpload,
   FileCopy,
   FileDelete,
   FileMutationOpen,
+  FileUntitledPlaceholderLease,
   FileRename,
   FileWrite,
   FileWriteBase64,
@@ -33,7 +35,64 @@ function sshMutationArguments(
   ]
 }
 
+function placeholderCaller(context: RpcContext): string {
+  return (
+    context.connectionId ??
+    context.authenticatedAccountOperationCallerKey ??
+    context.pairedDeviceId ??
+    context.clientId ??
+    'local'
+  )
+}
+
 export const FILE_MUTATION_METHODS = [
+  defineMethod({
+    name: 'files.createUntitledPlaceholder',
+    params: FileMutationOpen,
+    handler: async (params, context) => {
+      const caller = placeholderCaller(context)
+      context.signal?.throwIfAborted()
+      try {
+        const token = await context.runtime.createUntitledPlaceholder(
+          params.worktree,
+          params.relativePath,
+          caller,
+          ...sshMutationArguments(params)
+        )
+        context.signal?.throwIfAborted()
+        return token
+      } catch (error) {
+        if (context.signal?.aborted) {
+          context.runtime.releaseUntitledPlaceholdersForClient(caller)
+        }
+        throw error
+      }
+    }
+  }),
+  defineMethod({
+    name: 'files.discardUntitledPlaceholder',
+    params: FileUntitledPlaceholderLease,
+    handler: async (params, context) =>
+      context.runtime.discardUntitledPlaceholder(
+        params.worktree,
+        params.relativePath,
+        placeholderCaller(context),
+        params.leaseToken,
+        ...sshMutationArguments(params)
+      )
+  }),
+  defineMethod({
+    name: 'files.releaseUntitledPlaceholder',
+    params: FileUntitledPlaceholderLease,
+    handler: async (params, context) =>
+      context.runtime.releaseUntitledPlaceholder(
+        params.worktree,
+        params.relativePath,
+        placeholderCaller(context),
+        params.leaseToken,
+        ...sshMutationArguments(params)
+      )
+  }),
   defineMethod({
     name: 'files.write',
     params: FileWrite,

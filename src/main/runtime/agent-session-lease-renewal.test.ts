@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import {
   openTestAgentSessionRecordStore,
   readPersistedTestAgentSessionStoreText
@@ -73,7 +74,12 @@ async function liveStore(): Promise<{ directory: string; store: AgentSessionReco
 }
 
 afterEach(async () => {
-  await Promise.all(directories.splice(0).map((path) => rm(path, { recursive: true, force: true })))
+  await Promise.all(
+    directories.splice(0).map(async (path) => {
+      closeTestJournalHostDatabase(path)
+      await rm(path, { recursive: true, force: true })
+    })
+  )
 })
 
 describe('agent-session lease renewal batch', () => {

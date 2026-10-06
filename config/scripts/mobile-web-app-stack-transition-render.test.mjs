@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, webkit } from 'playwright-core'
 import { buildMobileWebAppBundle } from './build-mobile-web-app-bundle.mjs'
 import { mobileWebAppDependenciesPresent } from './mobile-web-app-bundle-dependencies.mjs'
@@ -238,6 +238,14 @@ describeRender('the host stack transition on the page', () => {
   for (const engine of ENGINES) {
     describe(engine.name, () => {
       const open = (options) => openList(browsers.get(engine.name), options)
+      afterEach(async () => {
+        await Promise.all(
+          browsers
+            .get(engine.name)
+            ?.contexts()
+            .map((context) => context.close()) ?? []
+        )
+      })
       it('slides the session in from the right on push, over the list', async () => {
         const { errors, page } = await open()
         const frames = await sampleFrames(page, 'push')

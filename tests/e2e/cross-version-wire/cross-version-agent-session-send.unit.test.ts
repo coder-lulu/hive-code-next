@@ -4,7 +4,6 @@
 // operation conflict, loses the user's message.
 
 import { beforeAll, describe, expect, it } from 'vitest'
-import { resolveBaselineReleaseRef } from './release-checkout'
 import { installableHost, structuredHostStub } from './structured-agent-session-host-fixture'
 import {
   resetOperationIds,
@@ -22,13 +21,15 @@ import {
 
 // Why: a cold CI run extracts the baseline checkout before the first pairing.
 const SUITE_TIMEOUT_MS = 180_000
+// Official v1.4.219 ships queued delivery and fingerprints it; v1.4.211 predates that contract.
+const SEND_BASELINE_REF = 'v1.4.219'
 
 let current: AgentSessionWireBuild
 let baseline: AgentSessionWireBuild
 
 beforeAll(async () => {
   current = await loadAgentSessionWireBuild(WORKING_TREE)
-  baseline = await loadAgentSessionWireBuild(resolveBaselineReleaseRef())
+  baseline = await loadAgentSessionWireBuild(SEND_BASELINE_REF)
 }, SUITE_TIMEOUT_MS)
 
 async function send(build: AgentSessionWireBuild, params: unknown): Promise<RpcReply[]> {

@@ -1,3 +1,4 @@
+import { releaseEditorUntitledPlaceholder } from './editor-untitled-placeholder'
 import { useCallback, useState } from 'react'
 import { dirname, joinPath } from '@/lib/path'
 import { useAppStore } from '@/store'
@@ -68,6 +69,8 @@ export function useUntitledFileRename({
       }
 
       if (newPath === oldPath) {
+        releaseEditorUntitledPlaceholder(useAppStore.getState(), renameDialogFile)
+        useAppStore.getState().clearUntitledPlaceholderLease(renameDialogFile.id)
         clearUntitled(renameDialogFile.id)
         closeRenameDialog()
         return

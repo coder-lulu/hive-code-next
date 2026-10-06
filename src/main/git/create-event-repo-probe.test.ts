@@ -1,9 +1,27 @@
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import type * as FsPromises from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { probeCreateEventRepoFacts } from './create-event-repo-probe'
 import { createWorktreePreparationLockReason } from '../../shared/worktree/create-preparation'
+
+const { posixHookModes } = vi.hoisted(() => ({ posixHookModes: new Map<string, number>() }))
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const fs = await importOriginal<typeof FsPromises>()
+  return {
+    ...fs,
+    stat: async (...args: Parameters<typeof fs.stat>) => {
+      const entry = await fs.stat(...args)
+      const mode = typeof args[0] === 'string' ? posixHookModes.get(args[0]) : undefined
+      if (mode !== undefined && entry && typeof entry.mode === 'number') {
+        // Supply only this fixture's POSIX permissions; native Windows stat has no execute bits.
+        entry.mode = (entry.mode & ~0o777) | (mode & 0o777)
+      }
+      return entry
+    }
+  }
+})
 
 async function hookPresence(repoPath: string, platform: NodeJS.Platform): Promise<string> {
   return (await probeCreateEventRepoFacts(repoPath, platform)).postCheckoutHook
@@ -19,6 +37,7 @@ describe('probeCreateEventRepoFacts', () => {
   })
 
   afterEach(async () => {
+    posixHookModes.clear()
     await rm(repo, { recursive: true, force: true })
   })
 
@@ -28,6 +47,12 @@ describe('probeCreateEventRepoFacts', () => {
     await chmod(hook, mode)
   }
 
+  function usePosixHookModeFixture(mode: number): void {
+    if (process.platform === 'win32') {
+      posixHookModes.set(path.join(repo, '.git', 'hooks', 'post-checkout'), mode)
+    }
+  }
+
   it('reports absent when only sample hooks exist', async () => {
     await writeFile(path.join(repo, '.git', 'hooks', 'post-checkout.sample'), '#!/bin/sh\n')
     expect(await hookPresence(repo, 'darwin')).toBe('absent')
@@ -35,11 +60,13 @@ describe('probeCreateEventRepoFacts', () => {
 
   it('reports present for an executable hook', async () => {
     await writeHook(0o755)
+    usePosixHookModeFixture(0o755)
     expect(await hookPresence(repo, 'linux')).toBe('present')
   })
 
   it('reports absent for a hook Git would skip as non-executable', async () => {
     await writeHook(0o644)
+    usePosixHookModeFixture(0o644)
     expect(await hookPresence(repo, 'linux')).toBe('absent')
   })
 

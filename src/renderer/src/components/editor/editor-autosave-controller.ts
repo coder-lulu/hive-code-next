@@ -8,6 +8,12 @@ import {
   type EditorSaveQuiesceDetail
 } from './editor-autosave'
 import { flushPendingEditorChange } from './editor-pending-flush'
+import { findWorktreeById } from '@/store/slices/worktree-helpers'
+import {
+  assertEditorFileOperationCurrent,
+  captureEditorFileOperationProvenance,
+  getEditorFileOperationContext
+} from '@/lib/editor-file-operation-owner'
 import {
   autosaveSubscriberInputsEqual,
   getAutosaveSubscriberInputs
@@ -39,12 +45,34 @@ export function attachEditorAutosaveController(store: AppStoreApi): () => void {
 
   const handleSaveAndClose = async (event: Event): Promise<void> => {
     const { fileId } = (event as CustomEvent<{ fileId: string }>).detail
-    const file = store.getState().openFiles.find((openFile) => openFile.id === fileId)
+    const initial = store.getState()
+    const file = initial.openFiles.find((openFile) => openFile.id === fileId)
     if (!file) {
       return
     }
 
-    flushPendingEditorChange(file.id)
+    let operationProvenance: ReturnType<typeof captureEditorFileOperationProvenance>
+    let originalContext: ReturnType<typeof getEditorFileOperationContext>
+    try {
+      operationProvenance =
+        file.operationProvenance ??
+        captureEditorFileOperationProvenance(
+          initial,
+          file.worktreeId,
+          file.runtimeEnvironmentId,
+          file.runtimeEnvironmentId !== undefined
+        )
+      const worktree = findWorktreeById(initial.worktreesByRepo ?? {}, file.worktreeId)
+      originalContext = getEditorFileOperationContext(
+        initial,
+        { ...file, operationProvenance },
+        worktree?.path ?? null
+      )
+      flushPendingEditorChange(file.id)
+      assertEditorFileOperationCurrent(store.getState(), file.worktreeId, operationProvenance)
+    } catch {
+      return
+    }
     const draft = store.getState().editorDrafts[fileId]
     if (draft !== undefined) {
       try {
@@ -53,7 +81,44 @@ export function attachEditorAutosaveController(store: AppStoreApi): () => void {
         return
       }
     }
-    store.getState().closeFile(fileId)
+    const current = store.getState()
+    const currentFile = current.openFiles.find((entry) => entry.id === fileId)
+    if (
+      !currentFile ||
+      currentFile.filePath !== file.filePath ||
+      currentFile.operationProvenance !== file.operationProvenance ||
+      currentFile.worktreeId !== file.worktreeId ||
+      currentFile.pendingOwnerMigration === true ||
+      currentFile.isDirty ||
+      current.editorDrafts[fileId] !== undefined ||
+      (currentFile.untitledPlaceholderLeaseToken !== undefined &&
+        currentFile.untitledPlaceholderLeaseToken !== file.untitledPlaceholderLeaseToken)
+    ) {
+      return
+    }
+    try {
+      const worktree = findWorktreeById(current.worktreesByRepo ?? {}, currentFile.worktreeId)
+      const currentContext = getEditorFileOperationContext(
+        current,
+        { ...currentFile, operationProvenance },
+        worktree?.path ?? null
+      )
+      if (
+        currentContext.worktreePath !== originalContext.worktreePath ||
+        currentContext.connectionId !== originalContext.connectionId ||
+        currentContext.expectedExecutionHostId !== originalContext.expectedExecutionHostId ||
+        currentContext.expectedSshTargetId !== originalContext.expectedSshTargetId ||
+        currentContext.expectedSshConnectionGeneration !==
+          originalContext.expectedSshConnectionGeneration ||
+        currentContext.settings?.activeRuntimeEnvironmentId !==
+          originalContext.settings?.activeRuntimeEnvironmentId
+      ) {
+        return
+      }
+    } catch {
+      return
+    }
+    current.closeFile(fileId)
   }
 
   const handleSaveFile = async (event: Event): Promise<void> => {
@@ -101,8 +166,12 @@ export function attachEditorAutosaveController(store: AppStoreApi): () => void {
         ? store.getState().openFiles.filter((file) => file.id === detail.fileId)
         : getOpenFilesForExternalFileChange(store.getState().openFiles, detail)
 
-    await Promise.all(matchingFiles.map((file) => quiesceFileSave(file.id)))
-    detail.resolve()
+    try {
+      await Promise.all(matchingFiles.map((file) => quiesceFileSave(file.id)))
+      detail.resolve()
+    } catch (error) {
+      detail.reject(error instanceof Error ? error.message : String(error))
+    }
   }
 
   // Why: the root subscriber fires on every store tick; skip the scan unless the four autosave inputs changed.

@@ -116,16 +116,29 @@ describe('relay OpenCode source selection on real fixture files', () => {
       if (kind === 'shell') {
         writeFileSync(join(home, '.zshrc'), `export XDG_CONFIG_HOME='${xdg}'\n`)
       }
-      const env = await spawn({
-        cwd: home,
-        launchAgent: 'opencode',
-        env: {
-          HOME: home,
-          USERPROFILE: home,
-          XDG_CONFIG_HOME: kind === 'xdg' ? xdg : '',
-          SHELL: kind === 'shell' ? '/bin/zsh' : '/bin/sh'
+      const nativePlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+      if (!nativePlatform) {
+        throw new Error('Missing process.platform descriptor in relay fixture')
+      }
+      let env: Record<string, string>
+      try {
+        // This row models a POSIX shell; the canonical install does not use the mirror adapter.
+        if (kind === 'shell' && nativePlatform.value === 'win32') {
+          Object.defineProperty(process, 'platform', { ...nativePlatform, value: 'linux' })
         }
-      })
+        env = await spawn({
+          cwd: home,
+          launchAgent: 'opencode',
+          env: {
+            HOME: home,
+            USERPROFILE: home,
+            XDG_CONFIG_HOME: kind === 'xdg' ? xdg : '',
+            SHELL: kind === 'shell' ? '/bin/zsh' : '/bin/sh'
+          }
+        })
+      } finally {
+        Object.defineProperty(process, 'platform', nativePlatform)
+      }
       expect(readFileSync(plugin(consumer, 'opencode'), 'utf8')).toBe('// remote plugin')
       expect(existsSync(plugin(join(root, 'xdg', 'opencode'), 'opencode'))).toBe(false)
       expect(readFileSync(join(consumer, 'opencode.json'), 'utf8')).toBe('{"model":"remote-model"}')

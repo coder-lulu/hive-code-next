@@ -131,7 +131,15 @@ it.each([
     expect(Object.keys(installed.hooks).sort()).toEqual([...events].sort())
     expect(installed.statusLine).toEqual({ command: 'user-status' })
     expect(
-      readFileSync(join(sandbox.home, '.orca', 'agent-hooks', `${source}-hook.sh`), 'utf8')
+      readFileSync(
+        join(
+          sandbox.home,
+          '.orca',
+          'agent-hooks',
+          `${source}-hook.${process.platform === 'win32' ? 'cmd' : 'sh'}`
+        ),
+        'utf8'
+      )
     ).toContain(`/hook/${source}`)
     if (source === 'qoder-cn') {
       markQoderWorkspaceTrusted('/cn-workspace', sandbox.home, '.qoder-cn')

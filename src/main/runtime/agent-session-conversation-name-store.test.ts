@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AgentSessionExecutionLocation } from '../../shared/agent-session-record'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
 import { openTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
 
 const NOW = 1_800_000_000_000
@@ -43,10 +44,14 @@ const reserveRequest = (): AgentSessionReserveRequest => ({
 let directory: string
 
 beforeEach(async () => {
+  directory = ''
   directory = await mkdtemp(join(tmpdir(), 'orca-conversation-name-store-'))
 })
 afterEach(async () => {
-  await rm(directory, { recursive: true, force: true })
+  if (directory) {
+    closeTestJournalHostDatabase(directory)
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 async function reservedStore(): Promise<AgentSessionRecordStore> {
@@ -61,6 +66,7 @@ describe('AgentSessionRecordStore.setConversationName', () => {
 
     await store.setConversationName(SESSION, 'Fix the lease probe')
 
+    closeTestJournalHostDatabase(directory)
     const reloaded = await openTestAgentSessionRecordStore(directory)
     expect(reloaded.getRecord(SESSION)?.conversationName).toBe('Fix the lease probe')
   })
@@ -74,6 +80,7 @@ describe('AgentSessionRecordStore.setConversationName', () => {
     expect(name).toHaveLength(200)
     expect(name.startsWith('Fix the ')).toBe(true)
     // A reload validates every record; an over-long name would be dropped as unreadable.
+    closeTestJournalHostDatabase(directory)
     const reloaded = await openTestAgentSessionRecordStore(directory)
     expect(reloaded.getRecord(SESSION)?.conversationName).toBe(name)
   })

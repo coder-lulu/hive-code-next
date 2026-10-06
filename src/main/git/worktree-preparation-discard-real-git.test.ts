@@ -54,13 +54,27 @@ it('removes only the owned registration after external deletion of its checkout'
 
   expect(spy.mock.calls.map(([args]) => args)).toEqual([
     ['rev-parse', '--git-path', 'locked', '--git-common-dir'],
-    ['worktree', 'remove', '--force', '--force', prepared]
+    [
+      ...(process.platform === 'win32' ? ['-c', 'core.longpaths=true'] : []),
+      'worktree',
+      'remove',
+      '--force',
+      '--force',
+      prepared
+    ]
   ])
+  expect(spy.mock.calls[0]?.[1]).toEqual({
+    cwd: prepared,
+    timeout: WORKTREE_REMOVAL_REGISTRATION_TIMEOUT_MS
+  })
   expect(spy.mock.calls[1]?.[1]).toEqual({
     cwd: repo,
     timeout: WORKTREE_REMOVAL_REGISTRATION_TIMEOUT_MS
   })
   await expect(readFile(lock, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+  await expect(readFile(join(dirname(lock), 'gitdir'), 'utf8')).rejects.toMatchObject({
+    code: 'ENOENT'
+  })
   expect(
     (await runner.gitExecFileAsync(['worktree', 'list', '--porcelain'], { cwd: repo })).stdout
   ).not.toContain(prepared)
@@ -70,6 +84,12 @@ it.each(['foreign', 'empty', 'missing', 'unterminated', 'CRLF'])(
   'preserves a missing checkout registration with a %s ownership marker',
   async (kind) => {
     const { repo, prepared, lock, reason } = await fixture()
+    const registrationPath = join(dirname(lock), 'gitdir')
+    const registrationBefore = await readFile(registrationPath, 'utf8')
+    expect(registrationBefore.endsWith('\n')).toBe(true)
+    await expect(realpath(registrationBefore.slice(0, -1))).resolves.toBe(
+      await realpath(join(prepared, '.git'))
+    )
     const contents =
       kind === 'foreign'
         ? 'manual lock\n'
@@ -85,9 +105,7 @@ it.each(['foreign', 'empty', 'missing', 'unterminated', 'CRLF'])(
     )
 
     expect(spy.mock.calls.some(([args]) => args.includes('remove'))).toBe(false)
-    expect(await readFile(join(dirname(lock), 'gitdir'), 'utf8')).toBe(
-      `${join(prepared, '.git')}\n`
-    )
+    expect(await readFile(registrationPath, 'utf8')).toBe(registrationBefore)
     if (kind !== 'missing') {
       expect(await readFile(lock, 'utf8')).toBe(contents)
     }

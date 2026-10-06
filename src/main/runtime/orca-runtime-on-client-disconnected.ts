@@ -5,6 +5,7 @@ import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 export class OrcaRuntimeWithOnClientDisconnected extends OrcaRuntimeWithHasRecentTerminalOutputPath {
   onClientDisconnected(clientId: string): void {
     ;(this as RuntimeCommandSurfaceHost<this>).revokeTerminalFileGrantsForClient(clientId)
+    ;(this as RuntimeCommandSurfaceHost<this>).releaseUntitledPlaceholdersForClient(clientId)
     this.mobileDictation.cancelForClient(clientId)
 
     // (1) Cancel pending restore-debounce timers owned by this client.

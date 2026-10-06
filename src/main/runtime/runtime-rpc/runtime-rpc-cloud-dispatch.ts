@@ -72,6 +72,7 @@ export class RuntimeRpcCloudDispatch extends RuntimeRpcRequestAdmission {
     clearTimeout(this.cloudSessionExpiryTimers.get(socket.ws))
     this.cloudSessionExpiryTimers.delete(socket.ws)
     this.abortWebSocketDispatches(socket.ws)
+    this.runtime.releaseUntitledPlaceholdersForClient?.(socket.connectionId)
     this.runtime.cleanupSubscriptionsForConnection(socket.connectionId)
     this.runtime.cancelMobileDictationForConnection(socket.connectionId)
     this.binaryMessageRouter.deleteConnection(socket.connectionId)

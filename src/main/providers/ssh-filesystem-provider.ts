@@ -41,14 +41,14 @@ import {
   writeSshTerminalArtifact
 } from './ssh-filesystem-terminal-artifact'
 import { readSshDocPreviewFile } from './ssh-filesystem-doc-preview'
+import { SshPlaceholderTransport } from './ssh-untitled-placeholder-transport'
 const WORKSPACE_SPACE_SCAN_TIMEOUT_MS = 130_000
-export class SshFilesystemProvider implements IFilesystemProvider {
+export class SshFilesystemProvider extends SshPlaceholderTransport implements IFilesystemProvider {
   private connectionId: string
   private mux: SshChannelMultiplexer
   private watchListeners = new Map<string, WatchRegistration>()
   private unsubscribeNotifications: (() => void) | null = null
   private tempDirPromise: Promise<string> | null = null
-  private disposed = false
   private loggedStreamFallback = false
   readonly downloadFolder?: IFilesystemProvider['downloadFolder']
 
@@ -59,6 +59,7 @@ export class SshFilesystemProvider implements IFilesystemProvider {
     private readonly rawTransfer?: SshRawTransferOptions,
     hostPlatform?: RemoteHostPlatform
   ) {
+    super(mux)
     this.connectionId = connectionId
     this.mux = mux
 
@@ -83,7 +84,7 @@ export class SshFilesystemProvider implements IFilesystemProvider {
     if (this.disposed) {
       return
     }
-    this.disposed = true
+    super.dispose()
     if (this.unsubscribeNotifications) {
       this.unsubscribeNotifications()
       this.unsubscribeNotifications = null

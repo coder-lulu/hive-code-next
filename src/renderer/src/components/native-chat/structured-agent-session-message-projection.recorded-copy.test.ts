@@ -9,6 +9,7 @@ import type {
   AgentJournalSubmission
 } from '../../../../shared/agent-session-journal-types'
 import type { AgentSessionHistoryPage } from '../../../../shared/agent-session-wire'
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import { DISPATCH_REJECTED_HOST_RESTARTED } from '../../../../shared/structured-agent-session-dispatch-rejection'
 import { reconcileStructuredAgentSessionOutboxWithQueue } from '../../../../shared/structured-agent-session-draft-hand-off'
 import {
@@ -27,7 +28,7 @@ import { projectStructuredAgentSessionMessages } from './structured-agent-sessio
 
 const NO_CARDS: readonly string[] = []
 const MESSAGE_ID = agentJournalSubmissionKey('m')
-const WORDS = 'Orca restarted before this message was sent.'
+const WORDS = `${APP_DISPLAY_NAME} restarted before this message was sent.`
 
 function answer(sequence: number): AgentJournalRenderItem {
   return {

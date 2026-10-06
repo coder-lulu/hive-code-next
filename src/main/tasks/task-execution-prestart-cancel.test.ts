@@ -1,6 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { computeTaskExecutionFingerprint } from '../../shared/task-execution/task-execution-fingerprint'
 import { TaskExecutionHost } from './task-execution-host'
 import {
@@ -15,10 +16,16 @@ import {
 } from './task-execution.test-fixture'
 
 let directory: string
+let hostForCleanup: TaskExecutionHost | undefined
 beforeEach(async () => {
+  hostForCleanup = undefined
   directory = await taskTestDirectory()
 })
 afterEach(async () => {
+  if (hostForCleanup) {
+    await hostForCleanup.drain()
+  }
+  closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })
 async function fixture() {
@@ -40,6 +47,7 @@ async function fixture() {
     collect: async () => null,
     stop: async (record) => taskStopEvidence(record)
   })
+  hostForCleanup = host
   const command = {
     protocolVersion: 1,
     kind: 'execution.cancel',

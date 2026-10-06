@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { withFreshOmpLaunch } from '../../shared/omp-fresh-launch'
 import { describe, expect, it, vi } from 'vitest'
 import { piBuildPtyEnvMock, spawnMock } from './pty-ipc-mock-registry'
@@ -77,7 +78,7 @@ describe('registerPtyHandlers', () => {
               agentStatusHooksEnabled: false
             }
           )
-          expect(env.ORCA_CLI_BIN_DIR).toBe('/tmp/orca-user-data/cli/bin')
+          expect(env.ORCA_CLI_BIN_DIR).toBe(join('/tmp/orca-user-data', 'cli', 'bin'))
           expect(
             selectShellStartupFeatures({
               shellPath,

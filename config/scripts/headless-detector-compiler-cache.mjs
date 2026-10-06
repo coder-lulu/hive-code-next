@@ -104,7 +104,11 @@ export async function activateCompilerCache({
     mkdirSync(join(dependencies, '@esbuild'), { recursive: true })
     created = true
     for (const name of ['esbuild', `@esbuild/${process.platform}-${process.arch}`]) {
-      symlinkSync(join(identity.path, 'node_modules', name), join(dependencies, name), 'dir')
+      symlinkSync(
+        join(identity.path, 'node_modules', name),
+        join(dependencies, name),
+        process.platform === 'win32' ? 'junction' : 'dir'
+      )
     }
     const require = createRequire(join(root, 'package.json'))
     const esbuild = require('esbuild')

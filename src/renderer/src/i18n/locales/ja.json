@@ -3635,7 +3635,10 @@
         },
         "useRichMarkdownReviewData": {
           "f9d2acd6b0": "すべての未送信のメモ"
-        }
+        },
+        "untitledPlaceholderPreserved": "このホストでは空のファイルを安全に削除できないため、ファイルを保持しました。",
+        "untitledPlaceholderRecovery": "復元できるようファイルを保持しました。{{path}} から復元してください。",
+        "untitledDiscardFailed": "このファイルの変更を破棄できませんでした。編集内容は保持されています。"
       },
       "emulator": {
         "pane": {

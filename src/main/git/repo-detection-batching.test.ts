@@ -20,7 +20,7 @@ describe('repository registration probe batching', () => {
   let repo: string
 
   beforeEach(() => {
-    directory = mkdtempSync(join(tmpdir(), 'orca-repo-probe-count-'))
+    directory = realpathSync.native(mkdtempSync(join(tmpdir(), 'orca-repo-probe-count-')))
     repo = join(directory, 'repo')
     mkdirSync(repo)
     git(repo, ['init', '-q'])
@@ -60,7 +60,7 @@ describe('repository registration probe batching', () => {
     expect(inspected.rootPath).toBe(
       git(linked, ['rev-parse', '--show-toplevel']).trim().replace(/\\/g, '/')
     )
-    expect(inspected.mainRepoPath).toBe(realpathSync(repo))
+    expect(inspected.mainRepoPath).toBe(realpathSync.native(repo))
     expect(probe).toHaveBeenCalledTimes(2)
     if (!inspected.mainRepoPath) {
       throw new Error('Linked checkout did not identify its main checkout')
@@ -98,7 +98,7 @@ describe('repository registration probe batching', () => {
     expect(inspectGitRepoForRegistration(alias)).toEqual({
       isRepo: true,
       rootPath: git(linked, ['rev-parse', '--show-toplevel']).trim().replace(/\\/g, '/'),
-      mainRepoPath: realpathSync(repo)
+      mainRepoPath: realpathSync.native(repo)
     })
     expect(probe).toHaveBeenCalledTimes(2)
   })
@@ -109,7 +109,7 @@ describe('repository registration probe batching', () => {
     const probe = vi.spyOn(runner, 'gitExecFileSync')
     expect(inspectGitRepoForRegistration(bare)).toEqual({
       isRepo: true,
-      rootPath: bare,
+      rootPath: bare.replace(/\\/g, '/'),
       mainRepoPath: null
     })
     expect(probe).toHaveBeenCalledOnce()

@@ -24,8 +24,10 @@ Session Search:
   search                    Search indexed agent sessions on the selected HiveCode host
 
 Accounts:
-  account add               Add a managed Claude or Codex account on this HiveCode host
-  account list              List managed Claude and Codex accounts on this HiveCode host
+  account add               Add a managed agent account on this HiveCode host
+  account list              List managed agent accounts on this HiveCode host
+  account select            Select an OpenCode or Devin account for new launches
+  account rm                Remove an OpenCode or Devin account and its private data
 
 Runtime Ownership:
   runtime status            Show this installation's account ownership and presence

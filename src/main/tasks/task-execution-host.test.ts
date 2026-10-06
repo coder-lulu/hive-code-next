@@ -1,6 +1,7 @@
 import { rm } from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import {
   TaskExecutionHost,
   type TaskExecutionHostDependencies,
@@ -20,8 +21,20 @@ import {
 let directory: string
 let deps: TaskExecutionHostDependencies
 let host: TaskExecutionHost
+let directoryForCleanup: string | undefined
+const hostsForCleanup = new Set<TaskExecutionHost>()
+
+function createHost(dependencies: TaskExecutionHostDependencies): TaskExecutionHost {
+  const created = new TaskExecutionHost(dependencies)
+  hostsForCleanup.add(created)
+  return created
+}
+
 beforeEach(async () => {
+  directoryForCleanup = undefined
+  hostsForCleanup.clear()
   directory = await taskTestDirectory()
+  directoryForCleanup = directory
   const store = await openTestAgentSessionRecordStore(directory)
   deps = {
     store: store.tasks,
@@ -37,11 +50,16 @@ beforeEach(async () => {
     stop: vi.fn(async (record) => taskStopEvidence(record)),
     evidenceTimeoutMs: 5000
   }
-  host = new TaskExecutionHost(deps)
+  host = createHost(deps)
 })
 afterEach(async () => {
-  await host.drain()
-  await rm(directory, { recursive: true, force: true })
+  for (const created of hostsForCleanup) {
+    await created.drain()
+  }
+  if (directoryForCleanup) {
+    closeTestJournalHostDatabase(directoryForCleanup)
+    await rm(directoryForCleanup, { recursive: true, force: true })
+  }
 })
 
 async function query() {
@@ -221,7 +239,7 @@ describe('local task host admission and evidence boundaries', () => {
       return TASK_TEST_LAUNCH
     })
     deps.stop = vi.fn(async () => null)
-    host = new TaskExecutionHost({ ...deps, evidenceTimeoutMs: 50 })
+    host = createHost({ ...deps, evidenceTimeoutMs: 50 })
     const request = await cancelQuery()
     await entered
     try {
@@ -279,7 +297,7 @@ describe('local task host admission and evidence boundaries', () => {
           readStarted()
         })
     )
-    host = new TaskExecutionHost({ ...deps, evidenceTimeoutMs: 5000 })
+    host = createHost({ ...deps, evidenceTimeoutMs: 5000 })
     const request = await query()
     const reconciliation = host.reconcile(request, TASK_TEST_CALLER)
     await started
@@ -310,7 +328,7 @@ describe('local task host admission and evidence boundaries', () => {
     deps.stop = vi.fn(() => new Promise<TaskExecutionStopEvidence | null>(() => undefined))
     // The real clock, rather than an injected logical clock, owns I/O deadlines.
     deps.now = Date.now
-    host = new TaskExecutionHost({ ...deps, now: Date.now, evidenceTimeoutMs: 100 })
+    host = createHost({ ...deps, now: Date.now, evidenceTimeoutMs: 100 })
     const command = { ...taskCommand(), expiresAt: new Date(Date.now() + 60_000).toISOString() }
     const accepted = await host.start(command, TASK_TEST_CALLER)
     const observation = await host.cancel(

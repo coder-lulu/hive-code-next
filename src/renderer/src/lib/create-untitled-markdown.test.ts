@@ -239,7 +239,7 @@ describe('createUntitledMarkdownFile', () => {
       .mockResolvedValueOnce({
         id: 'rpc-2',
         ok: true,
-        result: { ok: true },
+        result: 'remote-origin-lease',
         _meta: { runtimeId: 'remote-runtime' }
       })
     const runtimeEnvironmentTransportCall = vi.fn((args: RuntimeEnvironmentCallRequest) => {
@@ -260,7 +260,8 @@ describe('createUntitledMarkdownFile', () => {
       })
     ).resolves.toMatchObject({
       filePath: '/remote/repo/untitled.md',
-      relativePath: 'untitled.md'
+      relativePath: 'untitled.md',
+      untitledPlaceholderLeaseToken: 'remote-origin-lease'
     })
 
     expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(1, {
@@ -271,8 +272,9 @@ describe('createUntitledMarkdownFile', () => {
     })
     expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(2, {
       selector: 'env-1',
-      method: 'files.createFile',
+      method: 'files.createUntitledPlaceholder',
       expectedEnvironmentPairingRevision: undefined,
+      expectedEnvironmentRuntimeId: undefined,
       params: {
         worktree: 'id:wt-1',
         relativePath: 'untitled.md',

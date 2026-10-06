@@ -1,4 +1,5 @@
 import type { EditorGet, EditorSet } from '../types/editor-set-get'
+import { releaseEditorUntitledPlaceholder } from '@/components/editor/editor-untitled-placeholder'
 import type { EditorSlice } from '../types/editor-slice'
 import type { OpenFilePathRekey, RekeyOpenFilesResult } from '../types/open-file-path-rekey'
 import { rekeyFileIdRecord } from '../file-ids/open-file-path-rekey'
@@ -6,7 +7,7 @@ import { migrateHydratedEditorTabsAndGroups } from '../file-ids/hydrated-editor-
 
 export function createRekeyOpenFilesAction(
   set: EditorSet,
-  _get: EditorGet
+  get: EditorGet
 ): Pick<EditorSlice, 'rekeyOpenFilesForPathChange'> {
   return {
     rekeyOpenFilesForPathChange: ({ rekeys, moveOperationId }) => {
@@ -14,6 +15,16 @@ export function createRekeyOpenFilesAction(
         return { ok: true }
       }
       let result: RekeyOpenFilesResult = { ok: true }
+      const sourceState = get()
+      const releasing = sourceState.openFiles.filter(
+        (file) =>
+          file.untitledPlaceholderLeaseToken &&
+          rekeys.some(
+            (rekey) =>
+              rekey.oldFileId === file.id &&
+              (rekey.consumeUntitled || rekey.newFilePath !== file.filePath)
+          )
+      )
       set((s) => {
         const migrations = new Map<string, string>()
         const rekeyByOldId = new Map<string, OpenFilePathRekey>()
@@ -61,6 +72,9 @@ export function createRekeyOpenFilesAction(
             id: rekey.newFileId,
             filePath: rekey.newFilePath,
             relativePath: rekey.newRelativePath,
+            ...(rekey.newFilePath !== f.filePath
+              ? { untitledPlaceholderLeaseToken: undefined }
+              : {}),
             // A moved tab's id no longer matches the host snapshot, so leaving it host-owned would cull it (losing the draft); the coordinator close-notifies the host's old-path tab. (Re-homing the host tab in place is a follow-up.)
             mirroredFromRuntimeSession: undefined,
             ...(rekey.newLanguage !== undefined ? { language: rekey.newLanguage } : {}),
@@ -68,7 +82,11 @@ export function createRekeyOpenFilesAction(
               ? { markdownPreviewSourceFileId: rekey.newMarkdownPreviewSourceFileId }
               : {}),
             ...(rekey.consumeUntitled
-              ? { isUntitled: undefined, deleteUntouchedOnClose: undefined }
+              ? {
+                  isUntitled: undefined,
+                  deleteUntouchedOnClose: undefined,
+                  untitledPlaceholderLeaseToken: undefined
+                }
               : {}),
             ...(gatesEcho
               ? {
@@ -146,6 +164,11 @@ export function createRekeyOpenFilesAction(
             : {})
         }
       })
+      if (result.ok) {
+        for (const file of releasing) {
+          releaseEditorUntitledPlaceholder(sourceState, file)
+        }
+      }
       return result
     }
   }

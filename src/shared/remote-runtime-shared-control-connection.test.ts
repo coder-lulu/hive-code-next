@@ -9,6 +9,7 @@ import { getRemoteRuntimeRequestAdmissionEvidence } from './remote-runtime-prepa
 import { RemoteRuntimeSharedControlConnection } from './remote-runtime-shared-control-connection'
 import { isRuntimeSubscriptionReplayResponse } from './runtime-subscription-replay'
 import * as protocolVersion from './protocol-version'
+import { AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY } from './agent-session-background-task-child-views-capability'
 import { APP_DISPLAY_NAME } from './brand'
 import {
   closeSharedControlTestServers,
@@ -41,6 +42,7 @@ describe('RemoteRuntimeSharedControlConnection', () => {
       clientCapabilities: [
         protocolVersion.AGENT_SESSION_BACKGROUND_TASK_STOP_CAPABILITY,
         protocolVersion.AGENT_SESSION_BACKGROUND_TASK_ROW_STOP_CAPABILITY,
+        AGENT_SESSION_BACKGROUND_TASK_CHILD_VIEWS_CAPABILITY,
         protocolVersion.AGENT_SESSION_TURN_ITEM_CAPABILITY,
         protocolVersion.SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
         protocolVersion.SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,

@@ -123,7 +123,7 @@ describe('moved-code base normalization budget', () => {
         return 'fixture.mjs\0'
       }
       if (args.includes('--unified=0')) {
-        return '@@ -0,0 +1 @@\n+brandNewCall()\n'
+        return 'diff --git a/fixture.mjs b/fixture.mjs\n--- a/fixture.mjs\n+++ b/fixture.mjs\n@@ -0,0 +1 @@\n+brandNewCall()\n'
       }
       throw new Error(`Unexpected Git arguments: ${args.join(' ')}`)
     })

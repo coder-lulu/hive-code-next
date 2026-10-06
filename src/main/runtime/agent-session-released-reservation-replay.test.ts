@@ -14,6 +14,7 @@ import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-ad
 import type { AgentSessionLease } from '../../shared/agent-session-record'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
 import { openTestAgentSessionRecordStore } from './agent-session-record-store-test-harness'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
 
 const NOW = 1_800_000_000_000
@@ -26,11 +27,15 @@ const INDETERMINATE: AgentSessionOwnerProbe = { outcome: 'indeterminate', reason
 let directory: string
 
 beforeEach(async () => {
+  directory = ''
   directory = await mkdtemp(join(tmpdir(), 'orca-released-reservation-replay-'))
 })
 
 afterEach(async () => {
-  await rm(directory, { recursive: true, force: true })
+  if (directory) {
+    closeTestJournalHostDatabase(directory)
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 function open(): Promise<AgentSessionRecordStore> {
@@ -65,6 +70,7 @@ function createRequest(
 async function releasedByRestart(now: number): Promise<AgentSessionRecordStore> {
   const first = await open()
   await first.reserveOwner(createRequest())
+  closeTestJournalHostDatabase(directory)
   const store = await open()
   await store.reconcileOnRestart({ probe: async () => ({ outcome: 'reservation-unused' }), now })
   expect(store.getRecord(SESSION)?.lease).toMatchObject({
@@ -79,6 +85,7 @@ describe('a create retried after recovery released its reservation', () => {
   it('keeps an unproven reservation fenced across restart and refuses a retry', async () => {
     const first = await open()
     await first.reserveOwner(createRequest())
+    closeTestJournalHostDatabase(directory)
     const store = await open()
     await store.reconcileOnRestart({ probe: async () => INDETERMINATE, now: NOW + 1_000 })
     const lease = store.getRecord(SESSION)?.lease

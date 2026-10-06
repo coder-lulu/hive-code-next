@@ -27,7 +27,10 @@ import type { NativeChatLaunchPromptDelivery } from '@/lib/native-chat-initial-v
 import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { readLocalRuntimeCapabilitiesOrUnknown } from '@/runtime/local-runtime-capabilities'
-import { resolveStructuredAgentSessionOwner } from '@/runtime/structured-agent-session-owner'
+import {
+  resolveStructuredAgentSessionOwner,
+  structuredAgentSessionTargetForHost
+} from '@/runtime/structured-agent-session-owner'
 import { pairedHostClientCapabilities } from '@/runtime/paired-host-client-capabilities'
 import { lastVerifiedRuntimeStatus } from '../../../shared/runtime-host-status'
 
@@ -143,9 +146,16 @@ export function buildAgentLaunchRouteInput(
   const { agent, workspace, tuiCustomization } = args
   // The host a chat here would be created on; a workspace the catalog cannot pin to one host has
   // no host to answer for it yet.
-  const owner = workspace.worktreeId
-    ? resolveStructuredAgentSessionOwner(store, workspace.worktreeId)
-    : undefined
+  // An explicit owner qualifies a colliding workspace ID; the unqualified catalog cannot replace it.
+  const explicitOwner = workspace.worktreeId ? workspace.executionHostId : undefined
+  const owner =
+    explicitOwner !== undefined
+      ? structuredAgentSessionTargetForHost(explicitOwner)
+        ? explicitOwner
+        : null
+      : workspace.worktreeId
+        ? resolveStructuredAgentSessionOwner(store, workspace.worktreeId)
+        : undefined
   const executionHostId = owner ?? resolveExecutionHostId(store, workspace)
   return {
     agent,

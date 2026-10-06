@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import {
   openTestAgentSessionRecordStore,
   readPersistedTestAgentSessionStoreText
@@ -39,11 +40,15 @@ function request(overrides: Partial<AgentSessionReserveRequest> = {}): AgentSess
 }
 
 beforeEach(async () => {
+  directory = ''
   directory = await mkdtemp(join(tmpdir(), 'orca-agent-session-launch-env-'))
 })
 
 afterEach(async () => {
-  await rm(directory, { recursive: true, force: true })
+  if (directory) {
+    closeTestJournalHostDatabase(directory)
+    await rm(directory, { recursive: true, force: true })
+  }
 })
 
 describe('agent session launch environment admission', () => {

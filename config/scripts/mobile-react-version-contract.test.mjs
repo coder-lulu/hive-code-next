@@ -12,8 +12,9 @@ describe('the mobile React runtime', () => {
     const reactTypes = manifest.devDependencies['@types/react']
 
     expect(react).toMatch(/^\d+\.\d+\.\d+$/)
-    expect(reactTypes).toMatch(/^\d+\.\d+\.\d+$/)
-    expect(reactTypes.split('.').slice(0, 2)).toEqual(react.split('.').slice(0, 2))
+    const reactTypesVersion = reactTypes.match(/^~?(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/)
+    expect(reactTypesVersion).not.toBeNull()
+    expect(reactTypesVersion?.slice(1, 3)).toEqual(react.split('.').slice(0, 2))
     expect({
       react,
       reactDom: manifest.dependencies['react-dom'],

@@ -647,11 +647,14 @@ function armUpdateCheckStallTimer(attemptId: number): void {
   }, UPDATE_CHECK_STALL_TIMEOUT_MS)
 }
 
-function beginUpdateCheckAttempt(): number {
+function beginUpdateCheckAttempt(preserveDownloadedContext = false): number {
+  const retainDownloadedContext = preserveDownloadedContext && hasInstallableDownloadedVersion()
   cancelAutomaticUpdateCheckTimer()
   finishActiveUpdateCheckAttempt()
-  clearHiveCloudDecision()
-  clearAvailableUpdateContext()
+  if (!retainDownloadedContext) {
+    clearHiveCloudDecision()
+    clearAvailableUpdateContext()
+  }
   updateAvailableEventPendingAttemptId = null
   updateCheckAttemptSequence += 1
   activeUpdateCheckAttemptId = updateCheckAttemptSequence
@@ -1769,7 +1772,7 @@ async function prepareHiveCloudReleaseFeed(
   if (checkSourceResolver && checkSource) {
     const identity = getDesktopReleaseIdentity()
     try {
-      pendingHiveCloudDecision = await fetchHiveCloudUpdateDecision({
+      const decision = await fetchHiveCloudUpdateDecision({
         endpoint: checkSource.endpoint,
         product: identity.product,
         platform: identity.platform,
@@ -1780,9 +1783,16 @@ async function prepareHiveCloudReleaseFeed(
         fetchImpl: fetchWithProductUpdaterSession,
         timeoutMs: GENERIC_UPDATE_PREFLIGHT_TIMEOUT_MS
       })
-      activeHiveCloudDecision = pendingHiveCloudDecision
-      cacheMandatoryHiveCloudDecision(pendingHiveCloudDecision)
+      if (!canCommitReleaseFeedForAttempt(attemptId)) {
+        return 'superseded'
+      }
+      pendingHiveCloudDecision = decision
+      activeHiveCloudDecision = decision
+      cacheMandatoryHiveCloudDecision(decision)
     } catch (error) {
+      if (!canCommitReleaseFeedForAttempt(attemptId)) {
+        return 'superseded'
+      }
       const cachedMandatory = readCachedMandatoryHiveCloudDecision(
         getDesktopReleaseIdentity().buildNumber
       )
@@ -2110,7 +2120,7 @@ function runBackgroundUpdateCheck(
   // Why: 'checking-for-update' arrives a tick later, so a second focus/resume can slip in before status flips; track launch in memory to dedupe that gap.
   backgroundCheckLaunchPending = true
   backgroundCheckPromotedToUserInitiated = false
-  const attemptId = beginUpdateCheckAttempt()
+  const attemptId = beginUpdateCheckAttempt(true)
   const checkVariant = getUpdateCheckVariant()
   applyUpdateCheckVariant(checkVariant)
   // Don't send 'checking' here — the 'checking-for-update' handler does; sending from both dupes notifications (issue #35).

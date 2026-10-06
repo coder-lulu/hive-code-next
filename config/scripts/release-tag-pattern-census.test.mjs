@@ -1,8 +1,8 @@
 // Census: every release-triggered workflow and every script that lists this repo's releases
-// classifies tags through release-tag-patterns.mjs, so a new tag family such as the agent state
+// classifies tags through shared patterns or real rejection proofs, so the agent state
 // rules cannot reach a desktop-only path through one that forgot it.
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { posix } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
 import {
@@ -51,7 +51,7 @@ function isReleaseTriggered(workflow) {
 function releaseTriggeredWorkflows() {
   return readdirSync(WORKFLOWS_DIR)
     .filter((name) => /\.ya?ml$/.test(name))
-    .map((name) => join(WORKFLOWS_DIR, name))
+    .map((name) => posix.join(WORKFLOWS_DIR, name))
     .filter((path) => isReleaseTriggered(parse(read(path))))
 }
 
@@ -65,7 +65,7 @@ function releaseListingScripts() {
   return SCRIPT_DIRS.flatMap((dir) =>
     readdirSync(dir)
       .filter((name) => name.endsWith('.mjs') && !name.includes('.test.'))
-      .map((name) => join(dir, name))
+      .map((name) => posix.join(dir, name))
   ).filter((path) => LISTS_RELEASES.test(read(path)))
 }
 
@@ -75,6 +75,28 @@ function releaseListingScripts() {
  * shared patterns or add a proof here.
  */
 const DESKTOP_ONLY_PROOFS = {
+  'config/scripts/publish-hivecloud-desktop-release.mjs': async () => {
+    const fetch = vi.fn()
+    vi.stubGlobal('fetch', fetch)
+    for (const tag of RULES_TAGS) {
+      for (const [name, value] of Object.entries({
+        HIVECLOUD_API_URL: 'https://releases.example.test',
+        HIVECLOUD_API_TOKEN: 'test-token',
+        HIVECODE_VERSION: tag,
+        HIVECODE_DESKTOP_PLATFORM: 'windows',
+        HIVECODE_DESKTOP_ARCHITECTURE: 'x64',
+        HIVECODE_RELEASE_CHANNEL: 'stable',
+        HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT: '',
+        HIVECLOUD_RELEASE_ATTESTATION_KEY: Buffer.alloc(32, 7).toString('base64')
+      })) {
+        vi.stubEnv(name, value)
+      }
+      vi.resetModules()
+      const { main } = await import('./publish-hivecloud-desktop-release.mjs')
+      await expect(main()).rejects.toThrow('HIVECODE_VERSION is not a supported SemVer value')
+      expect(fetch).not.toHaveBeenCalled()
+    }
+  },
   'config/scripts/create-draft-release.mjs': async () => {
     const { latestPreviousPublishedDesktopReleaseTag } = await import('./create-draft-release.mjs')
     const releases = [
@@ -118,25 +140,111 @@ const DESKTOP_ONLY_PROOFS = {
   }
 }
 
+const RELEASE_WORKFLOW_PROOFS = {
+  '.github/workflows/release-policy.yml': async () => {
+    const workflow = parse(read('.github/workflows/release-policy.yml'))
+    const script = workflow.jobs.enforce.steps.find(
+      (step) => step.name === 'Enforce release policy'
+    ).with.script
+    const execute = new (Object.getPrototypeOf(async () => {}).constructor)(
+      'github',
+      'context',
+      'core',
+      script
+    )
+    for (const tag of RULES_TAGS) {
+      for (const author of ['github-actions[bot]', 'maintainer']) {
+        for (const action of ['published', 'edited']) {
+          const release = rulesRelease(tag, {
+            id: 8,
+            prerelease: false,
+            author: { login: author }
+          })
+          const github = {
+            paginate: vi.fn(async () => [release]),
+            rest: {
+              repos: {
+                listReleases: vi.fn(),
+                updateRelease: vi.fn(async () => ({})),
+                deleteRelease: vi.fn(async () => ({}))
+              },
+              git: { deleteRef: vi.fn(async () => ({})) }
+            }
+          }
+          const core = { warning: vi.fn() }
+          await execute(
+            github,
+            {
+              repo: { owner: 'fixture-owner', repo: 'fixture-repo' },
+              payload: { action, release }
+            },
+            core
+          )
+          if (action === 'published') {
+            expect(github.rest.repos.updateRelease).toHaveBeenCalledExactlyOnceWith({
+              owner: 'fixture-owner',
+              repo: 'fixture-repo',
+              release_id: 8,
+              draft: true,
+              prerelease: true,
+              make_latest: 'false'
+            })
+            expect(github.rest.repos.deleteRelease).toHaveBeenCalledExactlyOnceWith({
+              owner: 'fixture-owner',
+              repo: 'fixture-repo',
+              release_id: 8
+            })
+            expect(github.rest.git.deleteRef).toHaveBeenCalledExactlyOnceWith({
+              owner: 'fixture-owner',
+              repo: 'fixture-repo',
+              ref: `tags/${tag}`
+            })
+          } else {
+            expect(github.rest.repos.updateRelease).not.toHaveBeenCalled()
+            expect(github.rest.repos.deleteRelease).not.toHaveBeenCalled()
+            expect(github.rest.git.deleteRef).not.toHaveBeenCalled()
+            expect(github.paginate).not.toHaveBeenCalled()
+            expect(core.warning).toHaveBeenCalledWith(expect.stringContaining('left as-is'))
+          }
+        }
+      }
+    }
+  }
+}
+
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
+  vi.resetModules()
 })
 
 describe('release tag pattern census', () => {
   it('finds the release-triggered workflows and release-listing scripts it guards', () => {
-    expect(releaseTriggeredWorkflows().length).toBeGreaterThan(0)
+    const workflows = releaseTriggeredWorkflows()
+    expect(workflows.length).toBeGreaterThan(0)
     expect(releaseListingScripts().length).toBeGreaterThan(0)
+    expect(
+      Object.keys(RELEASE_WORKFLOW_PROOFS).filter((path) => !workflows.includes(path))
+    ).toEqual([])
   })
 
-  it.each(releaseTriggeredWorkflows())('%s classifies tags through the shared patterns', (path) => {
-    const text = read(path)
-    const viaScript = scriptsNamedIn(text).some(importsSharedPatterns)
-    const viaShellPattern = text.includes(DESKTOP_STABLE_TAG_SHELL_PATTERN)
-    expect(
-      viaScript || viaShellPattern,
-      `${path} names no script importing release-tag-patterns.mjs and embeds no shared pattern`
-    ).toBe(true)
-  })
+  it.each(releaseTriggeredWorkflows())(
+    '%s classifies tags through the shared patterns',
+    async (path) => {
+      const text = read(path)
+      const viaScript = scriptsNamedIn(text).some(importsSharedPatterns)
+      const viaShellPattern = text.includes(DESKTOP_STABLE_TAG_SHELL_PATTERN)
+      const proof = RELEASE_WORKFLOW_PROOFS[path]
+      if (!viaScript && !viaShellPattern && proof) {
+        await proof()
+        return
+      }
+      expect(
+        viaScript || viaShellPattern,
+        `${path} names no script importing release-tag-patterns.mjs and embeds no shared pattern`
+      ).toBe(true)
+    }
+  )
 
   it.each(releaseTriggeredWorkflows())(
     '%s checks out the shared patterns beside its script',
