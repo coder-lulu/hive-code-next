@@ -561,6 +561,54 @@ describe('LocalRuntimeOwnershipService', () => {
     service.stop()
   })
 
+  it('requires step-up for rejected recovery without replacing the claimed identity', async () => {
+    const { service, client, getStored, clearState, clearIdentity, onRegistrationChanged } =
+      fixture()
+    client.lookup.mockResolvedValue({
+      exists: true,
+      runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
+      status: 'CLAIMED',
+      resourceVersion: 2,
+      authorityGeneration: 1,
+      fencingEpoch: 1,
+      latestLeaseEpoch: 0,
+      identityPublicKeySha256: identityDigest
+    })
+    service.setAuthorization(authorization)
+    await vi.waitFor(() => expect(service.getState().relation).toBe('CLAIMED_BY_CURRENT'))
+    const registration = getStored()
+    onRegistrationChanged.mockClear()
+    client.reconcileClaim.mockRejectedValue(
+      new HiveRuntimeCloudRequestError(403, 'runtime_claim_recovery_step_up_required')
+    )
+    const openVerification = vi.fn()
+
+    try {
+      await expect(
+        service.claimLocalRuntime(authorization.accountId, openVerification)
+      ).rejects.toMatchObject({ status: 403 })
+      expect(service.getState()).toMatchObject({
+        relation: 'UNVERIFIABLE',
+        errorCode: 'STEP_UP_REQUIRED',
+        runtimeRecordId: registration?.runtimeRecordId
+      })
+      expect(getStored()).toEqual(registration)
+      for (const operation of [
+        clearState,
+        clearIdentity,
+        onRegistrationChanged,
+        client.register,
+        client.reissueClaimCapability,
+        client.createClaimChallenge,
+        openVerification
+      ]) {
+        expect(operation).not.toHaveBeenCalled()
+      }
+    } finally {
+      service.stop()
+    }
+  })
+
   it.each(['UNLINKED', 'NETWORK_FAILURE'])(
     'rechecks fenced ownership using authoritative lookup: %s',
     async (outcome) => {

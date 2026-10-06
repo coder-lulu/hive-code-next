@@ -267,7 +267,8 @@ export class LocalRuntimeOwnershipSession {
 export function ownershipErrorCode(error: unknown): string {
   if (error instanceof HiveRuntimeCloudRequestError) {
     if (error.status === 403) {
-      return error.category === 'runtime_claim_step_up_required'
+      return error.category === 'runtime_claim_step_up_required' ||
+        error.category === 'runtime_claim_recovery_step_up_required'
         ? 'STEP_UP_REQUIRED'
         : (error.category ?? 'REQUEST_FAILED')
     }
