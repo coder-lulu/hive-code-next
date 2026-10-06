@@ -32,6 +32,8 @@ import {
   type WorkflowNativeReadQuery
 } from './task-workflow-outcome-access'
 import { assertTaskExecutionStartDeadlineCurrent } from './task-execution-budget'
+import { taskDispatchFailureSummary } from './task-dispatch-failure'
+import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
 
 export type {
   TaskExecutionCaller,
@@ -180,7 +182,7 @@ export class TaskExecutionHost {
       },
       'reconcile'
     )
-    await this.settle(record, authorization.assertCurrent)
+    await this.settle(record, authorization.assertCurrent, authorization.input)
     assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
     return taskRecordObservation(this.requireRecord(query, caller), 0, 32)
   }
@@ -212,13 +214,13 @@ export class TaskExecutionHost {
       },
       'cancel'
     )
-    const cancellation = await this.deps.store.requestCancellation(
+    await this.deps.store.requestCancellation(
       command,
       command.idempotencyKey,
       this.now(),
       authorization.assertCurrent
     )
-    await this.settle(cancellation.record, authorization.assertCurrent)
+    await this.settle(record, authorization.assertCurrent, authorization.input)
     assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
     return taskRecordObservation(this.requireRecord(command, caller), 0, 32)
   }
@@ -287,12 +289,14 @@ export class TaskExecutionHost {
         const launch = await this.deps.launch(dispatch.record, dispatch.authorization)
         await this.deps.store.bindLaunch(record.command, launch, this.now())
       }
-    } catch {
-      await this.deps.store.markUnknown(record.command, this.now()).catch(() => undefined)
+    } catch (error) {
+      await this.deps.store
+        .markUnknown(record.command, this.now(), () => undefined, taskDispatchFailureSummary(error))
+        .catch(() => undefined)
     }
   }
 
-  private async settle(record: TaskExecutionRecord, validate: () => void) {
+  private async settle(record: TaskExecutionRecord, validate: () => void, input?: string) {
     if (record.result) {
       return
     }
@@ -307,7 +311,27 @@ export class TaskExecutionHost {
       this.launches.get(key),
       this.now,
       validate
-    ).finally(() => this.settlements.delete(key))
+    )
+      .then(async () => {
+        const current = this.deps.store.get(record.command)
+        if (current) {
+          assertTaskExecutionSnapshotCurrent(record, current)
+        }
+        if (
+          current?.cancellationKey &&
+          !current.result &&
+          current.dispatch === 'dispatching' &&
+          input !== undefined
+        ) {
+          await this.deps.settleCancelledBeforeReservation?.(record, input, () => {
+            validate()
+            if (this.launches.has(key)) {
+              return refuseTaskExecution('OUTCOME_UNKNOWN')
+            }
+          })
+        }
+      })
+      .finally(() => this.settlements.delete(key))
     this.settlements.set(key, settlement)
     return settlement
   }

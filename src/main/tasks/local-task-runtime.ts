@@ -24,6 +24,7 @@ import { createLocalTaskServiceCredential } from './local-task-service-credentia
 import { startLocalTaskTransport } from './local-task-transport'
 import { createTaskAgentLaunchPort } from './task-agent-launch-port'
 import { createTaskCodexEvidence } from './task-codex-evidence'
+import { createTaskCancelledDispatchSettlement } from './task-cancelled-dispatch'
 import { refuseTaskExecution } from './task-execution-error'
 import { createLocalTaskFacadeAssembly } from './local-task-facade-assembly'
 import { TaskArtifactIndex } from './task-artifact-index'
@@ -198,6 +199,7 @@ export async function startLocalTaskRuntime(options: {
       collectCommands: evidence.collectCommands
     }),
     store: resources.store.tasks,
+    settleCancelledBeforeReservation: createTaskCancelledDispatchSettlement(resources.store.tasks),
     capabilities,
     authorizeEnforcement: enforcement.authorize,
     resolveStart: (query) => issuer.resolveGrant(query.authorizationRef)?.command ?? null,

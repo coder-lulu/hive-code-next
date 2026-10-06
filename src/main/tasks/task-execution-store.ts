@@ -20,6 +20,8 @@ import {
   reserveTaskModelDispatch
 } from './task-model-dispatch-reservation'
 import { bindTaskLaunch } from './task-launch-binding'
+import { settleCancelledTaskCodexDispatch } from './task-cancelled-dispatch'
+import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
 import { assertTaskCodexSessionBinding } from './task-codex-session-binding'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { hasTaskSessionBinding } from './task-session-association'
@@ -46,6 +48,29 @@ export class TaskExecutionPersistence {
 
   listActive(): TaskExecutionRecord[] {
     return this.transactions.readActiveTaskExecutions()
+  }
+
+  settleCancelledCodexDispatch(
+    expected: TaskExecutionRecord,
+    fingerprint: string,
+    readNow: () => number,
+    validate: () => void
+  ) {
+    return this.update(
+      expected.command,
+      (record, now) => {
+        validate()
+        assertTaskExecutionSnapshotCurrent(expected, record)
+        return settleCancelledTaskCodexDispatch(
+          this.transactions.state,
+          record,
+          fingerprint,
+          now,
+          expected
+        )
+      },
+      readNow
+    )
   }
 
   readActive(validate: () => void): Promise<TaskExecutionRecord[]> {
@@ -218,16 +243,25 @@ export class TaskExecutionPersistence {
     )
   }
 
-  markUnknown(identity: Identity, now: number, validate: () => void = () => undefined) {
+  markUnknown(
+    identity: Identity,
+    now: number,
+    validate: () => void = () => undefined,
+    summary?: string
+  ) {
     return this.update(
       identity,
       (record) => {
         validate()
-        return record.result || record.status === 'outcome_unknown'
+        return record.result ||
+          (record.status === 'outcome_unknown' &&
+            (!summary || record.events.at(-1)?.summary === summary))
           ? null
           : { ...record, status: 'outcome_unknown' }
       },
-      now
+      now,
+      undefined,
+      summary
     )
   }
 
@@ -269,9 +303,10 @@ export class TaskExecutionPersistence {
 
   private update(
     identity: Identity,
-    apply: (record: TaskExecutionRecord) => TaskExecutionRecord | null,
-    now: number,
-    validate?: () => void
+    apply: (record: TaskExecutionRecord, now: number) => TaskExecutionRecord | null,
+    now: number | (() => number),
+    validate?: () => void,
+    summary?: string
   ) {
     return this.transactions.transact(() => {
       validate?.()
@@ -280,22 +315,24 @@ export class TaskExecutionPersistence {
       if (!current) {
         return refuseTaskExecution('EXECUTION_NOT_FOUND')
       }
-      const next = apply(current)
+      const recordedAt = typeof now === 'function' ? now() : now
+      const next = apply(current, recordedAt)
       if (!next) {
         return { changed: false, record: structuredClone(current) }
       }
-      const statusChanged = next.status !== current.status
+      const statusChanged = next.status !== current.status || summary !== undefined
       const events = statusChanged
         ? [
             ...current.events,
             {
               ...taskExecutionIdentity(current.command),
               commandFingerprint: current.commandFingerprint,
-              recordedAt: new Date(now).toISOString(),
+              recordedAt: new Date(recordedAt).toISOString(),
               kind: 'execution.event' as const,
               eventId: `event:${current.commandFingerprint}:${current.events.length + 1}`,
               sequence: current.events.length + 1,
               status: next.status,
+              ...(summary ? { summary } : {}),
               artifactRefs: next.result?.artifactRefs ?? []
             }
           ]

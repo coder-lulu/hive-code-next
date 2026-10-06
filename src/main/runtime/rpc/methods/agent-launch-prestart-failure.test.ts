@@ -169,4 +169,26 @@ describe('a launch whose terminal fails', () => {
       error: { code: 'agent_session_operation_unknown' }
     })
   })
+
+  it('records an actual required-mode refusal before surface creation as failed', async () => {
+    const runtime = runtimeStub({ settings: {} })
+    runtime.getStructuredAgentSessionCreateSupport.mockResolvedValueOnce({
+      supported: false,
+      reason: 'agent'
+    })
+    const response = await AGENT_LAUNCH_REPLAY.handler(
+      AGENT_LAUNCH_REPLAY.params.parse({ ...EXISTING_LAUNCH, operationId: OPERATION_ID }),
+      {
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the existing replay fixture implements every reached runtime method and launches no provider.
+        runtime: runtime as unknown as OrcaRuntimeService,
+        requiredAgentLaunchMode: 'structured'
+      }
+    ).catch((error) => error)
+    expect(response.message).toBe('agent_launch_required_mode_unavailable')
+    expect(outcomeOf(OPERATION_ID)).toMatchObject({
+      status: 'failed',
+      code: 'agent_launch_required_mode_unavailable'
+    })
+    expect(runtime.createTerminal).not.toHaveBeenCalled()
+  })
 })

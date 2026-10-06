@@ -7,6 +7,8 @@ import {
 import { settleBeforeDeadline } from '../runtime/settle-before-deadline'
 import { TaskExecutionError } from './task-execution-error'
 import { taskExecutionIdentity, type TaskExecutionRecord } from './task-execution-record'
+import { taskCancelledResult } from './task-cancelled-result'
+import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
 import type {
   TaskExecutionHostDependencies,
   TaskExecutionStopEvidence
@@ -48,7 +50,14 @@ export async function collectTaskExecutionSettlement(
   if (pendingLaunch) {
     await settleBeforeDeadline(() => pendingLaunch, undefined, deadline)
   }
-  let record = deps.store.get(initial.command)
+  const readCurrent = () => {
+    const current = deps.store.get(initial.command)
+    if (current) {
+      assertTaskExecutionSnapshotCurrent(initial, current)
+    }
+    return current
+  }
+  let record = readCurrent()
   if (!record || record.result) {
     return
   }
@@ -68,7 +77,7 @@ export async function collectTaskExecutionSettlement(
       readFailed = true
     }
   }
-  record = deps.store.get(initial.command)
+  record = readCurrent()
   if (!record || record.result) {
     return
   }
@@ -87,7 +96,7 @@ export async function collectTaskExecutionSettlement(
     await deps.store.markUnknown(record.command, now(), validate)
     return
   }
-  const current = deps.store.get(record.command)
+  const current = readCurrent()
   if (!current || current.result) {
     return
   }
@@ -100,18 +109,22 @@ export async function collectTaskExecutionSettlement(
     record.command,
     (latest) => {
       validate()
+      assertTaskExecutionSnapshotCurrent(initial, latest)
       if (!latest.cancellationKey && !succeeded) {
         throw new TaskExecutionError('OUTCOME_UNKNOWN')
       }
       const recordedAt = new Date(now()).toISOString()
+      if (latest.cancellationKey) {
+        return taskCancelledResult(latest, proof.evidenceKind, now())
+      }
       const common = {
         ...taskExecutionIdentity(latest.command),
         commandFingerprint: latest.commandFingerprint,
         recordedAt,
         kind: 'execution.result' as const,
         receiptId: `result:${randomUUID()}`,
-        outcomeRef: latest.cancellationKey ? `cancel:${randomUUID()}` : succeeded!.outcomeRef,
-        artifactRefs: latest.cancellationKey ? [] : succeeded!.artifactRefs,
+        outcomeRef: succeeded!.outcomeRef,
+        artifactRefs: succeeded!.artifactRefs,
         usageFactRefs: [],
         stopProof: {
           proofRef: `stop:${randomUUID()}`,
@@ -121,13 +134,11 @@ export async function collectTaskExecutionSettlement(
           recordedAt
         }
       }
-      return latest.cancellationKey
-        ? { ...common, status: 'cancelled' }
-        : {
-            ...common,
-            status: succeeded!.status ?? 'succeeded',
-            stopProof: { ...common.stopProof, evidenceKind: 'stopped' }
-          }
+      return {
+        ...common,
+        status: succeeded!.status ?? 'succeeded',
+        stopProof: { ...common.stopProof, evidenceKind: 'stopped' }
+      }
     },
     now()
   )

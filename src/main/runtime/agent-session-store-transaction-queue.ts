@@ -12,6 +12,7 @@ import {
 } from './agent-session-record-store-file'
 import { withFileTransactionLock } from '../file-transaction-lock'
 import type { TaskExecutionRecord } from '../tasks/task-execution-record'
+import { taskExecutionEvidenceRegressed } from '../tasks/task-execution-evidence-regression'
 
 function markLoadedLeasesUnreconciled(state: AgentSessionStoreState): void {
   for (const [sessionId, record] of state.records) {
@@ -113,6 +114,7 @@ export class AgentSessionStoreTransactionQueue {
           throw new Error('agent_session_legacy_required')
         }
         await this.refreshExternallyChangedState()
+        await this.persistTaskRecoveryFence()
         const records = new Map(this.state.records)
         const hiveSessions = new Map(this.state.hiveSessions)
         const hiveRecoveryFenceAt = this.state.hiveRecoveryFenceAt
@@ -199,6 +201,20 @@ export class AgentSessionStoreTransactionQueue {
     return this.transact(() => undefined)
   }
 
+  private async persistTaskRecoveryFence(): Promise<void> {
+    if (!this.needsRewrite || !this.state.taskRecoveryBlocked || this.diskRecoveredFromBackup) {
+      return
+    }
+    // A refused business callback must not erase the host's observed loss of execution evidence.
+    await saveAgentSessionStore(this.filePath, this.state, {
+      primaryStatus: this.diskStoreFound ? 'validated' : 'unusable-or-absent'
+    })
+    this.state.schemaVersion = AGENT_SESSION_STORE_SCHEMA_VERSION
+    this.diskRevision = agentSessionStoreRevision(this.state)
+    this.diskStoreFound = true
+    this.needsRewrite = false
+  }
+
   private async refreshExternallyChangedState(): Promise<void> {
     const loaded = await loadAgentSessionStore(this.filePath, this.hostId)
     if (this.diskStoreFound && !loaded.storeFound) {
@@ -214,10 +230,19 @@ export class AgentSessionStoreTransactionQueue {
     if (loaded.readOnly) {
       throw new Error('agent_session_legacy_required')
     }
+    const lostTaskEffects = taskExecutionEvidenceRegressed(
+      this.state.taskExecutions,
+      loaded.state.taskExecutions
+    )
+    const retainedTaskFence =
+      this.state.taskRecoveryBlocked === true && !loaded.state.taskRecoveryBlocked
+    if (lostTaskEffects || this.state.taskRecoveryBlocked) {
+      loaded.state.taskRecoveryBlocked = true
+    }
     markLoadedLeasesUnreconciled(loaded.state)
     this.state = loaded.state
     this.diskRevision = diskRevision
-    this.needsRewrite = loaded.needsRewrite
+    this.needsRewrite = loaded.needsRewrite || lostTaskEffects || retainedTaskFence
   }
 }
 

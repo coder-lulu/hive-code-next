@@ -160,6 +160,7 @@ async function runAgentLaunch(
     runtime: context.runtime,
     intent,
     requiredMode: context.requiredAgentLaunchMode,
+    onPrelaunchRefused: terminalSpawn?.rethrow,
     surfaces: agentLaunchSurfaceFactory(
       context,
       attachOperationId,

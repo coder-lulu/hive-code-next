@@ -17,7 +17,8 @@ import { computeAgentSessionPayloadFingerprint } from '../../../../shared/agent-
 import type {
   AgentSessionAttachResult,
   AgentSessionMutationEnvelope,
-  AgentSessionMutationResult
+  AgentSessionMutationResult,
+  AgentSessionWireRefusal
 } from '../../../../shared/agent-session-wire'
 import {
   attachFingerprintFields,
@@ -177,12 +178,19 @@ export async function createStructuredAgentSessionForWorktree(args: {
   options?: Readonly<Record<string, string>>
   tabId?: string
   taskOrigin?: TaskStructuredLaunchOrigin
+  /** Private launch tracker; never called after attach starts. */
+  onPrepareRefused?: (refusal: AgentSessionWireRefusal, cause: unknown) => never
 }): Promise<AgentSessionMutationResult<AgentSessionAttachResult>> {
+  let preparationFailure: unknown
   const prepared: PreparedStructuredAgentSessionCreate | StructuredCreateRefused =
     await resolveUncommittedStructuredCreate(() =>
-      prepareStructuredAgentSessionCreateForWorktree(args)
+      prepareStructuredAgentSessionCreateForWorktree(args).catch((error: unknown) => {
+        preparationFailure = error
+        throw error
+      })
     )
   if ('refusal' in prepared) {
+    args.onPrepareRefused?.(prepared.refusal, preparationFailure)
     return { ok: false, refusal: prepared.refusal }
   }
   return commitStructuredAgentSessionCreate({

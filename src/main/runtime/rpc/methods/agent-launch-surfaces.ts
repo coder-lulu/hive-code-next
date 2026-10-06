@@ -112,7 +112,11 @@ export function agentLaunchSurfaceFactory(
             }
           : {}),
         // The user asked for this chat, so it takes the surface — unlike a dispatched worker.
-        activate: activateChat
+        activate: activateChat,
+        onPrepareRefused: (refusal, cause) =>
+          terminalSpawn.rethrow(
+            new AgentLaunchStructuredSessionRefusedError(refusal.code, refusal.message, { cause })
+          )
       })
       if (!created.ok) {
         // The caller named this session, so a taken id is its answer, not an opaque refusal; and not
