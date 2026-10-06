@@ -28,7 +28,10 @@ describe('local task service shutdown boundaries', () => {
         }),
         observe: vi.fn(),
         cancel: vi.fn(),
-        reconcile: vi.fn()
+        reconcile: vi.fn(),
+        workflowOutcome: vi.fn(),
+        workflowCommands: vi.fn(),
+        workflowArtifact: vi.fn()
       },
       authenticate: () => ({ operationCallerKey: 'service:test' }),
       capabilities: () => ({})
@@ -48,7 +51,15 @@ describe('local task service shutdown boundaries', () => {
   })
   it('makes repeated and concurrent close calls idempotent', async () => {
     const transport = await startLocalTaskTransport({
-      host: { start: vi.fn(), observe: vi.fn(), cancel: vi.fn(), reconcile: vi.fn() },
+      host: {
+        start: vi.fn(),
+        observe: vi.fn(),
+        cancel: vi.fn(),
+        reconcile: vi.fn(),
+        workflowOutcome: vi.fn(),
+        workflowCommands: vi.fn(),
+        workflowArtifact: vi.fn()
+      },
       authenticate: () => ({ operationCallerKey: 'service:test' }),
       capabilities: () => ({})
     })

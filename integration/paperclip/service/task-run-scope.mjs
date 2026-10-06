@@ -1,11 +1,7 @@
 import { z } from 'zod'
+import { validateWorkflowTaskCase } from './task-run-case-scope.mjs'
+import { readWorkflowDefinitionRevision } from './workflow-definition-repository.mjs'
 import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent-session-mutation-envelope.ts'
-import { WorkflowTeamBindingSchema } from '../../../src/shared/task-workflow/workflow-bindings.ts'
-import { WorkflowStageSchema } from '../../../src/shared/task-workflow/workflow-definition.ts'
-import {
-  TaskDigest,
-  TaskEpoch
-} from '../../../src/shared/task-execution/task-execution-primitives.ts'
 import { HiveRuntimeAdapterBinding } from '../../../src/main/tasks/paperclip-adapter-contract.ts'
 import {
   requireTaskRepositoryScope,
@@ -13,7 +9,6 @@ import {
 } from './task-delivery-repository.mjs'
 import {
   WORKBENCH_UPSTREAM_ROLES,
-  workbenchOwnerReferences,
   requireWorkbenchProject
 } from './team-workbench-repository-records.mjs'
 
@@ -27,88 +22,6 @@ function stored(schema, value) {
   const parsed = schema.safeParse(value)
   requireMatching(parsed.success)
   return parsed.data
-}
-
-function validateCase(task, row, accountId) {
-  const owner = workbenchOwnerReferences(accountId)
-  requireMatching(
-    row.owner_account_ref === owner.accountRef &&
-      row.owner_actor_ref === owner.actorRef &&
-      row.tenant_ref === owner.accountRef,
-    'FORBIDDEN'
-  )
-  const team = stored(WorkflowTeamBindingSchema, row.team_snapshot_json)
-  const revision = stored(TaskEpoch, Number(row.project_binding_revision))
-  stored(TaskEpoch, Number(row.workflow_revision))
-  stored(TaskDigest, row.definition_digest)
-  const stage = stored(WorkflowStageSchema, row.definition_stages?.[0])
-  requireMatching(
-    row.definition_stages.length === 1 &&
-      stage.stageRef === task.stage_ref &&
-      row.snapshot_workflow_id === row.workflow_id &&
-      row.snapshot_workflow_ref === row.workflow_id &&
-      Number(row.snapshot_revision) === Number(row.workflow_revision) &&
-      row.snapshot_digest === row.definition_digest &&
-      row.snapshot_scope?.companyRef === task.company_id &&
-      row.snapshot_scope?.projectRef === task.project_id &&
-      row.stage_key === `stage_${digest(task.stage_ref)}` &&
-      row.stage_pipeline_id === row.pipeline_id &&
-      row.stage_kind === (stage.role === 'tester' ? 'review' : 'working') &&
-      digest(row.stage_config) ===
-        digest({
-          hiveWorkflow: {
-            contractVersion: 1,
-            workflowRef: row.workflow_id,
-            workflowRevision: Number(row.workflow_revision),
-            stage
-          }
-        })
-  )
-  requireMatching(
-    row.case_id === task.case_id &&
-      row.account_id === accountId &&
-      row.company_id === task.company_id &&
-      row.project_id === task.project_id &&
-      row.case_company_id === task.company_id &&
-      row.case_retired_at === null &&
-      row.origin_issue_id === task.parent_id &&
-      row.origin_company_id === task.company_id &&
-      row.origin_project_id === task.project_id &&
-      row.origin_parent_id === null &&
-      row.origin_link_company_id === task.company_id &&
-      row.origin_link_role === 'origin' &&
-      row.origin_link_retired_at === null &&
-      row.link_company_id === task.company_id &&
-      row.link_role === 'work' &&
-      row.link_retired_at === null &&
-      row.revision_company_id === task.company_id &&
-      row.revision_project_id === task.project_id &&
-      row.revision_pipeline_id === row.pipeline_id &&
-      row.revision_digest === row.definition_digest &&
-      row.pipeline_company_id === task.company_id &&
-      row.pipeline_project_id === task.project_id &&
-      row.pipeline_archived_at === null &&
-      row.workspace_selector === task.workspace_selector &&
-      Number(row.project_revision) >= revision &&
-      digest(team) === row.team_snapshot_digest &&
-      team.company.companyRef === task.company_id &&
-      team.company.ownerAccountRef === owner.accountRef &&
-      team.company.ownerActorRef === owner.actorRef &&
-      team.company.ownerScope.kind === 'personalTenant' &&
-      team.company.ownerScope.tenantRef === owner.accountRef &&
-      team.company.bindingRevision === Number(row.company_revision) &&
-      team.project.scope.companyRef === task.company_id &&
-      team.project.scope.projectRef === task.project_id &&
-      team.project.hiveWorkspaceRef === row.hive_workspace_ref &&
-      team.project.bindingRevision === revision &&
-      team.employees.every(
-        (employee) =>
-          employee.bindingRevision === revision &&
-          employee.profileRef === 'codex' &&
-          employee.profileRevision === 'codex:1'
-      )
-  )
-  return { team, stage }
 }
 
 function validateBinding(task, scope, team) {
@@ -133,10 +46,11 @@ function validateBinding(task, scope, team) {
 
 /** Admission validates full revisions; immutable revision triggers preserve that proof. No grants are cached. */
 export function createTaskRunScopeReader(sql) {
-  const read = async (db = sql, accountId, taskId, runId, lock = false) => {
+  const readInTransaction = async (db, accountId, taskId, runId, lock) => {
     requireTaskRepositoryScope(accountId, taskId, runId)
     const [candidate] =
-      await db`SELECT r.case_id,cb.project_id,cb.company_id,cb.account_id AS case_account_id
+      await db`SELECT r.case_id,cb.project_id,cb.company_id,cb.account_id AS case_account_id,
+      cb.workflow_id,cb.workflow_revision,cb.project_binding_revision
       FROM hive_task_bindings b JOIN issues i ON i.id=b.task_id
       LEFT JOIN hive_workflow_case_stage_issues r ON r.issue_id=i.id
       LEFT JOIN hive_workflow_case_bindings cb ON cb.case_id=r.case_id
@@ -146,6 +60,13 @@ export function createTaskRunScopeReader(sql) {
       requireMatching(candidate.case_account_id === accountId, 'FORBIDDEN')
       const { project } = await requireWorkbenchProject(db, accountId, candidate.project_id)
       requireMatching(project.companyId === candidate.company_id, 'FORBIDDEN')
+      await readWorkflowDefinitionRevision(
+        db,
+        project,
+        candidate.workflow_id,
+        Number(candidate.workflow_revision),
+        Number(candidate.project_binding_revision)
+      )
     }
     if (lock) {
       const locked = await db`SELECT i.id FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id
@@ -211,8 +132,7 @@ export function createTaskRunScopeReader(sql) {
       v.definition_json->'definition'->'scope' AS snapshot_scope,
       v.definition_json->'definition'->>'workflowRef' AS snapshot_workflow_ref,
       v.definition_json->'definition'->>'workflowRevision' AS snapshot_revision,
-      jsonb_path_query_array(v.definition_json,'$.definition.stages[*] ? (@.stageRef == $stage)',
-        jsonb_build_object('stage',r.stage_ref)) AS definition_stages,
+      v.definition_json->'definition' AS snapshot_definition,
       s.pipeline_id AS stage_pipeline_id,s.key AS stage_key,s.kind AS stage_kind,s.config AS stage_config,
       p.company_id AS pipeline_company_id,p.project_id AS pipeline_project_id,p.archived_at AS pipeline_archived_at
       FROM hive_workflow_case_stage_issues r JOIN hive_workflow_case_bindings cb ON cb.case_id=r.case_id
@@ -230,7 +150,7 @@ export function createTaskRunScopeReader(sql) {
       WHERE r.issue_id=${taskId} AND r.case_id=${task.case_id} AND r.stage_ref=${task.stage_ref}
         AND cb.account_id=${accountId} FOR SHARE OF r,cb,c,co_native,co,project,pb,o,ol,l,v,p,s`
     requireMatching(Boolean(row), 'FORBIDDEN')
-    const { team, stage } = validateCase(task, row, accountId)
+    const { team, stage } = await validateWorkflowTaskCase(db, task, row, accountId)
     const [agent] = await db`SELECT id,company_id,adapter_type,adapter_config,role FROM agents
       WHERE id=${task.agent_id} AND company_id=${task.company_id} FOR SHARE`
     const role = stage.role
@@ -270,7 +190,13 @@ export function createTaskRunScopeReader(sql) {
     return { ...task, run_scope: scope }
   }
 
-  const resolve = async (db = sql, companyId, runId, accountId) => {
+  // postgres-js transaction handles expose savepoint, while only pool handles expose begin.
+  const read = (db = sql, accountId, taskId, runId, lock = false) =>
+    typeof db.begin === 'function'
+      ? db.begin((tx) => readInTransaction(tx, accountId, taskId, runId, lock))
+      : readInTransaction(db, accountId, taskId, runId, lock)
+
+  const resolveInTransaction = async (db, companyId, runId, accountId) => {
     z.string().uuid().parse(companyId)
     z.string().uuid().parse(runId)
     if (accountId !== undefined) {
@@ -285,9 +211,13 @@ export function createTaskRunScopeReader(sql) {
       rows.length === 1 && (accountId === undefined || rows[0].account_id === accountId),
       'FORBIDDEN'
     )
-    const task = await read(db, rows[0].account_id, rows[0].task_id, runId)
+    const task = await readInTransaction(db, rows[0].account_id, rows[0].task_id, runId, false)
     requireMatching(task.company_id === companyId, 'FORBIDDEN')
     return task
   }
+  const resolve = (db = sql, companyId, runId, accountId) =>
+    typeof db.begin === 'function'
+      ? db.begin((tx) => resolveInTransaction(tx, companyId, runId, accountId))
+      : resolveInTransaction(db, companyId, runId, accountId)
   return { read, resolve }
 }

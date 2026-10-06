@@ -147,10 +147,11 @@ function fixture(replies = []) {
     return typeof reply === 'function' ? reply({ text, values }) : reply
   })
   db.json = (value) => value
+  const tx = Object.assign((strings, ...values) => db(strings, ...values), { json: db.json })
   db.begin = vi.fn(async (run) => {
     transactions.push('begin')
     try {
-      const result = await run(db)
+      const result = await run(tx)
       transactions.push('commit')
       return result
     } catch (error) {

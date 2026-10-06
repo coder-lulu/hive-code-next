@@ -229,6 +229,9 @@ export class TaskArtifactIndex {
     if (contents.byteLength > 1024 * 1024) {
       return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
     }
-    return { name: entry.name, text: new TextDecoder('utf-8', { fatal: true }).decode(contents) }
+    return {
+      name: entry.name,
+      text: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(contents)
+    }
   }
 }

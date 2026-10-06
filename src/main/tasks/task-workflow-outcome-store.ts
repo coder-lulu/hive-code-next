@@ -23,6 +23,10 @@ import {
   withTaskWorkflowAssetPublication,
   writeTaskWorkflowAsset
 } from './task-workflow-outcome-assets'
+import {
+  WorkflowNativeArtifactSchema,
+  type WorkflowNativeArtifact
+} from '../../shared/task-workflow/workflow-native-artifact'
 
 const byteDigest = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex')
 const versionFor = (bytes: Buffer) => {
@@ -164,6 +168,41 @@ export class TaskWorkflowOutcomeStore {
       refuseTaskExecution('OUTCOME_UNKNOWN')
     }
     return commands.data
+  }
+
+  async readArtifact(
+    record: TaskExecutionRecord,
+    artifactRef: string,
+    assertCurrent: () => void
+  ): Promise<WorkflowNativeArtifact> {
+    const guard = () => assertTaskAuthorizationCurrent(assertCurrent)
+    const asset = await this.read(record, guard)
+    guard()
+    const description = asset.outcome.artifacts.find(
+      (item) => item.version.artifactRef === artifactRef
+    )
+    if (!description || !record.result?.artifactRefs.includes(artifactRef)) {
+      refuseTaskExecution('FORBIDDEN')
+    }
+    const original = await this.options.artifacts.describe(record, artifactRef)
+    guard()
+    if (digest(original) !== digest(description)) {
+      refuseTaskExecution('OUTCOME_UNKNOWN')
+    }
+    const contents = await this.options.artifacts.read(record.result.outcomeRef, artifactRef)
+    guard()
+    if (
+      contents.name !== description.name ||
+      byteDigest(Buffer.from(contents.text, 'utf8')) !== description.version.digest
+    ) {
+      refuseTaskExecution('OUTCOME_UNKNOWN')
+    }
+    const parsed = WorkflowNativeArtifactSchema.safeParse({ ...description, text: contents.text })
+    if (!parsed.success) {
+      refuseTaskExecution('OUTCOME_UNKNOWN')
+    }
+    guard()
+    return parsed.data
   }
 
   private async validate(record: TaskExecutionRecord, value: unknown, guard: () => void) {

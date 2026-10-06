@@ -213,6 +213,10 @@ export async function outcomeAccessFixture(commandCount = 0) {
         await Promise.resolve()
         guard()
         return commands
+      }),
+      readArtifact: vi.fn(async (_record, _artifactRef, guard) => {
+        guard()
+        throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
       })
     }
   }

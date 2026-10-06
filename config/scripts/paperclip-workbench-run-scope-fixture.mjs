@@ -5,6 +5,11 @@ import { workflowTestVectors } from '../../src/shared/task-workflow/workflow.tes
 import { taskCommand } from '../../src/main/tasks/task-execution.test-fixture.ts'
 import { computeTaskExecutionFingerprint } from '../../src/shared/task-execution/task-execution-fingerprint.ts'
 import { workbenchOwnerReferences } from '../../integration/paperclip/service/team-workbench-repository-records.mjs'
+import {
+  workflowPipelineStages,
+  workflowPipelineTransitions
+} from '../../integration/paperclip/service/workflow-pipeline-definition.mjs'
+import { workflowPipelineStageConfig } from '../../integration/paperclip/service/workflow-pipeline-policy.mjs'
 
 export function runScopeFixture(personal = false) {
   const accountId = 'authenticated:run-scope-test'
@@ -33,8 +38,6 @@ export function runScopeFixture(personal = false) {
     ...employee,
     scope: team.project.scope,
     employeeRef: randomUUID(),
-    profileRef: 'codex',
-    profileRevision: 'codex:1',
     bindingRevision: 2
   }))
   const employee = team.employees.find((member) => member.role === 'developer')
@@ -140,21 +143,25 @@ export function runScopeFixture(personal = false) {
     snapshot_revision: 1,
     snapshot_digest: snapshot.definitionDigest,
     snapshot_scope: team.project.scope,
-    definition_stages: [structuredClone(stage)],
+    snapshot_definition: structuredClone(definition),
     stage_pipeline_id: null,
     stage_key: `stage_${digest(stage.stageRef)}`,
     stage_kind: 'working',
-    stage_config: {
-      hiveWorkflow: {
-        contractVersion: 1,
-        workflowRef: workflowId,
-        workflowRevision: 1,
-        stage: structuredClone(stage)
-      }
-    }
+    stage_config: workflowPipelineStageConfig(definition, stage, team.employees)
   }
   caseRow.revision_pipeline_id = caseRow.pipeline_id
   caseRow.stage_pipeline_id = caseRow.pipeline_id
+  const currentEmployees = structuredClone(team.employees)
+  const pipelineStages = workflowPipelineStages(definition, currentEmployees).map((item) => ({
+    ...item,
+    id: randomUUID()
+  }))
+  const stageIds = new Map(pipelineStages.map((item) => [item.key, item.id]))
+  const pipelineEdges = workflowPipelineTransitions(definition).map((edge) => ({
+    from_stage_id: stageIds.get(edge.from),
+    to_stage_id: stageIds.get(edge.to),
+    label: edge.label
+  }))
   const calls = []
   const sql = vi.fn(async (strings, ...values) => {
     const text = strings.join('?').replaceAll(/\s+/g, ' ').trim()
@@ -166,7 +173,10 @@ export function runScopeFixture(personal = false) {
               case_id: task.case_id,
               project_id: caseRow.project_id,
               company_id: caseRow.company_id,
-              case_account_id: caseRow.account_id
+              case_account_id: caseRow.account_id,
+              workflow_id: caseRow.workflow_id,
+              workflow_revision: caseRow.workflow_revision,
+              project_binding_revision: caseRow.project_binding_revision
             }
           ]
         : []
@@ -187,6 +197,56 @@ export function runScopeFixture(personal = false) {
           project_revision: caseRow.project_revision
         }
       ]
+    }
+    if (text.startsWith('SELECT h.*')) {
+      return [
+        {
+          workflow_id: workflowId,
+          latest_revision: 1,
+          pipeline_company_id: companyId,
+          pipeline_project_id: projectId,
+          archived_at: null
+        }
+      ]
+    }
+    if (text.startsWith('SELECT r.definition_json')) {
+      return [
+        {
+          definition_json: structuredClone(snapshot),
+          definition_digest: snapshot.definitionDigest,
+          revision_company_id: companyId,
+          revision_project_id: projectId,
+          workflow_id: workflowId,
+          revision: 1,
+          id: caseRow.pipeline_id,
+          company_id: companyId,
+          project_id: projectId,
+          name: snapshot.name,
+          key: `hive_${workflowId}_r1`,
+          enforce_transitions: true,
+          archived_at: null
+        }
+      ]
+    }
+    if (text.includes('FROM hive_workbench_employee_bindings')) {
+      const upstream = { product: 'pm', developer: 'engineer', tester: 'qa', ops: 'devops' }
+      return currentEmployees.map((member) => ({
+        employee_id: member.employeeRef,
+        role: member.role,
+        company_id: companyId,
+        project_id: projectId,
+        upstream_role: upstream[member.role],
+        adapter_type: 'hive_runtime',
+        adapter_config: {},
+        binding_revision: caseRow.project_revision,
+        project_revision: caseRow.project_revision
+      }))
+    }
+    if (text.includes('FROM pipeline_stages')) {
+      return structuredClone(pipelineStages)
+    }
+    if (text.includes('FROM pipeline_transitions')) {
+      return structuredClone(pipelineEdges)
     }
     if (text.startsWith('SELECT i.id FROM issues')) {
       return task.id === values[1] ? [{ id: task.id }] : []
@@ -235,6 +295,7 @@ export function runScopeFixture(personal = false) {
     team,
     stage,
     employee,
+    currentEmployees,
     refreshTeamDigest
   }
 }

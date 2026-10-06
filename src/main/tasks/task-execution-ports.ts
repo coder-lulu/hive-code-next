@@ -46,7 +46,7 @@ export type TaskExecutionCandidate = {
 }
 export type TaskExecutionHostDependencies = {
   store: TaskExecutionPersistence
-  workflowOutcomes?: Pick<TaskWorkflowOutcomeStore, 'read' | 'readCommands'>
+  workflowOutcomes?: Pick<TaskWorkflowOutcomeStore, 'read' | 'readCommands' | 'readArtifact'>
   capabilities: () => unknown
   resolveStart?: (command: TaskExecutionCancel) => TaskExecutionStart | null
   authorize: (

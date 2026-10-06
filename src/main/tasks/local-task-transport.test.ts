@@ -46,7 +46,16 @@ async function fixture() {
     start: vi.fn(async () => accepted),
     observe: vi.fn(async () => observation),
     reconcile: vi.fn(async () => observation),
-    cancel: vi.fn(async () => observation)
+    cancel: vi.fn(async () => observation),
+    workflowOutcome: vi.fn(async () => {
+      throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
+    }),
+    workflowCommands: vi.fn(async () => {
+      throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
+    }),
+    workflowArtifact: vi.fn(async () => {
+      throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
+    })
   }
   transport = await startLocalTaskTransport({
     host,
@@ -155,7 +164,15 @@ describe('authenticated, bounded local task transport', () => {
   })
   it('fails a capability request explicitly when the authorized host is unavailable', async () => {
     transport = await startLocalTaskTransport({
-      host: { start: vi.fn(), observe: vi.fn(), cancel: vi.fn(), reconcile: vi.fn() },
+      host: {
+        start: vi.fn(),
+        observe: vi.fn(),
+        cancel: vi.fn(),
+        reconcile: vi.fn(),
+        workflowOutcome: vi.fn(),
+        workflowCommands: vi.fn(),
+        workflowArtifact: vi.fn()
+      },
       authenticate: () => ({ operationCallerKey: 'service:test' }),
       capabilities: () => {
         throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')

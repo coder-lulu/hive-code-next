@@ -15,6 +15,10 @@ import {
 } from './team-workbench-repository-records.mjs'
 import { requireWorkflowIssueCheckout } from './workflow-issue-checkout.mjs'
 import {
+  assertCurrentWorkflowEmployees,
+  requireLinearWorkflowDefinition
+} from './workflow-pipeline-policy.mjs'
+import {
   readWorkflowCaseRun,
   requireWorkflowCase,
   WorkflowRunInputSchema
@@ -56,6 +60,12 @@ export function createWorkflowCaseRunRepository(sql) {
       return sql.begin(async (db) => {
         await db`SELECT pg_advisory_xact_lock(hashtextextended(${`hive-workbench:${accountId}`},0))`
         const { project, view } = await requireWorkflowCase(db, accountId, input, true)
+        requireLinearWorkflowDefinition(view.workflow.definition)
+        await assertCurrentWorkflowEmployees(
+          db,
+          view.workflow.definition.scope,
+          view.team.employees
+        )
         const [previous] = await db`SELECT task_id,run_id,input_fingerprint FROM hive_task_bindings
           WHERE account_id=${accountId} AND request_id=${input.requestId}`
         const reply = async (taskId, runId, replayed) => {
@@ -168,9 +178,10 @@ export function createWorkflowCaseRunRepository(sql) {
         }
         await db`INSERT INTO hive_task_bindings(task_id,account_id,run_id,request_id,input_fingerprint,workspace_selector,workflow_input)
           VALUES(${task.id},${accountId},${runId},${input.requestId},${payloadFingerprint},${project.workspaceSelector},${db.json(intent)})`
-        const changed = await db`UPDATE pipeline_cases SET version=version+1,updated_at=now()
+        // Execution bookkeeping must preserve the review version and the unresolved-drift timestamp boundary.
+        const changed = await db`SELECT id FROM pipeline_cases
           WHERE id=${view.id} AND company_id=${project.companyId} AND version=${input.expectedCaseRevision}
-            AND stage_id=${business.stage_id} AND terminal_kind IS NULL RETURNING id`
+            AND stage_id=${business.stage_id} AND terminal_kind IS NULL FOR UPDATE`
         if (changed.length !== 1) {
           refuse('REVISION_CONFLICT')
         }

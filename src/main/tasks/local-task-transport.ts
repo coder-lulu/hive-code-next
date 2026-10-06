@@ -51,8 +51,16 @@ async function readTaskCommand(request: IncomingMessage) {
 
 /** Loopback is a network restriction; a separate restricted service credential authenticates every call. */
 export async function startLocalTaskTransport(options: {
-  host: Pick<TaskExecutionHost, 'start' | 'observe' | 'cancel' | 'reconcile'> &
-    Partial<Pick<TaskExecutionHost, 'workflowOutcome' | 'workflowCommands'>>
+  host: Pick<
+    TaskExecutionHost,
+    | 'start'
+    | 'observe'
+    | 'cancel'
+    | 'reconcile'
+    | 'workflowOutcome'
+    | 'workflowCommands'
+    | 'workflowArtifact'
+  >
   authenticate: (bearer: string) => TaskExecutionCaller | null
   capabilities: (caller: TaskExecutionCaller) => unknown
   currentOwner?: (caller: TaskExecutionCaller) => unknown
@@ -176,7 +184,8 @@ export async function startLocalTaskTransport(options: {
         '/execution/cancel': 'cancel',
         '/execution/reconcile': 'reconcile',
         '/execution/workflow-outcome': 'workflowOutcome',
-        '/execution/workflow-commands': 'workflowCommands'
+        '/execution/workflow-commands': 'workflowCommands',
+        '/execution/workflow-artifact': 'workflowArtifact'
       } as const
       const route = Object.entries(routes).find(([path]) => path === request.url)?.[1]
       if (
@@ -188,19 +197,17 @@ export async function startLocalTaskTransport(options: {
       }
       const command = await readTaskCommand(request)
       caller.assertCurrent?.()
-      const operation:
-        | ((value: unknown, caller: TaskExecutionCaller) => Promise<unknown>)
-        | undefined = options.host[route]
-      if (!operation) {
-        throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
-      }
+      const operation: (value: unknown, caller: TaskExecutionCaller) => Promise<unknown> =
+        options.host[route]
       const result = await operation.call(options.host, command, caller)
       caller.assertCurrent?.()
       send(
         response,
         route === 'start' ? 202 : 200,
         result,
-        route === 'workflowCommands' ? WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES : TASK_TRANSPORT_MAX_BYTES
+        route === 'workflowCommands' || route === 'workflowArtifact'
+          ? WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES
+          : TASK_TRANSPORT_MAX_BYTES
       )
     } catch (error) {
       const code = error instanceof TaskExecutionError ? error.code : 'SERVICE_UNAVAILABLE'

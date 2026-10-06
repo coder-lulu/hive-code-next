@@ -15,5 +15,11 @@ export const WorkflowNativeCommandsQuerySchema = TaskExecutionReconcileSchema.om
     .length(73)
     .regex(/^artifact:[a-f0-9]{64}$/)
 })
+export const WorkflowNativeArtifactQuerySchema = WorkflowNativeCommandsQuerySchema.omit({
+  kind: true
+}).extend({
+  kind: z.literal('workflow.artifact.read')
+})
 export type WorkflowNativeOutcomeQuery = z.infer<typeof WorkflowNativeOutcomeQuerySchema>
 export type WorkflowNativeCommandsQuery = z.infer<typeof WorkflowNativeCommandsQuerySchema>
+export type WorkflowNativeArtifactQuery = z.infer<typeof WorkflowNativeArtifactQuerySchema>

@@ -1,8 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import { refuseWorkbench } from './team-workbench-repository-records.mjs'
+import {
+  workflowStageKey,
+  workflowPipelineStageConfig,
+  readWorkflowProjectEmployees
+} from './workflow-pipeline-policy.mjs'
 
-function stageRows(definition) {
+export function workflowPipelineStages(definition, employees) {
   const identity = {
     contractVersion: 1,
     workflowRef: definition.workflowRef,
@@ -10,11 +15,11 @@ function stageRows(definition) {
   }
   return [
     ...definition.stages.map((stage, index) => ({
-      key: `stage_${digest(stage.stageRef)}`,
+      key: workflowStageKey(stage.stageRef),
       name: `${stage.role} ${index + 1}`,
       kind: stage.role === 'tester' ? 'review' : 'working',
       position: index,
-      config: { hiveWorkflow: { ...identity, stage } }
+      config: workflowPipelineStageConfig(definition, stage, employees)
     })),
     ...['done', 'cancelled'].map((kind, index) => ({
       key: kind,
@@ -26,8 +31,8 @@ function stageRows(definition) {
   ]
 }
 
-function transitionKeys(definition) {
-  const key = (ref) => `stage_${digest(ref)}`
+export function workflowPipelineTransitions(definition) {
+  const key = workflowStageKey
   const edges = new Map()
   const add = (from, to, label) => edges.set(JSON.stringify([from, to]), { from, to, label })
   for (const stage of definition.stages) {
@@ -46,18 +51,21 @@ function transitionKeys(definition) {
 }
 
 /** Each immutable definition revision is a real upstream Pipeline graph, without automation config. */
-export async function createWorkflowPipeline(db, snapshot, pipelineId, actorRef) {
+export async function createWorkflowPipeline(db, snapshot, pipelineId, actorRef, employees) {
   const definition = snapshot.definition
+  const stages = workflowPipelineStages(definition, employees).map((stage) => ({
+    ...stage,
+    id: randomUUID()
+  }))
   await db`INSERT INTO pipelines(id,company_id,project_id,key,name,enforce_transitions,created_by_user_id)
     VALUES(${pipelineId},${definition.scope.companyRef},${definition.scope.projectRef},
       ${`hive_${snapshot.workflowId}_r${definition.workflowRevision}`},${snapshot.name},true,${actorRef})`
-  const stages = stageRows(definition).map((stage) => ({ ...stage, id: randomUUID() }))
   for (const stage of stages) {
     await db`INSERT INTO pipeline_stages(id,pipeline_id,key,name,kind,position,config)
       VALUES(${stage.id},${pipelineId},${stage.key},${stage.name},${stage.kind},${stage.position},${db.json(stage.config)})`
   }
   const ids = new Map(stages.map((stage) => [stage.key, stage.id]))
-  for (const edge of transitionKeys(definition)) {
+  for (const edge of workflowPipelineTransitions(definition)) {
     await db`INSERT INTO pipeline_transitions(pipeline_id,from_stage_id,to_stage_id,label)
       VALUES(${pipelineId},${ids.get(edge.from)},${ids.get(edge.to)},${edge.label})`
   }
@@ -65,6 +73,7 @@ export async function createWorkflowPipeline(db, snapshot, pipelineId, actorRef)
 
 export async function assertWorkflowPipeline(db, snapshot, pipeline) {
   const definition = snapshot.definition
+  const employees = await readWorkflowProjectEmployees(db, definition.scope)
   if (
     pipeline.company_id !== definition.scope.companyRef ||
     pipeline.project_id !== definition.scope.projectRef ||
@@ -77,7 +86,10 @@ export async function assertWorkflowPipeline(db, snapshot, pipeline) {
   }
   const stages = await db`SELECT id,key,name,kind,position,config FROM pipeline_stages
     WHERE pipeline_id=${pipeline.id} ORDER BY position,key FOR SHARE`
-  if (digest(stages.map(({ id: _id, ...stage }) => stage)) !== digest(stageRows(definition))) {
+  if (
+    digest(stages.map(({ id: _id, ...stage }) => stage)) !==
+    digest(workflowPipelineStages(definition, employees))
+  ) {
     return refuseWorkbench('REVISION_CONFLICT')
   }
   const keys = new Map(stages.map((stage) => [stage.id, stage.key]))
@@ -89,7 +101,7 @@ export async function assertWorkflowPipeline(db, snapshot, pipeline) {
     to: keys.get(edge.to_stage_id),
     label: edge.label
   }))
-  if (digest(sort(actual)) !== digest(sort(transitionKeys(definition)))) {
+  if (digest(sort(actual)) !== digest(sort(workflowPipelineTransitions(definition)))) {
     return refuseWorkbench('REVISION_CONFLICT')
   }
 }

@@ -10,11 +10,13 @@ import { WorkflowDefinitionSchema } from '../../../src/shared/task-workflow/work
 import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import {
   requireWorkbenchProject,
+  readWorkbenchTeam,
   refuseWorkbench,
   workbenchOwnerReferences
 } from './team-workbench-repository-records.mjs'
 import { recordWorkbenchRequest, replayWorkbenchRequest } from './team-workbench-repository.mjs'
 import { assertWorkflowPipeline, createWorkflowPipeline } from './workflow-pipeline-definition.mjs'
+import { repairWorkflowPipelineReview } from './workflow-pipeline-review-migration.mjs'
 
 async function workflowHead(db, project, workflowId) {
   const [head] = await db`SELECT h.*,p.company_id AS pipeline_company_id,
@@ -69,6 +71,7 @@ async function readRevision(
   ) {
     return refuseWorkbench('REVISION_CONFLICT')
   }
+  await repairWorkflowPipelineReview(db, snapshot, row, project)
   await assertWorkflowPipeline(db, snapshot, row)
   return { snapshot, pipelineId: row.id }
 }
@@ -153,6 +156,7 @@ export function createWorkflowDefinitionRepository(sql) {
         ) {
           return refuseWorkbench('REVISION_CONFLICT')
         }
+        const team = await readWorkbenchTeam(db, accountId, project.id)
         const workflowId = input.workflowId ?? randomUUID()
         if (input.workflowId) {
           const head = await workflowHead(db, project, workflowId)
@@ -182,7 +186,13 @@ export function createWorkflowDefinitionRepository(sql) {
           return refuseWorkbench('INVALID_REQUEST')
         }
         const pipelineId = input.workflowId ? randomUUID() : workflowId
-        await createWorkflowPipeline(db, snapshot, pipelineId, owner.actorRef)
+        await createWorkflowPipeline(
+          db,
+          snapshot,
+          pipelineId,
+          owner.actorRef,
+          team.employees.map((employee) => employee.binding)
+        )
         if (!input.workflowId) {
           await db`INSERT INTO hive_workflow_definitions(workflow_id,company_id,project_id,latest_revision)
             VALUES(${workflowId},${project.companyId},${project.id},${definition.workflowRevision})`

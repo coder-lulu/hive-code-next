@@ -35,6 +35,25 @@ export function workflowCaseAdmissionFingerprint(view) {
 }
 
 async function readCaseRecord(db, accountId, project, caseId, revisions) {
+  const [binding] = await db`SELECT workflow_id,workflow_revision,project_binding_revision
+    FROM hive_workflow_case_bindings WHERE case_id=${caseId} AND account_id=${accountId}
+      AND company_id=${project.companyId} AND project_id=${project.id}`
+  if (!binding) {
+    return refuseWorkbench('FORBIDDEN')
+  }
+  // The authorized immutable binding selects the revision before any Case or stage row locks.
+  const key = `${binding.workflow_id}:${binding.workflow_revision}:${binding.project_binding_revision}`
+  let revision = revisions?.get(key)
+  if (!revision) {
+    revision = await readWorkflowDefinitionRevision(
+      db,
+      project,
+      binding.workflow_id,
+      Number(binding.workflow_revision),
+      Number(binding.project_binding_revision)
+    )
+    revisions?.set(key, revision)
+  }
   const [row] = await db`SELECT c.*,b.account_id,b.company_id AS binding_company_id,
     b.project_id,b.workflow_id,b.workflow_revision,b.definition_digest,b.project_binding_revision,
     b.team_snapshot_json,b.team_snapshot_digest,b.origin_issue_id,
@@ -50,6 +69,9 @@ async function readCaseRecord(db, accountId, project, caseId, revisions) {
   const team = stored(WorkflowTeamBindingSchema, row.team_snapshot_json)
   const owner = workbenchOwnerReferences(accountId)
   if (
+    row.workflow_id !== binding.workflow_id ||
+    Number(row.workflow_revision) !== Number(binding.workflow_revision) ||
+    Number(row.project_binding_revision) !== Number(binding.project_binding_revision) ||
     row.company_id !== project.companyId ||
     row.stage_pipeline_id !== row.pipeline_id ||
     row.retired_at !== null ||
@@ -63,18 +85,6 @@ async function readCaseRecord(db, accountId, project, caseId, revisions) {
     team.project.bindingRevision !== Number(row.project_binding_revision)
   ) {
     return refuseWorkbench('REVISION_CONFLICT')
-  }
-  const key = `${row.workflow_id}:${row.workflow_revision}:${row.project_binding_revision}`
-  let revision = revisions?.get(key)
-  if (!revision) {
-    revision = await readWorkflowDefinitionRevision(
-      db,
-      project,
-      row.workflow_id,
-      Number(row.workflow_revision),
-      Number(row.project_binding_revision)
-    )
-    revisions?.set(key, revision)
   }
   const workflow = revision.snapshot
   if (

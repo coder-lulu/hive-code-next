@@ -27,7 +27,10 @@ import type {
   TaskExecutionHostDependencies
 } from './task-execution-ports'
 import { authorizeTaskExecution } from './task-execution-authority'
-import { readTaskWorkflowOutcome } from './task-workflow-outcome-access'
+import {
+  readTaskWorkflowOutcome,
+  type WorkflowNativeReadQuery
+} from './task-workflow-outcome-access'
 import { assertTaskExecutionStartDeadlineCurrent } from './task-execution-budget'
 
 export type {
@@ -221,27 +224,28 @@ export class TaskExecutionHost {
   }
 
   async workflowOutcome(value: unknown, caller: TaskExecutionCaller) {
-    return readTaskWorkflowOutcome({
-      value,
-      caller,
-      commands: false,
-      now: this.now,
-      outcomes: this.deps.workflowOutcomes,
-      requireRecord: (query, actor) => this.requireRecord(query, actor),
-      authorize: (actor, command) => this.authorize(actor, command, 'observe')
-    })
+    return readTaskWorkflowOutcome({ ...this.workflowReadOptions(value, caller), mode: 'outcome' })
   }
 
   async workflowCommands(value: unknown, caller: TaskExecutionCaller) {
-    return readTaskWorkflowOutcome({
+    return readTaskWorkflowOutcome({ ...this.workflowReadOptions(value, caller), mode: 'commands' })
+  }
+
+  async workflowArtifact(value: unknown, caller: TaskExecutionCaller) {
+    return readTaskWorkflowOutcome({ ...this.workflowReadOptions(value, caller), mode: 'artifact' })
+  }
+
+  private workflowReadOptions(value: unknown, caller: TaskExecutionCaller) {
+    return {
       value,
       caller,
-      commands: true,
       now: this.now,
       outcomes: this.deps.workflowOutcomes,
-      requireRecord: (query, actor) => this.requireRecord(query, actor),
-      authorize: (actor, command) => this.authorize(actor, command, 'observe')
-    })
+      requireRecord: (query: WorkflowNativeReadQuery, actor: TaskExecutionCaller) =>
+        this.requireRecord(query, actor),
+      authorize: (actor: TaskExecutionCaller, command: TaskExecutionStart) =>
+        this.authorize(actor, command, 'observe')
+    }
   }
 
   private authorize(

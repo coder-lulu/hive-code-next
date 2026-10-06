@@ -158,9 +158,7 @@ describe('persistent Paperclip run authority for personal tasks and Workbench Ca
     const task = await f.read()
     expect(task.agent_id).toBe(f.employee.employeeRef)
     expect(task.run_scope.projectBindingRevision).toBe(2)
-    expect(f.calls.every(({ text }) => !text.includes('hive_workbench_employee_bindings'))).toBe(
-      true
-    )
+    expect(f.calls.some(({ text }) => text.includes('hive_workbench_employee_bindings'))).toBe(true)
   })
 
   it.each(['role', 'profileRef', 'profileRevision', 'bindingRevision'])(
@@ -196,7 +194,9 @@ describe('persistent Paperclip run authority for personal tasks and Workbench Ca
 
   it('rejects a malformed exact historical stage projection', async () => {
     const f = fixture()
-    f.caseRow.definition_stages[0].acceptanceCriteria = []
+    f.caseRow.snapshot_definition.stages.find(
+      (stage) => stage.stageRef === f.task.stage_ref
+    ).acceptanceCriteria = []
     await expect(f.read()).rejects.toThrow('REVISION_CONFLICT')
     expect(f.calls.at(-1).text).toContain('v.revision=cb.workflow_revision')
   })
@@ -223,7 +223,9 @@ describe('persistent Paperclip run authority for personal tasks and Workbench Ca
 
   it('rejects duplicate stage projections rather than accepting the first match', async () => {
     const f = fixture()
-    f.caseRow.definition_stages.push(structuredClone(f.caseRow.definition_stages[0]))
+    f.caseRow.snapshot_definition.stages.push(
+      structuredClone(f.caseRow.snapshot_definition.stages[0])
+    )
     await expect(f.read()).rejects.toThrow('REVISION_CONFLICT')
   })
 
@@ -289,19 +291,20 @@ describe('persistent Paperclip run authority for personal tasks and Workbench Ca
     await expect(f.read()).rejects.toThrow('FORBIDDEN')
   })
 
-  it('projects one exact historical stage on every read without fetching the full definition', async () => {
+  it('validates the complete original definition and selects the exact historical stage on every read', async () => {
     const f = fixture()
     await f.read()
     await f.read()
     await f.reader.resolve(f.sql, f.companyId, f.runId)
-    expect(f.calls.filter(({ text }) => text.startsWith('SELECT definition_json'))).toHaveLength(0)
+    expect(f.calls.filter(({ text }) => text.startsWith('SELECT r.definition_json'))).toHaveLength(
+      3
+    )
     expect(f.calls.filter(({ text }) => text.includes('ORDER BY r.stage_ref'))).toHaveLength(0)
     expect(
       f.calls
         .filter(({ text }) => text.startsWith('SELECT cb.case_id'))
-        .every(
-          ({ text }) =>
-            text.includes('jsonb_path_query_array') && !text.includes(',v.definition_json,')
+        .every(({ text }) =>
+          text.includes("v.definition_json->'definition' AS snapshot_definition")
         )
     ).toBe(true)
     expect(f.calls.filter(({ text }) => text.startsWith('SELECT cb.case_id'))).toHaveLength(3)
@@ -312,8 +315,10 @@ describe('persistent Paperclip run authority for personal tasks and Workbench Ca
     await f.read(true)
     expect(f.calls[0].text).not.toContain('FOR ')
     expect(f.calls[1].text).toContain('FOR SHARE OF c,cb,p,pb')
-    expect(f.calls[2].text).toContain('FOR UPDATE OF i,b')
-    expect(f.calls[2].values).toEqual([f.accountId, f.taskId, f.runId])
+    const issueLock = f.calls.find(({ text }) => text.includes('FOR UPDATE OF i,b'))
+    expect(issueLock).toBeDefined()
+    expect(issueLock.values).toEqual([f.accountId, f.taskId, f.runId])
+    expect(f.calls.indexOf(issueLock)).toBeGreaterThan(1)
   })
 
   it('locks the persisted project before Issue/run or Agent locks for ordinary polling', async () => {
@@ -323,7 +328,10 @@ describe('persistent Paperclip run authority for personal tasks and Workbench Ca
       ({ text }) => text.includes('FOR SHARE') || text.includes('FOR UPDATE')
     )
     expect(locks[0].text).toContain('FOR SHARE OF c,cb,p,pb')
-    expect(locks[1].text).toContain('FOR SHARE OF i,b,h')
+    const issueLock = locks.findIndex(({ text }) => text.includes('FOR SHARE OF i,b,h'))
+    const revisionLock = locks.findIndex(({ text }) => text.includes('FOR UPDATE OF p'))
+    expect(revisionLock).toBeGreaterThan(0)
+    expect(issueLock).toBeGreaterThan(revisionLock)
     expect(locks.at(-1).text).toContain('FROM agents')
   })
 

@@ -251,12 +251,14 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
       await repository.claimDispatch(account, task.id, task.run_id)
       let marking = Promise.resolve()
       await sql.begin(async (db) => {
+        const [locker] = await db`SELECT pg_backend_pid() AS pid`
         await db`SELECT id FROM heartbeat_runs WHERE id=${task.run_id} FOR UPDATE`
         marking = repository.unknown(account, task.id, task.run_id)
         await vi.waitFor(
           async () => {
             const [waiting] = await sql`SELECT count(*)::int AS count FROM pg_stat_activity
-            WHERE datname='hive_tasks' AND wait_event_type='Lock' AND query LIKE ${"%execution_stage='outcome_unknown'%"}`
+            WHERE datname='hive_tasks' AND wait_event_type='Lock'
+              AND ${locker.pid}::int=ANY(pg_blocking_pids(pid))`
             expect(waiting.count).toBeGreaterThan(0)
           },
           { timeout: 5000, interval: 25 }

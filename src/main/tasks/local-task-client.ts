@@ -21,6 +21,7 @@ import {
 } from './paperclip-adapter-contract'
 import {
   WorkflowNativeCommandsQuerySchema,
+  WorkflowNativeArtifactQuerySchema,
   WorkflowNativeOutcomeQuerySchema
 } from '../../shared/task-workflow/workflow-native-outcome-query'
 import {
@@ -28,6 +29,7 @@ import {
   WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES
 } from '../../shared/task-workflow/workflow-native-outcome'
 import { WorkflowCommandEvidenceSchema } from '../../shared/task-workflow/workflow-command-evidence'
+import { WorkflowNativeArtifactSchema } from '../../shared/task-workflow/workflow-native-artifact'
 
 type Identity = Pick<
   TaskExecutionStart,
@@ -51,11 +53,13 @@ export class LocalTaskClient {
       maximumResponseBytesByPath: {
         ...options.maximumResponseBytesByPath,
         '/execution/workflow-outcome': 64 * 1024,
-        '/execution/workflow-commands': WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES
+        '/execution/workflow-commands': WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES,
+        '/execution/workflow-artifact': WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES
       },
       maximumResponseStructuralTokensByPath: {
         ...options.maximumResponseStructuralTokensByPath,
-        '/execution/workflow-commands': 16_384
+        '/execution/workflow-commands': 16_384,
+        '/execution/workflow-artifact': 16_384
       }
     })
   }
@@ -193,6 +197,32 @@ export class LocalTaskClient {
       throw new TaskExecutionError('OUTCOME_UNKNOWN')
     }
     return parsed.data
+  }
+
+  async workflowArtifact(value: unknown) {
+    const query = WorkflowNativeArtifactQuerySchema.safeParse(value)
+    if (!query.success) {
+      throw new TaskExecutionError('INVALID_REQUEST')
+    }
+    const parsed = WorkflowNativeArtifactSchema.safeParse(
+      await this.request('/execution/workflow-artifact', query.data)
+    )
+    if (!parsed.success) {
+      throw new TaskExecutionError('OUTCOME_UNKNOWN')
+    }
+    const artifact = parsed.data
+    const digest = createHash('sha256').update(artifact.text, 'utf8').digest('hex')
+    const artifactRef = `artifact:${createHash('sha256')
+      .update(JSON.stringify([query.data.commandFingerprint, artifact.name, digest]))
+      .digest('hex')}`
+    if (
+      artifact.version.artifactRef !== query.data.artifactRef ||
+      artifact.version.digest !== digest ||
+      artifactRef !== query.data.artifactRef
+    ) {
+      throw new TaskExecutionError('OUTCOME_UNKNOWN')
+    }
+    return artifact
   }
 
   private async observation(path: string, query: Identity & { commandFingerprint: string }) {

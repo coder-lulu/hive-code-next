@@ -190,13 +190,40 @@ export function createWorkflowCaseRepository(sql) {
         if (query.workflowId) {
           await readWorkflowDefinitionRevision(db, project, query.workflowId)
         }
-        const rows = await db`SELECT case_id FROM hive_workflow_case_bindings
+        const rows = await db`SELECT case_id,workflow_id,workflow_revision,project_binding_revision
+          FROM hive_workflow_case_bindings
           WHERE account_id=${accountId} AND company_id=${project.companyId} AND project_id=${project.id}
             AND (${query.workflowId ?? null}::uuid IS NULL OR workflow_id=${query.workflowId ?? null}::uuid)
             AND (${query.after ?? null}::uuid IS NULL OR case_id>${query.after ?? null}::uuid)
           ORDER BY case_id LIMIT ${query.limit + 1}`
         const items = [],
           revisions = new Map()
+        // Match definition-list lock order while retaining the original Case page order.
+        const references = rows
+          .slice(0, query.limit)
+          .toSorted((a, b) =>
+            a.workflow_id < b.workflow_id
+              ? -1
+              : a.workflow_id > b.workflow_id
+                ? 1
+                : Number(a.workflow_revision) - Number(b.workflow_revision) ||
+                  Number(a.project_binding_revision) - Number(b.project_binding_revision)
+          )
+        for (const row of references) {
+          const key = `${row.workflow_id}:${row.workflow_revision}:${row.project_binding_revision}`
+          if (!revisions.has(key)) {
+            revisions.set(
+              key,
+              await readWorkflowDefinitionRevision(
+                db,
+                project,
+                row.workflow_id,
+                Number(row.workflow_revision),
+                Number(row.project_binding_revision)
+              )
+            )
+          }
+        }
         let bytes = 128
         for (const row of rows.slice(0, query.limit)) {
           const summary = await readWorkflowCaseSummary(

@@ -1,11 +1,14 @@
 import {
   WorkflowNativeCommandsQuerySchema,
+  WorkflowNativeArtifactQuerySchema,
   WorkflowNativeOutcomeQuerySchema,
   type WorkflowNativeOutcomeQuery,
-  type WorkflowNativeCommandsQuery
+  type WorkflowNativeCommandsQuery,
+  type WorkflowNativeArtifactQuery
 } from '../../shared/task-workflow/workflow-native-outcome-query'
 import type { WorkflowNativeOutcomeAsset } from '../../shared/task-workflow/workflow-native-outcome'
 import type { WorkflowCommandEvidence } from '../../shared/task-workflow/workflow-command-evidence'
+import type { WorkflowNativeArtifact } from '../../shared/task-workflow/workflow-native-artifact'
 import type { TaskExecutionStart } from '../../shared/task-execution/task-execution-command'
 import type {
   TaskExecutionAuthorization,
@@ -18,14 +21,18 @@ import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { canonicalAgentSessionDigest } from '../../shared/agent-session-mutation-envelope'
 import { taskCodeSnapshotProducer } from './task-code-snapshot-producer'
 
+export type WorkflowNativeReadQuery =
+  | WorkflowNativeOutcomeQuery
+  | WorkflowNativeCommandsQuery
+  | WorkflowNativeArtifactQuery
 type OutcomeAccessOptions = {
   value: unknown
   caller: TaskExecutionCaller
-  commands: boolean
+  mode: 'outcome' | 'commands' | 'artifact'
   now: () => number
   outcomes: TaskExecutionHostDependencies['workflowOutcomes']
   requireRecord: (
-    query: WorkflowNativeOutcomeQuery | WorkflowNativeCommandsQuery,
+    query: WorkflowNativeReadQuery,
     caller: TaskExecutionCaller
   ) => TaskExecutionRecord
   authorize: (
@@ -34,15 +41,20 @@ type OutcomeAccessOptions = {
   ) => Promise<TaskExecutionAuthorization>
 }
 export function readTaskWorkflowOutcome(
-  options: OutcomeAccessOptions & { commands: false }
+  options: OutcomeAccessOptions & { mode: 'outcome' }
 ): Promise<WorkflowNativeOutcomeAsset>
 export function readTaskWorkflowOutcome(
-  options: OutcomeAccessOptions & { commands: true }
+  options: OutcomeAccessOptions & { mode: 'commands' }
 ): Promise<WorkflowCommandEvidence>
+export function readTaskWorkflowOutcome(
+  options: OutcomeAccessOptions & { mode: 'artifact' }
+): Promise<WorkflowNativeArtifact>
 export async function readTaskWorkflowOutcome(options: OutcomeAccessOptions) {
-  const parsed = (
-    options.commands ? WorkflowNativeCommandsQuerySchema : WorkflowNativeOutcomeQuerySchema
-  ).safeParse(options.value)
+  const parsed = {
+    outcome: WorkflowNativeOutcomeQuerySchema,
+    commands: WorkflowNativeCommandsQuerySchema,
+    artifact: WorkflowNativeArtifactQuerySchema
+  }[options.mode].safeParse(options.value)
   if (!parsed.success) {
     return refuseTaskExecution('INVALID_REQUEST')
   }
@@ -66,9 +78,11 @@ export async function readTaskWorkflowOutcome(options: OutcomeAccessOptions) {
   assertCurrent()
   const producerDigest = canonicalAgentSessionDigest(taskCodeSnapshotProducer(record))
   const result =
-    'artifactRef' in query
-      ? await options.outcomes.readCommands(record, query.artifactRef, assertCurrent)
-      : await options.outcomes.read(record, assertCurrent)
+    query.kind === 'workflow.artifact.read'
+      ? await options.outcomes.readArtifact(record, query.artifactRef, assertCurrent)
+      : query.kind === 'workflow.commands.read'
+        ? await options.outcomes.readCommands(record, query.artifactRef, assertCurrent)
+        : await options.outcomes.read(record, assertCurrent)
   assertCurrent()
   const current = options.requireRecord(query, options.caller)
   if (canonicalAgentSessionDigest(taskCodeSnapshotProducer(current)) !== producerDigest) {
