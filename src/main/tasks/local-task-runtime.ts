@@ -28,6 +28,7 @@ import { createTaskCodexEvidence } from './task-codex-evidence'
 import { refuseTaskExecution } from './task-execution-error'
 import { createHiveTaskFacade } from './hive-task-facade'
 import { TaskArtifactIndex } from './task-artifact-index'
+import { TaskWorkflowOutcomeStore } from './task-workflow-outcome-store'
 import { installTaskAuthorizationMonitor } from './task-authorization-monitor'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { createLocalTaskDockerEnforcement } from './task-docker-enforcement-runtime'
@@ -99,6 +100,7 @@ export async function startLocalTaskRuntime(options: {
     currentRuntime,
     assertCurrent
   })
+  const artifacts = new TaskArtifactIndex(join(directory, 'artifacts'))
   const snapshots = new TaskCodeSnapshotStore(join(directory, 'artifacts'))
   const issuer = new LocalTaskBindingIssuer({
     directory,
@@ -190,6 +192,12 @@ export async function startLocalTaskRuntime(options: {
   const evidence = createTaskCodexEvidence(join(directory, 'artifacts'))
   const host = new TaskExecutionHost({
     evidenceTimeoutMs: 30_000,
+    workflowOutcomes: new TaskWorkflowOutcomeStore({
+      directory,
+      artifacts,
+      snapshots,
+      collectCommands: evidence.collectCommands
+    }),
     store: resources.store.tasks,
     capabilities,
     authorizeEnforcement: enforcement.authorize,
@@ -261,7 +269,7 @@ export async function startLocalTaskRuntime(options: {
     host,
     facade: createHiveTaskFacade({
       descriptorPath: join(directory, 'paperclip.json'),
-      artifacts: new TaskArtifactIndex(join(directory, 'artifacts')),
+      artifacts,
       issuer,
       enforcement: enforcement.current,
       currentAccount: () => options.account.getRuntimeCloudAuthorization(),

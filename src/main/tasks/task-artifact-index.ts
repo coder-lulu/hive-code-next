@@ -8,8 +8,21 @@ import { taskLaunchPathKey } from './task-launch-workspace'
 import { refuseTaskExecution } from './task-execution-error'
 import type { TaskExecutionRecord } from './task-execution-record'
 import { assertTaskOutputWorkspace } from './task-output-workspace'
+import type { WorkflowArtifactVersion } from '../../shared/task-workflow/workflow-evidence'
 
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
+const Outcome = z.strictObject({
+  status: z.enum(['succeeded', 'failed']),
+  artifacts: z
+    .array(
+      z.strictObject({
+        ref: z.string().regex(/^artifact:[a-f0-9]{64}$/),
+        name: z.string().min(1).max(512),
+        digest: z.string().regex(/^[a-f0-9]{64}$/)
+      })
+    )
+    .max(32)
+})
 const Manifest = z.strictObject({
   schemaVersion: z.literal(1),
   executionId: z.string(),
@@ -157,7 +170,7 @@ export class TaskArtifactIndex {
     }
   }
 
-  async read(outcomeRef: string, artifactRef: string) {
+  private async readAsset(outcomeRef: string, artifactRef: string) {
     if (
       !/^outcome:[a-f0-9]{64}$/.test(outcomeRef) ||
       !/^artifact:[a-f0-9]{64}$/.test(artifactRef)
@@ -169,13 +182,7 @@ export class TaskArtifactIndex {
       `outcome-${outcomeRef.slice(8)}.json`,
       32 * 1024
     )
-    const outcome = z
-      .object({
-        artifacts: z
-          .array(z.object({ ref: z.string(), name: z.string(), digest: z.string() }))
-          .max(32)
-      })
-      .parse(JSON.parse(data.toString('utf8')))
+    const outcome = Outcome.parse(JSON.parse(data.toString('utf8')))
     const entry = outcome.artifacts.find((artifact) => artifact.ref === artifactRef)
     if (!entry) {
       return refuseTaskExecution('FORBIDDEN')
@@ -188,6 +195,37 @@ export class TaskArtifactIndex {
     if (hash(contents) !== entry.digest) {
       return refuseTaskExecution('OUTCOME_UNKNOWN')
     }
+    return { entry, outcome, contents }
+  }
+
+  async describe(
+    record: TaskExecutionRecord,
+    artifactRef: string
+  ): Promise<{
+    name: string
+    version: WorkflowArtifactVersion & { artifactRevision: 1 }
+  }> {
+    const result = record.result
+    if (!result || !result.artifactRefs.includes(artifactRef)) {
+      return refuseTaskExecution('FORBIDDEN')
+    }
+    const { entry, outcome } = await this.readAsset(result.outcomeRef, artifactRef)
+    if (
+      outcome.status !== result.status ||
+      result.outcomeRef !==
+        `outcome:${hash(JSON.stringify([record.commandFingerprint, outcome.status, outcome.artifacts]))}` ||
+      entry.ref !==
+        `artifact:${hash(JSON.stringify([record.commandFingerprint, entry.name, entry.digest]))}` ||
+      JSON.stringify(outcome.artifacts.map((artifact) => artifact.ref)) !==
+        JSON.stringify(result.artifactRefs)
+    ) {
+      return refuseTaskExecution('OUTCOME_UNKNOWN')
+    }
+    return { name: entry.name, version: { artifactRef, artifactRevision: 1, digest: entry.digest } }
+  }
+
+  async read(outcomeRef: string, artifactRef: string) {
+    const { entry, contents } = await this.readAsset(outcomeRef, artifactRef)
     if (contents.byteLength > 1024 * 1024) {
       return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
     }

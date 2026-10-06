@@ -1,35 +1,12 @@
-import { z } from 'zod'
 import { canonicalAgentSessionDigest } from '../../shared/agent-session-mutation-envelope'
 import {
-  TaskExecutionIdentity,
-  TaskDigest,
-  TaskLaunchOperationId,
-  TaskOpaqueRef,
-  TaskOwnerScopeSchema,
-  TaskRefSchema,
-  TaskEpoch
-} from '../../shared/task-execution/task-execution-primitives'
+  WorkflowNativeProducerSchema as TaskCodeSnapshotProducerSchema,
+  type WorkflowNativeProducer as TaskCodeSnapshotProducer
+} from '../../shared/task-workflow/workflow-native-producer'
 import { TaskExecutionRecordSchema, type TaskExecutionRecord } from './task-execution-record'
 import { refuseTaskExecution } from './task-execution-error'
 
-export const TaskCodeSnapshotProducerSchema = z.strictObject({
-  ...TaskExecutionIdentity,
-  task: TaskRefSchema,
-  commandFingerprint: TaskDigest,
-  operationId: TaskLaunchOperationId,
-  operationCallerKey: TaskOpaqueRef,
-  ownerScope: TaskOwnerScopeSchema,
-  executionAccountRef: TaskOpaqueRef,
-  workspaceRef: TaskOpaqueRef,
-  executionWorkspaceId: z.string().min(1).max(512),
-  workspaceExecutionClaimRef: TaskOpaqueRef,
-  writeFence: TaskEpoch,
-  sessionRef: z.string().min(1).max(160).nullable(),
-  status: z.enum(['succeeded', 'failed']),
-  outcomeRef: TaskOpaqueRef,
-  resultDigest: TaskDigest
-})
-export type TaskCodeSnapshotProducer = z.infer<typeof TaskCodeSnapshotProducerSchema>
+export { TaskCodeSnapshotProducerSchema, type TaskCodeSnapshotProducer }
 
 /** Only the original host store supplies this record; neither metadata nor a version reference grants access. */
 export function taskCodeSnapshotProducer(record: TaskExecutionRecord): TaskCodeSnapshotProducer {

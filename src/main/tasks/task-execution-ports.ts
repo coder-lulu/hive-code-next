@@ -6,6 +6,7 @@ import type {
 } from '../../shared/task-execution/task-execution-command'
 import type { TaskExecutionRecord, TaskExecutionWorkspace } from './task-execution-record'
 import type { TaskExecutionPersistence } from './task-execution-store'
+import type { TaskWorkflowOutcomeStore } from './task-workflow-outcome-store'
 
 export type TaskExecutionCaller = Readonly<{
   operationCallerKey: string
@@ -45,6 +46,7 @@ export type TaskExecutionCandidate = {
 }
 export type TaskExecutionHostDependencies = {
   store: TaskExecutionPersistence
+  workflowOutcomes?: Pick<TaskWorkflowOutcomeStore, 'read' | 'readCommands'>
   capabilities: () => unknown
   resolveStart?: (command: TaskExecutionCancel) => TaskExecutionStart | null
   authorize: (

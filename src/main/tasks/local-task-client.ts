@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { TaskExecutionCapabilitiesSchema } from '../../shared/task-execution/task-execution-capabilities'
 import {
   TaskExecutionCancelSchema,
@@ -18,6 +19,15 @@ import {
   HiveRuntimeBindingPurposeSchema,
   type HiveRuntimeBindingPurpose
 } from './paperclip-adapter-contract'
+import {
+  WorkflowNativeCommandsQuerySchema,
+  WorkflowNativeOutcomeQuerySchema
+} from '../../shared/task-workflow/workflow-native-outcome-query'
+import {
+  WorkflowNativeOutcomeAssetSchema,
+  WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES
+} from '../../shared/task-workflow/workflow-native-outcome'
+import { WorkflowCommandEvidenceSchema } from '../../shared/task-workflow/workflow-command-evidence'
 
 type Identity = Pick<
   TaskExecutionStart,
@@ -36,7 +46,18 @@ function matchesIdentity(expected: Identity, actual: Identity) {
 export class LocalTaskClient {
   private readonly request: ReturnType<typeof createLocalTaskRequest>
   constructor(options: LocalTaskClientOptions) {
-    this.request = createLocalTaskRequest(options)
+    this.request = createLocalTaskRequest({
+      ...options,
+      maximumResponseBytesByPath: {
+        ...options.maximumResponseBytesByPath,
+        '/execution/workflow-outcome': 64 * 1024,
+        '/execution/workflow-commands': WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES
+      },
+      maximumResponseStructuralTokensByPath: {
+        ...options.maximumResponseStructuralTokensByPath,
+        '/execution/workflow-commands': 16_384
+      }
+    })
   }
 
   async capabilities() {
@@ -127,6 +148,51 @@ export class LocalTaskClient {
       throw new TaskExecutionError('INVALID_REQUEST')
     }
     return this.observation('/execution/cancel', query.data)
+  }
+
+  async workflowOutcome(value: unknown) {
+    const query = WorkflowNativeOutcomeQuerySchema.safeParse(value)
+    if (!query.success) {
+      throw new TaskExecutionError('INVALID_REQUEST')
+    }
+    const parsed = WorkflowNativeOutcomeAssetSchema.safeParse(
+      await this.request('/execution/workflow-outcome', query.data)
+    )
+    if (!parsed.success) {
+      throw new TaskExecutionError('OUTCOME_UNKNOWN')
+    }
+    const { outcome, version } = parsed.data
+    const digest = createHash('sha256').update(JSON.stringify(outcome)).digest('hex')
+    if (
+      !matchesIdentity(query.data, outcome.producer) ||
+      outcome.producer.commandFingerprint !== query.data.commandFingerprint ||
+      version.digest !== digest ||
+      version.artifactRef !== `artifact:${digest}`
+    ) {
+      throw new TaskExecutionError('OUTCOME_UNKNOWN')
+    }
+    return parsed.data
+  }
+
+  async workflowCommands(value: unknown) {
+    const query = WorkflowNativeCommandsQuerySchema.safeParse(value)
+    if (!query.success) {
+      throw new TaskExecutionError('INVALID_REQUEST')
+    }
+    const parsed = WorkflowCommandEvidenceSchema.safeParse(
+      await this.request('/execution/workflow-commands', query.data)
+    )
+    if (
+      !parsed.success ||
+      parsed.data.kind !== 'available' ||
+      !matchesIdentity(query.data, parsed.data.producer) ||
+      parsed.data.producer.commandFingerprint !== query.data.commandFingerprint ||
+      `artifact:${createHash('sha256').update(JSON.stringify(parsed.data)).digest('hex')}` !==
+        query.data.artifactRef
+    ) {
+      throw new TaskExecutionError('OUTCOME_UNKNOWN')
+    }
+    return parsed.data
   }
 
   private async observation(path: string, query: Identity & { commandFingerprint: string }) {

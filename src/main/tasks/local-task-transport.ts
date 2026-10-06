@@ -8,6 +8,7 @@ import {
   LocalTaskRuntimeOwnerSchema,
   TaskDeliveryTokenSchema
 } from '../../shared/task-execution/task-command-delivery'
+import { WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES } from '../../shared/task-workflow/workflow-native-outcome'
 
 export const TASK_TRANSPORT_MAX_BYTES = 64 * 1024
 const errorStatus = (code: TaskExecutionError['code']) =>
@@ -50,7 +51,8 @@ async function readTaskCommand(request: IncomingMessage) {
 
 /** Loopback is a network restriction; a separate restricted service credential authenticates every call. */
 export async function startLocalTaskTransport(options: {
-  host: Pick<TaskExecutionHost, 'start' | 'observe' | 'cancel' | 'reconcile'>
+  host: Pick<TaskExecutionHost, 'start' | 'observe' | 'cancel' | 'reconcile'> &
+    Partial<Pick<TaskExecutionHost, 'workflowOutcome' | 'workflowCommands'>>
   authenticate: (bearer: string) => TaskExecutionCaller | null
   capabilities: (caller: TaskExecutionCaller) => unknown
   currentOwner?: (caller: TaskExecutionCaller) => unknown
@@ -64,12 +66,17 @@ export async function startLocalTaskTransport(options: {
   let closed = false
   let closing: Promise<void> | undefined
   let authority = ''
-  const send = (response: ServerResponse, status: number, value: unknown) => {
+  const send = (
+    response: ServerResponse,
+    status: number,
+    value: unknown,
+    maximumBytes = TASK_TRANSPORT_MAX_BYTES
+  ) => {
     if (response.destroyed || response.writableEnded) {
       return
     }
     const body = JSON.stringify(value)
-    if (Buffer.byteLength(body) > TASK_TRANSPORT_MAX_BYTES) {
+    if (Buffer.byteLength(body) > maximumBytes) {
       response.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
       response.end(JSON.stringify({ error: { code: 'CAPACITY_EXCEEDED' } }))
       return
@@ -167,7 +174,9 @@ export async function startLocalTaskTransport(options: {
         '/execution/start': 'start',
         '/execution/observe': 'observe',
         '/execution/cancel': 'cancel',
-        '/execution/reconcile': 'reconcile'
+        '/execution/reconcile': 'reconcile',
+        '/execution/workflow-outcome': 'workflowOutcome',
+        '/execution/workflow-commands': 'workflowCommands'
       } as const
       const route = Object.entries(routes).find(([path]) => path === request.url)?.[1]
       if (
@@ -179,7 +188,20 @@ export async function startLocalTaskTransport(options: {
       }
       const command = await readTaskCommand(request)
       caller.assertCurrent?.()
-      send(response, route === 'start' ? 202 : 200, await options.host[route](command, caller))
+      const operation:
+        | ((value: unknown, caller: TaskExecutionCaller) => Promise<unknown>)
+        | undefined = options.host[route]
+      if (!operation) {
+        throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
+      }
+      const result = await operation.call(options.host, command, caller)
+      caller.assertCurrent?.()
+      send(
+        response,
+        route === 'start' ? 202 : 200,
+        result,
+        route === 'workflowCommands' ? WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES : TASK_TRANSPORT_MAX_BYTES
+      )
     } catch (error) {
       const code = error instanceof TaskExecutionError ? error.code : 'SERVICE_UNAVAILABLE'
       const status =

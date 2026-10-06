@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "composite": false,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["node"],
+    "paths": {
+      "@paperclipai/db": ["../../../../logs/paperclip-p1/paperclip/packages/db/src/index.ts"],
+      "@paperclipai/shared": [
+        "../../../../logs/paperclip-p1/paperclip/packages/shared/src/index.ts"
+      ],
+      "drizzle-orm": [
+        "../../../../logs/paperclip-p1/paperclip/packages/db/node_modules/drizzle-orm/index.d.ts"
+      ],
+      "drizzle-orm/*": [
+        "../../../../logs/paperclip-p1/paperclip/packages/db/node_modules/drizzle-orm/*"
+      ]
+    }
+  },
+  "include": ["errors.ts", "services/*.ts"]
+}

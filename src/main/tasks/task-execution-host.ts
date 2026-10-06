@@ -26,7 +26,8 @@ import type {
   TaskExecutionAuthorization,
   TaskExecutionHostDependencies
 } from './task-execution-ports'
-import { isTaskDockerEnforcementPolicy } from './task-docker-enforcement'
+import { authorizeTaskExecution } from './task-execution-authority'
+import { readTaskWorkflowOutcome } from './task-workflow-outcome-access'
 import { assertTaskExecutionStartDeadlineCurrent } from './task-execution-budget'
 
 export type {
@@ -219,46 +220,36 @@ export class TaskExecutionHost {
     return taskRecordObservation(this.requireRecord(command, caller), 0, 32)
   }
 
-  private async authorize(
+  async workflowOutcome(value: unknown, caller: TaskExecutionCaller) {
+    return readTaskWorkflowOutcome({
+      value,
+      caller,
+      commands: false,
+      now: this.now,
+      outcomes: this.deps.workflowOutcomes,
+      requireRecord: (query, actor) => this.requireRecord(query, actor),
+      authorize: (actor, command) => this.authorize(actor, command, 'observe')
+    })
+  }
+
+  async workflowCommands(value: unknown, caller: TaskExecutionCaller) {
+    return readTaskWorkflowOutcome({
+      value,
+      caller,
+      commands: true,
+      now: this.now,
+      outcomes: this.deps.workflowOutcomes,
+      requireRecord: (query, actor) => this.requireRecord(query, actor),
+      authorize: (actor, command) => this.authorize(actor, command, 'observe')
+    })
+  }
+
+  private authorize(
     caller: TaskExecutionCaller,
     command: TaskExecutionStart,
     action: TaskExecutionAction
   ) {
-    assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
-    if (
-      !TaskOpaqueRef.safeParse(caller.operationCallerKey).success ||
-      Date.parse(command.expiresAt) <= this.now()
-    ) {
-      return refuseTaskExecution('FORBIDDEN')
-    }
-    if (command.ownerScope.kind !== 'personalTenant') {
-      return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
-    }
-    if (
-      command.executionPolicy.trustMode === 'enforced_autonomous' &&
-      (!this.deps.authorizeEnforcement || !isTaskDockerEnforcementPolicy(command.executionPolicy))
-    ) {
-      return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
-    }
-    const authorization = await this.deps.authorize(caller, command, action)
-    const assertCurrent = () => {
-      assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
-      assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
-      if (action === 'start') {
-        assertTaskExecutionStartDeadlineCurrent(command, this.now())
-      }
-    }
-    if (
-      command.executionPolicy.trustMode === 'enforced_autonomous' &&
-      (await this.deps.authorizeEnforcement?.(command, action)) !== undefined
-    ) {
-      return refuseTaskExecution('FORBIDDEN')
-    }
-    assertCurrent()
-    if (action === 'start') {
-      assertTaskExecutionDispatchCurrent(authorization)
-    }
-    return { ...authorization, assertCurrent }
+    return authorizeTaskExecution(this.deps, this.now, caller, command, action)
   }
 
   private requireRecord(

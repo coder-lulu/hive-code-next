@@ -8,10 +8,11 @@ import {
   paperclipExternalExecutionSourceDigest
 } from './paperclip-source-proof.mjs'
 import { paperclipServiceNotices } from './paperclip-service-notices.mjs'
+import { verifyPaperclipCheckoutSources } from './paperclip-checkout-source.mjs'
 import {
-  paperclipCheckoutAliases,
-  verifyPaperclipCheckoutSources
-} from './paperclip-checkout-source.mjs'
+  paperclipCaseKernelAliases,
+  verifyPaperclipCaseKernelSources
+} from './paperclip-case-kernel-source.mjs'
 import { canonicalizePaperclipMigrationFiles } from '../../integration/paperclip/service/migration-history.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
@@ -47,6 +48,7 @@ if (externalExecutionSourceDigest !== manifest.externalExecutionCore.moduleSha25
 }
 const requireDb = createRequire(join(source, 'packages/db/package.json'))
 await verifyPaperclipCheckoutSources(root, manifest)
+const caseTransitionCore = await verifyPaperclipCaseKernelSources(root, manifest)
 await mkdir(output, { recursive: true })
 const compiled = await build({
   entryPoints: [join(root, 'integration/paperclip/service/server.mjs')],
@@ -61,7 +63,7 @@ const compiled = await build({
     js: "import { createRequire as createBundleRequire } from 'node:module'; const require = createBundleRequire(import.meta.url);"
   },
   alias: {
-    ...paperclipCheckoutAliases(source),
+    ...paperclipCaseKernelAliases(source, root),
     '@hive-paperclip-external-execution': externalExecutionModule,
     '@hive-paperclip-db': join(source, 'packages/db/src/client.ts'),
     '@hive-paperclip-postgres': requireDb.resolve('postgres')
@@ -115,6 +117,7 @@ await writeFile(
       paperclipRevision: revision,
       sourceDigest,
       externalExecutionSourceDigest,
+      caseTransitionCore,
       bundledDependencies: notices.packages,
       adapterAllowlist: ['hive_runtime'],
       providerPackagesBundled: [],
