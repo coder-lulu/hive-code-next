@@ -8,6 +8,7 @@ import { StructuredConversationCommandController } from './structured-conversati
 
 import type { AgentJournalSnapshot } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionExecutionLocation } from '../../../shared/agent-session-record'
+import type { TaskExecutionRecord } from '../../tasks/task-execution-record'
 import type * as SessionWire from '../../../shared/agent-session-wire'
 import type { AgentSessionAttachParams } from './structured-agent-session-attach'
 import { createRestartReconciler } from './structured-agent-session-restart-reconcile'
@@ -208,6 +209,9 @@ export class StructuredAgentSessionHost {
   }
   /** Releases a session's resources without ending the conversation; see the lifetime's close. */
   close = (sessionId: string): Promise<void> => this.lifetime.close(sessionId)
+
+  /** Private Task stop surface; opens at rest under the original session's serialize. */
+  closeTaskExecution = (record: TaskExecutionRecord) => this.lifetime.closeTaskExecution(record)
 
   supportsCreate = (location: AgentSessionExecutionLocation, agent: string): boolean =>
     providerSupport.adapterSupportsCreate(this.deps.adapter, location, agent)

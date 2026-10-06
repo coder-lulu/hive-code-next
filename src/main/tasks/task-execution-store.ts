@@ -25,7 +25,10 @@ import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-gu
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import type { TaskDockerNeverStartedEvidence } from './task-docker-boundary'
 import { settleCancelledTaskDockerPrestart } from './task-cancelled-docker-prestart'
-import { assertTaskCodexSessionBinding } from './task-codex-session-binding'
+import {
+  assertTaskCodexSessionBinding,
+  assertTaskCodexFailedBootBinding
+} from './task-codex-session-binding'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { hasTaskSessionBinding } from './task-session-association'
 import {
@@ -205,6 +208,14 @@ export class TaskExecutionPersistence {
     assertTaskCodexSessionBinding(state, task, binding, true)
   }
 
+  assertFailedBootStopCurrent(expected: TaskExecutionRecord, requireStopped = false) {
+    return this.transactions.transact(() =>
+      structuredClone(
+        assertTaskCodexFailedBootBinding(this.transactions.state, expected, requireStopped)
+      )
+    )
+  }
+
   persistDockerIdentity(
     identity: Identity & Pick<TaskExecutionRecord['command'], 'ownershipEpoch'>,
     dockerIdentity: TaskDockerIdentity,
@@ -316,7 +327,8 @@ export class TaskExecutionPersistence {
   settle(
     identity: Identity,
     resultValue: TaskExecutionResult | ((record: TaskExecutionRecord) => TaskExecutionResult),
-    now: number
+    now: number,
+    stopping?: TaskExecutionRecord
   ) {
     return this.update(
       identity,
@@ -333,6 +345,18 @@ export class TaskExecutionPersistence {
             return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
           }
           return null
+        }
+        if (
+          result.status === 'cancelled' &&
+          result.stopProof.evidenceKind === 'stopped' &&
+          ((record.dispatch === 'dispatching' && record.structuredBinding) ||
+            (stopping?.dispatch === 'dispatching' && stopping.structuredBinding))
+        ) {
+          if (!stopping) {
+            return refuseTaskExecution('OUTCOME_UNKNOWN')
+          }
+          assertTaskExecutionSnapshotCurrent(stopping, record)
+          assertTaskCodexFailedBootBinding(this.transactions.state, stopping, true)
         }
         if (
           (result.stopProof.evidenceKind === 'not_started' &&

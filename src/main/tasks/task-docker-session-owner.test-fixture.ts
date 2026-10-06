@@ -16,8 +16,11 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
-export async function dockerSessionFixture(live = true, persistCid = true) {
-  const artifacts = resolve('logs/paperclip-development/p3/controlled-runtime/owner-writer/tmp')
+export async function dockerSessionFixture(
+  live = true,
+  persistCid = true,
+  artifacts = resolve('logs/paperclip-development/p3/controlled-runtime/owner-writer/tmp')
+) {
   await mkdir(artifacts, { recursive: true })
   const directory = await mkdtemp(join(artifacts, 'owner-'))
   roots.push(directory)

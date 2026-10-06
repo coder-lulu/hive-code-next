@@ -21,6 +21,11 @@ import type { StructuredAgentSessionHostSession } from './structured-agent-sessi
 import { StructuredAgentSessionIdleSweep } from './structured-agent-session-idle-sweep'
 import { AGENT_SESSION_NOT_ATTACHED } from './structured-agent-session-mutation-admission'
 import { adapterSupportsRecord } from './structured-agent-session-provider-support'
+import type { TaskExecutionRecord } from '../../tasks/task-execution-record'
+import {
+  captureUnfinishedStructuredAgentSessionWork,
+  settleStaleStructuredAgentSessionState
+} from './structured-agent-session-dead-generation-settlement'
 
 export type StructuredAgentSessionConversationLifetime = ReturnType<
   typeof createStructuredAgentSessionConversationLifetime
@@ -157,6 +162,58 @@ export function createStructuredAgentSessionConversationLifetime(host: {
           cause: 'evict'
         })
         await closeConversation(sessionId)
+      }),
+    /** A failed Task acquisition may retain an owner without ever opening its conversation. */
+    closeTaskExecution: async (expected: TaskExecutionRecord): Promise<true> => {
+      const original = await deps().store.tasks.assertFailedBootStopCurrent(expected)
+      return serialize(original.sessionId, async (): Promise<true> => {
+        await deps().store.tasks.assertFailedBootStopCurrent(expected)
+        if (disposed) {
+          throw new AgentSessionRefusalError(AGENT_SESSION_NOT_ATTACHED)
+        }
+        const session = sessions.get(original.sessionId) ?? (await host.open(original.sessionId))
+        await deps().store.tasks.assertFailedBootStopCurrent(expected)
+        if (!session) {
+          throw new AgentSessionRefusalError(AGENT_SESSION_NOT_ATTACHED)
+        }
+        // Opening schedules delivery behind this serialize; reject it before releasing the lock.
+        await abandonQueuedStructuredAgentSessionMessages(
+          deps(),
+          original.sessionId,
+          session.journal
+        )
+        if (!session.child) {
+          const closed = await deps().adapter.releaseAcquisition?.({
+            sessionId: original.sessionId,
+            agent: original.provider
+          })
+          if (closed !== true) {
+            throw new Error('Task provider acquisition close was not proven')
+          }
+          await deps().store.tasks.assertFailedBootStopCurrent(expected)
+        }
+        await stopStructuredAgentSessionAgentUnderSerialize(host.context(), original.sessionId, {
+          cause: 'evict'
+        })
+        const stopped = await deps().store.tasks.assertFailedBootStopCurrent(expected, true)
+        await settleStaleStructuredAgentSessionState({
+          journal: session.journal,
+          sessionId: original.sessionId,
+          fence: stopped.lease.runtimeFence,
+          acquisitionGeneration: null,
+          deathEvidence: stopped.lease.deathEvidence
+        })
+        const remaining = captureUnfinishedStructuredAgentSessionWork(session.journal)
+        if (
+          remaining.hadUnsettledSubmissions ||
+          remaining.items.length > 0 ||
+          !(await closeConversation(original.sessionId))
+        ) {
+          throw new Error('Task session close was not settled')
+        }
+        await deps().store.tasks.assertFailedBootStopCurrent(expected, true)
+        return true
       })
+    }
   }
 }

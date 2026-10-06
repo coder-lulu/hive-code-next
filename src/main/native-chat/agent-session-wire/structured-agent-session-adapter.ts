@@ -259,7 +259,7 @@ export type StructuredAgentSessionAdapter = {
    *  Returns true only after provider child exit is proven. Throws
    *  `AgentSessionAcquisitionRootExitObservedError` when the provider root's own
    *  exit was observed first-hand but its descendants were not proven gone. */
-  releaseAcquisition?(input: { sessionId: string }): Promise<boolean>
+  releaseAcquisition?(input: { sessionId: string; agent?: string }): Promise<boolean>
   dispatch(input: {
     sessionId: string
     clientMessageId: string

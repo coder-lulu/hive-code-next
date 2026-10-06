@@ -144,6 +144,7 @@ export async function collectTaskExecutionSettlement(
         stopProof: { ...common.stopProof, evidenceKind: 'stopped' }
       }
     },
-    now()
+    now(),
+    stopping
   )
 }

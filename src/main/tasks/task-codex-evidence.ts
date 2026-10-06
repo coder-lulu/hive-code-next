@@ -7,6 +7,7 @@ import { restoreTaskWorkflowCopyGuard } from './task-workflow-copy-guard'
 import { assertTaskOutputWorkspace } from './task-output-workspace'
 import { taskCodexSessionFor, readTaskCodexJournalEvidence } from './task-codex-journal-evidence'
 import { collectTaskCodexCommandEvidence } from './task-codex-command-evidence'
+import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 
 export function taskCodexResultInstructions(
   record: Pick<TaskExecutionRecord, 'command' | 'commandFingerprint'>
@@ -50,21 +51,39 @@ export function createTaskCodexEvidence(directory: string) {
       return candidate
     },
     async stop(record: TaskExecutionRecord): Promise<TaskExecutionStopEvidence | null> {
+      let sessionStopped = false
       if (record.dispatch === 'dispatching') {
-        return null
-      }
-      const binding = taskCodexSessionFor(record)
-      if (record.dispatch !== 'not_dispatched' && !binding) {
-        return null
-      }
-      if (binding) {
-        const stopped = await closeStructuredAgentSessionChild(binding.sessionId)
-        // UI cleanup accepts released leases without death evidence; tasks require observed death.
-        if (
-          !stopped.stopped ||
-          observeStructuredWorker({ sessionId: binding.sessionId }).status !== 'exited'
-        ) {
+        const host = getStructuredAgentSessionHost()
+        if (!host) {
           return null
+        }
+        try {
+          if ((await host.closeTaskExecution(record)) !== true) {
+            return null
+          }
+          const stopped = await host.deps.store.tasks.assertFailedBootStopCurrent(record, true)
+          if (getStructuredAgentSessionHost() !== host || host.hasSession(stopped.sessionId)) {
+            return null
+          }
+          sessionStopped = true
+        } catch {
+          return null
+        }
+      } else {
+        const binding = taskCodexSessionFor(record)
+        if (record.dispatch !== 'not_dispatched' && !binding) {
+          return null
+        }
+        if (binding) {
+          const stopped = await closeStructuredAgentSessionChild(binding.sessionId)
+          // UI cleanup accepts released leases without death evidence; tasks require observed death.
+          if (
+            !stopped.stopped ||
+            observeStructuredWorker({ sessionId: binding.sessionId }).status !== 'exited'
+          ) {
+            return null
+          }
+          sessionStopped = true
         }
       }
       return {
@@ -77,7 +96,7 @@ export function createTaskCodexEvidence(directory: string) {
         operationCallerKey: record.operationCallerKey,
         workspaceExecutionClaimRef: record.command.workspaceExecutionClaimRef,
         writeFence: record.command.writeFence,
-        evidenceKind: binding ? 'stopped' : 'not_started',
+        evidenceKind: sessionStopped ? 'stopped' : 'not_started',
         managedToolsSettled: true,
         writersFenced: true
       }
