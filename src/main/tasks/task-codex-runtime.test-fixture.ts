@@ -24,10 +24,17 @@ import { TASK_TEST_NOW } from './task-execution.test-fixture'
 import type { TaskExecutionStart } from '../../shared/task-execution/task-execution-command'
 
 /** Offline transport/account fixtures only; no provider or real Docker qualification. */
-export async function taskCodexRuntimeFixture(taskReference?: TaskExecutionStart['task']) {
+export async function taskCodexRuntimeFixture(
+  taskReference?: TaskExecutionStart['task'],
+  commandPatch?: Partial<TaskExecutionStart>
+) {
   const docker = await taskDockerFixture()
   const directory = join(docker.root, 'host-state')
-  const original = taskStructuredFixture(docker.options.record.workspace, taskReference)
+  const original = taskStructuredFixture(
+    docker.options.record.workspace,
+    taskReference,
+    commandPatch
+  )
   original.request.accountHome.path = resolve(docker.root, 'synthetic-managed-home')
   const store = await openTestAgentSessionRecordStore(directory)
   await store.tasks.admit(original.admission)

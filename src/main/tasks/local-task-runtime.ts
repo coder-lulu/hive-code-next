@@ -32,6 +32,7 @@ import { installTaskAuthorizationMonitor } from './task-authorization-monitor'
 import { taskLaunchPathKey } from './task-launch-workspace'
 import { assertTaskDirectoryIdentity } from './task-managed-copy'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import { createLocalTaskDockerEnforcement } from './task-docker-enforcement-runtime'
 
 /** One task service assembled from the existing account, Runtime, record store and Codex host. */
 export async function startLocalTaskRuntime(options: {
@@ -92,12 +93,18 @@ export async function startLocalTaskRuntime(options: {
     assertTaskAuthorizationCurrent(() => proof.assertCurrent())
     return { path: scope.path, assertCurrent: proof.assertCurrent }
   }
+  const enforcement = createLocalTaskDockerEnforcement({
+    ...options,
+    currentRuntime,
+    assertCurrent
+  })
   const issuer = new LocalTaskBindingIssuer({
     directory,
     operationCallerKey: 'trusted-local:runtime',
     currentRuntime,
     currentAccount: () => options.account.getRuntimeCloudAuthorization(),
     assertCurrent,
+    resolveEnforcement: enforcement.probe,
     resolveSource: resolveWorkspaceSource,
     readExecution: (command) => resources.store.tasks.get(command),
     restoreWorkspace: async (workspace) => {
@@ -182,7 +189,8 @@ export async function startLocalTaskRuntime(options: {
         ...RUNTIME_CAPABILITIES,
         TASK_EXECUTION_CAPABILITY,
         TASK_STOP_PROOF_CAPABILITY,
-        TASK_WORKSPACE_CLAIM_CAPABILITY
+        TASK_WORKSPACE_CLAIM_CAPABILITY,
+        ...enforcement.capabilities()
       ],
       resourceCoverage: [],
       manifestVersions: [],
@@ -193,6 +201,7 @@ export async function startLocalTaskRuntime(options: {
   const host = new TaskExecutionHost({
     store: resources.store.tasks,
     capabilities,
+    authorizeEnforcement: enforcement.authorize,
     resolveStart: (query) => issuer.resolveGrant(query.authorizationRef)?.command ?? null,
     authorize: createTaskDeliveryAuthorizer({
       authorize: createLocalTaskAuthorizer({
@@ -263,6 +272,7 @@ export async function startLocalTaskRuntime(options: {
       descriptorPath: join(directory, 'paperclip.json'),
       artifacts: new TaskArtifactIndex(join(directory, 'artifacts')),
       issuer,
+      enforcement: enforcement.current,
       currentAccount: () => options.account.getRuntimeCloudAuthorization(),
       assertCurrent,
       validateWorkspace: async (selector) => {

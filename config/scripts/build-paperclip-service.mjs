@@ -8,6 +8,10 @@ import {
   paperclipExternalExecutionSourceDigest
 } from './paperclip-source-proof.mjs'
 import { paperclipServiceNotices } from './paperclip-service-notices.mjs'
+import {
+  paperclipCheckoutAliases,
+  verifyPaperclipCheckoutSources
+} from './paperclip-checkout-source.mjs'
 import { canonicalizePaperclipMigrationFiles } from '../../integration/paperclip/service/migration-history.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
@@ -42,6 +46,7 @@ if (externalExecutionSourceDigest !== manifest.externalExecutionCore.moduleSha25
   throw new Error('Paperclip external execution source differs from the reviewed module')
 }
 const requireDb = createRequire(join(source, 'packages/db/package.json'))
+await verifyPaperclipCheckoutSources(root, manifest)
 await mkdir(output, { recursive: true })
 const compiled = await build({
   entryPoints: [join(root, 'integration/paperclip/service/server.mjs')],
@@ -56,6 +61,7 @@ const compiled = await build({
     js: "import { createRequire as createBundleRequire } from 'node:module'; const require = createBundleRequire(import.meta.url);"
   },
   alias: {
+    ...paperclipCheckoutAliases(source),
     '@hive-paperclip-external-execution': externalExecutionModule,
     '@hive-paperclip-db': join(source, 'packages/db/src/client.ts'),
     '@hive-paperclip-postgres': requireDb.resolve('postgres')

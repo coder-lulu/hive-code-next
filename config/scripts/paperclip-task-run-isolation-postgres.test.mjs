@@ -168,13 +168,7 @@ describe.skipIf(!configPath)('real PostgreSQL repeated Issue run isolation', () 
           (value) => ({ status: 'fulfilled', value }),
           (reason) => ({ status: 'rejected', reason })
         )
-        const pattern =
-          action === 'unknown'
-            ? '%UPDATE heartbeat_runs SET execution_stage=%'
-            : action === 'settle'
-              ? '%UPDATE heartbeat_runs SET status=%'
-              : '%UPDATE heartbeat_runs SET context_snapshot=%'
-        await h.waitForLocks(session.pid, 1, pattern)
+        await h.waitForLocks(session.pid, 1, '%JOIN heartbeat_runs h%FOR SHARE OF i,b,h%')
         await (action === 'unknown'
           ? db`UPDATE heartbeat_runs SET driver_kind='codex_local' WHERE id=${first.task.run_id}`
           : db`UPDATE heartbeat_runs SET agent_id=${otherAgent} WHERE id=${first.task.run_id}`)

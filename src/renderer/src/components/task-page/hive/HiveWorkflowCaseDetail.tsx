@@ -1,8 +1,18 @@
 import { useTranslation } from 'react-i18next'
 import { Badge } from '@/components/ui/badge'
 import type { HiveWorkflowCaseView } from '../../../../../shared/hive-workflow-cases'
+import { HiveWorkflowCaseRuns } from './HiveWorkflowCaseRuns'
+import type { HiveWorkflowCaseRunsModel } from './use-hive-workflow-case-runs'
 
-export function HiveWorkflowCaseDetail({ view }: { view: HiveWorkflowCaseView }) {
+export function HiveWorkflowCaseDetail({
+  view,
+  runs,
+  scopeLabel
+}: {
+  view: HiveWorkflowCaseView
+  runs: HiveWorkflowCaseRunsModel
+  scopeLabel: string
+}) {
   const { t } = useTranslation()
   const stages = view.workflow.definition.stages
   const currentIndex = stages.findIndex((stage) => stage.stageRef === view.currentStageRef)
@@ -77,9 +87,7 @@ export function HiveWorkflowCaseDetail({ view }: { view: HiveWorkflowCaseView })
           })}
         </ol>
       </div>
-      <p role="status" className="text-xs text-muted-foreground">
-        {t('hiveWorkflowCases.executionUnavailable')}
-      </p>
+      <HiveWorkflowCaseRuns view={view} model={runs} scopeLabel={scopeLabel} />
     </section>
   )
 }

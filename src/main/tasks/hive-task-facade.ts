@@ -1,7 +1,13 @@
 import { z } from 'zod'
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-publication'
-import { HiveTaskCreateSchema, type HiveTasksApi, type HiveTaskView } from '../../shared/hive-tasks'
-import { TaskExecutionResultSchema } from '../../shared/task-execution/task-execution-receipts'
+import { HiveTaskCreateSchema, type HiveTasksApi } from '../../shared/hive-tasks'
+import {
+  HiveTaskServiceRowSchema as Task,
+  HiveTaskListRowSchema as ListTask,
+  projectHiveTask as project,
+  parseHiveTaskRun as parseTaskRun,
+  hiveTaskRunPath
+} from './hive-task-service-row'
 import type { createLocalTaskRequest } from './local-task-http-client'
 import { createHiveTaskServiceContext } from './hive-task-service-context'
 import type { TaskArtifactIndex } from './task-artifact-index'
@@ -13,59 +19,9 @@ import {
 } from './hive-team-workbench-facade'
 import { createHiveTaskWorkflowFacade } from './hive-task-workflow-facade'
 import { createHiveWorkflowCaseFacade } from './hive-workflow-case-facade'
-
-const Task = z.object({
-  id: z.string().uuid(),
-  title: z.string(),
-  status: z.string(),
-  status_version: z.coerce.number().int().nonnegative(),
-  company_id: z.string().uuid().optional(),
-  agent_id: z.string().uuid().optional(),
-  run_id: z.string().uuid(),
-  workspace_selector: z.string().optional(),
-  description: z.string().optional(),
-  binding: z.unknown().optional(),
-  cancel_requested: z.boolean(),
-  execution_stage: z.string().nullable().optional(),
-  result_receipt: TaskExecutionResultSchema.nullable()
-})
-type TaskRow = z.infer<typeof Task>
-const ListTask = Task.extend({
-  result_receipt: z
-    .object({
-      status: z.enum(['succeeded', 'failed', 'cancelled']),
-      artifactRefs: z.array(z.string().max(160)).max(32)
-    })
-    .nullable()
-})
-type Projection = Omit<TaskRow, 'result_receipt'> & {
-  result_receipt: Pick<NonNullable<TaskRow['result_receipt']>, 'status' | 'artifactRefs'> | null
-}
-function project(row: Projection): HiveTaskView {
-  return {
-    id: row.id,
-    runId: row.run_id,
-    title: row.title,
-    status:
-      row.result_receipt?.status ??
-      (row.execution_stage === 'outcome_unknown'
-        ? 'unknown'
-        : row.cancel_requested
-          ? 'cancelRequested'
-          : row.status === 'in_progress'
-            ? 'running'
-            : 'pending'),
-    artifactRefs: row.result_receipt?.artifactRefs ?? []
-  }
-}
-
-function parseTaskRun(value: unknown, id: string, runId: string): TaskRow {
-  const task = Task.parse(value)
-  if (task.id !== id || task.run_id !== runId) {
-    return refuseTaskExecution('REVISION_CONFLICT')
-  }
-  return task
-}
+import { createHiveWorkflowCaseRunFacade } from './hive-workflow-case-run-facade'
+import { bindAndDispatchHiveTask } from './hive-task-run-dispatch'
+import { prepareWorkflowCaseCancellation } from './hive-workflow-case-cancellation'
 
 /** Only the authenticated desktop Facade may turn a business task into a Runtime binding. */
 export function createHiveTaskFacade(options: {
@@ -74,6 +30,7 @@ export function createHiveTaskFacade(options: {
   issuer: Pick<LocalTaskBindingIssuer, 'issue'>
   currentAccount: () => HiveRuntimeCloudAuthorization | null
   validateWorkspace: (selector: string) => Promise<HiveTaskWorkspaceProof>
+  enforcement?: () => Promise<{ assertCurrent(): void }>
   assertCurrent(): void
   request?: typeof createLocalTaskRequest
 }): HiveTasksApi {
@@ -87,16 +44,26 @@ export function createHiveTaskFacade(options: {
     getTeam: workbench.getTeam,
     validateWorkspace: options.validateWorkspace
   })
-  const taskPath = (id: string, runId: string) =>
-    `/hive/tasks/${z.string().uuid().parse(id)}/runs/${z.string().uuid().parse(runId)}`
+  const taskPath = hiveTaskRunPath
+  const cases = createHiveWorkflowCaseFacade({
+    context,
+    getTeam: workbench.getTeam,
+    getWorkflow: workflows.getWorkflow,
+    validateWorkspace: options.validateWorkspace,
+    enforcement: options.enforcement
+  })
   return {
     ...workbench,
     ...workflows,
-    ...createHiveWorkflowCaseFacade({
+    ...cases,
+    ...createHiveWorkflowCaseRunFacade({
       context,
-      getTeam: workbench.getTeam,
-      getWorkflow: workflows.getWorkflow,
-      validateWorkspace: options.validateWorkspace
+      getWorkflowCase: cases.getWorkflowCase,
+      workspaceSelector: async (projectId) =>
+        (await workbench.getTeam(projectId)).project.workspaceSelector,
+      validateWorkspace: options.validateWorkspace,
+      issuer: options.issuer,
+      enforcement: options.enforcement
     }),
     async list() {
       const caller = await context()
@@ -125,9 +92,12 @@ export function createHiveTaskFacade(options: {
         return refuseTaskExecution('REVISION_CONFLICT')
       }
       // The durable Paperclip task precedes the durable binding, which precedes dispatch.
-      const binding = await options.issuer.issue({
-        paperclipCompanyId: task.company_id,
-        paperclipAgentId: task.agent_id,
+      const bound = await bindAndDispatchHiveTask({
+        caller,
+        issuer: options.issuer,
+        workspace,
+        companyId: task.company_id,
+        employeeRef: task.agent_id,
         task: {
           spaceId: task.company_id,
           taskId: task.id,
@@ -138,21 +108,31 @@ export function createHiveTaskFacade(options: {
         workspaceSelector: input.workspaceSelector,
         input: task.description
       })
-      workspace.assertCurrent()
-      caller.assertCurrent()
-      const path = taskPath(task.id, task.run_id)
-      const bound = parseTaskRun(
-        await caller.request(`${path}/binding`, binding),
-        task.id,
-        task.run_id
-      )
-      await caller.request(`${path}/dispatch`, {})
       return project(bound)
     },
     async cancel(id, runId) {
       const path = taskPath(id, runId)
       const caller = await context()
-      return project(parseTaskRun(await caller.request(`${path}/cancel`, {}), id, runId))
+      let task = parseTaskRun(await caller.request(`${path}/cancel`, {}), id, runId)
+      if (!task.binding && !task.result_receipt && task.run_scope?.kind === 'workbenchCase') {
+        if (!task.company_id || !task.agent_id) {
+          return refuseTaskExecution('REVISION_CONFLICT')
+        }
+        await prepareWorkflowCaseCancellation({
+          caller,
+          issuer: options.issuer,
+          validateWorkspace: options.validateWorkspace,
+          taskId: id,
+          runId,
+          projectId: task.run_scope.projectId,
+          caseId: task.run_scope.caseId,
+          companyId: task.company_id,
+          employeeRef: task.agent_id,
+          workspaceRef: task.run_scope.workspaceRef
+        })
+        task = parseTaskRun(await caller.request(`${path}/cancel`, {}), id, runId)
+      }
+      return project(task)
     },
     async artifact(id, runId, ref) {
       const path = taskPath(id, runId)

@@ -2,7 +2,15 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
-import { taskExecutionCapabilityRefusal } from './task-execution-capabilities'
+import {
+  taskExecutionCapabilityRefusal,
+  TaskExecutionCapabilitiesSchema
+} from './task-execution-capabilities'
+import {
+  TASK_ENFORCEMENT_CAPABILITY,
+  TASK_STOP_PROOF_CAPABILITY,
+  TASK_WORKSPACE_CLAIM_CAPABILITY
+} from './task-execution-primitives'
 import { TaskExecutionStartSchema } from './task-execution-command'
 import { taskExecutionEvidenceRefusal } from './task-execution-evidence'
 import { computeTaskExecutionFingerprint } from './task-execution-fingerprint'
@@ -21,6 +29,63 @@ const command = TaskExecutionStartSchema.parse({
 const activation = TaskResourceActivationSchema.parse({
   ...vectors.examples.activation,
   commandFingerprint: computeTaskExecutionFingerprint(command, vectors.operationCallerKey)
+})
+
+describe('cancellation capability boundaries', () => {
+  const controlled = TaskExecutionStartSchema.parse({
+    ...vectors.examples.start,
+    requiredCapabilities: [TASK_ENFORCEMENT_CAPABILITY],
+    executionPolicy: {
+      trustMode: 'enforced_autonomous',
+      executionPolicyRef: 'policy:controlled',
+      executionPolicyRevision: 'policy:1',
+      enforcementEvidenceRef: 'proof:controlled'
+    }
+  })
+  const initialHost = TaskExecutionCapabilitiesSchema.parse(vectors.examples.capability)
+  const host = {
+    ...initialHost,
+    capabilities: initialHost.capabilities.filter(
+      (capability) => capability !== TASK_ENFORCEMENT_CAPABILITY
+    )
+  }
+  it('admits cancellation without new-launch enforcement and keeps default start strict', () => {
+    expect(taskExecutionCapabilityRefusal(controlled, host, 'cancel')).toBeNull()
+    expect(taskExecutionCapabilityRefusal(controlled, host)).toBe('task_capability_unavailable')
+  })
+  it.each([TASK_STOP_PROOF_CAPABILITY, TASK_WORKSPACE_CLAIM_CAPABILITY, 'task.extra-required.v1'])(
+    'does not waive another required cancellation capability: %s',
+    (capability) => {
+      const value = {
+        ...controlled,
+        requiredCapabilities: [...controlled.requiredCapabilities, capability]
+      }
+      const current = {
+        ...host,
+        capabilities: host.capabilities.filter((entry) => entry !== capability)
+      }
+      expect(taskExecutionCapabilityRefusal(value, current, 'cancel')).toBe(
+        'task_capability_unavailable'
+      )
+    }
+  )
+  it.each([
+    { runtimeRecordId: 'runtime:foreign' },
+    { ownershipEpoch: controlled.ownershipEpoch + 1 }
+  ])('rejects foreign runtime ownership during cancellation: %j', (identity) => {
+    expect(
+      taskExecutionCapabilityRefusal(controlled, { ...host, ...identity }, 'cancel')
+    ).not.toBeNull()
+  })
+  it('preserves the required snapshot coverage during cancellation', () => {
+    expect(
+      taskExecutionCapabilityRefusal(
+        { ...controlled, ...vectors.examples.resources },
+        { ...host, resourceCoverage: [] },
+        'cancel'
+      )
+    ).toBe('task_coverage_unavailable')
+  })
 })
 
 describe('task boundary failure handling', () => {

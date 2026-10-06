@@ -1,7 +1,7 @@
 {
   "hiveWorkflowCases": {
     "title": "功能需求",
-    "description": "基于已保存的流程提交需求，查看分配给各职责的阶段任务。",
+    "description": "基于已保存的流程提交需求，查看已分配任务并执行产品需求首阶段。暂不支持四个职责间的自动交接。",
     "newRequirement": "提交功能需求",
     "submit": "提交需求",
     "submitted": "需求已提交。",
@@ -21,7 +21,16 @@
     "discard": "丢弃草稿",
     "teamNotConfigured": "保存全部四个员工后可以提交需求，已有需求仍可查看。",
     "definitionNotReady": "加载当前已保存版本并保存流程修改后可以提交需求，已有需求仍可查看。",
-    "executionUnavailable": "当前环境尚未提供团队隔离保障，团队执行暂不可用。",
+    "executionUnavailable": "确认 Docker Linux 执行环境可用后，才能启动阶段。",
+    "execution": {
+      "title": "阶段执行",
+      "scope": "使用已分配员工执行当前需求的产品需求首阶段。暂不支持四个职责间的自动交接。",
+      "start": "启动当前阶段",
+      "resume": "恢复当前阶段",
+      "uncertain": "启动结果尚未确认。重试启动会复用同一请求，继续刷新可查看运行状态。",
+      "empty": "当前需求还没有阶段运行。",
+      "artifactTruncated": "预览仅显示前 262,144 个字符。"
+    },
     "caseStatuses": {
       "open": "未完结",
       "done": "已完成",
@@ -53,7 +62,7 @@
   },
   "hiveWorkflow": {
     "title": "工程交付流程",
-    "description": "配置交付阶段与验收标准。保存流程定义会生成版本，团队执行暂不可用。",
+    "description": "配置交付阶段与验收标准，保存后生成流程版本。确认 Docker Linux 执行环境可用后，可执行需求的产品需求首阶段；暂不支持四个职责间的自动交接。",
     "refresh": "刷新流程",
     "newWorkflow": "新建流程",
     "chooseWorkflow": "选择流程",
@@ -166,8 +175,8 @@
     "teamHelp": "每个职责对应独立员工，首期执行配置使用 Codex。",
     "saveTeam": "保存员工配置",
     "teamSaved": "AI 员工配置已保存。",
-    "teamNotConfigured": "保存四个员工后完成团队配置。团队执行暂不可用，个人任务仍可使用。",
-    "executionUnavailable": "团队执行暂不可用，当前执行环境尚未提供团队隔离保障。可以配置项目和员工，个人任务仍可运行。",
+    "teamNotConfigured": "保存四个员工完成团队配置后，可提交需求并执行产品需求首阶段。暂不支持四个职责间的自动交接。",
+    "executionUnavailable": "阶段执行需要已确认可用的 Docker Linux 环境。目前仅支持需求的产品需求首阶段，暂不支持四个职责间的自动交接。",
     "signIn": "使用有权限的账号登录 HiveCloud、连接当前电脑后刷新。",
     "invalidWorkspace": "所选工作区不可用。选择已有的本机工作区后重试。",
     "clientUnavailable": "当前客户端无法访问本机团队工作台。请在已连接的电脑上打开 HiveCode。",

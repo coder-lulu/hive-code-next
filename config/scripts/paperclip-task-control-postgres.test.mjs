@@ -93,7 +93,7 @@ describe.skipIf(!configPath)('real PostgreSQL external controller identity', () 
   )
 
   it.each(['cancel', 'drain'])(
-    'rolls back %s when the final writer loses its persisted driver after a real lock wait',
+    'rolls back %s when its authority read loses the persisted driver after a real lock wait',
     async (action) => {
       const context = await h.newTask()
       let pending
@@ -108,10 +108,10 @@ describe.skipIf(!configPath)('real PostgreSQL external controller identity', () 
           () => null,
           (error) => error
         )
-        await h.waitForLocks(session.pid, 1, '%UPDATE heartbeat_runs SET context_snapshot%')
+        await h.waitForLocks(session.pid, 1, '%JOIN heartbeat_runs h%FOR SHARE OF i,b,h%')
         await db`UPDATE heartbeat_runs SET driver_kind='codex_local' WHERE id=${context.task.run_id}`
       })
-      expect((await pending)?.code).toBe('REVISION_CONFLICT')
+      expect((await pending)?.code).toBe('FORBIDDEN')
       const state = await h.snapshot(context)
       expect(state.task.cancel_requested).toBe(false)
       expect(state.task.result_receipt).toBeNull()

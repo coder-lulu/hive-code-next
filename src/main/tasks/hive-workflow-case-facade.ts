@@ -24,7 +24,30 @@ export function createHiveWorkflowCaseFacade(options: {
   getTeam: HiveTeamWorkbenchApi['getTeam']
   getWorkflow: HiveTaskWorkflowsApi['getWorkflow']
   validateWorkspace(selector: string): Promise<HiveTaskWorkspaceProof>
+  enforcement?: () => Promise<{ assertCurrent(): void }>
 }): HiveWorkflowCasesApi {
+  const availability = async (
+    caller: HiveTaskRequestContext,
+    view: ReturnType<typeof HiveWorkflowCaseViewSchema.parse>
+  ) => {
+    if (options.enforcement) {
+      try {
+        const proof = await options.enforcement()
+        caller.assertCurrent()
+        proof.assertCurrent()
+        return HiveWorkflowCaseViewSchema.parse({
+          ...view,
+          executionAvailability: { available: true, mode: 'docker_linux' }
+        })
+      } catch {
+        caller.assertCurrent()
+      }
+    }
+    return HiveWorkflowCaseViewSchema.parse({
+      ...view,
+      executionAvailability: { available: false, reason: 'EXECUTION_ISOLATION_UNAVAILABLE' }
+    })
+  }
   const projectTeam = async (caller: HiveTaskRequestContext, projectId: string) => {
     caller.assertCurrent()
     const team = await options.getTeam(projectId)
@@ -90,7 +113,7 @@ export function createHiveWorkflowCaseFacade(options: {
       if (view.id.toLowerCase() !== query.caseId) {
         return refuseTaskExecution('REVISION_CONFLICT')
       }
-      return view
+      return availability(caller, view)
     },
     async createWorkflowCase(rawInput) {
       const input = HiveWorkflowCaseCreateSchema.parse(rawInput)
@@ -146,7 +169,7 @@ export function createHiveWorkflowCaseFacade(options: {
       ) {
         return refuseTaskExecution('REVISION_CONFLICT')
       }
-      return view
+      return availability(caller, view)
     }
   }
 }

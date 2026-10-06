@@ -26,6 +26,8 @@ import type {
   TaskExecutionAuthorization,
   TaskExecutionHostDependencies
 } from './task-execution-ports'
+import { isTaskDockerEnforcementPolicy } from './task-docker-enforcement'
+import { assertTaskExecutionStartDeadlineCurrent } from './task-execution-budget'
 
 export type {
   TaskExecutionCaller,
@@ -42,7 +44,11 @@ export class TaskExecutionHost {
   private readonly settlements = new Map<string, Promise<void>>()
   private readonly now: () => number
 
-  constructor(private readonly deps: TaskExecutionHostDependencies) {
+  constructor(
+    private readonly deps: TaskExecutionHostDependencies & {
+      authorizeEnforcement?(command: TaskExecutionStart, action: TaskExecutionAction): Promise<void>
+    }
+  ) {
     this.now = deps.now ?? Date.now
   }
 
@@ -110,6 +116,7 @@ export class TaskExecutionHost {
       return refuseTaskExecution('INVALID_REQUEST')
     }
     const command = parsed.data
+    assertTaskExecutionStartDeadlineCurrent(command, this.now())
     const authorization = await this.authorize(caller, command, 'start')
     if (taskExecutionCapabilityRefusal(command, this.deps.capabilities())) {
       return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
@@ -224,9 +231,12 @@ export class TaskExecutionHost {
     ) {
       return refuseTaskExecution('FORBIDDEN')
     }
+    if (command.ownerScope.kind !== 'personalTenant') {
+      return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
+    }
     if (
-      command.ownerScope.kind !== 'personalTenant' ||
-      command.executionPolicy.trustMode !== 'trusted_personal_preview'
+      command.executionPolicy.trustMode === 'enforced_autonomous' &&
+      (!this.deps.authorizeEnforcement || !isTaskDockerEnforcementPolicy(command.executionPolicy))
     ) {
       return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
     }
@@ -234,6 +244,15 @@ export class TaskExecutionHost {
     const assertCurrent = () => {
       assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
       assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
+      if (action === 'start') {
+        assertTaskExecutionStartDeadlineCurrent(command, this.now())
+      }
+    }
+    if (
+      command.executionPolicy.trustMode === 'enforced_autonomous' &&
+      (await this.deps.authorizeEnforcement?.(command, action)) !== undefined
+    ) {
+      return refuseTaskExecution('FORBIDDEN')
     }
     assertCurrent()
     if (action === 'start') {

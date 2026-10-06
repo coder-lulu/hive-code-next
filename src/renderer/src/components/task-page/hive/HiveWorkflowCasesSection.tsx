@@ -8,6 +8,7 @@ import { HiveWorkbenchPicker } from './HiveWorkbenchPicker'
 import { useHiveWorkflowCases } from './use-hive-workflow-cases'
 import { HiveWorkflowCaseCreateForm } from './HiveWorkflowCaseCreateForm'
 import { HiveWorkflowCaseDetail } from './HiveWorkflowCaseDetail'
+import { useHiveWorkflowCaseRuns } from './use-hive-workflow-case-runs'
 
 function caseErrorKey(error: string) {
   const key = error.includes('FORBIDDEN')
@@ -36,6 +37,7 @@ export function HiveWorkflowCasesSection({
 }) {
   const { t } = useTranslation()
   const model = useHiveWorkflowCases(team, workflow, submissionBlocked)
+  const runs = useHiveWorkflowCaseRuns(model.view, model.accountAvailable, model.select, model.busy)
   const pending = useDelayedStatus(`${team.project.id}:${workflow.workflowId}`, model.pending, 200)
   const error =
     model.error ??
@@ -64,7 +66,7 @@ export function HiveWorkflowCasesSection({
             type="button"
             variant="ghost"
             size="sm"
-            disabled={model.busy}
+            disabled={model.busy || runs.busy}
             onClick={() => {
               void model.refresh()
             }}
@@ -75,7 +77,7 @@ export function HiveWorkflowCasesSection({
           <Button
             type="button"
             size="sm"
-            disabled={model.busy || !model.canCreate || Boolean(model.draft)}
+            disabled={model.busy || runs.busy || !model.canCreate || Boolean(model.draft)}
             onClick={model.begin}
           >
             <Plus />
@@ -130,7 +132,7 @@ export function HiveWorkflowCasesSection({
             })
           }))}
           value={model.view?.id ?? null}
-          disabled={model.busy}
+          disabled={model.busy || runs.busy}
           hasMore={Boolean(model.nextCursor)}
           onLoadMore={() => {
             void model.loadMore()
@@ -143,7 +145,13 @@ export function HiveWorkflowCasesSection({
       {!model.items.length && !model.busy && !model.error && (
         <p className="text-sm text-muted-foreground">{t('hiveWorkflowCases.empty')}</p>
       )}
-      {model.view && <HiveWorkflowCaseDetail view={model.view} />}
+      {model.view && (
+        <HiveWorkflowCaseDetail
+          view={model.view}
+          runs={runs}
+          scopeLabel={`${team.company.name} / ${team.project.name}`}
+        />
+      )}
       {!model.view && (
         <p role="status" className="text-xs text-muted-foreground">
           {t('hiveWorkflowCases.executionUnavailable')}

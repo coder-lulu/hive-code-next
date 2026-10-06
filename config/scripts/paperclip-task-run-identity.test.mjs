@@ -8,16 +8,39 @@ describe('exact task run selection', () => {
     const taskId = randomUUID(),
       firstRun = randomUUID(),
       secondRun = randomUUID()
-    const first = { id: taskId, run_id: firstRun, result_receipt: { status: 'failed' } }
-    const second = { id: taskId, run_id: secondRun, result_receipt: null }
-    const sql = vi.fn(async (_strings, ...values) => [values.includes(secondRun) ? second : first])
+    const company = randomUUID(),
+      agent = randomUUID()
+    const scope = {
+      account_id: 'account:run-tests',
+      case_id: null,
+      company_id: company,
+      run_company_id: company,
+      agent_company_id: company,
+      personal_company_id: company,
+      personal_agent_id: agent,
+      agent_id: agent,
+      driver_kind: 'hive_runtime'
+    }
+    const first = { ...scope, id: taskId, run_id: firstRun, result_receipt: { status: 'failed' } }
+    const second = { ...scope, id: taskId, run_id: secondRun, result_receipt: null }
+    const query = vi.fn(async (_strings, ...values) => [
+      values.includes(secondRun) ? second : first
+    ])
+    const sql = Object.assign(query, { begin: async (operation) => operation(query) })
     const repository = createTaskRepository(sql)
-    expect(await repository.read('account:run-tests', taskId, secondRun)).toEqual(second)
-    expect(await repository.read('account:run-tests', taskId, firstRun)).toEqual(first)
+    expect(await repository.read('account:run-tests', taskId, secondRun)).toMatchObject(second)
+    expect(await repository.read('account:run-tests', taskId, firstRun)).toMatchObject(first)
+    expect(
+      query.mock.calls.every(
+        ([, account, issue, run]) =>
+          account === scope.account_id && issue === taskId && [firstRun, secondRun].includes(run)
+      )
+    ).toBe(true)
   })
 
   it('rejects an Issue-only read before accessing persisted bindings', async () => {
-    const sql = vi.fn(async () => [{}])
+    const query = vi.fn(async () => [{}])
+    const sql = Object.assign(query, { begin: async (operation) => operation(query) })
     await expect(
       createTaskRepository(sql).read('account:run-tests', randomUUID())
     ).rejects.toThrow()

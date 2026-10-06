@@ -12,6 +12,26 @@ BEGIN
   END IF;
 END $$;
 
+ALTER TABLE hive_task_bindings ADD COLUMN IF NOT EXISTS workflow_input jsonb
+  CHECK (workflow_input IS NULL OR octet_length(workflow_input::text) <= 1048576);
+CREATE OR REPLACE FUNCTION hive_refuse_workflow_run_input_mutation()
+RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.workflow_input IS DISTINCT FROM NEW.workflow_input THEN
+    RAISE EXCEPTION 'Hive workflow run input is immutable' USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END $$;
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_trigger
+    WHERE tgrelid='hive_task_bindings'::regclass AND tgname='hive_workflow_run_input_immutable') THEN
+    CREATE TRIGGER hive_workflow_run_input_immutable
+      BEFORE UPDATE OF workflow_input ON hive_task_bindings
+      FOR EACH ROW EXECUTE FUNCTION hive_refuse_workflow_run_input_mutation();
+  END IF;
+END $$;
+
 -- Case content, cursor, version and Issue state remain in the upstream business tables.
 CREATE TABLE IF NOT EXISTS hive_workflow_case_bindings (
   case_id uuid PRIMARY KEY REFERENCES pipeline_cases(id),

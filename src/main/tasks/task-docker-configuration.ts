@@ -53,6 +53,21 @@ function requireLocalEndpoint(endpoint: string): void {
   }
 }
 
+export function taskDockerCliConfiguration(options: { dockerPath: string; endpoint: string }) {
+  if (!isAbsolute(options.dockerPath) || /[\0\r\n]/.test(options.dockerPath)) {
+    return refuseTaskExecution('INVALID_REQUEST')
+  }
+  requireLocalEndpoint(options.endpoint)
+  const cliEnv: Record<string, string> = { ORCA_BACKGROUND_LAUNCH: '1' }
+  for (const key of ['SystemRoot', 'WINDIR', 'TEMP', 'TMP']) {
+    const value = process.env[key]
+    if (value) {
+      cliEnv[key] = value
+    }
+  }
+  return { cliEnv, prefix: ['--config', options.dockerPath, '--host', options.endpoint] }
+}
+
 export function taskDockerConfiguration(options: {
   dockerPath: string
   endpoint: string
@@ -81,19 +96,12 @@ export function taskDockerConfiguration(options: {
   ) {
     return refuseTaskExecution('INVALID_REQUEST')
   }
-  requireLocalEndpoint(options.endpoint)
+  const cli = taskDockerCliConfiguration(options)
   const { name, labels } = taskDockerBinding({
     ...binding.data,
     command: binding.data,
     workspace: workspace.data
   })
-  const cliEnv: Record<string, string> = { ORCA_BACKGROUND_LAUNCH: '1' }
-  for (const key of ['SystemRoot', 'WINDIR', 'TEMP', 'TMP']) {
-    const value = process.env[key]
-    if (value) {
-      cliEnv[key] = value
-    }
-  }
   const configDirectory = join(dirname(workspace.data.executionPath), `.${name}-docker-empty`)
   const prefix = ['--config', configDirectory, '--host', options.endpoint]
   const createArgs = [
@@ -136,12 +144,12 @@ export function taskDockerConfiguration(options: {
     workspace: workspace.data,
     name,
     labels,
-    cliEnv,
+    cliEnv: cli.cliEnv,
     configDirectory,
     prefix,
     // A regular executable cannot contain config.json or Docker contexts. Cleanup
     // stays independent of a removed workspace or an occupied launch config sibling.
-    cleanupPrefix: ['--config', options.dockerPath, '--host', options.endpoint],
+    cleanupPrefix: cli.prefix,
     createArgs
   })
 }

@@ -129,5 +129,28 @@
     "moduleSha256": "96d083b04f1e139657d1c8c8f664340d683eb2d5e1351d983ed54321c0fdc684",
     "vendoredModule": "integration/paperclip/core/external-execution.ts",
     "license": "MIT"
+  },
+  "issueCheckoutCore": {
+    "branch": "hive/workflow-external-runs-20261006",
+    "repository": "https://github.com/coder-lulu/hive-paperclip",
+    "status": "source_digest_pinned",
+    "modules": [
+      {
+        "vendoredModule": "integration/paperclip/core/issue-checkout-ownership.ts",
+        "module": "server/src/services/issue-checkout-ownership.ts",
+        "sha256": "e0a35e1ff91d91fdd7307c7bdf4063011e4f101849f93a3f49b4eeb4c3564f21"
+      },
+      {
+        "vendoredModule": "integration/paperclip/core/issue-checkout-admission.ts",
+        "module": "server/src/services/issue-checkout-admission.ts",
+        "sha256": "8ca86f3c4f34eeb1b0b44ae37e38db0cbfe9fb07124a1031ee1bf09764129dcc"
+      },
+      {
+        "vendoredModule": "integration/paperclip/core/issue-dependency-readiness.ts",
+        "module": "server/src/services/issue-dependency-readiness.ts",
+        "sha256": "dfa28268ebae189e1d3bce2c5239f9612daec18cd41e8d3fa6fceedfd7cd79aa"
+      }
+    ],
+    "baseRevision": "a027f76a726e8a556674eded807c2de0e55f5cc0"
   }
 }

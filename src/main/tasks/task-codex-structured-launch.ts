@@ -31,6 +31,10 @@ import {
   requireTaskDispatchAuthorization
 } from './task-dispatch-authorization'
 import { assertTaskCodexProcessCheckpoint } from './task-codex-process-checkpoint'
+import {
+  assertTaskDockerEnforcementCommand,
+  probeTaskDockerEnforcement
+} from './task-docker-enforcement'
 
 export type TaskCodexStructuredLaunchDependencies = {
   store: AgentSessionRecordStore
@@ -139,6 +143,34 @@ export function createTaskCodexStructuredLaunchResolver(
       assertTaskAuthorizationCurrent(() => account.assertMetadataCurrent())
     }
     assertCurrent()
+    const enforcement =
+      task.command.executionPolicy.trustMode === 'enforced_autonomous'
+        ? await probeTaskDockerEnforcement({
+            configuration: () => {
+              const current = deps.resolveDockerConfiguration()
+              if (!same(current, configuration)) {
+                return refuseTaskExecution('FORBIDDEN')
+              }
+              return current
+            },
+            owner: {
+              runtimeRecordId: task.command.runtimeRecordId,
+              ownershipEpoch: task.command.ownershipEpoch,
+              executionAccountRef: task.command.executionAccountRef
+            },
+            assertCurrent,
+            run: deps.runDocker
+          })
+        : null
+    if (enforcement) {
+      assertTaskDockerEnforcementCommand(task.command, enforcement)
+    }
+    const assertEnforcementCurrent = () => {
+      assertCurrent()
+      if (enforcement) {
+        assertTaskAuthorizationCurrent(() => enforcement.assertCurrent())
+      }
+    }
     let committedPid: number | undefined
     const assertModelCurrent = () => {
       assertCurrent()
@@ -156,9 +188,10 @@ export function createTaskCodexStructuredLaunchResolver(
     const boundary = createTaskDockerBoundary({
       ...configuration,
       record: task,
-      assertCurrent,
+      assertCurrent: assertEnforcementCurrent,
       dispatch,
       run: deps.runDocker,
+      expectedDaemon: enforcement?.daemon,
       persistIdentity: async (identity) => {
         await prepareTaskDispatch(dispatch, assertCurrent)
         await deps.store.tasks.persistDockerIdentity(binding.source, identity, Date.now(), () => {

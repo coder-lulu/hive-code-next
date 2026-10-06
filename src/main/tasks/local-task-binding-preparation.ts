@@ -13,6 +13,12 @@ import type { TaskExecutionWorkspace } from './task-execution-record'
 import type { LocalTaskBindingInput } from './local-task-binding-file'
 import type { LocalTaskBindingIssuer, LocalTaskRuntimeOwner } from './local-task-binding-issuer'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import { TASK_ENFORCEMENT_CAPABILITY } from '../../shared/task-execution/task-execution-primitives'
+import {
+  assertTaskDockerEnforcementCommand,
+  TASK_DOCKER_ENFORCEMENT_POLICY,
+  TASK_DOCKER_ENFORCEMENT_REVISION
+} from './task-docker-enforcement'
 
 type BindingPreparationOptions = ConstructorParameters<typeof LocalTaskBindingIssuer>[0] & {
   requireOwner(): { account: HiveRuntimeCloudAuthorization; runtime: LocalTaskRuntimeOwner }
@@ -39,6 +45,14 @@ export async function prepareLocalTaskBinding(
     ) {
       return refuseTaskExecution('FORBIDDEN')
     }
+  }
+  const enforcement =
+    input.executionMode === 'enforced_autonomous'
+      ? await (options.resolveEnforcement?.() ?? refuseTaskExecution('CAPABILITY_UNAVAILABLE'))
+      : null
+  assertOwner()
+  if (enforcement) {
+    assertTaskAuthorizationCurrent(() => enforcement.assertCurrent())
   }
   await mkdir(join(options.directory, 'bindings'), { recursive: true, mode: 0o700 })
   assertOwner()
@@ -68,6 +82,9 @@ export async function prepareLocalTaskBinding(
   const registered = await options.registerWorkspace(copy.executionPath)
   const assertCurrent = () => {
     assertOwner()
+    if (enforcement) {
+      assertTaskAuthorizationCurrent(() => enforcement.assertCurrent())
+    }
     assertTaskAuthorizationCurrent(() => source.assertCurrent())
     assertTaskAuthorizationCurrent(() => copy.assertCurrent())
     assertTaskAuthorizationCurrent(() => registered.assertCurrent())
@@ -94,7 +111,9 @@ export async function prepareLocalTaskBinding(
     agent: 'hivecode',
     profileId: 'codex',
     profileRevision: 'codex:1',
-    policyRevision: 'personal-preview:1',
+    policyRevision: enforcement
+      ? `${TASK_DOCKER_ENFORCEMENT_POLICY}:${TASK_DOCKER_ENFORCEMENT_REVISION}`
+      : 'personal-preview:1',
     ownerScope: {
       kind: 'personalTenant',
       tenantRef: `account:${digest(owner.account.accountId)}`
@@ -105,7 +124,7 @@ export async function prepareLocalTaskBinding(
     workspaceExecutionClaimRef: reference('claim'),
     isolationPolicyRef: 'managed-copy:1',
     writeFence: 1,
-    executionPolicy: {
+    executionPolicy: enforcement?.policy ?? {
       trustMode: 'trusted_personal_preview',
       executionPolicyRef: 'personal-preview',
       executionPolicyRevision: '1'
@@ -116,8 +135,14 @@ export async function prepareLocalTaskBinding(
     expiresAt: new Date(
       Math.min(owner.account.sessionExpiresAt, options.now() + 60_000)
     ).toISOString(),
-    requiredCapabilities: []
+    ...(input.executionDeadlineAt === undefined
+      ? {}
+      : { executionDeadlineAt: input.executionDeadlineAt }),
+    requiredCapabilities: enforcement ? [TASK_ENFORCEMENT_CAPABILITY] : []
   })
+  if (enforcement) {
+    assertTaskDockerEnforcementCommand(command, enforcement)
+  }
   const commandFingerprint = computeTaskExecutionFingerprint(command, options.operationCallerKey)
   const binding = HiveRuntimeAdapterBinding.parse({
     bindingRef: reference('binding'),

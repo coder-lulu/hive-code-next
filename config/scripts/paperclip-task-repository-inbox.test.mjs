@@ -60,13 +60,27 @@ const receipt = {
 }
 const task = {
   id: taskId,
+  account_id: accountId,
+  case_id: null,
+  run_company_id: companyId,
+  agent_company_id: companyId,
+  personal_company_id: companyId,
+  personal_agent_id: agentId,
+  driver_kind: 'hive_runtime',
   company_id: companyId,
   agent_id: agentId,
   run_id: runId,
   binding,
   result_receipt: null,
   status_version: 1,
-  checkout_run_id: runId
+  checkout_run_id: runId,
+  run_scope: {
+    kind: 'personal',
+    accountId,
+    companyId,
+    employeeRef: agentId,
+    workspaceSelector: undefined
+  }
 }
 const settledTask = {
   ...task,
@@ -129,6 +143,14 @@ function fixture(replies = []) {
   const db = vi.fn(async (strings, ...values) => {
     const text = strings.join('?').replaceAll(/\s+/g, ' ').trim()
     calls.push({ text, values })
+    if (text.startsWith('SELECT r.case_id,cb.project_id')) {
+      expect(values).toEqual([accountId, taskId, runId])
+      return [{ case_id: null }]
+    }
+    if (text.startsWith('SELECT i.id FROM issues i')) {
+      expect(values).toEqual([accountId, taskId, runId])
+      return [{ id: taskId }]
+    }
     if (!replies.length) {
       throw new Error(`Unexpected SQL: ${text}`)
     }
@@ -259,7 +281,11 @@ describe('task execution inbox and transactional business settlement', () => {
       await f.repository.consumeObservation(accountId, taskId, runId, token, observation([first]))
     ).toMatchObject({ cursor: 1, needsReplay: false })
     expect(f.businessWrites()).toHaveLength(0)
-    expect(f.calls[3].values).toEqual([
+    expect(
+      f.calls.find((call) =>
+        call.text.includes('SELECT payload_hash,payload FROM hive_task_event_inbox')
+      )?.values
+    ).toEqual([
       accountId,
       taskId,
       runId,
@@ -523,7 +549,7 @@ describe('task execution inbox and transactional business settlement', () => {
     const f = fixture([[settledTask]])
     expect(await f.repository.settle(accountId, taskId, runId, receipt)).toEqual(settledTask)
     expect(f.writes()).toHaveLength(0)
-    expect(f.calls).toHaveLength(1)
+    expect(f.calls.some((call) => call.text.includes('FROM hive_task_deliveries'))).toBe(false)
   })
 
   it('rejects a conflicting replay of the committed business receipt', async () => {

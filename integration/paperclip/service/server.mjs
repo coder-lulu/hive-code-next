@@ -13,6 +13,7 @@ import { reconcilePaperclipMigrationHashes } from './migration-history.mjs'
 import { createTeamWorkbenchRepository } from './team-workbench-repository.mjs'
 import { createWorkflowDefinitionRepository } from './workflow-definition-repository.mjs'
 import { createWorkflowCaseRepository } from './workflow-case-repository.mjs'
+import { createWorkflowCaseRunRepository } from './workflow-case-run-repository.mjs'
 import { WORKBENCH_PATHS, handleTeamWorkbenchRequest } from './team-workbench-routes.mjs'
 import {
   EXTERNAL_EXECUTION_PATH,
@@ -52,7 +53,8 @@ const repository = createTaskRepository(sql),
 const workbenchRepository = {
   ...createTeamWorkbenchRepository(sql),
   ...createWorkflowDefinitionRepository(sql),
-  ...createWorkflowCaseRepository(sql)
+  ...createWorkflowCaseRepository(sql),
+  ...createWorkflowCaseRunRepository(sql)
 }
 const secret = randomBytes(32).toString('base64url'),
   expected = Buffer.from(secret)
@@ -94,12 +96,21 @@ const server = createServer(async (request, response) => {
       return
     }
     const delivery = request.url?.match(
-      /^\/hive\/execution-delivery\/([0-9a-f-]{36})\/([0-9a-f-]{36})$/
+      /^\/hive\/execution-delivery\/([0-9a-f-]{36})\/([0-9a-f-]{36})(\/start)?$/
     )
     if (delivery && request.method === 'GET') {
       const companyId = z.string().uuid().parse(delivery[1])
       const runId = z.string().uuid().parse(delivery[2])
-      send(response, 200, await repository.getCurrentDelivery(accountId, companyId, runId))
+      send(
+        response,
+        200,
+        await repository.getCurrentDelivery(
+          accountId,
+          companyId,
+          runId,
+          delivery[3] ? 'start' : 'observe'
+        )
+      )
       return
     }
     const route = request.url?.match(
@@ -193,7 +204,8 @@ const server = createServer(async (request, response) => {
               'IDEMPOTENCY_CONFLICT',
               'REVISION_CONFLICT',
               'OUTCOME_UNKNOWN',
-              'SEQUENCE_GAP'
+              'SEQUENCE_GAP',
+              'CAPABILITY_UNAVAILABLE'
             ].includes(error.code)
           ? error.code
           : 'SERVICE_UNAVAILABLE'

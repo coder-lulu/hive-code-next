@@ -20,8 +20,9 @@ describe.skipIf(!process.env.HIVE_PAPERCLIP_TEST_CONFIG)(
       const database = new URL(config.databaseUrl)
       if (
         config.containerName !== 'hive-paperclip-p1-p2-validation-d2861510ba' ||
+        !['postgres:', 'postgresql:'].includes(database.protocol) ||
         database.hostname !== '127.0.0.1' ||
-        database.port !== '63555' ||
+        database.port !== '52054' ||
         database.pathname !== '/hive_tasks'
       ) {
         throw new Error('Dedicated loopback PostgreSQL is required')

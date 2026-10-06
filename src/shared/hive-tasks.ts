@@ -2,6 +2,7 @@ import { z } from 'zod'
 import type { HiveTeamWorkbenchApi } from './hive-team-workbench'
 import type { HiveTaskWorkflowsApi } from './hive-task-workflows'
 import type { HiveWorkflowCasesApi } from './hive-workflow-cases'
+import type { HiveWorkflowCaseRunsApi } from './hive-workflow-case-runs'
 
 export const HiveTaskCreateSchema = z.strictObject({
   requestId: z.string().uuid(),
@@ -27,7 +28,8 @@ export type HiveTaskView = {
 export type HiveTaskArtifact = { name: string; text: string }
 export type HiveTasksApi = HiveTeamWorkbenchApi &
   HiveTaskWorkflowsApi &
-  HiveWorkflowCasesApi & {
+  HiveWorkflowCasesApi &
+  HiveWorkflowCaseRunsApi & {
     list(): Promise<HiveTaskView[]>
     create(input: HiveTaskCreate): Promise<HiveTaskView>
     cancel(taskId: string, runId: string): Promise<HiveTaskView>

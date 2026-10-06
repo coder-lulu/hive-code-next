@@ -1,4 +1,24 @@
 {
+  "hiveWorkflowCases": {
+    "description": "Soumettez des exigences avec un processus enregistré, consultez les tâches affectées et exécutez l’étape initiale des exigences produit. Le passage automatique entre les quatre rôles n’est pas encore pris en charge.",
+    "executionUnavailable": "L’exécution des étapes est indisponible tant qu’un environnement d’exécution Docker Linux n’a pas été vérifié.",
+    "execution": {
+      "title": "Exécution des étapes",
+      "scope": "Exécutez l’étape initiale des exigences produit avec l’employé affecté. Le passage automatique entre les quatre rôles n’est pas encore pris en charge.",
+      "start": "Démarrer l’étape actuelle",
+      "resume": "Reprendre l’étape actuelle",
+      "uncertain": "Le résultat du démarrage n’a pas été confirmé. Réessayer réutilise la même requête ; actualisez pour consulter l’état de l’exécution.",
+      "empty": "Cette demande n’a encore aucune exécution d’étape.",
+      "artifactTruncated": "L’aperçu affiche uniquement les 262 144 premiers caractères."
+    }
+  },
+  "hiveWorkflow": {
+    "description": "Configurez les étapes de livraison et les critères d’acceptation. L’enregistrement crée une version du processus. Les demandes peuvent exécuter l’étape initiale des exigences produit dans un environnement Docker Linux vérifié ; le passage automatique entre les quatre rôles n’est pas encore pris en charge."
+  },
+  "hiveWorkbench": {
+    "teamNotConfigured": "Enregistrez les quatre employés pour terminer la configuration de l’équipe, puis soumettez une demande pour exécuter l’étape initiale des exigences produit. Le passage automatique entre les quatre rôles n’est pas encore pris en charge.",
+    "executionUnavailable": "L’exécution des étapes nécessite un environnement Docker Linux vérifié. Les demandes prennent uniquement en charge l’étape initiale des exigences produit ; le passage automatique entre les quatre rôles n’est pas encore pris en charge."
+  },
   "usage": {
     "redesign": {
       "collection": "Paramètres de collecte et détails des sources",

@@ -97,6 +97,18 @@ export async function createPostgresTaskHarness(configPath) {
         'utf8'
       )
     )
+    for (const file of [
+      'team-workbench-tables.sql',
+      'workflow-definition-tables.sql',
+      'workflow-case-tables.sql'
+    ]) {
+      await sql.unsafe(
+        await readFile(
+          new URL(`../../integration/paperclip/service/${file}`, import.meta.url),
+          'utf8'
+        )
+      )
+    }
     await sql.unsafe(
       await readFile(
         new URL('../../integration/paperclip/service/task-run-migration.sql', import.meta.url),
@@ -206,7 +218,12 @@ export async function createPostgresTaskHarness(configPath) {
     }
   }
   async function snapshot(context) {
-    const task = await repository.read(context.accountId, context.task.id, context.task.run_id)
+    // Administrative fixture inspection does not confer service permission on corrupted rows.
+    const [task] = await sql`SELECT i.*,b.run_id,b.binding,b.result_receipt,
+      (b.cancel_requested OR h.context_snapshot->'externalExecutionControl'->'cancel' IS NOT NULL) AS cancel_requested,
+      h.agent_id,h.execution_stage,h.driver_kind,h.status AS run_status
+      FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id JOIN heartbeat_runs h ON h.id=b.run_id
+      WHERE b.account_id=${context.accountId} AND i.id=${context.task.id} AND b.run_id=${context.task.run_id}`
     const [delivery] = await sql`SELECT *,expires_at<=clock_timestamp() AS expired,
       takeover_after<=clock_timestamp() AS takeover_expired FROM hive_task_deliveries
       WHERE account_id=${context.accountId} AND task_id=${context.task.id} AND run_id=${context.task.run_id}`

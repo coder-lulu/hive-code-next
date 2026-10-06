@@ -85,7 +85,10 @@ export async function executePaperclipTask(
       await ports.onObservation?.(observation)
       cursor = observation.cursor
       if (ports.waitTimeoutMs === undefined) {
-        deadline = Math.min(deadline, taskExecutionDeadline(observation))
+        deadline = Math.min(
+          deadline,
+          taskExecutionDeadline({ accepted: observation.accepted, command: binding?.command })
+        )
       }
     } while (observation.result && cursor < observation.lastSequence)
     return observation

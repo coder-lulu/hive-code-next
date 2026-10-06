@@ -15,6 +15,7 @@ import type { TaskExecutionRecord, TaskExecutionWorkspace } from './task-executi
 import { computeAgentLaunchFingerprint } from '../../shared/agent-launch-operation'
 import { taskAgentLaunchParams } from './task-agent-launch-params'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import type { TaskDockerEnforcement } from './task-docker-enforcement'
 import {
   LocalTaskBindingInputSchema as Input,
   localTaskBindingKey,
@@ -48,11 +49,10 @@ export class LocalTaskBindingIssuer {
       currentAccount: () => HiveRuntimeCloudAuthorization | null
       currentRuntime: () => LocalTaskRuntimeOwner | null
       resolveSource: (selector: string) => Promise<{ path: string; assertCurrent: () => void }>
-      registerWorkspace: (
-        path: string
-      ) => Promise<{ workspaceId: string; assertCurrent: () => void }>
+      registerWorkspace(path: string): Promise<{ workspaceId: string; assertCurrent: () => void }>
       readExecution(command: TaskExecutionRecord['command']): TaskExecutionRecord | null
       restoreWorkspace(workspace: TaskExecutionWorkspace): Promise<{ assertCurrent(): void }>
+      resolveEnforcement?: () => Promise<TaskDockerEnforcement>
       assertCurrent?: () => void
       now?: () => number
     }

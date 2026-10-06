@@ -84,10 +84,13 @@ export const HiveWorkflowCaseViewSchema = CaseSummary.extend({
   workflow: HiveWorkflowSnapshotSchema,
   team: WorkflowTeamBindingSchema,
   stageTasks: boundedTaskCollection(HiveWorkflowStageTaskSchema, WORKFLOW_STAGE_LIMITS.stages, 4),
-  executionAvailability: z.strictObject({
-    available: z.literal(false),
-    reason: z.literal('EXECUTION_ISOLATION_UNAVAILABLE')
-  })
+  executionAvailability: z.discriminatedUnion('available', [
+    z.strictObject({
+      available: z.literal(false),
+      reason: z.literal('EXECUTION_ISOLATION_UNAVAILABLE')
+    }),
+    z.strictObject({ available: z.literal(true), mode: z.literal('docker_linux') })
+  ])
 }).superRefine((view, context) => {
   const { binding, workflow, team } = view
   const scope = binding.scope

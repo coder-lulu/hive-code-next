@@ -1,5 +1,9 @@
 import { z } from 'zod'
 import {
+  HiveWorkflowCaseStartSchema,
+  HiveWorkflowCaseRunReadSchema
+} from '../../../src/shared/hive-workflow-case-runs.ts'
+import {
   HiveWorkbenchCompanyCreateSchema,
   HiveWorkbenchObjectIdInputSchema,
   HiveWorkbenchPageQuerySchema,
@@ -31,13 +35,25 @@ export const WORKBENCH_PATHS = Object.freeze([
   '/hive/workbench/workflows/save',
   '/hive/workbench/cases/create',
   '/hive/workbench/cases/list',
-  '/hive/workbench/cases/read'
+  '/hive/workbench/cases/read',
+  '/hive/workbench/cases/start',
+  '/hive/workbench/cases/runs',
+  '/hive/workbench/cases/run-read'
 ])
 const TeamRead = z.strictObject({ projectId: HiveWorkbenchObjectIdInputSchema })
 
 /** The authenticated Hive facade supplies account identity and the validated workspace binding. */
 export function handleTeamWorkbenchRequest(repository, accountId, path, body) {
   switch (path) {
+    case '/hive/workbench/cases/run-read':
+      return repository.getWorkflowCaseRunAdmission(
+        accountId,
+        HiveWorkflowCaseRunReadSchema.parse(body)
+      )
+    case '/hive/workbench/cases/start':
+      return repository.startWorkflowCase(accountId, HiveWorkflowCaseStartSchema.parse(body))
+    case '/hive/workbench/cases/runs':
+      return repository.getWorkflowCaseRuns(accountId, HiveWorkflowCaseReadQuerySchema.parse(body))
     case '/hive/workbench/cases/create':
       return repository.createWorkflowCase(accountId, HiveWorkflowCaseCreateSchema.parse(body))
     case '/hive/workbench/cases/list':

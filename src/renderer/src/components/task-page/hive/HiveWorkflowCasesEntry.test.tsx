@@ -66,7 +66,8 @@ const api = {
   saveWorkflow: vi.fn(),
   listWorkflowCases: vi.fn(),
   getWorkflowCase: vi.fn(),
-  createWorkflowCase: vi.fn()
+  createWorkflowCase: vi.fn(),
+  getWorkflowCaseRuns: vi.fn()
 }
 const firstAccount = workbenchAccountState()
 const listeners = new Set<(state: HiveAccountState) => void>()
@@ -84,6 +85,7 @@ beforeEach(() => {
     nextCursor: null
   })
   api.getWorkflowCase.mockResolvedValue(historicalCase)
+  api.getWorkflowCaseRuns.mockResolvedValue([])
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {
@@ -147,7 +149,7 @@ describe('requirements entry in the selected workflow', () => {
       '#hive-workflow-case-requirement'
     )
     const fixedVersion = container.querySelector('[data-case-fixed-version]')
-    expect(listeners.size).toBe(2)
+    expect(listeners.size).toBe(3)
     for (const account of workbenchAccountRefreshStates(firstAccount)) {
       await act(async () => accountStateChanged(account))
       expect(container.querySelector('#hive-workflow-name')).toBe(name)

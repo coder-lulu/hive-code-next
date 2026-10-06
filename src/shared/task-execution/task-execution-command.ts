@@ -35,6 +35,7 @@ const StartFields = {
   authorizationRef: TaskOpaqueRef,
   authorizationRevision: TaskOpaqueRef,
   expiresAt: TaskTimestamp,
+  executionDeadlineAt: TaskTimestamp.optional(),
   requiredCapabilities: boundedTaskCollection(TaskOpaqueRef, 32)
 }
 

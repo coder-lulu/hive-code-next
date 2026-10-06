@@ -6,12 +6,17 @@ import { z } from 'zod'
 import { canonicalAgentSessionDigest } from '../../shared/agent-session-mutation-envelope'
 import { readNodeFileHandleWithinLimit } from '../../shared/node-bounded-file-reader'
 import { computeTaskExecutionFingerprint } from '../../shared/task-execution/task-execution-fingerprint'
-import { TaskOpaqueRef, TaskRefSchema } from '../../shared/task-execution/task-execution-primitives'
+import {
+  TaskOpaqueRef,
+  TaskRefSchema,
+  TaskTimestamp
+} from '../../shared/task-execution/task-execution-primitives'
 import { HiveRuntimeAdapterBinding } from './paperclip-adapter-contract'
 import { TaskExecutionWorkspaceSchema, type TaskExecutionRecord } from './task-execution-record'
 import { refuseTaskExecution } from './task-execution-error'
 import { taskLaunchPathKey } from './task-launch-workspace'
 import { assertTaskDirectoryIdentity } from './task-managed-copy'
+import { isTaskDockerEnforcementPolicy } from './task-docker-enforcement'
 
 export const LocalTaskBindingInputSchema = z
   .strictObject({
@@ -19,8 +24,19 @@ export const LocalTaskBindingInputSchema = z
     paperclipAgentId: TaskOpaqueRef,
     task: TaskRefSchema,
     workspaceSelector: z.string().min(1).max(512),
-    input: z.string().min(1).max(48_000)
+    input: z.string().min(1).max(128_000),
+    executionMode: z.literal('enforced_autonomous').optional(),
+    executionDeadlineAt: TaskTimestamp.optional()
   })
+  .refine(
+    (input) =>
+      input.executionDeadlineAt === undefined || input.executionMode === 'enforced_autonomous',
+    'Only enforced tasks may supply an execution deadline.'
+  )
+  .refine(
+    (input) => input.executionMode === 'enforced_autonomous' || input.input.length <= 48_000,
+    'Personal task input exceeds its limit.'
+  )
   .refine(
     (input) => input.task.spaceId === input.paperclipCompanyId,
     'Task company does not match its binding.'
@@ -65,7 +81,7 @@ async function readBindingFile(path: string) {
   }
   const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   try {
-    const read = await readNodeFileHandleWithinLimit(file, 512 * 1024)
+    const read = await readNodeFileHandleWithinLimit(file, 1024 * 1024)
     if (!sameFile(before, read.stats) || !sameFile(before, await lstat(path))) {
       return refuseTaskExecution('REVISION_CONFLICT')
     }
@@ -130,11 +146,19 @@ export async function readLocalTaskBinding(options: {
     canonicalAgentSessionDigest(intent.input.task) !==
       canonicalAgentSessionDigest(stored.binding.command.task) ||
     stored.binding.command.inputRef !== `input:${digest(intent.input.input)}` ||
+    intent.input.executionDeadlineAt !== stored.binding.command.executionDeadlineAt ||
     stored.binding.command.ownerScope.kind !== 'personalTenant' ||
     stored.binding.command.ownerScope.tenantRef !== accountRef ||
     stored.binding.command.executionAccountRef !== accountRef ||
     stored.binding.command.profileId !== 'codex' ||
     stored.binding.command.profileRevision !== 'codex:1' ||
+    (intent.input.executionMode === 'enforced_autonomous'
+      ? !isTaskDockerEnforcementPolicy(stored.binding.command.executionPolicy) ||
+        stored.binding.command.policyRevision !== 'docker-local-linux:1'
+      : stored.binding.command.executionPolicy.trustMode !== 'trusted_personal_preview' ||
+        stored.binding.command.executionPolicy.executionPolicyRef !== 'personal-preview' ||
+        stored.binding.command.executionPolicy.executionPolicyRevision !== '1' ||
+        stored.binding.command.policyRevision !== 'personal-preview:1') ||
     stored.workspace.isolation !== 'managed_copy' ||
     !suffix ||
     isAbsolute(suffix) ||

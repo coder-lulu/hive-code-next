@@ -25,6 +25,13 @@ const binding = {
 }
 const task = {
   id: taskId,
+  account_id: accountId,
+  case_id: null,
+  run_company_id: companyId,
+  agent_company_id: companyId,
+  personal_company_id: companyId,
+  personal_agent_id: agentId,
+  driver_kind: 'hive_runtime',
   company_id: companyId,
   agent_id: agentId,
   run_id: runId,
@@ -33,7 +40,14 @@ const task = {
   status_version: 1,
   checkout_run_id: runId,
   run_status: 'running',
-  cancel_requested: false
+  cancel_requested: false,
+  run_scope: {
+    kind: 'personal',
+    accountId,
+    companyId,
+    employeeRef: agentId,
+    workspaceSelector: undefined
+  }
 }
 const initial = {
   ownerId: 'gateway:first',
@@ -111,6 +125,21 @@ function fixture(replies = []) {
   const db = vi.fn(async (strings, ...values) => {
     const text = strings.join('?').replaceAll(/\s+/g, ' ').trim()
     calls.push({ text, values })
+    if (text.startsWith('SELECT b.account_id,b.task_id')) {
+      expect(values).toEqual([companyId, runId])
+      if (replies[0]?.length === 0) {
+        return replies.shift()
+      }
+      return [{ account_id: accountId, task_id: taskId }]
+    }
+    if (text.startsWith('SELECT r.case_id,cb.project_id')) {
+      expect(values).toEqual([accountId, taskId, runId])
+      return [{ case_id: null }]
+    }
+    if (text.startsWith('SELECT i.id FROM issues i')) {
+      expect(values).toEqual([accountId, taskId, runId])
+      return [{ id: taskId }]
+    }
     if (!replies.length) {
       throw new Error(`Unexpected SQL: ${text}`)
     }
@@ -166,7 +195,7 @@ describe('durable task delivery ownership', () => {
       expiresAt: '2026-10-04T00:00:30.000Z'
     })
     expect(f.transactions).toEqual(['begin', 'commit'])
-    expect(f.calls[0].text).toContain('FOR UPDATE OF i,b')
+    expect(f.calls.some((call) => call.text.includes('FOR UPDATE OF i,b'))).toBe(true)
     expect(f.writes()).toHaveLength(2)
     expect(f.writes()[0].text).toContain('INSERT INTO hive_task_deliveries')
     expect(f.writes()[0].text).toContain("lease_clock.server_now+?*interval '1 millisecond'")
@@ -222,8 +251,10 @@ describe('durable task delivery ownership', () => {
       expiresAt: receipt().expiresAt,
       serverNow: '2026-10-04T00:05:00.000Z'
     })
-    expect(f.calls).toHaveLength(2)
-    expect(f.calls[1].text).toContain('FROM hive_task_delivery_claim_receipts')
+    expect(
+      f.calls.filter((call) => call.text.includes('FROM hive_task_delivery_claim_receipts'))
+    ).toHaveLength(1)
+    expect(f.calls.some((call) => call.text.includes('FROM hive_task_deliveries'))).toBe(false)
     expect(f.writes()).toHaveLength(0)
   })
 
@@ -441,7 +472,7 @@ describe('durable task delivery ownership', () => {
   })
 
   it('reads the current proof only inside the authenticated account and company/run scope', async () => {
-    const f = fixture([[{ ...row(), ...task }]])
+    const f = fixture([[task], [row()]])
     const current = await f.repository.getCurrentDelivery(accountId, companyId, runId)
     expect(current).toMatchObject({
       accountId,
@@ -450,14 +481,17 @@ describe('durable task delivery ownership', () => {
       ...token,
       commandFingerprint: binding.commandFingerprint
     })
-    expect(f.calls[0].values).toEqual([accountId, companyId, runId])
-    expect(f.calls[0].text).toContain('b.account_id=? AND a.company_id=? AND b.run_id=?')
-    expect(f.sql.begin).not.toHaveBeenCalled()
+    expect(f.calls[0].values).toEqual([companyId, runId])
+    expect(
+      f.calls.some((call) => call.text.includes('b.account_id=? AND i.id=? AND b.run_id=?'))
+    ).toBe(true)
+    expect(f.calls.at(-1).values).toEqual([accountId, taskId, runId])
+    expect(f.sql.begin).toHaveBeenCalledTimes(1)
     expect(f.writes()).toHaveLength(0)
   })
 
   it('returns no proof for an owned run with no delivery and denies a foreign run', async () => {
-    const owned = fixture([[{ ...task, generation: null }]])
+    const owned = fixture([[task], []])
     expect(await owned.repository.getCurrentDelivery(accountId, companyId, runId)).toBeNull()
     const foreign = fixture([[]])
     await expect(

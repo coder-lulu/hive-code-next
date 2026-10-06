@@ -2,6 +2,7 @@ import { ipcMain } from 'electron'
 import { getLocalTasks } from '../startup/main-process-tasks'
 import { isTrustedUIRenderer } from './ui'
 import type { HiveTaskCreate, HiveTasksApi } from '../../shared/hive-tasks'
+import type { HiveWorkflowCaseStart } from '../../shared/hive-workflow-case-runs'
 import type {
   HiveWorkbenchCompanyCreate,
   HiveWorkbenchPageQuery,
@@ -66,5 +67,11 @@ export function registerHiveTaskHandlers() {
   )
   bind('getWorkflowCase', (facade, query: HiveWorkflowCaseReadQuery) =>
     facade.getWorkflowCase(query)
+  )
+  bind('startWorkflowCase', (facade, input: HiveWorkflowCaseStart) =>
+    facade.startWorkflowCase(input)
+  )
+  bind('getWorkflowCaseRuns', (facade, query: HiveWorkflowCaseReadQuery) =>
+    facade.getWorkflowCaseRuns(query)
   )
 }

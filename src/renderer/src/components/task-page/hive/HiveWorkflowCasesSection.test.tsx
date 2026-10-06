@@ -89,7 +89,12 @@ const team = workbenchTeam(company, workbenchProject(3, company), true)
 const secondTeam = workbenchTeam(company, workbenchProject(4, company), true)
 const workflow = workflowSnapshot(team)
 const secondWorkflow = workflowSnapshot(secondTeam, 1, 101)
-const api = { listWorkflowCases: vi.fn(), getWorkflowCase: vi.fn(), createWorkflowCase: vi.fn() }
+const api = {
+  listWorkflowCases: vi.fn(),
+  getWorkflowCase: vi.fn(),
+  createWorkflowCase: vi.fn(),
+  getWorkflowCaseRuns: vi.fn()
+}
 const firstAccount = workbenchAccountState()
 const secondAccount = workbenchAccountState('other-owner', 'other-authority')
 const accountGetState = vi.fn<() => Promise<HiveAccountState>>()
@@ -104,6 +109,7 @@ beforeEach(() => {
   accountGetState.mockReset().mockResolvedValue(firstAccount)
   feedback.submitted.mockReset()
   api.listWorkflowCases.mockResolvedValue({ items: [], nextCursor: null })
+  api.getWorkflowCaseRuns.mockResolvedValue([])
   api.createWorkflowCase.mockImplementation((input: HiveWorkflowCaseCreate) =>
     Promise.resolve(submittedWorkflowCase(input, team, workflow))
   )

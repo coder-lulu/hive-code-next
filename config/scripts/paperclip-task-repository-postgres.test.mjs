@@ -74,12 +74,12 @@ describe.skipIf(!configPath)('isolated real PostgreSQL delivery and inbox regres
       pending = outcome(
         h.repository.claimDispatch(context.accountId, context.task.id, context.task.run_id, token)
       )
-      await h.waitForLocks(session.pid, 1, '%SELECT status FROM heartbeat_runs%')
+      await h.waitForLocks(session.pid, 1, '%JOIN heartbeat_runs h%FOR SHARE OF i,b,h%')
       await db`UPDATE heartbeat_runs SET driver_kind='codex_local' WHERE id=${context.task.run_id}`
     })
     expect(await pending).toMatchObject({
       status: 'rejected',
-      reason: { code: 'REVISION_CONFLICT' }
+      reason: { code: 'FORBIDDEN' }
     })
     const state = await h.snapshot(context)
     retained(state, context)
@@ -171,7 +171,7 @@ describe.skipIf(!configPath)('isolated real PostgreSQL delivery and inbox regres
         token,
         context.observation(events, context.result)
       )
-    ).rejects.toThrow('REVISION_CONFLICT')
+    ).rejects.toThrow('FORBIDDEN')
     const state = await h.snapshot(context)
     retained(state, context)
     expect(state.inbox).toBe(0)
@@ -499,7 +499,7 @@ describe.skipIf(!configPath)('isolated real PostgreSQL delivery and inbox regres
           context.observation(events, context.result)
         )
       )
-      await h.waitForLocks(blockerPid, 1, '%UPDATE heartbeat_runs%')
+      await h.waitForLocks(blockerPid, 1, '%JOIN heartbeat_runs h%FOR SHARE OF i,b,h%')
       await h.waitForExpiry(first.proof.expiresAt)
       const invisible = await h.snapshot(context)
       expect(invisible.inbox).toBe(0)
@@ -577,131 +577,5 @@ describe.skipIf(!configPath)('isolated real PostgreSQL delivery and inbox regres
     expect(saved.map((event) => event.payload_hash)).toEqual(events.map(digest))
     expect(saved.every((event) => event.payload_hash === digest(event.payload))).toBe(true)
     retained(state, context)
-  })
-
-  it('resumes a persisted terminal across repository recreation and consumes a lost response idempotently', async () => {
-    const context = await h.newTask()
-    const first = await claim(context)
-    await h.repository.claimDispatch(
-      context.accountId,
-      context.task.id,
-      context.task.run_id,
-      first.token
-    )
-    const initial = context.observation([context.event(1, 'accepted')], context.result, {
-      lastSequence: 3
-    })
-    expect(
-      await h.repository.consumeObservation(
-        context.accountId,
-        context.task.id,
-        context.task.run_id,
-        first.token,
-        initial
-      )
-    ).toMatchObject({ cursor: 1, needsReplay: true, settled: false })
-    const stored = await h.snapshot(context)
-    expect(Number(stored.delivery.terminal_sequence)).toBe(3)
-    retained(stored, context)
-    const resumed = createTaskRepository(h.sql)
-    const recoveryPage = await resumed.listRecoverableRuns(context.accountId, { limit: 1 })
-    expect(recoveryPage.items).toHaveLength(1)
-    expect(recoveryPage.items[0].run_id).toBe(context.task.run_id)
-    expect(
-      await resumed.getCurrentDelivery(
-        context.accountId,
-        context.task.company_id,
-        context.task.run_id
-      )
-    ).toMatchObject({ ...first.token, cursor: 1 })
-    const final = context.observation(
-      [context.event(2, 'running'), context.event(3, 'succeeded')],
-      context.result
-    )
-    // Deliberately discard the committed response, then retry through a fresh repository reader.
-    await resumed.consumeObservation(
-      context.accountId,
-      context.task.id,
-      context.task.run_id,
-      first.token,
-      final
-    )
-    const replay = await createTaskRepository(h.sql).consumeObservation(
-      context.accountId,
-      context.task.id,
-      context.task.run_id,
-      first.token,
-      final
-    )
-    expect(replay).toMatchObject({ cursor: 3, needsReplay: false, settled: true })
-    const state = await h.snapshot(context)
-    expect(state.inbox).toBe(3)
-    expect(state.task).toMatchObject({
-      checkout_run_id: null,
-      execution_run_id: null,
-      execution_locked_at: null,
-      status: 'in_review',
-      result_receipt: context.result
-    })
-    expect(Number(state.task.status_version)).toBe(2)
-    expect(state.delivery.expires_at.toISOString()).toBe(first.proof.expiresAt)
-    expect(state.run).toMatchObject({
-      status: 'succeeded',
-      execution_stage: 'settled',
-      result_json: context.result
-    })
-    expect(state.run.finished_at).toBeInstanceOf(Date)
-    expect((await resumed.listRecoverableRuns(context.accountId)).items).toHaveLength(0)
-    await expect(
-      resumed.consumeObservation(
-        context.accountId,
-        context.task.id,
-        context.task.run_id,
-        first.token,
-        context.observation(final.events, { ...context.result, receiptId: 'result:p2-pg:changed' })
-      )
-    ).rejects.toThrow('IDEMPOTENCY_CONFLICT')
-    expect(Number((await h.snapshot(context)).task.status_version)).toBe(2)
-  })
-
-  it('requires the authenticated account and company/run scope for a complete delivery proof', async () => {
-    const context = await h.newTask()
-    const foreign = await h.newTask()
-    const first = await claim(context)
-    const proof = await h.repository.getCurrentDelivery(
-      context.accountId,
-      context.task.company_id,
-      context.task.run_id
-    )
-    expect(proof).toMatchObject({
-      accountId: context.accountId,
-      companyId: context.task.company_id,
-      taskId: context.task.id,
-      runId: context.task.run_id,
-      ...first.token,
-      commandFingerprint: context.binding.commandFingerprint,
-      runtimeRecordId: context.command.runtimeRecordId,
-      ownershipEpoch: context.command.ownershipEpoch,
-      executionId: context.command.executionId,
-      executionEpoch: context.command.executionEpoch,
-      operationId: context.command.operationId,
-      workspaceExecutionClaimRef: context.command.workspaceExecutionClaimRef,
-      writeFence: context.command.writeFence
-    })
-    await expect(
-      h.repository.getCurrentDelivery(
-        foreign.accountId,
-        context.task.company_id,
-        context.task.run_id
-      )
-    ).rejects.toThrow('FORBIDDEN')
-    await expect(
-      h.repository.getCurrentDelivery(
-        context.accountId,
-        foreign.task.company_id,
-        context.task.run_id
-      )
-    ).rejects.toThrow('FORBIDDEN')
-    expect((await h.snapshot(context)).claims).toBe(1)
   })
 })

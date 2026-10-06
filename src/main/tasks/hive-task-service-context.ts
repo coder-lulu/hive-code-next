@@ -51,6 +51,10 @@ export function createHiveTaskServiceContext(options: {
       ...descriptor,
       headers: { 'X-Hive-Account-Id': account.accountId },
       maximumResponseBytes: 512 * 1024,
+      maximumResponseBytesByPath: {
+        '/hive/workbench/cases/start': 1024 * 1024,
+        '/hive/workbench/cases/run-read': 1024 * 1024
+      },
       maximumResponseStructuralTokensByPath: {
         '/hive/workbench/workflows/list': HIVE_WORKFLOW_PAGE_STRUCTURAL_TOKENS
       }

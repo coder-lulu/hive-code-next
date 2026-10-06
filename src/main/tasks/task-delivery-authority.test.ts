@@ -142,7 +142,7 @@ describe('private persisted delivery authority', () => {
     const authorization = await current.authorize(current.caller, current.command, 'start')
     expect(authorization.workspace).toEqual(current.authorization.workspace)
     expect(current.context.request).toHaveBeenCalledWith(
-      `/hive/execution-delivery/${current.command.task.spaceId}/${current.command.task.runId}`
+      `/hive/execution-delivery/${current.command.task.spaceId}/${current.command.task.runId}/start`
     )
     current.advance(29_999)
     expect(authorization.assertCurrent).not.toThrow()

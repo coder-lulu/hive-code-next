@@ -10,6 +10,7 @@ export type LocalTaskClientOptions = {
   requestTimeoutMs?: number
   headers?: Readonly<Record<string, string>>
   maximumResponseBytes?: number
+  maximumResponseBytesByPath?: Readonly<Record<string, number>>
   maximumResponseStructuralTokensByPath?: Readonly<Record<string, number>>
 }
 const MAX_BYTES = 64 * 1024
@@ -58,7 +59,9 @@ export function createLocalTaskRequest(options: LocalTaskClientOptions) {
       })
       const bytes = await readFetchResponseBytesWithinLimit(
         response,
-        options.maximumResponseBytes ?? MAX_BYTES
+        options.maximumResponseBytesByPath?.[target.pathname] ??
+          options.maximumResponseBytes ??
+          MAX_BYTES
       )
       const content = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
       assertJsonTextStructureWithinLimits(content, {

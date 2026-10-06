@@ -11,6 +11,9 @@ import {
   refuseTaskRepository as refuse
 } from './task-delivery-repository.mjs'
 import { createTaskInboxRepository } from './task-inbox-repository.mjs'
+import { createTaskRunScopeReader } from './task-run-scope.mjs'
+import { requireWorkflowIssueCheckout } from './workflow-issue-checkout.mjs'
+import { readWorkflowCaseRun } from './workflow-case-run-records.mjs'
 import {
   createTaskControlRepository,
   requireExternalTaskScope
@@ -20,28 +23,7 @@ const digest = canonicalAgentSessionDigest
 
 /** Business state lives in the pinned Paperclip tables, with one transactional receipt per run. */
 export function createTaskRepository(sql) {
-  const read = async (db, accountId, taskId, runId, lock = false) => {
-    requireTaskRepositoryScope(accountId, taskId, runId)
-    const rows = lock
-      ? await db`SELECT i.*, b.run_id, b.binding, b.result_receipt,
-          (b.cancel_requested OR h.context_snapshot->'externalExecutionControl'->'cancel' IS NOT NULL) AS cancel_requested,b.workspace_selector,
-          h.agent_id, h.execution_stage, h.driver_kind, h.status AS run_status FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id
-          JOIN heartbeat_runs h ON h.id=b.run_id AND h.company_id=i.company_id
-          JOIN hive_task_accounts a ON a.account_id=b.account_id AND a.company_id=i.company_id AND a.agent_id=h.agent_id
-          JOIN agents g ON g.id=h.agent_id AND g.company_id=i.company_id
-          WHERE b.account_id=${accountId} AND i.id=${taskId} AND b.run_id=${runId} FOR UPDATE OF i,b`
-      : await db`SELECT i.*, b.run_id, b.binding, b.result_receipt,
-          (b.cancel_requested OR h.context_snapshot->'externalExecutionControl'->'cancel' IS NOT NULL) AS cancel_requested,b.workspace_selector,
-          h.agent_id, h.execution_stage, h.driver_kind, h.status AS run_status FROM issues i JOIN hive_task_bindings b ON b.task_id=i.id
-          JOIN heartbeat_runs h ON h.id=b.run_id AND h.company_id=i.company_id
-          JOIN hive_task_accounts a ON a.account_id=b.account_id AND a.company_id=i.company_id AND a.agent_id=h.agent_id
-          JOIN agents g ON g.id=h.agent_id AND g.company_id=i.company_id
-          WHERE b.account_id=${accountId} AND i.id=${taskId} AND b.run_id=${runId}`
-    if (!rows[0]) {
-      refuse('FORBIDDEN')
-    }
-    return rows[0]
-  }
+  const { read, resolve } = createTaskRunScopeReader(sql)
   const persistIntent = async (db, task, kind, reason) => {
     const rows = await db`UPDATE heartbeat_runs SET context_snapshot=
     coalesce(context_snapshot,'{}'::jsonb)||jsonb_build_object('externalExecutionControl',
@@ -108,12 +90,12 @@ export function createTaskRepository(sql) {
     }
     return settled
   }
-  const deliveries = createTaskDeliveryRepository(sql, read)
+  const deliveries = createTaskDeliveryRepository(sql, read, resolve)
   const inbox = createTaskInboxRepository(sql, { read, settle })
   return {
     ...deliveries,
     ...inbox,
-    ...createTaskControlRepository(sql, read),
+    ...createTaskControlRepository(sql, read, resolve),
     async create(accountId, input) {
       requireTaskRepositoryScope(accountId)
       return sql.begin(async (db) => {
@@ -149,7 +131,7 @@ export function createTaskRepository(sql) {
         return read(db, accountId, taskId, runId)
       })
     },
-    read: (accountId, taskId, runId) => read(sql, accountId, taskId, runId),
+    read: (accountId, taskId, runId) => sql.begin((db) => read(db, accountId, taskId, runId)),
     async list(accountId) {
       requireTaskRepositoryScope(accountId)
       return sql`SELECT i.id,i.title,i.status,i.status_version,b.run_id,
@@ -165,7 +147,6 @@ export function createTaskRepository(sql) {
       const binding = HiveRuntimeAdapterBinding.parse(rawBinding)
       if (
         binding.command.ownerScope.kind !== 'personalTenant' ||
-        binding.command.executionPolicy.trustMode !== 'trusted_personal_preview' ||
         binding.command.profileId !== 'codex' ||
         binding.command.profileRevision !== 'codex:1' ||
         'resourceSnapshotRef' in binding.command
@@ -174,6 +155,14 @@ export function createTaskRepository(sql) {
       }
       return sql.begin(async (db) => {
         const task = await read(db, accountId, taskId, runId, true)
+        if (
+          binding.command.executionPolicy.trustMode !==
+          (task.run_scope.kind === 'workbenchCase'
+            ? 'enforced_autonomous'
+            : 'trusted_personal_preview')
+        ) {
+          refuse('FORBIDDEN')
+        }
         if (task.binding) {
           const immutable = (value) => ({
             ...value,
@@ -195,6 +184,26 @@ export function createTaskRepository(sql) {
           binding.command.task.taskRevision !== String(task.status_version)
         ) {
           refuse('REVISION_CONFLICT')
+        }
+        if (task.run_scope.kind === 'workbenchCase') {
+          const record = await readWorkflowCaseRun(db, accountId, taskId, runId)
+          if (
+            digest(record.run.task) !== digest(binding.command.task) ||
+            binding.command.executionDeadlineAt !== record.input.executionDeadlineAt ||
+            binding.command.inputRef !== `input:${record.input.inputDigest}`
+          ) {
+            refuse('REVISION_CONFLICT')
+          }
+          if (!task.cancel_requested) {
+            const active =
+              await db`SELECT c.id FROM pipeline_cases c JOIN pipeline_stages s ON s.id=c.stage_id
+              WHERE c.id=${task.run_scope.caseId} AND c.company_id=${task.company_id} AND c.terminal_kind IS NULL
+                AND c.retired_at IS NULL AND s.config->'hiveWorkflow'->'stage'->>'stageRef'=${task.run_scope.stageRef} FOR SHARE OF c,s`
+            if (active.length !== 1) {
+              refuse('REVISION_CONFLICT')
+            }
+            await requireWorkflowIssueCheckout(db, task, runId)
+          }
         }
         await db`UPDATE hive_task_bindings SET binding=${sql.json(binding)} WHERE account_id=${accountId} AND task_id=${task.id} AND run_id=${runId}`
         await db`UPDATE issues SET checkout_run_id=${task.run_id},execution_locked_at=now(),status='in_progress',status_version=status_version+1 WHERE id=${task.id}`

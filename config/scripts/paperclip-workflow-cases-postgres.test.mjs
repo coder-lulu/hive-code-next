@@ -597,7 +597,10 @@ describe.skipIf(!configPath)('real requirement case admission in Paperclip Postg
     expect(WORKBENCH_PATHS.filter((path) => path.includes('/cases/'))).toEqual([
       '/hive/workbench/cases/create',
       '/hive/workbench/cases/list',
-      '/hive/workbench/cases/read'
+      '/hive/workbench/cases/read',
+      '/hive/workbench/cases/start',
+      '/hive/workbench/cases/runs',
+      '/hive/workbench/cases/run-read'
     ])
     expect(() =>
       handleTeamWorkbenchRequest(cases, f.accountId, '/hive/workbench/cases/run', {})

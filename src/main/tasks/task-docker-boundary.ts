@@ -20,7 +20,8 @@ import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import {
   taskDockerIdentityFor,
   taskDockerRecoveryIdentity,
-  type TaskDockerIdentity
+  type TaskDockerIdentity,
+  type TaskDockerDaemonIdentity
 } from './task-docker-identity'
 
 export type TaskDockerPrepared = {
@@ -44,6 +45,7 @@ export function createTaskDockerBoundary(options: {
   persistIdentity?: (identity: TaskDockerIdentity) => Promise<void>
   dispatch?: TaskExecutionDispatchAuthorization
   recoveryIdentity?: TaskDockerIdentity
+  expectedDaemon?: TaskDockerDaemonIdentity
   run?: typeof runProcess
 }) {
   const config = taskDockerConfiguration(options)
@@ -57,7 +59,8 @@ export function createTaskDockerBoundary(options: {
   const exitProof = new RetryableProcessExitProof()
   let containerId = recovery?.containerId ?? null
   let imageEnv: Record<string, string> | null = null
-  let daemon: ReturnType<typeof taskDockerDaemon> | null = recovery?.daemon ?? null
+  let daemon: ReturnType<typeof taskDockerDaemon> | null =
+    options.expectedDaemon ?? recovery?.daemon ?? null
   let createAttempted = false
   let stopping = recovery !== null
   let pendingCheckpointed = false

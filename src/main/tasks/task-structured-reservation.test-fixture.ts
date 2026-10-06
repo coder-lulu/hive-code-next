@@ -25,12 +25,14 @@ export const TASK_STRUCTURED_LOGS = 'logs/paperclip-development/p3/task-session-
 
 export function taskStructuredFixture(
   workspace: TaskExecutionWorkspace = taskWorkspace('isolated-test'),
-  taskReference?: TaskExecutionStart['task']
+  taskReference?: TaskExecutionStart['task'],
+  commandPatch: Partial<TaskExecutionStart> = {}
 ) {
   const state = emptyState('local')
   const validate = vi.fn(() => undefined)
   const command = taskCommand({
     operationId: `${TASK_TEST_NOW}-${'b'.repeat(32)}`,
+    ...commandPatch,
     ...(taskReference ? { task: taskReference } : {})
   })
   const admission = {

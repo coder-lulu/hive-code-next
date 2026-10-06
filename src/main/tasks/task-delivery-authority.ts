@@ -47,7 +47,7 @@ export function createTaskDeliveryAuthorizer(options: {
       commandFingerprint: computeTaskExecutionFingerprint(command, caller.operationCallerKey),
       ...token.data
     }
-    const path = `/hive/execution-delivery/${encodeURIComponent(command.task.spaceId)}/${encodeURIComponent(command.task.runId)}`
+    const path = `/hive/execution-delivery/${encodeURIComponent(command.task.spaceId)}/${encodeURIComponent(command.task.runId)}/start`
     let deadline = 0
     let flight: Promise<void> | null = null
     const assertDispatchCurrent = () => {
