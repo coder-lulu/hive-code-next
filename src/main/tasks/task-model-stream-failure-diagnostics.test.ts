@@ -53,6 +53,19 @@ async function fixture(body: string | Buffer) {
   return result
 }
 const refused = (error: unknown) => taskFailure(error, 'stream', 'TASK_MODEL_STREAM_REFUSED', 200)
+const malformedResponseReasons: Record<string, string> = {
+  access_programs: 'OBJECT',
+  parallel_tool_calls: 'BOOLEAN',
+  tool_choice: 'ENUM',
+  tools: 'ARRAY',
+  max_output_tokens: 'INTEGER',
+  max_tool_calls: 'INTEGER',
+  reasoning: 'OBJECT',
+  store: 'BOOLEAN',
+  text: 'OBJECT',
+  top_logprobs: 'INTEGER',
+  truncation: 'ENUM'
+}
 describe('actual finite stream guard and policy producer diagnostics', () => {
   it.each<{
     label: string
@@ -85,14 +98,14 @@ describe('actual finite stream guard and policy producer diagnostics', () => {
       }))
     ),
     ...refusedTaskModelResponseFields.map((key) => ({
-      label: `public response ${key} field`,
+      label: `malformed public response ${key} field`,
       body: modelEvent('response.created', {
         response: { id: 'resp-fixture', [key]: 'body-token-secret' }
       }),
       reason: 'policy',
-      policy: 'UNKNOWN_FIELD',
+      policy: malformedResponseReasons[key] ?? 'RESPONSE_CONFIGURATION',
       location: 'response',
-      key
+      key: malformedResponseReasons[key] ? undefined : key
     })),
     { label: 'empty stream', body: '', reason: 'no_events' },
     { label: 'comments only', body: ': ping\n\n', reason: 'no_events' },

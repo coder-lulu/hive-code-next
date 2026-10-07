@@ -1,6 +1,11 @@
 import type { createPolicyItems, PolicyCall } from './task-model-policy-items'
 import { addTaskModelPolicyLocation } from './task-model-stream-failure'
 import {
+  TASK_MODEL_RESPONSE_CONFIGURATION_FIELDS,
+  validateTaskModelResponseConfiguration,
+  type TaskModelResponseConfiguration
+} from './task-model-response-configuration'
+import {
   array,
   boolean,
   deny,
@@ -22,12 +27,13 @@ export function createTaskModelResponsePolicy(
     value: unknown,
     next: Map<string, PolicyCall>,
     learned: Set<string>,
-    completed: boolean
+    completed: boolean,
+    configuration?: TaskModelResponseConfiguration
   ): void => {
     try {
       const r = object(
         value,
-        'id object created_at status model output usage usage_metadata end_turn error incomplete_details background user metadata headers',
+        `id object created_at status model output usage usage_metadata end_turn error incomplete_details background user metadata headers ${TASK_MODEL_RESPONSE_CONFIGURATION_FIELDS}`,
         'id'
       )
       id(r.id)
@@ -58,12 +64,12 @@ export function createTaskModelResponsePolicy(
         boolean(r.end_turn)
       }
       if (
-        (r.background !== undefined && r.background !== false) ||
+        (r.background != null && r.background !== false) ||
         (r.user !== undefined && r.user !== null)
       ) {
         deny('RESPONSE_METADATA')
       }
-      if (r.metadata !== undefined) {
+      if (r.metadata != null) {
         try {
           object(r.metadata, '')
         } catch (error) {
@@ -95,6 +101,7 @@ export function createTaskModelResponsePolicy(
           throw error
         }
       }
+      validateTaskModelResponseConfiguration(r, completed, configuration)
     } catch (error) {
       addTaskModelPolicyLocation(error, 'response')
       throw error

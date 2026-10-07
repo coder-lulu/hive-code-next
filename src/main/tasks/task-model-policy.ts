@@ -8,6 +8,10 @@ import { addTaskModelPolicyLocation } from './task-model-stream-failure'
 import { createTaskModelResponsePolicy } from './task-model-policy-response'
 import { validateTaskModelSafetyBuffering } from './task-model-safety-buffering'
 import {
+  captureTaskModelResponseConfiguration,
+  type TaskModelResponseConfiguration
+} from './task-model-response-configuration'
+import {
   array,
   boolean,
   canonical,
@@ -52,6 +56,7 @@ const callKinds =
 export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
   request: (jsonText: string) => string
   event: (dataText: string) => void
+  responseEvent: (body: string) => (dataText: string) => void
 } {
   const model = id(profile.model),
     lite = profile.responsesLite,
@@ -65,7 +70,15 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
   let calls = new Map<string, PolicyCall>(),
     eventBytes = 0
   const response = createTaskModelResponsePolicy(model, item)
-  return {
+  const policy: {
+    request: (jsonText: string) => string
+    event: (dataText: string, configuration?: TaskModelResponseConfiguration) => void
+    responseEvent: (body: string) => (dataText: string) => void
+  } = {
+    responseEvent: (body) => {
+      const configuration = captureTaskModelResponseConfiguration(policy.request(body), model, lite)
+      return (dataText) => policy.event(dataText, configuration)
+    },
     request: (jsonText) => {
       const r = object(
         parse(jsonText, TASK_MODEL_REQUEST_BYTES),
@@ -153,7 +166,7 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
       }
       return result
     },
-    event: (dataText) => {
+    event: (dataText, configuration) => {
       try {
         if (typeof dataText !== 'string') {
           deny('BYTES')
@@ -187,7 +200,7 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
         if (responseKinds.includes(kind)) {
           object(e, `${prefix}response`, 'response')
           next = new Map(calls)
-          response(e.response, next, learned, kind === 'response.completed')
+          response(e.response, next, learned, kind === 'response.completed', configuration)
         } else if (['response.output_item.added', 'response.output_item.done'].includes(kind)) {
           object(e, `${prefix}output_index item`, 'item')
           next = new Map(calls)
@@ -248,4 +261,5 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
       }
     }
   }
+  return policy
 }

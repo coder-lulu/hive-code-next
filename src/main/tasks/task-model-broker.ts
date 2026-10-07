@@ -184,6 +184,7 @@ export function createTaskModelBroker(options: {
         if (active !== state) {
           throw new Error('TASK_MODEL_REQUEST_ABORTED')
         }
+        state.stream = createTaskModelSseReader(policy.responseEvent(body))
         phase = 'fetch'
         state.reader = await openTaskModelUpstream({
           scope,
