@@ -1,5 +1,6 @@
 import type { TaskModelPolicyProfile } from './task-model-policy'
 import { TASK_MODEL_EVENT_BYTES, TASK_MODEL_REQUEST_BYTES } from './task-model-channel-protocol'
+import { addTaskModelPolicyLocation } from './task-model-stream-failure'
 import {
   array,
   boolean,
@@ -109,117 +110,126 @@ export function createPolicyItems(profile: TaskModelPolicyProfile): {
     learned: Set<string>,
     upstream: boolean
   ): void => {
-    const v = object(
-      value,
-      'type id role content phase summary encrypted_content tools name namespace arguments input call_id status output',
-      'type'
-    )
-    const kind = text(v.type)
-    if (v.id != null) {
-      id(v.id)
-    }
-    if (v.status !== undefined && !(kind === 'custom_tool_call' && v.status === null)) {
-      if (!upstream && kind !== 'custom_tool_call') {
-        deny('STATUS')
-      }
-      oneOf(v.status, 'in_progress completed incomplete failed')
-    }
-    if (kind === 'message') {
-      object(
-        v,
-        upstream ? 'type id role content phase status' : 'type id role content phase',
-        'role content'
+    try {
+      const v = object(
+        value,
+        'type id role content phase summary encrypted_content tools name namespace arguments input call_id status output',
+        'type'
       )
-      oneOf(v.role, upstream ? 'assistant' : 'user assistant developer system')
-      if (v.phase != null) {
-        oneOf(v.phase, 'commentary final_answer')
+      const kind = text(v.type)
+      if (v.id != null) {
+        id(v.id)
       }
-      array(v.content).forEach((p) => part(p, upstream ? 'output_text' : 'input_text output_text'))
-    } else if (kind === 'reasoning') {
-      object(
-        v,
-        upstream
-          ? 'type id summary content encrypted_content status'
-          : 'type id summary content encrypted_content',
-        'summary'
-      )
-      array(v.summary).forEach((p) => part(p, 'summary_text'))
-      if (v.content != null) {
-        array(v.content).forEach((p) => part(p, 'reasoning_text text'))
-      }
-      if (v.encrypted_content != null) {
-        const hash = digest(text(v.encrypted_content, TASK_MODEL_EVENT_BYTES))
-        if (upstream) {
-          learned.add(hash)
-        } else if (!opaque.has(hash)) {
-          deny('OPAQUE_REPLAY_UNPROVEN')
+      if (v.status !== undefined && !(kind === 'custom_tool_call' && v.status === null)) {
+        if (!upstream && kind !== 'custom_tool_call') {
+          deny('STATUS')
         }
+        oneOf(v.status, 'in_progress completed incomplete failed')
       }
-    } else if (kind === 'additional_tools') {
-      object(v, 'type id role tools', 'role tools')
-      if (upstream || !lite || v.role !== 'developer') {
-        deny('ADDITIONAL_TOOLS')
-      }
-      tools(v.tools)
-    } else if (kind === 'function_call' || kind === 'custom_tool_call') {
-      const functional = kind === 'function_call'
-      object(
-        v,
-        `${functional ? 'type id name namespace arguments call_id' : 'type id name namespace input call_id status'}${upstream && functional ? ' status' : ''}`,
-        'name call_id'
-      )
-      const call: PolicyCall = {
-        kind: functional ? 'function' : 'custom',
-        name: id(v.name),
-        namespace: v.namespace == null ? 'functions' : id(v.namespace),
-        ...(v.id ? { itemId: id(v.id) } : {})
-      }
-      if (inventory.get(toolKey(call.namespace, call.name)) !== call.kind) {
-        deny('CALL_UNAPPROVED')
-      }
-      text(functional ? v.arguments : v.input)
-      const callId = id(v.call_id),
-        prior = calls.get(callId)
-      if (
-        prior &&
-        (prior.kind !== call.kind ||
-          prior.name !== call.name ||
-          prior.namespace !== call.namespace ||
-          (prior.itemId && call.itemId && prior.itemId !== call.itemId))
-      ) {
-        deny('CALL_MISMATCH')
-      }
-      if (
-        call.itemId &&
-        [...calls.entries()].some(([key, other]) => key !== callId && other.itemId === call.itemId)
-      ) {
-        deny('CALL_MISMATCH')
-      }
-      calls.set(callId, { ...call, itemId: call.itemId ?? prior?.itemId })
-    } else if (kind === 'function_call_output' || kind === 'custom_tool_call_output') {
-      object(
-        v,
-        kind === 'function_call_output'
-          ? 'type id name namespace call_id output'
-          : 'type id name call_id output',
-        'call_id output'
-      )
-      const call = calls.get(id(v.call_id))
-      if (
-        !call ||
-        call.kind !== (kind === 'function_call_output' ? 'function' : 'custom') ||
-        (v.name != null && v.name !== call.name) ||
-        (v.namespace != null && v.namespace !== call.namespace)
-      ) {
-        deny('OUTPUT_CALL_MISMATCH')
-      }
-      if (typeof v.output === 'string') {
-        text(v.output)
+      if (kind === 'message') {
+        object(
+          v,
+          upstream ? 'type id role content phase status' : 'type id role content phase',
+          'role content'
+        )
+        oneOf(v.role, upstream ? 'assistant' : 'user assistant developer system')
+        if (v.phase != null) {
+          oneOf(v.phase, 'commentary final_answer')
+        }
+        array(v.content).forEach((p) =>
+          part(p, upstream ? 'output_text' : 'input_text output_text')
+        )
+      } else if (kind === 'reasoning') {
+        object(
+          v,
+          upstream
+            ? 'type id summary content encrypted_content status'
+            : 'type id summary content encrypted_content',
+          'summary'
+        )
+        array(v.summary).forEach((p) => part(p, 'summary_text'))
+        if (v.content != null) {
+          array(v.content).forEach((p) => part(p, 'reasoning_text text'))
+        }
+        if (v.encrypted_content != null) {
+          const hash = digest(text(v.encrypted_content, TASK_MODEL_EVENT_BYTES))
+          if (upstream) {
+            learned.add(hash)
+          } else if (!opaque.has(hash)) {
+            deny('OPAQUE_REPLAY_UNPROVEN')
+          }
+        }
+      } else if (kind === 'additional_tools') {
+        object(v, 'type id role tools', 'role tools')
+        if (upstream || !lite || v.role !== 'developer') {
+          deny('ADDITIONAL_TOOLS')
+        }
+        tools(v.tools)
+      } else if (kind === 'function_call' || kind === 'custom_tool_call') {
+        const functional = kind === 'function_call'
+        object(
+          v,
+          `${functional ? 'type id name namespace arguments call_id' : 'type id name namespace input call_id status'}${upstream && functional ? ' status' : ''}`,
+          'name call_id'
+        )
+        const call: PolicyCall = {
+          kind: functional ? 'function' : 'custom',
+          name: id(v.name),
+          namespace: v.namespace == null ? 'functions' : id(v.namespace),
+          ...(v.id ? { itemId: id(v.id) } : {})
+        }
+        if (inventory.get(toolKey(call.namespace, call.name)) !== call.kind) {
+          deny('CALL_UNAPPROVED')
+        }
+        text(functional ? v.arguments : v.input)
+        const callId = id(v.call_id),
+          prior = calls.get(callId)
+        if (
+          prior &&
+          (prior.kind !== call.kind ||
+            prior.name !== call.name ||
+            prior.namespace !== call.namespace ||
+            (prior.itemId && call.itemId && prior.itemId !== call.itemId))
+        ) {
+          deny('CALL_MISMATCH')
+        }
+        if (
+          call.itemId &&
+          [...calls.entries()].some(
+            ([key, other]) => key !== callId && other.itemId === call.itemId
+          )
+        ) {
+          deny('CALL_MISMATCH')
+        }
+        calls.set(callId, { ...call, itemId: call.itemId ?? prior?.itemId })
+      } else if (kind === 'function_call_output' || kind === 'custom_tool_call_output') {
+        object(
+          v,
+          kind === 'function_call_output'
+            ? 'type id name namespace call_id output'
+            : 'type id name call_id output',
+          'call_id output'
+        )
+        const call = calls.get(id(v.call_id))
+        if (
+          !call ||
+          call.kind !== (kind === 'function_call_output' ? 'function' : 'custom') ||
+          (v.name != null && v.name !== call.name) ||
+          (v.namespace != null && v.namespace !== call.namespace)
+        ) {
+          deny('OUTPUT_CALL_MISMATCH')
+        }
+        if (typeof v.output === 'string') {
+          text(v.output)
+        } else {
+          array(v.output).forEach((p) => part(p, 'input_text'))
+        }
       } else {
-        array(v.output).forEach((p) => part(p, 'input_text'))
+        deny('ITEM_UNSUPPORTED')
       }
-    } else {
-      deny('ITEM_UNSUPPORTED')
+    } catch (error) {
+      addTaskModelPolicyLocation(error, 'item')
+      throw error
     }
   }
   return { tools, item, opaque }

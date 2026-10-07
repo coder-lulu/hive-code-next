@@ -4,6 +4,10 @@ import {
   isTaskResponseContentTypeKind,
   type TaskResponseContentTypeKind
 } from './task-response-content-type'
+import {
+  taskModelStreamDiagnostic,
+  type TaskModelStreamDiagnostic
+} from './task-model-stream-failure'
 
 const modelCodes = [
   'TASK_MODEL_ACCOUNT_BUSY',
@@ -83,6 +87,10 @@ export type TaskFailureDiagnostic = Readonly<{
   networkCode?: string
   responseReason?: ResponseReason
   contentTypeKind?: TaskResponseContentTypeKind
+  streamReason?: TaskModelStreamDiagnostic['streamReason']
+  policyReason?: TaskModelStreamDiagnostic['policyReason']
+  policyLocation?: TaskModelStreamDiagnostic['policyLocation']
+  policyKey?: TaskModelStreamDiagnostic['policyKey']
 }>
 const trustedFailures = new WeakSet<TaskFailureError>()
 
@@ -151,7 +159,9 @@ export class TaskFailureError extends Error {
     let code: Code = safeFallback
     let causeCode: Code | undefined
     let networkCode: string | undefined
+    let streamDiagnostic: TaskModelStreamDiagnostic | undefined
     for (let depth = 0; depth < 5 && error; depth++) {
+      streamDiagnostic ??= taskModelStreamDiagnostic(error)
       const candidate = own(error, 'code'),
         message = own(error, 'message')
       const found = isCode(candidate) ? candidate : isCode(message) ? message : undefined
@@ -196,6 +206,23 @@ export class TaskFailureError extends Error {
       responseReason === 'content_type' &&
       isTaskResponseContentTypeKind(contentTypeKind)
         ? { contentTypeKind }
+        : {}),
+      ...(phase === 'stream' &&
+      code === 'TASK_MODEL_STREAM_REFUSED' &&
+      status === 200 &&
+      streamDiagnostic
+        ? {
+            streamReason: streamDiagnostic.streamReason,
+            ...(streamDiagnostic.policyReason
+              ? { policyReason: streamDiagnostic.policyReason }
+              : {}),
+            ...(streamDiagnostic.policyLocation
+              ? {
+                  policyLocation: streamDiagnostic.policyLocation,
+                  ...(streamDiagnostic.policyKey ? { policyKey: streamDiagnostic.policyKey } : {})
+                }
+              : {})
+          }
         : {})
     })
     trustedFailures.add(this)

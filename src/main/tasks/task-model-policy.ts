@@ -4,6 +4,8 @@ import {
   TASK_MODEL_RESPONSE_BYTES
 } from './task-model-channel-protocol'
 import { createPolicyItems, type PolicyCall } from './task-model-policy-items'
+import { addTaskModelPolicyLocation } from './task-model-stream-failure'
+import { createTaskModelResponsePolicy } from './task-model-policy-response'
 import {
   array,
   boolean,
@@ -19,8 +21,7 @@ import {
   parse,
   part,
   strings,
-  text,
-  usage
+  text
 } from './task-model-policy-json'
 
 export type TaskModelPolicyProfile = {
@@ -47,7 +48,6 @@ const callKinds =
   'response.function_call_arguments.delta response.function_call_arguments.done response.custom_tool_call_input.delta response.custom_tool_call_input.done'.split(
     ' '
   )
-const statuses = 'in_progress completed incomplete failed'
 export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
   request: (jsonText: string) => string
   event: (dataText: string) => void
@@ -63,70 +63,7 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
   const { tools, item, opaque } = createPolicyItems(profile)
   let calls = new Map<string, PolicyCall>(),
     eventBytes = 0
-  const response = (
-    value: unknown,
-    next: Map<string, PolicyCall>,
-    learned: Set<string>,
-    completed: boolean
-  ): void => {
-    const r = object(
-      value,
-      'id object created_at status model output usage usage_metadata end_turn error incomplete_details background user metadata headers',
-      'id'
-    )
-    id(r.id)
-    if (
-      (r.object !== undefined && r.object !== 'response') ||
-      (r.model !== undefined && r.model !== model)
-    ) {
-      deny('RESPONSE_IDENTITY')
-    }
-    if (r.created_at !== undefined) {
-      integer(r.created_at)
-    }
-    if (r.status !== undefined) {
-      oneOf(r.status, statuses)
-    }
-    if (
-      completed &&
-      ((r.status !== undefined && r.status !== 'completed') ||
-        r.error != null ||
-        r.incomplete_details != null)
-    ) {
-      deny('RESPONSE_TERMINAL_STATE')
-    }
-    if (r.end_turn != null) {
-      boolean(r.end_turn)
-    }
-    if (
-      (r.background !== undefined && r.background !== false) ||
-      (r.user !== undefined && r.user !== null)
-    ) {
-      deny('RESPONSE_METADATA')
-    }
-    if (r.metadata !== undefined) {
-      object(r.metadata, '')
-    }
-    if (r.headers !== undefined) {
-      headers(r.headers, model)
-    }
-    if (r.output !== undefined) {
-      array(r.output).forEach((v) => item(v, next, learned, true))
-    }
-    if (r.usage != null) {
-      usage(r.usage)
-    }
-    if (r.usage_metadata != null) {
-      deny('USAGE_METADATA_UNSUPPORTED')
-    }
-    if (r.error != null) {
-      error(r.error)
-    }
-    if (r.incomplete_details != null) {
-      const d = object(r.incomplete_details, 'reason', 'reason')
-      text(d.reason)
-    }
-  }
+  const response = createTaskModelResponsePolicy(model, item)
   return {
     request: (jsonText) => {
       const r = object(
@@ -216,83 +153,91 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
       return result
     },
     event: (dataText) => {
-      if (typeof dataText !== 'string') {
-        deny('BYTES')
-      }
-      eventBytes += Buffer.byteLength(dataText)
-      if (eventBytes > TASK_MODEL_RESPONSE_BYTES) {
-        deny('RESPONSE_BYTES')
-      }
-      const e = object(
-        parse(dataText, TASK_MODEL_EVENT_BYTES),
-        'type sequence_number output_index item_id call_id content_index summary_index response item delta text part arguments input error headers metadata',
-        'type'
-      )
-      for (const key of ['sequence_number', 'output_index', 'content_index', 'summary_index']) {
-        if (e[key] !== undefined) {
-          integer(e[key])
+      try {
+        if (typeof dataText !== 'string') {
+          deny('BYTES')
         }
-      }
-      for (const key of ['item_id', 'call_id']) {
-        if (e[key] !== undefined) {
-          id(e[key])
+        eventBytes += Buffer.byteLength(dataText)
+        if (eventBytes > TASK_MODEL_RESPONSE_BYTES) {
+          deny('RESPONSE_BYTES')
         }
-      }
-      const kind = text(e.type),
-        learned = new Set<string>()
-      let next = calls
-      const prefix = 'type sequence_number '
-      if (responseKinds.includes(kind)) {
-        object(e, `${prefix}response`, 'response')
-        next = new Map(calls)
-        response(e.response, next, learned, kind === 'response.completed')
-      } else if (['response.output_item.added', 'response.output_item.done'].includes(kind)) {
-        object(e, `${prefix}output_index item`, 'item')
-        next = new Map(calls)
-        item(e.item, next, learned, true)
-      } else if (partKinds.includes(kind)) {
-        object(e, `${prefix}output_index item_id content_index summary_index part`, 'part')
-        part(e.part, kind.includes('summary') ? 'summary_text' : 'output_text reasoning_text text')
-      } else if (textKinds.includes(kind)) {
-        const field = kind.endsWith('.delta') ? 'delta' : 'text'
-        object(e, `${prefix}output_index item_id content_index summary_index ${field}`, field)
-        text(e[field])
-      } else if (callKinds.includes(kind)) {
-        const functional = kind.includes('function'),
-          field = kind.endsWith('.delta') ? 'delta' : functional ? 'arguments' : 'input'
-        object(e, `${prefix}output_index item_id call_id ${field}`, field)
-        text(e[field])
-        const candidates = [...calls.entries()].filter(
-          ([callId, call]) =>
-            (e.call_id !== undefined || e.item_id !== undefined) &&
-            (e.call_id === undefined || callId === e.call_id) &&
-            (e.item_id === undefined || call.itemId === e.item_id)
+        const e = object(
+          parse(dataText, TASK_MODEL_EVENT_BYTES),
+          'type sequence_number output_index item_id call_id content_index summary_index response item delta text part arguments input error headers metadata',
+          'type'
         )
-        if (
-          candidates.length !== 1 ||
-          candidates[0][1].kind !== (functional ? 'function' : 'custom')
-        ) {
-          deny('DELTA_CALL_UNPROVEN')
+        for (const key of ['sequence_number', 'output_index', 'content_index', 'summary_index']) {
+          if (e[key] !== undefined) {
+            integer(e[key])
+          }
         }
-      } else if (kind === 'response.metadata') {
-        object(e, `${prefix}headers metadata`)
-        if (e.headers !== undefined) {
-          headers(e.headers, model)
+        for (const key of ['item_id', 'call_id']) {
+          if (e[key] !== undefined) {
+            id(e[key])
+          }
         }
-        if (e.metadata !== undefined) {
-          object(e.metadata, '')
+        const kind = text(e.type),
+          learned = new Set<string>()
+        let next = calls
+        const prefix = 'type sequence_number '
+        if (responseKinds.includes(kind)) {
+          object(e, `${prefix}response`, 'response')
+          next = new Map(calls)
+          response(e.response, next, learned, kind === 'response.completed')
+        } else if (['response.output_item.added', 'response.output_item.done'].includes(kind)) {
+          object(e, `${prefix}output_index item`, 'item')
+          next = new Map(calls)
+          item(e.item, next, learned, true)
+        } else if (partKinds.includes(kind)) {
+          object(e, `${prefix}output_index item_id content_index summary_index part`, 'part')
+          part(
+            e.part,
+            kind.includes('summary') ? 'summary_text' : 'output_text reasoning_text text'
+          )
+        } else if (textKinds.includes(kind)) {
+          const field = kind.endsWith('.delta') ? 'delta' : 'text'
+          object(e, `${prefix}output_index item_id content_index summary_index ${field}`, field)
+          text(e[field])
+        } else if (callKinds.includes(kind)) {
+          const functional = kind.includes('function'),
+            field = kind.endsWith('.delta') ? 'delta' : functional ? 'arguments' : 'input'
+          object(e, `${prefix}output_index item_id call_id ${field}`, field)
+          text(e[field])
+          const candidates = [...calls.entries()].filter(
+            ([callId, call]) =>
+              (e.call_id !== undefined || e.item_id !== undefined) &&
+              (e.call_id === undefined || callId === e.call_id) &&
+              (e.item_id === undefined || call.itemId === e.item_id)
+          )
+          if (
+            candidates.length !== 1 ||
+            candidates[0][1].kind !== (functional ? 'function' : 'custom')
+          ) {
+            deny('DELTA_CALL_UNPROVEN')
+          }
+        } else if (kind === 'response.metadata') {
+          object(e, `${prefix}headers metadata`)
+          if (e.headers !== undefined) {
+            headers(e.headers, model)
+          }
+          if (e.metadata !== undefined) {
+            object(e.metadata, '')
+          }
+        } else if (kind === 'error') {
+          object(e, `${prefix}error`, 'error')
+          error(e.error)
+        } else {
+          deny('EVENT_UNSUPPORTED')
         }
-      } else if (kind === 'error') {
-        object(e, `${prefix}error`, 'error')
-        error(e.error)
-      } else {
-        deny('EVENT_UNSUPPORTED')
+        if (next.size > 1024 || (learned.size && new Set([...opaque, ...learned]).size > 128)) {
+          deny('REPLAY_LIMIT')
+        }
+        calls = next
+        learned.forEach((hash) => opaque.add(hash))
+      } catch (error) {
+        addTaskModelPolicyLocation(error, 'event')
+        throw error
       }
-      if (next.size > 1024 || (learned.size && new Set([...opaque, ...learned]).size > 128)) {
-        deny('REPLAY_LIMIT')
-      }
-      calls = next
-      learned.forEach((hash) => opaque.add(hash))
     }
   }
 }

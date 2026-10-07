@@ -108,7 +108,7 @@ describe('finite refused Content-Type header metadata on the original Task', () 
     await f.channel.close()
     const task = (await readPersistedTestAgentSessionStore(directory)).taskExecutions[f.owner.key]
     expect(task.events.at(-1)?.summary).toBe(
-      'Task model failure: {"phase":"stream","category":"protocol","code":"TASK_MODEL_STREAM_REFUSED","httpStatus":200}'
+      'Task model failure: {"phase":"stream","category":"protocol","code":"TASK_MODEL_STREAM_REFUSED","httpStatus":200,"streamReason":"terminal"}'
     )
     expect(f.readerCalls()).toBe(1)
     expect(task.result).toBeNull()

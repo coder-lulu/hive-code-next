@@ -3,9 +3,14 @@ import {
   TASK_MODEL_EVENT_LIMIT,
   TASK_MODEL_RESPONSE_BYTES
 } from './task-model-channel-protocol'
+import {
+  markTaskModelStreamFailure,
+  taskModelStreamRefusal,
+  type TaskModelStreamReason
+} from './task-model-stream-failure'
 
-function refused(): never {
-  throw new Error('TASK_MODEL_STREAM_REFUSED')
+function refused(reason: TaskModelStreamReason): never {
+  throw taskModelStreamRefusal(reason)
 }
 
 function object(value: unknown): value is Record<string, unknown> {
@@ -64,22 +69,28 @@ export function createTaskModelSseReader(validate: (data: string) => void) {
     const data = dataLines.join('\n')
     if (data === '[DONE]') {
       if (!completed) {
-        refused()
+        refused('terminal')
       }
     } else {
       if (completed || ++eventCount > TASK_MODEL_EVENT_LIMIT) {
-        refused()
+        refused(completed ? 'terminal' : 'event_limit')
       }
-      const value: unknown = JSON.parse(data)
+      let value: unknown
+      try {
+        value = JSON.parse(data)
+      } catch (error) {
+        markTaskModelStreamFailure(error, 'json')
+        throw error
+      }
       if (
         !object(value) ||
         typeof value.type !== 'string' ||
         !/^[a-z._]{1,128}$/.test(value.type)
       ) {
-        refused()
+        refused('event_type')
       }
       if (eventName !== undefined && eventName !== value.type) {
-        refused()
+        refused('event_name')
       }
       validate(data)
       if (value.type === 'response.created' || value.type === 'response.completed') {
@@ -89,25 +100,25 @@ export function createTaskModelSseReader(validate: (data: string) => void) {
           value.response.id.length === 0 ||
           value.response.id.length > 256
         ) {
-          refused()
+          refused('response_id')
         }
         if (value.type === 'response.created') {
           if (responseId !== undefined) {
-            refused()
+            refused('response_order')
           }
           responseId = value.response.id
         } else {
           if (responseId === undefined || value.response.id !== responseId) {
-            refused()
+            refused(responseId === undefined ? 'response_order' : 'response_id')
           }
           completed = true
         }
       } else if (responseId === undefined) {
-        refused()
+        refused('response_order')
       }
       const encoded = Buffer.from(`event: ${value.type}\ndata: ${data}\n\n`)
       if (queuedBytes + encoded.length > TASK_MODEL_RESPONSE_BYTES) {
-        refused()
+        refused('queue_limit')
       }
       queue.push(encoded)
       queuedBytes += encoded.length
@@ -121,7 +132,7 @@ export function createTaskModelSseReader(validate: (data: string) => void) {
   const line = (value: string) => {
     eventBytes += Buffer.byteLength(value) + 1
     if (eventBytes > TASK_MODEL_EVENT_BYTES || ++eventLines > 128) {
-      refused()
+      refused(eventBytes > TASK_MODEL_EVENT_BYTES ? 'event_size' : 'line_limit')
     }
     if (value.endsWith('\r')) {
       value = value.slice(0, -1)
@@ -137,7 +148,15 @@ export function createTaskModelSseReader(validate: (data: string) => void) {
       } else if (field === 'event' && eventName === undefined) {
         eventName = content
       } else {
-        refused()
+        refused(
+          field === 'id'
+            ? 'id_field'
+            : field === 'retry'
+              ? 'retry_field'
+              : field === 'event'
+                ? 'duplicate_event_name'
+                : 'field'
+        )
       }
     }
   }
@@ -150,7 +169,13 @@ export function createTaskModelSseReader(validate: (data: string) => void) {
       return queuedBytes
     },
     feed(bytes: Uint8Array): void {
-      const text = decoder.decode(bytes, { stream: true })
+      let text: string
+      try {
+        text = decoder.decode(bytes, { stream: true })
+      } catch (error) {
+        markTaskModelStreamFailure(error, 'utf8')
+        throw error
+      }
       let cursor = 0
       for (;;) {
         const newline = text.indexOf('\n', cursor)
@@ -164,7 +189,7 @@ export function createTaskModelSseReader(validate: (data: string) => void) {
             eventBytes + partialBytes > TASK_MODEL_EVENT_BYTES ||
             (completed && !terminalTail())
           ) {
-            refused()
+            refused(eventBytes + partialBytes > TASK_MODEL_EVENT_BYTES ? 'event_size' : 'terminal')
           }
           return
         }
@@ -181,7 +206,7 @@ export function createTaskModelSseReader(validate: (data: string) => void) {
       while (remaining > 0 && queueHead < queue.length) {
         const first = queue[queueHead]
         if (!first) {
-          refused()
+          refused('queue_state')
         }
         const length = Math.min(remaining, first.length - queueOffset)
         chunks.push(first.subarray(queueOffset, queueOffset + length))
@@ -200,9 +225,18 @@ export function createTaskModelSseReader(validate: (data: string) => void) {
       return Buffer.concat(chunks)
     },
     finish(): void {
-      const tail = decoder.decode()
-      if (tail.length !== 0 || !terminalTail() || !completed) {
-        refused()
+      let tail: string
+      try {
+        tail = decoder.decode()
+      } catch (error) {
+        markTaskModelStreamFailure(error, 'utf8')
+        throw error
+      }
+      if (tail.length !== 0 || !terminalTail()) {
+        refused('terminal')
+      }
+      if (!completed) {
+        refused(eventCount === 0 ? 'no_events' : 'terminal')
       }
     },
     reset(): void {

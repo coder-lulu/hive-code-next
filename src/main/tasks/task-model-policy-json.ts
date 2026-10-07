@@ -2,63 +2,84 @@ import { createHash } from 'node:crypto'
 import { parseTree, type Node } from 'jsonc-parser'
 import { assertJsonTextStructureWithinLimits } from '../../shared/json-text-structure-limit'
 import { TASK_MODEL_REQUEST_BYTES } from './task-model-channel-protocol'
+import {
+  addTaskModelPolicyLocation,
+  taskModelPolicyRefusal,
+  taskModelRefusedPolicyKey,
+  type TaskModelPolicyKey
+} from './task-model-stream-failure'
 
 export type PolicyObject = Record<string, unknown>
 export function usage(value: unknown): void {
-  const u = object(
-    value,
-    'input_tokens output_tokens total_tokens input_tokens_details output_tokens_details codex_rollout_budget_units',
-    'input_tokens output_tokens total_tokens'
-  )
-  for (const key of ['input_tokens', 'output_tokens', 'total_tokens']) {
-    integer(u[key])
-  }
-  for (const key of ['input_tokens_details', 'output_tokens_details']) {
-    if (u[key] != null) {
-      const input = key === 'input_tokens_details'
-      const d = object(
-        u[key],
-        input ? 'cached_tokens cache_write_tokens' : 'reasoning_tokens',
-        input ? 'cached_tokens' : 'reasoning_tokens'
-      )
-      Object.values(d).forEach(integer)
+  try {
+    const u = object(
+      value,
+      'input_tokens output_tokens total_tokens input_tokens_details output_tokens_details codex_rollout_budget_units',
+      'input_tokens output_tokens total_tokens'
+    )
+    for (const key of ['input_tokens', 'output_tokens', 'total_tokens']) {
+      integer(u[key])
     }
-  }
-  if (
-    u.codex_rollout_budget_units != null &&
-    (typeof u.codex_rollout_budget_units !== 'number' ||
-      !Number.isFinite(u.codex_rollout_budget_units) ||
-      u.codex_rollout_budget_units < 0)
-  ) {
-    deny('USAGE_UNITS')
+    for (const key of ['input_tokens_details', 'output_tokens_details']) {
+      if (u[key] != null) {
+        const input = key === 'input_tokens_details'
+        const d = object(
+          u[key],
+          input ? 'cached_tokens cache_write_tokens' : 'reasoning_tokens',
+          input ? 'cached_tokens' : 'reasoning_tokens'
+        )
+        Object.values(d).forEach(integer)
+      }
+    }
+    if (
+      u.codex_rollout_budget_units != null &&
+      (typeof u.codex_rollout_budget_units !== 'number' ||
+        !Number.isFinite(u.codex_rollout_budget_units) ||
+        u.codex_rollout_budget_units < 0)
+    ) {
+      deny('USAGE_UNITS')
+    }
+  } catch (error) {
+    addTaskModelPolicyLocation(error, 'usage')
+    throw error
   }
 }
 export function error(value: unknown): void {
-  const e = object(value, 'code message type param', 'message')
-  text(e.message)
-  for (const key of ['code', 'type', 'param']) {
-    if (e[key] != null) {
-      text(e[key])
+  try {
+    const e = object(value, 'code message type param', 'message')
+    text(e.message)
+    for (const key of ['code', 'type', 'param']) {
+      if (e[key] != null) {
+        text(e[key])
+      }
     }
+  } catch (error) {
+    addTaskModelPolicyLocation(error, 'error')
+    throw error
   }
 }
 export function headers(value: unknown, model: string): void {
-  const h = record(value)
-  for (const [name, content] of Object.entries(h)) {
-    const lower = name.toLowerCase()
-    oneOf(lower, 'openai-model x-openai-model x-codex-turn-state')
-    const values = typeof content === 'string' ? [content] : array(content)
-    if (values.length === 0) {
-      deny('HEADER')
+  try {
+    const h = record(value)
+    for (const [name, content] of Object.entries(h)) {
+      const lower = name.toLowerCase()
+      oneOf(lower, 'openai-model x-openai-model x-codex-turn-state')
+      const values = typeof content === 'string' ? [content] : array(content)
+      if (values.length === 0) {
+        deny('HEADER')
+      }
+      values.forEach((v) => text(v, 8192))
+      if (lower !== 'x-codex-turn-state' && values.some((v) => v !== model)) {
+        deny('RESPONSE_IDENTITY')
+      }
     }
-    values.forEach((v) => text(v, 8192))
-    if (lower !== 'x-codex-turn-state' && values.some((v) => v !== model)) {
-      deny('RESPONSE_IDENTITY')
-    }
+  } catch (error) {
+    addTaskModelPolicyLocation(error, 'headers')
+    throw error
   }
 }
-export function deny(reason: string): never {
-  throw new Error(`TASK_MODEL_POLICY_REFUSED:${reason}`)
+export function deny(reason: string, key?: TaskModelPolicyKey): never {
+  throw taskModelPolicyRefusal(reason, key)
 }
 export function isObject(value: unknown): value is PolicyObject {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -72,8 +93,9 @@ export function record(value: unknown): PolicyObject {
 export function object(value: unknown, allowed: string, required = ''): PolicyObject {
   const result = record(value)
   const keys = allowed.split(' ')
-  if (Object.keys(result).some((key) => !keys.includes(key))) {
-    deny('UNKNOWN_FIELD')
+  const unknownKey = Object.keys(result).find((key) => !keys.includes(key))
+  if (unknownKey !== undefined) {
+    deny('UNKNOWN_FIELD', taskModelRefusedPolicyKey(unknownKey))
   }
   if (
     required
@@ -202,13 +224,22 @@ export function references(value: unknown): void {
   }
 }
 export function part(value: unknown, kinds: string): void {
-  const p = record(value)
-  object(p, p.type === 'output_text' ? 'type text annotations logprobs' : 'type text', 'type text')
-  oneOf(p.type, kinds)
-  text(p.text)
-  for (const key of ['annotations', 'logprobs']) {
-    if (Object.hasOwn(p, key) && array(p[key]).length) {
-      deny('CONTENT_METADATA_UNSUPPORTED')
+  try {
+    const p = record(value)
+    object(
+      p,
+      p.type === 'output_text' ? 'type text annotations logprobs' : 'type text',
+      'type text'
+    )
+    oneOf(p.type, kinds)
+    text(p.text)
+    for (const key of ['annotations', 'logprobs']) {
+      if (Object.hasOwn(p, key) && array(p[key]).length) {
+        deny('CONTENT_METADATA_UNSUPPORTED')
+      }
     }
+  } catch (error) {
+    addTaskModelPolicyLocation(error, 'part')
+    throw error
   }
 }
