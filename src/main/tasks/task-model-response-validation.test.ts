@@ -214,18 +214,22 @@ describe('Fetch-decoded controlled model responses', () => {
     })
   })
 
-  it('retains a finite missing body reason through late observers', async () => {
-    const f = fixture(
-      async () => new Response(null, { headers: { 'content-type': 'text/event-stream' } })
-    )
-    await expect(f.channel.start(modelStartParams())).rejects.toMatchObject({
-      diagnostic: { responseReason: 'missing_body' }
-    })
-    const late = vi.fn<(failure: TaskFailureError) => void>()
-    f.channel.onFailure(late)
-    await new Promise<void>((resolve) => queueMicrotask(resolve))
-    expect(late.mock.calls[0][0].diagnostic).toMatchObject({ responseReason: 'missing_body' })
-  })
+  it.each([false, true])(
+    'retains a finite missing body reason through late observers with headerless=%s',
+    async (headerless) => {
+      const f = fixture(
+        async () =>
+          new Response(null, { headers: headerless ? {} : { 'content-type': 'text/event-stream' } })
+      )
+      await expect(f.channel.start(modelStartParams())).rejects.toMatchObject({
+        diagnostic: { responseReason: 'missing_body' }
+      })
+      const late = vi.fn<(failure: TaskFailureError) => void>()
+      f.channel.onFailure(late)
+      await new Promise<void>((resolve) => queueMicrotask(resolve))
+      expect(late.mock.calls[0][0].diagnostic).toMatchObject({ responseReason: 'missing_body' })
+    }
+  )
 
   it('rejects malformed gzip during decoded stream reading without producing a model completion', async () => {
     const f = await localResponse({

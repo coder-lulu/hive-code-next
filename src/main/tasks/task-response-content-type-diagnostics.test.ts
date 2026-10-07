@@ -15,9 +15,7 @@ let directory: string
 const servers: Server[] = []
 const channels: ReturnType<typeof createTaskCodexModelChannel>[] = []
 beforeEach(async () => {
-  const root = resolve(
-    'logs/paperclip-development/p3/task-response-content-type-diagnostics/writer/tmp'
-  )
+  const root = resolve('logs/paperclip-development/p3/task-codex-headerless-sse/writer/tmp')
   await mkdir(root, { recursive: true })
   directory = await mkdtemp(join(root, 'metadata-'))
   vi.spyOn(Date, 'now').mockReturnValue(TASK_TEST_NOW)
@@ -99,8 +97,24 @@ async function refusedResponse(contentType: string | string[] | null) {
   return { owner, channel, params, request, readerCalls: () => readerCalls() }
 }
 describe('finite refused Content-Type header metadata on the original Task', () => {
+  it('requires strict body validation after an absent header instead of inventing MIME or body evidence', async () => {
+    const f = await refusedResponse(null)
+    await expect(f.channel.start(f.params)).resolves.toMatchObject({ status: 200 })
+    await expect(
+      f.channel.next({ requestId: f.params.requestId, sequence: 0 })
+    ).rejects.toMatchObject({
+      diagnostic: { phase: 'stream', code: 'TASK_MODEL_STREAM_REFUSED', httpStatus: 200 }
+    })
+    await f.channel.close()
+    const task = (await readPersistedTestAgentSessionStore(directory)).taskExecutions[f.owner.key]
+    expect(task.events.at(-1)?.summary).toBe(
+      'Task model failure: {"phase":"stream","category":"protocol","code":"TASK_MODEL_STREAM_REFUSED","httpStatus":200}'
+    )
+    expect(f.readerCalls()).toBe(1)
+    expect(task.result).toBeNull()
+    expect(task.modelDispatchAttempts).toBe(1)
+  })
   it.each([
-    ['absent', null, 'missing'],
     ['empty', '', 'empty'],
     ['oversized', `application/${'a'.repeat(129)}`, 'over_limit'],
     ['JSON', 'application/json; private="https://private.invalid/?token=token-secret"', 'json'],

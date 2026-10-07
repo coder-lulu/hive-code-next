@@ -145,13 +145,13 @@ export async function openTaskModelUpstream(options: {
         reply.status
       )
     }
-    const declaredContentType = reply.headers.get('content-type')
-    const contentType = declaredContentType ?? ''
+    const contentType = reply.headers.get('content-type')
     if (
-      contentType.length > 128 ||
-      !/^text\/event-stream(?:[ \t]*;[ \t]*charset[ \t]*=[ \t]*(?:utf-8|"utf-8"))?[ \t]*$/i.test(
-        contentType
-      )
+      contentType !== null &&
+      (contentType.length > 128 ||
+        !/^text\/event-stream(?:[ \t]*;[ \t]*charset[ \t]*=[ \t]*(?:utf-8|"utf-8"))?[ \t]*$/i.test(
+          contentType
+        ))
     ) {
       throw taskFailure(
         undefined,
@@ -159,7 +159,7 @@ export async function openTaskModelUpstream(options: {
         'TASK_MODEL_STREAM_REFUSED',
         200,
         'content_type',
-        classifyRefusedTaskContentType(declaredContentType)
+        classifyRefusedTaskContentType(contentType)
       )
     }
     if (!decodedContentEncoding(reply.headers.get('content-encoding'))) {
