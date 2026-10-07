@@ -93,13 +93,8 @@ export async function installTranscriptWatcher(
     watchedBoundary = await boundaryFingerprint(filePath, state.offset, gateAbort.signal)
     const completedVersion = await readTranscriptFileVersion(filePath, gateAbort.signal)
     if (transcriptFileVersionChanged(completedVersion, startVersion)) {
-      // Why: a write racing this drain needs another pass even when the reader
-      // happened to reach its new EOF; timestamp-only rewrites may need replace.
-      // Keep the completed stat as the observed version so duplicate watcher
-      // notifications do not replay the same replacement snapshot. The next
-      // drain still compares the boundary and offset, and pendingReadRequested
-      // ensures a write observed during this drain is reconciled immediately.
-      watchedVersion = completedVersion
+      // Reconcile versions changed after the stable read instead of accepting unread content.
+      watchedVersion = startVersion
       pendingReadRequested = true
     } else {
       watchedVersion = completedVersion
@@ -136,16 +131,12 @@ export async function installTranscriptWatcher(
     if (identityChanged) {
       nativeWatcher.invalidate()
     }
-    if (contentReplaced) {
-      resetIncrementalTranscriptState(state)
-    }
-    // Why: subscriber callbacks may replace the path before the drain can finish.
-    watchedVersion ??= current
-
-    const replacementSnapshot =
-      // Why: 0 is a valid window — an explicit undefined check keeps an empty
-      // snapshot empty instead of falling back to an unbounded incremental read.
+    const needsReplacementSnapshot =
       contentReplaced && !initialDrain && onReplace && initialLimit !== undefined
+    const needsInitialSnapshot = initialDrain && onInitialSnapshot && initialLimit !== undefined
+    // An explicit undefined check preserves the valid zero-message window.
+    const snapshot =
+      (needsReplacementSnapshot || needsInitialSnapshot) && initialLimit !== undefined
         ? await readNativeChatTranscriptTailFile(
             filePath,
             initialLimit,
@@ -159,46 +150,41 @@ export async function installTranscriptWatcher(
     if (closed) {
       return
     }
-    if (replacementSnapshot && onReplace) {
-      state.offset = replacementSnapshot.consumedTo
+    if (snapshot) {
+      const readVersion = await readTranscriptFileVersion(filePath, gateAbort.signal)
+      if (closed) {
+        return
+      }
+      if (transcriptFileVersionChanged(readVersion, current)) {
+        pendingReadRequested = true
+        return
+      }
+    }
+    if (contentReplaced) {
+      resetIncrementalTranscriptState(state)
+    }
+    // Subscriber callbacks may replace the path before the drain finishes.
+    watchedVersion ??= current
+    if (needsReplacementSnapshot && snapshot && onReplace) {
+      state.offset = snapshot.consumedTo
       state.pendingStart = state.offset
-      onReplace(
-        replacementSnapshot.messages,
-        replacementSnapshot.hasMore,
-        replacementSnapshot.beforeOffset,
-        replacementSnapshot.lifecycle
-      )
+      onReplace(snapshot.messages, snapshot.hasMore, snapshot.beforeOffset, snapshot.lifecycle)
       await readAndEmitAppends()
       await finishSuccessfulDrain(current)
       return
     }
 
-    const initialSnapshot =
-      initialDrain && onInitialSnapshot && initialLimit !== undefined
-        ? await readNativeChatTranscriptTailFile(
-            filePath,
-            initialLimit,
-            decode,
-            false,
-            undefined,
-            decodeLifecycle,
-            gateAbort.signal
-          )
-        : null
-    if (closed) {
-      return
-    }
     if (initialDrain && onInitialSnapshot) {
       initialDrain = false
-      if (initialSnapshot) {
-        state.offset = initialSnapshot.consumedTo
+      if (snapshot) {
+        state.offset = snapshot.consumedTo
         state.pendingStart = state.offset
         onInitialSnapshot(
-          initialSnapshot.messages,
-          initialSnapshot.hasMore,
-          initialSnapshot.beforeOffset,
+          snapshot.messages,
+          snapshot.hasMore,
+          snapshot.beforeOffset,
           undefined,
-          initialSnapshot.lifecycle
+          snapshot.lifecycle
         )
         await readAndEmitAppends()
       } else {

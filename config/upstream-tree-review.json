@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "0ae657391f35e115be08a0f3db388f5f22d9134d",
+  "sourceProductSha": "a1cb9dd0bed5423891d8e07fe50e7a47a6eda364",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -20288,6 +20288,54 @@
         "src/main/ipc/worktree-git-common-polling.test.ts",
         "src/main/ipc/worktree-git-common-watch.test.ts",
         "src/main/ipc/worktree-git-common-watch-reconciliation.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch-engine.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "b0ebbeaebfc1a6f8dd2741a0c05c075792d4eb36"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "b5073c56ee1c4c63e57252e5aa65a97e5f8e78f5"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "b0ebbeaebfc1a6f8dd2741a0c05c075792d4eb36"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "b5073c56ee1c4c63e57252e5aa65a97e5f8e78f5"
+      },
+      "reason": "Prevent a completed stat from accepting a same-size prefix rewrite that the transcript drain has not read. Publish bounded initial/replacement tail snapshots and commit their offsets only when the real post-read file version equals the drain start version; discard unstable candidates without publishing or resetting state and re-read through the existing serial drain. Preserve the read start baseline when finishing across a version change. Keep original unbounded initial and streaming append bodies, bounded-tail performance, conservative later metadata-event replacement semantics, rotation/cancellation ownership and one logical stable replacement; introduce no full-history hash, payload/window equality or permanent metadata deduplication. The actual isolated Windows old-engine Red has both new cases failing and proposed-engine five-owner Green has43 passes with zero skips, including the original seven liveness cases. Linux and exact-candidate validation remain pending.",
+      "regressionTests": [
+        "src/main/native-chat/transcript-watch-read-version.test.ts",
+        "src/main/native-chat/transcript-watch-liveness.test.ts",
+        "src/main/native-chat/transcript-watch.test.ts",
+        "src/main/native-chat/transcript-watch-unsubscribe-race.test.ts",
+        "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/native-chat/transcript-watch-read-version.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "b6e735ce48dea38c36db076fd6c92cbce18bef96"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "b6e735ce48dea38c36db076fd6c92cbce18bef96"
+      },
+      "reason": "Add two deterministic real-file regressions for synchronous same-size prefix rewrite during initial snapshot publication and a write/utimes mutation between completed bounded replacement read and commit. Gate only the real read completion, keep real writeFileSync/utimesSync and source-version reads, and require full prefix/tail IDs and text blocks, two reads for the unstable candidate, one stable replacement and one follow-up append despite duplicate notifications. Restore scoped spies, release the owned gate and unsubscribe in finally. Preserve all original owners and their budgets and assertions, the5s inner wait and original30s body/60s hooks; no fake timers, skip, budget increase or production oracle substitution. The two same case IDs fail against the actual K14 engine and pass against the exact proposed engine in the isolated Windows43-case Green; Linux and exact-candidate validation remain pending.",
+      "regressionTests": [
+        "src/main/native-chat/transcript-watch-read-version.test.ts",
+        "src/main/native-chat/transcript-watch-liveness.test.ts",
+        "src/main/native-chat/transcript-watch.test.ts",
+        "src/main/native-chat/transcript-watch-unsubscribe-race.test.ts",
+        "src/main/native-chat/transcript-watch-engine-wsl-lifecycle.test.ts"
       ]
     }
   ]
