@@ -69,9 +69,61 @@ const policyReasons = [
   'USAGE_UNITS'
 ] as const
 export type TaskModelPolicyReason = (typeof policyReasons)[number]
-const locations = ['event', 'response', 'usage', 'item', 'part', 'error', 'headers'] as const
+const locations = [
+  'event',
+  'response',
+  'response_metadata',
+  'incomplete_details',
+  'usage',
+  'item',
+  'part',
+  'error',
+  'headers'
+] as const
 export type TaskModelPolicyLocation = (typeof locations)[number]
-const keys = ['safety_buffering', 'usage_metadata', 'model', 'other'] as const
+// Names only; diagnostic labels do not admit response fields.
+const keys = [
+  'safety_buffering',
+  'usage_metadata',
+  'model',
+  'id',
+  'access_programs',
+  'created_at',
+  'error',
+  'incomplete_details',
+  'instructions',
+  'metadata',
+  'object',
+  'output',
+  'parallel_tool_calls',
+  'temperature',
+  'tool_choice',
+  'tools',
+  'top_p',
+  'background',
+  'completed_at',
+  'conversation',
+  'max_output_tokens',
+  'max_tool_calls',
+  'moderation',
+  'previous_response_id',
+  'prompt',
+  'prompt_cache_diagnostics',
+  'prompt_cache_key',
+  'prompt_cache_options',
+  'prompt_cache_retention',
+  'reasoning',
+  'safety_identifier',
+  'service_tier',
+  'status',
+  'store',
+  'text',
+  'top_logprobs',
+  'truncation',
+  'usage',
+  'user',
+  'other'
+] as const
 export type TaskModelPolicyKey = (typeof keys)[number]
 export type TaskModelStreamDiagnostic = Readonly<{
   streamReason: TaskModelStreamReason

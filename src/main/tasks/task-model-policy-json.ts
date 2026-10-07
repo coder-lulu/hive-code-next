@@ -92,7 +92,7 @@ export function record(value: unknown): PolicyObject {
 }
 export function object(value: unknown, allowed: string, required = ''): PolicyObject {
   const result = record(value)
-  const keys = allowed.split(' ')
+  const keys = allowed.split(' ').filter(Boolean)
   const unknownKey = Object.keys(result).find((key) => !keys.includes(key))
   if (unknownKey !== undefined) {
     deny('UNKNOWN_FIELD', taskModelRefusedPolicyKey(unknownKey))

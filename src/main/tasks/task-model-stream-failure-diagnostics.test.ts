@@ -23,6 +23,7 @@ import {
 } from './task-model-channel-protocol'
 import { createTaskModelPolicy } from './task-model-policy'
 import { addTaskModelPolicyLocation } from './task-model-stream-failure'
+import { refusedTaskModelResponseFields } from './task-model-response-field-diagnostics.test-fixture'
 import { readPersistedTestAgentSessionStore } from '../runtime/agent-session-record-store-test-harness'
 import { TASK_TEST_NOW } from './task-execution.test-fixture'
 
@@ -30,9 +31,7 @@ let directory: string
 const servers: Server[] = []
 const channels: ReturnType<typeof createTaskCodexModelChannel>[] = []
 beforeEach(async () => {
-  const root = resolve(
-    'logs/paperclip-development/p3/task-model-stream-failure-diagnostics/writer/tmp'
-  )
+  const root = resolve('logs/paperclip-development/p3/task-response-field-diagnostics/writer/tmp')
   await mkdir(root, { recursive: true })
   directory = await mkdtemp(join(root, 'stream-reasons-'))
   vi.spyOn(Date, 'now').mockReturnValue(TASK_TEST_NOW)
@@ -110,7 +109,46 @@ async function fixture(body: string | Buffer) {
 }
 const refused = (error: unknown) => taskFailure(error, 'stream', 'TASK_MODEL_STREAM_REFUSED', 200)
 describe('actual finite stream guard and policy producer diagnostics', () => {
-  it.each([
+  it.each<{
+    label: string
+    body: string | Buffer
+    reason: string
+    policy?: string
+    location?: string
+    key?: string
+  }>([
+    {
+      label: 'empty response metadata property',
+      body:
+        modelEvent('response.created', { response: { id: 'resp-fixture', metadata: { '': 1 } } }) +
+        completedModelEvent,
+      reason: 'policy',
+      policy: 'UNKNOWN_FIELD',
+      location: 'response_metadata',
+      key: 'other'
+    },
+    ...['metadata', 'incomplete_details'].flatMap((container) =>
+      ['instructions', 'private-secret'].map((key) => ({
+        label: `unknown ${container} ${key} field`,
+        body: modelEvent('response.created', {
+          response: { id: 'resp-fixture', [container]: { [key]: 'body-token-secret' } }
+        }),
+        reason: 'policy',
+        policy: 'UNKNOWN_FIELD',
+        location: container === 'metadata' ? 'response_metadata' : 'incomplete_details',
+        key: key === 'instructions' ? key : 'other'
+      }))
+    ),
+    ...refusedTaskModelResponseFields.map((key) => ({
+      label: `public response ${key} field`,
+      body: modelEvent('response.created', {
+        response: { id: 'resp-fixture', [key]: 'body-token-secret' }
+      }),
+      reason: 'policy',
+      policy: 'UNKNOWN_FIELD',
+      location: 'response',
+      key
+    })),
     { label: 'empty stream', body: '', reason: 'no_events' },
     { label: 'comments only', body: ': ping\n\n', reason: 'no_events' },
     {
@@ -353,7 +391,9 @@ describe('actual finite stream guard and policy producer diagnostics', () => {
   )
   it('keeps valid bytes identical and does not manufacture diagnostic or outcome evidence', async () => {
     const body =
-      createdModelEvent +
+      modelEvent('response.created', {
+        response: { id: 'resp-fixture', metadata: {}, incomplete_details: null }
+      }) +
       modelEvent('response.output_text.delta', { delta: 'Synthetic 中文🙂' }) +
       completedModelEvent
     const f = await fixture(body)

@@ -64,7 +64,12 @@ export function createTaskModelResponsePolicy(
         deny('RESPONSE_METADATA')
       }
       if (r.metadata !== undefined) {
-        object(r.metadata, '')
+        try {
+          object(r.metadata, '')
+        } catch (error) {
+          addTaskModelPolicyLocation(error, 'response_metadata')
+          throw error
+        }
       }
       if (r.headers !== undefined) {
         headers(r.headers, model)
@@ -82,8 +87,13 @@ export function createTaskModelResponsePolicy(
         error(r.error)
       }
       if (r.incomplete_details != null) {
-        const d = object(r.incomplete_details, 'reason', 'reason')
-        text(d.reason)
+        try {
+          const d = object(r.incomplete_details, 'reason', 'reason')
+          text(d.reason)
+        } catch (error) {
+          addTaskModelPolicyLocation(error, 'incomplete_details')
+          throw error
+        }
       }
     } catch (error) {
       addTaskModelPolicyLocation(error, 'response')
