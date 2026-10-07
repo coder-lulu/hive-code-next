@@ -52,7 +52,6 @@ describe('finite public response field diagnostic labels', () => {
     'https://private.invalid/token-secret',
     '/private/token-secret',
     'token-secret',
-    'output_text',
     'billing',
     'Instructions',
     'instructions ',

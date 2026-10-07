@@ -14,7 +14,7 @@ import {
   deny,
   type PolicyObject
 } from './task-model-policy-json'
-import { taskModelRefusedPolicyKey } from './task-model-stream-failure'
+import { addTaskModelPolicyLocation, taskModelRefusedPolicyKey } from './task-model-stream-failure'
 
 export const TASK_MODEL_RESPONSE_CONFIGURATION_FIELDS =
   'access_programs instructions parallel_tool_calls temperature tool_choice tools top_p completed_at conversation max_output_tokens max_tool_calls moderation previous_response_id prompt reasoning service_tier store text truncation prompt_cache_key prompt_cache_retention top_logprobs prompt_cache_diagnostics prompt_cache_options safety_identifier'
@@ -102,8 +102,13 @@ export function validateTaskModelResponseConfiguration(
   config?: TaskModelResponseConfiguration
 ): void {
   if (response.access_programs != null) {
-    const programs = object(response.access_programs, 'cyber', 'cyber')
-    oneOf(programs.cyber, 'standard daybreak_blue daybreak_red')
+    try {
+      const programs = object(response.access_programs, 'cyber', 'cyber')
+      oneOf(programs.cyber, 'standard daybreak_blue daybreak_red')
+    } catch (error) {
+      addTaskModelPolicyLocation(error, 'response_access_programs')
+      throw error
+    }
   }
   for (const key of [
     'conversation',
@@ -141,33 +146,48 @@ export function validateTaskModelResponseConfiguration(
     }
   }
   if (response.reasoning != null) {
-    const reasoning = object(response.reasoning, 'effort summary context generate_summary mode')
-    if (reasoning.mode != null) {
-      refused('reasoning')
-    }
-    for (const key of ['effort', 'summary', 'context', 'generate_summary']) {
-      if (reasoning[key] != null) {
-        text(reasoning[key], 32)
-        matches(
-          config,
-          key,
-          reasoning[key] === 'none' && key !== 'effort' && key !== 'context'
-            ? null
-            : reasoning[key],
-          'reasoning'
-        )
+    try {
+      const reasoning = object(response.reasoning, 'effort summary context generate_summary mode')
+      if (reasoning.mode != null) {
+        refused('reasoning')
       }
+      for (const key of ['effort', 'summary', 'context', 'generate_summary']) {
+        if (reasoning[key] != null) {
+          text(reasoning[key], 32)
+          matches(
+            config,
+            key,
+            reasoning[key] === 'none' && key !== 'effort' && key !== 'context'
+              ? null
+              : reasoning[key],
+            'reasoning'
+          )
+        }
+      }
+    } catch (error) {
+      addTaskModelPolicyLocation(error, 'response_reasoning')
+      throw error
     }
   }
   if (response.text != null) {
-    const controls = object(response.text, 'format verbosity')
-    if (controls.format != null) {
-      const format = object(controls.format, 'type', 'type')
-      oneOf(format.type, 'text')
-    }
-    if (controls.verbosity != null) {
-      oneOf(controls.verbosity, 'low medium high')
-      matches(config, 'verbosity', controls.verbosity, 'text')
+    try {
+      const controls = object(response.text, 'format verbosity')
+      if (controls.format != null) {
+        try {
+          const format = object(controls.format, 'type', 'type')
+          oneOf(format.type, 'text')
+        } catch (error) {
+          addTaskModelPolicyLocation(error, 'response_text_format')
+          throw error
+        }
+      }
+      if (controls.verbosity != null) {
+        oneOf(controls.verbosity, 'low medium high')
+        matches(config, 'verbosity', controls.verbosity, 'text')
+      }
+    } catch (error) {
+      addTaskModelPolicyLocation(error, 'response_text')
+      throw error
     }
   }
   if (response.service_tier != null) {

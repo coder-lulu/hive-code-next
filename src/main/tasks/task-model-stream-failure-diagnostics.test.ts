@@ -104,7 +104,14 @@ describe('actual finite stream guard and policy producer diagnostics', () => {
       }),
       reason: 'policy',
       policy: malformedResponseReasons[key] ?? 'RESPONSE_CONFIGURATION',
-      location: 'response',
+      location:
+        key === 'access_programs'
+          ? 'response_access_programs'
+          : key === 'reasoning'
+            ? 'response_reasoning'
+            : key === 'text'
+              ? 'response_text'
+              : 'response',
       key: malformedResponseReasons[key] ? undefined : key
     })),
     { label: 'empty stream', body: '', reason: 'no_events' },

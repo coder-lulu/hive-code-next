@@ -74,6 +74,10 @@ export type TaskModelPolicyReason = (typeof policyReasons)[number]
 const locations = [
   'event',
   'response',
+  'response_access_programs',
+  'response_reasoning',
+  'response_text',
+  'response_text_format',
   'response_metadata',
   'incomplete_details',
   'safety_buffering',
@@ -125,6 +129,20 @@ const keys = [
   'truncation',
   'usage',
   'user',
+  'cyber',
+  'context',
+  'effort',
+  'generate_summary',
+  'mode',
+  'summary',
+  'format',
+  'verbosity',
+  'type',
+  'name',
+  'schema',
+  'description',
+  'strict',
+  'output_text',
   'other'
 ] as const
 export type TaskModelPolicyKey = (typeof keys)[number]
