@@ -1,5 +1,9 @@
 import { AGENT_SESSION_WIRE_REFUSAL_CODES } from '../../shared/agent-session-wire-refusals'
 import { TASK_EXECUTION_ERROR_CODES } from './task-execution-error'
+import {
+  isTaskResponseContentTypeKind,
+  type TaskResponseContentTypeKind
+} from './task-response-content-type'
 
 const modelCodes = [
   'TASK_MODEL_ACCOUNT_BUSY',
@@ -78,6 +82,7 @@ export type TaskFailureDiagnostic = Readonly<{
   httpStatus?: number
   networkCode?: string
   responseReason?: ResponseReason
+  contentTypeKind?: TaskResponseContentTypeKind
 }>
 const trustedFailures = new WeakSet<TaskFailureError>()
 
@@ -139,7 +144,8 @@ export class TaskFailureError extends Error {
     phase: Phase,
     fallback: Code,
     httpStatus?: number,
-    responseReason?: ResponseReason
+    responseReason?: ResponseReason,
+    contentTypeKind?: TaskResponseContentTypeKind
   ) {
     const safeFallback = isCode(fallback) ? fallback : 'OUTCOME_UNKNOWN'
     let code: Code = safeFallback
@@ -183,6 +189,13 @@ export class TaskFailureError extends Error {
       responseReason &&
       responseReasons.includes(responseReason)
         ? { responseReason }
+        : {}),
+      ...(phase === 'response' &&
+      code === 'TASK_MODEL_STREAM_REFUSED' &&
+      status === 200 &&
+      responseReason === 'content_type' &&
+      isTaskResponseContentTypeKind(contentTypeKind)
+        ? { contentTypeKind }
         : {})
     })
     trustedFailures.add(this)
@@ -196,7 +209,8 @@ export function taskFailure(
   phase: Phase,
   fallback: Code,
   httpStatus?: number,
-  responseReason?: ResponseReason
+  responseReason?: ResponseReason,
+  contentTypeKind?: TaskResponseContentTypeKind
 ): TaskFailureError {
   try {
     if (error instanceof TaskFailureError && trustedFailures.has(error)) {
@@ -205,7 +219,7 @@ export function taskFailure(
   } catch {
     /* Even a hostile prototype trap cannot prevent safe cleanup. */
   }
-  return new TaskFailureError(error, phase, fallback, httpStatus, responseReason)
+  return new TaskFailureError(error, phase, fallback, httpStatus, responseReason, contentTypeKind)
 }
 export function taskFailureSummary(
   source: 'model' | 'authorization',

@@ -2,6 +2,7 @@ import { isAbsolute } from 'node:path'
 import { getCodexBackendAuthHeaders } from '../rate-limits/codex-backend-auth'
 import { abortTaskModelWait } from './task-model-broker-io'
 import { taskFailure } from './task-failure-diagnostic'
+import { classifyRefusedTaskContentType } from './task-response-content-type'
 
 const RESPONSES_URL = 'https://chatgpt.com/backend-api/codex/responses'
 const FETCH_DECODED_CODINGS = new Set(['gzip', 'x-gzip', 'deflate', 'br'])
@@ -144,14 +145,22 @@ export async function openTaskModelUpstream(options: {
         reply.status
       )
     }
-    const contentType = reply.headers.get('content-type') ?? ''
+    const declaredContentType = reply.headers.get('content-type')
+    const contentType = declaredContentType ?? ''
     if (
       contentType.length > 128 ||
       !/^text\/event-stream(?:[ \t]*;[ \t]*charset[ \t]*=[ \t]*(?:utf-8|"utf-8"))?[ \t]*$/i.test(
         contentType
       )
     ) {
-      throw taskFailure(undefined, phase, 'TASK_MODEL_STREAM_REFUSED', 200, 'content_type')
+      throw taskFailure(
+        undefined,
+        phase,
+        'TASK_MODEL_STREAM_REFUSED',
+        200,
+        'content_type',
+        classifyRefusedTaskContentType(declaredContentType)
+      )
     }
     if (!decodedContentEncoding(reply.headers.get('content-encoding'))) {
       throw taskFailure(undefined, phase, 'TASK_MODEL_STREAM_REFUSED', 200, 'content_encoding')

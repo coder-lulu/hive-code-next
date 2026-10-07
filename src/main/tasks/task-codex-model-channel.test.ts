@@ -20,7 +20,9 @@ import {
 let directory: string
 const channels: ReturnType<typeof createTaskCodexModelChannel>[] = []
 beforeEach(async () => {
-  const root = resolve('logs/paperclip-development/p3/task-model-response-validation/writer/tmp')
+  const root = resolve(
+    'logs/paperclip-development/p3/task-response-content-type-diagnostics/writer/tmp'
+  )
   await mkdir(root, { recursive: true })
   directory = await mkdtemp(join(root, 'channel-'))
   vi.spyOn(Date, 'now').mockReturnValue(TASK_TEST_NOW)
@@ -114,7 +116,7 @@ describe('controlled Codex production model channel', () => {
     await f.channel.close()
     const task = (await readPersistedTestAgentSessionStore(directory)).taskExecutions[f.owner.key]
     expect(task.events.at(-1)?.summary).toBe(
-      'Task model failure: {"phase":"response","category":"protocol","code":"TASK_MODEL_STREAM_REFUSED","httpStatus":200,"responseReason":"content_type"}'
+      'Task model failure: {"phase":"response","category":"protocol","code":"TASK_MODEL_STREAM_REFUSED","httpStatus":200,"responseReason":"content_type","contentTypeKind":"other"}'
     )
     expect(JSON.stringify(task.events)).not.toContain('secret')
     expect(task.result).toBeNull()
