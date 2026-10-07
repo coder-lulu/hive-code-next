@@ -4,11 +4,11 @@
   "upstream": "stablyai/orca",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
-  "targetSha": "82aab6a04a530413e70e422c6668e02df32e8ad1",
+  "targetSha": "4830654e07479456e3bf98e93ca93b95f720ac04",
   "baseTreeSha": "be3b3b0bd31532f0ab6a545744d7420848311b21",
   "upstreamTreeSha": "307815385c4bf005b093cf0115b73d9490720548",
-  "targetTreeSha": "6822f95cb6c8daa3056f80c24093453981576431",
-  "mergedTreeSha": "4ab685df82d0227713db7f84d6203e17c91ba7fb",
+  "targetTreeSha": "d86a5a09939751a7adad5c8df4d0901db8ee2c5a",
+  "mergedTreeSha": "241e98af86972a5e104bdbbe99a19ca63cf46c42",
   "docs": {
     "path": "docs",
     "mode": "160000",
@@ -405,7 +405,7 @@
     }
   },
   "review": {
-    "frozenReviewBlobSha": "b0cf298a73076c01d859030217c7bac847c28115",
+    "frozenReviewBlobSha": "2f96849d002fc3b8381ccac2ab052587ffdc2961",
     "conflictPaths": [
       ".github/workflows/adhoc-mac-build.yml",
       ".github/workflows/agent-state-rules-publish.yml",
@@ -1897,7 +1897,9 @@
       "src/main/daemon/pty-subprocess-foreground-identity.test.ts",
       "src/main/daemon/pty-subprocess-handle-lifecycle.test.ts",
       "src/main/ipc/worktree-git-common-entry-snapshot.ts",
-      "src/main/ipc/worktree-git-common-polling.test.ts"
+      "src/main/ipc/worktree-git-common-polling.test.ts",
+      "src/main/native-chat/transcript-watch-engine.ts",
+      "src/main/native-chat/transcript-watch-read-version.test.ts"
     ]
   },
   "absorbedUpstreamShas": [
