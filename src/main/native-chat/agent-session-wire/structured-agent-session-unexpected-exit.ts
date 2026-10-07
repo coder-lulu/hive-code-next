@@ -69,6 +69,18 @@ export async function settleUnexpectedStructuredAgentSessionExit<
     // failed told as one: the row says so.
     const exitedDuringStartup =
       unexpectedEvent.startupUnproven === true || child.phase === 'starting'
+    const record = context.store.getRecord(unexpectedEvent.sessionId)
+    const taskExecution =
+      Boolean(record && Object.hasOwn(record, 'taskSource')) ||
+      context.store.tasks.hasSessionBinding(unexpectedEvent.sessionId)
+    const isTaskExecution = () => {
+      const current = context.store.getRecord(unexpectedEvent.sessionId)
+      return (
+        taskExecution ||
+        Boolean(current && Object.hasOwn(current, 'taskSource')) ||
+        context.store.tasks.hasSessionBinding(unexpectedEvent.sessionId)
+      )
+    }
     const endChild = (): void => {
       endProviderChild(session, {
         generation: child.generation,
@@ -78,11 +90,10 @@ export async function settleUnexpectedStructuredAgentSessionExit<
         ...(unexpectedEvent.failure ? { failure: unexpectedEvent.failure } : {}),
         duringStartup: exitedDuringStartup,
         // The adapter publishes an exit only once it saw the root go, first-hand or proven.
-        rootGone: true
+        rootGone: !isTaskExecution()
       })
       context.publishStatus?.(unexpectedEvent.sessionId)
     }
-    const record = context.store.getRecord(unexpectedEvent.sessionId)
     if (!record || record.lease.handoffStage !== null) {
       // An acquisition or recovery already owns this lease's transition.
       endChild()
@@ -107,7 +118,9 @@ export async function settleUnexpectedStructuredAgentSessionExit<
         journal: session.journal,
         fence: child.fence,
         stableSettlementId,
-        verdict: { state: 'interrupted', completedAt: observedAt },
+        verdict: isTaskExecution()
+          ? { state: 'unverifiable' }
+          : { state: 'interrupted', completedAt: observedAt },
         exitedDuringStartup,
         failureTextContext: structuredAgentSessionFailureWordsContext(record, session.journal),
         // A failed start always says why: no response was running to carry the reason.
@@ -126,18 +139,34 @@ export async function settleUnexpectedStructuredAgentSessionExit<
         ReturnType<typeof releaseStoredStructuredAgentSessionOwnerAfterUnexpectedExit>
       > | null = null
       try {
-        released = await releaseStoredStructuredAgentSessionOwnerAfterUnexpectedExit({
-          store: context.store,
-          sessionId: unexpectedEvent.sessionId,
-          expectedFence: unexpectedEvent.fence,
-          expectedAcquisitionGeneration: unexpectedEvent.acquisitionGeneration,
-          acquisitionGeneration: child.generation,
-          now: context.now(),
-          exitObservedAt: observedAt,
-          // Bare cause: whatever this settlement could not write is settled from it later (the
-          // settle recording it queues, or the next open or acquire); `exit-observed` says the rest.
-          exitReason: unexpectedEvent.reason.slice(0, MAX_UNEXPECTED_EXIT_REASON_CHARS)
-        })
+        if (isTaskExecution()) {
+          await context.store.transitionHandoff(unexpectedEvent.sessionId, (current) => {
+            if (
+              current.lease.runtimeFence !== record.lease.runtimeFence ||
+              current.lease.reservedSpawnToken !== record.lease.reservedSpawnToken ||
+              JSON.stringify(current.taskSource) !== JSON.stringify(record.taskSource)
+            ) {
+              throw new Error('agent_session_checkpoint_stale')
+            }
+            return {
+              ...current,
+              lease: { ...current.lease, handoffStage: 'recovering', handoffOperationId: null }
+            }
+          })
+        } else {
+          released = await releaseStoredStructuredAgentSessionOwnerAfterUnexpectedExit({
+            store: context.store,
+            sessionId: unexpectedEvent.sessionId,
+            expectedFence: unexpectedEvent.fence,
+            expectedAcquisitionGeneration: unexpectedEvent.acquisitionGeneration,
+            acquisitionGeneration: child.generation,
+            now: context.now(),
+            exitObservedAt: observedAt,
+            // Bare cause: whatever this settlement could not write is settled from it later (the
+            // settle recording it queues, or the next open or acquire); `exit-observed` says the rest.
+            exitReason: unexpectedEvent.reason.slice(0, MAX_UNEXPECTED_EXIT_REASON_CHARS)
+          })
+        }
       } catch (error) {
         logExitFailure(context, unexpectedEvent, 'exit-owner-release', error)
       } finally {

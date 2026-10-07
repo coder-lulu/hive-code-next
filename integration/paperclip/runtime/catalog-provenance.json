@@ -1,0 +1,15 @@
+{
+  "codexVersion": "0.159.2",
+  "sourceRevision": "ff6aec96948b70d94983af2641a6b67c94faeff5",
+  "sourceUrl": "https://github.com/openai/codex/blob/ff6aec96948b70d94983af2641a6b67c94faeff5/codex-rs/models-manager/models.json",
+  "sourceSha256": "fd219bd9f061278275f528939f82f54d2eb97df4b25c23b022adbe48813d920b",
+  "originalEntrySha256": "8739bfc4872d5bd71d55b331541588313e115d944bc2058d32c5d9455cc531d9",
+  "catalogSha256": "6f67606dc69a813a6a0e7f2618dfd51d55c7c41b59cd0c817692e1ffc1193687",
+  "model": "gpt-6.1-sol",
+  "catalogSerialization": "JSON.stringify(JSON.parse(utf8))",
+  "policyProjection": {
+    "input_modalities": ["text"],
+    "experimental_supported_tools": []
+  },
+  "projectionPurpose": "Intersect the pinned model metadata with the delivered text/code task capabilities; protocol and tool-mode metadata remain unchanged."
+}

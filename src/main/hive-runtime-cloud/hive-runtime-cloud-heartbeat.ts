@@ -10,11 +10,23 @@ import {
 } from './hive-runtime-cloud-proof'
 import {
   FatalPresenceError,
+  ReconcilePresenceError,
   type ActiveLease,
   type PresenceClient
 } from './hive-runtime-cloud-presence-support'
 
 export type PendingHeartbeat = Parameters<typeof createRuntimeHeartbeatRequest>[1]
+export type HeartbeatRequestTiming = Readonly<{ requestedAt: number; requestedMonotonic: number }>
+
+export type AcceptedHeartbeatLease = Readonly<{
+  acceptedHeartbeatSeq: number
+  observedAt: number
+  leaseExpiresAt: number
+  requestedAt: number
+  requestedMonotonic: number
+  receivedAt: number
+  receivedMonotonic: number
+}>
 
 export type HeartbeatOptions = {
   client: PresenceClient
@@ -23,15 +35,20 @@ export type HeartbeatOptions = {
   authorityId: string
   lease: ActiveLease
   pending: PendingHeartbeat | null
+  pendingTiming: HeartbeatRequestTiming | null
   report: HiveRuntimeCloudReport
   now: () => number
   signal: AbortSignal
-  onPrepared: (pending: PendingHeartbeat) => void
+  onPrepared: (pending: PendingHeartbeat, timing: HeartbeatRequestTiming) => void
   assertCurrent: () => void
-  onAccepted?: (response: RuntimeHeartbeat, sent: PendingHeartbeat) => void
+  onAccepted?: (
+    response: RuntimeHeartbeat,
+    sent: PendingHeartbeat,
+    proof: AcceptedHeartbeatLease | null
+  ) => void
 }
 
-export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): Promise<number> {
+export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions) {
   options.assertCurrent()
   const authorization = options.authorization()
   if (!authorization) {
@@ -54,7 +71,17 @@ export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): 
     throw new FatalPresenceError('heartbeat_session_mismatch')
   }
   options.assertCurrent()
-  options.onPrepared(pending)
+  const timing = options.pending
+    ? options.pendingTiming
+    : {
+        requestedAt: options.now(),
+        requestedMonotonic: performance.now()
+      }
+  if (!timing) {
+    throw new FatalPresenceError('heartbeat_request_timing_unavailable')
+  }
+  const { requestedAt, requestedMonotonic } = timing
+  options.onPrepared(pending, timing)
   const heartbeat = await withHiveRuntimeCloudPresenceSession(
     authorization,
     options.authorization,
@@ -69,6 +96,8 @@ export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): 
       )
   )
   options.assertCurrent()
+  const receivedAt = options.now(),
+    receivedMonotonic = performance.now()
   if (
     heartbeat.leaseId !== options.lease.leaseId ||
     heartbeat.authorityGeneration !== options.lease.authorityGeneration ||
@@ -81,10 +110,37 @@ export async function sendHiveRuntimeCloudHeartbeat(options: HeartbeatOptions): 
   if (heartbeat.presence === 'FENCED') {
     throw new FatalPresenceError('heartbeat_fenced')
   }
+  const duration = heartbeat.leaseExpiresAt - heartbeat.observedAt
+  if (
+    options.signal.aborted ||
+    heartbeat.presence !== 'ONLINE' ||
+    !Number.isSafeInteger(heartbeat.observedAt) ||
+    !Number.isSafeInteger(heartbeat.leaseExpiresAt) ||
+    heartbeat.observedAt <= 0 ||
+    duration <= 0 ||
+    requestedAt + duration <= receivedAt ||
+    requestedMonotonic + duration <= receivedMonotonic
+  ) {
+    throw new ReconcilePresenceError('heartbeat_lease_expired')
+  }
   if (pending.report.relayControl && heartbeat.responseVersion !== 'runtime-session-control/v1') {
     throw new FatalPresenceError('heartbeat_relay_control_missing')
   }
-  options.onAccepted?.(heartbeat, pending)
+  const acceptedLease = heartbeat.duplicate
+    ? null
+    : ({
+        acceptedHeartbeatSeq: heartbeat.acceptedHeartbeatSeq,
+        observedAt: heartbeat.observedAt,
+        leaseExpiresAt: heartbeat.leaseExpiresAt,
+        requestedAt,
+        requestedMonotonic,
+        receivedAt,
+        receivedMonotonic
+      } satisfies AcceptedHeartbeatLease)
+  options.onAccepted?.(heartbeat, pending, acceptedLease)
   options.assertCurrent()
-  return heartbeat.acceptedHeartbeatSeq + 1
+  return {
+    nextHeartbeatSeq: heartbeat.acceptedHeartbeatSeq + 1,
+    acceptedLease
+  }
 }

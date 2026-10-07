@@ -10,6 +10,10 @@ import { journalIdentityFor } from './structured-agent-session-attach'
 import type { AttachFlowInput } from './structured-agent-session-attach-flow'
 import { readNativeSessionOptions } from './structured-agent-session-option-restoration'
 import { withAgentSessionCreatePhase } from '../../observability/agent-session-instrumentation'
+import {
+  assertTaskAttachAuthorityCurrent,
+  assertTaskAttachCurrent
+} from './structured-agent-session-task-acquisition'
 
 /** A reservation with no process behind it is only a promise to spawn; the
  * adapter makes it real and the store then grants the writer. */
@@ -29,6 +33,8 @@ export async function acquireOwner(
   try {
     try {
       await input.onAcquiring?.()
+      await assertTaskAttachCurrent(input, record)
+      assertTaskAttachAuthorityCurrent(input, record)
     } catch (error) {
       throw new AgentSessionPreSpawnError(error)
     }
@@ -40,6 +46,15 @@ export async function acquireOwner(
       ...(record.options ? { options: record.options } : {}),
       ...(input.eventSink ? { events: input.eventSink } : {}),
       ...(input.recordPhase ? { recordPhase: input.recordPhase } : {}),
+      ...(Object.hasOwn(input.params, 'taskOrigin') || Object.hasOwn(record, 'taskSource')
+        ? {
+            spawnGuard: {
+              prepare: () => assertTaskAttachCurrent(input, record),
+              assertCurrent: () => assertTaskAttachAuthorityCurrent(input, record)
+            },
+            taskOrigin: input.params.taskOrigin
+          }
+        : {}),
       onSpawned: async (process) => {
         record = await input.store.commitProcessIdentity({
           sessionId: record.sessionId,

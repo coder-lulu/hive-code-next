@@ -5,8 +5,10 @@ import {
   TaskOpaqueRef
 } from '../../shared/task-execution/task-execution-primitives'
 import { settleBeforeDeadline } from '../runtime/settle-before-deadline'
-import { TaskExecutionError } from './task-execution-error'
+import { refuseTaskExecution, TaskExecutionError } from './task-execution-error'
 import { taskExecutionIdentity, type TaskExecutionRecord } from './task-execution-record'
+import { taskCancelledResult } from './task-cancelled-result'
+import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
 import type {
   TaskExecutionHostDependencies,
   TaskExecutionStopEvidence
@@ -36,21 +38,66 @@ function proofMatches(record: TaskExecutionRecord, proof: TaskExecutionStopEvide
   )
 }
 
+export function collectTaskExecutionHostSettlement(
+  deps: TaskExecutionHostDependencies,
+  record: TaskExecutionRecord,
+  pendingLaunch: Promise<void> | undefined,
+  now: () => number,
+  validate: () => void,
+  isLaunching: () => boolean,
+  input?: string
+) {
+  return collectTaskExecutionSettlement(deps, record, pendingLaunch, now, validate).then(
+    async () => {
+      const current = deps.store.get(record.command)
+      if (current) {
+        assertTaskExecutionSnapshotCurrent(record, current)
+      }
+      if (
+        current?.cancellationKey &&
+        !current.result &&
+        current.dispatch === 'dispatching' &&
+        input !== undefined
+      ) {
+        await deps.settleCancelledDispatch?.(record, input, () => {
+          validate()
+          if (isLaunching()) {
+            return refuseTaskExecution('OUTCOME_UNKNOWN')
+          }
+        })
+      }
+    }
+  )
+}
+
 /** Refresh cancellation after I/O, then select the terminal outcome under the store lock. */
 export async function collectTaskExecutionSettlement(
   deps: TaskExecutionHostDependencies,
   initial: TaskExecutionRecord,
   pendingLaunch: Promise<void> | undefined,
-  now: () => number
+  now: () => number,
+  validate: () => void = () => undefined
 ) {
   const deadline = Date.now() + (deps.evidenceTimeoutMs ?? 5000)
   if (pendingLaunch) {
     await settleBeforeDeadline(() => pendingLaunch, undefined, deadline)
   }
-  let record = deps.store.get(initial.command)
+  const readCurrent = () => {
+    const current = deps.store.get(initial.command)
+    if (current) {
+      assertTaskExecutionSnapshotCurrent(initial, current)
+    }
+    return current
+  }
+  const validateSnapshot = (latest: TaskExecutionRecord) => {
+    assertTaskExecutionSnapshotCurrent(initial, latest)
+    validate()
+  }
+  let record = readCurrent()
   if (!record || record.result) {
     return
   }
+  validate()
   let rawCandidate: unknown = null
   let readFailed = false
   if (!record.cancellationKey) {
@@ -66,48 +113,54 @@ export async function collectTaskExecutionSettlement(
       readFailed = true
     }
   }
-  record = deps.store.get(initial.command)
+  record = readCurrent()
   if (!record || record.result) {
     return
   }
   const candidate = Candidate.safeParse(rawCandidate)
   if (!record.cancellationKey && (readFailed || (rawCandidate !== null && !candidate.success))) {
-    await deps.store.markUnknown(record.command, now())
+    await deps.store.markUnknown(record.command, now(), validateSnapshot)
     return
   }
   if (!record.cancellationKey && !candidate.success) {
     return
   }
   const stopping = record
+  validate()
   const proof = await settleBeforeDeadline(() => deps.stop(stopping), null, deadline)
   if (!proof || !proofMatches(record, proof)) {
-    await deps.store.markUnknown(record.command, now())
+    await deps.store.markUnknown(record.command, now(), validateSnapshot)
     return
   }
-  const current = deps.store.get(record.command)
+  const current = readCurrent()
   if (!current || current.result) {
     return
   }
   if (!current.cancellationKey && proof.evidenceKind !== 'stopped') {
-    await deps.store.markUnknown(record.command, now())
+    await deps.store.markUnknown(record.command, now(), validateSnapshot)
     return
   }
   const succeeded = candidate.success ? candidate.data : null
   await deps.store.settle(
     record.command,
     (latest) => {
+      validate()
+      assertTaskExecutionSnapshotCurrent(initial, latest)
       if (!latest.cancellationKey && !succeeded) {
         throw new TaskExecutionError('OUTCOME_UNKNOWN')
       }
       const recordedAt = new Date(now()).toISOString()
+      if (latest.cancellationKey) {
+        return taskCancelledResult(latest, proof.evidenceKind, now())
+      }
       const common = {
         ...taskExecutionIdentity(latest.command),
         commandFingerprint: latest.commandFingerprint,
         recordedAt,
         kind: 'execution.result' as const,
         receiptId: `result:${randomUUID()}`,
-        outcomeRef: latest.cancellationKey ? `cancel:${randomUUID()}` : succeeded!.outcomeRef,
-        artifactRefs: latest.cancellationKey ? [] : succeeded!.artifactRefs,
+        outcomeRef: succeeded!.outcomeRef,
+        artifactRefs: succeeded!.artifactRefs,
         usageFactRefs: [],
         stopProof: {
           proofRef: `stop:${randomUUID()}`,
@@ -117,14 +170,13 @@ export async function collectTaskExecutionSettlement(
           recordedAt
         }
       }
-      return latest.cancellationKey
-        ? { ...common, status: 'cancelled' }
-        : {
-            ...common,
-            status: succeeded!.status ?? 'succeeded',
-            stopProof: { ...common.stopProof, evidenceKind: 'stopped' }
-          }
+      return {
+        ...common,
+        status: succeeded!.status ?? 'succeeded',
+        stopProof: { ...common.stopProof, evidenceKind: 'stopped' }
+      }
     },
-    now()
+    now(),
+    stopping
   )
 }

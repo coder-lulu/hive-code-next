@@ -83,7 +83,9 @@ describe("a /clear's commit", () => {
       now: NOW + 5
     })
 
+    closeTestJournalHostDatabase(directory)
     const reopened = await open()
+    expect(reopened).not.toBe(store)
     const source = reopened.getRecord(SOURCE)!
     expect(source.conversationCommand).toEqual(marker(fence))
     expect(reopened.getRecord(REPLACEMENT)).toEqual({
@@ -135,7 +137,10 @@ describe("a /clear's commit", () => {
       .catch((error: unknown) => error)
     expect(isAgentSessionRefusalError(refused)).toBe(true)
 
-    for (const each of [store, await open()]) {
+    closeTestJournalHostDatabase(directory)
+    const reopened = await open()
+    expect(reopened).not.toBe(store)
+    for (const each of [store, reopened]) {
       expect(each.getRecord(REPLACEMENT)).toBeNull()
       expect(each.getRecord(SOURCE)?.conversationCommand).toBeUndefined()
       expect(each.getSessionTabId(SOURCE)).toBe('tab-alpha')

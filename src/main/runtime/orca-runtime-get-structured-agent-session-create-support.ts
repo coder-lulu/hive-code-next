@@ -24,6 +24,8 @@ import { getProfileUserDataPath } from '../orca-profiles/profile-storage-paths'
 import { parseWslUncPath } from '../../shared/wsl-paths'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
 import { applyStructuredCodexWorkspaceTrust } from '../agent-workspace-trust-spawn'
+import { resolveTaskCodexCreateIntent } from '../tasks/task-codex-create-intent'
+import type { TaskStructuredLaunchOrigin } from '../tasks/task-structured-launch-origin'
 
 export class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport extends OrcaRuntimeWithGetWorktreePs {
   async getStructuredAgentSessionCreateSupport(
@@ -96,7 +98,15 @@ export class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport extends OrcaR
     agent: 'claude' | 'codex'
     callerKey?: string
     resumeFrom?: { providerSessionId: string }
+    taskOrigin?: TaskStructuredLaunchOrigin
   }): Promise<AgentSessionAttachParams> {
+    if (Object.hasOwn(input, 'taskOrigin')) {
+      return resolveTaskCodexCreateIntent({
+        input,
+        resolveLocation: (selector) => this.resolveStructuredAgentSessionLocation(selector),
+        resolveSelectedAccount: this.taskCodexAccounts?.resolveSelected
+      })
+    }
     if (input.agent === 'claude') {
       return this.resolveStructuredAgentSessionIntent(input, async ({ launchEnv, location }) =>
         resolveStructuredClaudeAccountHomePath({

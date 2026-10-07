@@ -105,6 +105,11 @@ async function open(hostId = 'local'): Promise<AgentSessionRecordStore> {
   return openTestAgentSessionRecordStore(directory, { hostId })
 }
 
+async function restart(): Promise<AgentSessionRecordStore> {
+  closeTestJournalHostDatabase(directory)
+  return open()
+}
+
 /** Reserve, observe the spawn, prove the handle — the full path to an admitted writer. */
 async function establishOwner(
   store: AgentSessionRecordStore,
@@ -450,7 +455,7 @@ describe('restart reconciliation', () => {
     const first = await open()
     await establishOwner(first)
 
-    const reopened = await open()
+    const reopened = await restart()
     const loaded = reopened.getRecord('session-alpha')
     expect(loaded?.lease.unreconciled).toBe(true)
     expect(loaded?.providerHandleChain).toHaveLength(1)
@@ -476,7 +481,7 @@ describe('restart reconciliation', () => {
   it('re-adopts a live owner without moving the fence', async () => {
     const first = await open()
     await establishOwner(first)
-    const reopened = await open()
+    const reopened = await restart()
     await reopened.reconcileOnRestart({ probe: async () => MATCHED, now: NOW + 1_000 })
     const record = reopened.getRecord('session-alpha')
     expect(record?.lease).toMatchObject({
@@ -489,7 +494,7 @@ describe('restart reconciliation', () => {
 
   it('never applies a stale restart probe to a lease another reconcile already settled', async () => {
     await establishOwner(await open())
-    const store = await open()
+    const store = await restart()
     let releaseProbe!: (probe: AgentSessionOwnerProbe) => void
     let markProbeStarted!: () => void
     const probeStarted = new Promise<void>((resolve) => (markProbeStarted = resolve))
@@ -527,7 +532,7 @@ describe('restart reconciliation', () => {
       now: NOW
     })
 
-    const second = await open()
+    const second = await restart()
     await second.reconcileOnRestart({ probe: async () => UNUSED, now: NOW + 1_000 })
     const afterRestart = second.getRecord('session-alpha')?.lease.runtimeFence ?? 0
     expect(afterRestart).toBeGreaterThanOrEqual(2)
@@ -547,14 +552,14 @@ describe('restart reconciliation', () => {
     )
     expect(reacquired.record.lease.runtimeFence).toBe(afterRestart + 1)
 
-    const third = await open()
+    const third = await restart()
     expect(third.getRecord('session-alpha')?.lease.runtimeFence).toBe(afterRestart + 1)
   })
 
   it('sends an unverifiable owner to recovery rather than releasing it', async () => {
     const first = await open()
     await establishOwner(first)
-    const reopened = await open()
+    const reopened = await restart()
     await reopened.reconcileOnRestart({ probe: async () => INDETERMINATE, now: NOW + 1_000 })
     const lease = reopened.getRecord('session-alpha')?.lease
     expect(lease).toMatchObject({ handoffStage: 'recovering', runtimeFence: 1 })
@@ -580,7 +585,7 @@ describe('restart reconciliation', () => {
     await establishOwner(first)
     await markLegacyConflicted(first)
 
-    const reopened = await open()
+    const reopened = await restart()
     await reopened.reconcileOnRestart({
       probe: async () => ({ outcome: 'indeterminate', reason: 'no answer' }),
       now: NOW
@@ -596,7 +601,7 @@ describe('restart reconciliation', () => {
     const first = await open()
     await markLegacyConflicted(first, { ownerProcess: null })
 
-    const reopened = await open()
+    const reopened = await restart()
     await reopened.reconcileOnRestart({
       probe: async () => ({ outcome: 'indeterminate', reason: 'no answer' }),
       now: NOW
@@ -615,7 +620,7 @@ describe('restart reconciliation', () => {
     await establishOwner(first)
     await markLegacyConflicted(first)
 
-    const reopened = await open()
+    const reopened = await restart()
     await reopened.reconcileOnRestart({ probe: async () => ({ outcome: 'pid-absent' }), now: NOW })
 
     const lease = reopened.getRecord('session-alpha')?.lease
@@ -637,7 +642,7 @@ describe('restart reconciliation', () => {
   it('frees a reservation that provably never spawned', async () => {
     const first = await open()
     await first.reserveOwner(reserveRequest())
-    const reopened = await open()
+    const reopened = await restart()
     await reopened.reconcileOnRestart({ probe: async () => UNUSED, now: NOW + 1_000 })
     expect(reopened.getRecord('session-alpha')?.lease).toMatchObject({
       claimStatus: 'released',
@@ -656,7 +661,7 @@ describe('restart reconciliation', () => {
       outcome: { status: 'succeeded', sessionId: 'session-alpha' }
     })
 
-    const reopened = await open()
+    const reopened = await restart()
     expect(reopened.listOperationRows()).toHaveLength(1)
     const replayed = await reopened.reserveOwner(reserveRequest({ operation }))
     expect(replayed.disposition).toBe('replayed')
@@ -706,7 +711,7 @@ describe('host and workspace isolation', () => {
   it('preserves the workspace kind so a folder workspace is never read back as a worktree', async () => {
     const first = await open()
     await establishOwner(first, { sessionId: 'session-folder', location: FOLDER })
-    const reopened = await open()
+    const reopened = await restart()
     expect(reopened.getRecord('session-folder')?.location).toEqual(FOLDER)
   })
 })

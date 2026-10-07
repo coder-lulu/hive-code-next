@@ -72,6 +72,8 @@ export type AgentLaunchExecution = {
   vocabulary?: AgentLaunchModeVocabulary
   /** Attributes a throw to the step that was running, the way a dispatch's own stages do. */
   onStage?: (stage: 'worktree_create' | 'mode_settle' | 'surface_create') => void
+  /** Called only at the original guards before any surface creation. */
+  onPrelaunchRefused?: (error: Error) => never
 }
 
 export async function executeAgentLaunch(
@@ -105,7 +107,9 @@ export async function executeAgentLaunch(
   })
 
   if (execution.requiredMode && preflight.mode !== execution.requiredMode) {
-    throw new Error('agent_launch_required_mode_unavailable')
+    const error = new Error('agent_launch_required_mode_unavailable')
+    execution.onPrelaunchRefused?.(error)
+    throw error
   }
 
   // A reused terminal already downgraded in the pre-flight; there is nothing to create. Its agent
@@ -154,7 +158,9 @@ export async function executeAgentLaunch(
 
   execution.onStage?.('surface_create')
   if (execution.requiredMode && settled.mode !== execution.requiredMode) {
-    throw new Error('agent_launch_required_mode_unavailable')
+    const error = new Error('agent_launch_required_mode_unavailable')
+    execution.onPrelaunchRefused?.(error)
+    throw error
   }
   let created: CreatedSurface
   try {

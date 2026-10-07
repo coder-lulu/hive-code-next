@@ -114,22 +114,30 @@ const api = {
   listProjects: vi.fn(),
   createProject: vi.fn(),
   getTeam: vi.fn(),
-  configureTeam: vi.fn()
+  configureTeam: vi.fn(),
+  listWorkflows: vi.fn(),
+  getWorkflow: vi.fn(),
+  saveWorkflow: vi.fn()
 }
 let root: Root
 let container: HTMLDivElement
-let accountChanged: () => void
-let accountStateChanged: (state: HiveAccountState) => void
 const firstAccount = workbenchAccountState()
+const secondAccount = workbenchAccountState('other-owner', 'other-authority')
+const accountListeners = new Set<(state: HiveAccountState) => void>()
+const accountStateChanged = (state: HiveAccountState) =>
+  accountListeners.forEach((listener) => listener(state))
+const accountChanged = () => accountStateChanged(secondAccount)
 beforeEach(() => {
   Object.values(api).forEach((mock) => mock.mockReset())
   workspaces.openSpacePage.mockClear()
   workspaces.savedToast.mockClear()
+  accountListeners.clear()
   api.listCompanies.mockResolvedValue({ items: [company], nextCursor: null })
   api.listProjects.mockResolvedValue({ items: [project], nextCursor: null })
   api.getTeam.mockResolvedValue(team)
   api.configureTeam.mockResolvedValue(team)
   api.createProject.mockResolvedValue(project)
+  api.listWorkflows.mockResolvedValue({ items: [], nextCursor: null })
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {
@@ -137,9 +145,8 @@ beforeEach(() => {
       hiveAccount: {
         getState: vi.fn().mockResolvedValue(firstAccount),
         onStateChanged: (listener: (state: HiveAccountState) => void) => {
-          accountStateChanged = listener
-          accountChanged = () => listener(workbenchAccountState('other-owner', 'other-authority'))
-          return () => undefined
+          accountListeners.add(listener)
+          return () => accountListeners.delete(listener)
         }
       }
     }
@@ -217,6 +224,13 @@ describe('team-workbench forms and availability', () => {
     expect(container.querySelectorAll('input[id^="hive-employee-"]')).toHaveLength(4)
     expect(container.textContent).toContain('hiveWorkbench.executionUnavailable')
     expect(api.configureTeam).not.toHaveBeenCalled()
+    expect(api.listWorkflows).toHaveBeenCalledWith({
+      projectId: project.id,
+      after: undefined,
+      limit: 25
+    })
+    expect(container.textContent).toContain('hiveWorkflow.title')
+    expect(container.querySelector('#hive-workflow-name')).toBeNull()
   })
   it('distinguishes unsupported client access from an invalid workspace on the initial request', async () => {
     api.listCompanies.mockRejectedValue(new Error('CAPABILITY_UNAVAILABLE'))

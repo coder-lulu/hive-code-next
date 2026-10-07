@@ -21,6 +21,37 @@ export function workbenchAccountState(
   }
 }
 
+export function workbenchAccountRefreshStates(state: HiveAccountState): HiveAccountState[] {
+  return [
+    {
+      ...state,
+      account: { ...state.account!, displayName: 'Renamed owner' },
+      expiresAt: Date.now() + 120_000,
+      sessionExpiresAt: Date.now() + 86_500_000
+    },
+    { ...state, expiresAt: Date.now() - 1000, errorCode: 'network_unavailable' },
+    { ...state, expiresAt: Date.now() + 60_000 }
+  ]
+}
+
+export function workbenchAccountBoundaryStates(
+  state: HiveAccountState
+): { name: string; state: HiveAccountState }[] {
+  return [
+    { name: 'owner', state: workbenchAccountState('replacement-owner', state.authorityId) },
+    { name: 'authority', state: { ...state, authorityId: 'replacement-authority' } },
+    { name: 'profile', state: { ...state, sessionProfile: 'TEMPORARY' } },
+    { name: 'signout', state: { configured: true, status: 'signed-out', persistence: 'none' } },
+    {
+      name: 'unconfigured',
+      state: { configured: false, status: 'unconfigured', persistence: 'none' }
+    },
+    { name: 'expired long session', state: { ...state, sessionExpiresAt: Date.now() - 1000 } },
+    { name: 'explicit expired session', state: { ...state, errorCode: 'session_expired' } },
+    { name: 'rejected session', state: { ...state, errorCode: 'session_rejected' } }
+  ]
+}
+
 export function workbenchId(value: number): string {
   return `00000000-0000-4000-8000-${String(value).padStart(12, '0')}`
 }

@@ -8,6 +8,7 @@ import type { HiveRuntimeCloudControl } from '../../hive-runtime-cloud/hive-runt
 import type { OrchestrationSessionCaller } from '../orchestration/orchestration-caller-identity'
 import type { AgentLaunchIntent } from '../../../shared/agent-launch-intent'
 import type { TerminalSpawnScope } from '../runtime-terminal-contracts'
+import type { TaskStructuredLaunchOrigin } from '../../tasks/task-structured-launch-origin'
 
 export type RpcEnvelopeMeta = {
   runtimeId: string
@@ -60,6 +61,8 @@ export type RpcContext = {
   assertAgentLaunchCurrent?: (intent: AgentLaunchIntent, spawnScope?: TerminalSpawnScope) => void
   // A task requires host-owned completion/stop evidence, which a plain terminal cannot supply.
   requiredAgentLaunchMode?: 'structured'
+  // Host-only task origin; never accepted from RPC request parameters.
+  taskLaunchOrigin?: TaskStructuredLaunchOrigin
   hiveRuntimeCloud?: HiveRuntimeCloudControl
   // Why: lets long-poll handlers release immediately on client disconnect instead of running down timeoutMs. See design doc §3.1.
   signal?: AbortSignal

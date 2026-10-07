@@ -1,12 +1,10 @@
-import type {
-  AgentJournalItemIdentity,
-  AgentSessionJournalIdentity
-} from '../../shared/agent-session-journal-types'
+import type { AgentJournalItemIdentity } from '../../shared/agent-session-journal-types'
 import { randomUUID } from 'node:crypto'
 import type { AgentJournalDispatchRejection } from '../../shared/agent-session-failure-words'
 import { cancelProcessAcquisition } from '../../shared/child-process/cancel-process-acquisition'
 import type {
   CodexAppServerConnection,
+  CodexAppServerConnectionHandlers,
   openCodexAppServerConnection
 } from './codex-app-server-connection'
 import { CodexAcquisitionWindow } from './codex-structured-acquisition-window'
@@ -18,7 +16,10 @@ import type { CodexDispatchEchoes } from './codex-structured-dispatch-echo'
 import type { AgentChildWorkEvidence } from '../../shared/agent-status-child-work-evidence'
 import type { CodexBackgroundTaskTracker } from './codex-background-task-tracker'
 import type { CodexJournalTranslator } from './codex-structured-journal-translation'
-import type { StructuredAgentSessionEndedEvent } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
+import type {
+  StructuredAgentSessionEndedEvent,
+  StructuredAgentSessionAcquireInput
+} from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import type { CodexStructuredPermissionPolicy } from './codex-structured-permission-policy'
 import type {
   AgentModelCatalogSessionAccess,
@@ -41,7 +42,15 @@ export type CodexStructuredLaunch = {
   /** The model the session chose; the thread opens on it so its first turn is not a switch. */
   model?: string
   env?: Record<string, string>
+  openTaskConnection?: (
+    handlers: CodexAppServerConnectionHandlers
+  ) => Promise<CodexAppServerConnection>
 }
+
+export type CodexStructuredLaunchInput = Pick<StructuredAgentSessionAcquireInput, 'identity'> &
+  Partial<
+    Pick<StructuredAgentSessionAcquireInput, 'fence' | 'spawnToken' | 'spawnGuard' | 'taskOrigin'>
+  >
 
 export type CodexStructuredSessionEvent =
   | {
@@ -71,9 +80,7 @@ export type CodexStructuredSessionEvent =
   | { type: 'ended'; sessionId: string; reason: string; observedAt?: number }
 
 export type CodexStructuredSessionAdapterDeps = {
-  resolveLaunch: (input: {
-    identity: AgentSessionJournalIdentity
-  }) => Promise<CodexStructuredLaunch>
+  resolveLaunch: (input: CodexStructuredLaunchInput) => Promise<CodexStructuredLaunch>
   /** Host capability seam; production uses the native Windows process table. */
   isWindowsProcessStartTimeAvailable?: () => boolean
   onEvent?: (event: CodexStructuredSessionEvent) => void

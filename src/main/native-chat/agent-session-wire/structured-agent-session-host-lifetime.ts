@@ -9,9 +9,8 @@
 // reentrant, so every public entry point takes it once and calls these.
 
 import { isQueuedAgentJournalSubmission } from '../../../shared/agent-session-queued-submission'
-import type { AgentJournalSubmission } from '../../../shared/agent-session-journal-types'
-import { agentSessionFailureFact } from '../../../shared/agent-session-failure'
-import { agentSessionFailureWords } from '../../../shared/agent-session-failure-words'
+import { agentSessionExecutionHostWitnessMatchesRecord } from '../../../shared/agent-session-execution-host-proof'
+export { abandonQueuedStructuredAgentSessionMessages } from './structured-agent-session-queued-abandon'
 import {
   evictStructuredAgentSession,
   STRUCTURED_AGENT_SESSION_EVICTION_STEPS,
@@ -55,39 +54,6 @@ export type StructuredAgentSessionLifetimeContext = {
     beforeStop: (sessionId: string) => void
     stopped: (sessionId: string) => void
   }
-}
-
-type ConversationCloseDeps = Pick<StructuredAgentSessionHostDeps, 'logger'> & {
-  store: Pick<StructuredAgentSessionHostDeps['store'], 'getRecord'>
-}
-
-/** A conversation's handle closes with nothing queued: what is still queued when the chat closes,
- *  or the app quits, will not be handed over. Best effort: the next open's delivery loop rejects a
- *  leftover itself. `which` narrows it to the messages a close that did not complete closed.
- *  Resolves false when the rejection failed; the failure is reported, never thrown. */
-export async function abandonQueuedStructuredAgentSessionMessages(
-  deps: ConversationCloseDeps,
-  sessionId: string,
-  journal: StructuredAgentSessionHostSession['journal'],
-  which?: (submission: AgentJournalSubmission) => boolean
-): Promise<boolean> {
-  return journal
-    .rejectQueuedSubmissions(
-      structuredAgentSessionConversationFence(deps.store, sessionId),
-      agentSessionFailureWords(agentSessionFailureFact('chatClosed'), { surface: 'rejection' }),
-      which
-    )
-    .then(
-      () => true,
-      (error: unknown) => {
-        deps.logger.warn('rejecting queued messages of a closed chat failed', {
-          scope: 'queued-abandon',
-          sessionId,
-          error
-        })
-        return false
-      }
-    )
 }
 
 /** The wind-down this host owes for the session's child. A live child always owes one, whatever a
@@ -150,6 +116,15 @@ export async function stopStructuredAgentSessionAgentUnderSerialize(
   const owed = owedStop(session, cause, ending.retry === true)
   session.owesProviderChildWindDown = owed
   const stopping = session.child
+  const record = context.deps.store.getRecord(sessionId)
+  const taskExecution =
+    (record && Object.hasOwn(record, 'taskSource')) ||
+    context.deps.store.tasks.hasSessionBinding(sessionId)
+  const taskFence =
+    owed?.fence ??
+    (record?.lease.deathEvidence?.kind === 'execution-host-exit-observed'
+      ? record.lease.deathEvidence.ownerFence
+      : record?.lease.runtimeFence)
   const eviction: StructuredAgentSessionEvictionContext = {
     sessionId,
     // The retry must not re-stop a child the adapter already proved gone, so this stays honest.
@@ -158,6 +133,19 @@ export async function stopStructuredAgentSessionAgentUnderSerialize(
     eventSink: context.runtimeState.eventSinkFor(sessionId),
     adapter: context.deps.adapter,
     logger: context.deps.logger,
+    ...(taskExecution
+      ? {
+          stopExecutionOwner: async () => {
+            if (
+              taskFence === undefined ||
+              (await context.runtimeState.commitExecutionOwnerStop(sessionId, taskFence)) !==
+                'resolved'
+            ) {
+              throw new Error('exact execution host exit was not committed')
+            }
+          }
+        }
+      : {}),
     ...(context.restartWitness
       ? { beforeProviderChildStop: () => context.restartWitness?.beforeStop(sessionId) }
       : {}),
@@ -206,7 +194,19 @@ export async function stopStructuredAgentSessionAgentUnderSerialize(
       }
     },
     releaseLease: async () => {
-      if (owed) {
+      if (taskExecution) {
+        const current = context.deps.store.getRecord(sessionId)
+        const death = current?.lease.deathEvidence
+        if (
+          !current ||
+          death?.kind !== 'execution-host-exit-observed' ||
+          death.ownerFence !== taskFence ||
+          current.lease.unreconciled ||
+          !agentSessionExecutionHostWitnessMatchesRecord(death.witness, current)
+        ) {
+          throw new Error('execution host lease exit was not committed')
+        }
+      } else if (owed) {
         await releaseStoredStructuredAgentSessionOwner({
           store: context.deps.store,
           sessionId,

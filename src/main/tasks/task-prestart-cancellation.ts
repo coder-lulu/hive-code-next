@@ -40,7 +40,7 @@ export async function admitTaskPrestartCancellation(
     return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
   }
   const grant = await authorize(caller, start, 'cancel')
-  if (taskExecutionCapabilityRefusal(start, deps.capabilities())) {
+  if (taskExecutionCapabilityRefusal(start, deps.capabilities(), 'cancel')) {
     return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
   }
   await deps.store.admit({

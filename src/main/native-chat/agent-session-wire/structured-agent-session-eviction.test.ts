@@ -57,6 +57,36 @@ function runtimeState(): StructuredAgentSessionHostRuntimeState {
 }
 
 describe('structured agent session eviction', () => {
+  it.each(['root-exit', 'pre-spawn'] as const)(
+    'does not coerce Task %s cleanup into full provider stop',
+    async (kind) => {
+      const ctx = context()
+      ctx.stopExecutionOwner = vi.fn(async () => undefined)
+      vi.mocked(ctx.adapter.closeSession!).mockRejectedValueOnce(
+        kind === 'root-exit'
+          ? new AgentSessionAcquisitionRootExitObservedError(new Error('descendants unsettled'))
+          : new AgentSessionPreSpawnError(new Error('processless verdict'))
+      )
+      await expect(evictStructuredAgentSession(ctx)).rejects.toBeInstanceOf(
+        StructuredAgentSessionEvictionError
+      )
+      expect(ctx.stopExecutionOwner).not.toHaveBeenCalled()
+      expect(ctx.releaseLease).not.toHaveBeenCalled()
+      expect(ctx.eventSink.close).not.toHaveBeenCalled()
+    }
+  )
+
+  it('refuses an indexed Task child whose adapter cannot supply positive close evidence', async () => {
+    const ctx = context()
+    ctx.stopExecutionOwner = vi.fn(async () => undefined)
+    ctx.adapter.closeSession = undefined
+    await expect(evictStructuredAgentSession(ctx)).rejects.toBeInstanceOf(
+      StructuredAgentSessionEvictionError
+    )
+    expect(ctx.stopExecutionOwner).not.toHaveBeenCalled()
+    expect(ctx.releaseLease).not.toHaveBeenCalled()
+  })
+
   it('stops the child before it lets the sink go, then acknowledges the release', async () => {
     const ctx = context()
     await evictStructuredAgentSession(ctx)

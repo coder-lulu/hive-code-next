@@ -20476,5 +20476,25 @@
     "hivecode": {
       "name": "HiveCode AI"
     }
+  },
+  "hiveWorkflowCases": {
+    "description": "Envía requisitos con un flujo guardado, consulta las tareas asignadas y ejecuta la etapa inicial de requisitos del producto. Los traspasos automáticos entre los cuatro roles aún no están disponibles.",
+    "executionUnavailable": "La ejecución de etapas no está disponible hasta que se verifique un entorno de ejecución Docker Linux.",
+    "execution": {
+      "title": "Ejecución de etapas",
+      "scope": "Ejecuta la etapa inicial de requisitos del producto con el empleado asignado. Los traspasos automáticos entre los cuatro roles aún no están disponibles.",
+      "start": "Iniciar etapa actual",
+      "resume": "Reanudar etapa actual",
+      "uncertain": "No se ha confirmado el resultado del inicio. Reintentar reutiliza la misma solicitud; actualiza para consultar el estado de la ejecución.",
+      "empty": "Esta solicitud aún no tiene ejecuciones de etapas.",
+      "artifactTruncated": "La vista previa solo muestra los primeros 262.144 caracteres."
+    }
+  },
+  "hiveWorkflow": {
+    "description": "Configura las etapas de entrega y los criterios de aceptación. Guardar crea una versión del flujo. Las solicitudes pueden ejecutar la etapa inicial de requisitos del producto en un entorno Docker Linux verificado; los traspasos automáticos entre los cuatro roles aún no están disponibles."
+  },
+  "hiveWorkbench": {
+    "teamNotConfigured": "Guarda los cuatro empleados para completar la configuración del equipo y envía una solicitud para ejecutar la etapa inicial de requisitos del producto. Los traspasos automáticos entre los cuatro roles aún no están disponibles.",
+    "executionUnavailable": "La ejecución de etapas requiere un entorno Docker Linux verificado. Las solicitudes solo admiten la etapa inicial de requisitos del producto; los traspasos automáticos entre los cuatro roles aún no están disponibles."
   }
 }

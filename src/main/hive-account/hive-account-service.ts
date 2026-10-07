@@ -60,6 +60,8 @@ import {
 } from './hive-account-session-store'
 import { HiveAccountPublication } from './hive-account-publication'
 import { scheduleHiveAccountRefresh } from './hive-account-refresh-schedule'
+import { isDeepStrictEqual } from 'node:util'
+import { sameLiveHiveAccountLogin } from './hive-account-refresh-session'
 
 export type { HiveRuntimeCloudAuthorization } from './hive-account-publication'
 
@@ -510,21 +512,34 @@ export class HiveAccountService extends HiveAccountPublication {
         )
       }
     }
-    const expected = stored.value
+    const expected = structuredClone(stored.value)
     try {
       const client = this.dependencies.createClient(configured.config)
       const refreshed = await client.refreshSession(expected.refreshToken)
-      const superseded = this.getSupersededRefreshResult(expectedEpoch, expected)
-      if (superseded) {
-        await this.bestEffortRevokeCurrent(client, refreshed.accessToken)
-        return superseded
-      }
       const session: HiveAccountSession = {
         schemaVersion: 2,
         ...refreshed,
         deviceLabel: expected.deviceLabel,
         generation: expected.generation + 1,
         savedAt: Date.now()
+      }
+      const superseded = this.getSupersededRefreshResult(expectedEpoch, expected)
+      if (superseded) {
+        const current = this.readCurrentSession()
+        if (
+          current.status !== 'ok' ||
+          !this.getRuntimeCloudAuthorization() ||
+          !sameLiveHiveAccountLogin(current.value, session, Date.now())
+        ) {
+          await this.bestEffortRevokeCurrent(client, refreshed.accessToken)
+        }
+        return superseded
+      }
+      if (
+        this.getRuntimeCloudAuthorization() &&
+        sameLiveHiveAccountLogin(expected, session, Date.now())
+      ) {
+        session.generation = expected.generation
       }
       if (!this.persistSession(session)) {
         return { status: 'failed', state: errorState('secure_storage_unavailable') }
@@ -556,8 +571,7 @@ export class HiveAccountService extends HiveAccountPublication {
     if (
       current.status === 'ok' &&
       this.mutationEpoch === expectedEpoch &&
-      current.value.generation === expected.generation &&
-      current.value.refreshToken === expected.refreshToken
+      isDeepStrictEqual(current.value, expected)
     ) {
       return null
     }

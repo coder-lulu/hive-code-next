@@ -8,8 +8,20 @@ export const hiveTasksApi: HiveTasksApi = {
   createProject: (input) => ipcRenderer.invoke('hiveTasks:createProject', input),
   getTeam: (projectId) => ipcRenderer.invoke('hiveTasks:getTeam', projectId),
   configureTeam: (input) => ipcRenderer.invoke('hiveTasks:configureTeam', input),
+  listWorkflows: (query) => ipcRenderer.invoke('hiveTasks:listWorkflows', query),
+  getWorkflow: (query) => ipcRenderer.invoke('hiveTasks:getWorkflow', query),
+  saveWorkflow: (input) => ipcRenderer.invoke('hiveTasks:saveWorkflow', input),
+  createWorkflowCase: (input) => ipcRenderer.invoke('hiveTasks:createWorkflowCase', input),
+  listWorkflowCases: (query) => ipcRenderer.invoke('hiveTasks:listWorkflowCases', query),
+  getWorkflowCase: (query) => ipcRenderer.invoke('hiveTasks:getWorkflowCase', query),
+  startWorkflowCase: (input) => ipcRenderer.invoke('hiveTasks:startWorkflowCase', input),
+  getWorkflowCaseRuns: (query) => ipcRenderer.invoke('hiveTasks:getWorkflowCaseRuns', query),
+  getWorkflowCaseCodePage: (query) =>
+    ipcRenderer.invoke('hiveTasks:getWorkflowCaseCodePage', query),
+  getWorkflowCaseCodeFile: (query) =>
+    ipcRenderer.invoke('hiveTasks:getWorkflowCaseCodeFile', query),
   list: () => ipcRenderer.invoke('hiveTasks:list'),
   create: (input) => ipcRenderer.invoke('hiveTasks:create', input),
-  cancel: (id) => ipcRenderer.invoke('hiveTasks:cancel', id),
-  artifact: (id, ref) => ipcRenderer.invoke('hiveTasks:artifact', id, ref)
+  cancel: (id, runId) => ipcRenderer.invoke('hiveTasks:cancel', id, runId),
+  artifact: (id, runId, ref) => ipcRenderer.invoke('hiveTasks:artifact', id, runId, ref)
 }

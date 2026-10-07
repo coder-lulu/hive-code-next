@@ -29,6 +29,8 @@ export function journalDatabasePath(stateDirectory: string): string {
 }
 
 export class JournalHostDatabase {
+  private readonly beforeTransactionListeners = new Set<() => void>()
+  private readonly storeUnchangedListeners = new Set<() => void>()
   private connection: Database.Database | null
   /** A newer Orca wrote the database: every chat's history reads, and no chat writes. */
   readonly readOnly: boolean
@@ -89,10 +91,36 @@ export class JournalHostDatabase {
   }
 
   /** One IMMEDIATE transaction; see `runJournalTransaction`. */
-  transaction<T>(run: (db: Database.Database) => T): T {
-    return runJournalTransaction(this.db, run, () => {
+  transaction<T>(run: (db: Database.Database) => T, scope?: 'journal'): T {
+    const db = this.db
+    if (!db.isTransaction) {
+      this.beforeTransactionListeners.forEach((listener) => listener())
+    }
+    const result = runJournalTransaction(db, run, () => {
       this.stranded = true
     })
+    if (scope === 'journal') {
+      this.storeUnchangedListeners.forEach((listener) => listener())
+    }
+    return result
+  }
+
+  /** Synchronous preparation before BEGIN; observers never read this transaction's staged rows. */
+  onBeforeTransaction(listener: () => void): () => void {
+    if (this.isClosed) {
+      throw new AgentSessionJournalError('journal_closed', 'the chat journal database is closed')
+    }
+    this.beforeTransactionListeners.add(listener)
+    return () => this.beforeTransactionListeners.delete(listener)
+  }
+
+  /** Only callers whose writes are confined to journal/queued-message rows use this notification. */
+  onStoreUnchangedCommit(listener: () => void): () => void {
+    if (this.isClosed) {
+      throw new AgentSessionJournalError('journal_closed', 'the chat journal database is closed')
+    }
+    this.storeUnchangedListeners.add(listener)
+    return () => this.storeUnchangedListeners.delete(listener)
   }
 
   /**
@@ -125,6 +153,8 @@ export class JournalHostDatabase {
   close(): void {
     this.connection?.close()
     this.connection = null
+    this.beforeTransactionListeners.clear()
+    this.storeUnchangedListeners.clear()
   }
 
   /**

@@ -10,8 +10,12 @@ import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusa
 import {
   adjudicateAgentSessionRestart,
   evaluateAgentSessionAcquisition,
+  isProvenAliveProbe,
   type AgentSessionOwnerProbe
 } from '../../shared/agent-session-lease-adjudication'
+import { agentSessionExecutionHostProbeMatchesRecord } from '../../shared/agent-session-execution-host-proof'
+import { taskDockerSessionProbeForRecord } from '../tasks/task-docker-session-owner'
+import type { TaskExecutionRecord } from '../tasks/task-execution-record'
 import {
   appendAgentSessionProviderHandleLink,
   type AgentSessionProviderHandleLink
@@ -59,6 +63,7 @@ export function reserveAgentSessionOwner(args: {
 }): { record: AgentSessionRecord; disposition: 'reserved' | 'retry-reservation' } {
   const { record, reservation } = args
   const decision = evaluateAgentSessionAcquisition({
+    record,
     lease: record.lease,
     expectedFence: args.expectedFence,
     handoffOperationId: reservation.handoffOperationId,
@@ -191,7 +196,12 @@ export function renewAgentSessionLease(args: {
   if (record.lease.ownerProcess === null) {
     throw new Error('agent_session_ownership_unknown')
   }
-  if (args.childProbe.outcome !== 'identity-matched' || args.childProbe.matchedOn.length === 0) {
+  if (
+    !isProvenAliveProbe(args.childProbe) ||
+    ((Object.hasOwn(record, 'taskSource') ||
+      args.childProbe.outcome.startsWith('execution-host-')) &&
+      !agentSessionExecutionHostProbeMatchesRecord(args.childProbe, record))
+  ) {
     throw new Error('agent_session_ownership_unknown')
   }
   return withLease(record, {
@@ -202,17 +212,34 @@ export function renewAgentSessionLease(args: {
 }
 
 /** Proven eviction — the only other thing besides acquisition that may move the fence. */
-export function evictAgentSessionOwner(args: {
-  record: AgentSessionRecord
+export type AgentSessionOwnerEviction = {
+  sessionId: string
   expectedFence: number
   probe: AgentSessionOwnerProbe
   now: number
-}): AgentSessionRecord {
+}
+export function evictAgentSessionOwner(
+  args: Omit<AgentSessionOwnerEviction, 'sessionId'> & { record: AgentSessionRecord },
+  taskExecutions?: ReadonlyMap<string, TaskExecutionRecord>
+): AgentSessionRecord {
   const { record } = args
+  const probe = taskDockerSessionProbeForRecord(record, args.probe, taskExecutions)
+  if (
+    !record.lease.unreconciled &&
+    record.lease.claimStatus === 'released' &&
+    record.lease.deathEvidence?.kind === 'execution-host-exit-observed' &&
+    probe.outcome === 'execution-host-exited' &&
+    (args.expectedFence === record.lease.runtimeFence ||
+      args.expectedFence === probe.witness.ownerFence) &&
+    agentSessionExecutionHostProbeMatchesRecord(probe, record)
+  ) {
+    return record
+  }
   assertFence(record.lease, args.expectedFence)
   const adjudication = adjudicateAgentSessionRestart({
+    record,
     lease: record.lease,
-    probe: args.probe,
+    probe,
     observedAt: args.now
   })
   if (adjudication.disposition === 'free') {

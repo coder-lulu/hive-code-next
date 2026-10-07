@@ -113,6 +113,7 @@ export type StructuredAgentSessionHostDeps = {
   ) => Promise<Map<string, AgentSessionOwnerProbe>>
   /** Recovery-exit stop requests only; a lease moves only on a later proven-absent probe. */
   stopOwnerProcess?: (pid: number, signal: 'SIGTERM' | 'SIGKILL') => void
+  stopExecutionOwner?: (record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe | null>
   /** Host spawn-token process scan; null means the platform cannot enumerate, never "none". */
   scanSpawnTokenProcesses?: () => Promise<AgentSessionSpawnTokenScan | null>
   mintSpawnToken?: () => string

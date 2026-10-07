@@ -120,5 +120,199 @@
       "path": "package.json",
       "sha256": "5f9ecf80ea7e07f1aea677b78d6e68505cd618d14cd5ab45eeff4b49930407bc"
     }
-  ]
+  ],
+  "externalExecutionCore": {
+    "repository": "https://github.com/coder-lulu/hive-paperclip",
+    "branch": "hive/external-execution-20261004",
+    "status": "development_unpublished",
+    "module": "server/src/services/external-execution.ts",
+    "moduleSha256": "96d083b04f1e139657d1c8c8f664340d683eb2d5e1351d983ed54321c0fdc684",
+    "vendoredModule": "integration/paperclip/core/external-execution.ts",
+    "license": "MIT"
+  },
+  "issueCheckoutCore": {
+    "branch": "hive/workflow-external-runs-20261006",
+    "repository": "https://github.com/coder-lulu/hive-paperclip",
+    "status": "source_digest_pinned",
+    "modules": [
+      {
+        "vendoredModule": "integration/paperclip/core/issue-checkout-ownership.ts",
+        "module": "server/src/services/issue-checkout-ownership.ts",
+        "sha256": "e0a35e1ff91d91fdd7307c7bdf4063011e4f101849f93a3f49b4eeb4c3564f21"
+      },
+      {
+        "vendoredModule": "integration/paperclip/core/issue-checkout-admission.ts",
+        "module": "server/src/services/issue-checkout-admission.ts",
+        "sha256": "8ca86f3c4f34eeb1b0b44ae37e38db0cbfe9fb07124a1031ee1bf09764129dcc"
+      },
+      {
+        "vendoredModule": "integration/paperclip/core/issue-dependency-readiness.ts",
+        "module": "server/src/services/issue-dependency-readiness.ts",
+        "sha256": "dfa28268ebae189e1d3bce2c5239f9612daec18cd41e8d3fa6fceedfd7cd79aa"
+      }
+    ],
+    "baseRevision": "a027f76a726e8a556674eded807c2de0e55f5cc0"
+  },
+  "caseTransitionCore": {
+    "repository": "https://github.com/coder-lulu/hive-paperclip",
+    "revision": "d56db5a46be1557314d93b1a4b2ba7d3947c2843",
+    "status": "reviewed_provider_free_source_digest_pinned",
+    "sourceEntry": "server/src/services/pipeline-case-kernel.ts",
+    "vendoredEntry": "integration/paperclip/core/case-kernel/services/pipeline-case-kernel.ts",
+    "license": "MIT",
+    "modules": [
+      {
+        "module": "server/src/errors.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/errors.ts",
+        "sourceSha256": "b9919cbf75bb358fa8724bb44db62edc3ae32dcb53a2870ce03615a93ade5144",
+        "sha256": "c9908a6ebbffe4e33bac32c94fca2323d53f77129432d0337f831eb592609591"
+      },
+      {
+        "module": "server/src/services/issue-visibility.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/issue-visibility.ts",
+        "sourceSha256": "c5d7261dc111cdafc19eb0f47d6478d393bbdd98c98599dbbcba79b4d8f482d5",
+        "sha256": "cb2da8f75c0eef63e7360d4e4ca90354b51e4c771123496dab8c9631b67ed8e0"
+      },
+      {
+        "module": "server/src/services/pipeline-case-children.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-children.ts",
+        "sourceSha256": "3cf076adf33032aea2bc12b6cf69a67809285be38411469a702811aac3095b47",
+        "sha256": "0a2677cf5b3b4ca3ce8675660f5bf41cdd1cb9f94697db2d78fc54b89fed6a92"
+      },
+      {
+        "module": "server/src/services/pipeline-case-content.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-content.ts",
+        "sourceSha256": "210b911d84ce74cbf2a7759cbe3c8b0c613a036699313cc7f33b48ad9da59310",
+        "sha256": "eedc80e7988cc25ff2934a9dc77557647c9fb520bf2d42f0a68f98f33cc69148"
+      },
+      {
+        "module": "server/src/services/pipeline-case-drift.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-drift.ts",
+        "sourceSha256": "1213b2809776d0ebd396cdd5870e88464ec1f4dddad9b68692b0fb448debc2cb",
+        "sha256": "715eadb375eefec794231877e7b470e3b4956a3c8c7f91d911f8b4a5cb33ebbb"
+      },
+      {
+        "module": "server/src/services/pipeline-case-events.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-events.ts",
+        "sourceSha256": "65c5b96a9c853516af4a41f934af26fc8b3200314a893b6a073b353345cfcd0d",
+        "sha256": "f6873e82ed4622de84a903f69e5e23275a8d1f7dfed57f3397be096cc33f78c3"
+      },
+      {
+        "module": "server/src/services/pipeline-case-gates.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-gates.ts",
+        "sourceSha256": "a93a4365a04d9154d69fd61b3547900821b174e2e38b08dd9500aefb9a709805",
+        "sha256": "94e31e898a11919d09d1a93507581cf79535c4132b997b42890c41c599591fb9"
+      },
+      {
+        "module": "server/src/services/pipeline-case-kernel.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-kernel.ts",
+        "sourceSha256": "07626a7805354465d16ae90a7a3611fa38e423f212c38810f04cbcb280b926aa",
+        "sha256": "bc6bb56df6c0a6b2e7170e74f6ba2aa8e1e6e5985e0090accd3ebe35d5bf51d4"
+      },
+      {
+        "module": "server/src/services/pipeline-case-review.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-review.ts",
+        "sourceSha256": "6ba3e5c97518bf863918b12f794a4034ad4ecadacb7b1879cf6d59530a38cd9e",
+        "sha256": "a535298758b7a794fdd11b72a2910af64480b21272f7feb1e8e3add6ac9fe796"
+      },
+      {
+        "module": "server/src/services/pipeline-case-rollups.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-rollups.ts",
+        "sourceSha256": "40589d41e21f9643e14c730fc263b7302149c22b75e36d436e1d97344a7be8f1",
+        "sha256": "704b134b89b85b583b0e5a399d2507ed0683504182c79d3b5f3bb2684bd08001"
+      },
+      {
+        "module": "server/src/services/pipeline-case-state.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-state.ts",
+        "sourceSha256": "37420d580e645a385e9566778e647e8dc765081861a5b60d69f50f6b08816e72",
+        "sha256": "e81cbf19115161ce9a5b5b8b497e4a5b1438ce8bda35d07588f75f0640bb5c8d"
+      },
+      {
+        "module": "server/src/services/pipeline-case-transition.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-transition.ts",
+        "sourceSha256": "3b5584789216e21a85d065e5c0b465c2513b5fd31102b2ba074262a0dfe574d5",
+        "sha256": "14933302d5c4b62cc8eae51393a64fa702c671b41a02952aaa93e3abcc0d6932"
+      },
+      {
+        "module": "server/src/services/pipeline-case-types.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-case-types.ts",
+        "sourceSha256": "29dcc541ddee1ba48f3a6cf4b0303c3afc1a2a5b42c3815341c760aed0e168d2",
+        "sha256": "a7fb3c01dd2014cb88250316e72e73a5540658d3840318d084f250cc09162029"
+      },
+      {
+        "module": "server/src/services/pipeline-stage-breakdown.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-stage-breakdown.ts",
+        "sourceSha256": "5ac1a775058991b8c571bbf521ba652bcc9021380e783c93359db12885ada2d1",
+        "sha256": "286e6f0bac4a9e82198a63f8a090f2b3f25cff5a32488c555c3f885ed17ed316"
+      },
+      {
+        "module": "server/src/services/pipeline-stage-config.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-stage-config.ts",
+        "sourceSha256": "5f2240e38b6c1ef99910d3ddb33f06f4ea8e59d3765c7a36765726bcdb78dd0a",
+        "sha256": "8f53302df6ee590bbf2dfbbff67a5d8fed5183adc36a3d516ec8859ce7a31e32"
+      },
+      {
+        "module": "server/src/services/pipeline-stage-ledger.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/pipeline-stage-ledger.ts",
+        "sourceSha256": "ca01408d04baa6039f56201e4733650025260f0b636e25f634c6e6b250fe01d8",
+        "sha256": "ec7f1868917471ac540b959fef39a23c42fac9393e1b8e177224c2f81b80930d"
+      },
+      {
+        "module": "server/src/services/slack-conversation-state.ts",
+        "vendoredModule": "integration/paperclip/core/case-kernel/services/slack-conversation-state.ts",
+        "sourceSha256": "8f994a5e67048f5085b84cd8966245eeca88490d4a0bfcc0efeb6ce7566787c7",
+        "sha256": "aa979c3b54c754134673b05edf921a3b28675274cb1b52a8b40399c35ca432e1"
+      }
+    ],
+    "runtimeExternals": ["@paperclipai/db", "drizzle-orm", "node:util"],
+    "typeOnlyExternals": ["@paperclipai/shared"],
+    "normalization": [
+      {
+        "tool": "oxlint",
+        "version": "1.86.0",
+        "config": ".oxlintrc.json",
+        "configSha256": "a57aa0201fe13bf8353acea43c9ab1d1fe4e3fe98f655782405652a88b9761db",
+        "arguments": ["--fix"],
+        "appliedRules": [
+          "eslint(curly)",
+          "typescript(array-type)",
+          "typescript(consistent-type-definitions)",
+          "typescript(consistent-type-imports)",
+          "unicorn(no-useless-fallback-in-spread)"
+        ]
+      },
+      {
+        "tool": "oxfmt",
+        "version": "0.71.0",
+        "config": ".oxfmtrc.json",
+        "configSha256": "441a38e8912ff30d9afc0ae8cdbd9223a9c16108fd174c42c61ae5489840df82",
+        "arguments": ["--write"],
+        "appliedRules": []
+      },
+      {
+        "tool": "hive_case_type_normalization",
+        "version": 1,
+        "module": "config/scripts/paperclip-case-kernel-type-normalization.mjs",
+        "sha256": "4ea9760821c0aa34951c6cea986adba884a4a6f66a04eb6264daecc1ecfdef0b",
+        "operations": [
+          "compatible_type_annotations_and_satisfies",
+          "sql_valued_update_patch_type",
+          "remove_redundant_string_union",
+          "unknown_switch_input_preserves_default"
+        ]
+      },
+      {
+        "tool": "oxfmt",
+        "version": "0.71.0",
+        "config": ".oxfmtrc.json",
+        "configSha256": "441a38e8912ff30d9afc0ae8cdbd9223a9c16108fd174c42c61ae5489840df82",
+        "arguments": ["--write"],
+        "appliedRules": []
+      }
+    ],
+    "typeProject": {
+      "module": "integration/paperclip/core/case-kernel/tsconfig.json",
+      "sha256": "2b50abc67be0c2ec37db0eb833a78374929e5939413e1b2a1d08f1987c2c9d45"
+    }
+  }
 }

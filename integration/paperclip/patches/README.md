@@ -6,8 +6,10 @@ package builds with `pnpm run build:paperclip-adapter`, and the authenticated ho
 binding producer is installed. The current P1 [restricted task service](../service/README.md)
 uses the pinned database schema and migrations without importing upstream server
 or Provider code. Its minimal image has been built; Windows development runs the
-same entry on host Node. No upstream server patches have been applied. This
-directory specifies the boundaries required before incorporating that server.
+same entry on host Node. The upstream server remains unloaded. An unpublished
+external-execution fork patch is being verified; see the [failure matrix](failure-matrix.md)
+for its implemented seams and remaining qualification work. This directory
+specifies the boundaries required before incorporating that server.
 
 The upstream server must remain unavailable until the following boundaries are
 patched and verified against the pinned source. The restricted P1 distribution

@@ -81,9 +81,16 @@ export async function analyzeLocalRuntimeOwnership({
     throw error
   }
   assertCurrent()
-  const claimed = registration.claimedFromLookup(lookup, authorization.authorityId)
+  const claimed = {
+    ...registration.claimedFromLookup(lookup, authorization.authorityId),
+    ownerAccountId: authorization.accountId
+  }
   const registrationChanged = !sameRegistrationTuple(stored, claimed)
-  if (registrationChanged) {
+  if (
+    registrationChanged ||
+    stored?.status !== 'CLAIMED' ||
+    stored.ownerAccountId !== authorization.accountId
+  ) {
     registration.persist(claimed)
   }
   return {

@@ -7,19 +7,35 @@ import {
 } from '../../shared/task-execution/task-execution-command'
 import {
   TaskExecutionObserveSchema,
-  TaskExecutionObservationSchema,
   TaskExecutionReconcileSchema
 } from '../../shared/task-execution/task-execution-observation'
 import { TaskOpaqueRef } from '../../shared/task-execution/task-execution-primitives'
-import { refuseTaskExecution } from './task-execution-error'
-import { taskExecutionIdentity, type TaskExecutionRecord } from './task-execution-record'
-import { collectTaskExecutionSettlement } from './task-execution-settlement'
+import { refuseTaskExecution, TaskExecutionError } from './task-execution-error'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import type { TaskExecutionRecord } from './task-execution-record'
+import { taskRecordObservation } from './task-record-observation'
+import { collectTaskExecutionHostSettlement } from './task-execution-settlement'
+import { recoverPersistedTaskExecution } from './task-execution-recovery'
+import {
+  assertTaskExecutionDispatchCurrent,
+  dispatchTaskExecution,
+  requireTaskExecutionRecord,
+  type TaskExecutionRecordLookup
+} from './task-execution-launch-authorization'
 import type {
   TaskExecutionCaller,
   TaskExecutionAction,
   TaskExecutionAuthorization,
   TaskExecutionHostDependencies
 } from './task-execution-ports'
+import { authorizeTaskExecution } from './task-execution-authority'
+import {
+  readTaskWorkflowOutcome,
+  type WorkflowNativeReadQuery
+} from './task-workflow-outcome-access'
+import { assertTaskExecutionStartDeadlineCurrent } from './task-execution-budget'
+import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
+import type { TaskFailureError } from './task-failure-diagnostic'
 
 export type {
   TaskExecutionCaller,
@@ -36,7 +52,11 @@ export class TaskExecutionHost {
   private readonly settlements = new Map<string, Promise<void>>()
   private readonly now: () => number
 
-  constructor(private readonly deps: TaskExecutionHostDependencies) {
+  constructor(
+    private readonly deps: TaskExecutionHostDependencies & {
+      authorizeEnforcement?(command: TaskExecutionStart, action: TaskExecutionAction): Promise<void>
+    }
+  ) {
     this.now = deps.now ?? Date.now
   }
 
@@ -47,23 +67,67 @@ export class TaskExecutionHost {
     }
   }
 
-  /** Private Runtime cleanup; a revoked caller cannot authorize another transport operation. */
-  async cancelRevokedExecution(record: TaskExecutionRecord, caller: TaskExecutionCaller) {
-    caller.assertCurrent?.()
-    const current = this.requireRecord(
-      { ...record.command, commandFingerprint: record.commandFingerprint },
-      caller
-    )
-    if (current.result) {
+  async recoverPersistedExecution(
+    record: TaskExecutionRecord,
+    caller: TaskExecutionCaller,
+    launchFingerprint: string | null,
+    assertAuthorized: () => void
+  ): Promise<void> {
+    return recoverPersistedTaskExecution({
+      store: this.deps.store,
+      read: () => this.requireSnapshot(record, caller),
+      isLaunching: (fingerprint) => this.launches.has(fingerprint),
+      now: this.now,
+      validate: () => assertTaskAuthorizationCurrent(() => caller.assertCurrent?.()),
+      assertAuthorized,
+      launchFingerprint,
+      settle: (current, validate) => this.settle(current, validate),
+      cancelRevoked: (current) => this.cancelRevokedExecution(current, caller)
+    })
+  }
+
+  /** Persist revocation before slow collection; this never proves that the writer stopped. */
+  async fenceRevokedExecution(
+    record: TaskExecutionRecord,
+    caller: TaskExecutionCaller,
+    failure?: TaskFailureError
+  ) {
+    assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
+    const current = this.requireSnapshot(record, caller)
+    if (current.result && !failure) {
       return
     }
-    const cancellation = await this.deps.store.requestCancellation(
-      current.command,
-      `revoked:${current.commandFingerprint}`,
-      this.now(),
-      () => caller.assertCurrent?.()
-    )
-    await this.settle(cancellation.record)
+    const cancel = (diagnostic?: { expected: TaskExecutionRecord; failure: TaskFailureError }) =>
+      this.deps.store.requestCancellation(
+        current.command,
+        `revoked:${current.commandFingerprint}`,
+        this.now(),
+        (latest) => {
+          assertTaskExecutionSnapshotCurrent(record, latest)
+          assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
+        },
+        diagnostic
+      )
+    try {
+      await cancel(failure ? { expected: record, failure } : undefined)
+    } catch (error) {
+      if (
+        !failure ||
+        !(error instanceof TaskExecutionError) ||
+        !['OUTCOME_UNKNOWN', 'IDEMPOTENCY_CONFLICT', 'INVALID_REQUEST'].includes(error.code)
+      ) {
+        throw error
+      }
+      // Unavailable diagnostics do not widen or disable the original cancellation fence.
+      await cancel()
+    }
+  }
+
+  /** Private Runtime cleanup; a revoked caller cannot authorize another transport operation. */
+  async cancelRevokedExecution(record: TaskExecutionRecord, caller: TaskExecutionCaller) {
+    await this.fenceRevokedExecution(record, caller)
+    this.requireSnapshot(record, caller)
+    await this.settle(record, () => assertTaskAuthorizationCurrent(() => caller.assertCurrent?.()))
   }
 
   async start(value: unknown, caller: TaskExecutionCaller) {
@@ -72,6 +136,7 @@ export class TaskExecutionHost {
       return refuseTaskExecution('INVALID_REQUEST')
     }
     const command = parsed.data
+    assertTaskExecutionStartDeadlineCurrent(command, this.now())
     const authorization = await this.authorize(caller, command, 'start')
     if (taskExecutionCapabilityRefusal(command, this.deps.capabilities())) {
       return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
@@ -81,7 +146,7 @@ export class TaskExecutionHost {
       operationCallerKey: caller.operationCallerKey,
       workspace: authorization.workspace,
       now: this.now(),
-      validate: authorization.assertCurrent
+      validate: () => assertTaskExecutionDispatchCurrent(authorization)
     })
     if (admitted.created) {
       const key = admitted.record.commandFingerprint
@@ -90,7 +155,7 @@ export class TaskExecutionHost {
       )
       this.launches.set(key, flight)
     }
-    authorization.assertCurrent()
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
     return admitted.record.accepted
   }
 
@@ -111,7 +176,7 @@ export class TaskExecutionHost {
       },
       'observe'
     )
-    return this.observation(record, query.afterSequence, query.limit)
+    return taskRecordObservation(record, query.afterSequence, query.limit)
   }
 
   async reconcile(value: unknown, caller: TaskExecutionCaller) {
@@ -131,9 +196,9 @@ export class TaskExecutionHost {
       },
       'reconcile'
     )
-    await this.settle(record)
-    authorization.assertCurrent()
-    return this.observation(this.requireRecord(query, caller), 0, 32)
+    await this.settle(record, authorization.assertCurrent, authorization.input)
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
+    return taskRecordObservation(this.requireRecord(query, caller), 0, 32)
   }
 
   async cancel(value: unknown, caller: TaskExecutionCaller) {
@@ -163,96 +228,71 @@ export class TaskExecutionHost {
       },
       'cancel'
     )
-    const cancellation = await this.deps.store.requestCancellation(
+    await this.deps.store.requestCancellation(
       command,
       command.idempotencyKey,
       this.now(),
-      authorization.assertCurrent
+      (latest) => {
+        assertTaskExecutionSnapshotCurrent(record, latest)
+        authorization.assertCurrent()
+      }
     )
-    await this.settle(cancellation.record)
-    authorization.assertCurrent()
-    return this.observation(this.requireRecord(command, caller), 0, 32)
+    await this.settle(record, authorization.assertCurrent, authorization.input)
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
+    return taskRecordObservation(this.requireRecord(command, caller), 0, 32)
   }
 
-  private async authorize(
+  async workflowOutcome(value: unknown, caller: TaskExecutionCaller) {
+    return readTaskWorkflowOutcome({ ...this.workflowReadOptions(value, caller), mode: 'outcome' })
+  }
+
+  async workflowCommands(value: unknown, caller: TaskExecutionCaller) {
+    return readTaskWorkflowOutcome({ ...this.workflowReadOptions(value, caller), mode: 'commands' })
+  }
+
+  async workflowArtifact(value: unknown, caller: TaskExecutionCaller) {
+    return readTaskWorkflowOutcome({ ...this.workflowReadOptions(value, caller), mode: 'artifact' })
+  }
+
+  private workflowReadOptions(value: unknown, caller: TaskExecutionCaller) {
+    return {
+      value,
+      caller,
+      now: this.now,
+      outcomes: this.deps.workflowOutcomes,
+      requireRecord: (query: WorkflowNativeReadQuery, actor: TaskExecutionCaller) =>
+        this.requireRecord(query, actor),
+      authorize: (actor: TaskExecutionCaller, command: TaskExecutionStart) =>
+        this.authorize(actor, command, 'observe')
+    }
+  }
+
+  private authorize(
     caller: TaskExecutionCaller,
     command: TaskExecutionStart,
     action: TaskExecutionAction
   ) {
-    caller.assertCurrent?.()
-    if (
-      !TaskOpaqueRef.safeParse(caller.operationCallerKey).success ||
-      Date.parse(command.expiresAt) <= this.now()
-    ) {
-      return refuseTaskExecution('FORBIDDEN')
-    }
-    if (
-      command.ownerScope.kind !== 'personalTenant' ||
-      command.executionPolicy.trustMode !== 'trusted_personal_preview'
-    ) {
-      return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
-    }
-    const authorization = await this.deps.authorize(caller, command, action)
-    const assertCurrent = () => {
-      caller.assertCurrent?.()
-      authorization.assertCurrent()
-    }
-    assertCurrent()
-    return { ...authorization, assertCurrent }
+    return authorizeTaskExecution(this.deps, this.now, caller, command, action)
   }
 
-  private requireRecord(
-    query: Pick<
-      TaskExecutionRecord['accepted'],
-      'runtimeRecordId' | 'ownershipEpoch' | 'executionId' | 'executionEpoch' | 'commandFingerprint'
-    >,
-    caller: TaskExecutionCaller
-  ) {
-    const record = this.deps.store.get(query)
-    if (!record || record.operationCallerKey !== caller.operationCallerKey) {
-      return refuseTaskExecution('EXECUTION_NOT_FOUND')
-    }
-    if (
-      query.ownershipEpoch !== record.command.ownershipEpoch ||
-      query.commandFingerprint !== record.commandFingerprint
-    ) {
-      return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
-    }
-    return record
+  private requireRecord(query: TaskExecutionRecordLookup, caller: TaskExecutionCaller) {
+    return requireTaskExecutionRecord(this.deps.store, query, caller)
   }
 
-  private async dispatch(record: TaskExecutionRecord, authorization: TaskExecutionAuthorization) {
-    try {
-      const dispatch = await this.deps.store.beginDispatch(
-        record.command,
-        this.now(),
-        authorization.assertCurrent
-      )
-      if (!dispatch.changed) {
-        return
-      }
-      // Cancellation can commit while the launch port awaits replay or terminal preparation.
-      const assertCurrent = () => {
-        authorization.assertCurrent()
-        const current = this.deps.store.get(record.command)
-        if (
-          !current ||
-          current.cancellationKey ||
-          current.result ||
-          current.dispatch !== 'dispatching'
-        ) {
-          return refuseTaskExecution('OUTCOME_UNKNOWN')
-        }
-      }
-      assertCurrent()
-      const launch = await this.deps.launch(dispatch.record, { ...authorization, assertCurrent })
-      await this.deps.store.bindLaunch(record.command, launch, this.now())
-    } catch {
-      await this.deps.store.markUnknown(record.command, this.now()).catch(() => undefined)
-    }
+  private requireSnapshot(expected: TaskExecutionRecord, caller: TaskExecutionCaller) {
+    const current = this.requireRecord(
+      { ...expected.command, commandFingerprint: expected.commandFingerprint },
+      caller
+    )
+    assertTaskExecutionSnapshotCurrent(expected, current)
+    return current
   }
 
-  private async settle(record: TaskExecutionRecord) {
+  private dispatch(record: TaskExecutionRecord, authorization: TaskExecutionAuthorization) {
+    return dispatchTaskExecution(this.deps, this.now, record, authorization)
+  }
+
+  private async settle(record: TaskExecutionRecord, validate: () => void, input?: string) {
     if (record.result) {
       return
     }
@@ -261,35 +301,16 @@ export class TaskExecutionHost {
     if (active) {
       return active
     }
-    const settlement = collectTaskExecutionSettlement(
+    const settlement = collectTaskExecutionHostSettlement(
       this.deps,
       record,
       this.launches.get(key),
-      this.now
+      this.now,
+      validate,
+      () => this.launches.has(key),
+      input
     ).finally(() => this.settlements.delete(key))
     this.settlements.set(key, settlement)
     return settlement
-  }
-
-  private observation(record: TaskExecutionRecord, after: number, limit: number) {
-    if (after > record.events.length) {
-      return refuseTaskExecution('INVALID_REQUEST')
-    }
-    const events = record.events.filter((event) => event.sequence > after).slice(0, limit)
-    return TaskExecutionObservationSchema.parse({
-      ...taskExecutionIdentity(record.command),
-      kind: 'execution.observation',
-      commandFingerprint: record.commandFingerprint,
-      status: record.status,
-      accepted: record.accepted,
-      events,
-      cursor: events.at(-1)?.sequence ?? after,
-      lastSequence: record.events.length,
-      result: record.result,
-      sessionRef:
-        record.launch?.outcome.kind === 'structured'
-          ? record.launch.outcome.sessionId
-          : (record.launch?.outcome.handle ?? null)
-    })
   }
 }

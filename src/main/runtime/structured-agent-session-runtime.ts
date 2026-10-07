@@ -43,10 +43,9 @@ import { openStructuredAgentSessionJournalDatabase } from './structured-agent-se
 import { legacyAgentSessionStorePath } from './agent-session-record-store-file'
 import { journalDatabasePath } from '../native-chat/agent-session-journal/journal-host-database'
 import { journalDatabaseHoldsAgentSessions } from '../native-chat/agent-session-journal/journal-database'
-import {
-  createStructuredAgentSessionOwnerProbe,
-  createStructuredAgentSessionOwnerProbes
-} from './structured-agent-session-owner-probe'
+import { createStructuredTaskCodexRuntime } from './structured-task-codex-runtime'
+import type { TaskCodexRuntimeAccountPorts } from '../tasks/task-codex-runtime-account-ports'
+import type { TaskCodexStructuredLaunchDependencies } from '../tasks/task-codex-structured-launch'
 import type { NativeChatShellEnvironmentPolicy } from '../../shared/native-chat-shell-environment'
 import { createStructuredAgentEnvironmentResolvers } from './structured-agent-shell-environment'
 import type { ClaudeStructuredAuthPolicy } from '../claude-accounts/claude-structured-auth-policy'
@@ -130,6 +129,13 @@ export type StructuredAgentSessionRuntimeDeps = {
   /** The account home a structured launch would pin right now, for catalog
    *  reads with no session record. Absent disables the catalog surface. */
   resolveAgentAccountHome?: RuntimeAgentAccountHomeResolver
+  taskCodexAccounts?: TaskCodexRuntimeAccountPorts
+  taskDocker?: Partial<
+    Pick<
+      TaskCodexStructuredLaunchDependencies,
+      'resolveDockerConfiguration' | 'runDocker' | 'openDocker' | 'readAuth' | 'request'
+    >
+  >
 }
 
 type InstalledRuntime = RuntimeTeardownHandle & {
@@ -275,11 +281,13 @@ async function installOnJournal(
   })
   const { onDispatchSettledLate, releaseUnansweredDispatches } =
     createStructuredAgentSessionDispatchFollowUps({ host: () => host, logger: deps.logger })
+  const taskRuntime = createStructuredTaskCodexRuntime(deps, store)
   const codex = new CodexStructuredSessionAdapter({
     resolveLaunch: createCodexStructuredLaunchResolver({
       store,
       resolveWorkspacePath: deps.resolveWorkspacePath,
       resolveEnvironment: resolveCodexEnvironment,
+      resolveTaskLaunch: taskRuntime.resolveLaunch,
       ...(deps.resolveCodexPermissionPolicy
         ? { resolvePermissionPolicy: deps.resolveCodexPermissionPolicy }
         : {}),
@@ -332,8 +340,9 @@ async function installOnJournal(
     recoveryCapsule: new AgentSessionRecoveryCapsule(deps.stateDirectory),
     journalDatabase,
     claimKeyId: deps.claimKeyId,
-    probeOwner: createStructuredAgentSessionOwnerProbe(deps.hostId),
-    probeOwners: createStructuredAgentSessionOwnerProbes(deps.hostId),
+    probeOwner: taskRuntime.probeOwner,
+    probeOwners: taskRuntime.probeOwners,
+    stopExecutionOwner: taskRuntime.stopExecutionOwner,
     ...(deps.resolveLaunchArgs
       ? {
           resolveLaunchArgs: async (provider: AgentSessionRecord['provider']) =>

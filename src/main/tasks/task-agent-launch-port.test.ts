@@ -1,5 +1,7 @@
 import { mkdir, rm, symlink } from 'node:fs/promises'
 import { join } from 'node:path'
+import { computeAgentLaunchFingerprint } from '../../shared/agent-launch-operation'
+import { taskSessionSourceReference } from '../../shared/task-execution/task-structured-binding'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
 import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
@@ -64,18 +66,73 @@ async function fixture() {
   const authorization = {
     workspace: taskWorkspace(directory),
     input: 'Create report.md.',
-    assertCurrent: vi.fn()
+    assertCurrent: vi.fn(),
+    dispatch: {
+      prepare: vi.fn(async () => undefined),
+      assertCurrent: vi.fn(() => undefined)
+    }
   }
   replay.mockResolvedValue(TASK_TEST_LAUNCH)
   return { record, options, authorization, runtime }
 }
 
 describe('HiveCode task launch uses the installed replay port', () => {
+  it('rejects an asynchronous original authorizer before preparing any launch', async () => {
+    const { record, options, authorization, runtime } = await fixture()
+    authorization.assertCurrent.mockImplementation(async () => undefined)
+    await expect(
+      createTaskAgentLaunchPort({ ...options, executor: 'codex' })(record, authorization)
+    ).rejects.toThrow('FORBIDDEN')
+    expect(runtime.showTerminalWorkspaceLaunchScope).not.toHaveBeenCalled()
+    expect(replay).not.toHaveBeenCalled()
+  })
+
+  it('preserves synchronous authorization through the private origin wrapper', async () => {
+    const { record, options, authorization } = await fixture()
+    await createTaskAgentLaunchPort({ ...options, executor: 'codex' })(record, authorization)
+    const [, context] = replay.mock.calls[0]
+    authorization.assertCurrent.mockImplementation(async () => undefined)
+    expect(() => context.taskLaunchOrigin.validate()).toThrow('FORBIDDEN')
+  })
+
+  it('rejects an async inherited current guard through the replay context wrapper', async () => {
+    const { record, options, authorization } = await fixture()
+    options.context().assertAgentLaunchCurrent = async () => undefined
+    await createTaskAgentLaunchPort({ ...options, executor: 'codex' })(record, authorization)
+    const [, context] = replay.mock.calls[0]
+    expect(() =>
+      context.assertAgentLaunchCurrent({
+        agent: 'codex',
+        target: {
+          kind: 'existing',
+          connectionId: null,
+          worktree: record.workspace.workspaceId,
+          workspacePath: record.workspace.executionPath
+        },
+        cwd: record.workspace.executionPath
+      })
+    ).toThrow('FORBIDDEN')
+  })
   it('uses Codex with a required structured surface when selected by the host', async () => {
     const { record, options, authorization } = await fixture()
     await createTaskAgentLaunchPort({ ...options, executor: 'codex' })(record, authorization)
     expect(replay.mock.calls[0][0].agent).toBe('codex')
     expect(replay.mock.calls[0][1].requiredAgentLaunchMode).toBe('structured')
+    const [params, context] = replay.mock.calls[0]
+    expect(params).not.toHaveProperty('taskOrigin')
+    expect(context.taskLaunchOrigin).toMatchObject({
+      source: taskSessionSourceReference(record),
+      operationCallerKey: record.operationCallerKey,
+      operationId: record.command.operationId,
+      launchFingerprint: computeAgentLaunchFingerprint(params)
+    })
+    authorization.assertCurrent.mockClear()
+    context.taskLaunchOrigin.validate()
+    expect(authorization.assertCurrent).toHaveBeenCalledOnce()
+    authorization.assertCurrent.mockImplementation(() => {
+      throw new Error('grant revoked')
+    })
+    expect(() => context.taskLaunchOrigin.validate()).toThrow('grant revoked')
   })
   it('keeps the stored operation/caller and requests a background builtin launch', async () => {
     const { record, options, authorization } = await fixture()

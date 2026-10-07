@@ -41,6 +41,7 @@ export type StructuredAgentSessionEvictionContext = {
   /** Fires with the stop's verdict once `stopAgentSessionProviderRoot` read the root gone, so host
    *  bookkeeping stops claiming a child. */
   onProviderChildStopped?: (verdict: StructuredAgentSessionStopVerdict) => void
+  stopExecutionOwner?: () => Promise<void>
   /** Whether this host still owes the child's wind-down. Distinct from `hasProviderChild`, which a
    *  proven exit retires mid-run: the two disagree for exactly the steps a retry has to repeat. */
   owesProviderChildWindDown?: boolean
@@ -84,16 +85,26 @@ export const STRUCTURED_AGENT_SESSION_EVICTION_STEPS: readonly StructuredAgentSe
       name: 'stop-provider-child',
       run: async (context) => {
         if (context.hasProviderChild === false) {
+          await context.stopExecutionOwner?.()
           return
         }
         // An adapter with no close has nothing to stop; anything else must PROVE the exit.
         const stop = context.adapter.disposeSession ?? context.adapter.closeSession
-        const rootGone = stop
-          ? await stopAgentSessionProviderRoot(() => stop.call(context.adapter, context.sessionId))
-          : true
+        let rootGone: boolean
+        if (context.stopExecutionOwner) {
+          // Task settlement requires complete cleanup, never a root-only or processless verdict.
+          rootGone = (await stop?.call(context.adapter, context.sessionId)) === true
+        } else {
+          rootGone = stop
+            ? await stopAgentSessionProviderRoot(() =>
+                stop.call(context.adapter, context.sessionId)
+              )
+            : true
+        }
         if (!rootGone) {
           throw new Error('provider child exit was not proven')
         }
+        await context.stopExecutionOwner?.()
         context.onProviderChildStopped?.({ rootGone })
       }
     },

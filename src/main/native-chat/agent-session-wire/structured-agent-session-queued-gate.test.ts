@@ -7,6 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 import { structuredQueueHold } from './structured-agent-session-queued-messages'
 import {
+  editPersistedTestAgentSessionStore,
+  openTestAgentSessionRecordStore
+} from '../../runtime/agent-session-record-store-test-harness'
+import {
   createQueuedMessageTestRig,
   eventually,
   QUEUED_RIG_CALLER as CALLER,
@@ -249,12 +253,15 @@ describe('the hand-off link on answers', () => {
     await eventually(async () => expect(await rig.handoff(clientOperationId)).toBeDefined())
     const handedOffAs = await rig.handoffId(clientOperationId)
     // The ledger forgot the id, so the send runs again rather than replaying.
-    const operations = store['transactions'].state.operations
-    for (const [key, row] of operations) {
-      if (row.operationId === clientOperationId) {
-        operations.delete(key)
+    await editPersistedTestAgentSessionStore(rig.root, (persisted) => {
+      for (const [key, row] of Object.entries(persisted.operations)) {
+        if (row.operationId === clientOperationId) {
+          delete persisted.operations[key]
+        }
       }
-    }
+    })
+    // Refresh the same canonical store: this fixture forgot the row in memory and on disk.
+    await openTestAgentSessionRecordStore(rig.root)
     const count = (await host.journalSnapshot(SESSION)).submissions.length
     expect(await host.send(CALLER, params)).toMatchObject({
       ok: true,
@@ -286,12 +293,14 @@ describe('Send-now rerun', () => {
       expect(await drafts()).toMatchObject([{ messageId: draftId, state: 'returned' }])
     )
     // The host died before the Send's answer settled: its ledger row is still pending, so it reruns.
-    const operations = store['transactions'].state.operations
-    for (const [key, row] of operations) {
-      if (row.operationId === operationId) {
-        operations.set(key, { ...row, outcome: { status: 'pending' } })
+    await editPersistedTestAgentSessionStore(rig.root, (persisted) => {
+      for (const [key, row] of Object.entries(persisted.operations)) {
+        if (row.operationId === operationId) {
+          persisted.operations[key] = { ...row, outcome: { status: 'pending' } }
+        }
       }
-    }
+    })
+    await openTestAgentSessionRecordStore(rig.root)
     const count = (await host.journalSnapshot(SESSION)).submissions.length
     expect(await sendNow(draftId, operationId)).toMatchObject({
       ok: true,

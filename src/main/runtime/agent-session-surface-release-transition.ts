@@ -13,6 +13,8 @@ import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import { nextAgentSessionFence } from '../../shared/agent-session-next-fence'
 import { assertFence, withLease } from './agent-session-lease-transitions'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
+import type { TaskExecutionRecord } from '../tasks/task-execution-record'
+import { hasTaskSessionBinding } from '../tasks/task-session-association'
 
 export type AgentSessionRecordTransitionStore = Pick<AgentSessionRecordStore, 'transitionHandoff'>
 
@@ -28,6 +30,7 @@ export function isSurfaceReleasableAgentSessionRecord(record: AgentSessionRecord
 
 export function releaseAgentSessionOwnerAfterSurfaceClose(args: {
   record: AgentSessionRecord
+  taskExecutions?: ReadonlyMap<string, TaskExecutionRecord>
   expectedFence: number
   now: number
   /** Exit receipt can precede a delayed journal settlement and lease release. */
@@ -37,6 +40,12 @@ export function releaseAgentSessionOwnerAfterSurfaceClose(args: {
 }): AgentSessionRecord {
   const { record } = args
   assertFence(record.lease, args.expectedFence)
+  if (
+    Object.hasOwn(record, 'taskSource') ||
+    hasTaskSessionBinding(args.taskExecutions, record.sessionId)
+  ) {
+    throw agentSessionRefusalError('agent_session_ownership_unknown', { reason: 'ownerUnproven' })
+  }
   if (!isSurfaceReleasableAgentSessionRecord(record)) {
     throw agentSessionRefusalError('agent_session_ownership_unknown', { reason: 'leaseMoved' })
   }
@@ -68,7 +77,7 @@ export function releaseStoredAgentSessionOwnerAfterSurfaceClose(
     exitReason?: string
   }
 ): Promise<AgentSessionRecord> {
-  return store.transitionHandoff(args.sessionId, (record) =>
-    releaseAgentSessionOwnerAfterSurfaceClose({ ...args, record })
+  return store.transitionHandoff(args.sessionId, (record, taskExecutions) =>
+    releaseAgentSessionOwnerAfterSurfaceClose({ ...args, record, taskExecutions })
   )
 }

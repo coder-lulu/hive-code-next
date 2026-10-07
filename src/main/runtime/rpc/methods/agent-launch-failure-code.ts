@@ -13,6 +13,7 @@ import {
   AGENT_LAUNCH_SESSION_ALREADY_EXISTS_CODE
 } from '../../../../shared/agent-launch-session-already-exists'
 import type { TerminalSpawnDispatch } from '../../../agent-launch/agent-launch-not-started'
+import { AgentLaunchStructuredSessionRefusedError } from '../../../agent-launch/agent-launch-surface-factories'
 
 /** Long enough for every code this path raises, with room for one a later guard adds. */
 const LAUNCH_FAILURE_CODE_MAX_LENGTH = 128
@@ -29,7 +30,11 @@ const LAUNCH_FAILURE_CODE_MAX_LENGTH = 128
  */
 export function agentLaunchFailureCode(error: unknown): string {
   const code =
-    error instanceof OrchestrationError ? error.code : error instanceof Error ? error.message : ''
+    error instanceof OrchestrationError || error instanceof AgentLaunchStructuredSessionRefusedError
+      ? error.code
+      : error instanceof Error
+        ? error.message
+        : ''
   return code.length > 0 ? code.slice(0, LAUNCH_FAILURE_CODE_MAX_LENGTH) : 'agent_launch_failed'
 }
 

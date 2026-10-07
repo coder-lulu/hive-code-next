@@ -272,6 +272,7 @@ describe('settled attach retry', () => {
     })
 
     await host.flushAllStreamedEvents()
+    closeTestJournalHostDatabases()
     store = await openTestAgentSessionRecordStore(root)
     host = new StructuredAgentSessionHost({
       logger: createStructuredAgentSessionLogger(),
@@ -321,6 +322,7 @@ describe('settled attach retry', () => {
     await vi.waitFor(() => expect(dispatch).toHaveBeenCalledTimes(1))
 
     await host.flushAllStreamedEvents()
+    closeTestJournalHostDatabases()
     store = await openTestAgentSessionRecordStore(root)
     host = new StructuredAgentSessionHost({
       logger: createStructuredAgentSessionLogger(),

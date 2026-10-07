@@ -61,7 +61,10 @@ describe('long-running Paperclip task authorization', () => {
   })
   it('renews only authorization and keeps waiting for the original execution result', async () => {
     const { current, expire } = await expiringFixture()
-    current.context.onLog = vi.fn(async () => {
+    current.context.onLog = vi.fn(async (_stream, data) => {
+      if (!data.endsWith(' running\n')) {
+        return
+      }
       expire()
       current.deps.collect = vi.fn(async () => ({
         outcomeRef: 'outcome:test',
@@ -73,15 +76,23 @@ describe('long-running Paperclip task authorization', () => {
     expect(current.ports.resolveBinding).toHaveBeenCalledTimes(2)
     expect(current.deps.launch).toHaveBeenCalledTimes(1)
     expect(result.sessionParams?.executionId).toBe(current.binding.command.executionId)
-    expect(current.deps.authorize).toHaveBeenLastCalledWith(
+    expect(current.deps.authorize).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({ authorizationRef: 'grant:renewed' }),
       'reconcile'
     )
+    expect(current.deps.authorize).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ authorizationRef: 'grant:renewed' }),
+      'observe'
+    )
   })
   it('renews expired authorization before forwarding operator cancellation', async () => {
     const { current, expire } = await expiringFixture()
-    current.context.onLog = vi.fn(async () => {
+    current.context.onLog = vi.fn(async (_stream, data) => {
+      if (!data.endsWith(' running\n')) {
+        return
+      }
       expire()
       current.controller.abort()
     })
@@ -93,7 +104,10 @@ describe('long-running Paperclip task authorization', () => {
   })
   it('refuses changed immutable input under a reused declared fingerprint during renewal', async () => {
     const { current, expire } = await expiringFixture()
-    current.context.onLog = vi.fn(async () => {
+    current.context.onLog = vi.fn(async (_stream, data) => {
+      if (!data.endsWith(' running\n')) {
+        return
+      }
       expire()
       current.ports.resolveBinding = vi.fn(async () => ({
         ...current.binding,

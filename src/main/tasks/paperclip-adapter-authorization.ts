@@ -3,6 +3,7 @@ import { requirePaperclipTaskBinding } from './paperclip-adapter-binding'
 import type {
   HiveRuntimeAdapterPorts,
   HiveRuntimeBinding,
+  HiveRuntimeBindingPurpose,
   PaperclipTaskExecutionContext
 } from './paperclip-adapter-contract'
 import { TaskExecutionError } from './task-execution-error'
@@ -15,7 +16,8 @@ const COMPARISON_CALLER = 'adapter:authorization-comparison'
 export function createPaperclipTaskAuthorization(
   context: PaperclipTaskExecutionContext,
   ports: HiveRuntimeAdapterPorts,
-  initial: HiveRuntimeBinding
+  initial: HiveRuntimeBinding,
+  purpose: HiveRuntimeBindingPurpose
 ) {
   let binding = initial
   let renewAt = Date.parse(initial.command.expiresAt) - RENEWAL_LEAD_MS
@@ -27,7 +29,7 @@ export function createPaperclipTaskAuthorization(
     if (Date.now() < renewAt) {
       return binding
     }
-    flight = requirePaperclipTaskBinding(context, ports)
+    flight = requirePaperclipTaskBinding(context, ports, purpose)
       .then((next) => {
         if (
           next.bindingRef !== initial.bindingRef ||

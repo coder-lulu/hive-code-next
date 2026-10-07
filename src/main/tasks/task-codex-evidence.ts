@@ -1,20 +1,27 @@
-import { readAgentJournalTurn } from '../../shared/agent-session-turn-record'
-import { agentJournalSubmissionKey } from '../../shared/agent-session-journal-item-key'
-import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 import { observeStructuredWorker } from '../runtime/structured-worker-authority'
 import { closeStructuredAgentSessionChild } from '../runtime/structured-agent-session-close'
 import type { TaskExecutionRecord } from './task-execution-record'
 import type { TaskExecutionStopEvidence } from './task-execution-ports'
 import { TaskArtifactIndex, taskResultManifestName } from './task-artifact-index'
-import { refuseTaskExecution } from './task-execution-error'
+import { restoreTaskWorkflowCopyGuard } from './task-workflow-copy-guard'
+import { assertTaskOutputWorkspace } from './task-output-workspace'
+import { taskCodexSessionFor, readTaskCodexJournalEvidence } from './task-codex-journal-evidence'
+import { collectTaskCodexCommandEvidence } from './task-codex-command-evidence'
+import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
+import { readTaskModelFatalFailure } from './task-model-fatal-failure'
 
 export function taskCodexResultInstructions(
   record: Pick<TaskExecutionRecord, 'command' | 'commandFingerprint'>
 ) {
+  const tester = record.command.workflowContext?.role === 'tester'
+  const filename = taskResultManifestName(record.commandFingerprint)
   return (
     `\n\nTask completion contract: write a result manifest only after your artifact files are complete.\n` +
-    `Manifest filename: ${taskResultManifestName(record.commandFingerprint)}\n` +
-    `Manifest JSON: ${JSON.stringify({
+    `Manifest filename: ${tester ? `/outputs/${filename}` : filename}\n${
+      tester
+        ? 'The fixed code at /workspace is read-only. Write report files and build outputs under /outputs; artifact paths are relative to /outputs. Use /tmp for disposable test data.\n'
+        : ''
+    }Manifest JSON: ${JSON.stringify({
       schemaVersion: 1,
       executionId: record.command.executionId,
       commandFingerprint: record.commandFingerprint,
@@ -26,84 +33,72 @@ export function taskCodexResultInstructions(
   )
 }
 
-function sessionFor(record: TaskExecutionRecord) {
-  if (record.launch?.outcome.kind !== 'structured') {
-    return null
-  }
-  const host = getStructuredAgentSessionHost()
-  const sessionId = record.launch.outcome.sessionId
-  const session = host?.deps.store.getRecord(sessionId)
-  if (
-    !host ||
-    !session ||
-    session.provider !== 'codex' ||
-    session.location.executionHostId !== 'local' ||
-    session.location.wslDistro ||
-    session.location.workspaceId !== record.workspace.workspaceId
-  ) {
-    return refuseTaskExecution('OUTCOME_UNKNOWN')
-  }
-  return { host, session, sessionId }
-}
-
 /** Provider verdict and real child-close evidence are separate from a result candidate. */
 export function createTaskCodexEvidence(directory: string) {
   const artifacts = new TaskArtifactIndex(directory)
   return {
+    collectCommands: collectTaskCodexCommandEvidence,
     async collect(record: TaskExecutionRecord) {
-      const binding = sessionFor(record)
-      const prompt = record.launch?.prompt
-      if (!binding || prompt?.outcome !== 'journaled') {
+      const host = getStructuredAgentSessionHost()
+      if (host && readTaskModelFatalFailure(host.deps.store.tasks, record)) {
+        await host.deps.store.tasks.assertFailedBootStopCurrent(record)
+        const candidate = await artifacts.collectHostFailure(record)
+        await host.deps.store.tasks.assertFailedBootStopCurrent(record)
+        if (getStructuredAgentSessionHost() !== host) {
+          return null
+        }
+        return candidate
+      }
+      const journal = await readTaskCodexJournalEvidence(record)
+      if (!journal) {
         return null
       }
-      await binding.host.flushStreamedEvents(binding.sessionId)
-      const snapshot = await binding.host.journalSnapshot(binding.sessionId)
-      const submission = snapshot.submissions.find(
-        (entry) => entry.clientMessageId === prompt.messageId
-      )
-      if (!submission || submission.dispatchState !== 'accepted' || !submission.providerItemId) {
-        return null
-      }
-      const turns = snapshot.items
-        .filter((entry) => !entry.agentId)
-        .map((entry) => readAgentJournalTurn(entry.body))
-      const turn = turns.find(
-        (entry) => entry?.userItemId === agentJournalSubmissionKey(prompt.messageId)
-      )
-      if (
-        !turn ||
-        turn.state !== 'completed' ||
-        (turn.outcome !== 'success' && turn.outcome !== 'failure')
-      ) {
-        return null
-      }
-      if (
-        snapshot.items.some(
-          (entry) =>
-            (entry.body.kind === 'tool-call' && entry.body.state === 'running') ||
-            readAgentJournalTurn(entry.body)?.state === 'running'
-        )
-      ) {
-        return null
-      }
-      return artifacts.collect(record, turn.outcome)
+      const code = await restoreTaskWorkflowCopyGuard(record.workspace, record.command, () => {
+        assertTaskOutputWorkspace(record.workspace)
+      })
+      code?.assertUnchanged()
+      const candidate = await artifacts.collect(record, journal.turnOutcome)
+      code?.assertUnchanged()
+      return candidate
     },
     async stop(record: TaskExecutionRecord): Promise<TaskExecutionStopEvidence | null> {
-      if (record.dispatch === 'dispatching') {
-        return null
-      }
-      const binding = sessionFor(record)
-      if (record.dispatch !== 'not_dispatched' && !binding) {
-        return null
-      }
-      if (binding) {
-        const stopped = await closeStructuredAgentSessionChild(binding.sessionId)
-        // UI cleanup accepts released leases without death evidence; tasks require observed death.
-        if (
-          !stopped.stopped ||
-          observeStructuredWorker({ sessionId: binding.sessionId }).status !== 'exited'
-        ) {
+      let sessionStopped = false
+      const originalHost = getStructuredAgentSessionHost()
+      if (
+        record.dispatch === 'dispatching' ||
+        (originalHost && readTaskModelFatalFailure(originalHost.deps.store.tasks, record))
+      ) {
+        const host = getStructuredAgentSessionHost()
+        if (!host) {
           return null
+        }
+        try {
+          if ((await host.closeTaskExecution(record)) !== true) {
+            return null
+          }
+          const stopped = await host.deps.store.tasks.assertFailedBootStopCurrent(record, true)
+          if (getStructuredAgentSessionHost() !== host || host.hasSession(stopped.sessionId)) {
+            return null
+          }
+          sessionStopped = true
+        } catch {
+          return null
+        }
+      } else {
+        const binding = taskCodexSessionFor(record)
+        if (record.dispatch !== 'not_dispatched' && !binding) {
+          return null
+        }
+        if (binding) {
+          const stopped = await closeStructuredAgentSessionChild(binding.sessionId)
+          // UI cleanup accepts released leases without death evidence; tasks require observed death.
+          if (
+            !stopped.stopped ||
+            observeStructuredWorker({ sessionId: binding.sessionId }).status !== 'exited'
+          ) {
+            return null
+          }
+          sessionStopped = true
         }
       }
       return {
@@ -116,7 +111,7 @@ export function createTaskCodexEvidence(directory: string) {
         operationCallerKey: record.operationCallerKey,
         workspaceExecutionClaimRef: record.command.workspaceExecutionClaimRef,
         writeFence: record.command.writeFence,
-        evidenceKind: binding ? 'stopped' : 'not_started',
+        evidenceKind: sessionStopped ? 'stopped' : 'not_started',
         managedToolsSettled: true,
         writersFenced: true
       }

@@ -63,6 +63,7 @@ function mutableStore() {
   let record = liveRecord()
   return {
     store: {
+      tasks: { hasSessionBinding: () => false },
       getRecord: () => record,
       transitionHandoff: async (
         _sessionId: string,
@@ -79,6 +80,7 @@ describe('provider-exit settlement', () => {
       agentSessionLeaseFixture({ runtimeKind: 'native', reservedSpawnToken: null })
     )
     const store = {
+      tasks: { hasSessionBinding: () => false },
       getRecord: () => record,
       transitionHandoff: async (
         _sessionId: string,
@@ -177,6 +179,7 @@ describe('provider-exit settlement', () => {
       }
     } as unknown as StructuredAgentSessionHostSession
     const store = {
+      tasks: { hasSessionBinding: () => false },
       getRecord: () => ({
         lease: {
           handoffStage: null,

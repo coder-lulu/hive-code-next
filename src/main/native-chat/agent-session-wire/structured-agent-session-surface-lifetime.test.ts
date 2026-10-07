@@ -98,6 +98,7 @@ function openHost(
 /** A fresh app generation over the same durable store, with its owner proven gone. */
 async function reboot(): Promise<void> {
   await host.flushAllStreamedEvents()
+  closeTestJournalHostDatabases()
   store = await openTestAgentSessionRecordStore(root)
   openHost(async () => ({ outcome: 'pid-absent' }))
   acquire.mockClear()
@@ -406,6 +407,7 @@ describe('startup', () => {
     await attach()
     const beforeRestart = store.getRecord(SESSION)
     await abandonStructuredAgentSessionHost(host)
+    closeTestJournalHostDatabases()
 
     store = await openTestAgentSessionRecordStore(root)
     openHost(async () => ({ outcome: 'pid-absent' }))

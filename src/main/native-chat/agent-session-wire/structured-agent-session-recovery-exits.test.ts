@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest'
 import { spawnProcess } from '../../../shared/child-process/run-process'
 import { CODEX_SPAWN_TOKEN_ENV } from '../../codex/codex-structured-owner-identity'
-import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
+import { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import { readProcessStartTimeMs } from '../../runtime/agent-session-process-identity-probe'
 import { createStructuredAgentSessionOwnerProbe } from '../../runtime/structured-agent-session-owner-probe'
@@ -14,6 +14,8 @@ import type { StructuredAgentSessionAdapter } from './structured-agent-session-a
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import { abandonStructuredAgentSessionHost } from './structured-agent-session-host-test-abandon'
 import type { StructuredAgentSessionHostDeps } from './structured-agent-session-host-types'
+import { JournalHostDatabase } from '../agent-session-journal/journal-host-database'
+import { NO_LEGACY_JOURNAL_RECORDS } from '../agent-session-journal/journal-database'
 import {
   HOST_TEST_NOW as NOW,
   HOST_TEST_SESSION as SESSION,
@@ -35,6 +37,7 @@ let host: StructuredAgentSessionHost
 let acquire: Mock<StructuredAgentSessionAdapter['acquire']>
 const spawnedOwners = new Set<ReturnType<typeof spawnProcess>>()
 const supersededHosts = new Set<StructuredAgentSessionHost>()
+const replacementDatabases = new Set<JournalHostDatabase>()
 
 async function spawnOwner(spawnToken: string) {
   const child = spawnProcess({
@@ -98,6 +101,7 @@ function openHost(overrides: Partial<StructuredAgentSessionHostDeps> = {}): void
 
 async function reopenStore(): Promise<void> {
   await abandonStructuredAgentSessionHost(host)
+  closeTestJournalHostDatabases()
   store = await openTestAgentSessionRecordStore(root)
 }
 
@@ -128,6 +132,10 @@ afterEach(async () => {
   await Promise.all([...supersededHosts].map(abandonStructuredAgentSessionHost))
   supersededHosts.clear()
   await Promise.all([...spawnedOwners].map((child) => stopOwner(child)))
+  for (const database of replacementDatabases) {
+    database.close()
+  }
+  replacementDatabases.clear()
   closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
@@ -303,10 +311,13 @@ describe('recovery exits', () => {
     const outgoingHost = host
     const outgoingStore = store
     supersededHosts.add(outgoingHost)
-    store = await openTestAgentSessionRecordStore(root)
+    const replacementDatabase = JournalHostDatabase.openWith(root, NO_LEGACY_JOURNAL_RECORDS)
+    replacementDatabases.add(replacementDatabase)
+    store = AgentSessionRecordStore.open({ journalDatabase: replacementDatabase, hostId: 'local' })
     const realProbe = createStructuredAgentSessionOwnerProbe('local')
     let overlapDriven = false
     openHost({
+      journalDatabase: replacementDatabase,
       mintSpawnToken: () => 'spawn-b',
       probeOwner: async (record) => {
         const probe = await realProbe(record)

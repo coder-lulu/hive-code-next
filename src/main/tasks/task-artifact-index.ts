@@ -7,8 +7,22 @@ import { readNodeFileHandleWithinLimit } from '../../shared/node-bounded-file-re
 import { taskLaunchPathKey } from './task-launch-workspace'
 import { refuseTaskExecution } from './task-execution-error'
 import type { TaskExecutionRecord } from './task-execution-record'
+import { assertTaskOutputWorkspace } from './task-output-workspace'
+import type { WorkflowArtifactVersion } from '../../shared/task-workflow/workflow-evidence'
 
 const hash = (value: string | Buffer) => createHash('sha256').update(value).digest('hex')
+const Outcome = z.strictObject({
+  status: z.enum(['succeeded', 'failed']),
+  artifacts: z
+    .array(
+      z.strictObject({
+        ref: z.string().regex(/^artifact:[a-f0-9]{64}$/),
+        name: z.string().min(1).max(512),
+        digest: z.string().regex(/^[a-f0-9]{64}$/)
+      })
+    )
+    .max(32)
+})
 const Manifest = z.strictObject({
   schemaVersion: z.literal(1),
   executionId: z.string(),
@@ -78,10 +92,20 @@ export class TaskArtifactIndex {
   constructor(private readonly directory: string) {}
 
   async collect(record: TaskExecutionRecord, turnOutcome: 'success' | 'failure') {
+    const tester = record.command.workflowContext?.role === 'tester'
+    const assertSource = () => {
+      if (tester) {
+        assertTaskOutputWorkspace(record.workspace)
+      }
+    }
+    assertSource()
+    const source = tester
+      ? (record.workspace.outputDirectory?.path ?? refuseTaskExecution('OUTCOME_UNKNOWN'))
+      : record.workspace.executionPath
     let contents: Buffer
     try {
       contents = await readTaskArtifactFile(
-        record.workspace.executionPath,
+        source,
         taskResultManifestName(record.commandFingerprint),
         16 * 1024
       )
@@ -104,6 +128,7 @@ export class TaskArtifactIndex {
       }
     }
     const manifest = Manifest.parse(JSON.parse(contents.toString('utf8')))
+    assertSource()
     if (
       manifest.executionId !== record.command.executionId ||
       manifest.commandFingerprint !== record.commandFingerprint
@@ -114,7 +139,9 @@ export class TaskArtifactIndex {
     const artifacts: { ref: string; name: string; digest: string }[] = []
     await mkdir(this.directory, { recursive: true, mode: 0o700 })
     for (const name of new Set(manifest.artifacts)) {
-      const data = await readTaskArtifactFile(record.workspace.executionPath, name, 8 * 1024 * 1024)
+      assertSource()
+      const data = await readTaskArtifactFile(source, name, 8 * 1024 * 1024)
+      assertSource()
       const digest = hash(data)
       const id = hash(JSON.stringify([record.commandFingerprint, name, digest]))
       const destination = join(this.directory, id)
@@ -130,6 +157,20 @@ export class TaskArtifactIndex {
       }
       artifacts.push({ ref: `artifact:${id}`, name, digest })
     }
+    return this.indexOutcome(record, status, artifacts)
+  }
+
+  /** A host-fatal failure has no provider completion or trusted workspace artifacts. */
+  collectHostFailure(record: TaskExecutionRecord) {
+    return this.indexOutcome(record, 'failed', [])
+  }
+
+  private async indexOutcome(
+    record: TaskExecutionRecord,
+    status: 'succeeded' | 'failed',
+    artifacts: { ref: string; name: string; digest: string }[]
+  ) {
+    await mkdir(this.directory, { recursive: true, mode: 0o700 })
     const outcomeId = hash(JSON.stringify([record.commandFingerprint, status, artifacts]))
     await writeFile(
       join(this.directory, `outcome-${outcomeId}.json`),
@@ -143,7 +184,7 @@ export class TaskArtifactIndex {
     }
   }
 
-  async read(outcomeRef: string, artifactRef: string) {
+  private async readAsset(outcomeRef: string, artifactRef: string) {
     if (
       !/^outcome:[a-f0-9]{64}$/.test(outcomeRef) ||
       !/^artifact:[a-f0-9]{64}$/.test(artifactRef)
@@ -155,13 +196,7 @@ export class TaskArtifactIndex {
       `outcome-${outcomeRef.slice(8)}.json`,
       32 * 1024
     )
-    const outcome = z
-      .object({
-        artifacts: z
-          .array(z.object({ ref: z.string(), name: z.string(), digest: z.string() }))
-          .max(32)
-      })
-      .parse(JSON.parse(data.toString('utf8')))
+    const outcome = Outcome.parse(JSON.parse(data.toString('utf8')))
     const entry = outcome.artifacts.find((artifact) => artifact.ref === artifactRef)
     if (!entry) {
       return refuseTaskExecution('FORBIDDEN')
@@ -174,9 +209,43 @@ export class TaskArtifactIndex {
     if (hash(contents) !== entry.digest) {
       return refuseTaskExecution('OUTCOME_UNKNOWN')
     }
+    return { entry, outcome, contents }
+  }
+
+  async describe(
+    record: TaskExecutionRecord,
+    artifactRef: string
+  ): Promise<{
+    name: string
+    version: WorkflowArtifactVersion & { artifactRevision: 1 }
+  }> {
+    const result = record.result
+    if (!result || !result.artifactRefs.includes(artifactRef)) {
+      return refuseTaskExecution('FORBIDDEN')
+    }
+    const { entry, outcome } = await this.readAsset(result.outcomeRef, artifactRef)
+    if (
+      outcome.status !== result.status ||
+      result.outcomeRef !==
+        `outcome:${hash(JSON.stringify([record.commandFingerprint, outcome.status, outcome.artifacts]))}` ||
+      entry.ref !==
+        `artifact:${hash(JSON.stringify([record.commandFingerprint, entry.name, entry.digest]))}` ||
+      JSON.stringify(outcome.artifacts.map((artifact) => artifact.ref)) !==
+        JSON.stringify(result.artifactRefs)
+    ) {
+      return refuseTaskExecution('OUTCOME_UNKNOWN')
+    }
+    return { name: entry.name, version: { artifactRef, artifactRevision: 1, digest: entry.digest } }
+  }
+
+  async read(outcomeRef: string, artifactRef: string) {
+    const { entry, contents } = await this.readAsset(outcomeRef, artifactRef)
     if (contents.byteLength > 1024 * 1024) {
       return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
     }
-    return { name: entry.name, text: new TextDecoder('utf-8', { fatal: true }).decode(contents) }
+    return {
+      name: entry.name,
+      text: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(contents)
+    }
   }
 }

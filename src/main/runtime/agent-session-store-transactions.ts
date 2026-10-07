@@ -12,8 +12,11 @@ import type { JournalHostDatabase } from '../native-chat/agent-session-journal/j
 import type { JournalOperationReceipt } from '../native-chat/agent-session-journal/journal-row-writer'
 import { journalOpenRefusalError } from '../native-chat/agent-session-journal/journal-open-failure'
 import { AgentSessionJournalError } from '../native-chat/agent-session-journal/journal-write-guards'
+import { takeJournalTransactionFailureOutcome } from '../native-chat/agent-session-journal/journal-database'
 import type { AgentSessionStoreState } from './agent-session-record-store-file'
 import { writeAgentSessionStoreRows } from './agent-session-record-rows'
+import { AgentSessionStoreCommittedRefresh } from './agent-session-store-committed-refresh'
+import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import {
   agentSessionStoreDraftRowWrites,
   draftAgentSessionStoreState,
@@ -71,6 +74,7 @@ function readOnlyStoreRefusal(): Error {
 type StagedStoreTransaction<T> = {
   result: T
   writes: AgentSessionStoreRowWrites | null
+  draft: AgentSessionStoreState
   /** Publishes the draft. Only once its rows have committed. */
   adopt: () => void
 }
@@ -78,6 +82,7 @@ type StagedStoreTransaction<T> = {
 export class AgentSessionStoreTransactions {
   private queue: Promise<unknown> = Promise.resolve()
   private published: AgentSessionStoreState
+  private readonly refresh: AgentSessionStoreCommittedRefresh
 
   constructor(
     private readonly journalDatabase: JournalHostDatabase,
@@ -85,6 +90,17 @@ export class AgentSessionStoreTransactions {
   ) {
     freezeRows(loaded, null)
     this.published = loaded
+    this.refresh = new AgentSessionStoreCommittedRefresh(
+      journalDatabase,
+      () => this.published,
+      (state) => {
+        freezeRows(state, null)
+        this.published = state
+      },
+      readOnlyStoreRefusal
+    )
+    journalDatabase.onBeforeTransaction(() => this.refreshCommittedState())
+    journalDatabase.onStoreUnchangedCommit(() => this.refresh.committed())
   }
 
   /** The committed state. A transaction in flight never shows here until its rows have landed. */
@@ -94,6 +110,10 @@ export class AgentSessionStoreTransactions {
 
   get readOnly(): boolean {
     return this.journalDatabase.readOnly
+  }
+
+  refreshCommittedState(): void {
+    this.refresh.refresh()
   }
 
   /**
@@ -122,6 +142,7 @@ export class AgentSessionStoreTransactions {
         if (this.journalDatabase.readOnly) {
           throw readOnlyStoreRefusal()
         }
+        this.refresh.assertTransactionCurrent(db)
         staged = this.stage(apply)
         const writes = staged.writes
         if (writes) {
@@ -131,11 +152,13 @@ export class AgentSessionStoreTransactions {
       committed: () => {
         staged?.adopt()
         staged = null
+        this.refresh.committed()
       }
     }
   }
 
   private commit<T>(apply: (draft: AgentSessionStoreState) => T, inMemoryWhenReadOnly: boolean): T {
+    this.refreshCommittedState()
     const readOnly = this.journalDatabase.readOnly
     if (readOnly && !inMemoryWhenReadOnly) {
       throw readOnlyStoreRefusal()
@@ -143,9 +166,30 @@ export class AgentSessionStoreTransactions {
     const staged = this.stage(apply)
     const writes = staged.writes
     if (writes && !readOnly) {
-      this.journalDatabase.transaction((db) => writeAgentSessionStoreRows(db, writes))
+      const published = this.published
+      const database = this.journalDatabase.db
+      let writing = false
+      try {
+        this.journalDatabase.transaction((db) => {
+          this.refresh.assertTransactionCurrent(db)
+          if (this.published !== published) {
+            throw agentSessionRefusalError('agent_session_ownership_unknown', {
+              reason: 'replaySuperseded'
+            })
+          }
+          writing = true
+          writeAgentSessionStoreRows(db, writes)
+        })
+      } catch (error) {
+        const outcome = takeJournalTransactionFailureOutcome(error, database)
+        if (writing && outcome !== 'rolled_back') {
+          this.refresh.recordFailedTaskWrite(published, staged.draft)
+        }
+        throw error
+      }
     }
     staged.adopt()
+    this.refresh.committed()
     return staged.result
   }
 
@@ -157,6 +201,7 @@ export class AgentSessionStoreTransactions {
     return {
       result,
       writes,
+      draft,
       adopt: () => {
         if (writes) {
           freezeRows(draft, writes)

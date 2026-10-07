@@ -45,6 +45,7 @@ import {
 import type { ProviderHistoryWindow } from '../agent-session-journal/journal-submission-reconciler'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import type { StructuredAgentSessionLogger } from './structured-agent-session-logger'
+import { assertTaskAttachCurrent } from './structured-agent-session-task-acquisition'
 
 export type AttachFlowInput = {
   store: AgentSessionRecordStore
@@ -163,6 +164,7 @@ export async function performAttach(
     // Sample provider history before a new child is acquired. Once acquireOwner
     // starts the child, the adapter's liveness signal intentionally becomes
     // conservative and an absent prompt can no longer prove non-delivery.
+    await assertTaskAttachCurrent(input, record)
     providerHistoryWindow = await readProviderHistoryWindow({
       adapter: input.adapter,
       identity: journalIdentityFor(record, params),

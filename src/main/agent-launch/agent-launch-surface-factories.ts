@@ -78,8 +78,8 @@ export type AgentLaunchStructuredSurface = {
 export class AgentLaunchStructuredSessionRefusedError extends Error {
   readonly code: string
 
-  constructor(code: string, message: string) {
-    super(message)
+  constructor(code: string, message: string, options?: ErrorOptions) {
+    super(message, options)
     this.name = 'AgentLaunchStructuredSessionRefusedError'
     this.code = code
   }

@@ -29,7 +29,7 @@ export const WorkbenchProjectBindingCreateSchema = HiveWorkbenchProjectCreateSch
   hiveWorkspaceRef: TaskOpaqueRef
 })
 
-async function replayWorkbenchRequest(db, accountId, input, operation, responseSchema) {
+export async function replayWorkbenchRequest(db, accountId, input, operation, responseSchema) {
   const [receipt] = await db`SELECT operation,payload_fingerprint,company_id,response_json
     FROM hive_workbench_request_receipts WHERE account_id=${accountId} AND request_id=${input.requestId}`
   if (!receipt) {
@@ -42,25 +42,58 @@ async function replayWorkbenchRequest(db, accountId, input, operation, responseS
   ) {
     return refuseWorkbench('IDEMPOTENCY_CONFLICT')
   }
-  const response = responseSchema.parse(receipt.response_json)
+  const parsed = responseSchema.safeParse(receipt.response_json)
+  if (!parsed.success) {
+    return refuseWorkbench('REVISION_CONFLICT')
+  }
+  const response = parsed.data
   const responseCompanyId =
     operation === 'companies.create'
       ? response.id
       : operation === 'projects.create'
         ? response.companyId
-        : response.company.id
+        : operation === 'workflows.save'
+          ? response.definition.scope.companyRef
+          : operation === 'cases.create'
+            ? response.binding.scope.companyRef
+            : response.company.id
   if (
     responseCompanyId !== receipt.company_id ||
     (operation === 'team.configure' && response.project.id !== input.projectId) ||
     (operation === 'projects.create' &&
-      response.binding.hiveWorkspaceRef !== input.hiveWorkspaceRef)
+      response.binding.hiveWorkspaceRef !== input.hiveWorkspaceRef) ||
+    (operation === 'cases.create' &&
+      (response.binding.scope.projectRef !== input.projectId ||
+        response.binding.workflowRef !== input.workflowId ||
+        response.binding.workflowRevision !== input.workflowRevision ||
+        response.definitionDigest !== input.definitionDigest ||
+        response.projectBindingRevision !== input.expectedProjectRevision ||
+        response.title !== input.title ||
+        response.requirement !== input.requirement)) ||
+    (operation === 'workflows.save' &&
+      (response.definition.scope.projectRef !== input.projectId ||
+        (input.workflowId && response.workflowId !== input.workflowId) ||
+        response.definition.workflowRevision !== input.expectedRevision + 1 ||
+        response.projectBindingRevision !== input.expectedProjectRevision ||
+        canonicalAgentSessionDigest({
+          name: response.name,
+          stages: response.definition.stages,
+          maxParallelism: response.definition.maxParallelism,
+          maxDurationMs: response.definition.maxDurationMs
+        }) !==
+          canonicalAgentSessionDigest({
+            name: input.name,
+            stages: input.stages,
+            maxParallelism: input.maxParallelism,
+            maxDurationMs: input.maxDurationMs
+          })))
   ) {
     return refuseWorkbench('REVISION_CONFLICT')
   }
   return response
 }
 
-async function recordWorkbenchRequest(db, accountId, input, operation, companyId, response) {
+export async function recordWorkbenchRequest(db, accountId, input, operation, companyId, response) {
   await db`INSERT INTO hive_workbench_request_receipts
     (account_id,request_id,operation,payload_fingerprint,company_id,response_json)
     VALUES(${accountId},${input.requestId},${operation},${canonicalAgentSessionDigest({ operation, input })},${companyId},${db.json(response)})`

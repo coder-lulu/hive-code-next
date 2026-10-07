@@ -1,12 +1,21 @@
 import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-adjudication'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import {
+  TASK_OWNER_PROBE_BUDGET_MS,
+  type TaskDockerSessionOwner
+} from '../tasks/task-docker-session-owner'
+import { mapWithConcurrency } from '../../shared/map-with-concurrency'
+import { withTimeout } from '../../shared/promise-timeout-fallback'
+import {
   probeAgentSessionProcessIdentities,
   probeAgentSessionProcessIdentity,
   probeAgentSessionReservation
 } from './agent-session-process-identity-probe'
 import { findAgentSessionSpawnTokenProcesses } from './agent-session-spawn-token-process-scan'
 import { readEchoedAgentSessionSpawnToken } from './agent-session-spawn-token-readback'
+
+const UNVERIFIABLE: AgentSessionOwnerProbe = { outcome: 'execution-host-unverifiable' }
+type ExecutionOwnerProbe = Pick<TaskDockerSessionOwner, 'classify' | 'probe'>
 
 /**
  * The lease's only source of truth about a previous owner. Everything it cannot
@@ -15,9 +24,20 @@ import { readEchoedAgentSessionSpawnToken } from './agent-session-spawn-token-re
 export function createStructuredAgentSessionOwnerProbe(
   hostId: string,
   probe = probeAgentSessionProcessIdentity,
-  findSpawnTokenProcesses = findAgentSessionSpawnTokenProcesses
+  findSpawnTokenProcesses = findAgentSessionSpawnTokenProcesses,
+  executionOwner?: ExecutionOwnerProbe
 ): (record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe> {
   return async (record) => {
+    if (executionOwner && executionOwner.classify(record) !== 'personal') {
+      try {
+        return (await executionOwner.probe(record)) ?? UNVERIFIABLE
+      } catch {
+        return UNVERIFIABLE
+      }
+    }
+    if (Object.hasOwn(record, 'taskSource')) {
+      return UNVERIFIABLE
+    }
     const owner = record.lease.ownerProcess
     if (!owner) {
       const spawnToken = record.lease.reservedSpawnToken
@@ -62,32 +82,79 @@ export function createStructuredAgentSessionOwnerProbe(
 export function createStructuredAgentSessionOwnerProbes(
   hostId: string,
   probeMany: typeof probeAgentSessionProcessIdentities = probeAgentSessionProcessIdentities,
-  probeOne = createStructuredAgentSessionOwnerProbe(hostId)
+  probeOne = createStructuredAgentSessionOwnerProbe(hostId),
+  executionOwner?: ExecutionOwnerProbe
 ): (records: readonly AgentSessionRecord[]) => Promise<Map<string, AgentSessionOwnerProbe>> {
+  const pendingTaskProbes = new Set<Promise<AgentSessionOwnerProbe | null>>()
   return async (records) => {
+    const deadline = performance.now() + TASK_OWNER_PROBE_BUDGET_MS
     const results = new Map<string, AgentSessionOwnerProbe>()
+    const taskRecords: AgentSessionRecord[] = []
+    const otherRecords: AgentSessionRecord[] = []
     const localOwners: {
       record: AgentSessionRecord
       owner: NonNullable<AgentSessionRecord['lease']['ownerProcess']>
     }[] = []
     for (const record of records) {
+      const kind = executionOwner?.classify(record)
+      if (kind === 'task') {
+        taskRecords.push(record)
+        continue
+      }
+      if (kind === 'unverifiable' || Object.hasOwn(record, 'taskSource')) {
+        results.set(record.sessionId, UNVERIFIABLE)
+        continue
+      }
       const owner = record.lease.ownerProcess
       if (owner?.hostId === hostId) {
         localOwners.push({ record, owner })
       } else {
-        results.set(record.sessionId, await probeOne(record))
+        otherRecords.push(record)
       }
     }
-    const probes = await probeMany({
+    const nativeProbes = probeMany({
       identities: localOwners.map(({ owner }) => owner),
       deps: { readEchoedSpawnToken: readEchoedAgentSessionSpawnToken }
+    }).then((probes) => {
+      for (const [index, { record }] of localOwners.entries()) {
+        results.set(
+          record.sessionId,
+          probes[index] ?? { outcome: 'indeterminate', reason: 'owner probe returned no result' }
+        )
+      }
     })
-    for (const [index, { record }] of localOwners.entries()) {
-      results.set(
-        record.sessionId,
-        probes[index] ?? { outcome: 'indeterminate', reason: 'owner probe returned no result' }
+    const otherProbes = (async () => {
+      for (const record of otherRecords) {
+        results.set(record.sessionId, await probeOne(record))
+      }
+    })()
+    const taskProbes = mapWithConcurrency(taskRecords, 4, async (record) => {
+      if (!executionOwner || performance.now() >= deadline || pendingTaskProbes.size >= 4) {
+        return UNVERIFIABLE
+      }
+      let attempt: Promise<AgentSessionOwnerProbe | null>
+      try {
+        attempt = executionOwner.probe(record, deadline)
+      } catch {
+        return UNVERIFIABLE
+      }
+      pendingTaskProbes.add(attempt)
+      void attempt.then(
+        () => pendingTaskProbes.delete(attempt),
+        () => pendingTaskProbes.delete(attempt)
       )
-    }
+      const probe = await withTimeout(
+        attempt,
+        Math.max(0, deadline - performance.now()),
+        UNVERIFIABLE
+      )
+      return performance.now() < deadline ? (probe ?? UNVERIFIABLE) : UNVERIFIABLE
+    }).then((probes) => {
+      for (const [index, record] of taskRecords.entries()) {
+        results.set(record.sessionId, probes[index] ?? UNVERIFIABLE)
+      }
+    })
+    await Promise.all([nativeProbes, otherProbes, taskProbes])
     return results
   }
 }

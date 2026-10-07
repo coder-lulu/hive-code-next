@@ -88,6 +88,25 @@ async function cancelQuery() {
 }
 
 describe('local task host admission and evidence boundaries', () => {
+  it('refuses an async original authorizer before admission or dispatch', async () => {
+    deps.authorize = vi.fn(async () => ({
+      workspace: taskWorkspace(directory),
+      input: 'Create report.md.',
+      assertCurrent: async () => undefined
+    }))
+    await expect(host.start(taskCommand(), TASK_TEST_CALLER)).rejects.toThrow('FORBIDDEN')
+    expect(deps.store.get(taskCommand())).toBeNull()
+    expect(deps.launch).not.toHaveBeenCalled()
+  })
+
+  it('refuses an async original caller guard before contacting the authorizer', async () => {
+    await expect(
+      host.start(taskCommand(), { ...TASK_TEST_CALLER, assertCurrent: async () => undefined })
+    ).rejects.toThrow('FORBIDDEN')
+    expect(deps.authorize).not.toHaveBeenCalled()
+    expect(deps.store.get(taskCommand())).toBeNull()
+    expect(deps.launch).not.toHaveBeenCalled()
+  })
   it('returns the same accepted receipt and dispatches once under concurrent starts', async () => {
     const results = await Promise.all(
       Array.from({ length: 6 }, () => host.start(taskCommand(), TASK_TEST_CALLER))

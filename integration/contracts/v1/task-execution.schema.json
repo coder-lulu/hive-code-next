@@ -310,6 +310,321 @@
                 }
               ]
             },
+            "executionDeadlineAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "workflowContext": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "workflow.execution-context"
+                },
+                "binding": {
+                  "type": "object",
+                  "properties": {
+                    "scope": {
+                      "type": "object",
+                      "properties": {
+                        "companyRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "projectRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        }
+                      },
+                      "required": ["companyRef", "projectRef"],
+                      "additionalProperties": false
+                    },
+                    "workflowRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "workflowRevision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "workflowRunRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["scope", "workflowRef", "workflowRevision", "workflowRunRef"],
+                  "additionalProperties": false
+                },
+                "definitionDigest": {
+                  "type": "string",
+                  "minLength": 64,
+                  "maxLength": 64,
+                  "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                },
+                "stageRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "employeeRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": ["product", "developer", "tester", "ops"]
+                },
+                "handoffRefs": {
+                  "maxItems": 32,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                  }
+                },
+                "codeInput": {
+                  "type": "object",
+                  "properties": {
+                    "producer": {
+                      "type": "object",
+                      "properties": {
+                        "employeeRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": ["product", "developer", "tester", "ops"]
+                        },
+                        "task": {
+                          "type": "object",
+                          "properties": {
+                            "spaceId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            },
+                            "taskId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            },
+                            "runId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            },
+                            "attempt": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "taskRevision": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            }
+                          },
+                          "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+                          "additionalProperties": false
+                        },
+                        "runtimeRecordId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "ownershipEpoch": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "executionId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "executionEpoch": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "commandFingerprint": {
+                          "type": "string",
+                          "minLength": 64,
+                          "maxLength": 64,
+                          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                        },
+                        "sessionRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "executionWorkspaceRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "workspaceExecutionClaimRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        }
+                      },
+                      "required": [
+                        "employeeRef",
+                        "role",
+                        "task",
+                        "runtimeRecordId",
+                        "ownershipEpoch",
+                        "executionId",
+                        "executionEpoch",
+                        "commandFingerprint",
+                        "sessionRef",
+                        "executionWorkspaceRef",
+                        "workspaceExecutionClaimRef"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "version": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "git_patch"
+                            },
+                            "baseCommit": {
+                              "type": "string",
+                              "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})(?![\\s\\S])"
+                            },
+                            "patch": {
+                              "type": "object",
+                              "properties": {
+                                "artifactRef": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                },
+                                "artifactRevision": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "digest": {
+                                  "type": "string",
+                                  "minLength": 64,
+                                  "maxLength": 64,
+                                  "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                                }
+                              },
+                              "required": ["artifactRef", "artifactRevision", "digest"],
+                              "additionalProperties": false
+                            },
+                            "treeDigest": {
+                              "type": "string",
+                              "minLength": 64,
+                              "maxLength": 64,
+                              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                            }
+                          },
+                          "required": ["kind", "baseCommit", "patch", "treeDigest"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "snapshot"
+                            },
+                            "snapshot": {
+                              "type": "object",
+                              "properties": {
+                                "artifactRef": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                },
+                                "artifactRevision": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "digest": {
+                                  "type": "string",
+                                  "minLength": 64,
+                                  "maxLength": 64,
+                                  "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                                }
+                              },
+                              "required": ["artifactRef", "artifactRevision", "digest"],
+                              "additionalProperties": false
+                            },
+                            "treeDigest": {
+                              "type": "string",
+                              "minLength": 64,
+                              "maxLength": 64,
+                              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                            }
+                          },
+                          "required": ["kind", "snapshot", "treeDigest"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["producer", "version"],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "kind",
+                "binding",
+                "definitionDigest",
+                "stageRef",
+                "employeeRef",
+                "role",
+                "handoffRefs"
+              ],
+              "additionalProperties": false
+            },
             "requiredCapabilities": {
               "maxItems": 32,
               "type": "array",
@@ -618,6 +933,321 @@
                   "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
                 }
               ]
+            },
+            "executionDeadlineAt": {
+              "type": "string",
+              "minLength": 24,
+              "maxLength": 24,
+              "allOf": [
+                {
+                  "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d\\.\\d{3}(?:Z))$"
+                },
+                {
+                  "pattern": "^[0-9TZ:.-]{24}(?![\\s\\S])"
+                }
+              ]
+            },
+            "workflowContext": {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "workflow.execution-context"
+                },
+                "binding": {
+                  "type": "object",
+                  "properties": {
+                    "scope": {
+                      "type": "object",
+                      "properties": {
+                        "companyRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "projectRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        }
+                      },
+                      "required": ["companyRef", "projectRef"],
+                      "additionalProperties": false
+                    },
+                    "workflowRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "workflowRevision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "workflowRunRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["scope", "workflowRef", "workflowRevision", "workflowRunRef"],
+                  "additionalProperties": false
+                },
+                "definitionDigest": {
+                  "type": "string",
+                  "minLength": 64,
+                  "maxLength": 64,
+                  "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                },
+                "stageRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "employeeRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": ["product", "developer", "tester", "ops"]
+                },
+                "handoffRefs": {
+                  "maxItems": 32,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 160,
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                  }
+                },
+                "codeInput": {
+                  "type": "object",
+                  "properties": {
+                    "producer": {
+                      "type": "object",
+                      "properties": {
+                        "employeeRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "role": {
+                          "type": "string",
+                          "enum": ["product", "developer", "tester", "ops"]
+                        },
+                        "task": {
+                          "type": "object",
+                          "properties": {
+                            "spaceId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            },
+                            "taskId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            },
+                            "runId": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            },
+                            "attempt": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "taskRevision": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            }
+                          },
+                          "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+                          "additionalProperties": false
+                        },
+                        "runtimeRecordId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "ownershipEpoch": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "executionId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "executionEpoch": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "commandFingerprint": {
+                          "type": "string",
+                          "minLength": 64,
+                          "maxLength": 64,
+                          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                        },
+                        "sessionRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "executionWorkspaceRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "workspaceExecutionClaimRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        }
+                      },
+                      "required": [
+                        "employeeRef",
+                        "role",
+                        "task",
+                        "runtimeRecordId",
+                        "ownershipEpoch",
+                        "executionId",
+                        "executionEpoch",
+                        "commandFingerprint",
+                        "sessionRef",
+                        "executionWorkspaceRef",
+                        "workspaceExecutionClaimRef"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "version": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "git_patch"
+                            },
+                            "baseCommit": {
+                              "type": "string",
+                              "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})(?![\\s\\S])"
+                            },
+                            "patch": {
+                              "type": "object",
+                              "properties": {
+                                "artifactRef": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                },
+                                "artifactRevision": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "digest": {
+                                  "type": "string",
+                                  "minLength": 64,
+                                  "maxLength": 64,
+                                  "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                                }
+                              },
+                              "required": ["artifactRef", "artifactRevision", "digest"],
+                              "additionalProperties": false
+                            },
+                            "treeDigest": {
+                              "type": "string",
+                              "minLength": 64,
+                              "maxLength": 64,
+                              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                            }
+                          },
+                          "required": ["kind", "baseCommit", "patch", "treeDigest"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "const": "snapshot"
+                            },
+                            "snapshot": {
+                              "type": "object",
+                              "properties": {
+                                "artifactRef": {
+                                  "type": "string",
+                                  "minLength": 1,
+                                  "maxLength": 160,
+                                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                },
+                                "artifactRevision": {
+                                  "type": "integer",
+                                  "minimum": 1,
+                                  "maximum": 9007199254740991
+                                },
+                                "digest": {
+                                  "type": "string",
+                                  "minLength": 64,
+                                  "maxLength": 64,
+                                  "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                                }
+                              },
+                              "required": ["artifactRef", "artifactRevision", "digest"],
+                              "additionalProperties": false
+                            },
+                            "treeDigest": {
+                              "type": "string",
+                              "minLength": 64,
+                              "maxLength": 64,
+                              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                            }
+                          },
+                          "required": ["kind", "snapshot", "treeDigest"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["producer", "version"],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "kind",
+                "binding",
+                "definitionDigest",
+                "stageRef",
+                "employeeRef",
+                "role",
+                "handoffRefs"
+              ],
+              "additionalProperties": false
             },
             "requiredCapabilities": {
               "maxItems": 32,

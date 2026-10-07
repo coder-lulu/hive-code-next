@@ -26,7 +26,11 @@ export const TaskExecutionCapabilitiesSchema = z.strictObject({
   resolverVersions: boundedTaskCollection(TaskOpaqueRef, 16)
 })
 
-export function taskExecutionCapabilityRefusal(commandValue: unknown, hostValue: unknown) {
+export function taskExecutionCapabilityRefusal(
+  commandValue: unknown,
+  hostValue: unknown,
+  purpose: 'start' | 'cancel' = 'start'
+) {
   const parsedCommand = TaskExecutionStartSchema.safeParse(commandValue)
   if (!parsedCommand.success) {
     return 'task_command_invalid'
@@ -55,9 +59,11 @@ export function taskExecutionCapabilityRefusal(commandValue: unknown, hostValue:
     AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY,
     TASK_WORKSPACE_CLAIM_CAPABILITY,
     TASK_STOP_PROOF_CAPABILITY,
-    ...command.requiredCapabilities
+    ...command.requiredCapabilities.filter(
+      (capability) => purpose !== 'cancel' || capability !== TASK_ENFORCEMENT_CAPABILITY
+    )
   ]
-  if (command.executionPolicy.trustMode === 'enforced_autonomous') {
+  if (command.executionPolicy.trustMode === 'enforced_autonomous' && purpose !== 'cancel') {
     required.push(TASK_ENFORCEMENT_CAPABILITY)
   }
   if ('resourceSnapshotRef' in command) {

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { WorkflowExecutionContextSchema } from '../task-workflow/workflow-execution-context'
 import {
   boundedTaskCollection,
   TaskDigest,
@@ -35,14 +36,40 @@ const StartFields = {
   authorizationRef: TaskOpaqueRef,
   authorizationRevision: TaskOpaqueRef,
   expiresAt: TaskTimestamp,
+  executionDeadlineAt: TaskTimestamp.optional(),
+  workflowContext: WorkflowExecutionContextSchema.optional(),
   requiredCapabilities: boundedTaskCollection(TaskOpaqueRef, 32)
 }
 
 // A partial snapshot must fail validation rather than become a static-resource launch.
-export const TaskExecutionStartSchema = z.union([
-  z.strictObject(StartFields),
-  z.strictObject({ ...StartFields, ...TaskResourceRequirements })
-])
+export const TaskExecutionStartSchema = z
+  .union([
+    z.strictObject(StartFields),
+    z.strictObject({ ...StartFields, ...TaskResourceRequirements })
+  ])
+  .superRefine((command, issue) => {
+    const context = command.workflowContext
+    if (!context) {
+      return
+    }
+    if (
+      command.executionPolicy.trustMode !== 'enforced_autonomous' ||
+      command.executionDeadlineAt === undefined ||
+      context.binding.scope.companyRef !== command.task.spaceId
+    ) {
+      issue.addIssue({ code: 'custom', message: 'workflow_controlled_admission_required' })
+    }
+    const producer = context.codeInput?.producer
+    if (
+      context.role === 'tester' &&
+      producer &&
+      (producer.executionId === command.executionId ||
+        producer.task.taskId === command.task.taskId ||
+        producer.workspaceExecutionClaimRef === command.workspaceExecutionClaimRef)
+    ) {
+      issue.addIssue({ code: 'custom', message: 'workflow_independent_execution_required' })
+    }
+  })
 
 export const TaskExecutionCancelSchema = z.strictObject({
   ...TaskExecutionIdentity,

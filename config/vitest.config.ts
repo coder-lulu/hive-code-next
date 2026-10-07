@@ -1,9 +1,15 @@
 import { resolve } from 'node:path'
+import { existsSync } from 'node:fs'
+import { paperclipCaseKernelAliases } from './scripts/paperclip-case-kernel-source.mjs'
 import { defaultExclude, defineConfig } from 'vitest/config'
 import { UNIT_INCLUDE, UNIT_EXCLUDE } from './scripts/ci-unit-files.mjs'
 import TimingSequencer from './scripts/ci-unit-sequencer.mjs'
 
 const windowsTestWorkerOptions = process.platform === 'win32' ? { maxWorkers: 4 } : {}
+const paperclipSource = resolve('logs/paperclip-p1/paperclip')
+const checkoutAliases = existsSync(resolve(paperclipSource, 'packages/db/node_modules/drizzle-orm'))
+  ? paperclipCaseKernelAliases(paperclipSource)
+  : {}
 
 export default defineConfig({
   define: {
@@ -11,8 +17,14 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      ...checkoutAliases,
       '@renderer': resolve('src/renderer/src'),
-      '@': resolve('src/renderer/src')
+      '@': resolve('src/renderer/src'),
+      '@hive-paperclip-external-execution': resolve(
+        process.env.HIVE_PAPERCLIP_SOURCE
+          ? resolve(process.env.HIVE_PAPERCLIP_SOURCE, 'server/src/services/external-execution.ts')
+          : 'integration/paperclip/core/external-execution.ts'
+      )
     }
   },
   test: {

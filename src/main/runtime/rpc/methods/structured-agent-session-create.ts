@@ -17,7 +17,8 @@ import { computeAgentSessionPayloadFingerprint } from '../../../../shared/agent-
 import type {
   AgentSessionAttachResult,
   AgentSessionMutationEnvelope,
-  AgentSessionMutationResult
+  AgentSessionMutationResult,
+  AgentSessionWireRefusal
 } from '../../../../shared/agent-session-wire'
 import {
   attachFingerprintFields,
@@ -27,6 +28,8 @@ import type { StructuredAgentSessionHost } from '../../../native-chat/agent-sess
 import type { StructuredAgentSessionCaller } from '../../../native-chat/agent-session-wire/structured-agent-session-host-types'
 import type { StructuredAgentSessionResumeSource } from '../../../../shared/structured-agent-session-create'
 import type { OrcaRuntimeService } from '../../orca-runtime'
+import type { TaskStructuredLaunchOrigin } from '../../../tasks/task-structured-launch-origin'
+import { assertTaskCodexLaunchOptions } from '../../../tasks/task-codex-launch-options'
 import {
   resolveUncommittedStructuredCreate,
   type StructuredCreateRefused
@@ -83,7 +86,12 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
   /** The tab id the caller reserved for this chat, taken when its tab is published; absent, the tab
    *  gets the id clients derive. Beside `options`, after the fingerprint, likewise. */
   tabId?: string
+  taskOrigin?: TaskStructuredLaunchOrigin
 }): Promise<PreparedStructuredAgentSessionCreate> {
+  const taskCreate = Object.hasOwn(args, 'taskOrigin')
+  if (taskCreate) {
+    assertTaskCodexLaunchOptions(args.options)
+  }
   // Adoption replay may need the record loaded from disk before source discovery can be skipped.
   let host = args.resumeFrom ? await args.ensureHost() : null
   const resolved = await args.runtime.resolveStructuredAgentSessionCreateIntent({
@@ -91,6 +99,7 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
     worktree: args.worktree,
     agent: args.agent,
     callerKey: args.caller.callerKey,
+    ...(taskCreate ? { taskOrigin: args.taskOrigin } : {}),
     ...(args.resumeFrom ? { resumeFrom: args.resumeFrom } : {})
   })
   const hostFingerprint = computeAgentSessionPayloadFingerprint({
@@ -107,8 +116,9 @@ export async function prepareStructuredAgentSessionCreateForWorktree(args: {
       // After the fingerprint, deliberately: `attachFingerprintFields` excludes options because
       // they are the session's initial state, not its identity, so a retry that re-resolves them
       // must replay rather than conflict.
-      ...(args.options ? { options: args.options } : {}),
+      ...(args.options && !taskCreate ? { options: args.options } : {}),
       ...(args.tabId ? { surfaceTabId: args.tabId } : {}),
+      ...(taskCreate ? { taskOrigin: args.taskOrigin } : {}),
       provider: resolved.provider as 'claude' | 'codex',
       agent: resolved.agent as 'claude' | 'codex',
       envelope: { ...args.envelope, payloadFingerprint: hostFingerprint }
@@ -171,12 +181,20 @@ export async function createStructuredAgentSessionForWorktree(args: {
   activate: boolean
   options?: Readonly<Record<string, string>>
   tabId?: string
+  taskOrigin?: TaskStructuredLaunchOrigin
+  /** Private launch tracker; never called after attach starts. */
+  onPrepareRefused?: (refusal: AgentSessionWireRefusal, cause: unknown) => never
 }): Promise<AgentSessionMutationResult<AgentSessionAttachResult>> {
+  let preparationFailure: unknown
   const prepared: PreparedStructuredAgentSessionCreate | StructuredCreateRefused =
     await resolveUncommittedStructuredCreate(() =>
-      prepareStructuredAgentSessionCreateForWorktree(args)
+      prepareStructuredAgentSessionCreateForWorktree(args).catch((error: unknown) => {
+        preparationFailure = error
+        throw error
+      })
     )
   if ('refusal' in prepared) {
+    args.onPrepareRefused?.(prepared.refusal, preparationFailure)
     return { ok: false, refusal: prepared.refusal }
   }
   return commitStructuredAgentSessionCreate({

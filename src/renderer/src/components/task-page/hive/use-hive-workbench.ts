@@ -1,24 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { HiveAccountState } from '../../../../../shared/hive-account'
 import {
   appendWorkbenchRows,
   emptyHiveWorkbenchState,
   type PendingOperation
 } from './hive-workbench-state'
 import { createHiveWorkbenchMutations } from './hive-workbench-mutations'
-
-function workbenchAccountIdentity(state: HiveAccountState): string {
-  return JSON.stringify([
-    state.configured,
-    state.status,
-    state.account?.accountId,
-    state.authorityId,
-    state.sessionProfile,
-    state.errorCode === 'session_expired' ||
-      state.errorCode === 'session_rejected' ||
-      (state.sessionExpiresAt !== undefined && state.sessionExpiresAt <= Date.now())
-  ])
-}
+import { subscribeHiveUiAccountBoundary } from './hive-ui-account-boundary'
 
 export function useHiveWorkbench() {
   const [state, setState] = useState(emptyHiveWorkbenchState)
@@ -70,68 +57,56 @@ export function useHiveWorkbench() {
         'companies',
         () => window.api.hiveTasks.listCompanies({ after }),
         (page) => {
-          setState((previous) =>
-            after
-              ? {
-                  ...previous,
-                  companies: {
-                    ...page,
-                    items: appendWorkbenchRows(previous.companies.items, page.items)
-                  }
+          setState((previous) => {
+            if (after) {
+              return {
+                ...previous,
+                companies: {
+                  ...page,
+                  items: appendWorkbenchRows(previous.companies.items, page.items)
                 }
-              : {
-                  ...previous,
-                  companies: page,
-                  companyId: page.items.some((company) => company.id === previous.companyId)
-                    ? previous.companyId
-                    : (page.items[0]?.id ?? null),
-                  projects: { items: [], nextCursor: null },
-                  projectId: null,
-                  team: null,
-                  companiesRevision: previous.companiesRevision + 1
-                }
-          )
+              }
+            }
+            const selectedCompany = previous.companies.items.find(
+              (company) => company.id === previous.companyId
+            )
+            // A paginated first page cannot prove the selected row was removed.
+            const items =
+              page.nextCursor &&
+              selectedCompany &&
+              !page.items.some((company) => company.id === selectedCompany.id)
+                ? appendWorkbenchRows(page.items, [selectedCompany])
+                : page.items
+            const companyId = items.some((company) => company.id === previous.companyId)
+              ? previous.companyId
+              : (page.items[0]?.id ?? null)
+            const sameCompany = companyId !== null && companyId === previous.companyId
+            return {
+              ...previous,
+              companies: { ...page, items },
+              companyId,
+              projects: sameCompany ? previous.projects : { items: [], nextCursor: null },
+              projectId: sameCompany ? previous.projectId : null,
+              team: sameCompany ? previous.team : null,
+              companiesRevision: previous.companiesRevision + 1
+            }
+          })
         }
       ),
     [act]
   )
   useEffect(() => {
     const requestCache = requests.current
-    let active = true
-    let accountEvents = 0
-    let accountIdentity: string | undefined
     mounted.current = true
     void loadCompanies()
-    const unsubscribe = window.api.hiveAccount.onStateChanged((account) => {
-      if (!active) {
-        return
-      }
-      accountEvents += 1
-      const nextIdentity = workbenchAccountIdentity(account)
-      // Token refresh does not change the owner of drafts or idempotent requests.
-      if (nextIdentity === accountIdentity) {
-        return
-      }
-      accountIdentity = nextIdentity
+    const unsubscribe = subscribeHiveUiAccountBoundary(() => {
       generation.current += 1
       flight.current = null
       requestCache.clear()
       setState((previous) => emptyHiveWorkbenchState(previous.accountRevision + 1))
       void loadCompanies()
     })
-    const readRevision = accountEvents
-    void Promise.resolve()
-      .then(() => window.api.hiveAccount.getState())
-      .then((account) => {
-        if (active && accountEvents === readRevision) {
-          accountIdentity = workbenchAccountIdentity(account)
-        }
-      })
-      .catch(() => {
-        // Task APIs authenticate independently; an unknown identity invalidates the next event.
-      })
     return () => {
-      active = false
       unsubscribe()
       mounted.current = false
       generation.current += 1
@@ -150,25 +125,36 @@ export function useHiveWorkbench() {
         'projects',
         () => window.api.hiveTasks.listProjects({ companyId, after }),
         (page) => {
-          setState((previous) =>
-            after
-              ? {
-                  ...previous,
-                  projects: {
-                    ...page,
-                    items: appendWorkbenchRows(previous.projects.items, page.items)
-                  }
+          setState((previous) => {
+            if (after) {
+              return {
+                ...previous,
+                projects: {
+                  ...page,
+                  items: appendWorkbenchRows(previous.projects.items, page.items)
                 }
-              : {
-                  ...previous,
-                  projects: page,
-                  projectId: page.items.some((project) => project.id === previous.projectId)
-                    ? previous.projectId
-                    : (page.items[0]?.id ?? null),
-                  team: null,
-                  projectsRevision: previous.projectsRevision + 1
-                }
-          )
+              }
+            }
+            const selectedProject = previous.projects.items.find(
+              (project) => project.id === previous.projectId
+            )
+            const items =
+              page.nextCursor &&
+              selectedProject &&
+              !page.items.some((project) => project.id === selectedProject.id)
+                ? appendWorkbenchRows(page.items, [selectedProject])
+                : page.items
+            const projectId = items.some((project) => project.id === previous.projectId)
+              ? previous.projectId
+              : (page.items[0]?.id ?? null)
+            return {
+              ...previous,
+              projects: { ...page, items },
+              projectId,
+              team: projectId !== null && projectId === previous.projectId ? previous.team : null,
+              projectsRevision: previous.projectsRevision + 1
+            }
+          })
         }
       )
     },
@@ -187,7 +173,12 @@ export function useHiveWorkbench() {
     return act(
       'team',
       () => window.api.hiveTasks.getTeam(projectId),
-      (team) => setState((previous) => ({ ...previous, team }))
+      (team) =>
+        setState((previous) => ({
+          ...previous,
+          // Equal bridge DTOs retain the dependent editors' pending requests and retry IDs.
+          team: JSON.stringify(team) === JSON.stringify(previous.team) ? previous.team : team
+        }))
     )
   }, [act, state.projectId])
   useEffect(() => {

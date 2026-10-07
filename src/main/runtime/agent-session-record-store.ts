@@ -3,6 +3,7 @@
 
 import { HiveAgentSessionPersistence } from './hive-agent-session-transactions'
 import { TaskExecutionPersistence } from '../tasks/task-execution-store'
+import { assertTaskStructuredAcquisition } from '../tasks/task-structured-reservation'
 import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import {
   commitConversationClearRecord,
@@ -31,7 +32,6 @@ import {
   isAgentSessionClaimKeyVerifiable,
   retireAgentSessionClaimKey
 } from './agent-session-claim-key-retention'
-import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-adjudication'
 import type { AgentSessionProviderHandleLink } from '../../shared/agent-session-provider-handle'
 import {
   agentSessionScopeKey,
@@ -43,6 +43,7 @@ import {
   commitAgentSessionProcessIdentity,
   evictAgentSessionOwner,
   proveAgentSessionOwner,
+  type AgentSessionOwnerEviction,
   type AgentSessionProcessIdentityCommit
 } from './agent-session-lease-transitions'
 import {
@@ -70,8 +71,9 @@ import type { AgentSessionStoreState } from './agent-session-record-store-file'
 import { setAgentSessionTabVisibility, showAgentSessionTabs } from './agent-session-tab-table'
 import type { JournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database'
 import type { JournalOperationReceipt } from '../native-chat/agent-session-journal/journal-row-writer'
-import { loadAgentSessionStoreRows } from './agent-session-record-rows'
-import { AgentSessionStoreTransactions } from './agent-session-store-transactions'
+import { openLiveAgentSessionRecordStore } from './agent-session-live-host-store'
+import type { AgentSessionStoreTransactions } from './agent-session-store-transactions'
+import type { AgentSessionRecordTransition } from './agent-session-store-contract'
 
 type AgentSessionOperationSettlement = Parameters<typeof settleAgentSessionOperationInto>[1]
 
@@ -90,15 +92,14 @@ export class AgentSessionRecordStore {
     this.tasks = new TaskExecutionPersistence(transactions)
   }
 
-  /** Reads every row once; nothing re-reads them. `hostId` is the execution host this runtime is. */
+  /** One live store per host database; committed SQL drift is revalidated before guarded writes. */
   static open(args: {
     journalDatabase: JournalHostDatabase
     hostId: string
   }): AgentSessionRecordStore {
-    const loaded = loadAgentSessionStoreRows(args.journalDatabase.db, args.hostId)
-    return new AgentSessionRecordStore(
-      new AgentSessionStoreTransactions(args.journalDatabase, loaded),
-      args.hostId
+    return openLiveAgentSessionRecordStore(
+      args,
+      (transactions, hostId) => new AgentSessionRecordStore(transactions, hostId)
     )
   }
 
@@ -181,9 +182,7 @@ export class AgentSessionRecordStore {
     )
 
   /** A record this build cannot validate: readable as present, never grantable as a writer. */
-  isSessionUnreadable(sessionId: string): boolean {
-    return this.state.unreadableRecords.has(sessionId)
-  }
+  isSessionUnreadable = (sessionId: string): boolean => this.state.unreadableRecords.has(sessionId)
 
   listOperationRows = (): AgentSessionOperationRow[] => [...this.state.operations.values()]
 
@@ -198,6 +197,12 @@ export class AgentSessionRecordStore {
       commitAgentSessionReservation(draft, request, AGENT_SESSION_LEASE_TTL_MS)
     )
   }
+
+  assertTaskAcquisition = (
+    request: AgentSessionReserveRequest,
+    record: AgentSessionRecord
+  ): Promise<void> =>
+    this.transact((draft) => assertTaskStructuredAcquisition(draft, request, record))
 
   commitProcessIdentity = (args: AgentSessionProcessIdentityCommit): Promise<AgentSessionRecord> =>
     this.mutate(args.sessionId, (record) => commitAgentSessionProcessIdentity({ ...args, record }))
@@ -241,20 +246,17 @@ export class AgentSessionRecordStore {
     )
   }
 
-  async evictProvenDeadOwner(args: {
-    sessionId: string
-    expectedFence: number
-    probe: AgentSessionOwnerProbe
-    now: number
-  }): Promise<AgentSessionRecord> {
-    return this.mutate(args.sessionId, (record) => evictAgentSessionOwner({ ...args, record }))
+  async evictProvenDeadOwner(args: AgentSessionOwnerEviction): Promise<AgentSessionRecord> {
+    return this.mutate(args.sessionId, (record, draft) =>
+      evictAgentSessionOwner({ ...args, record }, draft.taskExecutions)
+    )
   }
 
   async transitionHandoff(
     sessionId: string,
-    transition: (record: AgentSessionRecord) => AgentSessionRecord
+    transition: AgentSessionRecordTransition
   ): Promise<AgentSessionRecord> {
-    return this.mutate(sessionId, transition)
+    return this.mutate(sessionId, (record, draft) => transition(record, draft.taskExecutions))
   }
 
   /**
@@ -318,7 +320,7 @@ export class AgentSessionRecordStore {
 
   private async mutate(
     sessionId: string,
-    apply: (record: AgentSessionRecord) => AgentSessionRecord
+    apply: (record: AgentSessionRecord, draft: AgentSessionStoreState) => AgentSessionRecord
   ): Promise<AgentSessionRecord> {
     return this.transact((draft) => {
       const record = draft.records.get(sessionId)
@@ -327,7 +329,7 @@ export class AgentSessionRecordStore {
           ? agentSessionRefusalError('execution_owner_reconciling', { reason: 'recordUnreadable' })
           : agentSessionRefusalError('agent_session_identity_required', { reason: 'recordMissing' })
       }
-      const next = apply(record)
+      const next = apply(record, draft)
       draft.records.set(sessionId, next)
       return next
     })

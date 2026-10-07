@@ -1,18 +1,46 @@
-import { canonicalAgentSessionDigest } from '../../shared/agent-session-mutation-envelope'
+import { updateTaskExecutionRecord } from './task-execution-record-mutation'
+import { admitTaskExecutionResult } from './task-execution-result-admission'
 import type { AgentLaunchResult } from '../../shared/agent-launch-intent'
 import {
-  TaskExecutionResultSchema,
-  type TaskExecutionResult
-} from '../../shared/task-execution/task-execution-receipts'
+  TaskStructuredBindingSchema,
+  type TaskStructuredBinding
+} from '../../shared/task-execution/task-structured-binding'
+import type { TaskExecutionResult } from '../../shared/task-execution/task-execution-receipts'
 import type { AgentSessionStoreTransactions } from '../runtime/agent-session-store-transactions'
-import { admitTaskExecution, type TaskExecutionAdmission } from './task-execution-admission'
-import { refuseTaskExecution } from './task-execution-error'
+import type { AgentSessionStoreState } from '../runtime/agent-session-store-contract'
 import {
-  TaskExecutionRecordSchema,
-  taskExecutionIdentity,
-  taskExecutionRecordKey,
-  type TaskExecutionRecord
-} from './task-execution-record'
+  admitTaskExecution,
+  beginTaskDispatch,
+  type TaskExecutionAdmission
+} from './task-execution-admission'
+import { admitCurrentTaskDockerIdentity } from './task-docker-identity-admission'
+import type { TaskDockerIdentity } from './task-docker-identity'
+import { refuseTaskExecution } from './task-execution-error'
+import { runTaskModelEffect, reserveTaskModelDispatch } from './task-model-dispatch-reservation'
+import { bindTaskLaunch, recoverTaskLaunch } from './task-launch-binding'
+import { settleCancelledTaskCodexDispatch } from './task-cancelled-dispatch'
+import { assertTaskExecutionSnapshotCurrent } from './task-execution-snapshot-guard'
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
+import type { TaskDockerNeverStartedEvidence } from './task-docker-boundary'
+import { settleCancelledTaskDockerPrestart } from './task-cancelled-docker-prestart'
+import {
+  assertStoredTaskStructuredBinding,
+  assertTaskCodexFailedBootBinding
+} from './task-codex-session-binding'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import { hasTaskSessionBinding } from './task-session-association'
+import {
+  assertTaskFailureSnapshotCurrent,
+  runRecordedTaskModelFailureEffect,
+  taskModelFailureEventCandidate
+} from './task-failure-event'
+import { readTaskModelFatalFailure, forgetTaskModelFatalFailure } from './task-model-fatal-failure'
+import {
+  hasTaskFailureSummary,
+  taskFailureSummary,
+  type TaskFailureError
+} from './task-failure-diagnostic'
+import { taskExecutionRecordKey, type TaskExecutionRecord } from './task-execution-record'
 
 type Identity = Parameters<typeof taskExecutionRecordKey>[0]
 
@@ -26,59 +54,167 @@ export class TaskExecutionPersistence {
     )
   }
 
+  hasSessionBinding(sessionId: string): boolean {
+    return hasTaskSessionBinding(this.transactions.state.taskExecutions, sessionId)
+  }
+
+  listActive(): TaskExecutionRecord[] {
+    return structuredClone(
+      [...(this.transactions.state.taskExecutions?.values() ?? [])].filter(
+        (record) => !record.result
+      )
+    )
+  }
+
+  settleCancelledCodexDispatch(
+    expected: TaskExecutionRecord,
+    fingerprint: string,
+    readNow: () => number,
+    validate: () => void
+  ) {
+    return this.update(
+      expected.command,
+      (record, now, state) => {
+        validate()
+        assertTaskExecutionSnapshotCurrent(expected, record)
+        return settleCancelledTaskCodexDispatch(state, record, fingerprint, now, expected)
+      },
+      readNow
+    )
+  }
+
+  readActive(validate: () => void): Promise<TaskExecutionRecord[]> {
+    return this.transactions.transact((draft) => {
+      validate()
+      return structuredClone(
+        [...(draft.taskExecutions?.values() ?? [])].filter((record) => !record.result)
+      )
+    })
+  }
+
+  settleCancelledDockerPrestart(
+    authorized: TaskExecutionRecord,
+    expected: TaskExecutionRecord,
+    session: AgentSessionRecord,
+    evidence: TaskDockerNeverStartedEvidence,
+    readNow: () => number,
+    validate: () => void
+  ) {
+    return this.update(
+      authorized.command,
+      (record, now, state) => {
+        validate()
+        assertTaskExecutionSnapshotCurrent(authorized, record)
+        assertTaskExecutionSnapshotCurrent(expected, record)
+        return settleCancelledTaskDockerPrestart(
+          state,
+          record,
+          authorized,
+          expected,
+          session,
+          evidence,
+          now
+        )
+      },
+      readNow
+    )
+  }
+
   admit(input: TaskExecutionAdmission) {
     return this.transactions.transact((draft) => admitTaskExecution(draft, input))
   }
 
-  async beginDispatch(identity: Identity, now: number, validate: () => void) {
+  async beginDispatch(
+    identity: Identity,
+    now: number,
+    validate: (record: TaskExecutionRecord) => void
+  ) {
     return this.update(
       identity,
+      (record, _now, state) => beginTaskDispatch(state, record, validate),
+      now
+    )
+  }
+
+  bindLaunch(expected: TaskExecutionRecord, launch: AgentLaunchResult, now: number) {
+    return this.update(
+      expected.command,
       (record) => {
-        validate()
-        if (this.transactions.state.taskRecoveryBlocked) {
-          return refuseTaskExecution('OUTCOME_UNKNOWN')
-        }
-        if (
-          record.status !== 'accepted' ||
-          record.result ||
-          record.cancellationKey ||
-          record.dispatch !== 'not_dispatched'
-        ) {
-          return null
-        }
-        return { ...record, dispatch: 'dispatching' }
+        assertTaskExecutionSnapshotCurrent(expected, record)
+        return bindTaskLaunch(record, launch)
       },
       now
     )
   }
 
-  bindLaunch(identity: Identity, launch: AgentLaunchResult, now: number) {
+  async reserveModelDispatch(binding: TaskStructuredBinding, now: number, validate: () => void) {
+    const snapshot = TaskStructuredBindingSchema.safeParse(binding)
+    if (!snapshot.success) {
+      return refuseTaskExecution('INVALID_REQUEST')
+    }
+    return this.update(
+      snapshot.data.source,
+      (record, _now, state) => reserveTaskModelDispatch(state, record, snapshot.data),
+      now,
+      () => {
+        if (typeof validate !== 'function') {
+          return refuseTaskExecution('INVALID_REQUEST')
+        }
+        assertTaskAuthorizationCurrent(() => validate())
+      }
+    )
+  }
+
+  async runModelEffect<T>(binding: TaskStructuredBinding, validate: () => void, start: () => T) {
+    return runTaskModelEffect(this.transactions, binding, validate, start)
+  }
+
+  assertStructuredBindingCurrent(binding: TaskStructuredBinding): void {
+    assertStoredTaskStructuredBinding(this.transactions.state, binding)
+  }
+
+  assertFailedBootStopCurrent(expected: TaskExecutionRecord, requireStopped = false) {
+    return this.transactions.transact((draft) =>
+      structuredClone(
+        assertTaskCodexFailedBootBinding(
+          draft,
+          expected,
+          requireStopped,
+          Boolean(readTaskModelFatalFailure(this, expected))
+        )
+      )
+    )
+  }
+
+  persistDockerIdentity(
+    identity: Identity & Pick<TaskExecutionRecord['command'], 'ownershipEpoch'>,
+    dockerIdentity: TaskDockerIdentity,
+    now: number,
+    validate: () => void
+  ) {
     return this.update(
       identity,
-      (record) => {
-        if (record.dispatch === 'bound') {
-          if (!record.launch) {
-            return refuseTaskExecution('OUTCOME_UNKNOWN')
-          }
-          if (canonicalAgentSessionDigest(record.launch) !== canonicalAgentSessionDigest(launch)) {
-            return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
-          }
-          return null
+      (record, _now, state) =>
+        admitCurrentTaskDockerIdentity(state, record, identity, dockerIdentity),
+      now,
+      () => {
+        if (typeof validate !== 'function') {
+          return refuseTaskExecution('INVALID_REQUEST')
         }
-        if (
-          record.dispatch !== 'dispatching' ||
-          record.result ||
-          launch.worktreeId !== record.workspace.workspaceId
-        ) {
-          return refuseTaskExecution('OUTCOME_UNKNOWN')
-        }
-        return {
-          ...record,
-          dispatch: 'bound',
-          launch,
-          status: record.cancellationKey ? 'cancel_requested' : 'running'
-        }
-      },
+        assertTaskAuthorizationCurrent(() => validate())
+      }
+    )
+  }
+
+  recoverLaunch(
+    expected: TaskExecutionRecord,
+    fingerprint: string,
+    now: number,
+    validate: () => void
+  ) {
+    return this.update(
+      expected.command,
+      (record, _now, state) => recoverTaskLaunch(state, record, expected, fingerprint, validate),
       now
     )
   }
@@ -87,106 +223,102 @@ export class TaskExecutionPersistence {
     identity: Identity,
     cancellationKey: string,
     now: number,
-    validate: () => void
+    validate: (record: TaskExecutionRecord) => void,
+    diagnostic?: { expected: TaskExecutionRecord; failure: TaskFailureError }
+  ) {
+    const expected = diagnostic ? structuredClone(diagnostic.expected) : undefined
+    const summary = diagnostic ? taskFailureSummary('authorization', diagnostic.failure) : undefined
+    return this.update(
+      identity,
+      (record, _now, state) => {
+        validate(record)
+        if (diagnostic) {
+          assertTaskFailureSnapshotCurrent(state, expected!, record)
+        }
+        if (record.result || record.cancellationKey) {
+          return diagnostic && !hasTaskFailureSummary(record.events, 'authorization')
+            ? { ...record }
+            : null
+        }
+        return { ...record, cancellationKey, status: 'cancel_requested' }
+      },
+      now,
+      undefined,
+      summary
+    )
+  }
+
+  recordModelFailure(expected: TaskExecutionRecord, failure: TaskFailureError, now: number) {
+    const snapshot = structuredClone(expected)
+    const summary = taskFailureSummary('model', failure)
+    return this.update(
+      snapshot.command,
+      (record, _now, state) => taskModelFailureEventCandidate(state, snapshot, record),
+      now,
+      undefined,
+      summary
+    )
+  }
+
+  markUnknown(
+    identity: Identity,
+    now: number,
+    validate: (record: TaskExecutionRecord) => void = () => undefined,
+    summary?: string
   ) {
     return this.update(
       identity,
       (record) => {
-        validate()
-        if (record.result || record.cancellationKey) {
-          return null
-        }
-        return { ...record, cancellationKey, status: 'cancel_requested' }
+        validate(record)
+        return record.result ||
+          (record.status === 'outcome_unknown' &&
+            (!summary || record.events.at(-1)?.summary === summary))
+          ? null
+          : { ...record, status: 'outcome_unknown' }
       },
-      now
+      now,
+      undefined,
+      summary
     )
   }
 
-  markUnknown(identity: Identity, now: number) {
-    return this.update(
-      identity,
-      (record) =>
-        record.result || record.status === 'outcome_unknown'
-          ? null
-          : { ...record, status: 'outcome_unknown' },
-      now
-    )
+  runRecordedModelFailureEffect(
+    expected: TaskExecutionRecord,
+    apply: (current: TaskExecutionRecord) => void
+  ) {
+    return runRecordedTaskModelFailureEffect(this.transactions, expected, apply)
   }
 
   settle(
     identity: Identity,
     resultValue: TaskExecutionResult | ((record: TaskExecutionRecord) => TaskExecutionResult),
-    now: number
+    now: number,
+    stopping?: TaskExecutionRecord
   ) {
     return this.update(
       identity,
-      (record) => {
-        // A competing collector may have settled while this transaction waited for the lock.
-        if (record.result && typeof resultValue === 'function') {
-          return null
-        }
-        const result = TaskExecutionResultSchema.parse(
-          typeof resultValue === 'function' ? resultValue(structuredClone(record)) : resultValue
-        )
-        if (record.result) {
-          if (canonicalAgentSessionDigest(result) !== canonicalAgentSessionDigest(record.result)) {
-            return refuseTaskExecution('IDEMPOTENCY_CONFLICT')
-          }
-          return null
-        }
-        if (
-          (result.stopProof.evidenceKind === 'not_started' &&
-            record.dispatch !== 'not_dispatched') ||
-          (result.status === 'succeeded' &&
-            (record.dispatch !== 'bound' || record.cancellationKey !== null)) ||
-          (result.status === 'cancelled' && record.cancellationKey === null)
-        ) {
-          return refuseTaskExecution('OUTCOME_UNKNOWN')
-        }
-        return { ...record, result, status: result.status }
-      },
+      (record, _now, state) =>
+        admitTaskExecutionResult(state, record, resultValue, stopping, () =>
+          Boolean(readTaskModelFatalFailure(this, record))
+        ),
       now
-    )
+    ).then((settled) => {
+      forgetTaskModelFatalFailure(this, settled.record)
+      return settled
+    })
   }
 
   private update(
     identity: Identity,
-    apply: (record: TaskExecutionRecord) => TaskExecutionRecord | null,
-    now: number
+    apply: (
+      record: TaskExecutionRecord,
+      now: number,
+      state: AgentSessionStoreState
+    ) => TaskExecutionRecord | null,
+    now: number | (() => number),
+    validate?: () => void,
+    summary?: string
   ) {
-    return this.transactions.transact((draft) => {
-      const key = taskExecutionRecordKey(identity)
-      const current = draft.taskExecutions?.get(key)
-      if (!current) {
-        return refuseTaskExecution('EXECUTION_NOT_FOUND')
-      }
-      const next = apply(current)
-      if (!next) {
-        return { changed: false, record: structuredClone(current) }
-      }
-      const statusChanged = next.status !== current.status
-      const events = statusChanged
-        ? [
-            ...current.events,
-            {
-              ...taskExecutionIdentity(current.command),
-              commandFingerprint: current.commandFingerprint,
-              recordedAt: new Date(now).toISOString(),
-              kind: 'execution.event' as const,
-              eventId: `event:${current.commandFingerprint}:${current.events.length + 1}`,
-              sequence: current.events.length + 1,
-              status: next.status,
-              artifactRefs: next.result?.artifactRefs ?? []
-            }
-          ]
-        : current.events
-      const record = TaskExecutionRecordSchema.parse({
-        ...next,
-        revision: current.revision + 1,
-        events
-      })
-      draft.taskExecutions!.set(key, record)
-      return { changed: true, record: structuredClone(record) }
-    })
+    return updateTaskExecutionRecord(this.transactions, identity, apply, now, validate, summary)
   }
 }

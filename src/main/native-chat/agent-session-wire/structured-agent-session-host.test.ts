@@ -27,7 +27,10 @@ import {
   HOST_TEST_THREAD as THREAD,
   hostTestMessage
 } from './structured-agent-session-host-test-data'
-import { openTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 
 let root: string
@@ -549,6 +552,7 @@ describe('restart', () => {
     if (crashRecord) {
       await store.transitionHandoff(SESSION, () => crashRecord)
     }
+    closeTestJournalHostDatabase(root)
     store = await openTestAgentSessionRecordStore(root)
     host = new StructuredAgentSessionHost({
       logger: createStructuredAgentSessionLogger(),
@@ -707,7 +711,7 @@ describe('restart', () => {
       .fn<(record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe>>()
       .mockRejectedValueOnce(new Error('probe exploded'))
       .mockResolvedValue({ outcome: 'pid-absent' })
-    await reboot(probe)
+    await reboot(probe, before ?? undefined)
 
     await expect(host.attach(CALLER, ensureParams(held))).rejects.toThrow('probe exploded')
     const reattached = await host.attach(CALLER, ensureParams(await staleFenceFrom(held)))

@@ -1,5 +1,11 @@
 import { z } from 'zod'
+import { isAbsolute } from 'node:path'
 import { isAgentLaunchResult, type AgentLaunchResult } from '../../shared/agent-launch-intent'
+import { deriveAgentLaunchChildOperationId } from '../../shared/agent-launch-operation'
+import {
+  TaskStructuredBindingSchema,
+  taskSessionSourceReference
+} from '../../shared/task-execution/task-structured-binding'
 import { TaskExecutionStartSchema } from '../../shared/task-execution/task-execution-command'
 import { computeTaskExecutionFingerprint } from '../../shared/task-execution/task-execution-fingerprint'
 import {
@@ -13,13 +19,40 @@ import {
   TaskExecutionEventSchema,
   TaskExecutionResultSchema
 } from '../../shared/task-execution/task-execution-receipts'
+import { TaskDockerIdentitySchema, taskDockerIdentityMatchesRecord } from './task-docker-identity'
+import { TASK_MODEL_REQUEST_LIMIT } from './task-model-channel-protocol'
+
+export const TaskWorkspaceDirectoryIdentitySchema = z.strictObject({
+  dev: z.string().max(40).regex(/^\d+$/),
+  ino: z
+    .string()
+    .max(40)
+    .regex(/^[1-9]\d*$/),
+  birthtimeNs: z
+    .string()
+    .max(40)
+    .regex(/^-?\d+$/)
+})
+export type TaskWorkspaceDirectoryIdentity = z.infer<typeof TaskWorkspaceDirectoryIdentitySchema>
 
 export const TaskExecutionWorkspaceSchema = z.strictObject({
   hostId: z.literal('local'),
   workspaceId: z.string().min(1).max(512),
   canonicalPath: z.string().min(1).max(4096),
   executionPath: z.string().min(1).max(4096),
-  isolation: z.enum(['managed_worktree', 'managed_copy'])
+  isolation: z.enum(['managed_worktree', 'managed_copy']),
+  // Missing original evidence remains readable but cannot authorize workspace recovery.
+  directoryIdentity: TaskWorkspaceDirectoryIdentitySchema.optional(),
+  outputDirectory: z
+    .strictObject({
+      path: z
+        .string()
+        .min(1)
+        .max(4096)
+        .refine((path) => isAbsolute(path) && !/[,\0\r\n]/.test(path)),
+      directoryIdentity: TaskWorkspaceDirectoryIdentitySchema
+    })
+    .optional()
 })
 
 export const TaskExecutionRecordSchema = z
@@ -29,6 +62,9 @@ export const TaskExecutionRecordSchema = z
     commandFingerprint: TaskDigest,
     revision: TaskCounter.min(1),
     workspace: TaskExecutionWorkspaceSchema,
+    dockerIdentity: TaskDockerIdentitySchema.optional(),
+    structuredBinding: TaskStructuredBindingSchema.optional(),
+    modelDispatchAttempts: TaskCounter.max(TASK_MODEL_REQUEST_LIMIT).optional(),
     accepted: TaskExecutionAcceptedSchema,
     status: TaskExecutionStatus,
     dispatch: z.enum(['not_dispatched', 'dispatching', 'bound']),
@@ -40,8 +76,29 @@ export const TaskExecutionRecordSchema = z
   .superRefine((record, context) => {
     const fingerprint = computeTaskExecutionFingerprint(record.command, record.operationCallerKey)
     const receipts = [record.accepted, ...record.events, ...(record.result ? [record.result] : [])]
+    const binding = record.structuredBinding
     if (
+      (record.command.workflowContext?.role === 'tester') !==
+        Boolean(record.workspace.outputDirectory) ||
+      (Object.hasOwn(record.workspace, 'outputDirectory') &&
+        record.workspace.outputDirectory === undefined) ||
       fingerprint !== record.commandFingerprint ||
+      (Object.hasOwn(record, 'structuredBinding') && binding === undefined) ||
+      (Object.hasOwn(record, 'modelDispatchAttempts') &&
+        (record.modelDispatchAttempts === undefined || !binding)) ||
+      (binding &&
+        (JSON.stringify(binding.source) !== JSON.stringify(taskSessionSourceReference(record)) ||
+          binding.operationCallerKey !== record.operationCallerKey ||
+          binding.operationId !== record.command.operationId ||
+          binding.attachOperationId !==
+            deriveAgentLaunchChildOperationId(record.command.operationId) ||
+          binding.location.workspaceId !== record.workspace.workspaceId ||
+          binding.location.workspaceKind !==
+            (record.workspace.isolation === 'managed_worktree' ? 'git-worktree' : 'folder') ||
+          (record.launch &&
+            (record.launch.outcome.kind !== 'structured' ||
+              record.launch.outcome.sessionId !== binding.sessionId)))) ||
+      (record.dockerIdentity && !taskDockerIdentityMatchesRecord(record.dockerIdentity, record)) ||
       record.accepted.operationId !== record.command.operationId ||
       record.accepted.workspaceExecutionClaimRef !== record.command.workspaceExecutionClaimRef ||
       record.accepted.writeFence !== record.command.writeFence ||

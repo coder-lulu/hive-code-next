@@ -221,5 +221,21 @@
     "text": "HiveCode AI",
     "dynamic": false,
     "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/task-page/hive/use-hive-workflow-case-code.ts",
+    "kind": "object-property:error",
+    "text": "FORBIDDEN",
+    "dynamic": false,
+    "reason": "Protocol state mapped to hiveWorkflowCases.code.errors.forbidden before display.",
+    "count": 1
+  },
+  {
+    "filePath": "src/renderer/src/components/task-page/hive/use-hive-workflows.ts",
+    "kind": "object-property:error",
+    "text": "INVALID_REQUEST",
+    "dynamic": false,
+    "reason": "Protocol state mapped to hiveWorkflow.errors.invalidDefinition before display.",
+    "count": 1
   }
 ]

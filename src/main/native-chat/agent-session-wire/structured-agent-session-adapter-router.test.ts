@@ -46,6 +46,56 @@ function adapterOf(
 }
 
 describe('StructuredAgentSessionAdapterRouter.releaseAcquisition', () => {
+  it('requires the selected original provider even when a sibling has no acquisition debt', async () => {
+    const claudeRelease = vi.fn(async () => true)
+    const codexRelease = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    const router = new StructuredAgentSessionAdapterRouter(
+      { claude: adapterOf(claudeRelease), codex: adapterOf(codexRelease) },
+      async () => {}
+    )
+    const original = { sessionId: 'original-task', agent: 'codex' }
+    await expect(router.releaseAcquisition(original)).resolves.toBe(false)
+    expect(claudeRelease).not.toHaveBeenCalled()
+    await expect(router.releaseAcquisition(original)).resolves.toBe(true)
+    expect(codexRelease).toHaveBeenCalledTimes(2)
+  })
+
+  it('refuses cleanup through a provider that differs from the current route', async () => {
+    const claude = adapterOf(vi.fn(async () => true))
+    const codex = adapterOf(vi.fn(async () => true))
+    const router = new StructuredAgentSessionAdapterRouter({ claude, codex }, async () => {})
+    await router.acquire({ identity: claudeIdentity('session-1'), fence: 1, spawnToken: 'spawn-1' })
+    await expect(
+      router.releaseAcquisition({ sessionId: 'session-1', agent: 'codex' })
+    ).resolves.toBe(false)
+    expect(claude.releaseAcquisition).not.toHaveBeenCalled()
+    expect(codex.releaseAcquisition).not.toHaveBeenCalled()
+  })
+
+  it('retains the selected provider route after false or thrown cleanup', async () => {
+    const failure = new Error('transport descendants unsettled')
+    const release = vi
+      .fn()
+      .mockResolvedValueOnce(false)
+      .mockRejectedValueOnce(failure)
+      .mockResolvedValueOnce(true)
+    const claude = adapterOf(release)
+    claude.closeSession = vi.fn(async () => false)
+    const router = new StructuredAgentSessionAdapterRouter(
+      { claude, codex: adapterOf(vi.fn(async () => true)) },
+      async () => {}
+    )
+    await router.acquire({ identity: claudeIdentity('session-1'), fence: 1, spawnToken: 'spawn-1' })
+    const original = { sessionId: 'session-1', agent: 'claude' }
+    await expect(router.releaseAcquisition(original)).resolves.toBe(false)
+    await expect(router.releaseAcquisition(original)).rejects.toBe(failure)
+    await expect(router.closeSession('session-1')).resolves.toBe(false)
+    expect(claude.closeSession).toHaveBeenCalledOnce()
+    await expect(router.releaseAcquisition(original)).resolves.toBe(true)
+    await expect(router.closeSession('session-1')).resolves.toBe(false)
+    expect(claude.closeSession).toHaveBeenCalledOnce()
+  })
+
   it('drops the owner even when its release reports a typed failure', async () => {
     const failure = new Error('root exited')
     const claude = adapterOf(vi.fn().mockRejectedValueOnce(failure).mockResolvedValue(false))

@@ -3,6 +3,7 @@ import { LocalTaskClient } from './local-task-client'
 import { createLocalTaskRequest } from './local-task-http-client'
 import { taskAdapterFixture } from './task-adapter.test-fixture'
 import { taskCommand } from './task-execution.test-fixture'
+import { HIVE_WORKFLOW_PAGE_STRUCTURAL_TOKENS } from '../../shared/hive-task-workflows'
 
 let fixture: Awaited<ReturnType<typeof taskAdapterFixture>> | undefined
 afterEach(async () => {
@@ -76,6 +77,33 @@ describe('strict local task client', () => {
     })
     await expect(client.capabilities()).rejects.toThrow('SERVICE_UNAVAILABLE')
   })
+  it.each(['/hive/tasks', '/hive/workbench/workflows/read', '/hive/workbench/workflows/save'])(
+    'keeps the default structural limit on %s',
+    async (path) => {
+      const request = createLocalTaskRequest({
+        baseUrl: 'http://127.0.0.1:12345',
+        secret: 'a'.repeat(43),
+        maximumResponseStructuralTokensByPath: {
+          '/hive/workbench/workflows/list': HIVE_WORKFLOW_PAGE_STRUCTURAL_TOKENS
+        },
+        fetch: async () => new Response(JSON.stringify(Array.from({ length: 20_000 }, () => 0)))
+      })
+      await expect(request(path)).rejects.toThrow('SERVICE_UNAVAILABLE')
+    }
+  )
+  it('keeps the nesting and byte limits on a configured workflow page', async () => {
+    for (const content of [`${'['.repeat(17)}0${']'.repeat(17)}`, 'x'.repeat(64 * 1024 + 1)]) {
+      const request = createLocalTaskRequest({
+        baseUrl: 'http://127.0.0.1:12345',
+        secret: 'a'.repeat(43),
+        maximumResponseStructuralTokensByPath: {
+          '/hive/workbench/workflows/list': HIVE_WORKFLOW_PAGE_STRUCTURAL_TOKENS
+        },
+        fetch: async () => new Response(content)
+      })
+      await expect(request('/hive/workbench/workflows/list')).rejects.toThrow('SERVICE_UNAVAILABLE')
+    }
+  })
   it('treats a cross-bound accepted receipt as an unknown outcome', async () => {
     fixture = await taskAdapterFixture()
     const accepted = await fixture.client.start(
@@ -110,5 +138,39 @@ describe('strict local task client', () => {
     await expect(
       client.observe({ ...fixture.query, kind: 'execution.observe', afterSequence: 1, limit: 8 })
     ).rejects.toThrow('OUTCOME_UNKNOWN')
+  })
+  it.each(['first-event-gap', 'empty-cursor-jump', 'empty-unread-events'] as const)(
+    'refuses %s instead of losing durable events',
+    async (kind) => {
+      fixture = await taskAdapterFixture()
+      await fixture.client.start(fixture.binding.command, fixture.binding.commandFingerprint)
+      await fixture.host.drain()
+      const observation = await fixture.client.reconcile(fixture.query)
+      const events = kind === 'first-event-gap' ? [observation.events.at(-1)!] : []
+      const cursor =
+        kind === 'first-event-gap' ? observation.cursor : kind === 'empty-cursor-jump' ? 1 : 0
+      const client = new LocalTaskClient({
+        baseUrl: 'http://127.0.0.1:12345',
+        secret: 'a'.repeat(43),
+        fetch: vi.fn(async () => new Response(JSON.stringify({ ...observation, events, cursor })))
+      })
+      await expect(
+        client.observe({ ...fixture.query, kind: 'execution.observe', afterSequence: 0, limit: 8 })
+      ).rejects.toThrow('OUTCOME_UNKNOWN')
+    }
+  )
+  it('accepts an empty page exactly at the last committed event', async () => {
+    fixture = await taskAdapterFixture()
+    await fixture.client.start(fixture.binding.command, fixture.binding.commandFingerprint)
+    await fixture.host.drain()
+    const observation = await fixture.client.reconcile(fixture.query)
+    const page = await fixture.client.observe({
+      ...fixture.query,
+      kind: 'execution.observe',
+      afterSequence: observation.lastSequence,
+      limit: 8
+    })
+    expect(page.events).toEqual([])
+    expect(page.cursor).toBe(observation.lastSequence)
   })
 })

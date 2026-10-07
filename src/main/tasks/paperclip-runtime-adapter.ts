@@ -5,11 +5,13 @@ import { executePaperclipTask } from './paperclip-adapter-execute'
 import {
   hiveRuntimeSessionCodec,
   type HiveRuntimeAdapterPorts,
+  type HiveRuntimeBindingPurpose,
   type PaperclipTaskExecutionContext,
   type PaperclipEnvironmentTestResult
 } from './paperclip-adapter-contract'
 import { paperclipTaskErrorResult } from './paperclip-adapter-result'
 import { TaskExecutionError } from './task-execution-error'
+import type { LocalTaskClientOptions } from './local-task-http-client'
 import {
   TASK_EXECUTION_CAPABILITY,
   TASK_STOP_PROOF_CAPABILITY,
@@ -22,7 +24,7 @@ import {
 
 const Bridge = z.strictObject({ baseUrl: z.string().max(2048), secret: z.string().length(43) })
 
-async function localPorts(): Promise<HiveRuntimeAdapterPorts> {
+export async function createLocalTaskAdapterClient(headers?: LocalTaskClientOptions['headers']) {
   const path = process.env.HIVE_TASK_TRANSPORT_DESCRIPTOR
   if (!path) {
     throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
@@ -37,27 +39,43 @@ async function localPorts(): Promise<HiveRuntimeAdapterPorts> {
   if (!parsed.success) {
     throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
   }
-  const client = new LocalTaskClient(parsed.data)
-  return { client, resolveBinding: (companyId, runId) => client.binding(companyId, runId) }
+  return new LocalTaskClient({ ...parsed.data, headers })
+}
+
+async function localPorts(): Promise<HiveRuntimeAdapterPorts> {
+  const client = await createLocalTaskAdapterClient()
+  return {
+    client,
+    resolveBinding: (companyId, runId, purpose) => client.binding(companyId, runId, purpose)
+  }
 }
 
 /** Factory signature used by the pinned Paperclip external plugin loader. */
 export function createServerAdapter(
   resolvePorts: () => Promise<HiveRuntimeAdapterPorts> = localPorts
 ) {
+  const run = async (
+    context: PaperclipTaskExecutionContext,
+    purpose: HiveRuntimeBindingPurpose
+  ) => {
+    try {
+      return await executePaperclipTask(context, await resolvePorts(), purpose)
+    } catch (error) {
+      return paperclipTaskErrorResult(
+        error instanceof TaskExecutionError ? error.code : 'CAPABILITY_UNAVAILABLE',
+        null,
+        purpose === 'recover'
+      )
+    }
+  }
   return {
     type: 'hive_runtime',
     sessionCodec: hiveRuntimeSessionCodec,
     async execute(context: PaperclipTaskExecutionContext) {
-      try {
-        return await executePaperclipTask(context, await resolvePorts())
-      } catch (error) {
-        return paperclipTaskErrorResult(
-          error instanceof TaskExecutionError ? error.code : 'CAPABILITY_UNAVAILABLE',
-          null,
-          false
-        )
-      }
+      return run(context, 'execute')
+    },
+    async recover(context: PaperclipTaskExecutionContext) {
+      return run(context, 'recover')
     },
     async testEnvironment(_context: unknown): Promise<PaperclipEnvironmentTestResult> {
       const testedAt = new Date().toISOString()

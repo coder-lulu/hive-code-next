@@ -186,6 +186,7 @@ describe('structured session acquisition options', () => {
       fence: 1
     })
     await firstJournal!.close()
+    await journals.closeAll()
     const store = await openTestAgentSessionRecordStore(root)
     await store.reconcileOnRestart({
       probe: async () => ({ outcome: 'pid-absent' }),
@@ -333,6 +334,7 @@ describe('structured session acquisition options', () => {
       now: NOW
     })
 
+    await journals.closeAll()
     const resumedStore = await openTestAgentSessionRecordStore(root)
     await resumedStore.reconcileOnRestart({
       probe: async () => ({ outcome: 'pid-absent' }),

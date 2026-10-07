@@ -246,7 +246,7 @@ export async function reserveManagedPiExecutionLease(options: {
       if (record.lease.claimStatus === 'reserved') {
         await failed(receipt.pid === null ? 'processless' : 'root-exit-observed')
       } else if (record.lease.claimStatus === 'live') {
-        await store.transitionHandoff(recordId, (current) => {
+        await store.transitionHandoff(recordId, (current, taskExecutions) => {
           if (
             !isExactReservation(current) ||
             !isDeepStrictEqual(current.lease.ownerProcess, identity)
@@ -255,6 +255,7 @@ export async function reserveManagedPiExecutionLease(options: {
           }
           return releaseAgentSessionOwnerAfterSurfaceClose({
             record: current,
+            taskExecutions,
             expectedFence: fence,
             now: now()
           })

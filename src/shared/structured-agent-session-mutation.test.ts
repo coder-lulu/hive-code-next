@@ -1,11 +1,26 @@
 import { describe, expect, it } from 'vitest'
 import {
+  structuredAgentSessionDigest,
   structuredAgentSessionDomainFingerprint,
   structuredAgentSessionPayloadFingerprint
 } from './structured-agent-session-mutation'
-import { computeAgentSessionPayloadFingerprint } from './agent-session-mutation-envelope'
+import {
+  canonicalAgentSessionDigest,
+  computeAgentSessionPayloadFingerprint
+} from './agent-session-mutation-envelope'
 
 describe('structured agent session client mutations', () => {
+  it('matches host digests for empty, Unicode, optional, and large business definitions', () => {
+    for (const value of [
+      {},
+      { name: '流程 🐝', nested: { a: 1, A: 2, é: 3, 中: 4 } },
+      { values: [null, undefined, true, -0, 1.5], omitted: undefined },
+      { text: 'x'.repeat(65_536), nested: [{ z: null, a: ['value'] }] }
+    ]) {
+      expect(structuredAgentSessionDigest(value)).toBe(canonicalAgentSessionDigest(value))
+    }
+  })
+
   it('canonicalizes payload fields before hashing', () => {
     const first = structuredAgentSessionPayloadFingerprint({
       method: 'agentSession.send',

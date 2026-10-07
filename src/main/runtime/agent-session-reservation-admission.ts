@@ -47,6 +47,11 @@ import {
 } from './agent-session-lease-transitions'
 import type { AgentSessionStoreState } from './agent-session-record-store-file'
 import { agentSessionRecordIdentityFields } from './agent-session-record-founding'
+import type { TaskStructuredLaunchOrigin } from '../tasks/task-structured-launch-origin'
+import {
+  assertTaskStructuredReservation,
+  bindTaskStructuredReservation
+} from '../tasks/task-structured-reservation'
 
 export type AgentSessionReserveRequest = {
   sessionId: string
@@ -76,6 +81,7 @@ export type AgentSessionReserveRequest = {
   now: number
   leaseTtlMs?: number
   validate?: () => void
+  taskOrigin?: TaskStructuredLaunchOrigin
 }
 
 export type AgentSessionReserveDisposition =
@@ -313,6 +319,7 @@ export function commitAgentSessionReservation(
   request: AgentSessionReserveRequest,
   leaseTtlMs: number
 ): AgentSessionReserveResult {
+  assertTaskStructuredReservation(state, request)
   const decision = evaluateAgentSessionReserveOperation(state, request)
   const existing = state.records.get(request.sessionId)
   // An unfinished operation whose reservation recovery released continues under its own id at the
@@ -333,13 +340,15 @@ export function commitAgentSessionReservation(
   if (decision.decision === 'replay') {
     const record = requireAgentSessionRecordForReplay(state, decision.row, request.sessionId)
     if (decision.row.outcome.status !== 'pending' || request.handoffOperationId === null) {
-      return { record, disposition: 'replayed', operationRow: decision.row }
+      const bound = bindTaskStructuredReservation(state, request, record, decision.row)
+      return { record: bound, disposition: 'replayed', operationRow: decision.row }
     }
     if (continued) {
       return reserveWithOperationRow(state, continued, decision.row, leaseTtlMs)
     }
     const retried = admitPendingAgentSessionReservationReplay(record, request)
-    return { record: retried, disposition: 'replayed', operationRow: decision.row }
+    const bound = bindTaskStructuredReservation(state, request, retried, decision.row)
+    return { record: bound, disposition: 'replayed', operationRow: decision.row }
   }
   return reserveWithOperationRow(state, request, decision.row, leaseTtlMs)
 }
@@ -351,7 +360,8 @@ function reserveWithOperationRow(
   leaseTtlMs: number
 ): AgentSessionReserveResult {
   const result = applyAgentSessionReservation(state, request, leaseTtlMs)
+  const record = bindTaskStructuredReservation(state, request, result.record, row)
   state.operations.set(agentSessionOperationKey(row.callerKey, row.operationId), row)
-  state.records.set(result.record.sessionId, result.record)
-  return { ...result, operationRow: row }
+  state.records.set(record.sessionId, record)
+  return { ...result, record, operationRow: row }
 }

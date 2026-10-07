@@ -4,6 +4,8 @@ import {
   type AgentSessionAcquisition,
   type StructuredAgentSessionAcquireInput
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
+import { assertSynchronousAuthorization } from '../../shared/synchronous-authorization-guard'
+import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import {
   closeFailedCodexAcquisition,
   stopSupersededCodexAcquisition
@@ -12,12 +14,11 @@ import { CodexBackgroundTaskTracker, codexChildWorkSink } from './codex-backgrou
 import { CodexSubagentExecutions } from './codex-subagent-executions'
 import { createCodexDispatchEchoes } from './codex-structured-dispatch-echo'
 import { createCodexJournalTranslator } from './codex-structured-journal-translation'
-import { openCodexAppServerConnection } from './codex-app-server-connection'
 import {
   codexProviderHandleLink,
   codexSpawnedProcessIdentity
 } from './codex-structured-owner-identity'
-import { buildCodexStructuredChildEnvironment } from './codex-structured-child-environment'
+import { openCodexStructuredConnection } from './codex-structured-connection-open'
 import { openCodexThread } from './codex-structured-thread-open'
 import {
   closeCodexPublishedSession,
@@ -101,7 +102,6 @@ export async function acquireCodexStructuredSession(input: {
         }
       })
     : null
-  const open = deps.openConnection ?? openCodexAppServerConnection
   const spawnIdentity = codexSpawnedProcessIdentity(acquireInput, deps.readProcessStartTime)
   try {
     await stopSupersededCodexAcquisition({
@@ -115,19 +115,36 @@ export async function acquireCodexStructuredSession(input: {
       throw new Error(`codex app-server for session ${sessionId} could not be stopped`)
     }
     acquisitions.assertCurrent(sessionId, attempt)
-    const launch = await deps
-      .resolveLaunch({ identity: acquireInput.identity })
-      .catch((error: unknown) => {
-        throw new AgentSessionPreSpawnError(error)
-      })
+    const launch = await deps.resolveLaunch(acquireInput).catch((error: unknown) => {
+      throw new AgentSessionPreSpawnError(error)
+    })
     acquisitions.assertCurrent(sessionId, attempt)
-    const connection = await open(
-      {
-        command: launch.command,
-        args: launch.args,
-        cwd: launch.cwd,
-        env: buildCodexStructuredChildEnvironment(launch, acquireInput.spawnToken, sessionId)
-      },
+    const guard = acquireInput.spawnGuard
+    if (guard) {
+      try {
+        const prepared = await guard.prepare()
+        acquisitions.assertCurrent(sessionId, attempt)
+        if (prepared !== undefined) {
+          throw agentSessionRefusalError('agent_session_operation_invalid', {
+            reason: 'requestMalformed'
+          })
+        }
+        assertSynchronousAuthorization(
+          () => guard.assertCurrent(),
+          () => {
+            throw agentSessionRefusalError('agent_session_operation_invalid', {
+              reason: 'requestMalformed'
+            })
+          }
+        )
+      } catch (error) {
+        throw new AgentSessionPreSpawnError(error)
+      }
+    }
+    const connection = await openCodexStructuredConnection(
+      launch,
+      acquireInput,
+      deps.openConnection,
       {
         onNotification: (method, params) => {
           // Stamped at receipt, ahead of any pre-publication buffering or retry.

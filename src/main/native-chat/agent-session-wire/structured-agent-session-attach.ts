@@ -44,6 +44,7 @@ import { reconcileJournalSubmissionsAgainstHistory } from '../agent-session-jour
 import type { ProviderHistoryWindow } from '../agent-session-journal/journal-submission-reconciler'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { structuredAgentSessionRefusalMessage } from './structured-agent-session-refusal-message'
+import type { TaskStructuredLaunchOrigin } from '../../tasks/task-structured-launch-origin'
 
 /**
  * Everything a client may declare about the session it wants. Deliberately no
@@ -65,6 +66,8 @@ export type AgentSessionAttachParams = {
    *  attach fingerprint: which tab shows the chat is not which conversation it attaches to. */
   surfaceTabId?: string
   launchArgs?: string[]
+  /** Host-only task origin; remote attach schemas cannot supply it. */
+  taskOrigin?: TaskStructuredLaunchOrigin
   /** Omitted only for create-by-intent; the adapter proves the durable handle. */
   providerHandle?: Exclude<AgentSessionProviderHandle, { kind: 'opaque' }>
   /**
@@ -300,6 +303,7 @@ export function reserveRequestFor(input: {
     location: params.location,
     provider: params.provider,
     accountHome: params.accountHome,
+    ...(Object.hasOwn(params, 'taskOrigin') ? { taskOrigin: params.taskOrigin } : {}),
     ...(params.options ? { options: params.options } : {}),
     ...(params.envelope.expectedRuntimeFence === null && params.surfaceTabId
       ? { surfaceTabId: params.surfaceTabId }

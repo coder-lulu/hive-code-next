@@ -1,4 +1,3 @@
-import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
 import {
   AgentSessionPreDispatchError,
@@ -31,7 +30,7 @@ async function context(): Promise<AgentSessionTurnContext> {
         agent: 'codex',
         providerHandle: { kind: 'codex', threadId: THREAD }
       },
-      stateDirectory: join(hostTestState().root, 'settlement')
+      stateDirectory: hostTestState().root
     }),
     fence: 1,
     adapter: adapter(),

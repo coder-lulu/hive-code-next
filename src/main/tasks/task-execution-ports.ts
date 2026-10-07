@@ -1,21 +1,29 @@
 import type { AgentLaunchResult } from '../../shared/agent-launch-intent'
+import type { TaskDeliveryToken } from '../../shared/task-execution/task-command-delivery'
 import type {
   TaskExecutionCancel,
   TaskExecutionStart
 } from '../../shared/task-execution/task-execution-command'
 import type { TaskExecutionRecord, TaskExecutionWorkspace } from './task-execution-record'
 import type { TaskExecutionPersistence } from './task-execution-store'
+import type { TaskWorkflowOutcomeStore } from './task-workflow-outcome-store'
 
 export type TaskExecutionCaller = Readonly<{
   operationCallerKey: string
+  delivery?: TaskDeliveryToken
   // Private host lifetime guard; transport JSON cannot provide it.
   assertCurrent?: () => void
 }>
 export type TaskExecutionAction = 'start' | 'observe' | 'cancel' | 'reconcile'
+export type TaskExecutionDispatchAuthorization = {
+  prepare: () => Promise<void>
+  assertCurrent: () => void
+}
 export type TaskExecutionAuthorization = {
   workspace: TaskExecutionWorkspace
   input: string
   assertCurrent: () => void
+  dispatch?: TaskExecutionDispatchAuthorization
 }
 export type TaskExecutionStopEvidence = {
   runtimeRecordId: string
@@ -38,6 +46,7 @@ export type TaskExecutionCandidate = {
 }
 export type TaskExecutionHostDependencies = {
   store: TaskExecutionPersistence
+  workflowOutcomes?: Pick<TaskWorkflowOutcomeStore, 'read' | 'readCommands' | 'readArtifact'>
   capabilities: () => unknown
   resolveStart?: (command: TaskExecutionCancel) => TaskExecutionStart | null
   authorize: (
@@ -50,6 +59,12 @@ export type TaskExecutionHostDependencies = {
     authorization: TaskExecutionAuthorization
   ) => Promise<AgentLaunchResult>
   stop: (record: TaskExecutionRecord) => Promise<TaskExecutionStopEvidence | null>
+  /** Private original Codex host port; no transport can supply a prelaunch verdict. */
+  settleCancelledDispatch?: (
+    record: TaskExecutionRecord,
+    input: string,
+    validate: () => void
+  ) => Promise<void>
   collect: (record: TaskExecutionRecord) => Promise<TaskExecutionCandidate | null>
   now?: () => number
   evidenceTimeoutMs?: number

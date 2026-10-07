@@ -1,5 +1,4 @@
 import { AGENT_LAUNCH_METHODS } from '../runtime/rpc/methods/agent-launch'
-import { AgentLaunchReplay } from '../runtime/rpc/methods/agent-launch-schemas'
 import { agentLaunchOperationCallerKey } from '../runtime/rpc/methods/agent-launch-replay'
 import type { RpcContext } from '../runtime/rpc/core'
 import {
@@ -11,6 +10,14 @@ import type { TaskExecutionRecord } from './task-execution-record'
 import { refuseTaskExecution } from './task-execution-error'
 import { hasExplicitTuiLaunchCommand } from '../../shared/tui-agent-launch-command-override'
 import { requireTaskLaunchWorkspace, taskLaunchPathKey } from './task-launch-workspace'
+import { taskAgentLaunchParams } from './task-agent-launch-params'
+import { computeAgentLaunchFingerprint } from '../../shared/agent-launch-operation'
+import { taskSessionSourceReference } from '../../shared/task-execution/task-structured-binding'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import {
+  prepareTaskDispatch,
+  requireTaskDispatchAuthorization
+} from './task-dispatch-authorization'
 
 /** Uses the existing replay handler and ledger, including its unknown-outcome refusal. */
 export function createTaskAgentLaunchPort(options: {
@@ -21,7 +28,12 @@ export function createTaskAgentLaunchPort(options: {
   const executor = options.executor ?? 'hivecode'
   const method = AGENT_LAUNCH_METHODS.find((entry) => entry.name === 'agent.launchReplay')!
   return async (record: TaskExecutionRecord, authorization: TaskExecutionAuthorization) => {
-    authorization.assertCurrent()
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
+    const dispatch =
+      executor === 'codex' ? requireTaskDispatchAuthorization(authorization.dispatch) : undefined
+    if (dispatch) {
+      await prepareTaskDispatch(dispatch, () => authorization.assertCurrent())
+    }
     const capabilities = options.capabilities()
     if (
       !capabilities.includes(AGENT_LAUNCH_RUNTIME_CAPABILITY) ||
@@ -37,22 +49,35 @@ export function createTaskAgentLaunchPort(options: {
       return refuseTaskExecution('FORBIDDEN')
     }
     const workspace = await requireTaskLaunchWorkspace(context, record.workspace)
-    authorization.assertCurrent()
-    const params = AgentLaunchReplay.parse({
-      agent: executor,
-      operationId: record.command.operationId,
-      target: { kind: 'existing', worktree: `id:${record.workspace.workspaceId}` },
-      prompt: { text: authorization.input, delivery: 'submit' },
-      agentArgs: null,
-      cwd: workspace.executionPath,
-      presentation: 'background'
-    })
+    assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
+    const params = taskAgentLaunchParams(
+      { ...record, workspace: { ...record.workspace, executionPath: workspace.executionPath } },
+      authorization.input,
+      executor
+    )
+    const taskLaunchOrigin =
+      executor === 'codex'
+        ? {
+            source: taskSessionSourceReference(record),
+            operationCallerKey: record.operationCallerKey,
+            operationId: record.command.operationId,
+            launchFingerprint: computeAgentLaunchFingerprint(params),
+            dispatch,
+            validate: () => {
+              assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
+              if (hasExplicitTuiLaunchCommand(context.runtime.getClientSettings(), executor)) {
+                return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
+              }
+            }
+          }
+        : undefined
     return method.handler(params, {
       ...context,
+      ...(taskLaunchOrigin ? { taskLaunchOrigin } : {}),
       ...(executor === 'codex' ? { requiredAgentLaunchMode: 'structured' as const } : {}),
       assertAgentLaunchCurrent: (intent, spawnScope) => {
-        context.assertAgentLaunchCurrent?.(intent, spawnScope)
-        authorization.assertCurrent()
+        assertTaskAuthorizationCurrent(() => context.assertAgentLaunchCurrent?.(intent, spawnScope))
+        assertTaskAuthorizationCurrent(() => authorization.assertCurrent())
         if (hasExplicitTuiLaunchCommand(context.runtime.getClientSettings(), executor)) {
           return refuseTaskExecution('CAPABILITY_UNAVAILABLE')
         }

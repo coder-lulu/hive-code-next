@@ -7,6 +7,7 @@ import { HiveWorkbenchCompanySection } from './HiveWorkbenchCompanySection'
 import { HiveWorkbenchProjectSection } from './HiveWorkbenchProjectSection'
 import { HiveWorkbenchTeamSection } from './HiveWorkbenchTeamSection'
 import { HiveTaskDialog } from './HiveTaskDialog'
+import { HiveWorkflowSection } from './HiveWorkflowSection'
 
 function workbenchErrorKey(error: string): string {
   if (error.includes('FORBIDDEN')) {
@@ -77,6 +78,12 @@ function WorkbenchContent({ model }: { model: HiveWorkbenchModel }) {
           <HiveWorkbenchTeamSection
             key={`${model.team.project.id}:${model.team.project.binding.bindingRevision}`}
             model={model}
+            team={model.team}
+          />
+        )}
+        {model.team && (
+          <HiveWorkflowSection
+            key={`${model.accountRevision}:${model.team.company.id}:${model.team.project.id}:${model.team.project.binding.bindingRevision}`}
             team={model.team}
           />
         )}

@@ -50,6 +50,7 @@ function contextFor(session: StructuredAgentSessionUnexpectedExitSession) {
   const context: StructuredAgentSessionUnexpectedExitContext<typeof session> = {
     logger: recordingStructuredAgentSessionLogger().logger,
     store: {
+      tasks: { hasSessionBinding: () => false },
       getRecord: () => record,
       transitionHandoff: async (
         _sessionId: string,

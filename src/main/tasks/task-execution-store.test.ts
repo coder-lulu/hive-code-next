@@ -155,7 +155,7 @@ describe('task execution transactions in the runtime record store', () => {
   it('binds one launch and records state and cursor in the same transaction', async () => {
     await store.tasks.admit(admission())
     await store.tasks.beginDispatch(taskCommand(), TASK_TEST_NOW, () => undefined)
-    await store.tasks.bindLaunch(taskCommand(), TASK_TEST_LAUNCH, TASK_TEST_NOW)
+    await store.tasks.bindLaunch(store.tasks.get(taskCommand())!, TASK_TEST_LAUNCH, TASK_TEST_NOW)
     const record = store.tasks.get(taskCommand())!
     expect(record.status).toBe('running')
     expect(record.events.map((event) => event.sequence)).toEqual([1, 2])

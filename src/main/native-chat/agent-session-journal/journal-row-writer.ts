@@ -32,6 +32,8 @@ export type JournalRowWriterDeps = {
    *  transition rides here so no rejection path can bypass it. Bookkeeping: it
    *  runs in its own savepoint, so its failure is reported and never vetoes the row. */
   inTransaction?: JournalRowTransactionHook
+  /** The installed queue collaborator writes only queued_messages, never session-store rows. */
+  inTransactionScope?: 'queued-messages'
   /** After any rollback, so a cache filled inside the transaction cannot outlive it. */
   rolledBack?: () => void
 }
@@ -52,12 +54,15 @@ export class JournalRowWriter {
       assertJournalFence(row.fence, this.deps.highestFence())
       try {
         // One INSERT: the chat's epoch pointer moves only when the epoch does.
-        this.deps.database().transaction((db) => {
-          insertJournalRow(db, this.deps.sessionId, row)
-          hook?.(db, row)
-          receipt?.write(db)
-          this.runBookkeeping(db, row)
-        })
+        this.deps.database().transaction(
+          (db) => {
+            insertJournalRow(db, this.deps.sessionId, row)
+            hook?.(db, row)
+            receipt?.write(db)
+            this.runBookkeeping(db, row)
+          },
+          !hook && !receipt && this.storeRowsUnchanged() ? 'journal' : undefined
+        )
       } catch (error) {
         this.deps.rolledBack?.()
         throw error
@@ -88,12 +93,15 @@ export class JournalRowWriter {
         assertJournalFence(row.fence, this.deps.highestFence())
       }
       try {
-        this.deps.database().transaction((db) => {
-          for (const row of rows) {
-            insertJournalRow(db, this.deps.sessionId, row)
-            this.runBookkeeping(db, row)
-          }
-        })
+        this.deps.database().transaction(
+          (db) => {
+            for (const row of rows) {
+              insertJournalRow(db, this.deps.sessionId, row)
+              this.runBookkeeping(db, row)
+            }
+          },
+          this.storeRowsUnchanged() ? 'journal' : undefined
+        )
       } catch (error) {
         this.deps.rolledBack?.()
         throw error
@@ -139,5 +147,9 @@ export class JournalRowWriter {
         error: error instanceof Error ? error.message : String(error)
       })
     }
+  }
+
+  private storeRowsUnchanged(): boolean {
+    return !this.deps.inTransaction || this.deps.inTransactionScope === 'queued-messages'
   }
 }

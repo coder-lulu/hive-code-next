@@ -8,6 +8,7 @@ import { StructuredConversationCommandController } from './structured-conversati
 
 import type { AgentJournalSnapshot } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionExecutionLocation } from '../../../shared/agent-session-record'
+import type { TaskExecutionRecord } from '../../tasks/task-execution-record'
 import type * as SessionWire from '../../../shared/agent-session-wire'
 import type { AgentSessionAttachParams } from './structured-agent-session-attach'
 import { createRestartReconciler } from './structured-agent-session-restart-reconcile'
@@ -211,6 +212,9 @@ export class StructuredAgentSessionHost {
    *  `user-close` makes a turn it cuts short the user's cancellation; an `evict` leaves it news. */
   close: StructuredAgentSessionConversationLifetime['close'] = (sessionId, cause) =>
     this.lifetime.close(sessionId, cause)
+
+  /** Private Task stop surface; opens at rest under the original session's serialize. */
+  closeTaskExecution = (record: TaskExecutionRecord) => this.lifetime.closeTaskExecution(record)
 
   supportsCreate = (location: AgentSessionExecutionLocation, agent: string): boolean =>
     providerSupport.adapterSupportsCreate(this.deps.adapter, location, agent)

@@ -2,6 +2,20 @@ import { createHash } from 'node:crypto'
 import { lstat, readFile, readdir } from 'node:fs/promises'
 import { join } from 'node:path'
 
+/** Only the reviewed, provider-free lifecycle module may enter the restricted service. */
+export async function paperclipExternalExecutionSourceDigest(
+  source,
+  relativeModule = 'server/src/services/external-execution.ts'
+) {
+  const module = join(source, relativeModule)
+  const metadata = await lstat(module)
+  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > 256 * 1024) {
+    throw new Error('Unexpected Paperclip external execution source')
+  }
+  const content = (await readFile(module, 'utf8')).replaceAll('\r\n', '\n')
+  return createHash('sha256').update(content).digest('hex')
+}
+
 /** Freeze the actual DB/shared source and migration bytes, not just .git/HEAD. */
 export async function paperclipDatabaseSourceDigest(source) {
   const files = [

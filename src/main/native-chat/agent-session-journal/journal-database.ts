@@ -198,11 +198,39 @@ function migrateJournalSchema(
  * synchronous by contract: an await inside it would let another chat's statements land in this
  * transaction.
  */
+type JournalTransactionFailureOutcome = 'rolled_back' | 'unconfirmed'
+const transactionScopes = new WeakMap<Database.Database, object>()
+const transactionFailures = new WeakMap<
+  object,
+  {
+    db: Database.Database
+    scope: object
+    outcome: JournalTransactionFailureOutcome
+  }
+>()
+
+/** Consume only this database's most recent transaction proof, bound to its original thrown object. */
+export function takeJournalTransactionFailureOutcome(
+  error: unknown,
+  db: Database.Database
+): JournalTransactionFailureOutcome | undefined {
+  if (typeof error !== 'object' || error === null) {
+    return
+  }
+  const failure = transactionFailures.get(error)
+  transactionFailures.delete(error)
+  return failure?.db === db && failure.scope === transactionScopes.get(db)
+    ? failure.outcome
+    : undefined
+}
+
 export function runJournalTransaction<T>(
   db: Database.Database,
   run: (db: Database.Database) => T,
   onStranded: () => void = () => undefined
 ): T {
+  const scope = {}
+  transactionScopes.set(db, scope)
   db.exec('BEGIN IMMEDIATE')
   try {
     const result = run(db)
@@ -210,11 +238,16 @@ export function runJournalTransaction<T>(
       throw new Error('a chat journal transaction must not await')
     }
     db.exec('COMMIT')
+    transactionScopes.set(db, scope)
     return result
   } catch (error) {
+    let outcome: JournalTransactionFailureOutcome = 'unconfirmed'
     if (db.isTransaction) {
       try {
         db.exec('ROLLBACK')
+        if (!db.isTransaction) {
+          outcome = 'rolled_back'
+        }
       } catch (rollbackError) {
         console.warn(
           '[agent-session-journal] rolling back a failed transaction failed',
@@ -222,6 +255,10 @@ export function runJournalTransaction<T>(
         )
         onStranded()
       }
+    }
+    transactionScopes.set(db, scope)
+    if (typeof error === 'object' && error !== null) {
+      transactionFailures.set(error, { db, scope, outcome })
     }
     throw error
   }

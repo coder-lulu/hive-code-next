@@ -3,14 +3,17 @@ import {
   HiveRuntimeAdapterConfig,
   hiveRuntimeSessionCodec,
   type HiveRuntimeAdapterPorts,
+  type HiveRuntimeBindingPurpose,
   type PaperclipTaskExecutionContext
 } from './paperclip-adapter-contract'
 import { TaskExecutionError } from './task-execution-error'
+import { isTaskDockerEnforcementPolicy } from './task-docker-enforcement'
 
 /** The binding resolver must read a committed facade binding; adapter config never creates grants. */
 export async function requirePaperclipTaskBinding(
   context: PaperclipTaskExecutionContext,
-  ports: HiveRuntimeAdapterPorts
+  ports: HiveRuntimeAdapterPorts,
+  purpose: HiveRuntimeBindingPurpose
 ) {
   const config = HiveRuntimeAdapterConfig.safeParse(context.config)
   if (
@@ -30,7 +33,7 @@ export async function requirePaperclipTaskBinding(
     throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
   }
   const binding = HiveRuntimeAdapterBinding.safeParse(
-    await ports.resolveBinding(context.agent.companyId, context.runId)
+    await ports.resolveBinding(context.agent.companyId, context.runId, purpose)
   )
   if (
     !binding.success ||
@@ -42,7 +45,8 @@ export async function requirePaperclipTaskBinding(
     binding.data.command.profileId !== config.data.profileId ||
     binding.data.command.profileRevision !== config.data.profileRevision ||
     binding.data.command.ownerScope.kind !== 'personalTenant' ||
-    binding.data.command.executionPolicy.trustMode !== 'trusted_personal_preview'
+    (binding.data.command.executionPolicy.trustMode !== 'trusted_personal_preview' &&
+      !isTaskDockerEnforcementPolicy(binding.data.command.executionPolicy))
   ) {
     throw new TaskExecutionError('FORBIDDEN')
   }

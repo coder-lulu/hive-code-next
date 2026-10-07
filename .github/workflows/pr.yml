@@ -244,6 +244,31 @@ jobs:
       - uses: ./.github/actions/install-mobile-dependencies
         if: needs.code_paths.outputs.static_analysis == 'true' && needs.code_paths.outputs.mobile_dependencies == 'true'
 
+      - name: Prepare pinned Paperclip types for changed kernel sources
+        if: needs.code_paths.outputs.static_analysis == 'true'
+        env:
+          PREFLIGHT_PR_BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          base="$(node config/scripts/git-pull-request-diff-base.mjs "$PREFLIGHT_PR_BASE")"
+          if [ -z "$(git diff --name-only "$base" HEAD -- integration/paperclip/core/case-kernel)" ]; then exit 0; fi
+          revision="$(node --input-type=module -e "import fs from 'node:fs'; const p=JSON.parse(fs.readFileSync('integration/paperclip/compatibility-manifest.json','utf8')).paperclip; if(p.repository!=='https://github.com/paperclipai/paperclip'||!/^[a-f0-9]{40}$/.test(p.revision)) throw Error('Invalid pinned Paperclip source'); process.stdout.write(p.revision)")"
+          mkdir -p logs/paperclip-p1/paperclip
+          git init logs/paperclip-p1/paperclip
+          git -C logs/paperclip-p1/paperclip remote add origin https://github.com/paperclipai/paperclip
+          git -C logs/paperclip-p1/paperclip -c core.autocrlf=false fetch --depth=1 origin "$revision"
+          git -C logs/paperclip-p1/paperclip checkout --detach "$revision"
+          pnpm --dir logs/paperclip-p1/paperclip --filter @paperclipai/db... install --ignore-scripts --frozen-lockfile
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs/promises'
+          import { paperclipDatabaseSourceDigest } from './config/scripts/paperclip-source-proof.mjs'
+          import { verifyPaperclipCaseKernelSources } from './config/scripts/paperclip-case-kernel-source.mjs'
+          const manifest = JSON.parse(await fs.readFile('integration/paperclip/compatibility-manifest.json', 'utf8'))
+          if (await paperclipDatabaseSourceDigest('logs/paperclip-p1/paperclip') !== manifest.paperclip.databaseSourceDigest) {
+            throw new Error('Paperclip declared types differ from the pinned source')
+          }
+          await verifyPaperclipCaseKernelSources(process.cwd(), manifest)
+          NODE
+
       - name: Enforce changed-code quality
         if: '!cancelled()'
         id: changed-code-quality

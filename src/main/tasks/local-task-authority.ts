@@ -7,6 +7,7 @@ import type {
   TaskExecutionCaller
 } from './task-execution-host'
 import { refuseTaskExecution } from './task-execution-error'
+import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 
 export type LocalTaskGrant = TaskExecutionAuthorization & {
   command: TaskExecutionStart
@@ -14,6 +15,7 @@ export type LocalTaskGrant = TaskExecutionAuthorization & {
   accountId: string
   authorityId: string
   sessionGeneration: number
+  runtimeOwnershipEpoch: number
   validUntil: number
   actions: readonly TaskExecutionAction[]
 }
@@ -38,27 +40,35 @@ export function createLocalTaskAuthorizer(deps: LocalTaskAuthorityDependencies) 
     command: TaskExecutionStart,
     action: TaskExecutionAction
   ) => {
+    const expiresAt = Date.parse(command.expiresAt)
     const grant = deps.resolveGrant(command.authorizationRef)
-    if (!grant) {
+    if (
+      !grant ||
+      !Number.isFinite(expiresAt) ||
+      expiresAt <= now() ||
+      expiresAt > grant.validUntil
+    ) {
       return refuseTaskExecution('FORBIDDEN')
     }
     const assertCurrent = () => {
+      const currentTime = now()
       const account = deps.currentAccount()
       const runtime = deps.currentRuntime()
       if (
         deps.resolveGrant(command.authorizationRef) !== grant ||
         !account ||
         !runtime ||
-        account.sessionExpiresAt <= now() ||
-        grant.validUntil <= now() ||
-        Date.parse(command.expiresAt) > grant.validUntil ||
-        Date.parse(command.expiresAt) <= now() ||
+        !Number.isFinite(account.sessionExpiresAt) ||
+        account.sessionExpiresAt <= currentTime ||
+        !Number.isFinite(grant.validUntil) ||
+        grant.validUntil <= currentTime ||
         account.accountId !== grant.accountId ||
         account.authorityId !== grant.authorityId ||
         account.sessionGeneration !== grant.sessionGeneration ||
         runtime.accountId !== account.accountId ||
         runtime.runtimeRecordId !== command.runtimeRecordId ||
-        runtime.ownershipEpoch !== command.ownershipEpoch ||
+        runtime.ownershipEpoch !== grant.runtimeOwnershipEpoch ||
+        (action === 'start' && runtime.ownershipEpoch !== command.ownershipEpoch) ||
         caller.operationCallerKey !== grant.operationCallerKey ||
         !grant.actions.includes(action) ||
         computeTaskExecutionFingerprint(command, caller.operationCallerKey) !==
@@ -66,7 +76,7 @@ export function createLocalTaskAuthorizer(deps: LocalTaskAuthorityDependencies) 
       ) {
         return refuseTaskExecution('FORBIDDEN')
       }
-      grant.assertCurrent()
+      assertTaskAuthorizationCurrent(() => grant.assertCurrent())
     }
     assertCurrent()
     return { workspace: grant.workspace, input: grant.input, assertCurrent }

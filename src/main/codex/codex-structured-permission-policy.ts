@@ -4,6 +4,7 @@ import { resolvedTuiAgentArgsBypassPermissions } from '../../shared/tui-agent-la
 export type CodexStructuredPermissionPolicy =
   | { approvalPolicy: 'never'; sandbox: 'danger-full-access' }
   | { approvalPolicy: 'on-request'; sandbox: 'workspace-write' }
+  | { approvalPolicy: 'never'; sandbox: 'workspace-write' }
 
 /** Yolo: no approval prompts, no sandbox. */
 const BYPASS_POLICY = { approvalPolicy: 'never', sandbox: 'danger-full-access' } as const

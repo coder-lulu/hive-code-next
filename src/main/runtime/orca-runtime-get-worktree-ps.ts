@@ -146,6 +146,7 @@ export class OrcaRuntimeWithGetWorktreePs extends OrcaRuntimeWithStartTuiIdleVis
       claimKeyId: this.agentSessionClaimSigner.keyId,
       // The host's local trace file (the desktop's or orcad's own), plus the console.
       logger: createStructuredAgentSessionLogger(),
+      ...(this.taskCodexAccounts ? { taskCodexAccounts: this.taskCodexAccounts } : {}),
       // Resolves folder workspaces as well as git worktrees, so a chat session
       // in a plain folder lands in the folder rather than failing to resolve.
       resolveWorkspacePath: async (workspaceId) =>

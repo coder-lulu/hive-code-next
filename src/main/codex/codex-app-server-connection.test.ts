@@ -56,6 +56,9 @@ const FAKE_APP_SERVER = String.raw`
     if (message.method === 'test/env') {
       return send({ id: message.id, result: { codexHome: process.env.CODEX_HOME ?? null } })
     }
+    if (message.method === 'test/env-presence') {
+      return send({ id: message.id, result: { secretInherited: process.env.HIVE_DOCKER_TEST_PARENT_SECRET !== undefined, codexHome: process.env.CODEX_HOME ?? null } })
+    }
     if (message.method === 'test/cwd') {
       return send({ id: message.id, result: { cwd: process.cwd() } })
     }
@@ -277,6 +280,34 @@ describe('openCodexAppServerConnection', () => {
 
     await expect(connection.request('test/cwd')).resolves.toEqual({ cwd: workspace })
     await connection.close()
+  })
+
+  it('starts a boundary transport with a replacement environment and no inherited secrets', async () => {
+    const original = process.env.HIVE_DOCKER_TEST_PARENT_SECRET
+    process.env.HIVE_DOCKER_TEST_PARENT_SECRET = 'synthetic-parent-only'
+    let connection: CodexAppServerConnection | undefined
+    try {
+      connection = await openCodexAppServerConnection({
+        command: process.execPath,
+        args: ['-e', FAKE_APP_SERVER],
+        environmentMode: 'replace',
+        env: {
+          ...(process.env.SystemRoot ? { SystemRoot: process.env.SystemRoot } : {}),
+          CODEX_HOME: '/container-only'
+        }
+      })
+      expect(await connection.request('test/env-presence')).toEqual({
+        secretInherited: false,
+        codexHome: '/container-only'
+      })
+    } finally {
+      await connection?.close()
+      if (original === undefined) {
+        delete process.env.HIVE_DOCKER_TEST_PARENT_SECRET
+      } else {
+        process.env.HIVE_DOCKER_TEST_PARENT_SECRET = original
+      }
+    }
   })
 
   it('routes a server request to the handler and writes the reply back', async () => {

@@ -1,6 +1,7 @@
 import { loadHiveRuntimeState, writeHiveRuntimeState } from './agent-session-hive-state-rows'
-// The agent-session store's rows in the host's chat journal database: every row loaded once at open,
-// exactly the rows a transaction changed written back, and the one-time copy of the records file.
+import { isDeepStrictEqual as same } from 'node:util'
+// The agent-session store's rows in the host journal: snapshots of committed rows, exactly the
+// changed rows written back, and the one-time copy of the records file.
 //
 // A record row this build cannot read is derived as unreadable at each load and never rewritten: a
 // write only touches changed rows, and every mutation of an unreadable id is refused.
@@ -78,13 +79,14 @@ function unreadableRecordReason(value: unknown): string {
 }
 
 /**
- * The whole store, read once. Every lease loads unreconciled: the process that wrote it may still
- * be alive, so nothing persisted grants a writer until this host adjudicates it. Operation, key and
+ * A committed store snapshot. Cold loads reconcile every lease; hot reads retain only unchanged
+ * prior records, so persisted fields never grant an unproved writer. Operation, key and
  * tab rows this build cannot read are skipped, as a record row it cannot read is set aside.
  */
 export function loadAgentSessionStoreRows(
   db: Database.Database,
-  hostId: string
+  hostId: string,
+  previous?: AgentSessionStoreState
 ): AgentSessionStoreState {
   const state: AgentSessionStoreState = {
     schemaVersion: AGENT_SESSION_STORE_SCHEMA_VERSION,
@@ -114,10 +116,20 @@ export function loadAgentSessionStoreRows(
     const value = parsed.ok ? parsed.value : text(row, 'record_json')
     if (parsed.ok && isReadableAgentSessionStoreRecord(sessionId, value)) {
       const { record } = normalizeLegacyHandoffRecord(value)
-      state.records.set(sessionId, {
+      const prior = previous?.records.get(sessionId)
+      const candidate = {
         ...record,
-        lease: { ...withoutRetiredLeaseLatches(record.lease), unreconciled: true }
-      })
+        lease: {
+          ...withoutRetiredLeaseLatches(record.lease),
+          unreconciled: prior?.lease.unreconciled ?? true
+        }
+      }
+      state.records.set(
+        sessionId,
+        prior && same(prior, candidate)
+          ? prior
+          : { ...candidate, lease: { ...candidate.lease, unreconciled: true } }
+      )
     } else {
       state.unreadableRecords.set(sessionId, { reason: unreadableRecordReason(value), raw: value })
     }

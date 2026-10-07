@@ -1,9 +1,94 @@
+import { rm } from 'node:fs/promises'
 import { describe, expect, it, vi } from 'vitest'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { createRestartReconciler } from './structured-agent-session-restart-reconcile'
+import { closeTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
+import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
+import { taskStructuredFixture } from '../../tasks/task-structured-reservation.test-fixture'
+import {
+  taskTestDirectory,
+  taskWorkspace,
+  TASK_TEST_NOW
+} from '../../tasks/task-execution.test-fixture'
+
+async function unresolvedTaskStore(directory: string) {
+  const fixture = taskStructuredFixture(taskWorkspace(directory))
+  let store = await openTestAgentSessionRecordStore(directory)
+  await store.tasks.admit(fixture.admission)
+  await store.tasks.beginDispatch(fixture.command, TASK_TEST_NOW, fixture.validate)
+  await store.admitOperation({
+    callerKey: fixture.outer.callerKey,
+    operationId: fixture.outer.operationId,
+    fingerprint: fixture.outer.fingerprint,
+    now: TASK_TEST_NOW
+  })
+  await store.claimOperation(fixture.outer)
+  await store.reserveOwner(fixture.request)
+  closeTestJournalHostDatabase(directory)
+  store = await openTestAgentSessionRecordStore(directory)
+  return { store, fixture }
+}
 
 describe('createRestartReconciler', () => {
+  it.each(['fresh-session', 'startup'])(
+    'keeps an unverifiable Task fenced without blocking %s',
+    async (requested) => {
+      const directory = await taskTestDirectory()
+      try {
+        const { store, fixture } = await unresolvedTaskStore(directory)
+        const binding = store.tasks.get(fixture.command)?.structuredBinding
+        const reconcile = createRestartReconciler({
+          store,
+          probe: async () => ({ outcome: 'execution-host-unverifiable' }),
+          now: () => TASK_TEST_NOW
+        })
+        expect(await reconcile(requested)).toBeNull()
+        expect(store.listRecords()).toHaveLength(1)
+        expect(store.getRecord(fixture.request.sessionId)?.lease.unreconciled).toBe(true)
+        expect(store.tasks.get(fixture.command)?.structuredBinding).toEqual(binding)
+        expect(await reconcile(fixture.request.sessionId)).toMatchObject({
+          code: 'execution_owner_reconciling'
+        })
+        const reopened = await openTestAgentSessionRecordStore(directory)
+        expect(reopened.getRecord(fixture.request.sessionId)?.lease.unreconciled).toBe(true)
+        expect(reopened.tasks.get(fixture.command)?.result).toBeNull()
+      } finally {
+        closeTestJournalHostDatabase(directory)
+        await rm(directory, { recursive: true, force: true })
+      }
+    }
+  )
+  it('shares the probe flight while answering each original requested target separately', async () => {
+    const directory = await taskTestDirectory()
+    try {
+      const { store, fixture } = await unresolvedTaskStore(directory)
+      const reconcile = createRestartReconciler({
+        store,
+        probe: async () => ({ outcome: 'execution-host-unverifiable' }),
+        now: () => TASK_TEST_NOW
+      })
+      const [fresh, old] = await Promise.all([
+        reconcile('fresh-session'),
+        reconcile(fixture.request.sessionId)
+      ])
+      expect(fresh).toBeNull()
+      expect(old).toMatchObject({ code: 'execution_owner_reconciling' })
+      expect(store.getRecord(fixture.request.sessionId)?.lease.unreconciled).toBe(true)
+      const brokenProbe = createRestartReconciler({
+        store,
+        probe: async () => {
+          throw new Error('synthetic probe failure')
+        },
+        now: () => TASK_TEST_NOW
+      })
+      await expect(brokenProbe('fresh-session')).rejects.toThrow('synthetic probe failure')
+      expect(store.getRecord(fixture.request.sessionId)?.lease.unreconciled).toBe(true)
+    } finally {
+      closeTestJournalHostDatabase(directory)
+      await rm(directory, { recursive: true, force: true })
+    }
+  })
   it('reruns after an external store refresh introduces unreconciled leases', async () => {
     let record = { sessionId: 'session-1', lease: { unreconciled: true } } as AgentSessionRecord
     const reconcileOnRestart = vi.fn(async () => {

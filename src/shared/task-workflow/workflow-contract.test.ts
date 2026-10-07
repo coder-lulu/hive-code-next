@@ -104,6 +104,12 @@ describe('finite workflow definition', () => {
   it('accepts the product-development-test-ops chain', () => {
     expect(workflowDefinitionRefusal(definition)).toBeNull()
   })
+  it.each(['', ' \t\r\n'])('requires nonblank stage acceptance criteria %j', (criterion) => {
+    const changed = structuredClone(definition)
+    changed.stages[1].acceptanceCriteria = [criterion]
+    expect(workflowDefinitionRefusal(changed)).toBe('workflow_definition_invalid')
+    expect(WorkflowDefinitionSchema.safeParse(changed).success).toBe(false)
+  })
   it.each([
     [
       'workflow_duplicate_stage',

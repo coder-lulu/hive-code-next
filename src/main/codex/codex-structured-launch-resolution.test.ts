@@ -253,6 +253,29 @@ describe('codex structured launch resolution', () => {
     await expect(resolverFor(null)({ identity: IDENTITY })).rejects.toThrow(/no durable/)
   })
 
+  it.each([undefined, null, { kind: 'task_execution' }])(
+    'refuses a present Task source before any personal workspace launch (%j)',
+    async (taskSource) => {
+      const session = record()
+      Object.defineProperty(session, 'taskSource', { value: taskSource, enumerable: true })
+      const resolveWorkspacePath = vi.fn(async () => '/must-not-open-personal')
+      await expect(
+        resolverFor(session, resolveWorkspacePath)({ identity: IDENTITY })
+      ).rejects.toThrow('TASK_DOCKER_RUNTIME_UNAVAILABLE')
+      expect(resolveWorkspacePath).not.toHaveBeenCalled()
+    }
+  )
+
+  it('refuses present Task context on a personal record before resolving launch data', async () => {
+    const input = { identity: IDENTITY }
+    Object.defineProperty(input, 'taskOrigin', { value: undefined, enumerable: true })
+    const resolveWorkspacePath = vi.fn(async () => '/must-not-open-personal')
+    await expect(resolverFor(record(), resolveWorkspacePath)(input)).rejects.toThrow(
+      'TASK_DOCKER_RUNTIME_UNAVAILABLE'
+    )
+    expect(resolveWorkspacePath).not.toHaveBeenCalled()
+  })
+
   it('surfaces a workspace that no longer resolves instead of falling back to a default cwd', async () => {
     await expect(
       resolverFor(record(), async () => {

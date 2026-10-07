@@ -1,4 +1,5 @@
-import { mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { existsSync, mkdirSync, readdirSync, renameSync, writeFileSync } from 'node:fs'
+import { mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { taskTestDirectory } from './task-execution.test-fixture'
@@ -17,6 +18,76 @@ async function fixture() {
   return { source, directory: join(root, 'copies'), assertCurrent: () => undefined }
 }
 describe('task workspace isolation', () => {
+  it('refuses an async guard before creating a managed execution directory', async () => {
+    const options = await fixture()
+    await expect(
+      createTaskManagedCopy({
+        ...options,
+        assertCurrent: () => Promise.resolve()
+      })
+    ).rejects.toThrow('FORBIDDEN')
+    expect(existsSync(options.directory)).toBe(false)
+  })
+  it('rolls back its owned copy when a later guard starts returning a pending Promise', async () => {
+    const options = await fixture()
+    await writeFile(join(options.source, 'input.txt'), 'source remains owned by the user')
+    let calls = 0
+    await expect(
+      createTaskManagedCopy({
+        ...options,
+        assertCurrent: () => (++calls === 1 ? undefined : new Promise<void>(() => undefined))
+      })
+    ).rejects.toThrow('FORBIDDEN')
+    expect(readdirSync(options.directory)).toEqual([])
+    expect(await readFile(join(options.source, 'input.txt'), 'utf8')).toBe(
+      'source remains owned by the user'
+    )
+  })
+  it('fences its captured proof when the original callback later returns a Promise', async () => {
+    const options = await fixture()
+    let pending = false
+    const copy = await createTaskManagedCopy({
+      ...options,
+      assertCurrent: () => (pending ? Promise.resolve() : undefined)
+    })
+    pending = true
+    expect(() => copy.assertCurrent()).toThrow('FORBIDDEN')
+  })
+  it('preserves a replacement directory when preparation loses its original identity', async () => {
+    const options = await fixture()
+    let replacement = ''
+    await expect(
+      createTaskManagedCopy({
+        ...options,
+        assertCurrent: () => {
+          if (!existsSync(options.directory)) {
+            return
+          }
+          const entry = readdirSync(options.directory).find((name) => name.startsWith('execution-'))
+          if (!entry || replacement) {
+            return
+          }
+          replacement = join(options.directory, entry)
+          renameSync(replacement, `${replacement}-original`)
+          mkdirSync(replacement)
+          writeFileSync(join(replacement, 'unowned.txt'), 'keep this')
+          throw new Error('revoked')
+        }
+      })
+    ).rejects.toThrow('revoked')
+    expect(await readFile(join(replacement, 'unowned.txt'), 'utf8')).toBe('keep this')
+  })
+  it.each(['source', 'execution'] as const)(
+    'fences replacement of the %s directory after copying',
+    async (kind) => {
+      const options = await fixture()
+      const copy = await createTaskManagedCopy(options)
+      const path = kind === 'source' ? options.source : copy.executionPath
+      await rename(path, `${path}-original`)
+      await mkdir(path)
+      expect(() => copy.assertCurrent()).toThrow('FORBIDDEN')
+    }
+  )
   it('keeps dirty/untracked files and preserves later user edits in an independent copy', async () => {
     const options = await fixture()
     await writeFile(join(options.source, 'dirty.txt'), 'uncommitted')

@@ -10,9 +10,11 @@ let container: HTMLDivElement, root: Root, current: ReturnType<typeof useHiveTas
 let accountChanged: () => void
 const list = vi.fn(),
   create = vi.fn(),
-  artifact = vi.fn()
+  artifact = vi.fn(),
+  cancel = vi.fn()
 const task: HiveTaskView = {
   id: 'task:test',
+  runId: 'run:test',
   title: 'Task',
   status: 'succeeded',
   artifactRefs: ['artifact:test']
@@ -30,10 +32,11 @@ beforeEach(() => {
   list.mockReset().mockResolvedValue([])
   create.mockReset().mockResolvedValue(task)
   artifact.mockReset().mockResolvedValue({ name: 'report.md', text: 'private report' })
+  cancel.mockReset().mockResolvedValue(task)
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {
-      hiveTasks: { list, create, artifact, cancel: vi.fn() },
+      hiveTasks: { list, create, artifact, cancel },
       hiveAccount: {
         onStateChanged: (listener: () => void) => {
           accountChanged = listener
@@ -111,7 +114,7 @@ describe('Codex task page account and request races', () => {
       root.render(<Harness open />)
     })
     await act(async () => {
-      await current.readArtifact(task.id, 'artifact:test')
+      await current.readArtifact(task.id, task.runId, 'artifact:test')
     })
     expect(current.artifact?.text).toBe('private report')
     await act(async () => {
@@ -136,5 +139,28 @@ describe('Codex task page account and request races', () => {
       finish([task])
     })
     expect(current.tasks).toEqual([])
+  })
+  it('keeps cancellation and artifact access scoped to the selected run after a refresh', async () => {
+    list.mockResolvedValue([task])
+    await act(async () => {
+      root.render(<Harness open />)
+    })
+    const selected = current.tasks[0]
+    expect(selected).toBeDefined()
+    if (!selected) {
+      throw new Error('Missing selected task')
+    }
+    const next = { ...task, runId: 'run:next' }
+    list.mockResolvedValue([next])
+    await act(async () => {
+      await current.refresh()
+    })
+    expect(current.tasks).toEqual([next])
+    await act(async () => {
+      await current.cancel(selected.id, selected.runId)
+      await current.readArtifact(selected.id, selected.runId, selected.artifactRefs[0])
+    })
+    expect(cancel).toHaveBeenCalledWith(task.id, task.runId)
+    expect(artifact).toHaveBeenCalledWith(task.id, task.runId, 'artifact:test')
   })
 })

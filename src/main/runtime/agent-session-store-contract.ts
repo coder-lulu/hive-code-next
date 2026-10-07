@@ -3,6 +3,10 @@ import type { AgentSessionOperationRow } from '../../shared/agent-session-operat
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import type { HiveAgentSessionEntry } from '../../shared/hive-agent-session-entry'
 import type { TaskExecutionRecord } from '../tasks/task-execution-record'
+export type AgentSessionRecordTransition = (
+  record: AgentSessionRecord,
+  taskExecutions?: ReadonlyMap<string, TaskExecutionRecord>
+) => AgentSessionRecord
 
 export const AGENT_SESSION_STORE_SCHEMA_VERSION = 4 as const
 

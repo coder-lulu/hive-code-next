@@ -119,3 +119,22 @@ export function admitTaskExecution(state: AgentSessionStoreState, input: TaskExe
   records.set(key, record)
   return { created: true, record: structuredClone(record) }
 }
+export function beginTaskDispatch(
+  state: AgentSessionStoreState,
+  record: TaskExecutionRecord,
+  validate: (record: TaskExecutionRecord) => void
+): TaskExecutionRecord | null {
+  validate(record)
+  if (state.taskRecoveryBlocked) {
+    return refuseTaskExecution('OUTCOME_UNKNOWN')
+  }
+  if (
+    record.status !== 'accepted' ||
+    record.result ||
+    record.cancellationKey ||
+    record.dispatch !== 'not_dispatched'
+  ) {
+    return null
+  }
+  return { ...record, dispatch: 'dispatching' }
+}

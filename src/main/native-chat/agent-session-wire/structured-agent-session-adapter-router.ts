@@ -44,8 +44,19 @@ export class StructuredAgentSessionAdapterRouter implements StructuredAgentSessi
     return acquired
   }
 
-  async releaseAcquisition(input: { sessionId: string }): Promise<boolean> {
+  async releaseAcquisition(input: { sessionId: string; agent?: string }): Promise<boolean> {
     const route = this.routes.get(input.sessionId)
+    if (input.agent !== undefined) {
+      const adapter = this.adapterForAgent(input.agent)
+      if (!adapter || (route && route.adapter !== adapter)) {
+        return false
+      }
+      const released = (await adapter.releaseAcquisition?.(input)) === true
+      if (released) {
+        this.routes.delete(input.sessionId)
+      }
+      return released
+    }
     if (route) {
       try {
         return (await route.adapter.releaseAcquisition?.(input)) === true

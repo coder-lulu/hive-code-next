@@ -26,21 +26,24 @@ export type HiveTaskRequestContext = {
   request(path: string, body?: unknown): Promise<unknown>
 }
 
+export function assertHiveWorkbenchCompanyOwner(
+  binding: HiveWorkbenchCompany['binding'],
+  accountRef: string
+): void {
+  if (
+    binding.ownerAccountRef !== accountRef ||
+    binding.ownerActorRef !== `actor:${accountRef.slice('account:'.length)}` ||
+    binding.ownerScope.kind !== 'personalTenant' ||
+    binding.ownerScope.tenantRef !== accountRef
+  ) {
+    refuseTaskExecution('FORBIDDEN')
+  }
+}
+
 export function createHiveTeamWorkbenchFacade(options: {
   context(): Promise<HiveTaskRequestContext>
   validateWorkspace(selector: string): Promise<HiveTaskWorkspaceProof>
 }): HiveTeamWorkbenchApi {
-  const assertCompany = (company: HiveWorkbenchCompany, caller: HiveTaskRequestContext) => {
-    const binding = company.binding
-    if (
-      binding.ownerAccountRef !== caller.accountRef ||
-      binding.ownerActorRef !== `actor:${caller.accountRef.slice('account:'.length)}` ||
-      binding.ownerScope.kind !== 'personalTenant' ||
-      binding.ownerScope.tenantRef !== caller.accountRef
-    ) {
-      return refuseTaskExecution('FORBIDDEN')
-    }
-  }
   return {
     async listCompanies(rawQuery = {}) {
       const query = HiveWorkbenchPageQuerySchema.parse(rawQuery)
@@ -48,7 +51,9 @@ export function createHiveTeamWorkbenchFacade(options: {
       const result = HiveWorkbenchCompanyPageSchema.parse(
         await caller.request('/hive/workbench/companies/list', query)
       )
-      result.items.forEach((company) => assertCompany(company, caller))
+      result.items.forEach((company) =>
+        assertHiveWorkbenchCompanyOwner(company.binding, caller.accountRef)
+      )
       return result
     },
     async createCompany(rawInput) {
@@ -57,7 +62,7 @@ export function createHiveTeamWorkbenchFacade(options: {
       const result = HiveWorkbenchCompanySchema.parse(
         await caller.request('/hive/workbench/companies/create', input)
       )
-      assertCompany(result, caller)
+      assertHiveWorkbenchCompanyOwner(result.binding, caller.accountRef)
       if (result.name !== input.name) {
         return refuseTaskExecution('REVISION_CONFLICT')
       }
@@ -101,7 +106,7 @@ export function createHiveTeamWorkbenchFacade(options: {
       const result = HiveWorkbenchTeamSchema.parse(
         await caller.request('/hive/workbench/team/read', { projectId })
       )
-      assertCompany(result.company, caller)
+      assertHiveWorkbenchCompanyOwner(result.company.binding, caller.accountRef)
       if (result.project.id !== projectId) {
         return refuseTaskExecution('REVISION_CONFLICT')
       }
@@ -113,7 +118,7 @@ export function createHiveTeamWorkbenchFacade(options: {
       const result = HiveWorkbenchTeamSchema.parse(
         await caller.request('/hive/workbench/team/configure', input)
       )
-      assertCompany(result.company, caller)
+      assertHiveWorkbenchCompanyOwner(result.company.binding, caller.accountRef)
       if (
         result.project.id !== input.projectId ||
         result.project.binding.bindingRevision !== input.expectedRevision + 1 ||

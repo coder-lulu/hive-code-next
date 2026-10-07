@@ -20,6 +20,7 @@ import type {
   AgentSessionJournalIdentity
 } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionProviderHandleLink } from '../../../shared/agent-session-provider-handle'
+import type { TaskStructuredLaunchOrigin } from '../../tasks/task-structured-launch-origin'
 import type {
   AgentSessionAccountHome,
   AgentSessionExecutionLocation,
@@ -231,6 +232,9 @@ export type StructuredAgentSessionAcquireInput = {
   /** Durably records the child's identity the moment it exists, before any handshake, so a crash
    *  mid-start leaves an owner recovery can stop. The acquisition's `process` must match it. */
   onSpawned?: (process: AgentSessionProcessIdentity) => Promise<void>
+  /** Host-only source guard after launch preparation and again in the synchronous spawn frame. */
+  spawnGuard?: { prepare: () => Promise<void>; assertCurrent: () => void }
+  taskOrigin?: TaskStructuredLaunchOrigin
 }
 
 export type StructuredAgentSessionSetOptionInput = {
@@ -253,7 +257,7 @@ export type StructuredAgentSessionAdapter = StructuredAgentSessionAdapterStop & 
    *  Returns true only after provider child exit is proven. Throws
    *  `AgentSessionAcquisitionRootExitObservedError` when the provider root's own
    *  exit was observed first-hand but its descendants were not proven gone. */
-  releaseAcquisition?(input: { sessionId: string }): Promise<boolean>
+  releaseAcquisition?(input: { sessionId: string; agent?: string }): Promise<boolean>
   dispatch(input: {
     sessionId: string
     clientMessageId: string

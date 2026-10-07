@@ -148,7 +148,10 @@ export function HiveTaskDialog({ label }: { label?: string }) {
               <p className="py-3 text-sm text-muted-foreground">{t('hiveTasks.empty')}</p>
             )}
             {tasks.tasks.map((task) => (
-              <div key={task.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+              <div
+                key={task.runId}
+                className="flex flex-wrap items-center justify-between gap-2 py-3"
+              >
                 <div className="min-w-0">
                   <p className="break-words text-sm font-medium">{task.title}</p>
                   <p className="text-xs text-muted-foreground">
@@ -163,7 +166,7 @@ export function HiveTaskDialog({ label }: { label?: string }) {
                       variant="outline"
                       disabled={tasks.busy}
                       onClick={() => {
-                        void tasks.readArtifact(task.id, ref)
+                        void tasks.readArtifact(task.id, task.runId, ref)
                       }}
                     >
                       {t('hiveTasks.artifact', { number: index + 1 })}
@@ -175,7 +178,7 @@ export function HiveTaskDialog({ label }: { label?: string }) {
                       variant="ghost"
                       disabled={tasks.busy}
                       onClick={() => {
-                        void tasks.cancel(task.id)
+                        void tasks.cancel(task.id, task.runId)
                       }}
                     >
                       {t('hiveTasks.cancel')}

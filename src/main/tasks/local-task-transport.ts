@@ -3,6 +3,13 @@ import { once } from 'node:events'
 import type { TaskExecutionCaller, TaskExecutionHost } from './task-execution-host'
 import { TaskExecutionError } from './task-execution-error'
 import { TaskOpaqueRef } from '../../shared/task-execution/task-execution-primitives'
+import type { HiveRuntimeBindingPurpose } from './paperclip-adapter-contract'
+import {
+  LocalTaskRuntimeOwnerSchema,
+  TaskDeliveryTokenSchema
+} from '../../shared/task-execution/task-command-delivery'
+import { WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES } from '../../shared/task-workflow/workflow-native-outcome'
+import { HiveWorkflowCaseRunReadSchema } from '../../shared/hive-workflow-case-runs'
 
 export const TASK_TRANSPORT_MAX_BYTES = 64 * 1024
 const errorStatus = (code: TaskExecutionError['code']) =>
@@ -45,24 +52,41 @@ async function readTaskCommand(request: IncomingMessage) {
 
 /** Loopback is a network restriction; a separate restricted service credential authenticates every call. */
 export async function startLocalTaskTransport(options: {
-  host: Pick<TaskExecutionHost, 'start' | 'observe' | 'cancel' | 'reconcile'>
+  host: Pick<
+    TaskExecutionHost,
+    | 'start'
+    | 'observe'
+    | 'cancel'
+    | 'reconcile'
+    | 'workflowOutcome'
+    | 'workflowCommands'
+    | 'workflowArtifact'
+  >
   authenticate: (bearer: string) => TaskExecutionCaller | null
   capabilities: (caller: TaskExecutionCaller) => unknown
+  currentOwner?: (caller: TaskExecutionCaller) => unknown
+  prepareCaseRun?: (refs: unknown, caller: TaskExecutionCaller) => Promise<unknown>
   resolveBinding?: (
     companyId: string,
     runId: string,
+    purpose: HiveRuntimeBindingPurpose,
     caller: TaskExecutionCaller
   ) => Promise<unknown>
 }) {
   let closed = false
   let closing: Promise<void> | undefined
   let authority = ''
-  const send = (response: ServerResponse, status: number, value: unknown) => {
+  const send = (
+    response: ServerResponse,
+    status: number,
+    value: unknown,
+    maximumBytes = TASK_TRANSPORT_MAX_BYTES
+  ) => {
     if (response.destroyed || response.writableEnded) {
       return
     }
     const body = JSON.stringify(value)
-    if (Buffer.byteLength(body) > TASK_TRANSPORT_MAX_BYTES) {
+    if (Buffer.byteLength(body) > maximumBytes) {
       response.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
       response.end(JSON.stringify({ error: { code: 'CAPACITY_EXCEEDED' } }))
       return
@@ -88,8 +112,30 @@ export async function startLocalTaskTransport(options: {
         send(response, 401, { error: { code: 'FORBIDDEN' } })
         return
       }
+      const deliveryHeaders = [
+        'x-hive-delivery-owner',
+        'x-hive-delivery-lease',
+        'x-hive-delivery-generation'
+      ]
+      let delivery
+      if (deliveryHeaders.some((name) => request.headers[name] !== undefined)) {
+        const generation = request.headers['x-hive-delivery-generation']
+        if (typeof generation !== 'string' || !/^[1-9][0-9]{0,15}$/.test(generation)) {
+          throw new TaskExecutionError('FORBIDDEN')
+        }
+        const parsed = TaskDeliveryTokenSchema.safeParse({
+          ownerId: request.headers['x-hive-delivery-owner'],
+          leaseRef: request.headers['x-hive-delivery-lease'],
+          generation: Number(generation)
+        })
+        if (!parsed.success) {
+          throw new TaskExecutionError('FORBIDDEN')
+        }
+        delivery = parsed.data
+      }
       const caller: TaskExecutionCaller = {
         operationCallerKey: authenticated.operationCallerKey,
+        ...(delivery ? { delivery } : {}),
         assertCurrent: () => {
           if (closed) {
             throw new TaskExecutionError('SERVICE_UNAVAILABLE')
@@ -102,7 +148,18 @@ export async function startLocalTaskTransport(options: {
         send(response, 200, options.capabilities(caller))
         return
       }
-      const bindingPath = request.url?.match(/^\/execution\/binding\/([^/]+)\/([^/]+)$/)
+      if (request.url === '/execution/owner' && request.method === 'GET' && options.currentOwner) {
+        caller.assertCurrent?.()
+        const owner = LocalTaskRuntimeOwnerSchema.safeParse(options.currentOwner(caller))
+        if (!owner.success) {
+          throw new TaskExecutionError('FORBIDDEN')
+        }
+        send(response, 200, owner.data)
+        return
+      }
+      const bindingPath = request.url?.match(
+        /^\/execution\/binding\/([^/?]+)\/([^/?]+)\?purpose=(execute|recover)$/
+      )
       if (bindingPath && request.method === 'GET' && options.resolveBinding) {
         const decode = (value: string) => {
           try {
@@ -117,16 +174,50 @@ export async function startLocalTaskTransport(options: {
           throw new TaskExecutionError('INVALID_REQUEST')
         }
         caller.assertCurrent?.()
-        const binding = await options.resolveBinding(companyId.data, runId.data, caller)
+        const purpose = bindingPath[3] === 'execute' ? 'execute' : 'recover'
+        const binding = await options.resolveBinding(companyId.data, runId.data, purpose, caller)
         caller.assertCurrent?.()
         send(response, 200, binding)
+        return
+      }
+      if (request.url === '/execution/workflow-prepare' && request.method === 'POST') {
+        if (
+          !/^application\/json(?:;\s*charset=utf-8)?$/i.test(request.headers['content-type'] ?? '')
+        ) {
+          throw new TaskExecutionError('INVALID_REQUEST')
+        }
+        const refs = HiveWorkflowCaseRunReadSchema.safeParse(await readTaskCommand(request))
+        if (!refs.success) {
+          throw new TaskExecutionError('INVALID_REQUEST')
+        }
+        caller.assertCurrent?.()
+        if (!options.prepareCaseRun) {
+          throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
+        }
+        const result = HiveWorkflowCaseRunReadSchema.safeParse(
+          await options.prepareCaseRun(refs.data, caller)
+        )
+        caller.assertCurrent?.()
+        if (
+          !result.success ||
+          refs.data.projectId !== result.data.projectId ||
+          refs.data.caseId !== result.data.caseId ||
+          refs.data.taskId !== result.data.taskId ||
+          refs.data.runId !== result.data.runId
+        ) {
+          throw new TaskExecutionError('OUTCOME_UNKNOWN')
+        }
+        send(response, 200, result.data)
         return
       }
       const routes = {
         '/execution/start': 'start',
         '/execution/observe': 'observe',
         '/execution/cancel': 'cancel',
-        '/execution/reconcile': 'reconcile'
+        '/execution/reconcile': 'reconcile',
+        '/execution/workflow-outcome': 'workflowOutcome',
+        '/execution/workflow-commands': 'workflowCommands',
+        '/execution/workflow-artifact': 'workflowArtifact'
       } as const
       const route = Object.entries(routes).find(([path]) => path === request.url)?.[1]
       if (
@@ -138,7 +229,18 @@ export async function startLocalTaskTransport(options: {
       }
       const command = await readTaskCommand(request)
       caller.assertCurrent?.()
-      send(response, route === 'start' ? 202 : 200, await options.host[route](command, caller))
+      const operation: (value: unknown, caller: TaskExecutionCaller) => Promise<unknown> =
+        options.host[route]
+      const result = await operation.call(options.host, command, caller)
+      caller.assertCurrent?.()
+      send(
+        response,
+        route === 'start' ? 202 : 200,
+        result,
+        route === 'workflowCommands' || route === 'workflowArtifact'
+          ? WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES
+          : TASK_TRANSPORT_MAX_BYTES
+      )
     } catch (error) {
       const code = error instanceof TaskExecutionError ? error.code : 'SERVICE_UNAVAILABLE'
       const status =

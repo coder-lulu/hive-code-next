@@ -1,12 +1,11 @@
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import {
   AGENT_SESSION_RECORD_SCHEMA_VERSION,
   type AgentSessionRecord
 } from '../../../shared/agent-session-record'
-import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
+import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
@@ -19,7 +18,9 @@ import { createStructuredAgentSessionLogger } from './structured-agent-session-l
 const NOW = 1_800_000_000_000
 
 // The runtime state never reads the journal database; it only fills the deps' shape.
-const stateDirectory = mkdtempSync(join(tmpdir(), 'orca-host-runtime-state-'))
+const logs = resolve('logs/paperclip-development/p3/controlled-runtime/host-runtime-state/tmp')
+mkdirSync(logs, { recursive: true })
+const stateDirectory = mkdtempSync(join(logs, 'orca-host-runtime-state-'))
 afterAll(() => {
   closeTestJournalHostDatabases()
   rmSync(stateDirectory, { recursive: true, force: true })
@@ -60,13 +61,15 @@ function reservedRecord(): AgentSessionRecord {
   }
 }
 
-function runtimeState(
+async function runtimeState(
   record: AgentSessionRecord | null,
   probeOwner: NonNullable<StructuredAgentSessionHostDeps['probeOwner']>
 ) {
+  const store = await openTestAgentSessionRecordStore(stateDirectory)
+  vi.spyOn(store, 'getRecord').mockImplementation(() => record)
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the runtime state reads only store, probeOwner and optional deps; the rest of the host's deps are unused here.
   const deps = {
-    store: { getRecord: () => record } as unknown as AgentSessionRecordStore,
+    store,
     adapter: {},
     journalDatabase: openTestJournalHostDatabase(stateDirectory),
     claimKeyId: 'key-1',
@@ -97,7 +100,7 @@ describe('host runtime-state owner probe', () => {
       outcome: 'indeterminate' as const,
       reason: 'reservation named no process'
     }))
-    const state = runtimeState(reservedRecord(), probeOwner)
+    const state = await runtimeState(reservedRecord(), probeOwner)
 
     await expect(state.probeOwner('session-probe')).resolves.toEqual({
       outcome: 'indeterminate',
@@ -112,7 +115,7 @@ describe('host runtime-state owner probe', () => {
     released.lease.handoffStage = null
     released.lease.reservedSpawnToken = null
     const probeOwner = vi.fn(async () => ({ outcome: 'indeterminate' as const, reason: 'x' }))
-    const state = runtimeState(released, probeOwner)
+    const state = await runtimeState(released, probeOwner)
 
     await expect(state.probeOwner('session-probe')).resolves.toEqual({
       outcome: 'reservation-unused'
@@ -122,7 +125,7 @@ describe('host runtime-state owner probe', () => {
 
   it('treats a session with no record at all as an unused reservation', async () => {
     const probeOwner = vi.fn(async () => ({ outcome: 'indeterminate' as const, reason: 'x' }))
-    const state = runtimeState(null, probeOwner)
+    const state = await runtimeState(null, probeOwner)
 
     await expect(state.probeOwner('session-probe')).resolves.toEqual({
       outcome: 'reservation-unused'

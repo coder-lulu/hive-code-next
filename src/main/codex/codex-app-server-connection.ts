@@ -41,6 +41,10 @@ export type CodexAppServerLaunch = {
   cwd?: string
   /** Overlay on the inherited environment — the pinned CODEX_HOME lives here. */
   env?: Record<string, string>
+  /** Boundary transports supply their complete environment, including no provider credentials. */
+  environmentMode?: 'replace'
+  /** Host-owned transports may require a finite inbound frame limit. */
+  maxFrameBytes?: number
   /** Keys stripped after the overlay, matching `CodexAppServerInvocation`. */
   envToDelete?: readonly string[]
 }
@@ -60,7 +64,16 @@ export async function openCodexAppServerConnection(
   handlers: CodexAppServerConnectionHandlers = {},
   spawnImpl: typeof spawnProcess = spawnProcess
 ): Promise<CodexAppServerConnection> {
-  const childEnv: NodeJS.ProcessEnv = { ...process.env, ...launch.env }
+  if (
+    launch.maxFrameBytes !== undefined &&
+    (!Number.isSafeInteger(launch.maxFrameBytes) || launch.maxFrameBytes < 1)
+  ) {
+    throw new Error('invalid Codex stdout frame limit')
+  }
+  const childEnv: NodeJS.ProcessEnv = {
+    ...(launch.environmentMode === 'replace' ? {} : process.env),
+    ...launch.env
+  }
   for (const key of launch.envToDelete ?? []) {
     delete childEnv[key]
   }
@@ -158,6 +171,7 @@ export async function openCodexAppServerConnection(
 
   const recordReader = createCodexAppServerRecordReader({
     stdout: child.stdout,
+    ...(launch.maxFrameBytes !== undefined ? { maxLineBytes: launch.maxFrameBytes } : {}),
     onRecord: (parsed, line) => {
       if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
         handlers.onUnhandledFrame?.('frame:invalid-json', line)

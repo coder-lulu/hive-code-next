@@ -2,6 +2,11 @@ import { ipcMain } from 'electron'
 import { getLocalTasks } from '../startup/main-process-tasks'
 import { isTrustedUIRenderer } from './ui'
 import type { HiveTaskCreate, HiveTasksApi } from '../../shared/hive-tasks'
+import type { HiveWorkflowCaseStart } from '../../shared/hive-workflow-case-runs'
+import type {
+  HiveWorkflowCaseCodePageQuery,
+  HiveWorkflowCaseCodeFileQuery
+} from '../../shared/hive-workflow-case-code'
 import type {
   HiveWorkbenchCompanyCreate,
   HiveWorkbenchPageQuery,
@@ -9,6 +14,16 @@ import type {
   HiveWorkbenchProjectsQuery,
   HiveWorkbenchTeamConfigure
 } from '../../shared/hive-team-workbench'
+import type {
+  HiveWorkflowListQuery,
+  HiveWorkflowReadQuery,
+  HiveWorkflowSave
+} from '../../shared/hive-task-workflows'
+import type {
+  HiveWorkflowCaseCreate,
+  HiveWorkflowCaseListQuery,
+  HiveWorkflowCaseReadQuery
+} from '../../shared/hive-workflow-cases'
 
 export function registerHiveTaskHandlers() {
   const bind = <Args extends unknown[]>(
@@ -35,12 +50,38 @@ export function registerHiveTaskHandlers() {
   }
   bind('list', (facade) => facade.list())
   bind('create', (facade, input: HiveTaskCreate) => facade.create(input))
-  bind('cancel', (facade, id: string) => facade.cancel(id))
-  bind('artifact', (facade, id: string, ref: string) => facade.artifact(id, ref))
+  bind('cancel', (facade, id: string, runId: string) => facade.cancel(id, runId))
+  bind('artifact', (facade, id: string, runId: string, ref: string) =>
+    facade.artifact(id, runId, ref)
+  )
   bind('listCompanies', (facade, query?: HiveWorkbenchPageQuery) => facade.listCompanies(query))
   bind('createCompany', (facade, input: HiveWorkbenchCompanyCreate) => facade.createCompany(input))
   bind('listProjects', (facade, query: HiveWorkbenchProjectsQuery) => facade.listProjects(query))
   bind('createProject', (facade, input: HiveWorkbenchProjectCreate) => facade.createProject(input))
   bind('getTeam', (facade, projectId: string) => facade.getTeam(projectId))
   bind('configureTeam', (facade, input: HiveWorkbenchTeamConfigure) => facade.configureTeam(input))
+  bind('listWorkflows', (facade, query: HiveWorkflowListQuery) => facade.listWorkflows(query))
+  bind('getWorkflow', (facade, query: HiveWorkflowReadQuery) => facade.getWorkflow(query))
+  bind('saveWorkflow', (facade, input: HiveWorkflowSave) => facade.saveWorkflow(input))
+  bind('createWorkflowCase', (facade, input: HiveWorkflowCaseCreate) =>
+    facade.createWorkflowCase(input)
+  )
+  bind('listWorkflowCases', (facade, query: HiveWorkflowCaseListQuery) =>
+    facade.listWorkflowCases(query)
+  )
+  bind('getWorkflowCase', (facade, query: HiveWorkflowCaseReadQuery) =>
+    facade.getWorkflowCase(query)
+  )
+  bind('startWorkflowCase', (facade, input: HiveWorkflowCaseStart) =>
+    facade.startWorkflowCase(input)
+  )
+  bind('getWorkflowCaseRuns', (facade, query: HiveWorkflowCaseReadQuery) =>
+    facade.getWorkflowCaseRuns(query)
+  )
+  bind('getWorkflowCaseCodePage', (facade, query: HiveWorkflowCaseCodePageQuery) =>
+    facade.getWorkflowCaseCodePage(query)
+  )
+  bind('getWorkflowCaseCodeFile', (facade, query: HiveWorkflowCaseCodeFileQuery) =>
+    facade.getWorkflowCaseCodeFile(query)
+  )
 }
