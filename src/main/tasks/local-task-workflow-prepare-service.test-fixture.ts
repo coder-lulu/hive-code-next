@@ -3,6 +3,44 @@ import { once } from 'node:events'
 import { writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { HiveRuntimeAdapterBinding, type HiveRuntimeBinding } from './paperclip-adapter-contract'
+import { canonicalAgentSessionDigest as digest } from '../../shared/agent-session-mutation-envelope'
+import { TaskExecutionError } from './task-execution-error'
+import { vi } from 'vitest'
+
+export function workflowPrepareBindingCommit<
+  Task extends {
+    binding: HiveRuntimeBinding | null
+    status: string
+    status_version: number
+    run_id: string
+  }
+>(task: Task, stage: { status: string; taskRevision: number }) {
+  const bindingWrite = vi.fn<() => void>()
+  const bindingCommit = vi.fn(async (body: HiveRuntimeBinding) => {
+    if (task.binding) {
+      const immutable = (value: HiveRuntimeBinding) => ({
+        ...value,
+        command: { ...value.command, expiresAt: null }
+      })
+      if (digest(immutable(task.binding)) !== digest(immutable(body))) {
+        throw new TaskExecutionError('IDEMPOTENCY_CONFLICT')
+      }
+      return task
+    }
+    bindingWrite()
+    task.binding = body
+    task.status = 'in_progress'
+    task.status_version += 1
+    stage.taskRevision += 1
+    stage.status = 'in_progress'
+    Object.assign(task, {
+      checkout_run_id: task.run_id,
+      execution_locked_at: new Date().toISOString()
+    })
+    return task
+  })
+  return { bindingWrite, bindingCommit }
+}
 
 export async function startWorkflowPrepareUnitService(options: {
   directory: string
@@ -13,6 +51,7 @@ export async function startWorkflowPrepareUnitService(options: {
   task: unknown
   runId: string
   bindingCommit(value: HiveRuntimeBinding): Promise<unknown>
+  beforeTaskRead?(): Promise<void>
   requests: { path: string; body: unknown }[]
 }) {
   const serviceSecret = 'b'.repeat(43)
@@ -33,6 +72,9 @@ export async function startWorkflowPrepareUnitService(options: {
       const body = bytes.length ? JSON.parse(Buffer.concat(bytes).toString('utf8')) : undefined
       const path = request.url!
       options.requests.push({ path, body })
+      if (path.endsWith(`/runs/${options.runId}`)) {
+        await options.beforeTaskRead?.()
+      }
       const value = path.endsWith('/team/read')
         ? options.team
         : path.endsWith('/cases/read')

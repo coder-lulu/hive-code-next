@@ -6,6 +6,7 @@ import {
 import { createPolicyItems, type PolicyCall } from './task-model-policy-items'
 import { addTaskModelPolicyLocation } from './task-model-stream-failure'
 import { createTaskModelResponsePolicy } from './task-model-policy-response'
+import { validateTaskModelSafetyBuffering } from './task-model-safety-buffering'
 import {
   array,
   boolean,
@@ -163,7 +164,7 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
         }
         const e = object(
           parse(dataText, TASK_MODEL_EVENT_BYTES),
-          'type sequence_number output_index item_id call_id content_index summary_index response item delta text part arguments input error headers metadata',
+          'type sequence_number output_index item_id call_id content_index summary_index response item delta text part arguments input error headers metadata safety_buffering',
           'type'
         )
         for (const key of ['sequence_number', 'output_index', 'content_index', 'summary_index']) {
@@ -179,7 +180,10 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
         const kind = text(e.type),
           learned = new Set<string>()
         let next = calls
-        const prefix = 'type sequence_number '
+        const prefix = 'type sequence_number safety_buffering '
+        if (Object.hasOwn(e, 'safety_buffering')) {
+          validateTaskModelSafetyBuffering(e.safety_buffering)
+        }
         if (responseKinds.includes(kind)) {
           object(e, `${prefix}response`, 'response')
           next = new Map(calls)
@@ -221,7 +225,11 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
             headers(e.headers, model)
           }
           if (e.metadata !== undefined) {
-            object(e.metadata, '')
+            if (isObject(e.metadata) && e.metadata.type === 'safety_buffering') {
+              validateTaskModelSafetyBuffering(e.metadata, true)
+            } else {
+              object(e.metadata, '')
+            }
           }
         } else if (kind === 'error') {
           object(e, `${prefix}error`, 'error')

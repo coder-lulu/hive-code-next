@@ -14,12 +14,16 @@ import { createLocalTaskServiceCredential } from './local-task-service-credentia
 import { startLocalTaskTransport } from './local-task-transport'
 import { LocalTaskClient } from './local-task-client'
 import { TaskExecutionError } from './task-execution-error'
-import { HiveRuntimeAdapterBinding, type HiveRuntimeBinding } from './paperclip-adapter-contract'
-import { startWorkflowPrepareUnitService } from './local-task-workflow-prepare-service.test-fixture'
+import { HiveRuntimeAdapterBinding } from './paperclip-adapter-contract'
+import {
+  startWorkflowPrepareUnitService,
+  workflowPrepareBindingCommit
+} from './local-task-workflow-prepare-service.test-fixture'
 
 /** Actual HTTP, issuer and managed-copy files; account/Docker/service rows are explicit unit fixtures. */
-export async function workflowPrepareFixture() {
-  const parent = resolve('logs/paperclip-development/p3/case-consumption/native-prepare/tmp')
+export async function workflowPrepareFixture(
+  parent = resolve('logs/paperclip-development/p3/case-consumption/native-prepare/tmp')
+) {
   await mkdir(parent, { recursive: true })
   const root = await mkdtemp(join(parent, 'prepare-')),
     source = join(root, 'source'),
@@ -180,14 +184,8 @@ export async function workflowPrepareFixture() {
   const issuer = new LocalTaskBindingIssuer(issuerOptions),
     issue = vi.spyOn(issuer, 'issue')
   const requests: { path: string; body: unknown }[] = []
-  const bindingCommit = vi.fn(async (body: HiveRuntimeBinding) => {
-    task.binding = body
-    task.status = 'in_progress'
-    task.status_version += 1
-    stage.taskRevision += 1
-    stage.status = 'in_progress'
-    return task
-  })
+  const { bindingWrite, bindingCommit } = workflowPrepareBindingCommit(task, stage)
+  const beforeTaskRead = vi.fn(async () => undefined)
   const service = await startWorkflowPrepareUnitService({
     directory,
     accountId: () => account?.accountId,
@@ -197,6 +195,7 @@ export async function workflowPrepareFixture() {
     task,
     runId: refs.runId,
     bindingCommit,
+    beforeTaskRead,
     requests
   })
   const assembly = createLocalTaskFacadeAssembly({
@@ -254,6 +253,8 @@ export async function workflowPrepareFixture() {
     issue,
     assembly,
     bindingCommit,
+    bindingWrite,
+    beforeTaskRead,
     requests,
     client,
     caller,

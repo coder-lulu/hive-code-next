@@ -1,6 +1,5 @@
-import { once } from 'node:events'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
-import { createServer, type Server } from 'node:http'
+import type { Server } from 'node:http'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createTaskCodexModelChannel } from './task-codex-model-channel'
@@ -10,7 +9,6 @@ import {
   createdModelEvent,
   completedModelEvent,
   modelEvent,
-  modelStartParams,
   finishModelRequest
 } from './task-model-broker.test-fixture'
 import { taskFailure, taskFailureSummary, type TaskFailureError } from './task-failure-diagnostic'
@@ -26,6 +24,7 @@ import { addTaskModelPolicyLocation } from './task-model-stream-failure'
 import { refusedTaskModelResponseFields } from './task-model-response-field-diagnostics.test-fixture'
 import { readPersistedTestAgentSessionStore } from '../runtime/agent-session-record-store-test-harness'
 import { TASK_TEST_NOW } from './task-execution.test-fixture'
+import { createTaskModelStreamFetchFixture } from './task-model-stream-fetch.test-fixture'
 
 let directory: string
 const servers: Server[] = []
@@ -48,64 +47,10 @@ afterEach(async () => {
   await rm(directory, { recursive: true, force: true })
 })
 async function fixture(body: string | Buffer) {
-  const server = createServer((_request, reply) => {
-    reply.writeHead(200)
-    reply.end(body)
-  })
-  servers.push(server)
-  server.listen(0, '127.0.0.1')
-  await once(server, 'listening')
-  const address = server.address()
-  if (!address || typeof address === 'string') {
-    throw new Error('Local test endpoint unavailable')
-  }
-  const owner = await createTaskModelDispatchFixture(directory)
-  const providerAccountId = 'offline-provider'
-  const request = vi.fn<typeof fetch>(async (_input, init) => {
-    const actual = await fetch(`http://127.0.0.1:${address.port}`, { signal: init?.signal })
-    return new Response(actual.body, { status: actual.status, headers: actual.headers })
-  })
-  const channel = createTaskCodexModelChannel({
-    store: owner.store,
-    binding: owner.binding,
-    account: {
-      accountId: 'offline-managed-row',
-      codexHome: owner.binding.accountHome.path,
-      providerAccountId,
-      assertCurrent: owner.validate,
-      assertMetadataCurrent: owner.validate
-    },
-    deadline: TASK_TEST_NOW + 120_000,
-    assertCurrent: () => {
-      owner.validate()
-      owner.store.tasks.assertStructuredBindingCurrent(owner.binding)
-    },
-    readAuth: async () => ({
-      Authorization: 'Bearer offline_synthetic',
-      'ChatGPT-Account-Id': providerAccountId
-    }),
-    request
-  })
-  channels.push(channel)
-  const profile = taskDockerModelProfile()
-  const params = modelStartParams({
-    model: profile.model,
-    input: [
-      { type: 'additional_tools', role: 'developer', tools: profile.approvedTools },
-      {
-        type: 'message',
-        role: 'user',
-        content: [{ type: 'input_text', text: 'Synthetic request' }]
-      }
-    ],
-    tool_choice: 'auto',
-    parallel_tool_calls: false,
-    reasoning: { effort: 'low', context: 'all_turns' },
-    store: false,
-    stream: true,
-    include: ['reasoning.encrypted_content']
-  })
-  return { owner, channel, params, request }
+  const result = await createTaskModelStreamFetchFixture(directory, body)
+  servers.push(result.server)
+  channels.push(result.channel)
+  return result
 }
 const refused = (error: unknown) => taskFailure(error, 'stream', 'TASK_MODEL_STREAM_REFUSED', 200)
 describe('actual finite stream guard and policy producer diagnostics', () => {
@@ -226,15 +171,14 @@ describe('actual finite stream guard and policy producer diagnostics', () => {
       location: 'event'
     },
     {
-      label: 'standard safety buffering field',
+      label: 'malformed safety buffering field',
       body: modelEvent('response.created', {
         response: { id: 'resp-fixture' },
         safety_buffering: 'body-token-secret'
       }),
       reason: 'policy',
-      policy: 'UNKNOWN_FIELD',
-      location: 'event',
-      key: 'safety_buffering'
+      policy: 'OBJECT',
+      location: 'safety_buffering'
     },
     {
       label: 'response unknown field',

@@ -4,6 +4,7 @@ import type { LocalTaskBindingIssuer } from './local-task-binding-issuer'
 import { hiveTaskRunPath, parseHiveTaskRun } from './hive-task-service-row'
 import { refuseTaskExecution } from './task-execution-error'
 import type { WorkflowExecutionContext } from '../../shared/task-workflow/workflow-execution-context'
+import type { HiveRuntimeBinding } from './paperclip-adapter-contract'
 
 /** Personal and workflow admissions share the original binding, then the original dispatcher. */
 export async function bindHiveTask(options: {
@@ -19,7 +20,9 @@ export async function bindHiveTask(options: {
   executionDeadlineAt?: string
   workflowContext?: WorkflowExecutionContext
   action?: 'cancel'
-  assertCommitCurrent?: () => Promise<void>
+  assertCommitCurrent?: (
+    binding: HiveRuntimeBinding
+  ) => Promise<ReturnType<typeof parseHiveTaskRun> | void>
 }) {
   const assertCurrent = () => {
     options.workspace.assertCurrent()
@@ -37,11 +40,11 @@ export async function bindHiveTask(options: {
     ...(options.workflowContext ? { workflowContext: options.workflowContext } : {})
   })
   assertCurrent()
-  await options.assertCommitCurrent?.()
+  const existing = await options.assertCommitCurrent?.(binding)
   assertCurrent()
   const path = hiveTaskRunPath(options.task.taskId, options.task.runId)
   const bound = parseHiveTaskRun(
-    await options.caller.request(`${path}/binding`, binding),
+    existing ?? (await options.caller.request(`${path}/binding`, binding)),
     options.task.taskId,
     options.task.runId
   )

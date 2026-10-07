@@ -34,11 +34,11 @@ describe('private Main preparation through actual HTTP, issuer and filesystem', 
     expect(await readdir(join(f.directory, 'bindings'))).toContain(`${key}.json`)
     expect(f.unavailable).not.toHaveBeenCalled()
   })
-  it('does not prepare or dispatch an already bound admission again', async () => {
+  it('retains the exact live queued binding without another commit or dispatch', async () => {
     const f = await fixture()
     await f.client.prepareCaseRun(f.refs)
-    await expect(f.client.prepareCaseRun(f.refs)).rejects.toThrow('REVISION_CONFLICT')
-    expect(f.issue).toHaveBeenCalledOnce()
+    await expect(f.client.prepareCaseRun(f.refs)).resolves.toEqual(f.refs)
+    expect(f.issue).toHaveBeenCalledTimes(2)
     expect(f.bindingCommit).toHaveBeenCalledOnce()
   })
   it.each([

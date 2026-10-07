@@ -18,6 +18,7 @@ import { bindHiveTask } from './hive-task-run-dispatch'
 import { hiveTaskRunPath, parseHiveTaskRun } from './hive-task-service-row'
 import { refuseTaskExecution } from './task-execution-error'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
+import { HiveRuntimeAdapterBinding, type HiveRuntimeBinding } from './paperclip-adapter-contract'
 
 export function assertWorkflowCaseRunScope(run: HiveWorkflowCaseRun, view: HiveWorkflowCaseView) {
   const task = view.stageTasks.find((candidate) => candidate.stageRef === run.stageRef)
@@ -88,7 +89,7 @@ export function createWorkflowCaseRunPreparer(options: {
         return refuseTaskExecution('FORBIDDEN')
       }
     }
-    const assertView = (current: HiveWorkflowCaseView) => {
+    const assertView = (current: HiveWorkflowCaseView, bound: boolean) => {
       assertHiveWorkbenchCompanyOwner(current.team.company, caller.accountRef)
       assertWorkflowCaseRunScope(frozen.run, current)
       const stage = current.stageTasks.find((item) => item.stageRef === frozen.run.stageRef)!
@@ -98,8 +99,8 @@ export function createWorkflowCaseRunPreparer(options: {
         current.terminalKind !== null ||
         current.currentStageRef !== frozen.run.stageRef ||
         current.revision !== frozen.run.startRequest.expectedCaseRevision ||
-        stage.taskRevision !== Number(frozen.run.task.taskRevision) ||
-        stage.status !== 'todo' ||
+        stage.taskRevision !== Number(frozen.run.task.taskRevision) + Number(bound) ||
+        stage.status !== (bound ? 'in_progress' : 'todo') ||
         frozen.run.status !== 'pending' ||
         frozen.run.task.taskId !== refs.taskId ||
         frozen.run.task.runId !== refs.runId ||
@@ -119,26 +120,26 @@ export function createWorkflowCaseRunPreparer(options: {
         return refuseTaskExecution('REVISION_CONFLICT')
       }
     }
-    const assertAdmissionCurrent = async () => {
+    const assertAdmissionCurrent = async (issued?: HiveRuntimeBinding) => {
       assertCurrent()
-      const currentView = await options.getWorkflowCase({
+      let currentView = await options.getWorkflowCase({
         projectId: refs.projectId,
         caseId: refs.caseId
       })
       assertCurrent()
-      assertView(currentView)
       if ((await options.workspaceSelector(refs.projectId)) !== selector) {
         return refuseTaskExecution('REVISION_CONFLICT')
       }
       assertCurrent()
       const rawTask = await caller.request(hiveTaskRunPath(refs.taskId, refs.runId))
       const task = parseHiveTaskRun(rawTask, refs.taskId, refs.runId)
+      const bound = task.binding != null
       const pending = z
         .object({
           run_status: z.literal('queued'),
           driver_kind: z.literal('hive_runtime'),
-          checkout_run_id: z.null(),
-          execution_locked_at: z.null(),
+          checkout_run_id: bound ? z.literal(refs.runId) : z.null(),
+          execution_locked_at: bound ? z.iso.datetime({ offset: true }) : z.null(),
           execution_run_id: z.literal(refs.runId),
           execution_stage: z.null()
         })
@@ -146,14 +147,13 @@ export function createWorkflowCaseRunPreparer(options: {
       assertCurrent()
       if (
         !pending.success ||
-        task.binding ||
         task.result_receipt ||
         task.cancel_requested ||
         task.execution_stage === 'outcome_unknown' ||
         task.company_id !== frozen.run.task.spaceId ||
         task.agent_id !== frozen.run.employeeRef ||
-        task.status !== 'todo' ||
-        task.status_version !== Number(frozen.run.task.taskRevision) ||
+        task.status !== (bound ? 'in_progress' : 'todo') ||
+        task.status_version !== Number(frozen.run.task.taskRevision) + Number(bound) ||
         task.run_scope?.kind !== 'workbenchCase' ||
         task.run_scope.projectId !== refs.projectId ||
         task.run_scope.caseId !== refs.caseId ||
@@ -161,9 +161,39 @@ export function createWorkflowCaseRunPreparer(options: {
       ) {
         return refuseTaskExecution('REVISION_CONFLICT')
       }
+      if (bound) {
+        const binding = HiveRuntimeAdapterBinding.safeParse(task.binding)
+        const immutable = (value: HiveRuntimeBinding) => ({
+          ...value,
+          command: { ...value.command, expiresAt: null }
+        })
+        if (
+          !binding.success ||
+          (issued && digest(immutable(binding.data)) !== digest(immutable(issued)))
+        ) {
+          return refuseTaskExecution('REVISION_CONFLICT')
+        }
+        // The two reads may straddle the one durable binding transition.
+        if (
+          currentView.stageTasks.find((item) => item.stageRef === frozen.run.stageRef)?.status ===
+          'todo'
+        ) {
+          currentView = await options.getWorkflowCase({
+            projectId: refs.projectId,
+            caseId: refs.caseId
+          })
+          assertCurrent()
+        }
+      }
+      assertView(currentView, bound)
+      return bound && issued ? task : undefined
     }
     assertCurrent()
-    assertView(view)
+    assertView(
+      view,
+      view.stageTasks.find((item) => item.stageRef === frozen.run.stageRef)?.status ===
+        'in_progress'
+    )
     await assertAdmissionCurrent()
     const bound = await bindHiveTask({
       caller,
