@@ -82,20 +82,31 @@ export function assertTaskCodexSessionBinding(
   }
 }
 
-/** Stop admission uses the original reservation; cancellation never admits another writer. */
+/** Stop admission uses the original reservation and grants no writer authority. */
 export function assertTaskCodexFailedBootBinding(
   state: AgentSessionStoreState,
   expected: TaskExecutionRecord,
-  requireStopped = false
+  requireStopped = false,
+  fatalModelFailure = false
 ) {
   const task = state.taskExecutions?.get(taskExecutionRecordKey(expected.command))
   if (
     state.taskRecoveryBlocked ||
     !TaskExecutionRecordSchema.safeParse(expected).success ||
     !task ||
-    !same(task, expected) ||
-    task.dispatch !== 'dispatching' ||
-    !task.cancellationKey ||
+    (!same(task, expected) &&
+      !(
+        fatalModelFailure &&
+        same(task, {
+          ...expected,
+          revision: task.revision,
+          status: task.status,
+          events: task.events,
+          cancellationKey: task.cancellationKey
+        })
+      )) ||
+    (!fatalModelFailure && (task.dispatch !== 'dispatching' || !task.cancellationKey)) ||
+    (fatalModelFailure && !['bound', 'dispatching'].includes(task.dispatch)) ||
     task.result !== null ||
     !task.structuredBinding ||
     !task.dockerIdentity?.containerId

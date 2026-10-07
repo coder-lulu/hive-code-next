@@ -8,6 +8,7 @@ import { assertTaskOutputWorkspace } from './task-output-workspace'
 import { taskCodexSessionFor, readTaskCodexJournalEvidence } from './task-codex-journal-evidence'
 import { collectTaskCodexCommandEvidence } from './task-codex-command-evidence'
 import { getStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
+import { readTaskModelFatalFailure } from './task-model-fatal-failure'
 
 export function taskCodexResultInstructions(
   record: Pick<TaskExecutionRecord, 'command' | 'commandFingerprint'>
@@ -38,6 +39,16 @@ export function createTaskCodexEvidence(directory: string) {
   return {
     collectCommands: collectTaskCodexCommandEvidence,
     async collect(record: TaskExecutionRecord) {
+      const host = getStructuredAgentSessionHost()
+      if (host && readTaskModelFatalFailure(host.deps.store.tasks, record)) {
+        await host.deps.store.tasks.assertFailedBootStopCurrent(record)
+        const candidate = await artifacts.collectHostFailure(record)
+        await host.deps.store.tasks.assertFailedBootStopCurrent(record)
+        if (getStructuredAgentSessionHost() !== host) {
+          return null
+        }
+        return candidate
+      }
       const journal = await readTaskCodexJournalEvidence(record)
       if (!journal) {
         return null
@@ -52,7 +63,11 @@ export function createTaskCodexEvidence(directory: string) {
     },
     async stop(record: TaskExecutionRecord): Promise<TaskExecutionStopEvidence | null> {
       let sessionStopped = false
-      if (record.dispatch === 'dispatching') {
+      const originalHost = getStructuredAgentSessionHost()
+      if (
+        record.dispatch === 'dispatching' ||
+        (originalHost && readTaskModelFatalFailure(originalHost.deps.store.tasks, record))
+      ) {
         const host = getStructuredAgentSessionHost()
         if (!host) {
           return null

@@ -54,6 +54,24 @@ export async function openTaskDockerCodexConnection(options: {
   let exitReported = false
   let modelFailed = false
   let modelFailure: TaskFailureError | undefined
+  let failureRetry: ReturnType<typeof setTimeout> | undefined
+  let failureCloseAttempts = 0
+  const retryFailureClose = async () => {
+    failureCloseAttempts++
+    if (await close().catch(() => false)) {
+      return
+    }
+    if (!exitReported && failureCloseAttempts < 4) {
+      failureRetry = setTimeout(
+        () => {
+          failureRetry = undefined
+          void retryFailureClose()
+        },
+        250 * 2 ** (failureCloseAttempts - 1)
+      )
+      failureRetry.unref()
+    }
+  }
   const assertUsable = () => {
     prepared.assertCurrent()
     if (closing || modelFailed) {
@@ -68,7 +86,7 @@ export async function openTaskDockerCodexConnection(options: {
       modelFailure ??= failure
       modelFailed = true
       queueMicrotask(() => {
-        void close().catch(() => undefined)
+        void retryFailureClose()
       })
     }
   })
@@ -92,6 +110,10 @@ export async function openTaskDockerCodexConnection(options: {
         /* No transport exit proof. */
       }
       const proven = modelClosed && stopped && transportExited
+      if (proven && failureRetry) {
+        clearTimeout(failureRetry)
+        failureRetry = undefined
+      }
       if (proven && modelFailed && !exitReported) {
         exitReported = true
         handlers.onExit?.(modelFailure ?? new Error('TASK_MODEL_CHANNEL_UNAVAILABLE'))

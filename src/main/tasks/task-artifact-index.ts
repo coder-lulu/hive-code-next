@@ -157,6 +157,20 @@ export class TaskArtifactIndex {
       }
       artifacts.push({ ref: `artifact:${id}`, name, digest })
     }
+    return this.indexOutcome(record, status, artifacts)
+  }
+
+  /** A host-fatal failure has no provider completion or trusted workspace artifacts. */
+  collectHostFailure(record: TaskExecutionRecord) {
+    return this.indexOutcome(record, 'failed', [])
+  }
+
+  private async indexOutcome(
+    record: TaskExecutionRecord,
+    status: 'succeeded' | 'failed',
+    artifacts: { ref: string; name: string; digest: string }[]
+  ) {
+    await mkdir(this.directory, { recursive: true, mode: 0o700 })
     const outcomeId = hash(JSON.stringify([record.commandFingerprint, status, artifacts]))
     await writeFile(
       join(this.directory, `outcome-${outcomeId}.json`),

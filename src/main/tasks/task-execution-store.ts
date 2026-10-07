@@ -32,6 +32,7 @@ import {
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { hasTaskSessionBinding } from './task-session-association'
 import { assertTaskFailureSnapshotCurrent } from './task-failure-event'
+import { readTaskModelFatalFailure, forgetTaskModelFatalFailure } from './task-model-fatal-failure'
 import {
   hasTaskFailureSummary,
   taskFailureSummary,
@@ -217,7 +218,12 @@ export class TaskExecutionPersistence {
   assertFailedBootStopCurrent(expected: TaskExecutionRecord, requireStopped = false) {
     return this.transactions.transact(() =>
       structuredClone(
-        assertTaskCodexFailedBootBinding(this.transactions.state, expected, requireStopped)
+        assertTaskCodexFailedBootBinding(
+          this.transactions.state,
+          expected,
+          requireStopped,
+          Boolean(readTaskModelFatalFailure(this, expected))
+        )
       )
     )
   }
@@ -358,6 +364,28 @@ export class TaskExecutionPersistence {
     )
   }
 
+  runRecordedModelFailureEffect(
+    expected: TaskExecutionRecord,
+    apply: (current: TaskExecutionRecord) => void
+  ) {
+    return this.transactions.transact(() => {
+      const current = this.transactions.state.taskExecutions?.get(
+        taskExecutionRecordKey(expected.command)
+      )
+      if (!current || current.result || current.cancellationKey) {
+        return
+      }
+      assertTaskFailureSnapshotCurrent(this.transactions.state, expected, current)
+      const session =
+        current.structuredBinding &&
+        this.transactions.state.records.get(current.structuredBinding.sessionId)
+      if (!session || session.lease.unreconciled) {
+        return refuseTaskExecution('OUTCOME_UNKNOWN')
+      }
+      assertTaskAuthorizationCurrent(() => apply(structuredClone(current)))
+    })
+  }
+
   settle(
     identity: Identity,
     resultValue: TaskExecutionResult | ((record: TaskExecutionRecord) => TaskExecutionResult),
@@ -380,17 +408,24 @@ export class TaskExecutionPersistence {
           }
           return null
         }
+        const fatal = Boolean(readTaskModelFatalFailure(this, record))
         if (
-          result.status === 'cancelled' &&
+          (result.status === 'cancelled' || (result.status === 'failed' && fatal)) &&
           result.stopProof.evidenceKind === 'stopped' &&
-          ((record.dispatch === 'dispatching' && record.structuredBinding) ||
+          (fatal ||
+            (record.dispatch === 'dispatching' && record.structuredBinding) ||
             (stopping?.dispatch === 'dispatching' && stopping.structuredBinding))
         ) {
           if (!stopping) {
             return refuseTaskExecution('OUTCOME_UNKNOWN')
           }
           assertTaskExecutionSnapshotCurrent(stopping, record)
-          assertTaskCodexFailedBootBinding(this.transactions.state, stopping, true)
+          assertTaskCodexFailedBootBinding(
+            this.transactions.state,
+            fatal ? record : stopping,
+            true,
+            fatal
+          )
         }
         if (
           (result.stopProof.evidenceKind === 'not_started' &&
@@ -404,7 +439,10 @@ export class TaskExecutionPersistence {
         return { ...record, result, status: result.status }
       },
       now
-    )
+    ).then((settled) => {
+      forgetTaskModelFatalFailure(this, settled.record)
+      return settled
+    })
   }
 
   private update(

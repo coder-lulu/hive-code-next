@@ -10,6 +10,7 @@ import { taskDockerModelProfile } from './task-docker-model-profile'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { isDeepStrictEqual as same } from 'node:util'
 import { refuseTaskExecution } from './task-execution-error'
+import { retainTaskModelFatalFailure } from './task-model-fatal-failure'
 
 export function createTaskCodexModelChannel(options: {
   store: AgentSessionRecordStore
@@ -88,8 +89,14 @@ export function createTaskCodexModelChannel(options: {
       effect(signal, () => (options.readAuth ?? getCodexBackendAuthHeaders)(target, signal)),
     request: (input, init) =>
       effect(init?.signal, () => (options.request ?? fetch)(input, init), discardResponse),
-    recordFailure: (failure) =>
-      options.store.tasks.recordModelFailure(original, failure, Date.now())
+    recordFailure: async (failure) => {
+      const recorded = await options.store.tasks.recordModelFailure(original, failure, Date.now())
+      if (recorded.changed) {
+        await options.store.tasks.runRecordedModelFailureEffect(original, (current) => {
+          retainTaskModelFatalFailure(options.store.tasks, current, failure)
+        })
+      }
+    }
   })
 }
 
