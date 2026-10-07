@@ -132,6 +132,7 @@ export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): 
     userDataPath: app.getPath('userData'),
     getReport: getRuntimeCloudReport,
     getBootId: () => processRuntimeCloudPresence.getBootId(),
+    getCurrentLeaseContext: () => processRuntimeCloudPresence.getCurrentLeaseContext(),
     getRelayStatus: getHiveRuntimeRelayStatus,
     onRegistrationChanged: () => processRuntimeCloudPresence.notifyRegistrationChanged(),
     dependencies: serviceOwnedRuntimeCloudStorage

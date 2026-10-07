@@ -2,6 +2,8 @@ import type { CurrentHiveRuntimeCloudLeaseContext } from './hive-runtime-cloud-l
 import {
   sendHiveRuntimeCloudHeartbeat,
   type PendingHeartbeat,
+  type HeartbeatRequestTiming,
+  type AcceptedHeartbeatLease,
   type HeartbeatOptions
 } from './hive-runtime-cloud-heartbeat'
 import type { HiveRuntimeCloudReport } from './hive-runtime-cloud-proof'
@@ -17,6 +19,7 @@ export class HiveRuntimeCloudPresenceRelay {
   private heartbeatRequested = false
   private flushing = false
   private pendingHeartbeat: PendingHeartbeat | null = null
+  private pendingTiming: HeartbeatRequestTiming | null = null
   private contributor: HiveRuntimeRelayHeartbeatContributor | null = null
   private pending: {
     contributor: HiveRuntimeRelayHeartbeatContributor
@@ -48,19 +51,23 @@ export class HiveRuntimeCloudPresenceRelay {
   }
 
   async send(
-    options: Omit<HeartbeatOptions, 'pending' | 'onPrepared' | 'onAccepted'> & {
+    options: Omit<HeartbeatOptions, 'pending' | 'pendingTiming' | 'onPrepared' | 'onAccepted'> & {
       context: CurrentHiveRuntimeCloudLeaseContext | null
+      onAccepted: (proof: AcceptedHeartbeatLease | null) => void
     }
-  ): Promise<{ nextHeartbeatSeq: number; heartbeatDelay: number }> {
+  ) {
     let sessionAuthorityUntil: number | null = null
     const next = await sendHiveRuntimeCloudHeartbeat({
       ...options,
       report: this.prepare(options.report, options.context, this.pendingHeartbeat !== null),
       pending: this.pendingHeartbeat,
-      onPrepared: (pending) => {
+      pendingTiming: this.pendingTiming,
+      onPrepared: (pending, timing) => {
         this.pendingHeartbeat = pending
+        this.pendingTiming = timing
       },
-      onAccepted: (response, sent) => {
+      onAccepted: (response, sent, proof) => {
+        options.onAccepted(proof)
         if (sent.report.relayControl && response.responseVersion === 'runtime-session-control/v1') {
           sessionAuthorityUntil = response.sessionAuthorityUntil ?? null
         }
@@ -69,7 +76,7 @@ export class HiveRuntimeCloudPresenceRelay {
     })
     this.clearPending()
     return {
-      nextHeartbeatSeq: next,
+      ...next,
       heartbeatDelay: hiveRuntimeCloudHeartbeatDelay(sessionAuthorityUntil, options.now())
     }
   }
@@ -81,6 +88,7 @@ export class HiveRuntimeCloudPresenceRelay {
   clearPending(): void {
     this.pending = null
     this.pendingHeartbeat = null
+    this.pendingTiming = null
   }
   prepare(
     report: HiveRuntimeCloudReport,

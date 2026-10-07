@@ -69,6 +69,7 @@ export function createOrcadRuntimeCloud(options: {
     userDataPath: options.userDataPath,
     getReport,
     getBootId: () => presence.getBootId(),
+    getCurrentLeaseContext: () => presence.getCurrentLeaseContext(),
     getRelayStatus: () => host?.getStatus() ?? 'offline',
     onRegistrationChanged: () => presence.notifyRegistrationChanged(),
     dependencies: { ...defaultLocalRuntimeOwnershipDependencies, ...storage, createClient }

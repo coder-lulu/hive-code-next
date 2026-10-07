@@ -7,6 +7,7 @@ import { HiveRuntimeCloudRequestError } from './hive-runtime-cloud-client'
 import type { HiveRuntimeCloudPresenceState } from './hive-runtime-cloud-presence-support'
 import type { LocalRuntimeOwnershipServiceOptions } from './local-runtime-ownership-contracts'
 import type { LocalRuntimeRegistration } from './local-runtime-registration'
+import { retainsClaimedRuntimeOnAuthenticationRefresh } from './local-runtime-authentication-refresh'
 
 export type OwnershipOperation = Readonly<{
   epoch: number
@@ -66,6 +67,13 @@ export class LocalRuntimeOwnershipSession {
     if (this.stopped || !this.registration.isAvailable()) {
       return false
     }
+    const retainClaim = retainsClaimedRuntimeOnAuthenticationRefresh(
+      this.authorization,
+      authorization,
+      this.state,
+      this.registration,
+      this.options
+    )
     this.cancelOperation()
     if (!authorization || authorization.sessionExpiresAt <= this.registration.now()) {
       this.authorization = null
@@ -75,10 +83,10 @@ export class LocalRuntimeOwnershipSession {
     this.authorization = authorization
     this.setState({
       ...this.state,
-      relation: 'ANALYZING',
+      relation: retainClaim ? this.state.relation : 'ANALYZING',
       accountId: authorization.accountId,
       sessionGeneration: authorization.sessionGeneration,
-      checkedAt: null,
+      checkedAt: retainClaim ? this.state.checkedAt : null,
       errorCode: null
     })
     return true

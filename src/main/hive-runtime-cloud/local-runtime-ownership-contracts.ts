@@ -7,6 +7,7 @@ import {
   getOrCreateHiveRuntimeCloudIdentity
 } from './hive-runtime-cloud-identity-store'
 import type { HiveRuntimeCloudReport } from './hive-runtime-cloud-proof'
+import type { CurrentHiveRuntimeCloudLeaseContext } from './hive-runtime-cloud-lease-context'
 import {
   clearHiveRuntimeCloudRegistrationState,
   readHiveRuntimeCloudRegistrationState,
@@ -54,6 +55,7 @@ export type LocalRuntimeOwnershipServiceOptions = Readonly<{
   userDataPath: string
   getReport: () => HiveRuntimeCloudReport
   getBootId: () => string
+  getCurrentLeaseContext: () => CurrentHiveRuntimeCloudLeaseContext | null
   getRelayStatus?: () => HiveLocalRuntimeCloudStatus['relay']
   onRegistrationChanged?: () => void
   dependencies?: LocalRuntimeOwnershipDependencies

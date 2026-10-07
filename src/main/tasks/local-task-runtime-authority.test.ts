@@ -40,7 +40,9 @@ afterEach(async () => {
   vi.clearAllMocks()
 })
 async function fixture() {
-  const temporary = resolve('logs/task-session-binding/writer-authority/tmp')
+  const temporary = resolve(
+    'logs/paperclip-development/p3/task-authentication-refresh-continuity/writer/tmp'
+  )
   await mkdir(temporary, { recursive: true })
   const userDataPath = await mkdtemp(join(temporary, 'runtime-'))
   const source = join(userDataPath, 'source')
@@ -81,14 +83,20 @@ async function fixture() {
     accessToken: 'fixture-only',
     sessionExpiresAt: Date.now() + 120_000
   }
+  let signedOut = false
+  const listeners = new Set<() => void>()
   const start = async () => {
     const service = await startLocalTaskRuntime({
       userDataPath,
       runtime,
       store,
       account: {
-        getRuntimeCloudAuthorization: () => account,
-        subscribeRuntimeCloudAuthorization: () => () => undefined
+        getRuntimeCloudAuthorization: () => (signedOut ? null : account),
+        subscribeRuntimeCloudAuthorization: (listener) => {
+          const notify = () => listener(signedOut ? null : account)
+          listeners.add(notify)
+          return () => listeners.delete(notify)
+        }
       },
       ownership: {
         getState: () => ({
@@ -134,9 +142,101 @@ async function fixture() {
     workspaceSelector: 'id:synthetic-source',
     input: 'Write report.md.'
   }
-  return { userDataPath, source, resourceGuard, sourceGuard, createFolderWorkspace, start, input }
+  return {
+    userDataPath,
+    source,
+    resourceGuard,
+    sourceGuard,
+    createFolderWorkspace,
+    start,
+    input,
+    records,
+    signOut: () => {
+      signedOut = true
+      for (const listener of listeners) {
+        listener()
+      }
+    }
+  }
 }
 describe('original local Task runtime producer assembly', () => {
+  it('drains original captured revocation after public runtime close while resources remain authentic', async () => {
+    const h = await fixture(),
+      service = await h.start()
+    const binding = await service.issuer.issue(h.input)
+    const grant = service.issuer.resolveGrant(binding.command.authorizationRef)!
+    await h.records.tasks.admit({
+      command: binding.command,
+      operationCallerKey: 'trusted-local:runtime',
+      workspace: grant.workspace,
+      now: Date.now(),
+      validate: grant.assertCurrent
+    })
+    const originalFence = service.host.fenceRevokedExecution.bind(service.host)
+    let release!: () => void, started!: () => void
+    const held = new Promise<void>((resolveHold) => {
+      release = resolveHold
+    })
+    const ready = new Promise<void>((resolveReady) => {
+      started = resolveReady
+    })
+    vi.spyOn(service.host, 'fenceRevokedExecution').mockImplementation(async (...args) => {
+      started()
+      await held
+      await originalFence(...args)
+    })
+    h.signOut()
+    await ready
+    const closing = service.close()
+    expect(service.close()).toBe(closing)
+    expect(() => grant.assertCurrent()).toThrow()
+    release()
+    await closing
+    expect(h.records.tasks.get(binding.command)?.cancellationKey).toBe(
+      `revoked:${binding.commandFingerprint}`
+    )
+    expect(h.resourceGuard).toHaveBeenCalled()
+  })
+  it('reports unresolved original revocation when resources are unavailable and retries without reopening public grants', async () => {
+    const h = await fixture(),
+      service = await h.start()
+    const binding = await service.issuer.issue(h.input)
+    const grant = service.issuer.resolveGrant(binding.command.authorizationRef)!
+    await h.records.tasks.admit({
+      command: binding.command,
+      operationCallerKey: 'trusted-local:runtime',
+      workspace: grant.workspace,
+      now: Date.now(),
+      validate: grant.assertCurrent
+    })
+    const originalFence = service.host.fenceRevokedExecution.bind(service.host)
+    let release!: () => void, started!: () => void
+    const held = new Promise<void>((resolveHold) => {
+      release = resolveHold
+    })
+    const ready = new Promise<void>((resolveReady) => {
+      started = resolveReady
+    })
+    vi.spyOn(service.host, 'fenceRevokedExecution').mockImplementation(async (...args) => {
+      started()
+      await held
+      await originalFence(...args)
+    })
+    h.signOut()
+    await ready
+    h.resourceGuard.mockImplementation(() => Promise.resolve())
+    const closing = service.close()
+    release()
+    await expect(closing).rejects.toThrow('OUTCOME_UNKNOWN')
+    expect(h.records.tasks.get(binding.command)?.cancellationKey).toBeNull()
+    expect(() => grant.assertCurrent()).toThrow()
+    h.resourceGuard.mockImplementation(() => undefined)
+    await service.close()
+    expect(h.records.tasks.get(binding.command)?.cancellationKey).toBe(
+      `revoked:${binding.commandFingerprint}`
+    )
+    expect(() => grant.assertCurrent()).toThrow()
+  })
   it('refuses an async resource guard before publishing a runtime transport', async () => {
     const h = await fixture()
     h.resourceGuard.mockImplementation(() => Promise.resolve())

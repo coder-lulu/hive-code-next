@@ -42,7 +42,10 @@ export class HiveRuntimeCloudPresenceService {
   private bootId: string
   private lease: ActiveLease | null = null
   private readonly accountSession: HiveRuntimeCloudPresenceAccountSession
-  private readonly leaseContext = new HiveRuntimeCloudLeaseContextPublisher()
+  private readonly leaseContext = new HiveRuntimeCloudLeaseContextPublisher(
+    () => this.dependencies.now(),
+    () => this.publication.set('OFFLINE_RETRY')
+  )
   private readonly scheduler: HiveRuntimeCloudPresenceScheduler
   private readonly relayHeartbeat = new HiveRuntimeCloudPresenceRelay(() => {
     const context = this.getCurrentLeaseContext()
@@ -258,6 +261,7 @@ export class HiveRuntimeCloudPresenceService {
       context: this.getCurrentLeaseContext(),
       now: this.dependencies.now,
       signal,
+      onAccepted: (proof) => this.leaseContext.accept(this.lease!, proof),
       assertCurrent: () => this.assertCurrent(epoch)
     })
     this.assertCurrent(epoch)

@@ -764,8 +764,8 @@ describe('Hive Runtime Cloud Presence service', () => {
       leaseEpoch: 8,
       fencingEpoch: 5,
       acceptedHeartbeatSeq: 1,
-      observedAt: 1,
-      leaseExpiresAt: 2,
+      observedAt: Date.parse('2026-08-25T08:00:00.000Z'),
+      leaseExpiresAt: Date.parse('2026-08-25T08:01:30.000Z'),
       presence: 'ONLINE',
       duplicate: false
     })

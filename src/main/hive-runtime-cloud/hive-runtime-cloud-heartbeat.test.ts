@@ -2,7 +2,8 @@ import { generateKeyPairSync } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import {
   sendHiveRuntimeCloudHeartbeat,
-  type PendingHeartbeat
+  type PendingHeartbeat,
+  type HeartbeatRequestTiming
 } from './hive-runtime-cloud-heartbeat'
 import { normalizeHeartbeat } from './hive-runtime-cloud-response'
 import { withHiveRuntimeRelayHeartbeatReport } from './hive-runtime-cloud-report'
@@ -161,6 +162,7 @@ describe('Hive Runtime Relay signed heartbeat boundary', () => {
       .mockRejectedValueOnce(new Error('offline'))
       .mockResolvedValueOnce(normalizeHeartbeat({ ...base, ...fixture.input.response }))
     let pending: PendingHeartbeat | null = null
+    let pendingTiming: HeartbeatRequestTiming | null = null
     const options = {
       authorization: () => ({
         accessToken: 'session-token',
@@ -175,6 +177,7 @@ describe('Hive Runtime Relay signed heartbeat boundary', () => {
       authorityId: 'hive-primary',
       lease,
       pending,
+      pendingTiming,
       client: {
         heartbeat,
         lookup: vi.fn(),
@@ -188,14 +191,15 @@ describe('Hive Runtime Relay signed heartbeat boundary', () => {
       }),
       now: () => fixture.validationTime,
       signal: new AbortController().signal,
-      onPrepared: (value: PendingHeartbeat) => {
+      onPrepared: (value: PendingHeartbeat, timing: HeartbeatRequestTiming) => {
         pending = value
+        pendingTiming = timing
       },
       assertCurrent: vi.fn(),
       onAccepted: vi.fn()
     }
     await expect(sendHiveRuntimeCloudHeartbeat(options)).rejects.toThrow('offline')
-    await sendHiveRuntimeCloudHeartbeat({ ...options, pending, report })
+    await sendHiveRuntimeCloudHeartbeat({ ...options, pending, pendingTiming, report })
     const first = heartbeat.mock.calls[0][0]
     const second = heartbeat.mock.calls[1][0]
     expect(first.report.relayControl).toEqual(control)
@@ -221,6 +225,7 @@ describe('Hive Runtime Relay signed heartbeat boundary', () => {
         authorityId: 'hive-primary',
         lease,
         pending: null,
+        pendingTiming: null,
         client: {
           heartbeat: vi.fn().mockResolvedValue({
             ...normalizeHeartbeat({ ...base, ...fixture.input.response }),

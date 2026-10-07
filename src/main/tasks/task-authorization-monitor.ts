@@ -4,6 +4,7 @@ import type { TaskExecutionPersistence } from './task-execution-store'
 import type { TaskExecutionRecord } from './task-execution-record'
 import { refuseTaskExecution } from './task-execution-error'
 import { taskFailure, type TaskFailureError } from './task-failure-diagnostic'
+import { TASK_EXECUTION_RECORD_LIMIT } from './task-execution-admission'
 
 /** Recovery observes original executions; only the host may clean up revoked writers. */
 export function installTaskAuthorizationMonitor(options: {
@@ -11,17 +12,19 @@ export function installTaskAuthorizationMonitor(options: {
     LocalTaskBindingIssuer,
     'assertExecutionCurrent' | 'launchFingerprint' | 'restoreBindings'
   >
-  store: Pick<TaskExecutionPersistence, 'readActive'>
+  store: Pick<TaskExecutionPersistence, 'readActive' | 'listActive'>
   host: Pick<TaskExecutionHost, 'recoverPersistedExecution' | 'fenceRevokedExecution'>
   operationCallerKey: string
   subscribe(listener: () => void): () => void
   assertCurrent(): void
 }) {
   let closed = false,
+    closing = false,
     dirty = false,
     authorizationDirty = false
   let flight: Promise<void> | null = null
   let authorizationFlight: Promise<TaskExecutionRecord[]> | null = null
+  let closingFlight: Promise<void> | undefined
   const assertCurrent = () => {
     if (closed) {
       return refuseTaskExecution('SERVICE_UNAVAILABLE')
@@ -29,6 +32,64 @@ export function installTaskAuthorizationMonitor(options: {
     options.assertCurrent()
   }
   const caller = { operationCallerKey: options.operationCallerKey, assertCurrent }
+  const captured = new Map<
+    string,
+    {
+      record: TaskExecutionRecord
+      failure: TaskFailureError
+      flight?: Promise<void>
+    }
+  >()
+  const flushCaptured = () => {
+    for (const [key, entry] of captured) {
+      if (entry.flight) {
+        continue
+      }
+      // The Host queues only its original cancellation CAS here; slow collection stays bounded below.
+      entry.flight = options.host
+        .fenceRevokedExecution(entry.record, caller, entry.failure)
+        .then(
+          () => {
+            captured.delete(key)
+          },
+          () => undefined
+        )
+        .finally(() => {
+          entry.flight = undefined
+        })
+    }
+  }
+  const captureObservedRevocations = () => {
+    if (closing || closed) {
+      return
+    }
+    assertCurrent()
+    for (const record of options.store.listActive()) {
+      if (
+        record.operationCallerKey !== options.operationCallerKey ||
+        captured.has(record.commandFingerprint) ||
+        captured.size >= TASK_EXECUTION_RECORD_LIMIT
+      ) {
+        continue
+      }
+      try {
+        if (!options.issuer.launchFingerprint(record)) {
+          continue
+        }
+      } catch {
+        continue
+      }
+      try {
+        options.issuer.assertExecutionCurrent(record)
+      } catch (error) {
+        captured.set(record.commandFingerprint, {
+          record,
+          failure: taskFailure(error, 'authorization_monitor', 'OUTCOME_UNKNOWN')
+        })
+      }
+    }
+    flushCaptured()
+  }
   const fenceRevoked = () => {
     authorizationDirty = true
     if (authorizationFlight) {
@@ -41,6 +102,9 @@ export function installTaskAuthorizationMonitor(options: {
         records = (await options.store.readActive(assertCurrent)).filter(
           (record) => record.operationCallerKey === options.operationCallerKey
         )
+        if (closing) {
+          return records
+        }
         await options.issuer.restoreBindings(records)
         assertCurrent()
         const revoked: { record: TaskExecutionRecord; failure: TaskFailureError }[] = [],
@@ -64,7 +128,7 @@ export function installTaskAuthorizationMonitor(options: {
           })
         )
         records = [...revoked.map(({ record }) => record), ...authorized]
-      } while (!closed && authorizationDirty)
+      } while (!closing && !closed && authorizationDirty)
       return records
     })().finally(() => {
       authorizationFlight = null
@@ -75,7 +139,7 @@ export function installTaskAuthorizationMonitor(options: {
   const recover = async (records: TaskExecutionRecord[]) => {
     let index = 0
     const lane = async () => {
-      while (!closed && index < records.length) {
+      while (!closing && !closed && index < records.length) {
         const record = records[index++]!
         assertCurrent()
         let fingerprint: string | null = null
@@ -94,10 +158,11 @@ export function installTaskAuthorizationMonitor(options: {
     await Promise.allSettled(Array.from({ length: Math.min(4, records.length) }, lane))
   }
   const check = () => {
-    if (closed) {
+    if (closing || closed) {
       return flight
     }
     dirty = true
+    flushCaptured()
     const authorization = fenceRevoked()
     if (flight) {
       return flight
@@ -107,10 +172,10 @@ export function installTaskAuthorizationMonitor(options: {
       do {
         dirty = false
         await recover(records)
-        if (!closed && dirty) {
+        if (!closing && !closed && dirty) {
           records = await fenceRevoked()
         }
-      } while (!closed && dirty)
+      } while (!closing && !closed && dirty)
     })().finally(() => {
       flight = null
     })
@@ -118,6 +183,11 @@ export function installTaskAuthorizationMonitor(options: {
     return flight
   }
   const unsubscribe = options.subscribe(() => {
+    try {
+      captureObservedRevocations()
+    } catch {
+      /* Unavailable snapshots grant no authority. */
+    }
     void check()
   })
   const timer = setInterval(() => {
@@ -127,13 +197,42 @@ export function installTaskAuthorizationMonitor(options: {
   void check()
   return {
     check,
-    async close() {
-      if (!closed) {
-        closed = true
-        clearInterval(timer)
-        unsubscribe()
+    close() {
+      if (closed) {
+        return Promise.resolve()
       }
-      await Promise.allSettled([flight, authorizationFlight])
+      if (closingFlight) {
+        return closingFlight
+      }
+      closing = true
+      clearInterval(timer)
+      unsubscribe()
+      closingFlight = (async () => {
+        await Promise.allSettled([flight, authorizationFlight])
+        const pending = [...captured.values()]
+        for (let index = 0; index < pending.length; index += 4) {
+          await Promise.allSettled(
+            pending.slice(index, index + 4).map(async (entry) => {
+              if (entry.flight) {
+                await entry.flight
+              }
+              const key = entry.record.commandFingerprint
+              if (captured.get(key) === entry) {
+                await options.host.fenceRevokedExecution(entry.record, caller, entry.failure)
+                captured.delete(key)
+              }
+            })
+          )
+        }
+        if (captured.size) {
+          return refuseTaskExecution('OUTCOME_UNKNOWN')
+        }
+        closed = true
+      })().catch((error) => {
+        closingFlight = undefined
+        throw error
+      })
+      return closingFlight
     }
   }
 }

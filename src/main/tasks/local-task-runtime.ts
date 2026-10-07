@@ -262,7 +262,7 @@ export async function startLocalTaskRuntime(options: {
     issuer,
     store: resources.store.tasks,
     host,
-    assertCurrent,
+    assertCurrent: () => assertTaskAuthorizationCurrent(() => resources.assertCurrent()),
     operationCallerKey: 'trusted-local:runtime',
     subscribe(listener) {
       const account = options.account.subscribeRuntimeCloudAuthorization(listener)
@@ -283,7 +283,7 @@ export async function startLocalTaskRuntime(options: {
     facade: facadeService.facade,
     close() {
       closed = true
-      closing ??= (async () => {
+      return (closing ??= (async () => {
         await monitor.close()
         await transport.close()
         await issuer.close()
@@ -293,8 +293,10 @@ export async function startLocalTaskRuntime(options: {
             throw error
           }
         })
-      })()
-      return closing
+      })().catch((error) => {
+        closing = undefined
+        throw error
+      }))
     }
   }
 }
