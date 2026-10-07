@@ -627,22 +627,27 @@ describe('RemoteRuntimeSharedControlConnection', () => {
     const requests = Array.from({ length: admittedCount }, () =>
       connection.request('worktree.large', params, 60_000).catch(() => undefined)
     )
-    await vi.waitFor(() => expect(server.requests).toHaveLength(admittedCount))
+    // Real encrypted payload delivery shares the original whole-test budget.
+    try {
+      await vi.waitFor(() => expect(server.requests).toHaveLength(admittedCount), {
+        timeout: 30_000
+      })
 
-    expect(
-      Array.from(pendingRequests.values()).every(
-        (pending) => pending.preparedRequest?.serializedRequest === null
+      expect(
+        Array.from(pendingRequests.values()).every(
+          (pending) => pending.preparedRequest?.serializedRequest === null
+        )
+      ).toBe(true)
+      await expect(connection.request('worktree.large', params, 60_000)).rejects.toMatchObject({
+        code: 'remote_runtime_busy'
+      })
+      expect(getRemoteRuntimeRequestAdmissionEvidence().retainedBytes).toBeLessThanOrEqual(
+        REMOTE_RUNTIME_MAX_PENDING_RPC_BYTES
       )
-    ).toBe(true)
-    await expect(connection.request('worktree.large', params, 60_000)).rejects.toMatchObject({
-      code: 'remote_runtime_busy'
-    })
-    expect(getRemoteRuntimeRequestAdmissionEvidence().retainedBytes).toBeLessThanOrEqual(
-      REMOTE_RUNTIME_MAX_PENDING_RPC_BYTES
-    )
-
-    connection.close()
-    await Promise.all(requests)
+    } finally {
+      connection.close()
+      await Promise.all(requests)
+    }
     expect(getRemoteRuntimeRequestAdmissionEvidence()).toEqual({
       pendingRequestCount: 0,
       retainedBytes: 0

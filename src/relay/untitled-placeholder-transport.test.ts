@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { randomUUID } from 'node:crypto'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { FsHandler } from './fs-handler'
 import { RelayContext } from './context'
@@ -17,6 +17,7 @@ import {
   UntitledPlaceholderRecoveryLocationUnavailableError
 } from '../shared/untitled-placeholder-recovery-directory'
 import { runProcess } from '../shared/child-process/run-process'
+import { getAppEnvironment } from '../shared/app-environment'
 import type * as RetentionModule from '../shared/untitled-placeholder-retention'
 
 const factory = vi.hoisted(() => ({ create: vi.fn() }))
@@ -425,35 +426,46 @@ describe('SSH placeholder capability outcomes', () => {
       timeoutMs: 10_000
     })
     expect(initialized.code).toBe(0)
-    const actual = await vi.importActual<typeof RetentionModule>(
-      '../shared/untitled-placeholder-retention'
-    )
-    const realHost = actual.createUntitledPlaceholderRetentionHost({
-      resolveRetentionRoot: resolveUntitledPlaceholderRetentionRoot
-    })
-    const t = transport(context(), realHost)
-    const file = join(directory, 'Untitled.md')
-    const token = await t.provider.createUntitledPlaceholder(file, params.ownerKey)
-    expect(await readFile(file, 'utf8')).toBe('')
-    const result = await t.provider.discardUntitledPlaceholder(file, params.ownerKey, token!)
-    expect(result.status).toBe('removed-placeholder')
-    if (result.status !== 'removed-placeholder') {
-      throw new Error('Real transport did not safely capture the placeholder')
+    const app = getAppEnvironment()
+    const actualGetPath = app.getPath.bind(app)
+    const missingUserData = join(directory, 'missing-app-user-data')
+    await expect(lstat(missingUserData)).rejects.toMatchObject({ code: 'ENOENT' })
+    const getPath = vi
+      .spyOn(app, 'getPath')
+      .mockImplementation((name) => (name === 'userData' ? missingUserData : actualGetPath(name)))
+    try {
+      const actual = await vi.importActual<typeof RetentionModule>(
+        '../shared/untitled-placeholder-retention'
+      )
+      const realHost = actual.createUntitledPlaceholderRetentionHost({
+        resolveRetentionRoot: resolveUntitledPlaceholderRetentionRoot
+      })
+      const t = transport(context(), realHost)
+      const file = join(directory, 'Untitled.md')
+      const token = await t.provider.createUntitledPlaceholder(file, params.ownerKey)
+      expect(await readFile(file, 'utf8')).toBe('')
+      const result = await t.provider.discardUntitledPlaceholder(file, params.ownerKey, token!)
+      expect(result.status).toBe('removed-placeholder')
+      if (result.status !== 'removed-placeholder') {
+        throw new Error('Real transport did not safely capture the placeholder')
+      }
+      expect(result.recovery.originalPath).toBe(file)
+      expect(relative(join(directory, '.git'), result.recovery.retainedPath)).toMatch(
+        /^hivecode-untitled-placeholder-recovery[\\/]/
+      )
+      expect(await readFile(result.recovery.retainedPath, 'utf8')).toBe('')
+      expect(await readFile(result.recovery.manifestPath, 'utf8')).toContain('created')
+      const status = await runProcess({
+        program: 'git',
+        args: ['status', '--porcelain', '--untracked-files=all'],
+        cwd: directory,
+        timeoutMs: 10_000
+      })
+      expect(status.code).toBe(0)
+      expect(status.stdout).toBe('')
+    } finally {
+      getPath.mockRestore()
     }
-    expect(result.recovery.originalPath).toBe(file)
-    expect(relative(join(directory, '.git'), result.recovery.retainedPath)).toMatch(
-      /^hivecode-untitled-placeholder-recovery[\\/]/
-    )
-    expect(await readFile(result.recovery.retainedPath, 'utf8')).toBe('')
-    expect(await readFile(result.recovery.manifestPath, 'utf8')).toContain('created')
-    const status = await runProcess({
-      program: 'git',
-      args: ['status', '--porcelain', '--untracked-files=all'],
-      cwd: directory,
-      timeoutMs: 10_000
-    })
-    expect(status.code).toBe(0)
-    expect(status.stdout).toBe('')
   })
 
   it('creates a real ordinary file on only legacy MethodNotFound and returns no lease', async () => {

@@ -44,6 +44,7 @@ vi.mock('../providers/local-pty-utils', async (importOriginal) => {
   const actual = await importOriginal<typeof LocalPtyUtils>()
   return {
     ...actual,
+    ensureNodePtySpawnHelperExecutable: (): void => {},
     getNodePtySpawnHelperCandidates: () => [import.meta.filename]
   }
 })

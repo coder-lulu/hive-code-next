@@ -11,7 +11,7 @@ import {
 } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   completeUserDataMigration,
   getLegacyOrcaUserDataPath,
@@ -53,6 +53,7 @@ function throwAt(expected: MigrationStep): { beforeStep: (step: MigrationStep) =
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   for (const root of roots.splice(0)) {
     rmSync(root, { recursive: true, force: true })
   }
@@ -506,6 +507,7 @@ describe('copy-only user data migration', () => {
 
 describe('legacy user data paths', () => {
   it('uses the platform app-data convention and Linux lowercase app name', () => {
+    vi.stubEnv('XDG_CONFIG_HOME', undefined)
     expect(getLegacyOrcaUserDataPath('darwin', '/Users/test')).toContain(
       join('Library', 'Application Support', 'Orca')
     )

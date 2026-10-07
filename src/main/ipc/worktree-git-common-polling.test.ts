@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
+import * as fsPromises from 'node:fs/promises'
 import type * as NodeFsPromises from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
 import { startGitCommonPolling } from './worktree-git-common-polling'
+import {
+  snapshotGitCommonEntry,
+  type GitCommonEntrySnapshot
+} from './worktree-git-common-entry-snapshot'
+import { diffGitCommon, type GitCommonSnapshot } from './worktree-git-common-snapshot-diff'
 import type {
   WorktreeBasePollEvent,
   WorktreePollerWindowVisibility
@@ -234,4 +240,83 @@ describe('startGitCommonPolling fan-out bounds (#17828)', () => {
       expect(events.flat()).toContainEqual({ type: 'delete', path: newEntry })
     })
   })
+  it.each([false, true])(
+    'reconciles a directory-change scan across same-signature rename (forced=%s)',
+    async (forceFullScan) => {
+      const commonDir = await makeCommonDir(1)
+      dirsToRemove.push(commonDir)
+      const entryDir = join(commonDir, 'worktrees', 'wt-0')
+      const headPath = join(entryDir, 'HEAD')
+      const headLockPath = join(entryDir, 'HEAD.lock')
+      const actualStat = fsPromises.stat
+      const baselineDir = Object.assign(await actualStat(entryDir), { mtimeMs: 1, ctimeMs: 1 })
+      const changedDir = Object.assign(await actualStat(entryDir), { mtimeMs: 2, ctimeMs: 2 })
+      let directoryStat: typeof baselineDir | null = baselineDir
+      const spy = vi.spyOn(fsPromises, 'stat').mockImplementation((...args) => {
+        if (args[0] === entryDir) {
+          return directoryStat === null
+            ? Promise.reject(
+                Object.assign(new Error('owned entry unavailable'), { code: 'ENOENT' })
+              )
+            : Promise.resolve(directoryStat)
+        }
+        return actualStat(...args)
+      })
+      const whole = (entry: GitCommonEntrySnapshot): GitCommonSnapshot => ({
+        worktreesDirSignature: '1:1:1:1',
+        worktreesDirIdentity: '1',
+        entries: new Map([[entryDir, entry]]),
+        primarySignatures: new Map(),
+        statusRefPaths: new Set(),
+        statusRefSignatures: new Map(),
+        didFullScan: false
+      })
+      try {
+        const bootstrap = await snapshotGitCommonEntry(entryDir, undefined, false)
+        spy.mockClear()
+        expect(await snapshotGitCommonEntry(entryDir, bootstrap, false)).toBe(bootstrap)
+        expect(spy).toHaveBeenCalledTimes(1)
+
+        await writeFile(headLockPath, 'ref: refs/heads/feature\n')
+        directoryStat = changedDir
+        const preRename = await snapshotGitCommonEntry(entryDir, bootstrap, forceFullScan)
+        expect(preRename.structuralSignatures.get('HEAD')).toBe(
+          bootstrap.structuralSignatures.get('HEAD')
+        )
+        directoryStat = null
+        expect(await snapshotGitCommonEntry(entryDir, preRename, false)).toBe(preRename)
+        directoryStat = changedDir
+        await rename(headLockPath, headPath)
+        const newHead = await actualStat(headPath)
+        const newHeadSignature = [newHead.mtimeMs, newHead.ctimeMs, newHead.ino, newHead.size].join(
+          ':'
+        )
+        spy.mockClear()
+        const reconciled = await snapshotGitCommonEntry(entryDir, preRename, false)
+        expect(reconciled.structuralSignatures.get('HEAD')).toBe(newHeadSignature)
+        expect(spy).toHaveBeenCalledTimes(7)
+        expect(diffGitCommon(commonDir, whole(preRename), whole(reconciled))).toEqual([
+          { type: 'update', path: headPath }
+        ])
+        spy.mockClear()
+        expect(await snapshotGitCommonEntry(entryDir, reconciled, false)).toBe(reconciled)
+        expect(spy).toHaveBeenCalledTimes(1)
+        expect(diffGitCommon(commonDir, whole(reconciled), whole(reconciled))).toEqual([])
+
+        directoryStat = Object.assign(await actualStat(entryDir), { mtimeMs: 3, ctimeMs: 3 })
+        const changedAgain = await snapshotGitCommonEntry(entryDir, reconciled, false)
+        directoryStat = Object.assign(await actualStat(entryDir), { mtimeMs: 4, ctimeMs: 4 })
+        const rearmed = await snapshotGitCommonEntry(entryDir, changedAgain, false)
+        spy.mockClear()
+        const settled = await snapshotGitCommonEntry(entryDir, rearmed, false)
+        expect(spy).toHaveBeenCalledTimes(7)
+        expect(diffGitCommon(commonDir, whole(rearmed), whole(settled))).toEqual([])
+        spy.mockClear()
+        expect(await snapshotGitCommonEntry(entryDir, settled, false)).toBe(settled)
+        expect(spy).toHaveBeenCalledTimes(1)
+      } finally {
+        spy.mockRestore()
+      }
+    }
+  )
 })

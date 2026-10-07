@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync } from 'node:fs'
+import type * as NodeFs from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { credential } from './native-account-test-fixtures'
@@ -9,11 +10,30 @@ import {
   isAntigravityFileStorageHost
 } from './native-credential-backend'
 
+const nativeHost = vi.hoisted(() => ({ kernelRelease: null as string | null }))
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof NodeFs>()
+  return {
+    ...actual,
+    readFileSync: (...args: Parameters<typeof actual.readFileSync>) => {
+      if (
+        args[0] === '/proc/sys/kernel/osrelease' &&
+        args[1] === 'utf8' &&
+        nativeHost.kernelRelease !== null
+      ) {
+        return nativeHost.kernelRelease
+      }
+      return actual.readFileSync(...args)
+    }
+  }
+})
+
 vi.mock('./native-macos-credentials', () => ({
   readAntigravityMacOSCredential: vi.fn(),
   writeAntigravityMacOSCredential: vi.fn()
 }))
 afterEach(() => {
+  nativeHost.kernelRelease = null
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
 })
@@ -66,6 +86,9 @@ describe('execution-host native credential authority', () => {
   it.each(['win32', 'linux'] as const)(
     'capability-refuses unverified native %s without mutating client credentials',
     (platform) => {
+      if (platform === 'linux') {
+        nativeHost.kernelRelease = '6.8-linux'
+      }
       for (const key of [
         'SSH_TTY',
         'SSH_CLIENT',

@@ -213,7 +213,7 @@ describe.skipIf(process.platform === 'win32')(
             clear,
             'echo "RESULT=${ORCA_PI_PREFILL:+STILL}${ORCA_PI_PREFILL:-CLEARED}"'
           ].join('\n')
-          const out = execFileSync(shell.path, ['-i'], {
+          const out = execFileSync(shell.path, ['-i', '-s'], {
             input: `${script}\n`,
             encoding: 'utf8',
             timeout: 20_000,

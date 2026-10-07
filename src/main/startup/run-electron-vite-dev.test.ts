@@ -1,4 +1,13 @@
-import { existsSync, mkdtempSync, readFileSync, readlinkSync, rmSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  readlinkSync,
+  rmSync,
+  symlinkSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
@@ -296,41 +305,65 @@ describe('run-electron-vite-dev', () => {
       const userDataPath = join(tempDir, 'userData')
       const pidFile = join(tempDir, 'grandchild.pid')
       const envFile = join(tempDir, 'env.json')
-      const wrapperPath = resolve('config/scripts/run-electron-vite-dev.mjs')
-      const fakeCliPath = resolve('src/main/startup/__fixtures__/fake-electron-vite-dev-cli.mjs')
-
-      const wrapper = spawn(process.execPath, [wrapperPath], {
-        cwd: resolve('.'),
-        env: devWrapperTestEnv({
-          ORCA_DEV_USER_DATA_PATH: userDataPath,
-          ORCA_ELECTRON_VITE_CLI: fakeCliPath,
-          ORCA_SKIP_DEV_ELECTRON_APP_PREPARE: '1',
-          ORCA_SKIP_DEV_WEB_PREPARE: '1',
-          ORCA_DEV_WRAPPER_TEST_PID_FILE: pidFile,
-          ORCA_DEV_WRAPPER_TEST_ENV_FILE: envFile
-        }),
-        stdio: 'ignore'
-      })
-
-      expect(wrapper.pid).toBeTypeOf('number')
-      processesToCleanUp.add(wrapper.pid!)
-
-      await waitFor(() => {
-        try {
-          return readFileSync(envFile, 'utf8').trim().length > 0
-        } catch {
-          return false
+      let wrapper: ChildProcess | undefined
+      let trackedPids: number[] = []
+      try {
+        const fixtureRepoRoot = join(tempDir, 'repo')
+        const scriptsDir = join(fixtureRepoRoot, 'config', 'scripts')
+        mkdirSync(scriptsDir, { recursive: true })
+        for (const filename of [
+          'run-electron-vite-dev.mjs',
+          'dev-cli-terminal-wrapper.mjs',
+          'dev-electron-bundle-cache.mjs',
+          'space-sharing-copy.mjs',
+          'dev-electron-bundle-identity.mjs'
+        ]) {
+          copyFileSync(resolve('config', 'scripts', filename), join(scriptsDir, filename))
         }
-      })
+        // The runner resolves Vite's package even when this case skips Web preparation.
+        symlinkSync(resolve('node_modules'), join(fixtureRepoRoot, 'node_modules'), 'dir')
+        const wrapperPath = join(scriptsDir, 'run-electron-vite-dev.mjs')
+        const fakeCliPath = resolve('src/main/startup/__fixtures__/fake-electron-vite-dev-cli.mjs')
 
-      const trackedPids = trackPidFile(pidFile)
-      const devWrapper = readFileSync(join(userDataPath, 'cli', 'bin', 'orca-dev'), 'utf8')
-      const publicAliasWrapper = readFileSync(join(userDataPath, 'cli', 'bin', 'orca'), 'utf8')
-      expect(publicAliasWrapper).toBe(devWrapper)
-      expect(publicAliasWrapper).toContain('ORCA_USER_DATA_PATH')
-      expect(publicAliasWrapper).toContain('out/cli/index.js')
+        wrapper = spawn(process.execPath, [wrapperPath], {
+          cwd: fixtureRepoRoot,
+          env: devWrapperTestEnv({
+            ORCA_DEV_USER_DATA_PATH: userDataPath,
+            ORCA_ELECTRON_VITE_CLI: fakeCliPath,
+            ORCA_SKIP_DEV_ELECTRON_APP_PREPARE: '1',
+            ORCA_SKIP_DEV_WEB_PREPARE: '1',
+            ORCA_DEV_WRAPPER_TEST_PID_FILE: pidFile,
+            ORCA_DEV_WRAPPER_TEST_ENV_FILE: envFile
+          }),
+          stdio: 'ignore'
+        })
 
-      await stopWrapperAndTrackedPids(wrapper, trackedPids)
+        expect(wrapper.pid).toBeTypeOf('number')
+        processesToCleanUp.add(wrapper.pid!)
+
+        await waitFor(() => {
+          try {
+            return readFileSync(envFile, 'utf8').trim().length > 0
+          } catch {
+            return false
+          }
+        })
+
+        trackedPids = trackPidFile(pidFile)
+        const devWrapper = readFileSync(join(userDataPath, 'cli', 'bin', 'orca-dev'), 'utf8')
+        const publicAliasWrapper = readFileSync(join(userDataPath, 'cli', 'bin', 'orca'), 'utf8')
+        expect(publicAliasWrapper).toBe(devWrapper)
+        expect(publicAliasWrapper).toContain('ORCA_USER_DATA_PATH')
+        expect(publicAliasWrapper).toContain('out/cli/index.js')
+      } finally {
+        if (wrapper) {
+          if (trackedPids.length === 0 && existsSync(pidFile)) {
+            trackedPids = trackPidFile(pidFile)
+          }
+          await stopWrapperAndTrackedPids(wrapper, trackedPids)
+        }
+        rmSync(tempDir, { recursive: true, force: true })
+      }
     }
   )
 

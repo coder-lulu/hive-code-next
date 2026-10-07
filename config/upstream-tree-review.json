@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "5513171b2b18b92aee4133ab24b6cb5a937627f5",
+  "sourceProductSha": "4f9eaa85c5d1293098a1fc28af3fe0ab81c45cf9",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -3389,6 +3389,27 @@
       },
       "reason": "Cover actual product-main triggers and current Node artifact qualification, retaining mandatory floor/musl pinned-image checks while excluding the retired Bun product migration component.",
       "regressionTests": ["config/scripts/node-server-change-scope.test.mjs"]
+    },
+    {
+      "path": "config/scripts/orca-dev-bin.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "afcaf0fb7978baa5237db60b44ecfe1e2249a3c4"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a2fab90edb344ae42f90c0cfb822e144bbdc2951"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "afcaf0fb7978baa5237db60b44ecfe1e2249a3c4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a2fab90edb344ae42f90c0cfb822e144bbdc2951"
+      },
+      "reason": "Keep the original package/shebang test on the real repository. In the existing Node invocation case, copy byte-exact production entrypoint and its sole helper to the owned fixture config/scripts directory, execute that entry with all original argv/env/output assertions, and clean only the fixture in finally. Prevent the case from rewriting real compiled CLI inputs without changing production CLI behavior, timeouts, platform guards or the two original cases.",
+      "regressionTests": ["config/scripts/orca-dev-bin.test.mjs"]
     },
     {
       "path": "config/scripts/orcad-template-release-workflow.test.mjs",
@@ -7306,6 +7327,24 @@
       "regressionTests": ["src/main/ai-vault/antigravity-ide-history.test.ts"]
     },
     {
+      "path": "src/main/ai-vault/antigravity-index-file-admission.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "b08a52d5a98623800644c7fb0e9ee8dfae21d84f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "9e5a734370b5c350848ceda448134def2a54d7fe"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "b08a52d5a98623800644c7fb0e9ee8dfae21d84f"
+      },
+      "reason": "Retain the Node bounded metadata reader regular-file rejection oracle. Pin relay FIFO and missing-flag precheck to the maintained safe opener Unsafe transcript file rejection; when NOFOLLOW and NONBLOCK are available pin symlink rejection to real OS ELOOP. Retain all five original cases, two-second POSIX deadlines, real mkfifo/no-writer/symlink fixtures, rejects.toThrow operators, original Windows conditional skips and cleanup. Genuine Linux complete five-case owner passed including FIFO and alias paths; production readers and all safe-opener guards remain unchanged.",
+      "regressionTests": ["src/main/ai-vault/antigravity-index-file-admission.test.ts"]
+    },
+    {
       "path": "src/main/ai-vault/local-log-tail-reader.ts",
       "base": {
         "mode": "100644",
@@ -7364,6 +7403,24 @@
       },
       "reason": "Use independent full cmd/POSIX literals for the actual native resume shell grammar instead of a POSIX-only substring. Preserve full session id, cwd, actual file parse/content/model/token/hidden-envelope/partial JSON assertions. The resume check strengthens a POSIX substring into independent complete literal cmd/POSIX commands including /repo cwd and the exact session id; it does not call any product command helper to construct the oracle. Actual parser output/model/messages/injected-envelope/malformed-JSON/title/token assertions remain.",
       "regressionTests": ["src/main/ai-vault/session-scanner-jcode-parser.test.ts"]
+    },
+    {
+      "path": "src/main/antigravity/native-credential-backend.test.ts",
+      "base": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "b1fd466af7fbbb33d028abe85f6f0bdf3dc67482"
+      },
+      "reason": "Model native Linux without SSH/WSL using an exact ordinary-kernel UTF-8 probe fixture, preserving actual WSL support, unsupported-native refusal, and all real credential filesystem operations and original assertions.",
+      "regressionTests": ["src/main/antigravity/native-credential-backend.test.ts"],
+      "product": {
+        "mode": "100644",
+        "sha": "d37e00b9d66736d1d1fd3f8275c9b1df7c747df3"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "d37e00b9d66736d1d1fd3f8275c9b1df7c747df3"
+      }
     },
     {
       "path": "src/main/antigravity/native-credential-backend.ts",
@@ -8188,6 +8245,27 @@
         "src/main/opencode/opencode-go-api-key-store.test.ts",
         "src/main/zcode/zcode-plan-api-key-store.test.ts"
       ]
+    },
+    {
+      "path": "src/main/daemon/pty-subprocess-foreground-scan-cadence.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "47513702b7acbf2fc5f45e7cc56285c99388d2b7"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "47513702b7acbf2fc5f45e7cc56285c99388d2b7"
+      },
+      "reason": "Isolate the unrelated void host-mode ensure effect in the existing mocked PTY scan fixture; preserve actual candidate preflight and all 10 original foreground cadence/cache/identity assertions.",
+      "regressionTests": ["src/main/daemon/pty-subprocess-foreground-scan-cadence.test.ts"],
+      "product": {
+        "mode": "100644",
+        "sha": "717e94eeeafa65960a10032aa99fbd4d283d5f35"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "717e94eeeafa65960a10032aa99fbd4d283d5f35"
+      }
     },
     {
       "path": "src/main/daemon/pty-subprocess/bun-pty-process.test.ts",
@@ -10556,6 +10634,24 @@
       },
       "reason": "Legacy repair installs both server and required TUI companion. Require exact sorted two-entry inventory and inspect real companion setup; preserve original full server-source equality, both overwrite passes, no-mtime-rewrite and original user/plugin safety cases. Only the late/overwritten legacy repair case upgrades to an exact sorted two-entry server/TUI directory inventory and reads the actual TUI file for setupLegacyOpenCodeTui. Both original overwrite passes and full server source equality remain. Production refresh writes the TUI companion before the server; existing mtime/no-overwrite/user-plugin/ACL/symlink and real installed-module checks remain exact.",
       "regressionTests": ["src/main/opencode/hook-service.test.ts"]
+    },
+    {
+      "path": "src/main/opencode/opencode-go-api-key-store.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "60709340fbb586b225e33fd8345d45ba5a83902d"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "728665076f9358921e2d7b99236de790b15f5912"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "60709340fbb586b225e33fd8345d45ba5a83902d"
+      },
+      "reason": "Model the verified gnome_libsecret backend in the existing positive safeStorage unit-test double, as the maintained Electron and MiniMax fixtures do. Keep all four original encrypted-envelope, restart, cache isolation, malformed-key and transient-read-error assertions. Preserve mandatory protection-gap checks and rejection of unverified/basic_text Linux storage; no real OS-keyring execution is claimed.",
+      "regressionTests": ["src/main/opencode/opencode-go-api-key-store.test.ts"]
     },
     {
       "path": "src/main/opencode/opencode-pty-launch.test.ts",
@@ -13430,6 +13526,21 @@
       }
     },
     {
+      "path": "src/main/startup/hivecode-user-data-migration.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "19c26c7076d86972fd8736873786eb5b6e5fc3e4"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "19c26c7076d86972fd8736873786eb5b6e5fc3e4"
+      },
+      "reason": "Make the default Linux app-data path fixture explicitly remove inherited XDG_CONFIG_HOME and restore the original environment after each case; preserve configured XDG support, legacy lowercase app naming, all 28 original migration and legacy-path cases, assertions, exact-owned cleanup, and budgets.",
+      "regressionTests": ["src/main/startup/hivecode-user-data-migration.test.ts"]
+    },
+    {
       "path": "src/main/startup/main-process-preflight.ts",
       "base": {
         "mode": "100644",
@@ -13507,6 +13618,27 @@
       },
       "reason": "保留P Windows绝对native path fixture，采用U document泛化owner并保持失败restore断言",
       "regressionTests": ["src/main/startup/os-opened-document-delivery.test.ts"]
+    },
+    {
+      "path": "src/main/startup/run-electron-vite-dev.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "73d1bb21cdcf8225ace7d71647f8641f53ffd5d5"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "73d1bb21cdcf8225ace7d71647f8641f53ffd5d5"
+      },
+      "reason": "Run the real copied dev runner and its exact four helper closure under an owned repo fixture, retaining original Vite resolution and all assertions while isolating repoRoot-derived wrapper writes and mandatory child cleanup.",
+      "regressionTests": ["src/main/startup/run-electron-vite-dev.test.ts"],
+      "product": {
+        "mode": "100644",
+        "sha": "23ac0f4924e39ab4405e357888dd46b914f18be7"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "23ac0f4924e39ab4405e357888dd46b914f18be7"
+      }
     },
     {
       "path": "src/main/tasks/task-adapter.test-fixture.ts",
@@ -14515,14 +14647,14 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "0f9e7b36bff83c211e730fca68cf71306cdff94e"
+        "sha": "f4415c719e8ce853ba7867b54c3418e983539eb0"
       },
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "0f9e7b36bff83c211e730fca68cf71306cdff94e"
+        "sha": "f4415c719e8ce853ba7867b54c3418e983539eb0"
       },
-      "reason": "Forty-six cases preserve transport authentication/generation/cancellation/current-session/error assertions, with selected actual dispatcher, host, Git and wx cases.",
+      "reason": "Forty-six cases preserve transport authentication/generation/cancellation/current-session/error assertions, with selected actual dispatcher, host, Git and wx cases. Make the real Git-metadata fallback fixture prove only its owned app userData path unavailable via actual ENOENT lstat, delegate all other getPath names to the exact actual method and restore the spy in finally. Preserve real host/Git recovery and all original authority, cancellation, replay, refusal, schema, payload/manifest/Git-status assertions; keep production preference for a valid same-filesystem private app root. Bind the reviewed formatted AST-equivalent source.",
       "regressionTests": [
         "src/relay/untitled-placeholder-transport.test.ts",
         "src/shared/untitled-placeholder-retention.test.ts",
@@ -16712,6 +16844,29 @@
       ]
     },
     {
+      "path": "src/renderer/src/components/terminal-pane/terminal-pane-store-subscription-budget.test.tsx",
+      "base": {
+        "mode": "100644",
+        "sha": "e285932bf886fe21199d5009b05aac583e5c898f"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "2fdef257882eabc5fbfd7c0a5962de062044d2f3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e285932bf886fe21199d5009b05aac583e5c898f"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2fdef257882eabc5fbfd7c0a5962de062044d2f3"
+      },
+      "reason": "Tighten the exact per-pane listener ratchet from16 to12 after two maintained useShallow folds save1 settings/keybinding and3 chat-state listeners while preserving all six selected reactive values. Retain historical baseline50, all four original cases/operators/cleanup/timeout and29 stable getState actions; update exact saved-listener equality to29+9=38. Genuine Linux original whole-owner4 cases and Windows4 cases passed; the original four cases do not individually exercise all six reactive-field updates.",
+      "regressionTests": [
+        "src/renderer/src/components/terminal-pane/terminal-pane-store-subscription-budget.test.tsx"
+      ]
+    },
+    {
       "path": "src/renderer/src/components/terminal-pane/use-terminal-pane-chat-state.ts",
       "base": {
         "mode": "100644",
@@ -17229,7 +17384,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "59a9c0106073367434f010fb2917874129017935"
+        "sha": "002b632b6b002b59bd602abe0d448a633087d90b"
       },
       "upstream": {
         "mode": "100644",
@@ -17237,9 +17392,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "59a9c0106073367434f010fb2917874129017935"
+        "sha": "002b632b6b002b59bd602abe0d448a633087d90b"
       },
-      "reason": "Preserve browser-without-host negative authority regression and add paired admission/fallback tests.",
+      "reason": "Preserve browser-without-host negative authority regression and add paired admission/fallback tests. Supply the paired worktree catalog hostId in serverReports so the real entry context resolves the same runtime owner reported by the fixture; clear it with null before every case. Preserve explicit-owner precedence and every original case/assertion.",
       "regressionTests": ["src/renderer/src/lib/agent-launch-caller-routing.test.ts"]
     },
     {
@@ -18832,7 +18987,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "48fd4d39401e9a0875199d8d59d9304e1863d4aa"
+        "sha": "a4fd9350db9820dd691e1da69730643b900fc046"
       },
       "upstream": {
         "mode": "100644",
@@ -18840,9 +18995,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "48fd4d39401e9a0875199d8d59d9304e1863d4aa"
+        "sha": "a4fd9350db9820dd691e1da69730643b900fc046"
       },
-      "reason": "Add exactly upstream child-views capability at its defined place in the complete ordered auth-frame list. Preserve v2 message/transcript/device token, single authenticated socket, exact RPC order and all negative/memory/reconnect/security cases. The independently enumerated complete ordered authentication-frame capability list adds exactly U's child-views capability after row-stop. No product capability helper is used in the oracle. v2 frame, transcript hash, device token, one authenticated socket, request order and all authority/memory/reconnect/security-negative cases remain unchanged.",
+      "reason": "Add exactly upstream child-views capability at its defined place in the complete ordered auth-frame list. Preserve v2 message/transcript/device token, single authenticated socket, exact RPC order and all negative/memory/reconnect/security cases. The independently enumerated complete ordered authentication-frame capability list adds exactly U's child-views capability after row-stop. No product capability helper is used in the oracle. v2 frame, transcript hash, device token, one authenticated socket, request order and all authority/memory/reconnect/security-negative cases remain unchanged. Align only the large authenticated silent-socket capacity fixture receive wait with the original official 30-second body budget, using explicit timeout 30_000 after the invalid vi.getConfig API attribution was disproved by the preserved actual Windows 25-pass/1-fail run. Move the exact real connection.close and Promise.all(requests) cleanup to finally. Preserve all 26 original cases, 164 assertion ASTs, real E2EE and three 3-MiB payloads, admitted-count formula, serialized-buffer clearing, extra-request busy refusal, byte ceiling, final zero admission, and original body30s/hook60s/RPC60s. No transport warm-up, performance threshold or production change; the observed two receives before intentional close do not prove third-frame loss or completion.",
       "regressionTests": ["src/shared/remote-runtime-shared-control-connection.test.ts"]
     },
     {
@@ -20002,84 +20157,138 @@
       "regressionTests": ["tests/e2e/worktree-lineage.spec.ts"]
     },
     {
-      "path": "src/renderer/src/components/terminal-pane/terminal-pane-store-subscription-budget.test.tsx",
+      "path": "src/shared/startup-shell-portability.live-shell.test.ts",
       "base": {
         "mode": "100644",
-        "sha": "e285932bf886fe21199d5009b05aac583e5c898f"
+        "sha": "b72a60ec075729d3bbdd998bb8f6fe55534be92c"
       },
       "product": {
         "mode": "100644",
-        "sha": "2fdef257882eabc5fbfd7c0a5962de062044d2f3"
+        "sha": "c380778abd96e70d25625ef476d0563db2a4a074"
       },
       "upstream": {
         "mode": "100644",
-        "sha": "e285932bf886fe21199d5009b05aac583e5c898f"
+        "sha": "b72a60ec075729d3bbdd998bb8f6fe55534be92c"
       },
       "result": {
         "mode": "100644",
-        "sha": "2fdef257882eabc5fbfd7c0a5962de062044d2f3"
+        "sha": "c380778abd96e70d25625ef476d0563db2a4a074"
       },
-      "reason": "Tighten the exact per-pane listener ratchet from16 to12 after two maintained useShallow folds save1 settings/keybinding and3 chat-state listeners while preserving all six selected reactive values. Retain historical baseline50, all four original cases/operators/cleanup/timeout and29 stable getState actions; update exact saved-listener equality to29+9=38. Genuine Linux original whole-owner4 cases and Windows4 cases passed; the original four cases do not individually exercise all six reactive-field updates.",
+      "reason": "Make the real interactive bash/zsh alias fixture explicitly read its queued script from piped standard input with -i -s, rather than permitting zsh terminal-editor input through the inherited controlling tty. Preserve the real shell, alias-resistant clear command, all original assertions, timeout20s, case/skip conditions, sandbox and cleanup; keep the observed K12 timeout/recovery failure evidence and require an actual full original Linux owner rerun.",
+      "regressionTests": ["src/shared/startup-shell-portability.live-shell.test.ts"]
+    },
+    {
+      "path": "src/main/startup/configure-process.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "70747c926f483c03ce93737c83f01414d9a667d0"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "e1dfb98167239260bb971fddacc866c1b673f17d"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "70747c926f483c03ce93737c83f01414d9a667d0"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e1dfb98167239260bb971fddacc866c1b673f17d"
+      },
+      "reason": "Make only the two generic GPU-channel fixtures explicitly neutralize inherited WAYLAND_DISPLAY, XDG_SESSION_TYPE and ELECTRON_OZONE_PLATFORM_HINT, restoring their exact values after each GPU case. Preserve the real Linux platform and deliberate Wayland/X11/E2E GPU policy, all original46 cases, unsafe-feature refusals and exact existing-feature assertions; no production flags, budgets or skip conditions change.",
+      "regressionTests": ["src/main/startup/configure-process.test.ts"]
+    },
+    {
+      "path": "src/main/daemon/pty-subprocess-foreground-identity.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "76793cdbab2085031e7e7d843ee2148539951221"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "2add9cdaf75850a9380d5a9797a058e3a93c110f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "76793cdbab2085031e7e7d843ee2148539951221"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2add9cdaf75850a9380d5a9797a058e3a93c110f"
+      },
+      "reason": "Isolate the unrelated void ensureNodePtySpawnHelperExecutable filesystem effect in this existing mocked PTY owner, preserving actual helper-candidate preflight, original subprocess/foreground/kill/dispose assertions, environment and budgets. The real production ensure function and independent native helper slot contracts stay unchanged.",
+      "regressionTests": ["src/main/daemon/pty-subprocess-foreground-identity.test.ts"]
+    },
+    {
+      "path": "src/main/daemon/pty-subprocess-handle-lifecycle.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "6ab3284001022d071dbe3740d334ea0900fd8303"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "1f848605d5ca057d096080d8cb26861355416c35"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "6ab3284001022d071dbe3740d334ea0900fd8303"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "1f848605d5ca057d096080d8cb26861355416c35"
+      },
+      "reason": "Isolate the unrelated void ensureNodePtySpawnHelperExecutable filesystem effect in this existing mocked PTY owner, preserving actual helper-candidate preflight, original subprocess/foreground/kill/dispose assertions, environment and budgets. The real production ensure function and independent native helper slot contracts stay unchanged.",
+      "regressionTests": ["src/main/daemon/pty-subprocess-handle-lifecycle.test.ts"]
+    },
+    {
+      "path": "src/main/ipc/worktree-git-common-entry-snapshot.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "6dad6e0a0487852b63df2a38d86429a447eb436b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "d55a3c32f6a1bb90928bdf660f4b235215c83a45"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "6dad6e0a0487852b63df2a38d86429a447eb436b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "d55a3c32f6a1bb90928bdf660f4b235215c83a45"
+      },
+      "reason": "Reconcile an existing entry once on the next stable-directory tick after its directory signature changes, including forced scans, so a lock+rename that shares the sampled timestamp tuple cannot leave a mixed new-directory/old-HEAD snapshot cached through the detection window. Preserve missing-entry prior snapshots, re-arm on repeated changes, omitted-false internal DTO shape, stable one-stat gate, bounded pool8 and15-tick backstop. Keep actual signature diff, visibility, transient-error and watcher ownership contracts; no wire field or universal coarse-filesystem guarantee. Bound actual Linux causal old-helper Red and new-helper Green plus Windows38-case diagnostics; candidate gates still pending.",
       "regressionTests": [
-        "src/renderer/src/components/terminal-pane/terminal-pane-store-subscription-budget.test.tsx"
+        "src/main/ipc/worktree-git-common-polling.test.ts",
+        "src/main/ipc/worktree-git-common-watch.test.ts",
+        "src/main/ipc/worktree-git-common-watch-reconciliation.test.ts"
       ]
     },
     {
-      "path": "src/main/ai-vault/antigravity-index-file-admission.test.ts",
-      "base": null,
-      "product": {
-        "mode": "100644",
-        "sha": "b08a52d5a98623800644c7fb0e9ee8dfae21d84f"
-      },
-      "upstream": {
-        "mode": "100644",
-        "sha": "9e5a734370b5c350848ceda448134def2a54d7fe"
-      },
-      "result": {
-        "mode": "100644",
-        "sha": "b08a52d5a98623800644c7fb0e9ee8dfae21d84f"
-      },
-      "reason": "Retain the Node bounded metadata reader regular-file rejection oracle. Pin relay FIFO and missing-flag precheck to the maintained safe opener Unsafe transcript file rejection; when NOFOLLOW and NONBLOCK are available pin symlink rejection to real OS ELOOP. Retain all five original cases, two-second POSIX deadlines, real mkfifo/no-writer/symlink fixtures, rejects.toThrow operators, original Windows conditional skips and cleanup. Genuine Linux complete five-case owner passed including FIFO and alias paths; production readers and all safe-opener guards remain unchanged.",
-      "regressionTests": ["src/main/ai-vault/antigravity-index-file-admission.test.ts"]
-    },
-    {
-      "path": "src/main/opencode/opencode-go-api-key-store.test.ts",
-      "base": null,
-      "product": {
-        "mode": "100644",
-        "sha": "60709340fbb586b225e33fd8345d45ba5a83902d"
-      },
-      "upstream": {
-        "mode": "100644",
-        "sha": "728665076f9358921e2d7b99236de790b15f5912"
-      },
-      "result": {
-        "mode": "100644",
-        "sha": "60709340fbb586b225e33fd8345d45ba5a83902d"
-      },
-      "reason": "Model the verified gnome_libsecret backend in the existing positive safeStorage unit-test double, as the maintained Electron and MiniMax fixtures do. Keep all four original encrypted-envelope, restart, cache isolation, malformed-key and transient-read-error assertions. Preserve mandatory protection-gap checks and rejection of unverified/basic_text Linux storage; no real OS-keyring execution is claimed.",
-      "regressionTests": ["src/main/opencode/opencode-go-api-key-store.test.ts"]
-    },
-    {
-      "path": "config/scripts/orca-dev-bin.test.mjs",
+      "path": "src/main/ipc/worktree-git-common-polling.test.ts",
       "base": {
         "mode": "100644",
-        "sha": "afcaf0fb7978baa5237db60b44ecfe1e2249a3c4"
+        "sha": "179b73e2c33c08061945e9cffd7c4a45b7de353d"
       },
       "product": {
         "mode": "100644",
-        "sha": "a2fab90edb344ae42f90c0cfb822e144bbdc2951"
+        "sha": "3091d7749153fe0c9295dd7256a06c6999cac666"
       },
       "upstream": {
         "mode": "100644",
-        "sha": "afcaf0fb7978baa5237db60b44ecfe1e2249a3c4"
+        "sha": "179b73e2c33c08061945e9cffd7c4a45b7de353d"
       },
       "result": {
         "mode": "100644",
-        "sha": "a2fab90edb344ae42f90c0cfb822e144bbdc2951"
+        "sha": "3091d7749153fe0c9295dd7256a06c6999cac666"
       },
-      "reason": "Keep the original package/shebang test on the real repository. In the existing Node invocation case, copy byte-exact production entrypoint and its sole helper to the owned fixture config/scripts directory, execute that entry with all original argv/env/output assertions, and clean only the fixture in finally. Prevent the case from rewriting real compiled CLI inputs without changing production CLI behavior, timeouts, platform guards or the two original cases.",
-      "regressionTests": ["config/scripts/orca-dev-bin.test.mjs"]
+      "reason": "Add two deterministic forced/unforced same-signature lock+rename regressions after all six original polling cases, preserving their exact IDs/order/AST/assertions and explicit200ms detection/30s body/60s hook budgets. Use owned real files, real HEAD.lock write/rename, actual snapshot helper and diff; script only the owned directory stat tuple. Prove changed-directory/old-HEAD then same-directory/new-HEAD reconciliation, missing snapshot preservation, re-arm, one full seven-stat follow-up, subsequent one-stat stability and no duplicate event. Restore the scoped stat spy in finally and keep original owned cleanup. Actual new-case old-helper HEAD-signature Red is preserved and Linux/Windows three-owner38-case Green is bound; no fake filesystem event or utimes.",
+      "regressionTests": [
+        "src/main/ipc/worktree-git-common-polling.test.ts",
+        "src/main/ipc/worktree-git-common-watch.test.ts",
+        "src/main/ipc/worktree-git-common-watch-reconciliation.test.ts"
+      ]
     }
   ]
 }

@@ -75,6 +75,11 @@ vi.mock('@/runtime/local-runtime-capabilities', () => ({
 }))
 /** What the paired server that owns 'wt-1' last reported about itself. */
 function serverReports(capabilities: readonly string[] | null): void {
+  store.allWorktrees.mockReturnValue(
+    capabilities === null
+      ? []
+      : [{ id: 'wt-1', repoId: 'paired-repo', hostId: 'runtime:web-runtime' }]
+  )
   Object.assign(store, {
     runtimeStatusByEnvironmentId: new Map(
       capabilities ? [['web-runtime', { status: { capabilities } }]] : []

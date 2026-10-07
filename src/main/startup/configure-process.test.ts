@@ -653,6 +653,7 @@ describe('enableMainProcessGpuFeatures', () => {
   }
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     if (originalPlatform) {
       Object.defineProperty(process, 'platform', originalPlatform)
     }
@@ -667,6 +668,9 @@ describe('enableMainProcessGpuFeatures', () => {
     const { app } = await import('electron')
     const { enableMainProcessGpuFeatures } = await import('./configure-process')
 
+    vi.stubEnv('WAYLAND_DISPLAY', undefined)
+    vi.stubEnv('XDG_SESSION_TYPE', undefined)
+    vi.stubEnv('ELECTRON_OZONE_PLATFORM_HINT', undefined)
     delete process.env.ORCA_E2E_USER_DATA_DIR
     vi.mocked(app.commandLine.appendSwitch).mockClear()
     enableMainProcessGpuFeatures()
@@ -872,6 +876,9 @@ describe('enableMainProcessGpuFeatures', () => {
     const { app } = await import('electron')
     const { enableMainProcessGpuFeatures } = await import('./configure-process')
 
+    vi.stubEnv('WAYLAND_DISPLAY', undefined)
+    vi.stubEnv('XDG_SESSION_TYPE', undefined)
+    vi.stubEnv('ELECTRON_OZONE_PLATFORM_HINT', undefined)
     delete process.env.ORCA_E2E_USER_DATA_DIR
     vi.mocked(app.commandLine.appendSwitch).mockClear()
     vi.mocked(app.commandLine.getSwitchValue).mockReturnValue('ExistingFeature')

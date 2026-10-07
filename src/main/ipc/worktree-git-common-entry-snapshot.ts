@@ -29,6 +29,7 @@ export async function gitCommonFileSignature(path: string): Promise<string | nul
 
 export type GitCommonEntrySnapshot = {
   dirSignature: string
+  needsReconciliation?: boolean
   structuralSignatures: Map<string, string>
   indexSignature: string | null
   headLogSignature: string | null
@@ -58,7 +59,10 @@ export async function snapshotGitCommonEntry(
       }
     )
   }
-  const shouldRescan = forceFullScan || !previous || previous.dirSignature !== nextDirSignature
+  // Recheck changed directories once to catch lock+rename within one timestamp granule.
+  const directoryChanged = previous !== undefined && previous.dirSignature !== nextDirSignature
+  const shouldRescan =
+    forceFullScan || !previous || directoryChanged || previous.needsReconciliation === true
   if (!shouldRescan) {
     return previous
   }
@@ -77,6 +81,7 @@ export async function snapshotGitCommonEntry(
   ])
   return {
     dirSignature: nextDirSignature,
+    ...(directoryChanged ? { needsReconciliation: true } : {}),
     structuralSignatures,
     indexSignature,
     headLogSignature
