@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdir, mkdtemp, rename, rm, writeFile } from 'node:fs/promises'
-import * as fsPromises from 'node:fs/promises'
 import type * as NodeFsPromises from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
@@ -243,6 +242,7 @@ describe('startGitCommonPolling fan-out bounds (#17828)', () => {
   it.each([false, true])(
     'reconciles a directory-change scan across same-signature rename (forced=%s)',
     async (forceFullScan) => {
+      const fsPromises = await import('node:fs/promises')
       const commonDir = await makeCommonDir(1)
       dirsToRemove.push(commonDir)
       const entryDir = join(commonDir, 'worktrees', 'wt-0')

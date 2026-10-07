@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "4f9eaa85c5d1293098a1fc28af3fe0ab81c45cf9",
+  "sourceProductSha": "0ae657391f35e115be08a0f3db388f5f22d9134d",
   "baseUpstreamSha": "a781a602a8729439d7a3eebf0c3b9e5817362e77",
   "upstreamSha": "a154562a89846c944c13fcd460f8da463354f434",
   "documentation": {
@@ -20273,7 +20273,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "3091d7749153fe0c9295dd7256a06c6999cac666"
+        "sha": "8d4916caaaf0be2ed093d908277ee3820080a6ef"
       },
       "upstream": {
         "mode": "100644",
@@ -20281,9 +20281,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "3091d7749153fe0c9295dd7256a06c6999cac666"
+        "sha": "8d4916caaaf0be2ed093d908277ee3820080a6ef"
       },
-      "reason": "Add two deterministic forced/unforced same-signature lock+rename regressions after all six original polling cases, preserving their exact IDs/order/AST/assertions and explicit200ms detection/30s body/60s hook budgets. Use owned real files, real HEAD.lock write/rename, actual snapshot helper and diff; script only the owned directory stat tuple. Prove changed-directory/old-HEAD then same-directory/new-HEAD reconciliation, missing snapshot preservation, re-arm, one full seven-stat follow-up, subsequent one-stat stability and no duplicate event. Restore the scoped stat spy in finally and keep original owned cleanup. Actual new-case old-helper HEAD-signature Red is preserved and Linux/Windows three-owner38-case Green is bound; no fake filesystem event or utimes.",
+      "reason": "Add two deterministic forced/unforced same-signature lock+rename regressions after all six original polling cases, preserving their exact IDs/order/AST/assertions and explicit200ms detection/30s body/60s hook budgets. Use owned real files, real HEAD.lock write/rename, actual snapshot helper and diff; script only the owned directory stat tuple. Prove changed-directory/old-HEAD then same-directory/new-HEAD reconciliation, missing snapshot preservation, re-arm, one full seven-stat follow-up, subsequent one-stat stability and no duplicate event. Restore the scoped stat spy in finally and keep original owned cleanup. Actual new-case old-helper HEAD-signature Red is preserved and Linux/Windows three-owner38-case Green is bound; no fake filesystem event or utimes. Preserve the original native-plugin no-duplicate-imports rule: use the existing Vitest-mocked fs/promises module through one awaited runtime namespace import as the first statement of the new asynchronous reconciliation case, rather than a second top-level runtime import. All original six and new forced/unforced reconciliation case assertions, cleanup, budgets and production behavior remain unchanged.",
       "regressionTests": [
         "src/main/ipc/worktree-git-common-polling.test.ts",
         "src/main/ipc/worktree-git-common-watch.test.ts",
