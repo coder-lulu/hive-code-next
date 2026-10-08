@@ -1,7 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { canonicalAgentSessionDigest } from './agent-session-mutation-envelope'
 import type { HiveWorkbenchTeam } from './hive-team-workbench'
-import { HiveWorkflowCaseCreateSchema, HiveWorkflowCaseViewSchema } from './hive-workflow-cases'
+import {
+  HiveWorkflowCaseCreateSchema,
+  HiveWorkflowCaseSummarySchema,
+  HiveWorkflowCaseViewSchema
+} from './hive-workflow-cases'
 import { workflowTestVectors } from './task-workflow/workflow.test-fixture'
 import { WorkflowExecutionContextSchema } from './task-workflow/workflow-execution-context'
 import type { HiveWorkflowCaseView } from './hive-workflow-cases'
@@ -105,7 +109,20 @@ export function workflowCaseFixture(accountId = 'workflow-case-owner') {
     executionAvailability: _availability,
     ...summary
   } = view
-  return { input, view, summary, team, workflow }
+  return {
+    input,
+    view,
+    summary: HiveWorkflowCaseSummarySchema.parse({
+      ...summary,
+      currentStageRole:
+        view.currentStageRef === null
+          ? null
+          : view.workflow.definition.stages.find((stage) => stage.stageRef === view.currentStageRef)
+              ?.role
+    }),
+    team,
+    workflow
+  }
 }
 
 /** Isolated native library fixtures do not claim that a business Case accepted dependencies. */

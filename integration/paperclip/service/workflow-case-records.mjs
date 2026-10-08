@@ -95,10 +95,10 @@ async function readCaseRecord(db, accountId, project, caseId, revisions) {
     return refuseWorkbench('REVISION_CONFLICT')
   }
   const stageRef = row.stage_config.hiveWorkflow?.stage?.stageRef
+  const currentStage = workflow.definition.stages.find((stage) => stage.stageRef === stageRef)
   if (
     row.terminal_kind === null
-      ? !workflow.definition.stages.some((stage) => stage.stageRef === stageRef) ||
-        ['done', 'cancelled'].includes(row.stage_kind)
+      ? !currentStage || ['done', 'cancelled'].includes(row.stage_kind)
       : row.stage_kind !== row.terminal_kind || row.stage_key !== row.terminal_kind
   ) {
     return refuseWorkbench('REVISION_CONFLICT')
@@ -116,6 +116,7 @@ async function readCaseRecord(db, accountId, project, caseId, revisions) {
     projectBindingRevision: Number(row.project_binding_revision),
     revision: row.version,
     currentStageRef: row.terminal_kind === null ? stageRef : null,
+    currentStageRole: row.terminal_kind === null ? currentStage.role : null,
     terminalKind: row.terminal_kind,
     createdAt: row.created_at.toISOString(),
     updatedAt: row.updated_at.toISOString()
@@ -169,8 +170,9 @@ export async function readWorkflowCaseView(db, accountId, project, caseId, expec
     return refuseWorkbench('REVISION_CONFLICT')
   }
   const byStage = new Map(tasks.map((task) => [task.stage_ref, task]))
+  const { currentStageRole: _currentStageRole, ...detailSummary } = summary
   const view = {
-    ...summary,
+    ...detailSummary,
     requirement: origin.description,
     originTaskId: origin.id,
     workflow,

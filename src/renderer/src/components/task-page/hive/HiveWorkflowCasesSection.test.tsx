@@ -29,9 +29,6 @@ vi.mock('sonner', () => ({ toast: { success: feedback.submitted } }))
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
     t: (key: string, options?: { title?: string; revision?: number }) => {
-      if (key === 'hiveWorkflowCases.caseLabel') {
-        return `${options?.title}:version:${options?.revision}`
-      }
       if (key === 'hiveWorkflowCases.fixedVersion') {
         return `${key}:${options?.revision}`
       }
@@ -39,50 +36,6 @@ vi.mock('react-i18next', () => ({
     }
   })
 }))
-vi.mock('./HiveWorkbenchPicker', () => ({
-  HiveWorkbenchPicker: ({
-    id,
-    label,
-    items,
-    value,
-    disabled,
-    onValueChange,
-    hasMore,
-    onLoadMore
-  }: {
-    id: string
-    label: string
-    items: { id: string; name: string }[]
-    value: string | null
-    disabled: boolean
-    onValueChange: (value: string) => void
-    hasMore?: boolean
-    onLoadMore?: () => void
-  }) => (
-    <>
-      <select
-        id={id}
-        aria-label={label}
-        value={value ?? ''}
-        disabled={disabled}
-        onChange={(event) => onValueChange(event.target.value)}
-      >
-        <option value="" />
-        {items.map((item) => (
-          <option key={item.id} value={item.id}>
-            {item.name}
-          </option>
-        ))}
-      </select>
-      {hasMore && (
-        <button type="button" disabled={disabled} onClick={onLoadMore}>
-          hiveWorkflowCases.loadMore
-        </button>
-      )}
-    </>
-  )
-}))
-
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
 const company = workbenchCompany(1)
 const team = workbenchTeam(company, workbenchProject(3, company), true)
@@ -187,9 +140,7 @@ async function submit() {
 }
 async function choose(caseId: string) {
   await act(async () => {
-    const picker = container.querySelector<HTMLSelectElement>('#hive-workflow-case-picker')!
-    picker.value = caseId
-    picker.dispatchEvent(new Event('change', { bubbles: true }))
+    container.querySelector<HTMLButtonElement>(`[data-workflow-case-id="${caseId}"]`)!.click()
   })
 }
 
@@ -320,6 +271,38 @@ describe('requirements and actual assigned workflow stages', () => {
     expect(container.textContent).toContain(view.requirement)
     expect(container.querySelectorAll('[data-workflow-stage-task]')).toHaveLength(4)
   })
+  it('keeps request selection disabled through the original detail and run reads', async () => {
+    const view = workflowCaseView(team, workflow)
+    const second = workflowCaseView(team, workflow, 201, 'Second request')
+    const read = deferredWorkbenchValue<HiveWorkflowCaseView>()
+    const runRead = deferredWorkbenchValue<never[]>()
+    api.listWorkflowCases.mockResolvedValue({
+      items: [workflowCaseSummary(view), workflowCaseSummary(second)],
+      nextCursor: null
+    })
+    api.getWorkflowCase.mockReturnValueOnce(read.promise)
+    api.getWorkflowCaseRuns.mockReturnValueOnce(runRead.promise)
+    await mount()
+    const card = (caseId: string) =>
+      container.querySelector<HTMLButtonElement>(`[data-workflow-case-id="${caseId}"]`)!
+    await act(async () => {
+      card(view.id).click()
+      card(view.id).click()
+    })
+    expect(api.getWorkflowCase).toHaveBeenCalledOnce()
+    expect(card(view.id).disabled).toBe(true)
+    expect(card(second.id).disabled).toBe(true)
+    await act(async () => read.resolve(view))
+    expect(api.getWorkflowCaseRuns).toHaveBeenCalledOnce()
+    expect(card(view.id).disabled).toBe(true)
+    expect(card(second.id).disabled).toBe(true)
+    act(() => card(second.id).click())
+    expect(api.getWorkflowCase).toHaveBeenCalledOnce()
+    await act(async () => runRead.resolve([]))
+    expect(card(view.id).disabled).toBe(false)
+    expect(card(view.id).getAttribute('aria-pressed')).toBe('true')
+    expect(card(second.id).disabled).toBe(false)
+  })
   it('views a case fixed to an older version without changing the current definition', async () => {
     const latest = workflowSnapshot(team, 2)
     const view = workflowCaseView(team, workflow)
@@ -383,9 +366,12 @@ describe('requirements and actual assigned workflow stages', () => {
       after: one.id,
       limit: 25
     })
+    expect(container.querySelectorAll('[data-workflow-case-id]')).toHaveLength(2)
     expect(
-      container.querySelector<HTMLSelectElement>('#hive-workflow-case-picker')?.options
-    ).toHaveLength(3)
+      [...container.querySelectorAll('button')].some(
+        (item) => item.textContent === 'hiveWorkflowCases.loadMore'
+      )
+    ).toBe(false)
   })
   it.each(['scope', 'body-in-summary', 'wrong-created-binding'])(
     'refuses an invalid %s response',
@@ -413,7 +399,7 @@ describe('requirements and actual assigned workflow stages', () => {
           nextCursor: null
         })
         await mount()
-        expect(container.querySelector('#hive-workflow-case-picker')).toBeNull()
+        expect(container.querySelector('[data-workflow-case-browser]')).toBeNull()
       }
       expect(container.querySelector('[role="alert"]')?.textContent).toBe(
         kind === 'scope'

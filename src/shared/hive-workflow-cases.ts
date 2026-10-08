@@ -68,8 +68,13 @@ function invalidCaseSummary(view: z.infer<typeof CaseSummary>) {
     (view.terminalKind === null ? view.currentStageRef === null : view.currentStageRef !== null)
   )
 }
-export const HiveWorkflowCaseSummarySchema = CaseSummary.superRefine((view, context) => {
-  if (invalidCaseSummary(view)) {
+export const HiveWorkflowCaseSummarySchema = CaseSummary.extend({
+  currentStageRole: WorkflowRoleSchema.nullable()
+}).superRefine((view, context) => {
+  if (
+    invalidCaseSummary(view) ||
+    (view.terminalKind === null ? view.currentStageRole === null : view.currentStageRole !== null)
+  ) {
     context.addIssue({ code: 'custom', message: 'workflow_case_binding_mismatch' })
   }
 })

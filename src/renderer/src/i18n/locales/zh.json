@@ -20609,6 +20609,15 @@
     "loadMore": "加载更多需求",
     "chooseCase": "选择功能需求",
     "caseLabel": "{{title}} · 流程版本 {{revision}} · {{state}}",
+    "browser": {
+      "views": "需求视图",
+      "list": "需求列表",
+      "board": "阶段看板",
+      "loadedCount": "已加载 {{count}} 个需求",
+      "workflowVersion": "流程版本 {{revision}}",
+      "noCurrentStage": "无当前阶段",
+      "boardHelp": "按需求当前的流程阶段分组，实际执行状态见需求详情。"
+    },
     "empty": "此流程尚无已提交的功能需求。",
     "requirementTitle": "功能标题",
     "requirementBody": "需求正文",

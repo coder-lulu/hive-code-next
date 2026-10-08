@@ -20654,6 +20654,15 @@
     "loadMore": "Load more requests",
     "chooseCase": "Choose a feature request",
     "caseLabel": "{{title}} · Workflow version {{revision}} · {{state}}",
+    "browser": {
+      "views": "Request views",
+      "list": "Request list",
+      "board": "Stage board",
+      "loadedCount": "Requests loaded: {{count}}",
+      "workflowVersion": "Workflow version {{revision}}",
+      "noCurrentStage": "No current stage",
+      "boardHelp": "Grouped by the request’s current workflow stage. Execution status is shown in request details."
+    },
     "empty": "No feature requests have been submitted for this workflow.",
     "requirementTitle": "Feature title",
     "requirementBody": "Requirements",

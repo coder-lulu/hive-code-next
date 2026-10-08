@@ -5289,6 +5289,15 @@
   },
   "hiveWorkflowCases": {
     "assignedStages": "Assigned stage tasks",
+    "browser": {
+      "board": "Stage board",
+      "boardHelp": "Grouped by the request’s current workflow stage. Execution status is shown in request details.",
+      "list": "Request list",
+      "loadedCount": "Requests loaded: {{count}}",
+      "noCurrentStage": "No current stage",
+      "views": "Request views",
+      "workflowVersion": "Workflow version {{revision}}"
+    },
     "caseLabel": "{{title}} · Workflow version {{revision}} · {{state}}",
     "caseStatuses": {
       "cancelled": "Cancelled",

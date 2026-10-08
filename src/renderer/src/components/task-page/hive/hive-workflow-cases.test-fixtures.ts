@@ -71,6 +71,11 @@ export function workflowCaseSummary(view: HiveWorkflowCaseView) {
     projectBindingRevision: view.projectBindingRevision,
     revision: view.revision,
     currentStageRef: view.currentStageRef,
+    currentStageRole:
+      view.currentStageRef === null
+        ? null
+        : view.workflow.definition.stages.find((stage) => stage.stageRef === view.currentStageRef)
+            ?.role,
     terminalKind: view.terminalKind,
     createdAt: view.createdAt,
     updatedAt: view.updatedAt

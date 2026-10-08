@@ -57,7 +57,7 @@ export function createHiveWorkflowCaseFacade(options: {
     }
     return team
   }
-  const assertScope = (view: HiveWorkflowCaseSummary, team: HiveWorkbenchTeam) => {
+  const assertScope = (view: Pick<HiveWorkflowCaseSummary, 'binding'>, team: HiveWorkbenchTeam) => {
     if (
       view.binding.scope.companyRef !== team.company.id ||
       view.binding.scope.projectRef !== team.project.id

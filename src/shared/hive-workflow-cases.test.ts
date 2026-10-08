@@ -12,6 +12,28 @@ import {
 import { workflowCaseFixture } from './hive-workflow-cases.test-fixture'
 
 describe('fixed-version workflow case contract', () => {
+  it('requires a business stage role on open list summaries and none on terminal summaries', () => {
+    const { summary } = workflowCaseFixture()
+    const open = { ...summary, currentStageRole: 'product' }
+    expect(HiveWorkflowCaseSummarySchema.safeParse(open).success).toBe(true)
+    expect(
+      HiveWorkflowCaseSummarySchema.safeParse({ ...open, currentStageRole: null }).success
+    ).toBe(false)
+    expect(
+      HiveWorkflowCaseSummarySchema.safeParse({ ...open, currentStageRole: 'unknown' }).success
+    ).toBe(false)
+    const terminal = {
+      ...open,
+      terminalKind: 'done',
+      currentStageRef: null,
+      currentStageRole: null
+    }
+    expect(HiveWorkflowCaseSummarySchema.safeParse(terminal).success).toBe(true)
+    expect(
+      HiveWorkflowCaseSummarySchema.safeParse({ ...terminal, currentStageRole: 'product' }).success
+    ).toBe(false)
+  })
+
   it('normalizes UUID inputs before request identity without modifying saved workflow digests', () => {
     const { input, view } = workflowCaseFixture()
     const upper = {

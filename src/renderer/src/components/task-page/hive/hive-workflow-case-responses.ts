@@ -10,7 +10,7 @@ import {
 import { structuredAgentSessionDigest } from '../../../../../shared/structured-agent-session-mutation'
 
 function assertCaseScope(
-  summary: HiveWorkflowCaseSummary,
+  summary: Pick<HiveWorkflowCaseSummary, 'binding'>,
   team: HiveWorkbenchTeam,
   workflowId: string
 ) {
@@ -88,6 +88,11 @@ export function summarizeWorkflowCase(view: HiveWorkflowCaseView): HiveWorkflowC
     projectBindingRevision: view.projectBindingRevision,
     revision: view.revision,
     currentStageRef: view.currentStageRef,
+    currentStageRole:
+      view.currentStageRef === null
+        ? null
+        : view.workflow.definition.stages.find((stage) => stage.stageRef === view.currentStageRef)
+            ?.role,
     terminalKind: view.terminalKind,
     createdAt: view.createdAt,
     updatedAt: view.updatedAt

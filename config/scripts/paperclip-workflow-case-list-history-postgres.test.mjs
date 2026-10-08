@@ -5,6 +5,8 @@ import { createWorkflowCasePostgresFixture } from './paperclip-workflow-cases-po
 import { createTeamWorkbenchRepository } from '../../integration/paperclip/service/team-workbench-repository.mjs'
 import { createWorkflowDefinitionRepository } from '../../integration/paperclip/service/workflow-definition-repository.mjs'
 import { createWorkflowCaseRepository } from '../../integration/paperclip/service/workflow-case-repository.mjs'
+import { workflowStageAdmissionFixture } from './paperclip-workflow-stage-admission-postgres-fixture.mjs'
+import { workflowConsumerDelivery } from './paperclip-workflow-consumer-postgres-fixture.mjs'
 
 const configPath = process.env.HIVE_PAPERCLIP_P2_POSTGRES_CONFIG
 describe.skipIf(!configPath)('real workflow Case page historical revision keys', () => {
@@ -16,6 +18,45 @@ describe.skipIf(!configPath)('real workflow Case page historical revision keys',
     cases = createWorkflowCaseRepository(h.sql)
   })
   afterAll(async () => h?.sql.end({ timeout: 5 }))
+
+  it('projects the phase from the frozen Case definition after a new definition replaces stage references', async () => {
+    const f = await workflowStageAdmissionFixture(h)
+    const delivery = await workflowConsumerDelivery(h, f, f.first)
+    await delivery.consume()
+    const current = await f.read()
+    expect(current.currentStageRef).toBe(current.workflow.definition.stages[1].stageRef)
+    const stageRefs = new Map(
+      current.workflow.definition.stages.map((stage) => [stage.stageRef, randomUUID()])
+    )
+    await workflows.saveWorkflow(f.accountId, {
+      requestId: randomUUID(),
+      projectId: f.project.id,
+      workflowId: current.workflow.workflowId,
+      expectedRevision: current.binding.workflowRevision,
+      expectedProjectRevision: current.projectBindingRevision,
+      name: 'Replaced stage references',
+      stages: current.workflow.definition.stages.map((stage) => ({
+        ...stage,
+        stageRef: stageRefs.get(stage.stageRef),
+        dependsOn: stage.dependsOn.map((ref) => stageRefs.get(ref)),
+        ...(stage.returnToStageRef
+          ? { returnToStageRef: stageRefs.get(stage.returnToStageRef) }
+          : {})
+      })),
+      maxParallelism: current.workflow.definition.maxParallelism,
+      maxDurationMs: current.workflow.definition.maxDurationMs
+    })
+    const page = await cases.listWorkflowCases(f.accountId, { projectId: f.project.id })
+    expect(page.items.find((item) => item.id === current.id)).toMatchObject({
+      currentStageRef: current.currentStageRef,
+      currentStageRole: 'developer',
+      binding: { workflowRevision: current.binding.workflowRevision }
+    })
+    const replay = await f.cases.createWorkflowCase(f.accountId, f.input)
+    expect(replay.view.id).toBe(current.id)
+    expect(replay.admission.replayed).toBe(true)
+    expect(replay.view).not.toHaveProperty('currentStageRole')
+  })
 
   it('keeps distinct frozen project revisions while preloading original and later definition revisions', async () => {
     const f = await createWorkflowCasePostgresFixture({ workbench, workflows, cases })

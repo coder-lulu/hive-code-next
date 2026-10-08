@@ -265,6 +265,46 @@ describe('workflow request receipts and scope boundaries', () => {
       api.createWorkflowCase.mock.calls[0][0].requestId
     )
   })
+
+  it('retains a selected later-page Case and its newer phase while refreshing the first page', async () => {
+    const first = workflowCaseView(team, workflow)
+    const selected = workflowCaseView(team, workflow, 201)
+    const moved = {
+      ...selected,
+      revision: 2,
+      currentStageRef: selected.workflow.definition.stages.find(
+        (stage) => stage.role === 'developer'
+      )!.stageRef
+    }
+    const initial = { items: [workflowCaseSummary(first)], nextCursor: first.id }
+    api.listWorkflowCases
+      .mockResolvedValueOnce(initial)
+      .mockResolvedValueOnce({
+        items: [workflowCaseSummary(selected)],
+        nextCursor: null
+      })
+      .mockResolvedValueOnce(initial)
+    api.getWorkflowCase.mockResolvedValue(moved)
+    await mount()
+    await act(async () => {
+      expect(await current.loadMore()).toBe(true)
+    })
+    await act(async () => {
+      expect(await current.select(selected.id)).toBe(true)
+    })
+    await act(async () => {
+      expect(await current.refresh()).toBe(true)
+    })
+    expect(current.view).toEqual(moved)
+    expect(current.items.find((item) => item.id === selected.id)).toEqual(
+      workflowCaseSummary(moved)
+    )
+    expect(current.items.find((item) => item.id === selected.id)?.currentStageRole).toBe(
+      'developer'
+    )
+    expect(current.nextCursor).toBe(first.id)
+    expect(api.createWorkflowCase).not.toHaveBeenCalled()
+  })
   it('uses a different idempotency request after the current saved version changes', async () => {
     await mount()
     compose()

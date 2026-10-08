@@ -115,7 +115,10 @@ export function useHiveWorkflowCases(
         (page) =>
           setState((previous) => ({
             ...previous,
-            items: after ? mergeWorkflowCaseSummaries(previous.items, page.items) : page.items,
+            items: mergeWorkflowCaseSummaries(
+              after ? mergeWorkflowCaseSummaries(previous.items, page.items) : page.items,
+              previous.view ? [summarizeWorkflowCase(previous.view)] : []
+            ),
             nextCursor: page.nextCursor
           }))
       ),

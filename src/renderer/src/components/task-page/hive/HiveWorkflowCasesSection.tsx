@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { useDelayedStatus } from '@/hooks/use-delayed-status'
 import type { HiveWorkbenchTeam } from '../../../../../shared/hive-team-workbench'
 import type { HiveWorkflowSnapshot } from '../../../../../shared/hive-task-workflows'
-import { HiveWorkbenchPicker } from './HiveWorkbenchPicker'
+import { HiveWorkflowCaseBrowser } from './HiveWorkflowCaseBrowser'
 import { useHiveWorkflowCases } from './use-hive-workflow-cases'
 import { HiveWorkflowCaseCreateForm } from './HiveWorkflowCaseCreateForm'
 import { HiveWorkflowCaseDetail } from './HiveWorkflowCaseDetail'
@@ -119,25 +119,15 @@ export function HiveWorkflowCasesSection({
       )}
       {model.draft && <HiveWorkflowCaseCreateForm draft={model.draft} model={model} />}
       {model.items.length > 0 && (
-        <HiveWorkbenchPicker
-          id="hive-workflow-case-picker"
-          label={t('hiveWorkflowCases.chooseCase')}
-          placeholder={t('hiveWorkflowCases.chooseCase')}
-          items={model.items.map((item) => ({
-            id: item.id,
-            name: t('hiveWorkflowCases.caseLabel', {
-              title: item.title,
-              revision: item.binding.workflowRevision,
-              state: t(`hiveWorkflowCases.caseStatuses.${item.terminalKind ?? 'open'}`)
-            })
-          }))}
-          value={model.view?.id ?? null}
+        <HiveWorkflowCaseBrowser
+          items={model.items}
+          selectedId={model.view?.id ?? null}
           disabled={model.busy || runs.busy}
           hasMore={Boolean(model.nextCursor)}
           onLoadMore={() => {
             void model.loadMore()
           }}
-          onValueChange={(caseId) => {
+          onSelect={(caseId) => {
             void model.select(caseId)
           }}
         />

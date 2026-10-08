@@ -119,6 +119,11 @@ async function choose(id: string, value: string) {
     select.dispatchEvent(new Event('change', { bubbles: true }))
   })
 }
+async function chooseCase(caseId: string) {
+  await act(async () => {
+    container.querySelector<HTMLButtonElement>(`[data-workflow-case-id="${caseId}"]`)!.click()
+  })
+}
 function change(id: string, value: string) {
   const field = container.querySelector<HTMLInputElement | HTMLTextAreaElement>(`#${id}`)!
   const prototype =
@@ -131,7 +136,7 @@ describe('requirements entry in the selected workflow', () => {
   it('keeps workflow and requirement forms, selections and fixed case history mounted during refresh recovery', async () => {
     await mount()
     await choose('hive-workflow-picker', currentWorkflow.workflowId)
-    await choose('hive-workflow-case-picker', historicalCase.id)
+    await chooseCase(historicalCase.id)
     const compose = [...container.querySelectorAll('button')].find(
       (item) => item.textContent === 'hiveWorkflowCases.newRequirement'
     )!
@@ -164,9 +169,11 @@ describe('requirements entry in the selected workflow', () => {
       expect(container.querySelector<HTMLSelectElement>('#hive-workflow-picker')?.value).toBe(
         currentWorkflow.workflowId
       )
-      expect(container.querySelector<HTMLSelectElement>('#hive-workflow-case-picker')?.value).toBe(
-        historicalCase.id
-      )
+      expect(
+        container
+          .querySelector('[data-workflow-case-id][aria-pressed="true"]')
+          ?.getAttribute('data-workflow-case-id')
+      ).toBe(historicalCase.id)
       expect(fixedVersion?.textContent).toBe('hiveWorkflowCases.fixedVersion:1')
     }
     expect(api.listWorkflows).toHaveBeenCalledOnce()
@@ -195,7 +202,7 @@ describe('requirements entry in the selected workflow', () => {
   it('reads an older fixed case without changing the selected current definition or calling its loader', async () => {
     await mount()
     await choose('hive-workflow-picker', currentWorkflow.workflowId)
-    await choose('hive-workflow-case-picker', historicalCase.id)
+    await chooseCase(historicalCase.id)
     expect(container.querySelector<HTMLInputElement>('#hive-workflow-revision')?.value).toBe('2')
     expect(container.querySelector<HTMLInputElement>('#hive-workflow-name')?.value).toBe(
       'Current definition'
