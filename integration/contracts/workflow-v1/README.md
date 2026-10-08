@@ -1,6 +1,6 @@
 # 工程团队与成果交接契约 v1
 
-状态：2026-10-03 冻结首期契约和校验代码；P2/P3 的存储、Facade、页面与调度消费者仍待接入。通过契约测试不表示团队执行、部署或多人权限已开放。
+状态：2026-10-08。首条四角色工程链已接入存储、Facade、本机隔离执行、独立审核及原生页面；下述 PlanProposal 仅交付数据与校验基础，一般业务任务图、计划采纳和任务工具消费者仍待接入。契约测试不替代真实执行、部署或多人权限验收。
 
 TypeScript 唯一来源为 [src/shared/task-workflow](../../../src/shared/task-workflow/)。[task-workflow.schema.json](task-workflow.schema.json) 由该来源生成；[test-vectors.json](test-vectors.json) 给出固定示例和成果/批准失效向量。它是业务对象与证据绑定合同，不替代 [P0 execution v1](../v1/README.md)，不新增启动器、运行账本或业务调度器。
 
@@ -29,7 +29,21 @@ JSON Schema 描述字段、枚举和集合限制；跨对象/图语义还必须�
 
 流程编辑生成新 revision；在途运行继续引用原版本。employee/profile/配置变更仅影响新受理，旧执行仍需当前授权检查。Paperclip case.version 是个案乐观锁，不是流程定义版本；不得混用。不可变定义版本应保存在同一 Paperclip 业务域的受控增量表/记录中，而非另建 Hive 调度平面。
 
-当前 P1 成果索引提供固定字节和摘要，但还未生成上述完整代码快照、独立测试工作区或业务 review。工程团队运行必须使用 enforced_autonomous；即使公司的 ownerScope 仍是 personalTenant，也不能发行 trusted_personal_preview 绕过隔离。当前 TaskExecutionHost 仍拒绝该范围；无完整宿主强隔离证据时保持能力不可用。
+本机四角色链已有固定成果、代码快照、独立测试工作区及业务 review 消费者。工程团队运行必须使用 enforced_autonomous；即使公司的 ownerScope 仍是 personalTenant，也不能发行 trusted_personal_preview 绕过隔离。缺少当前宿主强隔离和授权证据时仍保持能力不可用。
+
+## 结构化计划提案基础
+
+`PlanProposal` 是严格的 `workflow.plan-proposal` 数据对象，绑定准确的 company/project、workflow/run/revision、definitionDigest、goalRef 和 planRevision。`goalRef` 表示调用方认证存储中的原业务目标；`planRevision` 是提案草稿版本，不能用 Case 乐观锁或流程定义版本替代。
+
+每个任务有提案内唯一 taskRef、非空标题、requestedRole、outputKind、验收标准、前置依赖及 1～3 次尝试。最多 32 个任务，每项最多 32 个前置依赖和 16 条验收标准；依赖路径最多 8 个节点。引用只在该提案内解析，不是已创建的业务 taskId。允许单角色研究计划；不要求所有提案包含四角色。解析拒绝重复/缺失依赖、自环、循环、超深图和角色输出不匹配。通过图校验不证明独立测试或工程完成。
+
+requestedLimits 限制最多 4 并发、最长 24 小时；可选预算只接受正整数 costMicros 和三个大写字母的 currency，复用既有用量的百万分之一精度。它是需求，不代表已预留额度、可计费金额或已覆盖硬预算。
+
+可选 resourceSelectionRefs 和 requiredCoverage 必须同时完整出现；最多 16 个唯一 opaque 选择器。可选 knowledgeRequirements 最多 16 个唯一 sourceRef，明确 required。选择器不是 URL、路径、命令或授权，消费者仍须准确解析与重新验权。普通无资源/知识计划可以省略它们；已声明的需求不可静默丢弃。
+
+`inspectWorkflowPlanProposalJson` 在 JSON.parse 前检查 128 KiB UTF-8 上限，保留 Unicode 字节语义。`inspectWorkflowPlanProposal` 对照调用方从认证存储取得的固定目标、允许角色与更窄策略上限，返回具体拒绝原因或保留原提案的 validated 投影。validated 仅表示这些数据检查通过，不是授权或采纳；当前总是明确报告一般业务 DAG 派发缺口。资源加载和硬预算需求有阻断缺口；必需知识有阻断缺口，可选知识缺失明确披露。
+
+本基础没有提案存储、差异页、proposePlan/plan-apply API、TaskToolFacade、模型规划请求或新派发路径。后续消费者必须复用原认证执行与成果/结算链，事务性保存草稿与采纳版本，并在具体动作前重新授权；不得把模型字段或此校验结果当作能力凭证。[plan-proposal-test-vectors.json](plan-proposal-test-vectors.json) 使用纯合成数据固定有效示例与拒绝向量。JSON Schema 只表达字段约束，图语义与策略检查必须运行同源 TypeScript。
 
 从项目根生成和核对：
 

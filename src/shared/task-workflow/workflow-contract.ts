@@ -6,6 +6,7 @@ import {
   WorkflowTeamBindingSchema
 } from './workflow-bindings'
 import { WorkflowDefinitionSchema } from './workflow-definition'
+import { WorkflowPlanProposalSchema } from './workflow-plan-proposal'
 import {
   WorkflowDeploymentApprovalSchema,
   WorkflowHandoffSchema,
@@ -19,6 +20,7 @@ export const WorkflowSchemas = {
   EmployeeBinding: WorkflowEmployeeBindingSchema,
   TeamBinding: WorkflowTeamBindingSchema,
   WorkflowDefinition: WorkflowDefinitionSchema,
+  PlanProposal: WorkflowPlanProposalSchema,
   Handoff: WorkflowHandoffSchema,
   Review: WorkflowReviewSchema,
   DeploymentApproval: WorkflowDeploymentApprovalSchema,

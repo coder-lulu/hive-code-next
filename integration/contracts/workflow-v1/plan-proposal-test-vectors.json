@@ -1,0 +1,116 @@
+{
+  "example": {
+    "contractVersion": 1,
+    "kind": "workflow.plan-proposal",
+    "binding": {
+      "scope": { "companyRef": "company:engineering", "projectRef": "project:demo" },
+      "workflowRef": "workflow:engineering",
+      "workflowRevision": 1,
+      "workflowRunRef": "case:synthetic-plan"
+    },
+    "definitionDigest": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "goalRef": "task:synthetic-goal",
+    "planRevision": 1,
+    "tasks": [
+      {
+        "taskRef": "task:requirements",
+        "title": "Define the synthetic feature",
+        "requestedRole": "product",
+        "outputKind": "requirements",
+        "dependsOn": [],
+        "acceptance": ["Describe expected behavior and acceptance checks"],
+        "maxAttempts": 1
+      },
+      {
+        "taskRef": "task:implementation",
+        "title": "Implement the synthetic feature",
+        "requestedRole": "developer",
+        "outputKind": "code",
+        "dependsOn": ["task:requirements"],
+        "acceptance": ["Supply fixed code and the implementation report"],
+        "maxAttempts": 2
+      },
+      {
+        "taskRef": "task:verification",
+        "title": "Independently verify the fixed code",
+        "requestedRole": "tester",
+        "outputKind": "test_report",
+        "dependsOn": ["task:implementation"],
+        "acceptance": ["Preserve actual independent test output and findings"],
+        "maxAttempts": 2
+      },
+      {
+        "taskRef": "task:release-preparation",
+        "title": "Prepare the release",
+        "requestedRole": "ops",
+        "outputKind": "release_plan",
+        "dependsOn": ["task:verification"],
+        "acceptance": ["Describe prerequisites and rollback without deploying"],
+        "maxAttempts": 1
+      }
+    ],
+    "requestedLimits": { "maxParallelism": 1, "maxDurationMs": 1800000 }
+  },
+  "cases": [
+    {
+      "name": "unrecognized role",
+      "path": ["tasks", 0, "requestedRole"],
+      "value": "administrator",
+      "expected": "plan_invalid"
+    },
+    {
+      "name": "provider injection",
+      "path": ["provider"],
+      "value": "synthetic:provider",
+      "expected": "plan_invalid"
+    },
+    {
+      "name": "empty acceptance",
+      "path": ["tasks", 0, "acceptance"],
+      "value": [],
+      "expected": "plan_invalid"
+    },
+    {
+      "name": "cycle",
+      "path": ["tasks", 0, "dependsOn"],
+      "value": ["task:release-preparation"],
+      "expected": "plan_dependency_cycle"
+    },
+    {
+      "name": "missing prerequisite",
+      "path": ["tasks", 1, "dependsOn"],
+      "value": ["task:missing"],
+      "expected": "plan_unknown_dependency"
+    },
+    {
+      "name": "duplicate prerequisite",
+      "path": ["tasks", 2, "dependsOn"],
+      "value": ["task:implementation", "task:implementation"],
+      "expected": "plan_duplicate_dependency"
+    },
+    {
+      "name": "unbounded parallelism",
+      "path": ["requestedLimits", "maxParallelism"],
+      "value": 5,
+      "expected": "plan_invalid"
+    },
+    {
+      "name": "fractional money",
+      "path": ["requestedLimits", "budget"],
+      "value": { "costMicros": 0.5, "currency": "USD" },
+      "expected": "plan_invalid"
+    },
+    {
+      "name": "currency trailing newline",
+      "path": ["requestedLimits", "budget"],
+      "value": { "costMicros": 1000, "currency": "USD\n" },
+      "expected": "plan_invalid"
+    },
+    {
+      "name": "resource selection without coverage",
+      "path": ["resourceSelectionRefs"],
+      "value": ["resource:synthetic"],
+      "expected": "plan_resource_coverage_required"
+    }
+  ]
+}
