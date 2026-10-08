@@ -1,0 +1,69 @@
+.hive-workflow-graph-canvas {
+  position: relative;
+  min-width: 0;
+  padding-inline: var(--hive-workflow-graph-lane-gap);
+  padding-block: var(--hive-workflow-graph-lane-gap);
+}
+
+.hive-workflow-graph-nodes {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--hive-workflow-graph-layer-gap);
+  align-items: start;
+}
+
+.hive-workflow-graph-canvas[data-orientation='horizontal'] {
+  padding-top: calc(var(--hive-workflow-graph-lane-gap) * (var(--workflow-forward-channels) + 1));
+  padding-bottom: calc(var(--hive-workflow-graph-lane-gap) * (var(--workflow-return-channels) + 1));
+}
+
+.hive-workflow-graph-canvas[data-orientation='horizontal'] .hive-workflow-graph-nodes {
+  grid-template-columns: repeat(
+    var(--workflow-layer-count),
+    minmax(var(--hive-workflow-graph-node-min-width), 1fr)
+  );
+}
+
+.hive-workflow-graph-canvas[data-orientation='vertical'] {
+  padding-left: min(
+    calc(var(--hive-workflow-graph-lane-gap) * (var(--workflow-return-channels) + 1)),
+    calc((100% - min(var(--hive-workflow-graph-node-min-width), 50%)) / 2)
+  );
+  padding-right: min(
+    calc(var(--hive-workflow-graph-lane-gap) * (var(--workflow-dependency-channels) + 1)),
+    calc((100% - min(var(--hive-workflow-graph-node-min-width), 50%)) / 2)
+  );
+}
+
+.hive-workflow-graph-node {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.hive-workflow-graph-connections {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  color: var(--muted-foreground);
+}
+
+.hive-workflow-graph-width-probe,
+.hive-workflow-graph-gap-probe {
+  position: absolute;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.hive-workflow-graph-width-probe {
+  width: var(--hive-workflow-graph-node-min-width);
+}
+
+.hive-workflow-graph-gap-probe {
+  width: var(--hive-workflow-graph-layer-gap);
+  height: var(--hive-workflow-graph-lane-gap);
+}

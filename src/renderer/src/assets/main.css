@@ -8,6 +8,7 @@
 @import './sessions.css';
 @import './project-tree.css';
 @import './integration-settings.css';
+@import './hive-workflow-graph.css';
 
 @font-face {
   font-family: 'Geist';
@@ -137,6 +138,10 @@
 /* ── Light Mode ──────────────────────────────────────── */
 
 :root {
+  --hive-workflow-graph-node-min-width: calc(var(--spacing) * 36);
+  --hive-workflow-graph-layer-gap: calc(var(--spacing) * 12);
+  --hive-workflow-graph-lane-gap: calc(var(--spacing) * 3);
+
   --desktop-settings-content-max: 1120px;
   --desktop-settings-drawer-width: 500px;
   --desktop-settings-row-height: 72px;

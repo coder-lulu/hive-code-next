@@ -5285,7 +5285,9 @@
     "title": "Delivery workflows",
     "unknownStage": "Missing stage",
     "version": "Saved version",
-    "viewingVersion": "Viewing version {{revision}} · Current version {{latest}}"
+    "viewingVersion": "Viewing version {{revision}} · Current version {{latest}}",
+    "graphLegend": "Solid arrows show prerequisites; dashed arrows show configured return stages.",
+    "graphInvalidLayout": "These dependencies cannot be drawn as a valid graph. Review the stage references and dependency errors."
   },
   "hiveWorkflowCases": {
     "session": {
@@ -5427,7 +5429,12 @@
     "submitted": "Requirements submitted.",
     "teamNotConfigured": "Save all four employees before submitting requirements. Existing requests remain available to view.",
     "title": "Feature requests",
-    "usingVersion": "New requests use: {{name}} · Version {{revision}}"
+    "usingVersion": "New requests use: {{name}} · Version {{revision}}",
+    "graph": {
+      "businessStatus": "Business task: {{status}}",
+      "currentStage": "Current stage",
+      "statusUnavailable": "Business task status unavailable"
+    }
   },
   "menu": {
     "exploreOrca": "Explore HiveCode",

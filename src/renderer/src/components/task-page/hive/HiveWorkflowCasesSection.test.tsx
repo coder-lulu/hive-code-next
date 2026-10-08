@@ -28,9 +28,12 @@ const feedback = vi.hoisted(() => ({ submitted: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { success: feedback.submitted } }))
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { title?: string; revision?: number }) => {
+    t: (key: string, options?: { title?: string; revision?: number; status?: string }) => {
       if (key === 'hiveWorkflowCases.fixedVersion') {
         return `${key}:${options?.revision}`
+      }
+      if (key === 'hiveWorkflowCases.graph.businessStatus') {
+        return `${key}:${options?.status}`
       }
       return key
     }

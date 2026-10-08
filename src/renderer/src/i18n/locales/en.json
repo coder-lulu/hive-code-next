@@ -950,6 +950,8 @@
         "fa90f739a5": "Choose the project, workspace name, and agent before creating the workspace."
       },
       "PullRequestPage": {
+        "2560588245": "Failed to request reviewer",
+        "3450247584": "Comment",
         "000f90afcf": "Completed",
         "00b7b82329": "head branch",
         "00d3be6bcd": "Reviewers",
@@ -975,7 +977,6 @@
         "1e6d089420": "Reviewers removed",
         "1ff5d979df": "No one assigned",
         "246b2c6456": "Failed to refresh checks",
-        "2560588245": "Failed to request reviewer",
         "25690a3855": "Start workspace from PR",
         "2760fa29a4": "Everyone else",
         "2b4fdb880c": "Unmark viewed",
@@ -984,7 +985,6 @@
         "2f5195c6a0": "Reopen",
         "319cf2d54b": "Show file tree",
         "31a7b202f2": "Reply to @{{value0}}",
-        "3450247584": "Comment",
         "345b68254c": "thread",
         "3463d10a63": "Comments",
         "347034903a": "Copy GitHub link",
@@ -2063,6 +2063,7 @@
           "aa593eb5e2": "Hour"
         },
         "AutomationsPage": {
+          "2695883141": "delete",
           "02a33e3204": "from",
           "0329f9bef1": "Close · Esc",
           "080dcb5fbb": "Delete Automation",
@@ -2079,7 +2080,6 @@
           "2430fecf53": "Choose a run location and enter a prompt before saving.",
           "244727e655": "Automation updated.",
           "25060635c6": "Add new",
-          "2695883141": "delete",
           "295698292f": "Rerun",
           "2a20596d6b": "Automation saved.",
           "2faecab10b": "Run Now",
@@ -5896,9 +5896,9 @@
             "4a8d9e0c1f": "Hide files in commit {{value0}}: {{value1}}"
           },
           "GitHubPRStackMap": {
+            "3511405914": "closed",
             "0c1645ebd0": "Expand stack #{{value0}}",
             "316039b5db": "checks pending",
-            "3511405914": "closed",
             "4b1e5ee9d3": "changes requested",
             "525259fa17": "Stack details are temporarily unavailable.",
             "568c647ccd": "draft",
@@ -6046,6 +6046,7 @@
             "cc06595a3b": "Copy Line Path"
           },
           "SourceControl": {
+            "1406954883": "Clear all notes...",
             "011f9713fc": "Commit blocked",
             "02d8c04339": "Generate {{value0}} details with AI",
             "03194cfff4": "Local session state derived from a conflict you opened here.",
@@ -6062,7 +6063,6 @@
             "0fad573938": "Uncommitted",
             "11463f7a98": "Delete untracked file",
             "11b5dd8e41": "Comparing against",
-            "1406954883": "Clear all notes...",
             "15b6e834ac": "Failed to open commit in browser",
             "15b7f210d7": "Review the prompt before starting an agent.",
             "1623bf4e19": "Copy note",
@@ -6349,6 +6349,7 @@
           "checks": {
             "panel": {
               "content": {
+                "3916814392": "behind (base commit:",
                 "00e1c1658a": "Completed",
                 "02ca4f9074": "passing",
                 "03ca88f623": "Edit",
@@ -6366,7 +6367,6 @@
                 "2ba0a32bdd": "bot",
                 "2dd5ddabc4": "workflow #",
                 "365254cc1b": "Unresolve",
-                "3916814392": "behind (base commit:",
                 "3a71a6ed0b": "Resolve conflicts before checks and merge can complete.",
                 "3fff651d32": "Add a PR comment",
                 "49731703ea": "Jobs",
@@ -6447,10 +6447,10 @@
               },
               "empty": {
                 "state": {
+                  "3322603418": "Pull request status unavailable",
                   "05e4aec17b": "{{value0}} checks will be available after the operation completes",
                   "13e1c7d5ed": "No {{value0}} found",
                   "2bdd7aaf2d": "GitHub status could not be refreshed. Existing cached data was preserved.",
-                  "3322603418": "Pull request status unavailable",
                   "3d4af82ff4": "Refreshing GitHub status for this branch",
                   "41252bc53f": "Branch not published",
                   "5b0cfae9a5": "Create a {{value0}} to start checks and review.",
@@ -7440,13 +7440,13 @@
           "advanced": "Advanced"
         },
         "AppearancePane": {
+          "3057983501": "Unassigned",
           "0cd9b8228f": "Choose the app icon shown in the Dock and window switcher.",
           "0f28e7b30c": "Choose how HiveCode looks in the app window.",
           "0fafabcf35": "Show Git-Ignored Files",
           "102d6b5f9b": "IDE Font",
           "2df8f79aa5": "Show HiveCode in the titlebar.",
           "2edf606c46": "Minimize to Tray on Close",
-          "3057983501": "Unassigned",
           "3e4175e5c6": "Status Bar",
           "42554f615f": "Choose the font used by the HiveCode interface.",
           "4de76f6902": "Control what appears in the application titlebar.",
@@ -7506,9 +7506,9 @@
           "usagePercentageDisplayUsed": "Used"
         },
         "AutoRenameBranchFromWorkSetting": {
+          "1626524572": "Nautilus",
           "0de9fda203": "Discard",
           "12ea4a408d": "When an agent starts working in a new workspace, HiveCode renames its auto-generated branch (e.g.",
-          "1626524572": "Nautilus",
           "2ee2779c05": "{firstPrompt}",
           "40e7be7850": "Saved",
           "56580dcf60": ". You can also reference",
@@ -7804,10 +7804,10 @@
           "fdee745b87": "merge request"
         },
         "ComputerUsePane": {
+          "1735461723": "Enables agents to inspect and operate local desktop apps.",
           "07bbe4c4cb": "Screenshots",
           "0c29da5805": "Ready",
           "0c9a33f468": "Capture app windows so agents can inspect visual state.",
-          "1735461723": "Enables agents to inspect and operate local desktop apps.",
           "2168fa5ab0": "Could not load Computer Use permissions",
           "3383ea1aab": "Could not reset Computer Use permissions",
           "45f8e22c2e": "Open",
@@ -9933,10 +9933,10 @@
           "tooltipTitle": "Repository overrides"
         },
         "SourceControlAiActionRecipeDefaults": {
+          "2576299196": "args",
           "06a9dab64d": "checks",
           "0740d30915": "Custom command",
           "2037c78a6f": "template",
-          "2576299196": "args",
           "2cb4bb7e5d": "CLI arguments",
           "4f549a5fa8": "Saving...",
           "673369fe0c": "cli",
@@ -10405,6 +10405,7 @@
           "target_title": "Theme Mode"
         },
         "TerminalWindowSection": {
+          "1705318506": "ANSI magenta color",
           "00eaa6b881": "Window appearance and background settings.",
           "026a0b8013": "Main text color",
           "03acb60aa0": "Controls the transparency of the terminal background.",
@@ -10414,7 +10415,6 @@
           "0ffb02f921": "ANSI bright green color",
           "1601140f03": "ANSI bright cyan color",
           "16948119cb": "Bright White",
-          "1705318506": "ANSI magenta color",
           "1846f6ee6a": "Vertical padding around the terminal grid in pixels.",
           "1afcc1d973": "Vertical Padding",
           "1be593d3e8": "ANSI Bright",
@@ -10781,13 +10781,13 @@
         },
         "agents": {
           "search": {
+            "2814401339": "installed",
             "01926b9d8c": "Configure AI coding agents, default agent, and command overrides.",
             "042c551bc5": "config",
             "0d1c334987": "lid",
             "0d752916f8": "hooks",
             "13b20636a6": "waiting",
             "167daeb5e9": "command",
-            "2814401339": "installed",
             "2afd3b5858": "enable",
             "2e188c771c": "hide",
             "32836788b0": "generated title",
@@ -11341,6 +11341,7 @@
           "message": {
             "ai": {
               "search": {
+                "3766941527": "agent",
                 "001ca3f2af": "Defaults used when the Create PR composer opens.",
                 "0b946b2abe": "Adds action recipes for Source Control commit, pull request, branch-name, and fix actions.",
                 "0f29331fed": "arguments",
@@ -11349,7 +11350,6 @@
                 "181cdb0637": "open",
                 "18b6d38835": "Agent, CLI arguments, and command template used by each Source Control AI button.",
                 "24dbdfca78": "Show Source Control AI actions",
-                "3766941527": "agent",
                 "37c65bbb44": "fix",
                 "3c4e5e5938": "Action recipes",
                 "402f101af8": "prompt",
@@ -11421,6 +11421,7 @@
         "developer": {
           "permissions": {
             "search": {
+              "3363889768": "LAN, USB, and Bluetooth",
               "00e954319e": "whisper",
               "05ab708ee5": "Open the macOS privacy pane for protected project and worktree file access.",
               "08f8039ca9": "accessibility",
@@ -11432,7 +11433,6 @@
               "259b829b84": "camera",
               "2e5d98ab56": "Allow screenshots, screen inspection, keystrokes, and window automation.",
               "302c0c42f9": "Microphone and Camera",
-              "3363889768": "LAN, USB, and Bluetooth",
               "39bb49e662": "Screen Recording and Accessibility",
               "3cd51d18a1": "screen recording",
               "3e0131e45d": "icloud",
@@ -11983,11 +11983,11 @@
         "mobile": {
           "emulator": {
             "search": {
+              "2348045036": "Choose which emulator device HiveCode opens by default.",
               "04c5f5d901": "device",
               "0b95dfd5b3": "Emulator Availability",
               "1ad6fb6230": "default device",
               "1dc8c52ffa": "default iphone",
-              "2348045036": "Choose which emulator device HiveCode opens by default.",
               "25159de808": "mobile emulator",
               "25d7bfbcd4": "udid",
               "27397fe8e9": "xcode command line tools",
@@ -12322,12 +12322,12 @@
         },
         "privacy": {
           "search": {
+            "3922051573": "data",
             "058550f6bc": "do_not_track",
             "10124159f1": "privacy",
             "1686c07fee": "support",
             "27a27b2f63": "opt out",
             "2b5a5c312f": "posthog",
-            "3922051573": "data",
             "4104f6f0f3": "analytics",
             "4d4bb76bf4": "opt in",
             "57b283461a": "Share Anonymous Usage Data",
@@ -13703,8 +13703,8 @@
           "e8c1f4a2b9": "in workspace options."
         },
         "RemoteFileBrowser": {
-          "00c4235c10": "No matches for '{{value0}}'",
           "2300612806": "Type to filter or enter a path…",
+          "00c4235c10": "No matches for '{{value0}}'",
           "51001182e3": "Empty directory",
           "971d85cc84": "Opens as a project on this host · {{value0}}",
           "9e060f5815": "Select folder",
@@ -15636,12 +15636,12 @@
             "tooltip": "Open interrupted chats available to resume"
           },
           "PetStatusSegment": {
+            "3668339495": "Remove {{value0}}",
             "0608ad02a2": "Choose pet",
             "1fbc51cc77": "Hide pet",
             "2021d4f6db": "Pet bundle import needs a full app restart (not just reload).",
             "2f7bbaa457": "Size",
             "34c25dfe9c": "Pet",
-            "3668339495": "Remove {{value0}}",
             "59b5955621": "Upload your own…",
             "6d0a8cd179": "Show pet",
             "aec479308a": "Pet menu",
@@ -15916,6 +15916,7 @@
             "f5e1a84d79": "Refresh"
           },
           "WorkspaceSpaceManagerPanel": {
+            "2965415393": "Force delete failed",
             "02b27c2230": "workspace",
             "0990a63160": "No scanned workspace sizes yet.",
             "09960d86bd": "Scanned",
@@ -15932,7 +15933,6 @@
             "20a4204dce": "Last successful results remain visible.",
             "243287ac60": "Name",
             "265d956765": "{{value0}}. You can leave this page.",
-            "2965415393": "Force delete failed",
             "2b501ee391": "Keep: main",
             "33653dbac2": "Deleting",
             "33aef3e9cc": "Size",
@@ -16673,8 +16673,8 @@
             "agent": {
               "session": {
                 "fork": {
-                  "046e8d853c": "No terminal context to fork",
                   "2317900211": "Failed to copy fork context.",
+                  "046e8d853c": "No terminal context to fork",
                   "373a3103e7": "Context copied",
                   "38e41edc6e": "This workspace cannot be forked into a git worktree.",
                   "3fc568a49d": "Failed to copy context.",
@@ -16833,6 +16833,7 @@
       "workspace": {
         "cleanup": {
           "WorkspaceCleanupDialog": {
+            "3828408538": "Remove {{value0}}",
             "06cf78521e": "Select all in {{value0}}",
             "0a2e3c7cba": "Review",
             "0b1766738a": "Repo",
@@ -16847,7 +16848,6 @@
             "2ddbd6fe8a": "checked",
             "352f15d6fc": "Last active",
             "37ab28277e": "not suggested",
-            "3828408538": "Remove {{value0}}",
             "38ca0b1400": "This permanently deletes their local files. You can't undo this.",
             "3d957ff117": "No workspaces match these filters.",
             "41d594d01e": "{{value0}} workspace{{value1}} could not be removed",
@@ -17763,8 +17763,8 @@
           }
         },
         "repos": {
-          "15cf5319ec": "{{path}} was checked on {{hostName}}, but that host did not report a usable folder.",
           "2975400634": "Update HiveCode server to open non-Git folders on this runtime.",
+          "15cf5319ec": "{{path}} was checked on {{hostName}}, but that host did not report a usable folder.",
           "2dcd706774": "Project also exists in another profile",
           "3be0f7df04": "Cannot open folder on selected runtime",
           "6d3318e813": "Failed to import repositories",
@@ -20784,6 +20784,11 @@
       "invalidResponse": "The request details could not be verified. Your draft is retained; refresh or retry.",
       "clientUnavailable": "Open HiveCode on the connected computer to manage feature requests.",
       "unavailable": "The request service is unavailable. Your draft is retained; refresh or retry submitting."
+    },
+    "graph": {
+      "businessStatus": "Business task: {{status}}",
+      "currentStage": "Current stage",
+      "statusUnavailable": "Business task status unavailable"
     }
   },
   "hiveWorkflow": {
@@ -20866,6 +20871,8 @@
       "clientUnavailable": "Open HiveCode on the connected computer to configure workflows.",
       "invalidResponse": "The saved definition could not be verified. Your draft is retained; refresh to retry.",
       "unavailable": "The workflow service is unavailable. Your draft is retained; refresh or retry saving."
-    }
+    },
+    "graphLegend": "Solid arrows show prerequisites; dashed arrows show configured return stages.",
+    "graphInvalidLayout": "These dependencies cannot be drawn as a valid graph. Review the stage references and dependency errors."
   }
 }
