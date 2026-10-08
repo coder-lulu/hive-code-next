@@ -51,6 +51,12 @@ export class LocalTaskClient {
   constructor(options: LocalTaskClientOptions) {
     this.request = createLocalTaskRequest({
       ...options,
+      // Settlement waits for the host's 30-second positive evidence budget.
+      requestTimeoutMsByPath: {
+        '/execution/reconcile': 40_000,
+        '/execution/cancel': 40_000,
+        ...options.requestTimeoutMsByPath
+      },
       maximumResponseBytesByPath: {
         ...options.maximumResponseBytesByPath,
         '/execution/workflow-outcome': 64 * 1024,

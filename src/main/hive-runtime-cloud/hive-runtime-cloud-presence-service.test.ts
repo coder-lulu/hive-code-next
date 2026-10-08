@@ -25,6 +25,23 @@ async function startClaimed(service: HiveRuntimeCloudPresenceService): Promise<v
 }
 
 describe('Hive Runtime Cloud Presence service', () => {
+  it('persists the acquired lease epoch before publishing an online Runtime', async () => {
+    const { service, saveState } = fixture(claimedState())
+    const advertisedEpochs: (number | undefined)[] = []
+    const unsubscribe = service.subscribeState((state) => {
+      if (state === 'ONLINE') {
+        advertisedEpochs.push(saveState.mock.calls.at(-1)?.[1].latestLeaseEpoch)
+      }
+    })
+    try {
+      await startClaimed(service)
+      expect(advertisedEpochs).toEqual([service.getCurrentLeaseContext()!.tuple.leaseEpoch])
+    } finally {
+      unsubscribe()
+      await service.stop()
+    }
+  })
+
   it('recovers automatically from a response body transport interruption', async () => {
     const http = new HiveRuntimeCloudClient(
       'https://test.invalid',

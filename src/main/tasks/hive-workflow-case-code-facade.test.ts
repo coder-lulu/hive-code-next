@@ -102,6 +102,45 @@ describe('owner reads of an original fixed Developer snapshot', () => {
       expect(spy).not.toHaveBeenCalled()
     }
   )
+  it.each(['authorizationRef', 'expiresAt'] as const)(
+    'keeps original immutable code readable after its %s is renewed',
+    async (field) => {
+      const f = await fixture()
+      const task = structuredClone(f.task)
+      if (field === 'authorizationRef') {
+        task.binding.command.authorizationRef = 'grant:renewed'
+      } else {
+        task.binding.command.expiresAt = new Date(
+          Date.parse(task.binding.command.expiresAt) + 60_000
+        ).toISOString()
+      }
+      f.task = task
+      expect((await f.facade().getWorkflowCaseCodePage(f.query)).files).toHaveLength(2)
+      const file = await f.facade().getWorkflowCaseCodeFile({ ...f.query, path: 'app.js' })
+      expect(file.preview.kind).toBe('text')
+    }
+  )
+
+  it.each(['authorizationRevision', 'executionEpoch', 'writeFence', 'inputRef'] as const)(
+    'refuses substituted immutable command %s before reading code',
+    async (field) => {
+      const f = await fixture()
+      const task = structuredClone(f.task)
+      const command = task.binding.command
+      if (field === 'inputRef') {
+        command.inputRef = 'input:substituted'
+      } else if (field === 'authorizationRevision') {
+        command.authorizationRevision = 'authorization:substituted'
+      } else {
+        command[field] += 1
+      }
+      f.task = task
+      const spy = vi.spyOn(f.snapshots, 'getCodePage')
+      await expect(f.facade().getWorkflowCaseCodePage(f.query)).rejects.toThrow('REVISION_CONFLICT')
+      expect(spy).not.toHaveBeenCalled()
+    }
+  )
+
   it('refuses revoked account state during the service read before file access', async () => {
     const f = await fixture(),
       spy = vi.spyOn(f.snapshots, 'getCodePage')

@@ -162,7 +162,7 @@ async function taskFixture() {
   presence.service.setAuthorization(a.account.getRuntimeCloudAuthorization())
   presence.service.setRuntimeReady(true)
   await vi.waitFor(() => expect(presence.service.getState()).toBe('ONLINE'))
-  let stored: HiveRuntimeCloudRegistrationState = { ...claimedState(), latestLeaseEpoch: 1 }
+  let stored: HiveRuntimeCloudRegistrationState = presence.saveState.mock.calls.at(-1)![1]
   let leaseUnavailable = false
   let bootIdChanged = false
   let leaseIdentityChanged = false
@@ -366,6 +366,26 @@ async function taskFixture() {
 }
 
 describe('ordinary account refresh and original Task custody', () => {
+  it('retains original Task custody without another owner lookup after a proven same-login rotation', async () => {
+    const f = await taskFixture(),
+      target = await f.addStructuredTask(2)
+    const ownerReads = f.owned.mock.calls.length
+    f.owned.mockRejectedValueOnce(new TypeError('synthetic optional metadata interruption'))
+    await f.account.refresh()
+    await f.monitor.check()
+    expect(f.owned).toHaveBeenCalledTimes(ownerReads)
+    expect(f.ownership.getState().relation).toBe('CLAIMED_BY_CURRENT')
+    expect(f.records.tasks.get(target.task.command)?.cancellationKey).toBeNull()
+    const effect = vi.fn(() => 'synthetic admitted effect')
+    await expect(
+      f.records.tasks.runModelEffect(
+        target.structured,
+        () => f.issuer.assertExecutionCurrent(target.task),
+        effect
+      )
+    ).resolves.toEqual({ value: 'synthetic admitted effect' })
+    expect(effect).toHaveBeenCalledOnce()
+  })
   it('fences expired accepted Cloud lease during same-login refresh and cannot dispatch its original model effect', async () => {
     const f = await taskFixture(),
       target = await f.addStructuredTask(2)
@@ -734,31 +754,22 @@ describe('ordinary account refresh and original Task custody', () => {
       }
     }
   )
-  it('rotates credentials without revoking the original Task during background ownership analysis', async () => {
+  it('rotates credentials without revoking the original Task or reanalyzing proven ownership', async () => {
     const f = await taskFixture()
     const generation = f.account.getRuntimeCloudAuthorization()!.sessionGeneration
     const lease = f.presence.service.getCurrentLeaseContext()
-    let release!: (value: HiveAccountRuntimeDirectoryEntry) => void
-    const held = new Promise<HiveAccountRuntimeDirectoryEntry>((resolveHold) => {
-      release = resolveHold
-    })
-    f.owned.mockReturnValueOnce(held)
-    try {
-      await f.account.refresh()
-      await vi.waitFor(() => expect(f.owned).toHaveBeenCalledTimes(2))
-      await f.monitor.check()
-      expect(f.records.tasks.get(f.record.command)?.cancellationKey).toBeNull()
-      expect(f.account.getRuntimeCloudAuthorization()!.sessionGeneration).toBe(generation)
-      expect(f.account.getRuntimeCloudAuthorization()!.accessToken).toBe(
-        response('rotated').accessToken
-      )
-      expect(f.owned.mock.calls.at(-1)?.[1]).toBe(response('rotated').accessToken)
-      expect(f.presence.service.getCurrentLeaseContext()).toEqual(lease)
-      expect(f.ownership.getState().relation).toBe('CLAIMED_BY_CURRENT')
-      expect(() => f.issuer.assertExecutionCurrent(f.record)).not.toThrow()
-    } finally {
-      release(ownedRuntime(f.record.command.runtimeRecordId))
-    }
+    const ownerReads = f.owned.mock.calls.length
+    await f.account.refresh()
+    await f.monitor.check()
+    expect(f.owned).toHaveBeenCalledTimes(ownerReads)
+    expect(f.records.tasks.get(f.record.command)?.cancellationKey).toBeNull()
+    expect(f.account.getRuntimeCloudAuthorization()!.sessionGeneration).toBe(generation)
+    expect(f.account.getRuntimeCloudAuthorization()!.accessToken).toBe(
+      response('rotated').accessToken
+    )
+    expect(f.presence.service.getCurrentLeaseContext()).toEqual(lease)
+    expect(f.ownership.getState().relation).toBe('CLAIMED_BY_CURRENT')
+    expect(() => f.issuer.assertExecutionCurrent(f.record)).not.toThrow()
   })
 
   it('cannot replace or revoke a newer same-generation rotation with a late refresh using the same refresh token', async () => {

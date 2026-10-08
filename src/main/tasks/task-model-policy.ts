@@ -7,6 +7,7 @@ import { createPolicyItems, type PolicyCall } from './task-model-policy-items'
 import { addTaskModelPolicyLocation } from './task-model-stream-failure'
 import { createTaskModelResponsePolicy } from './task-model-policy-response'
 import { validateTaskModelSafetyBuffering } from './task-model-safety-buffering'
+import { taskModelEventMetadataFields } from './task-model-event-metadata'
 import {
   captureTaskModelResponseConfiguration,
   type TaskModelResponseConfiguration
@@ -177,7 +178,7 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
         }
         const e = object(
           parse(dataText, TASK_MODEL_EVENT_BYTES),
-          'type sequence_number output_index item_id call_id content_index summary_index response item delta text part arguments input error headers metadata safety_buffering',
+          'type sequence_number output_index item_id call_id content_index summary_index response item delta text part arguments input error headers metadata safety_buffering logprobs obfuscation',
           'type'
         )
         for (const key of ['sequence_number', 'output_index', 'content_index', 'summary_index']) {
@@ -213,12 +214,20 @@ export function createTaskModelPolicy(profile: TaskModelPolicyProfile): {
           )
         } else if (textKinds.includes(kind)) {
           const field = kind.endsWith('.delta') ? 'delta' : 'text'
-          object(e, `${prefix}output_index item_id content_index summary_index ${field}`, field)
+          object(
+            e,
+            `${prefix}${taskModelEventMetadataFields(e, kind)}output_index item_id content_index summary_index ${field}`,
+            field
+          )
           text(e[field])
         } else if (callKinds.includes(kind)) {
           const functional = kind.includes('function'),
             field = kind.endsWith('.delta') ? 'delta' : functional ? 'arguments' : 'input'
-          object(e, `${prefix}output_index item_id call_id ${field}`, field)
+          object(
+            e,
+            `${prefix}${taskModelEventMetadataFields(e, kind)}output_index item_id call_id ${field}`,
+            field
+          )
           text(e[field])
           const candidates = [...calls.entries()].filter(
             ([callId, call]) =>

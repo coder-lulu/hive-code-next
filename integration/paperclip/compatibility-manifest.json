@@ -126,7 +126,8 @@
     "branch": "hive/external-execution-20261004",
     "status": "development_unpublished",
     "module": "server/src/services/external-execution.ts",
-    "moduleSha256": "96d083b04f1e139657d1c8c8f664340d683eb2d5e1351d983ed54321c0fdc684",
+    "sourceSha256": "96d083b04f1e139657d1c8c8f664340d683eb2d5e1351d983ed54321c0fdc684",
+    "moduleSha256": "c54f4995b9f04c578c6ebea43e29b5971541d989aad2d701a938bfa18f1b818a",
     "vendoredModule": "integration/paperclip/core/external-execution.ts",
     "license": "MIT"
   },

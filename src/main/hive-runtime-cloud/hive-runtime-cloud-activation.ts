@@ -154,7 +154,13 @@ async function claimRuntime(
 async function acquireRuntimeLease(
   options: Pick<
     ActivationOptions,
-    'client' | 'authorization' | 'getAuthorization' | 'identity' | 'signal' | 'assertCurrent'
+    | 'client'
+    | 'authorization'
+    | 'getAuthorization'
+    | 'identity'
+    | 'signal'
+    | 'assertCurrent'
+    | 'saveState'
   > & {
     authorityId: string
   },
@@ -182,6 +188,14 @@ async function acquireRuntimeLease(
         options.client.acquireLease(request(), authorization.accessToken, options.signal)
     )
     options.assertCurrent()
+    if (
+      lease.authorityGeneration !== registration.authorityGeneration ||
+      lease.fencingEpoch !== registration.fencingEpoch ||
+      lease.leaseEpoch < registration.latestLeaseEpoch
+    ) {
+      throw new ReconcilePresenceError('lease_tuple_changed')
+    }
+    options.saveState({ ...registration, latestLeaseEpoch: lease.leaseEpoch })
     return { ...lease, bootId, nextHeartbeatSeq: 1 }
   } catch (error) {
     if (

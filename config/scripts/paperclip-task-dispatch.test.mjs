@@ -356,18 +356,24 @@ describe('durable dispatch through the real Runtime HTTP event stream', () => {
       artifactRefs: []
     }))
     const consume = current.repository.consumeObservation.getMockImplementation()
-    current.repository.consumeObservation.mockImplementationOnce(async (...args) => {
-      await consume(...args)
-      throw new Error('Committed response lost')
+    let lostTerminalAcknowledgement = false
+    current.repository.consumeObservation.mockImplementation(async (...args) => {
+      const result = await consume(...args)
+      if (args[4].result && !lostTerminalAcknowledgement) {
+        lostTerminalAcknowledgement = true
+        throw new Error('Committed response lost')
+      }
+      return result
     })
     dispatch = createTaskDispatch(current.repository, { createClient: current.createClient })
     await dispatch.start(current.accountId, current.task.id, current.task.run_id)
     await vi.waitFor(() => expect(current.repository.releaseDelivery).toHaveBeenCalledOnce())
     expect(current.task.result_receipt?.status).toBe('succeeded')
-    expect(current.repository.consumeObservation).toHaveBeenCalledTimes(2)
-    expect(current.repository.consumeObservation.mock.calls[0][4]).toEqual(
-      current.repository.consumeObservation.mock.calls[1][4]
-    )
+    const terminalPages = current.repository.consumeObservation.mock.calls
+      .map((args) => args[4])
+      .filter((observation) => observation.result)
+    expect(terminalPages).toHaveLength(2)
+    expect(terminalPages[0]).toEqual(terminalPages[1])
     expect(current.runtime.deps.launch).toHaveBeenCalledOnce()
     expect(current.repository.settle).not.toHaveBeenCalled()
   })

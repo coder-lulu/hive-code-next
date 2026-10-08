@@ -17,7 +17,7 @@ import {
 } from './task-workflow/workflow-bindings'
 import { WORKFLOW_STAGE_LIMITS } from './task-workflow/workflow-definition'
 import { WorkflowHandoffSchema, WorkflowReviewSchema } from './task-workflow/workflow-evidence'
-import { canonicalAgentSessionDigest as digest } from './agent-session-mutation-envelope'
+import { structuredAgentSessionDigest as digest } from './structured-agent-session-mutation'
 
 const ObjectId = z.string().uuid()
 const Title = z.string().trim().min(1).max(240)

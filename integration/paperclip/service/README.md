@@ -9,13 +9,28 @@
 1. 在项目 `logs/paperclip-p1/paperclip` 检出上述固定 SHA。默认构建使用该数据库源码和本仓库固定摘要的外部执行核心模块。设置 `HIVE_PAPERCLIP_SOURCE` 时，指定检出还须包含 manifest 所列、摘要一致的外部执行模块；缺少模块或摘要不符会拒绝构建。
 2. 在该 Paperclip 检出目录执行 `pnpm --filter '@paperclipai/db...' install --ignore-scripts --frozen-lockfile`，仅准备已有固定数据库依赖。
 3. 在 HiveCode 项目执行 `pnpm run build:paperclip-service`。构建会同时验证 SHA 和 DB/shared/迁移源码摘要，生成 `out/paperclip-service`、许可证及 `logs/p1-closeout/service-build.json`。迁移产物固定 LF，原源码不变；启动时仅将已记录、可证明等价的 CRLF 校验和规范化到同一 Paperclip 迁移日志，保留记录 ID/时间与业务数据。无法证明的历史校验和会在迁移前拒绝。Provider 包或上游执行源码进入 bundle 时构建失败。
-4. 准备独立 PostgreSQL 数据库。当前本机验证使用 PostgreSQL 18，Docker 端口只发布到 `127.0.0.1`。禁止复用 HiveCloud 或 New API 的数据库。
+4. 准备独立 PostgreSQL 数据库。本机开发使用下述持久化 Compose 配置，Docker 端口只发布到 `127.0.0.1`。禁止复用 HiveCloud、New API 或一次性测试数据库。
 5. 按 [environment.example](environment.example) 设置服务环境，在启动 HiveCode 开发客户端后运行 `node out/paperclip-service/server.mjs`。三个环境变量只属于旁侧服务，不进入 Agent 环境或 Prompt。
 6. 运行 `pnpm run check:paperclip-service`。退出码 `0` 表示旁侧数据库和已授权 Runtime 均可用；`2` 表示旁侧服务已就绪但 Runtime 尚未授权；`1` 表示旁侧服务未就绪。检查只输出去敏元数据。
 
 Windows 开发服务在宿主 Node 中运行，以使用与原生 Runtime 相同的 loopback；HiveCode 默认从其 userData 的 `hive-tasks/paperclip.json` 读取私有描述符。开发版 userData 通常为 `%APPDATA%/orca-dev`。服务每次启动生成新的受限凭据和随机本机端口，描述符不得提交或交给 Renderer、Agent。
 
 [Dockerfile](Dockerfile) 只打包同一份 `out/paperclip-service`。构建示例：`docker build --pull=false -f integration/paperclip/service/Dockerfile -t hive-paperclip-p1:a027f76a out/paperclip-service`。镜像内没有 HiveCode/Agent。容器运行要求受支持的 host network 和私有描述符目录挂载；镜像构建通过不等于 Windows 上已完成该网络部署。当前实际开发验收使用上述宿主 Node 服务。
+
+### 本机数据库持久化
+
+[compose.yaml](compose.yaml) 固定已验证的 PostgreSQL 18 镜像摘要，使用命名卷存储业务数据，默认仅发布 `127.0.0.1:55432`。PostgreSQL 18 的卷挂载点为 `/var/lib/postgresql`，见[官方镜像说明](https://hub.docker.com/_/postgres)。数据库密码通过私有文件加载，不写入镜像、命令参数或仓库。
+
+将随机密码保存到当前用户私有目录，设置 `HIVE_PAPERCLIP_DATABASE_PASSWORD_FILE` 为该文件的绝对路径；需要更换本机端口时设置 `HIVE_PAPERCLIP_DATABASE_PORT`。然后在项目根执行：
+
+```sh
+docker compose -f integration/paperclip/service/compose.yaml config --quiet
+docker compose -f integration/paperclip/service/compose.yaml up -d --wait database
+```
+
+旁侧服务的私有 `HIVE_PAPERCLIP_DATABASE_URL` 使用该端口、`hive_tasks` 用户和数据库，以及同一密码。Windows 服务继续在宿主 Node 运行，访问当前 HiveCode Runtime 的本机传输描述符。首次启动仍由已有固定迁移建立业务表，不恢复或重新派发别处的执行。
+
+常规停止或重启只针对 `database` 服务，保留命名卷。删除数据卷会永久删除公司、项目、需求和业务执行记录。`tmpfs` 专用回归库只能存储一次性测试数据，不能承载开发客户端的真实任务；原 P2 回归配置与本配置分开。Docker 卷持久化不能替代备份，正式使用前须按数据库运维策略备份。
 
 ## 默认开放与拒绝
 
@@ -49,7 +64,7 @@ Codex 在任务中写入带 execution ID/指纹的结果 manifest。宿主还检
 
 Hive Facade 从既有认证通道和真实项目映射取得公司范围，保存前后复核账户与宿主工作区证明。浏览器使用同一严格 schema 和已有便携 SHA-256 校验定义摘要；不持有服务凭据，也不能从客户端指定执行命令、环境或权限。
 
-这些接口只编辑业务定义。流程派发、独立测试交接、失败退回执行和部署审批仍须完成相应宿主与业务实现；配置保存不代表任务已开始、团队隔离已通过或成果已测试。
+这些接口只编辑业务定义。保存配置不启动成员，也不证明成果已测试；需求详情中的启动操作经过当前账户、Runtime 归属和 Docker Linux 隔离预检后，才进入受管 Codex 执行链。当前本机四阶段流程支持真实交接、独立测试、失败退回和发布准备；真实部署及其审批执行仍未开放。
 
 ## 功能需求与阶段任务
 
@@ -65,7 +80,7 @@ Hive Facade 从既有认证通道和真实项目映射取得公司范围，保�
 
 需求正文最多 48,000 个 UTF-16 字符。只有需求创建的请求体上限为 320 KiB，以容纳中文及 JSON 转义；其它接口保持 64 KiB。超限请求在业务写入前拒绝。界面同账号的凭据或元数据刷新保留未提交草稿，真实账号或会话边界变更会清空草稿并拒绝迟到响应。
 
-当前需求提交只保存和分配阶段任务，未派发成员执行。缺少团队宿主隔离证明时明确显示执行不可用；真实成员交接、独立验收、失败退回和发布准备仍待接通。需求协议、容量和持久化回归分别见 `paperclip-workflow-cases-http.test.mjs`、`paperclip-workflow-cases-capacity-postgres.test.mjs`、`paperclip-workflow-cases-postgres.test.mjs`；合成账户验收不代表真实 Codex 团队执行通过。
+需求提交只保存和分配阶段任务，随后用户在详情中启动流程。受支持的本机 Docker Linux 环境经实际预检后，产品、开发、独立测试和运维准备各使用独立员工、会话和工作区；当前运行结算并验证固定成果后才能交接下一阶段。失败测试退回开发并复测新成果，尝试次数和总时限保持固定。缺少宿主隔离证明、原执行结果未知或停止未确认时，不开启新的尝试。2026-10-08 已通过原 TasksFacade 的六次真实运行，包括失败退回再通过；原生页面操作及持久化部署验收另记录实际结果，不以合成账户协议测试替代。需求协议、容量和持久化回归分别见 `paperclip-workflow-cases-http.test.mjs`、`paperclip-workflow-cases-capacity-postgres.test.mjs`、`paperclip-workflow-cases-postgres.test.mjs`。
 
 ## 验收
 
@@ -76,6 +91,7 @@ Hive Facade 从既有认证通道和真实项目映射取得公司范围，保�
 3. 点击「提交功能需求」，确认需求正文、固定流程版本和四个阶段任务可查看。最大合法中文需求应能提交；超过字符上限应保留草稿并拒绝提交。
 4. 修改并保存新流程版本，重载页面后重新选择原需求。原需求仍显示原流程和团队绑定，新流程继续用于后续提交。
 5. 缺少团队隔离能力时，页面应明确显示团队执行不可用。保存成功和任务分配不代表成员已执行或交付完成。
+6. 在受支持且已授权的环境点击「启动当前阶段」，查看实际阶段进展、交接、测试审核、固定代码版本及报告。完成后只表示发布准备完成，不表示已部署。停止/取消必须等待原执行的实际停止证据；Docker 数据库重启后，原公司、项目和需求仍应可读取。
 
 在 HiveCode「任务」页点击「Codex 任务」，选择已有本机工作区。使用要求生成 `report.md` 的无敏感输入，验证只出现一个任务、成果可查看、原工作区未被修改。另建持续工作任务并取消，确认状态在实际停止证明到达后才变为「已取消」。重复创建请求、重复 start、错账户、错工作区和未知状态不得产生第二次执行。
 

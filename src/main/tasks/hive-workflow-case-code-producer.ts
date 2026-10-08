@@ -1,4 +1,5 @@
 import { canonicalAgentSessionDigest as digest } from '../../shared/agent-session-mutation-envelope'
+import { computeTaskExecutionFingerprint } from '../../shared/task-execution/task-execution-fingerprint'
 import type { HiveWorkflowCaseView } from '../../shared/hive-workflow-cases'
 import type { WorkflowHandoff } from '../../shared/task-workflow/workflow-evidence'
 import { HiveRuntimeAdapterBinding } from './paperclip-adapter-contract'
@@ -58,7 +59,8 @@ export function assertWorkflowCaseCodeProducer(
     binding.data.paperclipCompanyId !== view.binding.scope.companyRef ||
     binding.data.paperclipAgentId !== stage.employeeRef ||
     binding.data.commandFingerprint !== native.commandFingerprint ||
-    digest(binding.data.command) !== digest(record.command) ||
+    computeTaskExecutionFingerprint(binding.data.command, record.operationCallerKey) !==
+      native.commandFingerprint ||
     task.company_id !== view.binding.scope.companyRef ||
     task.agent_id !== stage.employeeRef ||
     task.run_scope?.kind !== 'workbenchCase' ||

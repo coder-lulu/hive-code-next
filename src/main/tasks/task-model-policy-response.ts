@@ -1,5 +1,6 @@
 import type { createPolicyItems, PolicyCall } from './task-model-policy-items'
 import { addTaskModelPolicyLocation } from './task-model-stream-failure'
+import { validateTaskModelInactiveToolUsage } from './task-model-inactive-tool-usage'
 import {
   TASK_MODEL_RESPONSE_CONFIGURATION_FIELDS,
   validateTaskModelResponseConfiguration,
@@ -33,7 +34,7 @@ export function createTaskModelResponsePolicy(
     try {
       const r = object(
         value,
-        `id object created_at status model output usage usage_metadata end_turn error incomplete_details background user metadata headers ${TASK_MODEL_RESPONSE_CONFIGURATION_FIELDS}`,
+        `id object created_at status model output usage usage_metadata end_turn error incomplete_details background user metadata headers tool_usage ${TASK_MODEL_RESPONSE_CONFIGURATION_FIELDS}`,
         'id'
       )
       id(r.id)
@@ -88,6 +89,9 @@ export function createTaskModelResponsePolicy(
       }
       if (r.usage_metadata != null) {
         deny('USAGE_METADATA_UNSUPPORTED', 'usage_metadata')
+      }
+      if (Object.hasOwn(r, 'tool_usage')) {
+        validateTaskModelInactiveToolUsage(r.tool_usage)
       }
       if (r.error != null) {
         error(r.error)

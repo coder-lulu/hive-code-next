@@ -15,8 +15,20 @@ export function controlledTaskModelResponse(overrides: Record<string, unknown> =
     instructions: null,
     parallel_tool_calls: false,
     temperature: 1,
+    frequency_penalty: 0,
+    presence_penalty: 0,
     tool_choice: 'auto',
     tools: [],
+    tool_usage: {
+      image_gen: {
+        input_tokens: 0,
+        output_tokens: 0,
+        total_tokens: 0,
+        input_tokens_details: { image_tokens: 0, text_tokens: 0 },
+        output_tokens_details: { image_tokens: 0, text_tokens: 0 }
+      },
+      web_search: { num_requests: 0 }
+    },
     top_p: 1,
     conversation: null,
     max_output_tokens: null,
@@ -29,17 +41,17 @@ export function controlledTaskModelResponse(overrides: Record<string, unknown> =
       context: 'all_turns',
       summary: null,
       generate_summary: null,
-      mode: null
+      mode: 'standard'
     },
     service_tier: 'default',
     store: false,
     text: { format: { type: 'text' }, verbosity: 'low' },
     truncation: 'disabled',
-    prompt_cache_key: null,
-    prompt_cache_retention: null,
+    prompt_cache_key: 'fixture-cache',
+    prompt_cache_retention: '24h',
     prompt_cache_diagnostics: null,
     prompt_cache_options: null,
-    safety_identifier: null,
+    safety_identifier: 'fixture-safety',
     top_logprobs: 0,
     error: null,
     incomplete_details: null,

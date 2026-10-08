@@ -8,6 +8,7 @@ export type LocalTaskClientOptions = {
   secret: string
   fetch?: typeof fetch
   requestTimeoutMs?: number
+  requestTimeoutMsByPath?: Readonly<Record<string, number>>
   headers?: Readonly<Record<string, string>>
   maximumResponseBytes?: number
   maximumResponseBytesByPath?: Readonly<Record<string, number>>
@@ -55,7 +56,9 @@ export function createLocalTaskRequest(options: LocalTaskClientOptions) {
           'Content-Type': 'application/json'
         },
         body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(options.requestTimeoutMs ?? 10_000)
+        signal: AbortSignal.timeout(
+          options.requestTimeoutMs ?? options.requestTimeoutMsByPath?.[target.pathname] ?? 10_000
+        )
       })
       const bytes = await readFetchResponseBytesWithinLimit(
         response,

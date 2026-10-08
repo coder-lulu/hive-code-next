@@ -6,6 +6,7 @@ import {
   array,
   boolean,
   digest,
+  id,
   integer,
   object,
   oneOf,
@@ -15,9 +16,10 @@ import {
   type PolicyObject
 } from './task-model-policy-json'
 import { addTaskModelPolicyLocation, taskModelRefusedPolicyKey } from './task-model-stream-failure'
+import { taskModelResponseToolInventoryDigest } from './task-model-response-tool-inventory'
 
 export const TASK_MODEL_RESPONSE_CONFIGURATION_FIELDS =
-  'access_programs instructions parallel_tool_calls temperature tool_choice tools top_p completed_at conversation max_output_tokens max_tool_calls moderation previous_response_id prompt reasoning service_tier store text truncation prompt_cache_key prompt_cache_retention top_logprobs prompt_cache_diagnostics prompt_cache_options safety_identifier'
+  'access_programs instructions parallel_tool_calls temperature tool_choice tools top_p completed_at conversation max_output_tokens max_tool_calls moderation previous_response_id prompt reasoning service_tier store text truncation prompt_cache_key prompt_cache_retention top_logprobs prompt_cache_diagnostics prompt_cache_options safety_identifier frequency_penalty presence_penalty'
 
 export type TaskModelResponseConfiguration = Readonly<{
   echoes: Readonly<Record<string, string>>
@@ -67,7 +69,9 @@ export function captureTaskModelResponseConfiguration(
       verbosity: digest(controls.verbosity ?? defaultVerbosity)
     }),
     toolDigests: Object.freeze(
-      lite ? [digest([]), digest(expectedTools)] : [digest(expectedTools)]
+      lite
+        ? [digest([]), taskModelResponseToolInventoryDigest(expectedTools)]
+        : [taskModelResponseToolInventoryDigest(expectedTools)]
     ),
     tiers: Object.freeze(
       request.service_tier == null || request.service_tier === 'auto'
@@ -101,6 +105,11 @@ export function validateTaskModelResponseConfiguration(
   completed: boolean,
   config?: TaskModelResponseConfiguration
 ): void {
+  for (const key of ['frequency_penalty', 'presence_penalty']) {
+    if (Object.hasOwn(response, key) && response[key] !== 0) {
+      refused(key)
+    }
+  }
   if (response.access_programs != null) {
     try {
       const programs = object(response.access_programs, 'cyber', 'cyber')
@@ -116,13 +125,38 @@ export function validateTaskModelResponseConfiguration(
     'prompt',
     'moderation',
     'prompt_cache_diagnostics',
-    'prompt_cache_options',
-    'prompt_cache_retention',
-    'prompt_cache_key',
-    'safety_identifier'
+    'prompt_cache_options'
   ]) {
     if (response[key] != null) {
       refused(key)
+    }
+  }
+  if (
+    response.prompt_cache_retention != null &&
+    response.prompt_cache_retention !== 'in_memory' &&
+    response.prompt_cache_retention !== '24h'
+  ) {
+    refused('prompt_cache_retention')
+  }
+  for (const [key, maximum] of [
+    ['prompt_cache_key', 160],
+    ['safety_identifier', 128]
+  ] as const) {
+    if (response[key] != null) {
+      try {
+        const value = text(response[key], maximum)
+        id(value)
+        if (
+          [...value].some((character) => {
+            const code = character.charCodeAt(0)
+            return code >= 127 && code <= 159
+          })
+        ) {
+          refused(key)
+        }
+      } catch {
+        refused(key)
+      }
     }
   }
   for (const key of ['parallel_tool_calls', 'store']) {
@@ -141,14 +175,14 @@ export function validateTaskModelResponseConfiguration(
   }
   if (response.tools !== undefined) {
     array(response.tools)
-    if (!config?.toolDigests.includes(digest(response.tools))) {
+    if (!config?.toolDigests.includes(taskModelResponseToolInventoryDigest(response.tools))) {
       refused('tools')
     }
   }
   if (response.reasoning != null) {
     try {
       const reasoning = object(response.reasoning, 'effort summary context generate_summary mode')
-      if (reasoning.mode != null) {
+      if (reasoning.mode != null && reasoning.mode !== 'standard') {
         refused('reasoning')
       }
       for (const key of ['effort', 'summary', 'context', 'generate_summary']) {

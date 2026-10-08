@@ -17,7 +17,19 @@ import { refuseTaskRepository as refuse } from './task-delivery-repository.mjs'
 
 const ref = (kind, value) =>
   `${kind}:${createHash('sha256').update(JSON.stringify(value)).digest('hex')}`
-const summary = (text) => text.trim().slice(0, 4096) || 'Native role output'
+export function workflowHandoffSummary(text) {
+  const trimmed = text.trim()
+  let end = 0,
+    characters = 0
+  for (const character of trimmed) {
+    if (characters === 2048) {
+      break
+    }
+    end += character.length
+    characters++
+  }
+  return trimmed.slice(0, end) || 'Native role output'
+}
 
 async function event(db, task, payload) {
   await db`INSERT INTO pipeline_case_events(company_id,case_id,type,actor_type,actor_agent_id,run_id,payload)
@@ -44,7 +56,7 @@ function handoff(view, asset, report, target) {
     artifact: report.version,
     ...(asset.outcome.codeVersion ? { codeVersion: asset.outcome.codeVersion } : {}),
     dependencyVersions: dependencies,
-    summary: summary(report.text),
+    summary: workflowHandoffSummary(report.text),
     audienceScope: {
       scope: view.binding.scope,
       employeeRefs: [context.employeeRef, target.employeeRef]

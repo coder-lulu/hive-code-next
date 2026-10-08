@@ -1,0 +1,35 @@
+name: hivecode-paperclip
+
+services:
+  database:
+    image: postgres:18-alpine@sha256:d3e1620b530c944afa6e887d22eb899824da68e19c52024bf98f5220c88a65b2
+    restart: unless-stopped
+    ports:
+      - '127.0.0.1:${HIVE_PAPERCLIP_DATABASE_PORT:-55432}:5432'
+    environment:
+      POSTGRES_USER: hive_tasks
+      POSTGRES_DB: hive_tasks
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+    secrets:
+      - database_password
+    volumes:
+      - database:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD', 'pg_isready', '-U', 'hive_tasks', '-d', 'hive_tasks']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    shm_size: 128mb
+    mem_limit: 512m
+    cpus: 1
+    pids_limit: 256
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  database:
+
+secrets:
+  database_password:
+    file: ${HIVE_PAPERCLIP_DATABASE_PASSWORD_FILE:?Set the private database password file path}

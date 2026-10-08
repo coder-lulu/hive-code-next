@@ -102,7 +102,12 @@ describe('actual finite stream guard and policy producer diagnostics', () => {
     ...refusedTaskModelResponseFields.map((key) => ({
       label: `malformed public response ${key} field`,
       body: modelEvent('response.created', {
-        response: { id: 'resp-fixture', [key]: 'body-token-secret' }
+        response: {
+          id: 'resp-fixture',
+          [key]: ['prompt_cache_key', 'safety_identifier'].includes(key)
+            ? { private: 'body-token-secret' }
+            : 'body-token-secret'
+        }
       }),
       reason: 'policy',
       policy: malformedResponseReasons[key] ?? 'RESPONSE_CONFIGURATION',

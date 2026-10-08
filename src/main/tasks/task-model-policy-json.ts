@@ -10,15 +10,47 @@ import {
 } from './task-model-stream-failure'
 
 export type PolicyObject = Record<string, unknown>
+
+/** Supplemental counts never replace aggregate usage or the original Task debit. */
+function validateTaskModelUsageAttribution(value: unknown): void {
+  try {
+    const counters = 'input_tokens output_tokens cached_tokens cache_write_tokens'
+    const attribution = object(value, 'items', 'items')
+    const entries = Object.entries(record(attribution.items))
+    if (entries.length > 1024) {
+      deny('RESPONSE_METADATA', 'attribution')
+    }
+    for (const [key, value] of entries) {
+      id(key)
+      const item = object(value, `${counters} content`, counters)
+      for (const key of counters.split(' ')) {
+        integer(item[key])
+      }
+      if (Object.hasOwn(item, 'content')) {
+        for (const value of array(item.content)) {
+          const part = object(value, counters, counters)
+          Object.values(part).forEach(integer)
+        }
+      }
+    }
+  } catch (error) {
+    addTaskModelPolicyLocation(error, 'usage_attribution')
+    throw error
+  }
+}
+
 export function usage(value: unknown): void {
   try {
     const u = object(
       value,
-      'input_tokens output_tokens total_tokens input_tokens_details output_tokens_details codex_rollout_budget_units',
+      'input_tokens output_tokens total_tokens input_tokens_details output_tokens_details codex_rollout_budget_units attribution',
       'input_tokens output_tokens total_tokens'
     )
     for (const key of ['input_tokens', 'output_tokens', 'total_tokens']) {
       integer(u[key])
+    }
+    if (Object.hasOwn(u, 'attribution')) {
+      validateTaskModelUsageAttribution(u.attribution)
     }
     for (const key of ['input_tokens_details', 'output_tokens_details']) {
       if (u[key] != null) {

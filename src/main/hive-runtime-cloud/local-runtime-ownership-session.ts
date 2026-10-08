@@ -89,7 +89,7 @@ export class LocalRuntimeOwnershipSession {
       checkedAt: retainClaim ? this.state.checkedAt : null,
       errorCode: null
     })
-    return true
+    return !retainClaim
   }
 
   setClaimUserCode(code?: string): void {

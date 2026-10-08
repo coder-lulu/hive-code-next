@@ -43,7 +43,10 @@ const externalExecutionSourceDigest = await paperclipExternalExecutionSourceDige
     ? manifest.externalExecutionCore.module
     : manifest.externalExecutionCore.vendoredModule
 )
-if (externalExecutionSourceDigest !== manifest.externalExecutionCore.moduleSha256) {
+const expectedExternalExecutionDigest = process.env.HIVE_PAPERCLIP_SOURCE
+  ? manifest.externalExecutionCore.sourceSha256
+  : manifest.externalExecutionCore.moduleSha256
+if (externalExecutionSourceDigest !== expectedExternalExecutionDigest) {
   throw new Error('Paperclip external execution source differs from the reviewed module')
 }
 const requireDb = createRequire(join(source, 'packages/db/package.json'))

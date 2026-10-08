@@ -5,6 +5,7 @@ import { runInNewContext } from 'node:vm'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { canonicalAgentSessionDigest } from '../../src/shared/agent-session-mutation-envelope.ts'
 import { workflowCaseFixture } from '../../src/shared/hive-workflow-cases.test-fixture.ts'
+import { workflowCaseEvidenceFixture } from '../../src/renderer/src/components/task-page/hive/hive-workflow-case-evidence.test-fixtures.ts'
 import { workflowTestVectors } from '../../src/shared/task-workflow/workflow.test-fixture.ts'
 
 let contract
@@ -82,6 +83,37 @@ describe('browser workflow contract', () => {
       caseContract.HiveWorkflowCasePageSchema.parse({ items: [summary], nextCursor: null })
     ).toEqual({ items: [summary], nextCursor: null })
   })
+
+  it.each(['approved', 'changes_requested', 'rejected'])(
+    'validates a Case with %s review and handoffs without Node globals',
+    (decision) => {
+      const { view } = workflowCaseEvidenceFixture(decision)
+      expect(caseContract.HiveWorkflowCaseViewSchema.parse(view)).toEqual(view)
+    }
+  )
+
+  it.each(['handoff binding', 'review binding', 'review artifact', 'review code version'])(
+    'rejects changed %s in browser evidence',
+    (field) => {
+      const { view } = workflowCaseEvidenceFixture('approved')
+      if (field === 'handoff binding') {
+        view.handoffs[0].binding.workflowRevision += 1
+      }
+      if (field === 'review binding') {
+        view.reviews[0].binding.workflowRevision += 1
+      }
+      if (field === 'review artifact') {
+        view.reviews[0].artifact = { ...view.reviews[0].artifact, digest: 'e'.repeat(64) }
+      }
+      if (field === 'review code version') {
+        view.reviews[0].codeVersion = {
+          ...view.reviews[0].codeVersion,
+          treeDigest: 'e'.repeat(64)
+        }
+      }
+      expect(caseContract.HiveWorkflowCaseViewSchema.safeParse(view).success).toBe(false)
+    }
+  )
 
   it.each(['identity', 'definition', 'employee'])(
     'rejects changed case %s in the browser',

@@ -47,6 +47,29 @@ describe.skipIf(!configPath)('original native inbox and actual Case kernel trans
       await f.runs.getWorkflowCaseRuns(f.accountId, { projectId: f.project.id, caseId: f.view.id })
     ).toHaveLength(4)
   })
+  it.each(['需', '😀'])(
+    'commits a long %s report and admits exactly one successor',
+    async (character) => {
+      const f = await workflowStageAdmissionFixture(h)
+      const reportText = character.repeat(5412)
+      const delivery = await workflowConsumerDelivery(h, f, f.first, { reportText })
+      const consumed = await delivery.consume()
+      const view = await f.read()
+      expect(consumed.settled).toBe(true)
+      expect(view.revision).toBe(2)
+      expect(view.handoffs).toHaveLength(1)
+      expect(view.handoffs[0].summary).toBe(character.repeat(2048))
+      expect(view.handoffs[0].artifact).toEqual(delivery.delivery.artifacts[0].version)
+      expect(delivery.delivery.artifacts[0].text).toBe(reportText)
+      const runs = await f.runs.getWorkflowCaseRuns(f.accountId, {
+        projectId: f.project.id,
+        caseId: view.id
+      })
+      expect(runs.filter((run) => run.role === 'developer')).toHaveLength(1)
+      await delivery.consume()
+      expect((await f.read()).revision).toBe(2)
+    }
+  )
   it.each(['changes_requested', 'rejected'])(
     'keeps native failed evidence for %s and repairs/retests',
     async (decision) => {

@@ -167,9 +167,12 @@ describe('immutable original reader response configuration', () => {
     { label: 'nested unknown', value: { reasoning: { 'private-key': 'secret-value' } } },
     { label: 'changed verbosity', value: { text: { verbosity: 'high' } } },
     { label: 'tier opt-in', value: { service_tier: 'priority' } },
-    { label: 'unexpected retention', value: { prompt_cache_retention: '24h' } },
+    { label: 'unsupported retention', value: { prompt_cache_retention: '48h' } },
     { label: 'unexpected cache state', value: { prompt_cache_options: {} } },
-    { label: 'unexpected identity', value: { safety_identifier: 'secret-value' } },
+    {
+      label: 'unexpected identity shape',
+      value: { safety_identifier: { private: 'secret-value' } }
+    },
     { label: 'moderation object', value: { moderation: {} } },
     { label: 'automatic truncation', value: { truncation: 'auto' } },
     { label: 'bad temperature', value: { temperature: 2.01 } },
