@@ -20645,6 +20645,23 @@
     }
   },
   "hiveWorkflowCases": {
+    "session": {
+      "historyReset": "The journal window changed. Refresh the snapshot before reading older history.",
+      "open": "View original session",
+      "title": "Original session",
+      "description": "Read-only journal snapshot from this original stage run. Reading or refreshing does not change its execution status.",
+      "refresh": "Refresh snapshot",
+      "close": "Close session",
+      "loading": "Reading original journal…",
+      "empty": "No transcript items were returned in this journal snapshot.",
+      "limit": "This reader has reached its history window limit. Refresh to read the latest snapshot.",
+      "errors": {
+        "forbidden": "Session access is no longer available for the current account or device ownership.",
+        "invalidResponse": "The original session response could not be verified. Retry the read.",
+        "unsupported": "Original session reading is unavailable in this environment.",
+        "unavailable": "The original journal could not be read. Retry the read."
+      }
+    },
     "title": "Feature requests",
     "description": "Submit requirements using a saved standard four-stage workflow. Start the product stage, then the team hands off development, independent testing and release preparation automatically.",
     "newRequirement": "New feature request",

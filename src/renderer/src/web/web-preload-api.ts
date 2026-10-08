@@ -98,6 +98,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       getWorkflowCase: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
       startWorkflowCase: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
       getWorkflowCaseRuns: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
+      getWorkflowCaseSessionPage: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
       getWorkflowCaseCodePage: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
       getWorkflowCaseCodeFile: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),
       list: () => Promise.reject(new Error('CAPABILITY_UNAVAILABLE')),

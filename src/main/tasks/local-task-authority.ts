@@ -1,4 +1,7 @@
 import type { HiveRuntimeCloudAuthorization } from '../hive-account/hive-account-publication'
+import type { HiveAccountService } from '../hive-account/hive-account-service'
+import type { HiveRuntimeCloudPresenceService } from '../hive-runtime-cloud/hive-runtime-cloud-presence-service'
+import type { LocalRuntimeOwnershipService } from '../hive-runtime-cloud/local-runtime-ownership-service'
 import { computeTaskExecutionFingerprint } from '../../shared/task-execution/task-execution-fingerprint'
 import type { TaskExecutionStart } from '../../shared/task-execution/task-execution-command'
 import type {
@@ -30,6 +33,38 @@ export type LocalTaskAuthorityDependencies = {
   // A reference names its canonical live grant; deleting or replacing it revokes old admissions.
   resolveGrant: (authorizationRef: string) => LocalTaskGrant | null
   now?: () => number
+}
+
+export function createLocalTaskRuntimeOwner(options: {
+  account: Pick<HiveAccountService, 'getRuntimeCloudAuthorization'>
+  ownership: Pick<LocalRuntimeOwnershipService, 'getState'>
+  presence: Pick<HiveRuntimeCloudPresenceService, 'getCurrentLeaseContext'>
+  isClosed(): boolean
+}) {
+  return () => {
+    const account = options.account.getRuntimeCloudAuthorization()
+    const owner = options.ownership.getState()
+    const lease = options.presence.getCurrentLeaseContext()
+    if (
+      options.isClosed() ||
+      !account ||
+      !lease ||
+      account.sessionExpiresAt <= Date.now() ||
+      owner.relation !== 'CLAIMED_BY_CURRENT' ||
+      owner.accountId !== account.accountId ||
+      owner.sessionGeneration !== account.sessionGeneration ||
+      owner.runtimeRecordId !== lease.tuple.runtimeRecordId ||
+      lease.authorityId !== account.authorityId ||
+      ['FENCED', 'STOPPED', 'DISABLED'].includes(owner.presence)
+    ) {
+      return null
+    }
+    return {
+      runtimeRecordId: lease.tuple.runtimeRecordId,
+      ownershipEpoch: lease.tuple.fencingEpoch,
+      accountId: account.accountId
+    }
+  }
 }
 
 /** Grants originate in the local authenticated binding service, never in transport JSON. */

@@ -10,10 +10,11 @@ import { workflowTestVectors } from '../../src/shared/task-workflow/workflow.tes
 
 let contract
 let caseContract
+let sessionContract
 
 beforeAll(async () => {
   const bundles = await Promise.all(
-    ['hive-task-workflows', 'hive-workflow-cases'].map((module) =>
+    ['hive-task-workflows', 'hive-workflow-cases', 'hive-workflow-case-session'].map((module) =>
       build({
         entryPoints: [resolve(`src/shared/${module}.ts`)],
         bundle: true,
@@ -25,7 +26,7 @@ beforeAll(async () => {
       })
     )
   )
-  ;[contract, caseContract] = bundles.map((bundle) =>
+  ;[contract, caseContract, sessionContract] = bundles.map((bundle) =>
     runInNewContext(`${bundle.outputFiles[0].text}; HiveWorkflowContract`, { TextEncoder })
   )
 })
@@ -47,6 +48,59 @@ function snapshot() {
 }
 
 describe('browser workflow contract', () => {
+  it('validates original session history and UTF-8 bounds without Node globals', () => {
+    const cursor = { epoch: 'original-epoch', sequence: 3 }
+    const identity = {
+      projectId: randomUUID(),
+      caseId: randomUUID(),
+      taskId: randomUUID(),
+      runId: randomUUID()
+    }
+    const value = {
+      ...identity,
+      sessionId: 'original-session',
+      workspaceId: 'folder:original',
+      executionHostId: 'local',
+      provider: 'codex',
+      history: {
+        ok: true,
+        page: {
+          sessionId: 'original-session',
+          epoch: 'original-epoch',
+          direction: 'tail',
+          items: [
+            {
+              itemId: 'original-item',
+              revision: 1,
+              sequence: 3,
+              observedAt: 1,
+              body: {
+                kind: 'message',
+                role: 'assistant',
+                blocks: [{ type: 'text', text: '原会话 · 🐝' }]
+              }
+            }
+          ],
+          submissions: [],
+          removedItemIds: [],
+          hasOlder: false,
+          hasNewer: false,
+          window: { oldest: cursor, newest: cursor, nextCursor: cursor },
+          liveCursor: cursor
+        }
+      }
+    }
+    expect(
+      sessionContract.HiveWorkflowCaseSessionReadSchema.parse({ ...identity, direction: 'tail' })
+        .limit
+    ).toBe(40)
+    expect(sessionContract.HiveWorkflowCaseSessionPageSchema.parse(value)).toEqual(value)
+    const foreign = structuredClone(value)
+    foreign.history.page.sessionId = 'foreign-session'
+    expect(sessionContract.HiveWorkflowCaseSessionPageSchema.safeParse(foreign).success).toBe(false)
+    value.history.page.items[0].body.blocks[0].text = '验'.repeat(750_000)
+    expect(sessionContract.HiveWorkflowCaseSessionPageSchema.safeParse(value).success).toBe(false)
+  })
   it('bundles and validates the host digest without Node globals', () => {
     const value = snapshot()
     expect(contract.HiveWorkflowSnapshotSchema.parse(value)).toEqual(value)

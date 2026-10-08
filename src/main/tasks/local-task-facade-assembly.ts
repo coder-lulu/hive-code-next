@@ -11,6 +11,7 @@ export function createLocalTaskFacadeAssembly(options: {
   directory: string
   artifacts: FacadeOptions['artifacts']
   codeInspection: FacadeOptions['codeInspection']
+  sessionInspection: FacadeOptions['sessionInspection']
   issuer: FacadeOptions['issuer']
   enforcement: FacadeOptions['enforcement']
   currentAccount: FacadeOptions['currentAccount']
@@ -22,6 +23,7 @@ export function createLocalTaskFacadeAssembly(options: {
     descriptorPath: join(options.directory, 'paperclip.json'),
     artifacts: options.artifacts,
     codeInspection: options.codeInspection,
+    sessionInspection: options.sessionInspection,
     issuer: options.issuer,
     enforcement: options.enforcement,
     currentAccount: options.currentAccount,

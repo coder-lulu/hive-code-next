@@ -20,6 +20,10 @@ import {
 import { createHiveTaskWorkflowFacade } from './hive-task-workflow-facade'
 import { createHiveWorkflowCaseFacade } from './hive-workflow-case-facade'
 import { createHiveWorkflowCaseRunFacade } from './hive-workflow-case-run-facade'
+import {
+  createHiveWorkflowCaseSessionFacade,
+  type HiveWorkflowCaseSessionSource
+} from './hive-workflow-case-session-facade'
 import { bindAndDispatchHiveTask } from './hive-task-run-dispatch'
 import { prepareWorkflowCaseCancellation } from './hive-workflow-case-cancellation'
 import {
@@ -32,6 +36,7 @@ export function createHiveTaskFacade(options: {
   descriptorPath: string
   artifacts: TaskArtifactIndex
   codeInspection: HiveWorkflowCaseCodeSource | null
+  sessionInspection: HiveWorkflowCaseSessionSource | null
   issuer: Pick<LocalTaskBindingIssuer, 'issue'>
   currentAccount: () => HiveRuntimeCloudAuthorization | null
   validateWorkspace: (selector: string) => Promise<HiveTaskWorkspaceProof>
@@ -74,6 +79,11 @@ export function createHiveTaskFacade(options: {
       context,
       getWorkflowCase: cases.getWorkflowCase,
       source: options.codeInspection
+    }),
+    ...createHiveWorkflowCaseSessionFacade({
+      context,
+      getWorkflowCase: cases.getWorkflowCase,
+      source: options.sessionInspection
     }),
     ...runs.facade,
     async list() {

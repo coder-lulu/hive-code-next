@@ -16,7 +16,7 @@ import {
 } from '../../shared/task-execution/task-execution-primitives'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
 import { TaskExecutionHost } from './task-execution-host'
-import { createLocalTaskAuthorizer } from './local-task-authority'
+import { createLocalTaskAuthorizer, createLocalTaskRuntimeOwner } from './local-task-authority'
 import { createTaskDeliveryAuthorizer } from './task-delivery-authority'
 import { createHiveTaskServiceContext } from './hive-task-service-context'
 import { LocalTaskBindingIssuer } from './local-task-binding-issuer'
@@ -35,6 +35,7 @@ import { createLocalTaskDockerEnforcement } from './task-docker-enforcement-runt
 import { TaskCodeSnapshotStore } from './task-code-snapshot'
 import { createWorkflowTaskCodeRestorer } from './task-workflow-code-input'
 import { restoreLocalTaskWorkspace } from './local-task-workspace-recovery'
+import { createLocalTaskSessionInspection } from './local-task-session-inspection'
 
 /** One task service assembled from the existing account, Runtime, record store and Codex host. */
 export async function startLocalTaskRuntime(options: {
@@ -62,30 +63,7 @@ export async function startLocalTaskRuntime(options: {
     }
     assertTaskAuthorizationCurrent(() => resources.assertCurrent())
   }
-  const currentRuntime = () => {
-    const account = options.account.getRuntimeCloudAuthorization()
-    const owner = options.ownership.getState()
-    const lease = options.presence.getCurrentLeaseContext()
-    if (
-      closed ||
-      !account ||
-      !lease ||
-      account.sessionExpiresAt <= Date.now() ||
-      owner.relation !== 'CLAIMED_BY_CURRENT' ||
-      owner.accountId !== account.accountId ||
-      owner.sessionGeneration !== account.sessionGeneration ||
-      owner.runtimeRecordId !== lease.tuple.runtimeRecordId ||
-      lease.authorityId !== account.authorityId ||
-      ['FENCED', 'STOPPED', 'DISABLED'].includes(owner.presence)
-    ) {
-      return null
-    }
-    return {
-      runtimeRecordId: lease.tuple.runtimeRecordId,
-      ownershipEpoch: lease.tuple.fencingEpoch,
-      accountId: account.accountId
-    }
-  }
+  const currentRuntime = createLocalTaskRuntimeOwner({ ...options, isClosed: () => closed })
   const resolveWorkspaceSource = async (selector: string) => {
     const proof = await resolveHiveAgentLocalProject(options.runtime, options.store, selector)
     const scope = await options.runtime.showTerminalWorkspaceLaunchScope(selector)
@@ -228,6 +206,12 @@ export async function startLocalTaskRuntime(options: {
     directory,
     artifacts,
     codeInspection: { snapshots, readExecution: (identity) => resources.store.tasks.get(identity) },
+    sessionInspection: createLocalTaskSessionInspection({
+      resources,
+      store: options.store,
+      currentRuntime,
+      assertCurrent
+    }),
     issuer,
     enforcement: enforcement.current,
     currentAccount: () => options.account.getRuntimeCloudAuthorization(),

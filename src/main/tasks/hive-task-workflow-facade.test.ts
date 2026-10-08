@@ -137,6 +137,7 @@ async function fixture(useHttpClient = false) {
   const { facade } = createHiveTaskFacade({
     descriptorPath,
     codeInspection: null,
+    sessionInspection: null,
     artifacts: new TaskArtifactIndex(join(directory, 'artifacts')),
     issuer: { issue: vi.fn() },
     currentAccount: () => account,

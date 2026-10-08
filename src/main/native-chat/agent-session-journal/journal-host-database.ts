@@ -90,6 +90,14 @@ export class JournalHostDatabase {
     return connection
   }
 
+  /** Passive readers must not recover a transaction or observe uncommitted rows. */
+  readConnection(): Database.Database {
+    if (!this.connection || this.stranded || this.connection.isTransaction) {
+      throw new AgentSessionJournalError('journal_closed', 'the chat journal is unavailable')
+    }
+    return this.connection
+  }
+
   /** One IMMEDIATE transaction; see `runJournalTransaction`. */
   transaction<T>(run: (db: Database.Database) => T, scope?: 'journal'): T {
     const db = this.db

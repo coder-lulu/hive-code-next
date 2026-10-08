@@ -59,7 +59,7 @@ const ProviderCallId = z
 
 /** Child-agent lifecycle stays an open string for the same reason tool states
  *  do: a state a newer build writes must not turn the row malformed. */
-const SubagentEntry = z.object({
+export const AgentJournalSubagentEntrySchema = z.object({
   id: z.string(),
   label: z.string(),
   state: z.string().min(1),
@@ -103,7 +103,7 @@ const Block = z.union([
     z.object({
       type: z.literal('subagent-group'),
       groupId: z.string(),
-      agents: z.array(SubagentEntry)
+      agents: z.array(AgentJournalSubagentEntrySchema)
     }),
     // `kind` and `state` stay open strings for the same reason a child's
     // lifecycle does: a vocabulary a newer build writes must not turn the row

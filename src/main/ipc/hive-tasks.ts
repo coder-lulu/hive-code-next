@@ -3,6 +3,7 @@ import { getLocalTasks } from '../startup/main-process-tasks'
 import { isTrustedUIRenderer } from './ui'
 import type { HiveTaskCreate, HiveTasksApi } from '../../shared/hive-tasks'
 import type { HiveWorkflowCaseStart } from '../../shared/hive-workflow-case-runs'
+import type { HiveWorkflowCaseSessionRead } from '../../shared/hive-workflow-case-session'
 import type {
   HiveWorkflowCaseCodePageQuery,
   HiveWorkflowCaseCodeFileQuery
@@ -77,6 +78,9 @@ export function registerHiveTaskHandlers() {
   )
   bind('getWorkflowCaseRuns', (facade, query: HiveWorkflowCaseReadQuery) =>
     facade.getWorkflowCaseRuns(query)
+  )
+  bind('getWorkflowCaseSessionPage', (facade, query: HiveWorkflowCaseSessionRead) =>
+    facade.getWorkflowCaseSessionPage(query)
   )
   bind('getWorkflowCaseCodePage', (facade, query: HiveWorkflowCaseCodePageQuery) =>
     facade.getWorkflowCaseCodePage(query)

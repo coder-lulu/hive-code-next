@@ -202,6 +202,7 @@ export async function workflowPrepareFixture(
     directory,
     artifacts: new TaskArtifactIndex(join(directory, 'artifacts')),
     codeInspection: null,
+    sessionInspection: null,
     issuer,
     currentAccount: () => account,
     currentRuntime: () => owner,

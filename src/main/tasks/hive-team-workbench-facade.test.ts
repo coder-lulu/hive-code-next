@@ -113,6 +113,7 @@ async function fixture(companyId = randomUUID(), projectId = randomUUID()) {
   const { facade } = createHiveTaskFacade({
     descriptorPath,
     codeInspection: null,
+    sessionInspection: null,
     artifacts: new TaskArtifactIndex(join(directory, 'artifacts')),
     issuer: { issue: vi.fn() },
     currentAccount: () => account,

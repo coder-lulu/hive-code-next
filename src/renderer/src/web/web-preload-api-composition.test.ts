@@ -2,6 +2,22 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { installBrowserGlobals } from './web-preload-api-test-harness'
 
 describe('web preload API composition', () => {
+  it('explicitly rejects desktop original Case sessions without connecting or selecting a host', async () => {
+    const globals = installBrowserGlobals('Linux')
+    const before = globals.storage.length
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+    await expect(
+      globals.window.api.hiveTasks.getWorkflowCaseSessionPage({
+        projectId: '11111111-1111-4111-8111-111111111111',
+        caseId: '22222222-2222-4222-8222-222222222222',
+        taskId: '33333333-3333-4333-8333-333333333333',
+        runId: '44444444-4444-4444-8444-444444444444',
+        direction: 'tail'
+      })
+    ).rejects.toThrow('CAPABILITY_UNAVAILABLE')
+    expect(globals.storage.length).toBe(before)
+  })
   beforeEach(() => {
     vi.resetModules()
   })

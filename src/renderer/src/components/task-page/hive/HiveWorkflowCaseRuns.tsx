@@ -1,3 +1,4 @@
+import { lazy, Suspense, useCallback, useLayoutEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, RefreshCw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
@@ -7,6 +8,14 @@ import { useDelayedStatus } from '@/hooks/use-delayed-status'
 import type { HiveWorkflowCaseView } from '../../../../../shared/hive-workflow-cases'
 import type { HiveWorkflowCaseRunsModel } from './use-hive-workflow-case-runs'
 import { workflowCaseRunIsActive } from './hive-workflow-case-run-responses'
+import type { HiveWorkflowCaseSessionRead } from '../../../../../shared/hive-workflow-case-session'
+import { workflowCaseSessionKey } from './hive-workflow-case-session-responses'
+
+const HiveWorkflowCaseSession = lazy(() =>
+  import('./HiveWorkflowCaseSession').then((module) => ({
+    default: module.HiveWorkflowCaseSession
+  }))
+)
 
 export function HiveWorkflowCaseRuns({
   view,
@@ -18,6 +27,18 @@ export function HiveWorkflowCaseRuns({
   scopeLabel: string
 }) {
   const { t } = useTranslation()
+  const [sessionQuery, setSessionQuery] = useState<HiveWorkflowCaseSessionRead | null>(null)
+  const [sessionBusy, setSessionBusy] = useState(false)
+  const closeSession = useCallback(() => {
+    setSessionQuery(null)
+    setSessionBusy(false)
+  }, [])
+  const sessionScope = JSON.stringify([view.id, view.binding.scope])
+  useLayoutEffect(closeSession, [sessionScope, closeSession])
+  const selectedSession =
+    sessionQuery?.caseId === view.id && sessionQuery.projectId === view.binding.scope.projectRef
+      ? sessionQuery
+      : null
   const pending = useDelayedStatus(view.id, model.pending, 200)
   const errorKey = model.error?.includes('FORBIDDEN')
     ? 'forbidden'
@@ -123,6 +144,28 @@ export function HiveWorkflowCaseRuns({
               <p className="text-xs text-muted-foreground">{t('hiveTasks.unknownHelp')}</p>
             )}
             <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={model.busy || sessionBusy}
+                aria-pressed={selectedSession?.runId === run.task.runId}
+                onClick={() => {
+                  if (model.busy || sessionBusy) {
+                    return
+                  }
+                  setSessionQuery({
+                    projectId: view.binding.scope.projectRef,
+                    caseId: view.id,
+                    taskId: run.task.taskId,
+                    runId: run.task.runId,
+                    direction: 'tail',
+                    limit: 40
+                  })
+                }}
+              >
+                {t('hiveWorkflowCases.session.open')}
+              </Button>
               {run.artifactRefs.map((ref, index) => (
                 <Button
                   key={ref}
@@ -154,6 +197,16 @@ export function HiveWorkflowCaseRuns({
           </li>
         ))}
       </ol>
+      {selectedSession && (
+        <Suspense fallback={null}>
+          <HiveWorkflowCaseSession
+            key={workflowCaseSessionKey(selectedSession)}
+            query={selectedSession}
+            onClose={closeSession}
+            onBusyChange={setSessionBusy}
+          />
+        </Suspense>
+      )}
       {model.artifact && (
         <section className="space-y-2 border-t border-border pt-3">
           <div className="flex flex-wrap items-center justify-between gap-2">

@@ -20600,6 +20600,23 @@
     }
   },
   "hiveWorkflowCases": {
+    "session": {
+      "historyReset": "日志窗口已变化。刷新快照后再读取更早历史。",
+      "open": "查看原会话",
+      "title": "原会话",
+      "description": "只读查看原阶段运行的日志快照。读取或刷新不会改变执行状态。",
+      "refresh": "刷新快照",
+      "close": "关闭会话",
+      "loading": "正在读取原日志…",
+      "empty": "本次日志快照没有返回会话内容。",
+      "limit": "已达到当前历史窗口上限。刷新可读取最新快照。",
+      "errors": {
+        "forbidden": "当前账户或设备归属已无法访问此会话。",
+        "invalidResponse": "无法核验原会话响应，可重试读取。",
+        "unsupported": "当前环境不支持读取原会话。",
+        "unavailable": "无法读取原日志，可重试读取。"
+      }
+    },
     "title": "功能需求",
     "description": "基于已保存的标准四阶段流程提交需求，启动产品阶段后，由团队自动交接开发、独立测试和发布准备。",
     "newRequirement": "提交功能需求",
