@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import type { ComponentType } from 'react'
-import ts from 'typescript'
+import ts from 'typescript-api'
 
 /** Exercise the active Hive route switch without mounting its native task workspace. */
 export function loadTasksShellSwitch(bindings: Record<string, unknown>): ComponentType {

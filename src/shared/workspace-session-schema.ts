@@ -1,3 +1,4 @@
+import { tabGroupSchema, tabGroupLayoutNodeSchema } from './workspace-session-tab-group-schema'
 /* Why: the workspace session JSON is written to disk by older builds and read
  * back by newer ones. A field type flip (e.g. ptyId going from string to an
  * object) or a truncated write could poison Zustand state and crash the
@@ -11,10 +12,10 @@
  * survives, because one bad tab record must not cost every worktree its state.
  * Only a payload that is not a session at all falls back to defaults.
  */
+import { agentLaunchPaneOnTabSchema } from './agent-launch-pane-verdict'
 import { z } from 'zod'
 import { closedTerminalTabTombstoneSchema } from './closed-terminal-tab-tombstones'
 import type { WorkspaceKey } from './folder-workspace-types'
-import type { TabGroupLayoutNode } from './tab-types'
 import type { TerminalPaneLayoutNode } from './terminal-tab-types'
 import type { TuiAgent } from './tui-agent'
 import type { WorkspaceSessionState } from './workspace-session-state-types'
@@ -38,6 +39,7 @@ import {
   workspaceVisibleTabTypeSchema
 } from './workspace-session-tab-type-schema'
 import { salvagedField, salvagedOptional, salvagingArray, salvagingRecord } from './zod-salvage'
+import { isStructuredAgentId } from './agent-session-provider-handle-encoding'
 
 // ─── Terminal pane layout (recursive) ───────────────────────────────
 
@@ -129,7 +131,9 @@ const terminalTabSchema = z.object({
   launchAgent: z
     .custom<TuiAgent>((v) => isTuiAgent(v))
     .optional()
-    .catch(undefined)
+    .catch(undefined),
+  // Why: survives a restart so a restored launch pane reads its fate before it spawns.
+  agentLaunchPane: agentLaunchPaneOnTabSchema
 })
 
 // ─── Unified tab model ──────────────────────────────────────────────
@@ -145,7 +149,14 @@ const tabSchema = z.object({
   worktreeId: z.string(),
   executionHostId: executionHostIdSchema.optional(),
   contentType: tabContentTypeSchema,
-  agentSessionAgent: z.enum(['codex', 'claude']).optional().catch(undefined),
+  // Why: any agent a host registered, as the host published it. An id that is not an agent slug
+  // degrades to absent, which renders no chat, rather than failing the whole-session parse; a
+  // build that predates an agent reads its tab the same way.
+  agentSessionAgent: z
+    .string()
+    .refine((value) => isStructuredAgentId(value))
+    .optional()
+    .catch(undefined),
   label: z.string(),
   generatedLabel: z.string().nullable().optional(),
   aiVaultTitle: z
@@ -174,32 +185,6 @@ const tabSchema = z.object({
   // undefined → 'terminal' in the renderer.
   viewMode: z.enum(['terminal', 'chat']).catch('terminal').optional()
 })
-
-const tabGroupSchema = z.object({
-  id: z.string(),
-  worktreeId: z.string(),
-  activeTabId: z.string().nullable(),
-  tabOrder: z.array(z.string()),
-  recentTabIds: z.array(z.string()).optional()
-})
-
-const tabGroupSplitDirectionSchema = z.enum(['horizontal', 'vertical'])
-
-const tabGroupLayoutNodeSchema: z.ZodType<TabGroupLayoutNode> = z.lazy(() =>
-  z.discriminatedUnion('type', [
-    z.object({
-      type: z.literal('leaf'),
-      groupId: z.string()
-    }),
-    z.object({
-      type: z.literal('split'),
-      direction: tabGroupSplitDirectionSchema,
-      first: tabGroupLayoutNodeSchema,
-      second: tabGroupLayoutNodeSchema,
-      ratio: z.number().optional()
-    })
-  ])
-)
 
 // ─── Workspace session ──────────────────────────────────────────────
 

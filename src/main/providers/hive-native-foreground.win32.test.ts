@@ -6,6 +6,7 @@ import { expect, it, vi } from 'vitest'
 import { resolveWindowsPowerShellExecutablePath } from './windows-powershell-executable'
 import { readWindowsConsoleAttachedProcessIds } from './windows-console-attached-processes'
 import { resolveWindowsAgentForegroundProcessWithAvailability } from './windows-agent-foreground-process'
+import { HeadlessEmulator } from '../daemon/headless-emulator'
 
 it.skipIf(process.platform !== 'win32')(
   'confirms a real native Pi in ConPTY, then refuses agent identity after it exits',
@@ -35,8 +36,14 @@ it.skipIf(process.platform !== 'win32')(
       }
     })
     let output = ''
+    const terminal = new HeadlessEmulator({
+      cols: 140,
+      rows: 30,
+      onQueryReply: (reply) => proc.write(reply)
+    })
     proc.onData((chunk) => {
       output += chunk
+      void terminal.write(chunk, { forwardQueryReplies: true })
     })
     const inspect = () =>
       resolveWindowsAgentForegroundProcessWithAvailability(proc.pid, basename(shell), {
@@ -65,6 +72,7 @@ it.skipIf(process.platform !== 'win32')(
       )
     } finally {
       proc.kill()
+      terminal.dispose()
     }
   },
   60000

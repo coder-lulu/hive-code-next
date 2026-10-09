@@ -296,16 +296,12 @@
         "streamRestartFailed": "Échec du redémarrage du flux du navigateur distant."
       },
       "CodexRestartChip": {
-        "3ea91b5c07": "Cette session Codex utilise une configuration obsolète",
         "6133594b12": "Conserver l'ancien compte",
-        "7b1d20f4c8": "Conserver la session actuelle",
-        "8f0d5c92a1": "Configuration Codex modifiée",
         "9263e75f49": "Codex utilise le compte précédent",
         "9375620cc3": "Redémarrez cette session pour utiliser {{value0}}. Elle reste sur le compte précédent tant que vous ne l'avez pas fait.",
         "a4c8e1b2f7": "Codex est toujours connecté en tant que {{value0}}",
         "c72a5fb234": "Redémarrer",
-        "d3e8a1f4b2": "Compte changé",
-        "e6b7139d2a": "Redémarrez cette session pour charger votre configuration Codex actuelle."
+        "d3e8a1f4b2": "Compte changé"
       },
       "ComposerParentWorktreePicker": {
         "description": "Place cet espace de travail sous un autre dans la barre latérale. Ne modifie pas la branche de base.",
@@ -782,11 +778,11 @@
         "manualTrustNote": "La commande copiée crée une copie appartenant à root, vérifie son empreinte SHA-512 et installe cette copie vérifiée."
       },
       "NativeChatResumeFailureGuidance": {
-        "conflict": "Une autre fenêtre HiveCode ou un autre terminal détient toujours cette session. Fermez l’autre fenêtre HiveCode ou le terminal concerné, puis réessayez.",
+        "conflict": "Ce chat est ouvert dans une autre fenêtre HiveCode ou un terminal. Fermez-le là-bas, puis réessayez.",
         "dispatchRejected": "L'agent a refusé le message “continue”. Ouvrez le chat et envoyez-en un vous-même.",
         "fallback": "HiveCode n'a pas pu reprendre ce chat. Ouvrez-le pour continuer manuellement.",
         "notAttached": "Le chat ne s'est pas reconnecté. Réessayez ou ouvrez-le pour démarrer un nouveau tour.",
-        "ownershipUnknown": "HiveCode détermine encore quel processus détient cette session. Patientez un instant, puis réessayez.",
+        "ownershipUnknown": "Ce chat n’est pas encore prêt à reprendre. Patientez un instant, puis réessayez.",
         "superseded": "Ouvrez le chat et répondez. Du nouveau travail est arrivé juste après le redémarrage, donc HiveCode n'a pas envoyé son message “continue”.",
         "unconfirmed": "HiveCode n'a pas pu confirmer que le message “continue” a été livré. Ouvrez le chat et vérifiez avant d'en envoyer un autre.",
         "unsupported": "HiveCode ne peut pas reprendre ce chat. Ouvrez-le pour voir où il s'est arrêté."
@@ -801,14 +797,9 @@
         "activitySubagentOne": "Sous-agent en cours : {{value0}}",
         "activityUnnamed": "sans nom",
         "body": "Ces discussions étaient en cours lorsqu'HiveCode s'est fermé. La reprise restaure chacune là où elle s'est arrêtée, avec son contexte complet, et demande à l'agent de vérifier ce qu'il faisait avant de continuer. Votre propre invite n'est pas renvoyée.",
-        "continueUnconfirmed": "La livraison continue n'est pas confirmée pour les discussions {{value0}}. Ouvrez-les pour vérifier avant d'envoyer un autre message.",
-        "continueUnconfirmed_one": "La livraison continue n'est pas confirmée pour le chat {{value0}}. Ouvrez-le pour vérifier avant d'envoyer un autre message.",
-        "continueUnconfirmed_other": "La livraison continue n'est pas confirmée pour les discussions {{value0}}. Ouvrez-les pour vérifier avant d'envoyer un autre message.",
-        "continuedMany": "J'ai repris les discussions {{value0}} et leur ai demandé de continuer",
-        "continuedOne": "J'ai repris 1 chat et lui ai demandé de continuer",
-        "dismiss": "Ignorer",
+        "continuedMany": "{{value0}} chats ont été repris",
+        "continuedOne": "1 chat a été repris",
         "dismissAll": "Tout rejeter",
-        "dismissUnconfirmed": "Le rejet de l'offre de CV n'a pas été confirmé – il se peut qu'elle soit toujours dans la barre d'état.",
         "dontAskAgain": "Ne plus demander (reprendre automatiquement)",
         "dontAskAgainHint": "Vous pouvez désactiver cette option dans Paramètres → Expérimental → Chat UI.",
         "listLabel": "Des discussions qui reprendraient",
@@ -1673,12 +1664,17 @@
             "waiting": "En attente de saisie",
             "working": "En activité"
           },
-          "threadListOptionsFiltered": "Options de la liste des fils, filtres actifs",
-          "viewSection": "Affichage"
+          "viewSection": "Affichage",
+          "threadListOptionsActive": "Options de la liste des fils ({{value0}} actifs)",
+          "activityOptionsActive": "Options d'activité ({{value0}})"
         },
         "ActivityScopeFilterControls": {
           "hiddenCount": "{{value0}} masqués",
-          "resetScope": "Afficher tous les hôtes et projets"
+          "resetScope": "Afficher tous les hôtes et projets",
+          "hideAutomationCreated": "Masquer ceux créés par l'automatisation",
+          "hideCliCreated": "Masquer ceux créés par le CLI",
+          "hideOtherClientsAria": "Masquer les agents dans les espaces de travail créés par d'autres clients Orca sur des serveurs distants partagés",
+          "hideOtherClients": "Masquer les agents d'autres clients"
         },
         "ActivityThreadHoverCard": {
           "copyPath": "Copier le chemin",
@@ -1703,6 +1699,25 @@
         "standaloneWorktree": {
           "floatingTerminal": "Terminal flottant",
           "standaloneTerminal": "Terminal autonome"
+        },
+        "ActivityThreadContextMenu": {
+          "copyTitle": "Copier le titre",
+          "copyPath": "Copier le chemin",
+          "open": "Ouvrir",
+          "markRead": "Marquer comme lu",
+          "markUnread": "Marquer comme non lu",
+          "goToWorkspace": "Aller à l'espace de travail",
+          "clear": "Retirer de la liste",
+          "agentSection": "Agent",
+          "markManyRead_one": "Marquer {{count}} agent comme lu",
+          "markManyRead_other": "Marquer {{count}} agents comme lus",
+          "markManyUnread_one": "Marquer {{count}} agent comme non lu",
+          "markManyUnread_other": "Marquer {{count}} agents comme non lus",
+          "clearMany_one": "Retirer {{count}} agent de la liste",
+          "clearMany_other": "Retirer {{count}} agents de la liste",
+          "markManyRead": "Marquer {{count}} agents comme lus",
+          "markManyUnread": "Marquer {{count}} agents comme non lus",
+          "clearMany": "Retirer {{count}} agents de la liste"
         }
       },
       "agent": {
@@ -2421,7 +2436,8 @@
             "highlight": "Surligneur",
             "pen": "Stylo",
             "rect": "Rectangle",
-            "text": "Texte"
+            "text": "Texte",
+            "eraser": "Gomme"
           },
           "undo": "Annuler",
           "widthOption": "{{value0}} px"
@@ -2586,7 +2602,8 @@
             "d053db279d": "role=",
             "eb98a0971a": "\"",
             "effd75e330": "Contexte proche",
-            "f3575229df": "Capturer"
+            "f3575229df": "Capturer",
+            "accessibleNameOpenQuote": "\""
           },
           "annotate": {
             "browser": {
@@ -3099,10 +3116,7 @@
           "c98ce191da": "Ce diff n'a aucun fichier du côté modifié à ouvrir",
           "e836faacfa": "Passer au diff côte à côte",
           "f0fd4174b5": "Ouvrez un onglet de fichier pour utiliser l'édition Markdown enrichie",
-          "fb8331694e": "Ouvrir l'aperçu sur le côté",
-          "openContainingFolder": "Ouvrir le dossier parent",
-          "revealInFileExplorer": "Afficher dans l’Explorateur de fichiers",
-          "revealInFinder": "Afficher dans le Finder"
+          "fb8331694e": "Ouvrir l'aperçu sur le côté"
         },
         "EditorPanelMarkdownActionsMenu": {
           "10c39d58c1": "Masquer le front matter",
@@ -4267,20 +4281,13 @@
             "25d7817f79": "terminal",
             "2a3c5ddf5e": "Activer l'orchestration",
             "3215fc73e9": "Nouveau terminal",
-            "5ddc688c52": "« {{value0}} » contient des modifications non enregistrées. Voulez-vous enregistrer avant de fermer ?",
             "629528690b": "Nouvelle note Markdown",
-            "690b6fb98a": "Modifications non enregistrées",
             "88ffb502e5": "Ouvrir une note Markdown",
             "8b07759314": "Nouveau navigateur",
             "8b14ba6c17": "Nouvel onglet de navigateur",
             "8cf80db43b": "Configurez le CLI HiveCode et la skill d'agent pour que les agents puissent se coordonner via HiveCode.",
-            "918c2139f3": "Ne pas enregistrer",
             "adc281394d": "Ignorer",
-            "b085fb58b5": "Ce fichier contient des modifications non enregistrées.",
             "bbc177f98f": "Activer",
-            "d6b563ae24": "Chargement de l'éditeur...",
-            "da508bd7f5": "Enregistrer",
-            "e7bf09d4d4": "Annuler",
             "fc1042e92b": "Réduire"
           },
           "FloatingTerminalToggleButton": {
@@ -5214,7 +5221,7 @@
           "d7b3ef168b": "Détectés sur votre système",
           "e6a369bd04": "Agents populaires",
           "hideAgents": "Masquer les agents",
-          "showMoreAgents": "Afficher {{value0}} autres agents→",
+          "showMoreAgents": "Afficher {{value0}} autres agents →",
           "yoloModeLabel": "Mode Yolo",
           "yoloPermissionsDescription": "Les agents exécutent des commandes et modifient des fichiers sans demander, et certains contournent aussi leur sandbox. À utiliser uniquement dans des projets de confiance.",
           "yoloPermissionsInfo": "Informations sur les permissions des agents",
@@ -6267,7 +6274,6 @@
             "013c9ac04a": "Enregistrer pour",
             "15c5d85706": "Agent",
             "1bb611240f": "Utilisez {basePrompt} pour le prompt par défaut d'HiveCode.",
-            "1bc0bdbb5e": "Lancement :",
             "1d47db9bf0": "Aucun agent activé",
             "23280cbab1": "Ce modèle n'inclut pas {basePrompt}, l'agent ne recevra donc pas le prompt par défaut d'HiveCode.",
             "3e8f21954f": "erreur",
@@ -7050,7 +7056,7 @@
           "0b3a9f6c2e": "Choisissez l’hôte correspondant à votre compte. Les plateformes internationale (platform.minimax.io) et chinoise (platform.minimaxi.com) acceptent un cookie de session ou une clé API.",
           "0b4591ff93": "Choisissez l'environnement local à inspecter et l'emplacement où les nouveaux comptes Claude et Codex gérés sont ajoutés.",
           "0b8c1c7e02": "Stocké localement",
-          "0c64dc2a64": "Gemini",
+          "0c64dc2a64": "Gemini CLI (hérité)",
           "0c67a2a1aa": "WSL n'est pas disponible sur cette machine.",
           "0c7f915b01": "Utiliser les identifiants Gemini CLI",
           "0d47394635": "Supprimer le compte Codex ?",
@@ -7124,7 +7130,7 @@
           "93c47b333a": "Connexion requise",
           "94d351af4a": "Comptes",
           "96f3649526": "Utiliser les identifiants Gemini CLI (expérimental)",
-          "973741a871": "Configurer les paramètres du fournisseur Gemini.",
+          "973741a871": "Conserver les sessions Gemini CLI existantes disponibles. Les identifiants Gemini ne vous connectent pas à Antigravity.",
           "9baf45d071": "Cet appareil",
           "9dd50d3f75": "Avancé",
           "9fec52de4b": "Comment copier le cookie",
@@ -8072,8 +8078,8 @@
             "shellEnvNamesLabel": "Variables à transmettre depuis votre shell",
             "shellEnvTitle": "Utiliser l'environnement de votre shell",
             "shellEnvToggleLabel": "Activer l'utilisation de l'environnement de votre shell",
-            "structuredCopy": "Ouvre les nouveaux agents Codex et Claude sous forme de discussions structurées. Désactivé, ils s'ouvrent dans le chat basé sur le terminal. Les discussions existantes restent telles quelles.",
-            "structuredScope": "Fonctionne sur cette machine et sur les serveurs HiveCode appairés dont la version le prend en charge ; les serveurs plus anciens conservent le chat du terminal. WSL et les hôtes SSH continuent d'utiliser le chat du terminal, et Windows y revient à moins qu'HiveCode ne puisse lire les heures de début des processus.",
+            "structuredCopy": "Ouvre les nouveaux agents sous forme de discussions structurées lorsque c'est possible. Désactivé, ils s'ouvrent dans le chat basé sur le terminal. Les discussions existantes restent telles quelles.",
+            "structuredScope": "Fonctionne sur cette machine et sur les serveurs HiveCode appairés dont la version le prend en charge ; les serveurs plus anciens conservent le chat du terminal. WSL et les hôtes SSH continuent d'utiliser le chat du terminal.",
             "structuredTitle": "Utiliser le chat natif structuré mis à jour",
             "structuredToggleLabel": "Activer ou désactiver le chat natif structuré mis à jour",
             "title": "Interface de discussion",
@@ -9725,7 +9731,7 @@
           "084d8fac5b": "Confidentialité et sécurité",
           "11faa2f7dd": "Sources de tâches",
           "13d4fe30ad": "Commandes rapides",
-          "17bdee4ff1": "Abandonner les modifications Git AI Author non enregistrées ?",
+          "17bdee4ff1": "Abandonner les modifications IA non enregistrées ?",
           "1c87f8d024": "Avancé",
           "21f09426ea": "Facultatif. {{value0}} fonctionne avec vos connexions de fournisseurs existantes ; ajoutez des comptes uniquement si vous voulez qu'{{value0}} aide à basculer entre eux.",
           "2309068a6f": "destructive",
@@ -9738,7 +9744,7 @@
           "3d9adfe6a5": "Onglets globaux de terminal, de navigateur et de markdown.",
           "3de4bbb841": "Terminal",
           "3eb22a3ada": "Espace de travail flottant",
-          "43b68e10f0": "Vous avez des modifications Git AI Author non enregistrées. Quitter les abandonnera.",
+          "43b68e10f0": "Des modifications IA ne sont pas enregistrées. Elles seront abandonnées en quittant.",
           "475980f53d": "Coordonnez plusieurs agents de codage via {{value0}}.",
           "499c1cd7f9": "Paramètres de compatibilité bas niveau pour le dépannage.",
           "5063bb47a5": "Voix",
@@ -13768,7 +13774,8 @@
         "SidebarFeedbackImageAttachments": {
           "attachImages": "Joindre",
           "removeImage": "Supprimer {{fileName}}",
-          "screenshotsHint": "Joignez jusqu'à {{count}} captures d'écran, {{maxSize}} au total"
+          "screenshotsHint": "Joignez jusqu'à {{count}} captures d'écran, {{maxSize}} au total",
+          "preparing": "Préparation des pièces jointes…"
         },
         "SidebarFilter": {
           "139877b384": "Tout sélectionner",
@@ -15831,7 +15838,8 @@
             "grokUsageMenu": "Utilisation Grok",
             "hiddenUsageProviders": "Aussi : {{value0}}",
             "remoteServerLabel": "Serveur distant",
-            "zcodeUsageMenu": "Utilisation de ZCode"
+            "zcodeUsageMenu": "Utilisation de ZCode",
+            "4fba7dc1e7": "solde {{value0}}"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "Connecter un compte",
@@ -16067,6 +16075,15 @@
           "usagePercentageLabel": {
             "remaining": "{{value0}} % restants",
             "used": "{{value0}} % utilisé"
+          },
+          "provider": {
+            "extra": {
+              "usage": {
+                "section": {
+                  "135d51c19f": "Limite {{value0}}"
+                }
+              }
+            }
           }
         }
       },
@@ -16104,10 +16121,7 @@
             "e3ff145b98": "Scinder vers la gauche",
             "e5ff31ccaf": "Fermer les onglets à droite",
             "f7c3d7d5af": "Scinder vers la droite",
-            "fdd29eb669": "Épingler l'onglet",
-            "openContainingFolder": "Ouvrir le dossier parent",
-            "revealInFileExplorer": "Afficher dans l’Explorateur de fichiers",
-            "revealInFinder": "Afficher dans le Finder"
+            "fdd29eb669": "Épingler l'onglet"
           },
           "QuickLaunchButton": {
             "348a04c1ad": "Paramètres de l'agent…",
@@ -16540,7 +16554,8 @@
             "retrying": "Nouvelle tentative…",
             "sessionUnavailable": "HiveCode n'a pas pu se rattacher à la session de terminal de ce volet sur l'hôte. Ouvrez un nouveau terminal pour continuer.",
             "sourceRestoring": "Reconnexion de ce terminal : sa sortie est en cours de rétablissement. La session est toujours en cours d’exécution.",
-            "terminalProcessLimit": "Votre système ne peut pas démarrer un autre processus de terminal. Fermez les terminaux inutilisés ou quittez les processus inutiles, puis réessayez."
+            "terminalProcessLimit": "Votre système ne peut pas démarrer un autre processus de terminal. Fermez les terminaux inutilisés ou quittez les processus inutiles, puis réessayez.",
+            "heldByPreviousRelay": "Ce terminal s'exécute toujours sur l'hôte sous la version précédente d'Orca, à laquelle cette version ne peut pas se connecter. Il continue jusqu'à sa fin. Ouvrez un nouveau terminal pour continuer à travailler ici."
           },
           "TerminalLinkActionPopover": {
             "copied": "Copié",
@@ -16709,6 +16724,14 @@
                 "title": "Cette version de ZCode n’a pas d’interface de terminal"
               }
             }
+          },
+          "AgentLaunchPaneNotice": {
+            "commandNotFound": "Sa commande est introuvable sur cette machine.",
+            "copyPrompt": "Copier le prompt",
+            "exitedDuringStart": "Il s'est arrêté pendant le démarrage.",
+            "notStarted": "L'agent n'a pas pu démarrer.",
+            "unconfirmed": "Impossible de confirmer que l'agent a démarré.",
+            "workspaceGone": "Son espace de travail n'est plus disponible."
           }
         },
         "quick": {
@@ -17003,7 +17026,6 @@
       "useComposerState": {
         "3db83fc58a": "Aucun chemin de projet n'est disponible sur cet hôte pour les pièces jointes.",
         "5f3d2c8a1b": "Échec de la résolution de la base de la MR.",
-        "7eb3f44ff7": "L'agent sélectionné est désactivé. Choisissez un agent activé avant de créer.",
         "attachSkipMissing": "N'est plus sur son chemin d'origine.",
         "attachSkipPermissionDenied": "Autorisation refusée.",
         "attachSkipSymlink": "Les liens symboliques ne peuvent pas être attachés.",
@@ -17328,7 +17350,8 @@
             "tooLarge": "{{fileName}} dépasse {{maxSize}}.",
             "tooMany": "Vous pouvez joindre jusqu'à {{maxCount}} images.",
             "totalTooLarge": "{{fileName}} ferait dépasser {{maxSize}} au total pour les pièces jointes.",
-            "unsupportedType": "{{fileName}} n'est pas un type d'image pris en charge."
+            "unsupportedType": "{{fileName}} n'est pas un type d'image pris en charge.",
+            "compressed": "{{fileName}} a été compressé de {{originalSize}} à {{size}} pour respecter la limite des pièces jointes."
           }
         }
       },
@@ -17636,6 +17659,16 @@
       },
       "worktreeJumpNavigation": {
         "filteredNotice": "Ce worktree est masqué par les filtres de la barre latérale. L’espace de travail a été ouvert, mais n’apparaît pas dans Espaces."
+      },
+      "reveal": {
+        "in": {
+          "file": {
+            "manager": {
+              "notFound": "Fichier introuvable. Il a peut-être été déplacé ou supprimé.",
+              "launchFailed": "Impossible d’afficher le fichier."
+            }
+          }
+        }
       }
     },
     "main": {
@@ -17943,7 +17976,9 @@
       "popupBlocked": "Fenêtre contextuelle bloquée : {{origin}}",
       "preparationFailed": "Impossible de démarrer le navigateur distant sur cet ordinateur. Vérifiez la connexion appairée et réessayez.",
       "unavailableDescription": "Cette page est rattachée à un autre ordinateur ou n’est plus disponible.",
-      "unavailableTitle": "Navigateur hébergé sur le client indisponible"
+      "unavailableTitle": "Navigateur hébergé sur le client indisponible",
+      "unavailableOtherDesktopDescription": "Cette page est ouverte sur un autre bureau.",
+      "unavailableHostOfflineDescription": "{{host}} est hors ligne. Cette page se rechargera ici dès sa reconnexion."
     },
     "guestRecovery": {
       "failed": "La page du navigateur s'est arrêtée de manière inattendue. Réessayez pour la restaurer.",
@@ -18405,15 +18440,15 @@
     "native-chat": {
       "approval": {
         "allow": "Autoriser",
-        "askRule": "Demander la règle",
-        "blockedPath": "Chemin bloqué",
         "cancel": "Annuler",
         "deny": "Refuser",
         "plan": {
           "file": "Dossier de planification"
         },
         "reason": "Raison",
-        "title": "Autoriser {{value0}} ?"
+        "title": "Autoriser {{value0}} ?",
+        "needsNewerOrca": "Cette demande nécessite une version plus récente d'Orca.",
+        "needsAccess": "Nécessite l'accès à"
       },
       "ask": {
         "asked": "Demandé:",
@@ -18452,15 +18487,21 @@
         "stateDone": "terminé",
         "stateIdle": "arrêté",
         "stateMonitoring": "surveillance en cours",
-        "stateUnverifiable": "aucune mise à jour récente",
-        "stateUnverifiableCount": "{{value0}} sans mise à jour récente",
+        "stateUnverifiable": "statut indisponible",
+        "stateUnverifiableCount": "{{value0}} au statut indisponible",
         "stateWaiting": "en attente",
         "stateWorking": "travail en cours",
         "stop": "Arrêter",
         "stopAll": "Arrêter les tâches en arrière-plan",
         "stopTask": "Arrêter {{value0}}",
         "task": "Tâche en arrière-plan",
-        "workflow": "Flux de travail en arrière-plan"
+        "workflow": "Flux de travail en arrière-plan",
+        "stateWorkingCount": "{{value0}} en cours",
+        "stateMonitoringCount": "{{value0}} en surveillance",
+        "stateWaitingCount": "{{value0}} en attente",
+        "stateBlockedCount": "{{value0}} à l'état bloqué",
+        "stateDoneCount": "{{value0}} à l'état terminé",
+        "stateIdleCount": "{{value0}} à l'état arrêté"
       },
       "composer": {
         "attach": "Joindre un fichier",
@@ -18479,7 +18520,6 @@
         "loadingSkills": "Chargement des skills...",
         "localAttachmentUnsupported": "Les pièces jointes locales ne sont pas disponibles pour les sessions distantes.",
         "locked": "La saisie est détenue par un autre appareil.",
-        "mentionHint": "Fichier référencé :",
         "model": "Modèle",
         "noCommands": "Aucune commande correspondante",
         "noCommandsOrSkills": "Aucune commande ou skill correspondante",
@@ -18501,7 +18541,7 @@
         "pastedImageLabel": "Image collée",
         "pendingAttachmentLimit": "Trop de pièces jointes sont en attente. Terminez la rédaction avant d’en ajouter d’autres.",
         "pillAccessibleName": "{{value0}} {{value1}}",
-        "placeholder": "Envoyer un message…",
+        "placeholder": "Demandez ce que vous voulez, @ pour mentionner des fichiers, / pour les commandes",
         "removeAttachment": "Retirer la pièce jointe",
         "retrySkills": "Réessayer",
         "send": "Envoyer",
@@ -18527,7 +18567,26 @@
         "valueNotReported": "Non signalé",
         "viewAttachment": "Voir l’image",
         "workspaceAttachmentMismatch": "Les fichiers ne peuvent être joints qu'à leur espace de travail source.",
-        "worktreeNotReady": "Worktree pas encore prêt — réessayez dans un instant."
+        "worktreeNotReady": "Worktree pas encore prêt — réessayez dans un instant.",
+        "loadingFiles": "Chargement des fichiers...",
+        "noFiles": "Aucun fichier correspondant",
+        "filesLoadFailed": "Impossible de charger les fichiers",
+        "draftNotSaved": "Ce brouillon n'a pas encore pu être enregistré. Orca continue d'essayer.",
+        "imageNotBroughtBack": "L'image {{name}} n'a pas pu être récupérée avec ce brouillon. Joignez-la à nouveau ou retirez-la.",
+        "pastedImageNotBroughtBack": "Cette image collée n'a pas pu être récupérée avec ce brouillon. Retirez-la, puis collez-la à nouveau si vous en avez encore besoin.",
+        "removeImageToSend": "Une image n'a pas pu être récupérée. Retirez-la pour envoyer.",
+        "removeImagesToSend": "Certaines images n'ont pas pu être récupérées. Retirez-les pour envoyer.",
+        "imageAttachAgainLabel": "Joindre à nouveau",
+        "pastedImageNotKeptLabel": "Non conservée",
+        "searchModels": "Rechercher des modèles…",
+        "noModelsMatch": "Aucun modèle ne correspond à votre recherche.",
+        "copyImage": "Copier l’image",
+        "copyImageFailed": "Impossible de copier l’image",
+        "copyImageTooLarge": "L’image est trop volumineuse pour être copiée.",
+        "imageCopied": "Image copiée",
+        "tooManyAttachments": "Joignez {{value0}} fichiers maximum à la fois.",
+        "pasteFailed": "Échec du collage.",
+        "commandAttachmentsUnsupported": "Retirez les pièces jointes avant d'utiliser une commande de session de chat."
       },
       "contextMenu": {
         "copyOrcaSessionId": "Copier l'ID de session HiveCode",
@@ -18595,7 +18654,7 @@
         "notDelivered": "Ce message n'a pas été remis.",
         "notDeliveredSendAgain": "Ce message n'a pas été remis. Renvoyez-le pour continuer.",
         "notSignedIn": "{{agent}} n'est pas connecté avec le compte sélectionné.",
-        "previousExitUnverifiable": "L'exécution précédente de {{agent}} est peut-être toujours en cours. Vos messages seront envoyés dès qu'elle s'arrêtera.",
+        "previousExitUnverifiable": "Impossible d'arrêter l'exécution précédente de {{agent}}.",
         "providerExitedRejection": "{{agent}} s'est arrêté avant l'envoi de ce message.",
         "providerExitedRow": "{{agent}} s'est arrêté pendant que cette réponse était en cours. Vous pouvez continuer dans cette conversation.",
         "providerRateLimited": "{{agent}} est limité en débit et réessaie.",
@@ -18613,7 +18672,20 @@
         "stopRefused": "{{agent}} ne s'est pas arrêté.",
         "stopRefusedQuoted": "{{agent}} ne s'est pas arrêté : {{detail}}.",
         "theAgent": "L'agent",
-        "writeFailed": "HiveCode n'a pas pu transmettre ce message à l'agent, il n'a donc pas été envoyé."
+        "writeFailed": "HiveCode n'a pas pu transmettre ce message à l'agent, il n'a donc pas été envoyé.",
+        "sendAgainToTryOnceMore": "Renvoyez votre message pour réessayer.",
+        "editSavedArguments": "Modifiez-les dans Paramètres > Agents > Arguments.",
+        "launchFolderMissing": "Le dossier dans lequel ce chat s'exécutait n'existe plus. Restaurez-le pour poursuivre ce chat.",
+        "historyInOtherAccount": "L'historique de ce chat se trouve dans un autre compte Claude. Revenez à ce compte pour le poursuivre.",
+        "agentCommandNotRunnable": "{{agent}} : la Commande dans Paramètres → Agents doit être le chemin ou le nom d'un programme qu'Orca peut trouver, sans arguments ni variables. Modifiez-la ou réinitialisez-la.",
+        "argumentsMissingValue": "Les arguments enregistrés nécessitent une valeur pour {{option}}.",
+        "argumentsMultipleValues": "Les arguments enregistrés donnent plusieurs valeurs à {{option}}.",
+        "argumentsPositionalPrompt": "Les arguments enregistrés contiennent un message.",
+        "argumentsUnsupportedOption": "Les arguments enregistrés contiennent une option non prise en charge ({{option}}).",
+        "providerRetryNumber": "Nouvelle tentative {{attempt}}.",
+        "providerRetryNumberOf": "Nouvelle tentative {{attempt}} sur {{maxRetries}}.",
+        "providerRetryLastError": "Dernière erreur : {{detail}}.",
+        "sessionNotRestored": "{{agent}} n'a pas pu rouvrir sa session précédente, cette discussion continue donc dans une nouvelle. {{agent}} ne se souvient pas des messages précédents."
       },
       "fileLinks": {
         "notFound": "Fichier introuvable : {{value0}}",
@@ -18680,7 +18752,10 @@
         "details": "Détails",
         "historyItemTooLarge": "Cette partie du chat était trop volumineuse pour être affichée.",
         "historyRepaired": "Une partie de l'historique de ce chat n'a pas pu être chargée.",
-        "plan": "Plan"
+        "plan": "Plan",
+        "stoppedBeforeStart": "Arrêté avant le démarrage de l'agent",
+        "dismiss": "Ignorer",
+        "copyError": "Copier l'erreur"
       },
       "providerFrame": {
         "byteLength": "{{value0}} bytes"
@@ -18716,7 +18791,15 @@
         "steer": "Envoyer maintenant",
         "steerHint": "Envoyer sans interrompre le modèle",
         "turnOffQueueing": "Désactiver la file d'attente",
-        "withdrawnHold": "Arrêté avant l'envoi"
+        "withdrawnHold": "Arrêté avant l'envoi",
+        "pausedKept": "Pas encore envoyé. Appuyez sur Envoyer pour l'envoyer.",
+        "sendConfirmTitle": "Envoyer le message ?",
+        "sendConfirmBody": "Vous êtes sur le point d'envoyer un message. Voulez-vous effacer les {{count}} messages déjà en file d'attente ?",
+        "sendConfirmBody_one": "Vous êtes sur le point d'envoyer un message. Voulez-vous effacer {{count}} message déjà en file d'attente ?",
+        "sendConfirmBody_other": "Vous êtes sur le point d'envoyer un message. Voulez-vous effacer les {{count}} messages déjà en file d'attente ?",
+        "sendConfirmClear": "Vider la file d'attente",
+        "sendConfirmSend": "Envoyer le message",
+        "from": "De {{names}}"
       },
       "railEmptyMessage": "Message",
       "railImageMessage": "Image jointe",
@@ -18748,8 +18831,7 @@
           "subtitle": "Ce terminal n'exécute aucun agent de code reconnu.",
           "title": "Aucune conversation ici"
         },
-        "pairHost": "Associez un hôte pour consulter l'historique de chat des agents.",
-        "reconnecting": "Reconnexion à ce chat…"
+        "pairHost": "Associez un hôte pour consulter l'historique de chat des agents."
       },
       "status": {
         "failedAfter": "Échoué après {{value0}}",
@@ -18759,7 +18841,10 @@
         "toggleDetails": "Afficher ou masquer les détails du tour",
         "workedFor": "Travail effectué pendant {{value0}}",
         "working": "Traitement…",
-        "workingFor": "Travail en cours depuis {{value0}}"
+        "workingFor": "Travail en cours depuis {{value0}}",
+        "stopping": "Arrêt en cours…",
+        "queueAfterStop": "Mettez un message en file d'attente pour l'exécuter après l'arrêt",
+        "sendAfterStop": "Envoyez un message pour l'exécuter après l'arrêt"
       },
       "stop": "Arrêter l'agent",
       "structuredSessionCloseFailed": "Impossible de fermer cette session de discussion",
@@ -18783,8 +18868,8 @@
           "idleCount": "{{value0}} inactifs",
           "stopped": "arrêté",
           "stoppedCount": "{{value0}} arrêtés",
-          "unverifiable": "aucune mise à jour récente",
-          "unverifiableCount": "{{value0}} sans mise à jour récente",
+          "unverifiable": "statut indisponible",
+          "unverifiableCount": "{{value0}} au statut indisponible",
           "working": "travail en cours",
           "workingCount": "{{value0}} en cours"
         },
@@ -18813,14 +18898,11 @@
         "showTerminal": "Afficher le terminal"
       },
       "tool": {
-        "addedFile": "Fichier ajouté",
         "copyDiff": "Copier les différences",
         "countN": "{{value0}} appels d'outils",
         "countOne": "1 appel d'outil",
-        "deletedFile": "Fichier supprimé",
         "diffGap": "Lignes non affichées",
         "diffTruncated": "Différences tronquées",
-        "editedFile": "Fichier modifié",
         "exitCode": "sortie {{value0}}",
         "failedCallsLabel": "Appels d'outil ayant échoué : {{value0}}",
         "failedCount": "{{value0}} a échoué",
@@ -18830,7 +18912,6 @@
         "ranCommandOneToolSummary": "{{commandCount}} commande exécutée et {{toolCount}} outil utilisé",
         "ranCommandsManyToolsSummary": "{{commandCount}} commandes exécutées et {{toolCount}} outils utilisés",
         "ranCommandsOneToolSummary": "{{commandCount}} commandes exécutées et {{toolCount}} outil utilisé",
-        "renamedFile": "Fichier renommé",
         "result": "Résultat",
         "runAgentMany": "Agents {{value0}} exécutés",
         "runAgentOne": "J'ai couru 1 agent",
@@ -18880,7 +18961,35 @@
         "runningNamedPreview": "Exécution de {{toolName}} {{preview}}",
         "runningPreview": "Exécution de {{preview}}",
         "usedManySummary": "{{toolCount}} outils utilisés",
-        "usedOneSummary": "1 outil utilisé"
+        "usedOneSummary": "1 outil utilisé",
+        "interruptedCount": "{{value0}} interrompu(s)",
+        "interruptedCallsLabel": "Appels d'outil interrompus : {{value0}}",
+        "row": {
+          "running": "Exécution",
+          "reading": "Lecture",
+          "editing": "Modification",
+          "searching": "Recherche",
+          "searchingWeb": "Recherche sur le web",
+          "fetching": "Récupération",
+          "listed": "A listé",
+          "listing": "Liste",
+          "ran": "A exécuté",
+          "read": "A lu",
+          "edited": "A modifié",
+          "searched": "A recherché",
+          "searchedWeb": "A recherché sur le web",
+          "fetched": "A récupéré",
+          "added": "A ajouté",
+          "deleted": "A supprimé",
+          "renamed": "A renommé",
+          "subagent": "Sous-agent",
+          "triedRead": "A tenté de lire",
+          "triedEdit": "A tenté de modifier",
+          "triedSearch": "A tenté de rechercher",
+          "triedList": "A tenté de lister",
+          "triedFetch": "A tenté de récupérer",
+          "triedSearchWeb": "A tenté de rechercher sur le web"
+        }
       },
       "turnDiff": {
         "many": "{{count}} fichiers modifiés",
@@ -18941,7 +19050,33 @@
         "waitForCommand": "Attendez la fin du /compact ou /clear.",
         "waitForStart": "Attendez que l'agent ait fini de démarrer.",
         "waitForTurn": "Attendez que l'agent ait fini de répondre, ou arrêtez-le.",
-        "waitMoment": "Patientez un instant."
+        "waitMoment": "Patientez un instant.",
+        "chatSavedByNewerOrca": "Ce chat a été enregistré par une version plus récente d'Orca.",
+        "updateOrcaToOpenChat": "Mettez à jour Orca pour l'ouvrir.",
+        "cannotRunHere": "Orca ne peut pas exécuter cet agent dans un chat ici."
+      },
+      "reasoning": "Raisonnement",
+      "transcriptLabel": "Conversation",
+      "prompt": {
+        "collapse": "Réduire",
+        "expand": "Développer"
+      },
+      "context": {
+        "unavailable": "L'utilisation du contexte n'est pas encore connue. Elle sera disponible après la prochaine réponse de l'agent.",
+        "summary": "Contexte : {{used}} / {{window}} tokens ({{percent}} %), estimation basée sur la dernière réponse.",
+        "used": "Contexte : {{used}} tokens utilisés, estimation basée sur la dernière réponse.",
+        "unreported": "L'utilisation du contexte n'est pas disponible pour cette session."
+      },
+      "agentMessage": {
+        "messageFrom": "Message de",
+        "unnamedSender": "un agent"
+      },
+      "thought": "A réfléchi",
+      "thoughtForDuration": "A réfléchi pendant {{duration}}",
+      "hostOutage": {
+        "offline": "{{hostName}} est hors ligne",
+        "reconnecting": "{{hostName}} se reconnecte…",
+        "reconnect": "Reconnecter"
       }
     },
     "nativeChat": {
@@ -19554,6 +19689,16 @@
         "goToWorktree": "Aller au worktree",
         "workspaceReadyToast": "L'espace de travail {{name}} est prêt",
         "worktreeReadyToast": "Le worktree {{name}} est prêt"
+      },
+      "delete": {
+        "changes": {
+          "permanentLoss": "Toutes les modifications non validées ou non suivies dans les espaces de travail Git seront définitivement supprimées.",
+          "clean": "Aucune modification non validée ou non suivie",
+          "unavailable": "Impossible de vérifier les modifications",
+          "checking": "Recherche de modifications…",
+          "checkingDetails": "Vérification…",
+          "unavailableDetails": "Détails indisponibles"
+        }
       }
     },
     "worktreeCard": {
@@ -19585,6 +19730,11 @@
       "active": "Actif",
       "inactive": "Inactif",
       "permission": "Autorisation nécessaire"
+    },
+    "jiraIssueAssigneeField": {
+      "label": "Assigné",
+      "automatic": "Automatique",
+      "assignToMe": "M'assigner ({{name}})"
     }
   },
   "dashboard": {
@@ -20200,6 +20350,30 @@
         "resourceUsageToggleDescription": "Afficher le gestionnaire de ressources. Cliquez dessus pour le CPU, la mémoire, les sessions, les contrôles des daemons et les analyses disque des espaces de travail.",
         "sshToggleDescription": "Afficher les hôtes SSH et les hôtes HiveCode distants configurés lorsqu'ils sont disponibles.",
         "zcodeToggleDescription": "Afficher l’utilisation du quota ZCode Coding Plan."
+      },
+      "chat": {
+        "title": "Chat",
+        "textSize": "Taille du texte",
+        "textSizeDescription": "Messages, activité des outils et zone de message. {{increase}} / {{decrease}} dans un chat modifient aussi ce réglage.",
+        "codeTextSize": "Taille du texte du code",
+        "codeTextSizeDescription": "Blocs de code, code en ligne, commandes et sortie des outils.",
+        "width": "Largeur",
+        "widthDescription": "Largeur maximale des messages et de la zone de message dans un panneau large.",
+        "resetAppearance": "Réinitialiser l’apparence du chat",
+        "resetDescription": "Restaurer les valeurs par défaut ci-dessus.",
+        "comfortable": "Confortable",
+        "wide": "Large",
+        "full": "Pleine",
+        "pixels": "px",
+        "reset": "Réinitialiser",
+        "matchTerminalInterface": "Utiliser l’interface du terminal",
+        "matchTerminalInterfaceDescription": "Utilise la police et les couleurs de l’interface du terminal pour tout le chat. Les changements de thème du terminal sont appliqués automatiquement.",
+        "contrast": "Contraste",
+        "contrastDescription": "Ajuste la luminosité du texte du chat sur le fond. L’extrémité droite retrouve l’ancien aspect, plus lumineux.",
+        "softer": "Plus doux",
+        "sharper": "Plus net",
+        "terminalControlledHint": "Défini par l’interface du terminal.",
+        "terminalControlledTooltip": "Suit l’interface du terminal. Désactivez Utiliser l’interface du terminal pour le modifier."
       }
     },
     "browser": {
@@ -20252,6 +20426,20 @@
       "optionLayoutCompose": "la disposition utilise Option pour composer des caractères comme @, €, [, ]",
       "optionLayoutUnknown": "disposition inconnue — Option compose des caractères (choix sûr par défaut)",
       "optionShortcutHint": "Choisissez Les deux pour les raccourcis Option, Désactivé pour les accents et les symboles, ou Gauche/Droite pour attribuer un usage à chaque touche Option."
+    },
+    "chat": {
+      "description": "Choisissez l’apparence et le nom des chats.",
+      "names": {
+        "title": "Noms des chats",
+        "description": "Utilisez un agent pour nommer les nouveaux chats à partir de leur premier message. Sans nom généré, ils restent Claude Chat ou Codex Chat.",
+        "enable": "Nommer automatiquement les chats",
+        "recipe": "Nom du chat",
+        "recipeDescription": "Génère un nom court à partir du premier message d’un nouveau chat.",
+        "customCommandDescription": "Ligne de commande partagée par les recettes qui sélectionnent Commande personnalisée. Utilisez {prompt} pour transmettre le texte en argument ; sinon, il est envoyé sur l’entrée standard.",
+        "saveFailed": "Impossible d’enregistrer les paramètres de nom des chats.",
+        "searchAgent": "agent",
+        "searchTemplate": "modèle de commande"
+      }
     }
   },
   "sidebar": {
@@ -20500,5 +20688,59 @@
   "hiveWorkbench": {
     "teamNotConfigured": "Enregistrez les quatre employés pour terminer la configuration de l’équipe, puis soumettez une demande pour exécuter l’étape initiale des exigences produit. Le passage automatique entre les quatre rôles n’est pas encore pris en charge.",
     "executionUnavailable": "L’exécution des étapes nécessite un environnement Docker Linux vérifié. Les demandes prennent uniquement en charge l’étape initiale des exigences produit ; le passage automatique entre les quatre rôles n’est pas encore pris en charge."
+  },
+  "csv": {
+    "detectingDelimiter": "Détection du délimiteur…",
+    "indexProgress": "Indexation du CSV… {{percent}} %",
+    "loadingCell": "Chargement…",
+    "nextRows": "Lignes suivantes",
+    "previousRows": "Lignes précédentes",
+    "readOnlyPreview": "Aperçu de fichier volumineux · Lecture seule",
+    "resizeColumn": "Redimensionner la colonne {{column}}",
+    "rowWindow": "Lignes {{first}}–{{last}}",
+    "editor": "Éditeur CSV",
+    "editCell": "Modifier la ligne {{row}}, colonne {{column}}",
+    "filterRows": "Filtrer les lignes",
+    "edit": "Modifier la cellule",
+    "copy": "Copier",
+    "paste": "Coller",
+    "rows": "Lignes",
+    "insertRowAbove": "Insérer une ligne au-dessus",
+    "insertRowBelow": "Insérer une ligne en dessous",
+    "deleteRows": "Supprimer les lignes sélectionnées",
+    "columns": "Colonnes",
+    "newColumn": "Colonne {{column}}",
+    "insertColumnBefore": "Insérer une colonne avant",
+    "insertColumnAfter": "Insérer une colonne après",
+    "moveColumnLeft": "Déplacer la colonne vers la gauche",
+    "moveColumnRight": "Déplacer la colonne vers la droite",
+    "deleteColumns": "Supprimer les colonnes sélectionnées",
+    "sort": "Trier",
+    "sortAscending": "Trier la colonne sélectionnée par ordre croissant",
+    "sortDescending": "Trier la colonne sélectionnée par ordre décroissant",
+    "originalOrder": "Ordre d'origine des lignes",
+    "save": "Enregistrer",
+    "inspectionOnly": "Inspection uniquement · Ordre des lignes du fichier inchangé"
+  },
+  "worktree": {
+    "nestedRemoval": {
+      "refreshFailed": "Impossible d'actualiser la liste des espaces de travail",
+      "review": "Supprimer avec les worktrees imbriqués…",
+      "title": "Supprimer l'espace de travail et les worktrees imbriqués ?",
+      "description": "Cela supprime définitivement « {{name}} », chaque worktree imbriqué listé ci-dessous et tous les fichiers qu'il contient, y compris les modifications non validées. Leurs terminaux et agents seront arrêtés.",
+      "detached": "HEAD détaché",
+      "loading": "Vérification des worktrees imbriqués…",
+      "order": "Les worktrees imbriqués sont supprimés en premier. Si l'un échoue, la suppression s'arrête et le parent est conservé. Les branches suivent vos paramètres de suppression existants.",
+      "cancel": "Annuler",
+      "retry": "Vérifier à nouveau",
+      "deleting": "Suppression…",
+      "confirm": "Supprimer tous les worktrees listés",
+      "preservedBranches": "Certaines branches de worktrees imbriqués ont été conservées"
+    }
+  },
+  "mediaPreview": {
+    "unavailable": "Impossible de lire ce fichier multimédia. Le fichier peut être indisponible ou utiliser un codec non pris en charge.",
+    "openFailed": "Impossible d’ouvrir ce fichier dans l’application par défaut.",
+    "openDefault": "Ouvrir dans l’application par défaut"
   }
 }

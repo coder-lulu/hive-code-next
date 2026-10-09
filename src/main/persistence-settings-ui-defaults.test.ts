@@ -8,12 +8,13 @@ import {
 } from './persistence-test-harness'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, mkdtempSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { GlobalSettings } from '../shared/global-settings-types'
 import type { PersistedState } from '../shared/persisted-state-types'
 import { getDefaultPersistedState } from '../shared/constants'
 import { ONBOARDING_FINAL_STEP, ONBOARDING_FLOW_VERSION } from '../shared/onboarding-defaults'
+import { profileStateDatabaseFile } from '../shared/profile-state-storage-paths'
 
 // Stub the ~/.ssh/config parser so the SSH-import test drives the real Store with deterministic hosts, not the operator's actual ~/.ssh/config.
 const { loadUserSshConfigMock, sshConfigHostsToTargetsMock } = vi.hoisted(() => ({
@@ -296,12 +297,29 @@ describe('Store', () => {
     })
 
     // Why: a profile opened on another OS must not rewrite the mac-only preference on flush.
-    await withPlatform('win32', async () => {
-      const store = await createStore()
-      store.updateSettings({ minimizeToTrayOnClose: true })
-      store.flush()
-      expect((readDataFile() as PersistedState).settings.showMenuBarIcon).toBe(false)
-    })
+    const physicalDatabasePath = profileStateDatabaseFile(testState.dir)
+    const originalToNamespacedPath = win32.toNamespacedPath
+    const namespace =
+      process.platform === 'win32'
+        ? undefined
+        : vi.spyOn(win32, 'toNamespacedPath').mockImplementation(function (
+            this: unknown,
+            ...args: Parameters<typeof win32.toNamespacedPath>
+          ) {
+            return args[0] === physicalDatabasePath
+              ? physicalDatabasePath
+              : originalToNamespacedPath.apply(this, args)
+          })
+    try {
+      await withPlatform('win32', async () => {
+        const store = await createStore()
+        store.updateSettings({ minimizeToTrayOnClose: true })
+        store.flush()
+        expect((readDataFile() as PersistedState).settings.showMenuBarIcon).toBe(false)
+      })
+    } finally {
+      namespace?.mockRestore()
+    }
 
     await withPlatform('darwin', async () => {
       expect((await createStore()).getSettings().showMenuBarIcon).toBe(false)

@@ -1,12 +1,10 @@
 import { listEnvironments } from '../../shared/runtime-environment-store'
+import { publicRuntimeEnvironmentWithHostKey } from './runtime-environment-host-key'
 import type {
   HiveAccountRuntimeDirectoryState,
   HiveRuntimePendingDisplayName
 } from '../../shared/hive-runtime-cloud'
-import {
-  redactRuntimeEnvironment,
-  type PublicKnownRuntimeEnvironment
-} from '../../shared/runtime-environments'
+import type { PublicKnownRuntimeEnvironment } from '../../shared/runtime-environments'
 import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime-client'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import type {
@@ -29,7 +27,7 @@ import {
 export function listRuntimeEnvironmentCatalog(
   userDataPath: string
 ): PublicKnownRuntimeEnvironment[] {
-  const local = listEnvironments(userDataPath).map(redactRuntimeEnvironment)
+  const local = listEnvironments(userDataPath).map(publicRuntimeEnvironmentWithHostKey)
   const access = getHiveAccountRuntimeAccess()
   const state = access?.directory.getState()
   const accountRuntimes = state?.items ?? []
@@ -47,7 +45,7 @@ export function resolveRuntimeEnvironmentCatalogEntry(
   userDataPath: string,
   selector: string
 ): PublicKnownRuntimeEnvironment {
-  const local = listEnvironments(userDataPath).map(redactRuntimeEnvironment)
+  const local = listEnvironments(userDataPath).map(publicRuntimeEnvironmentWithHostKey)
   const access = getHiveAccountRuntimeAccess()
   const state = access?.directory.getState()
   const accountRuntimes = state?.items ?? []
@@ -176,8 +174,14 @@ export async function subscribeEnvironmentWithCloudFallback(
         | { type: 'close' }
     ) => void
     onClose: () => void
-  }
+  },
+  assertCurrent?: () => boolean,
+  signal?: AbortSignal
 ): Promise<RemoteRuntimeSubscription> {
+  signal?.throwIfAborted()
+  if (assertCurrent && !assertCurrent()) {
+    throw new Error('Runtime environment transport was invalidated')
+  }
   if (hasLocalPairing(environment)) {
     try {
       return await subscribeRuntimeEnvironment(
@@ -186,7 +190,9 @@ export async function subscribeEnvironmentWithCloudFallback(
         method,
         params,
         timeoutMs,
-        callbacks
+        callbacks,
+        assertCurrent,
+        signal
       )
     } catch (error) {
       if (!environment.accountClaim || !isPreDeliveryConnectionFailure(error)) {
@@ -200,6 +206,10 @@ export async function subscribeEnvironmentWithCloudFallback(
       'remote_runtime_unavailable',
       'Cloud Runtime transport is not available.'
     )
+  }
+  signal?.throwIfAborted()
+  if (assertCurrent && !assertCurrent()) {
+    throw new Error('Runtime environment transport was invalidated')
   }
   return access.transport.subscribe(environment.accountClaim, method, params, timeoutMs, {
     onResponse: (response) => callbacks.onEvent({ type: 'response', response }),

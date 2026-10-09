@@ -4,6 +4,7 @@ import {
   agentSessionRecordFixture
 } from '../../../shared/agent-session-record.test-fixture'
 import { lookupOrcaAgentSession } from './structured-session-mail-address'
+import { managedPiProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 
 describe('structured session address lookup', () => {
   it('recognizes the managed-Pi native session identity without reading a Codex thread id', () => {
@@ -15,7 +16,7 @@ describe('structured session address lookup', () => {
     record.providerHandleChain = [
       {
         linkId: 'pi-link',
-        handle: { provider: 'managed-pi', sessionId: 'pi-native' },
+        handle: managedPiProviderHandle('pi-native'),
         origin: 'created',
         mintedAtFence: 1,
         observedAt: 1

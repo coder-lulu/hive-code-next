@@ -1,5 +1,5 @@
 import { isDeepStrictEqual as same } from 'node:util'
-import { isAgentSessionRecord } from '../../shared/agent-session-record'
+import { isTaskSessionRecord } from './task-codex-session-binding'
 import type { TaskStructuredBinding } from '../../shared/task-execution/task-structured-binding'
 import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
 import { refuseTaskExecution } from './task-execution-error'
@@ -15,7 +15,7 @@ export function assertTaskCodexProcessCheckpoint(
   const owner = record?.lease.ownerProcess
   if (
     !record ||
-    !isAgentSessionRecord(record) ||
+    !isTaskSessionRecord(record) ||
     !owner ||
     !Number.isSafeInteger(pid) ||
     owner.pid !== pid ||

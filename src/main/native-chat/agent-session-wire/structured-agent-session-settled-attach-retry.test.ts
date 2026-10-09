@@ -29,7 +29,10 @@ import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
+import { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-1' }
 
@@ -101,7 +104,7 @@ beforeEach(async () => {
     },
     link: {
       linkId: `link-${fence}`,
-      handle: { provider: 'codex', threadId: THREAD },
+      handle: codexProviderHandle(THREAD),
       origin: store.getRecord(SESSION)?.providerHandleChain.length ? 'resumed' : 'created',
       mintedAtFence: fence,
       observedAt: NOW
@@ -111,6 +114,7 @@ beforeEach(async () => {
   dispatch = vi.fn(async () => accepted())
   store = await openTestAgentSessionRecordStore(root)
   host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter: adapter(),
@@ -135,15 +139,16 @@ function startAgent(): Promise<unknown> {
 
 describe('settled attach retry', () => {
   it('settles a post-acquisition journal failure and retries without a restart', async () => {
-    const historyFilePath = vi
-      .fn<NonNullable<StructuredAgentSessionAdapter['historyFilePath']>>()
-      .mockRejectedValueOnce(new Error('journal path unavailable'))
-      .mockResolvedValue(null)
+    const journalDatabase = openTestJournalHostDatabase(root)
+    vi.spyOn(AgentSessionJournal.prototype, 'open').mockRejectedValueOnce(
+      new Error('journal path unavailable')
+    )
     host = new StructuredAgentSessionHost({
+      agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
-      adapter: { ...adapter(), historyFilePath },
-      journalDatabase: openTestJournalHostDatabase(root),
+      adapter: adapter(),
+      journalDatabase,
       claimKeyId: 'key-1',
       mintSpawnToken: () => 'spawn-a',
       now: () => NOW
@@ -189,7 +194,7 @@ describe('settled attach retry', () => {
         },
         link: {
           linkId: `link-${fence}`,
-          handle: { provider: 'codex', threadId: THREAD },
+          handle: codexProviderHandle(THREAD),
           origin: 'created',
           mintedAtFence: fence,
           observedAt: NOW
@@ -198,6 +203,7 @@ describe('settled attach retry', () => {
     })
     const mintSpawnToken = vi.fn(() => 'spawn-safe')
     host = new StructuredAgentSessionHost({
+      agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
       adapter: adapter(),
@@ -233,7 +239,7 @@ describe('settled attach retry', () => {
         },
         link: {
           linkId: `link-${fence}`,
-          handle: { provider: 'codex', threadId: THREAD },
+          handle: codexProviderHandle(THREAD),
           origin: 'created',
           mintedAtFence: fence,
           observedAt: NOW
@@ -243,6 +249,7 @@ describe('settled attach retry', () => {
     let token = 0
     const mintSpawnToken = vi.fn(() => `spawn-${++token}`)
     host = new StructuredAgentSessionHost({
+      agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
       adapter: adapter(),
@@ -275,6 +282,7 @@ describe('settled attach retry', () => {
     closeTestJournalHostDatabases()
     store = await openTestAgentSessionRecordStore(root)
     host = new StructuredAgentSessionHost({
+      agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
       adapter: adapter(),
@@ -325,6 +333,7 @@ describe('settled attach retry', () => {
     closeTestJournalHostDatabases()
     store = await openTestAgentSessionRecordStore(root)
     host = new StructuredAgentSessionHost({
+      agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
       adapter: adapter(),

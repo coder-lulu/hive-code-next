@@ -5,12 +5,13 @@
  * of them wiring it up differently — different flags, a different untracked
  * source, a different completeness gate.
  */
-import { execFile, execFileSync } from 'node:child_process'
+import type * as childProcess from 'node:child_process'
+import { runProcess } from '../../shared/child-process/run-process'
+import { createGitTestRunner } from '../../relay/git-handler-test-setup'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
-import { promisify } from 'node:util'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getStatus } from './status'
 import type { GitExec } from '../../relay/git-handler-ops'
 import { getStatusOp } from '../../relay/git-handler-status-ops'
@@ -18,7 +19,31 @@ import type { RelayGitStreamExec } from '../../relay/git-stdout-stream'
 import { invalidateGitBranchLineTotalInFlight } from '../../shared/git-branch-line-total'
 import { clearGitStatusLineStatsCache } from '../../shared/git-status-line-stats-cache'
 
-const execFileAsync = promisify(execFile)
+const fixtureGit = createGitTestRunner()
+const relayChildren: Promise<void>[] = []
+let operationSignal: AbortSignal | undefined
+
+const subjectChildren = vi.hoisted<{ closed: Promise<void>[] }>(() => ({ closed: [] }))
+
+// Track actual close events while preserving the subject's default Git execution path.
+vi.mock('node:child_process', async (importOriginal) => {
+  const real = await importOriginal<typeof childProcess>()
+  const execFile = new Proxy(real.execFile, {
+    apply(target, receiver, args: Parameters<typeof real.execFile>) {
+      const child = target.apply(receiver, args)
+      const closed = Promise.withResolvers<void>()
+      subjectChildren.closed.push(closed.promise)
+      child.once('close', () => closed.resolve())
+      child.once('error', () => {
+        if (!child.pid) {
+          closed.resolve()
+        }
+      })
+      return child
+    }
+  })
+  return { ...real, execFile }
+})
 
 // Fork point → working tree for the fixture below:
 //   tracked.txt  +2  (branch commit only)
@@ -38,12 +63,22 @@ const EXPECTED_TOTAL = {
 const AREA_ROW_SUM = { added: 5, removed: 2 }
 
 const relayGit: GitExec = async (args, cwd, opts) => {
-  const { stdout, stderr } = await execFileAsync('git', args, {
+  const terminated = Promise.withResolvers<void>()
+  relayChildren.push(terminated.promise)
+  const result = await runProcess({
+    program: 'git',
+    args,
     cwd,
-    encoding: 'utf8',
-    ...(opts?.signal ? { signal: opts.signal } : {}),
-    ...(opts?.timeout ? { timeout: opts.timeout } : {})
+    signal: opts?.signal ?? operationSignal,
+    timeoutMs: opts?.timeout ?? null,
+    terminationBarrier: true,
+    onChildTerminated: terminated.resolve
   })
+  if (result.code !== 0 || result.signal || result.timedOut) {
+    throw new Error(result.stderr || 'Relay status Git command failed.')
+  }
+  const { stdout, stderr } = result
+
   return { stdout, stderr }
 }
 
@@ -55,10 +90,9 @@ const relayStreamGit: RelayGitStreamExec = async (args, cwd, options) => {
   return { stoppedEarly: options.onStdout(stdout) === true }
 }
 
-function runFixtureGit(repo: string, args: string[]): string {
-  return execFileSync(
-    'git',
-    [
+async function runFixtureGit(repo: string, args: string[]): Promise<string> {
+  return (
+    await fixtureGit.git(repo, [
       '-c',
       'user.email=test@test.com',
       '-c',
@@ -66,33 +100,32 @@ function runFixtureGit(repo: string, args: string[]): string {
       '-c',
       'commit.gpgSign=false',
       ...args
-    ],
-    { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }
+    ])
   ).trim()
 }
 
 /** Returns the merge-base OID the chip is measured against. */
 async function seedParityFixture(repo: string): Promise<string> {
-  execFileSync('git', ['init', '-q', repo], { stdio: 'pipe' })
+  await fixtureGit.git(process.cwd(), ['init', '-q', repo])
   await writeFile(path.join(repo, 'tracked.txt'), 'a\nb\n')
   await writeFile(path.join(repo, 'partial.txt'), 'one\ntwo\nthree\n')
   await writeFile(path.join(repo, 'renamed.txt'), 'stable\n')
   await writeFile(path.join(repo, 'flip.txt'), 'p\n')
-  runFixtureGit(repo, ['add', '.'])
-  runFixtureGit(repo, ['commit', '-m', 'base'])
-  const mergeBase = runFixtureGit(repo, ['rev-parse', 'HEAD'])
+  await runFixtureGit(repo, ['add', '.'])
+  await runFixtureGit(repo, ['commit', '-m', 'base'])
+  const mergeBase = await runFixtureGit(repo, ['rev-parse', 'HEAD'])
 
-  runFixtureGit(repo, ['checkout', '-q', '-b', 'feature'])
+  await runFixtureGit(repo, ['checkout', '-q', '-b', 'feature'])
   await writeFile(path.join(repo, 'tracked.txt'), 'a\nb\nc\nd\n')
   await writeFile(path.join(repo, 'flip.txt'), 'p\nq\n')
-  runFixtureGit(repo, ['add', '-A'])
-  runFixtureGit(repo, ['commit', '-m', 'branch commit'])
+  await runFixtureGit(repo, ['add', '-A'])
+  await runFixtureGit(repo, ['commit', '-m', 'branch commit'])
 
-  runFixtureGit(repo, ['mv', 'renamed.txt', 'moved.txt'])
+  await runFixtureGit(repo, ['mv', 'renamed.txt', 'moved.txt'])
   // Staged and unstaged hunks land on the same added lines, so an area sum
   // double-counts them.
   await writeFile(path.join(repo, 'partial.txt'), 'one\ntwo\nthree\nfoo\nbaz\n')
-  runFixtureGit(repo, ['add', 'partial.txt'])
+  await runFixtureGit(repo, ['add', 'partial.txt'])
   await writeFile(path.join(repo, 'partial.txt'), 'one\ntwo\nthree\nfoo\n')
   // The branch commit's line, taken back out in the worktree: net zero.
   await writeFile(path.join(repo, 'flip.txt'), 'p\n')
@@ -115,64 +148,102 @@ function sumAreaRows(entries: readonly { added?: number; removed?: number }[]): 
 
 describe('branch line total parity between main and relay', () => {
   let repo: string
+  let mergeBase: string
+  let pendingSetup: Promise<string> | undefined
+  let pendingSubject: Promise<void> | undefined
 
-  beforeEach(async () => {
+  beforeEach(async ({ signal }) => {
+    operationSignal = signal
+    fixtureGit.useSignal(signal, null)
     clearGitStatusLineStatsCache()
     invalidateGitBranchLineTotalInFlight()
     repo = await mkdtemp(path.join(tmpdir(), 'branch-line-total-parity-'))
+    pendingSetup = seedParityFixture(repo)
+    mergeBase = await pendingSetup
   })
 
   afterEach(async () => {
+    await Promise.allSettled([
+      ...(pendingSetup ? [pendingSetup] : []),
+      ...(pendingSubject ? [pendingSubject] : [])
+    ])
+    await fixtureGit.settle()
+    await Promise.all(relayChildren.splice(0))
+    await Promise.all(subjectChildren.closed.splice(0))
+    pendingSetup = undefined
+    pendingSubject = undefined
+
     clearGitStatusLineStatsCache()
     invalidateGitBranchLineTotalInFlight()
     await rm(repo, { recursive: true, force: true })
   })
 
-  it('produces identical totals for the same fixture repo', async () => {
-    const mergeBase = await seedParityFixture(repo)
+  it('produces identical totals for the same fixture repo', async ({ signal }) => {
+    operationSignal = signal
+    pendingSubject = (async () => {
+      const mainStatus = await getStatus(repo, { branchLineTotalMergeBase: mergeBase, signal })
+      clearGitStatusLineStatsCache()
+      const relayStatus = await getStatusOp(
+        relayGit,
+        relayStreamGit,
+        {
+          worktreePath: repo,
+          branchLineTotalMergeBase: mergeBase
+        },
+        { signal }
+      )
 
-    const mainStatus = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-    clearGitStatusLineStatsCache()
-    const relayStatus = await getStatusOp(relayGit, relayStreamGit, {
-      worktreePath: repo,
-      branchLineTotalMergeBase: mergeBase
-    })
-
-    expect(mainStatus.branchLineTotal).toEqual({ ...EXPECTED_TOTAL, mergeBase })
-    expect(relayStatus.branchLineTotal).toEqual(mainStatus.branchLineTotal)
-    // Both sides model the same worktree, so a parity pass on a mismatched
-    // entry list would be meaningless.
-    expect(relayStatus.entries.map((entry) => entry.path).sort()).toEqual(
-      mainStatus.entries.map((entry) => entry.path).sort()
-    )
+      expect(mainStatus.branchLineTotal).toEqual({ ...EXPECTED_TOTAL, mergeBase })
+      expect(relayStatus.branchLineTotal).toEqual(mainStatus.branchLineTotal)
+      // Both sides model the same worktree, so a parity pass on a mismatched
+      // entry list would be meaningless.
+      expect(relayStatus.entries.map((entry) => entry.path).sort()).toEqual(
+        mainStatus.entries.map((entry) => entry.path).sort()
+      )
+    })()
+    await pendingSubject
   })
 
-  it('agrees on a number no per-area row sum could produce', async () => {
-    const mergeBase = await seedParityFixture(repo)
+  it('agrees on a number no per-area row sum could produce', async ({ signal }) => {
+    operationSignal = signal
+    pendingSubject = (async () => {
+      const mainStatus = await getStatus(repo, { branchLineTotalMergeBase: mergeBase, signal })
+      clearGitStatusLineStatsCache()
+      const relayStatus = await getStatusOp(
+        relayGit,
+        relayStreamGit,
+        {
+          worktreePath: repo,
+          branchLineTotalMergeBase: mergeBase
+        },
+        { signal }
+      )
 
-    const mainStatus = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-    clearGitStatusLineStatsCache()
-    const relayStatus = await getStatusOp(relayGit, relayStreamGit, {
-      worktreePath: repo,
-      branchLineTotalMergeBase: mergeBase
-    })
-
-    expect(sumAreaRows(mainStatus.entries)).toEqual(AREA_ROW_SUM)
-    expect(sumAreaRows(relayStatus.entries as { added?: number; removed?: number }[])).toEqual(
-      AREA_ROW_SUM
-    )
-    expect(mainStatus.branchLineTotal).not.toMatchObject(AREA_ROW_SUM)
-    expect(relayStatus.branchLineTotal).toEqual(mainStatus.branchLineTotal)
+      expect(sumAreaRows(mainStatus.entries)).toEqual(AREA_ROW_SUM)
+      expect(sumAreaRows(relayStatus.entries as { added?: number; removed?: number }[])).toEqual(
+        AREA_ROW_SUM
+      )
+      expect(mainStatus.branchLineTotal).not.toMatchObject(AREA_ROW_SUM)
+      expect(relayStatus.branchLineTotal).toEqual(mainStatus.branchLineTotal)
+    })()
+    await pendingSubject
   })
 
-  it('omits the total on both sides when no merge base is requested', async () => {
-    await seedParityFixture(repo)
+  it('omits the total on both sides when no merge base is requested', async ({ signal }) => {
+    operationSignal = signal
+    pendingSubject = (async () => {
+      const mainStatus = await getStatus(repo, { signal })
+      clearGitStatusLineStatsCache()
+      const relayStatus = await getStatusOp(
+        relayGit,
+        relayStreamGit,
+        { worktreePath: repo },
+        { signal }
+      )
 
-    const mainStatus = await getStatus(repo)
-    clearGitStatusLineStatsCache()
-    const relayStatus = await getStatusOp(relayGit, relayStreamGit, { worktreePath: repo })
-
-    expect(Object.hasOwn(mainStatus, 'branchLineTotal')).toBe(false)
-    expect(Object.hasOwn(relayStatus, 'branchLineTotal')).toBe(false)
+      expect(Object.hasOwn(mainStatus, 'branchLineTotal')).toBe(false)
+      expect(Object.hasOwn(relayStatus, 'branchLineTotal')).toBe(false)
+    })()
+    await pendingSubject
   })
 })

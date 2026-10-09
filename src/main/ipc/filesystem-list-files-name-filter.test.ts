@@ -1,5 +1,8 @@
 import { EventEmitter } from 'node:events'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { Store } from '../persistence'
 import type * as GitRunner from '../git/runner'
@@ -57,8 +60,13 @@ function fakeRipgrep(
 }
 
 describe('listQuickOpenFiles name filter', () => {
-  afterEach(() => {
+  let repoPath: string
+  beforeEach(async () => {
+    repoPath = await mkdtemp(join(tmpdir(), 'name-filter-'))
+  })
+  afterEach(async () => {
     vi.clearAllMocks()
+    await rm(repoPath, { recursive: true, force: true })
   })
 
   it('counts only matches against the ripgrep cap', async () => {
@@ -67,8 +75,8 @@ describe('listQuickOpenFiles name filter', () => {
       .mockImplementationOnce(() => fakeRipgrep(''))
 
     const files = await listQuickOpenFiles(
-      '/repo',
-      makeStore('/repo'),
+      repoPath,
+      makeStore(repoPath),
       undefined,
       undefined,
       2,
@@ -86,8 +94,8 @@ describe('listQuickOpenFiles name filter', () => {
 
     await expect(
       listQuickOpenFiles(
-        '/repo',
-        makeStore('/repo'),
+        repoPath,
+        makeStore(repoPath),
         undefined,
         undefined,
         5,
@@ -104,8 +112,8 @@ describe('listQuickOpenFiles name filter', () => {
 
     await expect(
       listQuickOpenFiles(
-        '/repo',
-        makeStore('/repo'),
+        repoPath,
+        makeStore(repoPath),
         undefined,
         undefined,
         5,
@@ -121,7 +129,7 @@ describe('listQuickOpenFiles name filter', () => {
       .mockImplementationOnce(() => fakeRipgrep('', 'SIGKILL'))
 
     await expect(
-      listQuickOpenFiles('/repo', makeStore('/repo'), undefined, undefined, 5)
+      listQuickOpenFiles(repoPath, makeStore(repoPath), undefined, undefined, 5)
     ).rejects.toThrow('rg killed by SIGKILL')
   })
 })

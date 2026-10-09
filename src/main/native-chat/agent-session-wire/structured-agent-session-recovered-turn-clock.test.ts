@@ -1,3 +1,7 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener
+} from '../agent-session-journal/journal-host-database-test-support'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 // A turn that was running when its host went away ends when recovery settles it. That settlement is
 // the edge the user needs to see — their work stopped — so the session reads as newly done then,
@@ -20,7 +24,6 @@ import {
 import { formatNativeChatTurnStatusLabel } from '../../../shared/native-chat-turn-status'
 import { selectStructuredAgentSettledTurns } from '../../../shared/structured-agent-session-turn-timing'
 import { AgentHookServer, _internals } from '../../agent-hooks/server'
-import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import {
   settleStaleStructuredAgentSessionState,
@@ -31,6 +34,7 @@ import { StructuredAgentSessionStatusFeed } from './structured-agent-session-sta
 import { indexedStatusFeedSession } from './structured-agent-session-status-feed-test-session'
 import { StructuredAgentSessionTurnCompletionFeed } from './structured-agent-session-turn-completion-feed'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 
 const SESSION = 'recovered-turn-session'
 const THREAD = 'thread-1'
@@ -48,6 +52,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await journals.closeAll()
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -60,7 +65,7 @@ async function sessionWithRunningTurn() {
       workspaceId: 'workspace-1',
       hostId: 'local',
       agent: 'codex',
-      providerHandle: { kind: 'codex', threadId: THREAD }
+      providerHandle: codexProviderHandle(THREAD)
     },
     now: () => clock,
     stateDirectory: join(root, SESSION)
@@ -101,7 +106,7 @@ async function sessionWithRunningTurn() {
   const completions = new StructuredAgentSessionTurnCompletionFeed({
     sessions,
     now: () => clock,
-    readStatusState: (sessionId, source) => feed.statusState(sessionId, source)
+    readStatusState: (sessionId, source) => feed.journalProjection(sessionId, source)?.state ?? null
   })
   const completionEvents: AgentSessionTurnCompletionEvent[] = []
   completions.subscribe({ id: 'dot-1', emit: (event) => completionEvents.push(event) })

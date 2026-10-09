@@ -29,6 +29,7 @@ import {
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-1' }
 const CHILD_PID = 4321
@@ -97,6 +98,8 @@ function host(
   overrides: Partial<StructuredAgentSessionHostDeps> = {}
 ): StructuredAgentSessionHost {
   return new StructuredAgentSessionHost({
+    platform: 'linux',
+    agents: NO_STRUCTURED_AGENTS,
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter,

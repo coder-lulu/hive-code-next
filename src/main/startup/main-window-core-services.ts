@@ -139,7 +139,7 @@ export function attachMainWindowCoreServices(
         state.runtimeCloudPresence?.setRuntimeReady(false)
         state.runtimeCloudPresence?.setAuthorization(null)
         await preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
-        await store.writeLatestProfileStateJsonCompatibilityExportAsync()
+        await store.flushPendingOrThrowAsync({ fullCheckpoint: true })
       },
       onBeforeUpdateQuitFailure: 'abort',
       updateInstallMode: resolveUpdateInstallMode(state.isServeMode),

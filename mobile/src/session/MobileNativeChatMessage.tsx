@@ -1,7 +1,10 @@
 import { MobileSelectableText as Text } from '../components/MobileSelectableText'
-import { memo, useCallback } from 'react'
+import { memo, useCallback, useState } from 'react'
 import { ArrowUp, Copy } from 'lucide-react-native'
 import { Image, Pressable, View } from 'react-native'
+import { INLINE_TEXT_SELECTION } from '../components/inline-text-selection'
+import { MobileNativeChatMessageActionsSheet } from './MobileNativeChatMessageActionsSheet'
+import { MobileNativeChatLongPressContent as Content } from './MobileNativeChatLongPressContent'
 import { splitNativeChatBlocks } from '../../../src/shared/native-chat-tool-fold'
 import { selectActiveToolCall } from '../../../src/shared/native-chat-tool-activity'
 import { isImageRefBlock, isTextBlock } from '../../../src/shared/native-chat-types'
@@ -13,23 +16,29 @@ import type { NativeChatBlock, NativeChatMessage } from '../../../src/shared/nat
 import { MobileMarkdown } from '../components/MobileMarkdown'
 import { useClipboardWriter } from '../platform/clipboard'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { deriveNativeChatRowContent } from '../../../src/shared/native-chat-row-content'
+import { MobileNativeChatReasoningRow } from './MobileNativeChatReasoningRow'
 import { MobileNativeChatTurnStatus } from './MobileNativeChatTurnStatus'
 import { ToolRun } from './MobileNativeChatToolRun'
 import type { NativeChatTurnStatus } from './use-mobile-native-chat-turn-status'
 import { isRenderableImageUri } from './mobile-native-chat-image-preview'
 import { createMobileNativeChatMessageStyles } from './mobile-native-chat-message-styles'
 import { nativeChatMessageText } from './mobile-native-chat-message-text'
+import { agentMessageAttribution } from './mobile-agent-message-attribution'
 
 function Prose({
   block,
   invert,
   fontScale,
-  onOpenFile
+  onOpenFile,
+  onLongPress
 }: {
   block: NativeChatBlock
   invert?: boolean
   fontScale: number
   onOpenFile?: (relativePath: string) => void
+  /** Android only: routes a long press on a link span to the row's actions sheet. */
+  onLongPress?: () => void
 }): React.JSX.Element | null {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
@@ -37,7 +46,7 @@ function Prose({
     if (isAgentSessionHostStatusPresentation(block.presentation)) {
       return (
         <Text
-          selectable
+          selectable={INLINE_TEXT_SELECTION}
           style={[
             styles.hostNotice,
             {
@@ -55,7 +64,7 @@ function Prose({
     if (invert) {
       return (
         <Text
-          selectable
+          selectable={INLINE_TEXT_SELECTION}
           style={[
             styles.userText,
             {
@@ -74,6 +83,7 @@ function Prose({
         rangeSelectable
         textScale={1.25 * fontScale}
         onOpenFile={onOpenFile}
+        onLongPress={onLongPress}
       />
     )
   }
@@ -158,7 +168,10 @@ function MobileNativeChatMessageImpl({
   turnKey,
   onToggleTurn,
   activeTurnIsWorking,
-  structuredActivityUi = false
+  structuredActivityUi = false,
+  reasoningIsLive = false,
+  reasoningExpanded,
+  onToggleReasoning
 }: {
   message: NativeChatMessage
   toolsExpanded?: boolean
@@ -181,13 +194,20 @@ function MobileNativeChatMessageImpl({
   activeTurnIsWorking?: boolean
   /** Structured lane only: live tool progress plus the turn-status disclosure. */
   structuredActivityUi?: boolean
+  /** This open reasoning block is disclosed by the live activity line, so its row draws nothing. */
+  reasoningIsLive?: boolean
+  /** The transcript-held disclosure of a reasoning row; one stable handler takes its key. */
+  reasoningExpanded?: boolean
+  onToggleReasoning?: (key: string) => void
 }): React.JSX.Element {
   const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   const clipboard = useClipboardWriter()
   const copyMessage = useCallback(() => {
     void clipboard.writeText(nativeChatMessageText(message.blocks)).catch(() => {})
   }, [clipboard, message])
-  const isUser = message.role === 'user'
+  // Another agent's message is set apart from the person's bubble, left-aligned and named.
+  const attribution = agentMessageAttribution('Message from', message.from)
+  const isUser = message.role === 'user' && attribution === null
   const isReasoning = message.role === 'reasoning'
   // Separate the agent's words from its tool activity: prose renders first, the
   // tool calls fold into a collapsible run beneath. The user's own messages get
@@ -207,6 +227,11 @@ function MobileNativeChatMessageImpl({
     !turnExpanded &&
     !toolsExpanded
   const showToolRun = tools.length > 0 && !settledToolsHidden
+  // Mount selection UI only for the message being copied.
+  const [actionsOpen, setActionsOpen] = useState(false)
+  // Keep the memoized Markdown context stable as the message streams.
+  const openActions = useCallback(() => setActionsOpen(true), [])
+  const onLongPress = INLINE_TEXT_SELECTION ? undefined : openActions
 
   const statusRow = turnStatus ? (
     <MobileNativeChatTurnStatus
@@ -217,13 +242,50 @@ function MobileNativeChatMessageImpl({
       onToggleExpanded={turnKey && onToggleTurn ? () => onToggleTurn(turnKey) : undefined}
     />
   ) : null
+  if (isReasoning) {
+    // The same text the live line's selector reads, so the two agree on whether there is any.
+    const markdown = deriveNativeChatRowContent(message.blocks).markdown
+    // Blank, or disclosed by the live activity line: nothing draws, not even an empty row.
+    const draws = markdown.trim().length > 0 && !reasoningIsLive
+    return (
+      <>
+        {turnStatusAbove ? statusRow : null}
+        {draws ? (
+          <View style={styles.row}>
+            <MobileNativeChatReasoningRow
+              message={message}
+              markdown={markdown}
+              fontScale={fontScale}
+              live={activeTurnIsWorking === true}
+              expanded={reasoningExpanded}
+              onToggle={onToggleReasoning}
+              onOpenFile={onOpenFile}
+              onLongPress={onLongPress}
+            />
+          </View>
+        ) : null}
+        {actionsOpen ? (
+          <MobileNativeChatMessageActionsSheet
+            message={message}
+            onClose={() => setActionsOpen(false)}
+          />
+        ) : null}
+        {turnStatusAbove ? null : statusRow}
+      </>
+    )
+  }
   return (
     <>
       {/* A turn with no user bubble carries its bar above its first row. */}
       {turnStatusAbove ? statusRow : null}
       <View style={[styles.row, isUser && styles.rowUser]}>
-        <View
-          style={[styles.content, isUser && styles.userBubble, isReasoning && styles.reasoning]}
+        <Content
+          onLongPress={onLongPress}
+          style={[
+            styles.content,
+            isUser && styles.userBubble,
+            attribution !== null && styles.agentMessage
+          ]}
         >
           {!isUser && prose.length > 0 ? (
             <AgentControls
@@ -235,6 +297,11 @@ function MobileNativeChatMessageImpl({
               }
             />
           ) : null}
+          {attribution !== null ? (
+            <Text selectable={INLINE_TEXT_SELECTION} style={styles.agentAttribution}>
+              {attribution}
+            </Text>
+          ) : null}
           {prose.map((block, index) => (
             <Prose
               key={index}
@@ -242,6 +309,7 @@ function MobileNativeChatMessageImpl({
               invert={isUser}
               fontScale={fontScale}
               onOpenFile={onOpenFile}
+              onLongPress={onLongPress}
             />
           ))}
           {showToolRun ? (
@@ -256,8 +324,14 @@ function MobileNativeChatMessageImpl({
               onOpenFile={onOpenFile}
             />
           ) : null}
-        </View>
+        </Content>
       </View>
+      {actionsOpen ? (
+        <MobileNativeChatMessageActionsSheet
+          message={message}
+          onClose={() => setActionsOpen(false)}
+        />
+      ) : null}
       {turnStatusAbove ? null : statusRow}
     </>
   )

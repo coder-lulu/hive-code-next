@@ -16,6 +16,7 @@ export function getPinnedWorktreeDisplayPolicy(
 
 export type GroupHeaderRow = {
   type: 'header'
+  collapseKey?: string
   key: string
   /** Distinct mounted identity when one logical project appears in online and offline directories. */
   renderKey?: string

@@ -1,16 +1,56 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import * as durableFileWrite from '../durable-file-write'
+import * as windowsAcl from '../../shared/secure-path-windows-acl'
 import { DeviceRegistry } from './device-registry'
 import { MobileNotificationDismissalStore } from './mobile-notification-dismissal-store'
 import { DEVICE_REGISTRY_FILENAME } from './mobile-pairing-files'
 
 const dirs: string[] = []
-afterEach(() => {
-  vi.restoreAllMocks()
-  dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true }))
+let pendingJobs: Promise<unknown>[] = []
+const sweepTemps = durableFileWrite.removeStaleDurableWriteTempFiles
+const hardenPath = windowsAcl.bestEffortRestrictWindowsPath
+beforeEach(() => {
+  pendingJobs = []
+  vi.spyOn(durableFileWrite, 'removeStaleDurableWriteTempFiles').mockImplementation((...args) => {
+    const pending = sweepTemps(...args)
+    pendingJobs.push(pending)
+    return pending
+  })
+  vi.spyOn(windowsAcl, 'bestEffortRestrictWindowsPath').mockImplementation(
+    (path, isDirectory, onSettled) => {
+      let settle!: (restricted: boolean) => void
+      let fail!: (error: unknown) => void
+      const pending = new Promise<boolean>((resolve, reject) => {
+        settle = resolve
+        fail = reject
+      })
+      pendingJobs.push(pending)
+      try {
+        hardenPath(path, isDirectory, (restricted) => {
+          try {
+            onSettled?.(restricted)
+          } finally {
+            settle(restricted)
+          }
+        })
+      } catch (error) {
+        fail(error)
+        throw error
+      }
+    }
+  )
+})
+afterEach(async () => {
+  try {
+    await Promise.all(pendingJobs)
+  } finally {
+    await Promise.allSettled(pendingJobs)
+    vi.restoreAllMocks()
+    dirs.splice(0).forEach((dir) => rmSync(dir, { recursive: true, force: true }))
+  }
 })
 
 const stores = [
@@ -47,7 +87,10 @@ it.each(stores)(
       utimesSync(path, twoDaysAgo, twoDaysAgo)
     }
 
+    const cleanup = vi.mocked(durableFileWrite.removeStaleDurableWriteTempFiles)
     open(dir)
+    expect(cleanup).toHaveBeenCalledOnce()
+    await cleanup.mock.results[0]?.value
 
     await vi.waitFor(() => expect(existsSync(orphaned)).toBe(false))
     for (const path of [recent, own, otherStore, similarName, wrongSuffix, finalPath]) {

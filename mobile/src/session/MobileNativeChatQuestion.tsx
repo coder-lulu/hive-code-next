@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native'
-import { ArrowUp, Check, CircleHelp, X } from 'lucide-react-native'
+import { ArrowUp, Check, CircleHelp } from 'lucide-react-native'
+import { MobileNativeChatCardHeaderAction } from './MobileNativeChatCardHeaderAction'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { TEXT_INPUT_FONT_SIZE } from '../platform/text-input-font-size'
@@ -15,13 +16,16 @@ type Props = {
   question: MobileChatQuestion
   onAnswer: (text: string) => Promise<boolean>
   onCancel?: (prompt?: NonNullable<MobileChatQuestion['prompt']>) => Promise<boolean>
+  /** Fold the card to a strip and free Send, writing nothing. */
+  onCollapse?: () => void
 }
 
 /** Structured prompts restrict free text when required; heuristic prompts retain an escape hatch. */
 export function MobileNativeChatQuestion({
   question,
   onAnswer,
-  onCancel
+  onCancel,
+  onCollapse
 }: Props): React.JSX.Element {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
@@ -108,19 +112,12 @@ export function MobileNativeChatQuestion({
       <View style={styles.header}>
         <CircleHelp size={16} color={theme.color.brand.primary} strokeWidth={2} />
         <Text style={styles.question}>{question.question}</Text>
-        {onCancel ? (
-          <Pressable
-            accessibilityLabel="取消问题"
-            accessibilityRole="button"
-            accessibilityState={{ disabled: sending }}
-            hitSlop={8}
-            style={({ pressed }) => [styles.cancel, pressed && !sending && styles.pressed]}
-            onPress={() => void onCancel(question.prompt)}
-            disabled={sending}
-          >
-            <X size={16} color={theme.color.text.tertiary} />
-          </Pressable>
-        ) : null}
+        <MobileNativeChatCardHeaderAction
+          prompt={question.prompt}
+          onCancel={onCancel}
+          onCollapse={onCollapse}
+          disabled={sending}
+        />
       </View>
 
       {hasOptions ? (

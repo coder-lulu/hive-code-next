@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OrchestrationDb } from './db'
 import { reconcileLifecycleMessage } from './lifecycle-reconciliation'
 import { Coordinator } from './coordinator'
@@ -113,11 +113,39 @@ function insertWorkerDone(
   })
 }
 
+/** Drive the mocked scheduler through its existing polling intervals. */
+async function settleCoordinatorRun<T>(run: Promise<T>): Promise<T> {
+  let settled = false
+  void run.then(
+    () => {
+      settled = true
+    },
+    () => {
+      settled = true
+    }
+  )
+  for (let elapsed = 0; !settled && elapsed < 30_000; elapsed += 50) {
+    await vi.advanceTimersByTimeAsync(50)
+  }
+  if (!settled) {
+    throw new Error('Coordinator did not settle within its test clock budget')
+  }
+  return run
+}
+
 describe('Coordinator', () => {
   let db: OrchestrationDb
 
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  })
+
   afterEach(() => {
-    db?.close()
+    try {
+      db?.close()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('throws if no tasks exist', async () => {
@@ -152,14 +180,12 @@ describe('Coordinator', () => {
     const runPromise = coordinator.run()
 
     // Wait for dispatch to happen
-    await new Promise((r) => {
-      setTimeout(r, 100)
-    })
+    await vi.advanceTimersByTimeAsync(100)
 
     // Simulate the worker completing
     insertWorkerDone(db, { taskId: task.id, filesModified: ['a.ts'] })
 
-    const result = await runPromise
+    const result = await settleCoordinatorRun(runPromise)
     expect(result.status).toBe('completed')
     expect(result.completedTasks).toContain(task.id)
     expect(runtime.sentMessages.length).toBeGreaterThan(0)
@@ -185,15 +211,13 @@ describe('Coordinator', () => {
       pollIntervalMs: 50
     })
     const runPromise = coordinator.run()
-    await new Promise((r) => {
-      setTimeout(r, 100)
-    })
+    await vi.advanceTimersByTimeAsync(100)
 
     expect(db.getDispatchContext(task.id)?.assignee_pane_key).toBe('tab_a:leaf_a')
     expect(db.getDispatchContext(task.id)?.process_incarnation).toBeNull()
 
     insertWorkerDone(db, { taskId: task.id })
-    await runPromise
+    await settleCoordinatorRun(runPromise)
   })
 
   it('records authenticated process authority for automatic dispatch', async () => {
@@ -220,9 +244,7 @@ describe('Coordinator', () => {
       pollIntervalMs: 50
     })
     const runPromise = coordinator.run()
-    await new Promise((r) => {
-      setTimeout(r, 100)
-    })
+    await vi.advanceTimersByTimeAsync(100)
 
     expect(db.getDispatchContext(task.id)).toMatchObject({
       assignee_pane_key: 'tab_a:leaf_a',
@@ -231,7 +253,7 @@ describe('Coordinator', () => {
     })
 
     insertWorkerDone(db, { taskId: task.id })
-    await runPromise
+    await settleCoordinatorRun(runPromise)
   })
 
   it('records completedTasks when send reconciled worker_done before coordinator read', async () => {
@@ -259,7 +281,7 @@ describe('Coordinator', () => {
       coordinatorHandle: 'coord',
       pollIntervalMs: 20
     })
-    const result = await coordinator.run()
+    const result = await settleCoordinatorRun(coordinator.run())
 
     expect(result.status).toBe('completed')
     expect(result.completedTasks).toContain(task.id)
@@ -303,7 +325,7 @@ describe('Coordinator', () => {
       coordinatorHandle: 'coord',
       pollIntervalMs: 20
     })
-    const result = await coordinator.run()
+    const result = await settleCoordinatorRun(coordinator.run())
 
     expect(result.status).toBe('completed')
     expect(result.completedTasks.filter((id) => id === task.id)).toHaveLength(1)
@@ -323,9 +345,7 @@ describe('Coordinator', () => {
 
     const runPromise = coordinator.run()
 
-    await new Promise((r) => {
-      setTimeout(r, 100)
-    })
+    await vi.advanceTimersByTimeAsync(100)
 
     expect(runtime.createdTerminals.length).toBe(1)
     expect(runtime.createdTerminalOptions[0]).not.toHaveProperty('presentation')
@@ -333,7 +353,7 @@ describe('Coordinator', () => {
     // Complete the task
     insertWorkerDone(db, { taskId: task.id, from: runtime.createdTerminals[0] })
 
-    const result = await runPromise
+    const result = await settleCoordinatorRun(runPromise)
     expect(result.status).toBe('completed')
   })
 
@@ -360,9 +380,7 @@ describe('Coordinator', () => {
 
     // Send 3 escalations to trigger circuit breaker
     for (let i = 0; i < 3; i++) {
-      await new Promise((r) => {
-        setTimeout(r, 100)
-      })
+      await vi.advanceTimersByTimeAsync(100)
       const dispatch = db.getDispatchContext(task.id)
       expect(dispatch).toBeDefined()
       db.insertMessage({
@@ -375,7 +393,7 @@ describe('Coordinator', () => {
       })
     }
 
-    const result = await runPromise
+    const result = await settleCoordinatorRun(runPromise)
     expect(result.status).toBe('failed')
     expect(result.failedTasks).toContain(task.id)
   })
@@ -398,7 +416,7 @@ describe('Coordinator', () => {
       pollIntervalMs: 10
     })
 
-    const result = await coordinator.run()
+    const result = await settleCoordinatorRun(coordinator.run())
 
     expect(result.status).toBe('failed')
     expect(result.failedTasks).toContain(task.id)
@@ -424,9 +442,7 @@ describe('Coordinator', () => {
     const runPromise = coordinator.run()
 
     // Wait for dispatch
-    await new Promise((r) => {
-      setTimeout(r, 100)
-    })
+    await vi.advanceTimersByTimeAsync(100)
 
     // Worker sends decision gate
     const dispatch = db.getDispatchContext(task.id)
@@ -445,9 +461,7 @@ describe('Coordinator', () => {
       })
     })
 
-    await new Promise((r) => {
-      setTimeout(r, 100)
-    })
+    await vi.advanceTimersByTimeAsync(100)
 
     // Verify task is blocked
     const blocked = db.getTask(task.id)
@@ -460,13 +474,11 @@ describe('Coordinator', () => {
     db.resolveGate(gates[0].id, 'yes')
 
     // Wait for re-dispatch and simulate completion
-    await new Promise((r) => {
-      setTimeout(r, 200)
-    })
+    await vi.advanceTimersByTimeAsync(200)
 
     insertWorkerDone(db, { taskId: task.id })
 
-    const result = await runPromise
+    const result = await settleCoordinatorRun(runPromise)
     expect(result.status).toBe('completed')
     expect(result.completedTasks).toContain(task.id)
   })
@@ -494,9 +506,7 @@ describe('Coordinator', () => {
     const runPromise = coordinator.run()
 
     // Wait for t1 dispatch
-    await new Promise((r) => {
-      setTimeout(r, 100)
-    })
+    await vi.advanceTimersByTimeAsync(100)
 
     // t2 should still be pending
     expect(db.getTask(t2.id)?.status).toBe('pending')
@@ -505,9 +515,7 @@ describe('Coordinator', () => {
     insertWorkerDone(db, { taskId: t1.id })
 
     // Wait for t2 to be promoted and dispatched
-    await new Promise((r) => {
-      setTimeout(r, 200)
-    })
+    await vi.advanceTimersByTimeAsync(200)
 
     // t2 should now be dispatched
     const t2Status = db.getTask(t2.id)?.status
@@ -516,7 +524,7 @@ describe('Coordinator', () => {
     // Complete t2
     insertWorkerDone(db, { taskId: t2.id })
 
-    const result = await runPromise
+    const result = await settleCoordinatorRun(runPromise)
     expect(result.status).toBe('completed')
     expect(result.completedTasks).toContain(t1.id)
     expect(result.completedTasks).toContain(t2.id)
@@ -544,9 +552,7 @@ describe('Coordinator', () => {
 
     const runPromise = coordinator.run()
 
-    await new Promise((r) => {
-      setTimeout(r, 100)
-    })
+    await vi.advanceTimersByTimeAsync(100)
 
     // Only 2 should be dispatched
     const dispatched = db.listTasks({ status: 'dispatched' })
@@ -555,12 +561,10 @@ describe('Coordinator', () => {
     // Complete all tasks
     for (const task of [t1, t2, t3]) {
       insertWorkerDone(db, { taskId: task.id })
-      await new Promise((r) => {
-        setTimeout(r, 100)
-      })
+      await vi.advanceTimersByTimeAsync(100)
     }
 
-    const result = await runPromise
+    const result = await settleCoordinatorRun(runPromise)
     expect(result.status).toBe('completed')
   })
 
@@ -592,11 +596,9 @@ describe('Coordinator', () => {
 
     // Drive one tick then stop — we only need the stale warning to have fired.
     const runPromise = coordinator.run()
-    await new Promise((r) => {
-      setTimeout(r, 80)
-    })
+    await vi.advanceTimersByTimeAsync(80)
     coordinator.stop()
-    await runPromise
+    await settleCoordinatorRun(runPromise)
 
     expect(logs.some((l) => /has not sent a heartbeat/.test(l) && l.includes(task.id))).toBe(true)
     // Task status must NOT have been auto-failed — logging only.
@@ -628,16 +630,14 @@ describe('Coordinator', () => {
       payload: JSON.stringify({ taskId: task.id, dispatchId: ctx.id, phase: 'implementing' })
     })
 
-    await new Promise((r) => {
-      setTimeout(r, 80)
-    })
+    await vi.advanceTimersByTimeAsync(80)
 
     expect(db.getDispatchContext(task.id)?.last_heartbeat_at).toBeTruthy()
 
     // Complete the task so the coordinator run finishes cleanly.
     insertWorkerDone(db, { taskId: task.id })
 
-    const result = await runPromise
+    const result = await settleCoordinatorRun(runPromise)
     expect(result.status).toBe('completed')
   })
 
@@ -674,11 +674,9 @@ describe('Coordinator', () => {
       onLog: (m) => logs.push(m)
     })
     const staleRun = staleCoordinator.run()
-    await new Promise((r) => {
-      setTimeout(r, 80)
-    })
+    await vi.advanceTimersByTimeAsync(80)
     staleCoordinator.stop()
-    await staleRun
+    await settleCoordinatorRun(staleRun)
 
     expect(db.getTask(task.id)?.status).toBe('dispatched')
     expect(db.getDispatchContextById(staleCtx.id)?.status).toBe('failed')
@@ -695,7 +693,7 @@ describe('Coordinator', () => {
       coordinatorHandle: 'coord',
       pollIntervalMs: 20
     })
-    const result = await completionCoordinator.run()
+    const result = await settleCoordinatorRun(completionCoordinator.run())
 
     expect(result.status).toBe('completed')
     expect(db.getTask(task.id)?.status).toBe('completed')
@@ -730,7 +728,7 @@ describe('Coordinator', () => {
       pollIntervalMs: 20,
       onLog: (m) => logs.push(m)
     })
-    const result = await coordinator.run()
+    const result = await settleCoordinatorRun(coordinator.run())
 
     expect(result.status).toBe('completed')
     expect(db.getTask(task.id)?.status).toBe('completed')
@@ -751,12 +749,10 @@ describe('Coordinator', () => {
 
     const runPromise = coordinator.run()
 
-    await new Promise((r) => {
-      setTimeout(r, 100)
-    })
+    await vi.advanceTimersByTimeAsync(100)
     coordinator.stop()
 
-    const result = await runPromise
+    const result = await settleCoordinatorRun(runPromise)
     expect(result.status).toBe('failed')
   })
 
@@ -784,13 +780,11 @@ describe('Coordinator', () => {
       })
 
       const runPromise = coordinator.run()
-      await new Promise((r) => {
-        setTimeout(r, 100)
-      })
+      await vi.advanceTimersByTimeAsync(100)
 
       insertWorkerDone(db, { taskId: task.id })
 
-      const result = await runPromise
+      const result = await settleCoordinatorRun(runPromise)
       expect(result.status).toBe('completed')
       expect(runtime.probeDriftCalls).toContain('wt1')
       const sent = runtime.sentMessages.find((m) => m.handle === 'term_a')
@@ -823,11 +817,9 @@ describe('Coordinator', () => {
       })
 
       const runPromise = coordinator.run()
-      await new Promise((r) => {
-        setTimeout(r, 250)
-      })
+      await vi.advanceTimersByTimeAsync(250)
       coordinator.stop()
-      const result = await runPromise
+      const result = await settleCoordinatorRun(runPromise)
 
       // Why: silent-skip must NOT burn the circuit-breaker budget. Task must
       // stay in `ready`; failDispatch must NOT be called; no prompt injection
@@ -863,13 +855,11 @@ allow-stale-base: true`
       })
 
       const runPromise = coordinator.run()
-      await new Promise((r) => {
-        setTimeout(r, 100)
-      })
+      await vi.advanceTimersByTimeAsync(100)
 
       insertWorkerDone(db, { taskId: task.id })
 
-      const result = await runPromise
+      const result = await settleCoordinatorRun(runPromise)
       expect(result.status).toBe('completed')
       const sent = runtime.sentMessages.find((m) => m.handle === 'term_a')
       expect(sent).toBeDefined()
@@ -899,13 +889,11 @@ allow-stale-base: true`
       })
 
       const runPromise = coordinator.run()
-      await new Promise((r) => {
-        setTimeout(r, 100)
-      })
+      await vi.advanceTimersByTimeAsync(100)
 
       insertWorkerDone(db, { taskId: task.id })
 
-      const result = await runPromise
+      const result = await settleCoordinatorRun(runPromise)
       expect(result.status).toBe('completed')
       const sent = runtime.sentMessages.find((m) => m.handle === 'term_a')
       expect(sent).toBeDefined()
@@ -932,13 +920,11 @@ allow-stale-base: true`
       })
 
       const runPromise = coordinator.run()
-      await new Promise((r) => {
-        setTimeout(r, 100)
-      })
+      await vi.advanceTimersByTimeAsync(100)
 
       insertWorkerDone(db, { taskId: task.id })
 
-      const result = await runPromise
+      const result = await settleCoordinatorRun(runPromise)
       expect(result.status).toBe('completed')
       expect(runtime.probeDriftCalls).toHaveLength(0)
       expect(logs.some((m) => m.includes('stale-base guard inert'))).toBe(true)
@@ -965,13 +951,11 @@ allow-stale-base: true`
       })
 
       const runPromise = coordinator.run()
-      await new Promise((r) => {
-        setTimeout(r, 100)
-      })
+      await vi.advanceTimersByTimeAsync(100)
 
       insertWorkerDone(db, { taskId: task.id })
 
-      const result = await runPromise
+      const result = await settleCoordinatorRun(runPromise)
       expect(result.status).toBe('completed')
       const sent = runtime.sentMessages.find((m) => m.handle === 'term_a')
       expect(sent!.text).not.toContain('--- BASE DRIFT ---')

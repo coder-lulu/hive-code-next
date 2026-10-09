@@ -1,3 +1,4 @@
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { resolve } from 'node:path'
 import { canonicalAgentSessionDigest } from '../../shared/agent-session-mutation-envelope'
 import { pendingAgentSessionOperationRow } from '../../shared/agent-session-operation-ledger'
@@ -53,7 +54,7 @@ function preparedFixture(directory: string, options: Options) {
   }
   const link = {
     linkId: 'model-fixture-link',
-    handle: { provider: 'codex' as const, threadId: 'model-fixture-thread' },
+    handle: codexProviderHandle('model-fixture-thread'),
     origin: 'created' as const,
     mintedAtFence: 1,
     observedAt: TASK_TEST_NOW

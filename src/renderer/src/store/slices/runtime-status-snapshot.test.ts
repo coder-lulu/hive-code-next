@@ -10,12 +10,12 @@ import type { RuntimeHostStatusSnapshot } from '../../../../shared/runtime-host-
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
 import { runtimeHostConnectionStateForEntry } from '@/runtime/runtime-host-connection-state'
-import { ensureBrowserClientHostForRestartedRuntime } from '@/runtime/restored-client-hosted-browser-host-attach'
+import { ensureBrowserClientHostOnRuntimeContact } from '@/runtime/restored-client-hosted-browser-host-attach'
 
 vi.mock('sonner', () => ({ toast: { warning: vi.fn(), dismiss: vi.fn() } }))
 vi.mock('@/runtime/restored-client-hosted-browser-host-attach', () => ({
   ensureBrowserClientHostsForRestoredPages: vi.fn(),
-  ensureBrowserClientHostForRestartedRuntime: vi.fn()
+  ensureBrowserClientHostOnRuntimeContact: vi.fn()
 }))
 vi.mock('@/runtime/client-hosted-browser-close-intent-replay', () => ({
   replayClientHostedBrowserCloseIntents: vi.fn()
@@ -126,7 +126,7 @@ it('represents failed verification honestly without manufacturing a session rest
   viewer.getState().applyRuntimeHostStatusSnapshot(snapshot(3))
   // Regaining contact on the same runtime is neither a new connection nor a new session: the
   // generation holds so the session mirror is not rebuilt (#19647), and only the contact epoch
-  // — the mirror's resubscribe trigger — moves. No restart hook, no toast.
+  // — the mirror's resubscribe trigger — moves. Hosting is re-claimed, but no toast.
   expect(viewer.getState().runtimeStatusByEnvironmentId.get('env-a')?.connectionGeneration).toBe(
     generation
   )
@@ -134,7 +134,7 @@ it('represents failed verification honestly without manufacturing a session rest
   expect(viewer.getState().runtimeStatusByEnvironmentId.get('env-a')?.status?.runtimeId).toBe(
     'rt-1'
   )
-  expect(ensureBrowserClientHostForRestartedRuntime).not.toHaveBeenCalled()
+  expect(ensureBrowserClientHostOnRuntimeContact).toHaveBeenCalledTimes(1)
   expect(toast.warning).not.toHaveBeenCalled()
   const reconnectedGeneration = viewer
     .getState()
@@ -146,7 +146,7 @@ it('represents failed verification honestly without manufacturing a session rest
   expect(viewer.getState().runtimeStatusByEnvironmentId.get('env-a')?.connectionGeneration).toBe(
     (reconnectedGeneration ?? 0) + 1
   )
-  expect(ensureBrowserClientHostForRestartedRuntime).toHaveBeenCalled()
+  expect(ensureBrowserClientHostOnRuntimeContact).toHaveBeenCalledTimes(2)
 })
 
 it('keeps a live account route authoritative over a failed local-pairing snapshot', () => {
@@ -163,7 +163,7 @@ it('keeps a live account route authoritative over a failed local-pairing snapsho
     status: runtimeStatus('cloud-runtime'),
     checkedAt: 1
   })
-  vi.mocked(ensureBrowserClientHostForRestartedRuntime).mockClear()
+  vi.mocked(ensureBrowserClientHostOnRuntimeContact).mockClear()
 
   viewer
     .getState()
@@ -175,7 +175,7 @@ it('keeps a live account route authoritative over a failed local-pairing snapsho
   const routed = viewer.getState().runtimeStatusByEnvironmentId.get('env-a')
   expect(routed?.status?.runtimeId).toBe('cloud-runtime')
   expect(runtimeHostConnectionStateForEntry(routed)).toBe('connected')
-  expect(ensureBrowserClientHostForRestartedRuntime).not.toHaveBeenCalled()
+  expect(ensureBrowserClientHostOnRuntimeContact).not.toHaveBeenCalled()
 
   viewer.getState().setRuntimeEnvironmentStatus('env-a', { status: null, checkedAt: 3 })
   expect(

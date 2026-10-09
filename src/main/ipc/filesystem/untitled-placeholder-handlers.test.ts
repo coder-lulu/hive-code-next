@@ -2,7 +2,7 @@ import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join, relative, sep } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   resolveUntitledPlaceholderRetentionRoot,
@@ -11,11 +11,13 @@ import {
 import { registerUntitledPlaceholderHandlers } from './untitled-placeholder-handlers'
 import type { FilesystemHandlerContext } from './filesystem-handler-context'
 import type { SshMutationExpectation } from '../../../shared/ssh-types'
+import type * as GitCommonDirectory from '../../../shared/git-common-directory'
 
 const ports = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => unknown>(),
   authorize: vi.fn<(path: string) => Promise<string>>(),
   userData: null as string | null,
+  fixtureRoot: null as string | null,
   environmentError: null as Error | null
 }))
 vi.mock('electron', () => ({
@@ -27,6 +29,23 @@ vi.mock('electron', () => ({
 vi.mock('../local-file-access-resolution', () => ({
   resolveDesktopAuthorizedPath: ports.authorize
 }))
+vi.mock('../../../shared/git-common-directory', async (importOriginal) => {
+  const actual = await importOriginal<typeof GitCommonDirectory>()
+  return {
+    ...actual,
+    resolveGitCommonDirectory: async (
+      ...args: Parameters<typeof actual.resolveGitCommonDirectory>
+    ) => {
+      if (ports.fixtureRoot) {
+        const part = relative(ports.fixtureRoot, args[0])
+        if (isAbsolute(part) || part === '..' || part.startsWith(`..${sep}`)) {
+          return null
+        }
+      }
+      return actual.resolveGitCommonDirectory(...args)
+    }
+  }
+})
 vi.mock('../../../shared/app-environment', () => ({
   hasAppEnvironment: () => ports.userData !== null || ports.environmentError !== null,
   getAppEnvironment: () => ({
@@ -67,6 +86,7 @@ async function invoke(
 
 beforeEach(async () => {
   directory = await realpath(await mkdtemp(join(tmpdir(), 'untitled-desktop-fallback-')))
+  ports.fixtureRoot = directory
   workspace = join(directory, 'workspace')
   await mkdir(workspace)
   filePath = join(workspace, 'untitled.md')
@@ -85,6 +105,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
+  ports.fixtureRoot = null
   destroy()
   ports.userData = null
   ports.environmentError = null

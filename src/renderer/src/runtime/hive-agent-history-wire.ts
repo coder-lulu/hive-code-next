@@ -1,8 +1,6 @@
 import { z } from 'zod'
-import {
-  isAdmissibleAgentJournalRenderItem,
-  isAdmissibleAgentJournalSubmission
-} from '../../../shared/agent-session-journal-schemas'
+import { isAdmissibleAgentJournalRenderItem } from '../../../shared/agent-session-journal-schemas'
+import { isAdmissibleAgentJournalSubmission } from '../../../shared/agent-session-journal-submission-schema'
 import {
   AGENT_JOURNAL_RESET_REASONS,
   type AgentJournalRenderItem,

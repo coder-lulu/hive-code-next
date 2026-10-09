@@ -26,7 +26,7 @@ export async function createManagedPiExecutionHost(options: {
   inference: ManagedPiTextInference
   now: () => number
 }) {
-  const { store, pack } = options
+  const { store, pack, runtimeRecordId } = options
   if (
     store.hostId !== 'local' ||
     typeof options.inference?.run !== 'function' ||
@@ -37,8 +37,7 @@ export async function createManagedPiExecutionHost(options: {
   }
   await store.reconcileOnRestart({
     owns: (record) =>
-      record.provider === 'managed-pi' &&
-      record.options?.runtimeRecordId === options.runtimeRecordId,
+      record.provider === 'managed-pi' && record.options?.runtimeRecordId === runtimeRecordId,
     probe: (record) =>
       record.lease.ownerProcess
         ? probeAgentSessionProcessIdentity({ identity: record.lease.ownerProcess })
@@ -126,6 +125,8 @@ export async function createManagedPiExecutionHost(options: {
       store,
       now: options.now,
       owns: (record) => record.sessionId === lease.recordId,
+      // The managed driver has no generic host child record: each tick verifies its transport.
+      holdsLiveChild: () => false,
       validate: () => lease.assertLive(),
       probe: async () => {
         lease.assertLive()

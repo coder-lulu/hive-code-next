@@ -111,7 +111,9 @@ function transport(callContext = context(), actualHost?: UntitledPlaceholderRete
   const handler = new FsHandler(dispatcher as unknown as RelayDispatcher, new RelayContext(), {
     subscribe: vi.fn(),
     forgetRoot: vi.fn(),
-    dispose: vi.fn()
+    dispose: vi.fn(),
+    disposeAndWait: vi.fn(async () => {}),
+    reopen: vi.fn()
   })
   handlers.push(handler)
   const request = async (method: string, args: Record<string, unknown>, c = callContext) => {

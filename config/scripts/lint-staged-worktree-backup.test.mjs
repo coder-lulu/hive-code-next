@@ -1,80 +1,141 @@
-import { execFileSync } from 'node:child_process'
+import { createGitTestRunner } from '../../src/relay/git-handler-test-setup'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import lintStaged from 'lint-staged'
-import { expect, it } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const BACKUP_REFS = 'refs/worktree/lint-staged-backups'
 const silentLogger = { error() {}, log() {}, warn() {} }
 
-it('keeps lint-staged backups isolated to the current worktree', async () => {
-  const root = mkdtempSync(join(tmpdir(), 'orca-lint-staged-worktree-'))
+const fixtureGit = createGitTestRunner()
+const subjectChildren = vi.hoisted(() => ({ closed: [] }))
+vi.mock('node:child_process', async (importOriginal) => {
+  const real = await importOriginal()
+  const spawn = new Proxy(real.spawn, {
+    apply(target, receiver, args) {
+      const child = target.apply(receiver, args)
+      const closed = Promise.withResolvers()
+      subjectChildren.closed.push(closed.promise)
+      child.once('close', () => closed.resolve())
+      child.once('error', () => {
+        if (!child.pid) {
+          closed.resolve()
+        }
+      })
+      return child
+    }
+  })
+  return { ...real, spawn }
+})
 
-  try {
-    const repo = join(root, 'repo')
-    const worktree = join(root, 'linked worktree')
-    const trackedFile = join(worktree, 'tracked.txt')
+let root
+let repo
+let worktree
+let trackedFile
+let expectedStash
+let stashBefore
+let stagedBefore
+let unstagedBefore
+let contentBefore
+let observation
+let task
+let pendingSetup
+let pendingSubject
+let pendingLint
+
+beforeEach(async ({ signal }) => {
+  fixtureGit.useSignal(signal, null)
+  pendingSetup = (async () => {
+    root = mkdtempSync(join(tmpdir(), 'orca-lint-staged-worktree-'))
+
+    repo = join(root, 'repo')
+    worktree = join(root, 'linked worktree')
+    trackedFile = join(worktree, 'tracked.txt')
     mkdirSync(repo)
-    initializeRepo(repo)
+    await initializeRepo(repo)
 
     writeFileSync(join(repo, 'tracked.txt'), 'base-one\nbase-two\n')
-    git(repo, ['add', 'tracked.txt'])
-    git(repo, ['commit', '--quiet', '-m', 'initial'])
+    await git(repo, ['add', 'tracked.txt'])
+    await git(repo, ['commit', '--quiet', '-m', 'initial'])
     writeFileSync(join(repo, 'tracked.txt'), 'user stash\nbase-two\n')
-    git(repo, ['stash', 'push', '--quiet', '--message', 'user backup'])
-    git(repo, ['worktree', 'add', '--quiet', '-b', 'linked', worktree])
+    await git(repo, ['stash', 'push', '--quiet', '--message', 'user backup'])
+    await git(repo, ['worktree', 'add', '--quiet', '-b', 'linked', worktree])
 
     writeFileSync(trackedFile, 'staged-change\nbase-two\n')
-    git(worktree, ['add', 'tracked.txt'])
+    await git(worktree, ['add', 'tracked.txt'])
     writeFileSync(trackedFile, 'staged-change\nunstaged-change\n')
 
-    const expectedStash = gitTrim(worktree, ['rev-parse', 'refs/stash'])
-    const stashBefore = git(worktree, ['stash', 'list', '--format=%H%x00%gs'])
-    const stagedBefore = git(worktree, ['diff', '--cached', '--binary'])
-    const unstagedBefore = git(worktree, ['diff', '--binary'])
-    const contentBefore = readFileSync(trackedFile, 'utf8')
-    const observation = join(root, 'task-observation.json')
+    expectedStash = await gitTrim(worktree, ['rev-parse', 'refs/stash'])
+    stashBefore = await git(worktree, ['stash', 'list', '--format=%H%x00%gs'])
+    stagedBefore = await git(worktree, ['diff', '--cached', '--binary'])
+    unstagedBefore = await git(worktree, ['diff', '--binary'])
+    contentBefore = readFileSync(trackedFile, 'utf8')
+    observation = join(root, 'task-observation.json')
     const probe = join(root, 'failing-task.cjs')
     writeProbe(probe)
 
-    const task = [process.execPath, probe, expectedStash, observation].map(quote).join(' ')
-    const passed = await lintStaged(
+    task = [process.execPath, probe, expectedStash, observation].map(quote).join(' ')
+  })()
+  await pendingSetup
+})
+
+afterEach(async () => {
+  await Promise.allSettled([
+    ...(pendingSetup ? [pendingSetup] : []),
+    ...(pendingSubject ? [pendingSubject] : []),
+    ...(pendingLint ? [pendingLint] : [])
+  ])
+  await fixtureGit.settle()
+  await Promise.all(subjectChildren.closed.splice(0))
+  if (root) {
+    rmSync(root, { force: true, recursive: true })
+  }
+  pendingSetup = undefined
+  pendingSubject = undefined
+  pendingLint = undefined
+  root = undefined
+})
+
+it('keeps lint-staged backups isolated to the current worktree', async ({ signal }) => {
+  fixtureGit.useSignal(signal)
+  pendingSubject = (async () => {
+    pendingLint = lintStaged(
       { config: { '*.txt': task }, cwd: worktree, quiet: true },
       silentLogger
     )
+    const passed = await pendingLint
 
     expect(passed).toBe(false)
     expect(JSON.parse(readFileSync(observation, 'utf8'))).toEqual({
       backupRefs: [expect.stringMatching(`^${BACKUP_REFS}/`)],
       sharedStash: expectedStash
     })
-    expect(git(worktree, ['for-each-ref', '--format=%(refname)', BACKUP_REFS])).toBe('')
-    expect(git(worktree, ['stash', 'list', '--format=%H%x00%gs'])).toBe(stashBefore)
-    expect(git(worktree, ['diff', '--cached', '--binary'])).toBe(stagedBefore)
-    expect(git(worktree, ['diff', '--binary'])).toBe(unstagedBefore)
+    expect(await git(worktree, ['for-each-ref', '--format=%(refname)', BACKUP_REFS])).toBe('')
+    expect(await git(worktree, ['stash', 'list', '--format=%H%x00%gs'])).toBe(stashBefore)
+    expect(await git(worktree, ['diff', '--cached', '--binary'])).toBe(stagedBefore)
+    expect(await git(worktree, ['diff', '--binary'])).toBe(unstagedBefore)
     expect(readFileSync(trackedFile, 'utf8')).toBe(contentBefore)
-    expect(git(worktree, ['ls-files', '--unmerged'])).toBe('')
-  } finally {
-    rmSync(root, { force: true, recursive: true })
-  }
+    expect(await git(worktree, ['ls-files', '--unmerged'])).toBe('')
+  })()
+  await pendingSubject
 })
 
-function initializeRepo(repo) {
-  git(repo, ['init', '--quiet'])
-  git(repo, ['config', 'user.email', 'test@example.invalid'])
-  git(repo, ['config', 'user.name', 'Test'])
-  git(repo, ['config', 'core.autocrlf', 'false'])
-  git(repo, ['config', 'core.hooksPath', join(repo, '.git', 'no-hooks')])
-  git(repo, ['config', 'commit.gpgsign', 'false'])
+async function initializeRepo(repo) {
+  await git(repo, ['init', '--quiet'])
+  await git(repo, ['config', 'user.email', 'test@example.invalid'])
+  await git(repo, ['config', 'user.name', 'Test'])
+  await git(repo, ['config', 'core.autocrlf', 'false'])
+  await git(repo, ['config', 'core.hooksPath', join(repo, '.git', 'no-hooks')])
+  await git(repo, ['config', 'commit.gpgsign', 'false'])
 }
 
 function git(cwd, args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8' })
+  return fixtureGit.git(cwd, args)
 }
 
-function gitTrim(cwd, args) {
-  return git(cwd, args).trim()
+async function gitTrim(cwd, args) {
+  return (await git(cwd, args)).trim()
 }
 
 function quote(value) {

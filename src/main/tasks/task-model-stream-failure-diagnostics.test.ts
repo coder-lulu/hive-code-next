@@ -1,3 +1,7 @@
+import {
+  addTaskModelPolicyLocationWithInvalidInput,
+  refusedTaskModelResponseFields
+} from './task-model-response-field-diagnostics.test-fixture'
 import { closeTestJournalHostDatabases } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import type { Server } from 'node:http'
@@ -22,7 +26,6 @@ import {
 } from './task-model-channel-protocol'
 import { createTaskModelPolicy } from './task-model-policy'
 import { addTaskModelPolicyLocation } from './task-model-stream-failure'
-import { refusedTaskModelResponseFields } from './task-model-response-field-diagnostics.test-fixture'
 import { readPersistedTestAgentSessionStore } from '../runtime/agent-session-record-store-test-harness'
 import { TASK_TEST_NOW } from './task-execution.test-fixture'
 import { createTaskModelStreamFetchFixture } from './task-model-stream-fetch.test-fixture'
@@ -442,19 +445,13 @@ describe('actual finite stream guard and policy producer diagnostics', () => {
     } catch (error) {
       raw = error
     }
-    Reflect.apply(addTaskModelPolicyLocation, undefined, [
-      raw,
-      'https://private.invalid/token-secret'
-    ])
+    addTaskModelPolicyLocationWithInvalidInput(raw, 'https://private.invalid/token-secret')
     const getter = vi.fn(() => 'event')
-    Reflect.apply(addTaskModelPolicyLocation, undefined, [
-      raw,
-      {
-        get location() {
-          return getter()
-        }
+    addTaskModelPolicyLocationWithInvalidInput(raw, {
+      get location() {
+        return getter()
       }
-    ])
+    })
     expect(getter).not.toHaveBeenCalled()
     expect(refused(raw).diagnostic).not.toHaveProperty('policyLocation')
     expect(refused(raw).diagnostic).not.toHaveProperty('policyKey')

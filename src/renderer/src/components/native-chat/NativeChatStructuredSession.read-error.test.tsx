@@ -12,7 +12,7 @@ vi.mock('@/runtime/structured-agent-session-client', () =>
   moduleFactories.structuredAgentSessionClient()
 )
 vi.mock('./use-structured-agent-session', () => moduleFactories.useStructuredAgentSession())
-vi.mock('./use-native-chat-font-scale', () => moduleFactories.useNativeChatFontScale())
+vi.mock('./use-native-chat-font-size', () => moduleFactories.useNativeChatFontSize())
 vi.mock('./use-native-chat-file-link-context', () => moduleFactories.useNativeChatFileLinkContext())
 vi.mock('./use-native-chat-file-link-click', () => moduleFactories.useNativeChatFileLinkClick())
 vi.mock('./NativeChatMessageList', () => moduleFactories.nativeChatMessageList())
@@ -71,6 +71,8 @@ it('says a damaged history cannot load in one line, without claiming Orca keeps 
   expect(screen.queryByText('Could not load conversation')).toBeNull()
   expect(screen.queryByText(/keeps trying/)).toBeNull()
   expect(screen.queryByText(/agent_session_/)).toBeNull()
+  // Nothing to send into: a send would only be refused and say it again.
+  expect(mocks.composerProps).toBeNull()
 })
 
 it("names a history that couldn't open right now once, in its one line", () => {
@@ -86,6 +88,8 @@ it("names a history that couldn't open right now once, in its one line", () => {
   expect(screen.queryByText('Could not load conversation')).toBeNull()
   expect(screen.queryByText(/keeps trying/)).toBeNull()
   expect(screen.queryByText(/Try again/)).toBeNull()
+  // It can clear, so the composer stays and a send waits for the read.
+  expect(mocks.composerProps).not.toBeNull()
 })
 
 it("says a code's own words that the history didn't load, and nothing under them", () => {
@@ -103,7 +107,7 @@ it("says a code's own words that the history didn't load, and nothing under them
 })
 
 // "This isn't available in this chat." would name nothing the reader asked for.
-it('says only that the history did not load for a chat its host cannot run', () => {
+it('says why the history did not load for a chat its host cannot run', () => {
   mocks.status = 'error'
   mocks.readRefusal = {
     code: 'structured_agent_session_unsupported',
@@ -113,7 +117,11 @@ it('says only that the history did not load for a chat its host cannot run', () 
 
   renderPane()
 
-  expect(screen.getAllByText("This chat's history couldn't be loaded.")).toHaveLength(1)
+  expect(
+    screen.getAllByText(
+      `${APP_DISPLAY_NAME} can't run this agent in a chat here. This chat's history couldn't be loaded.`
+    )
+  ).toHaveLength(1)
   expect(screen.queryByText(/isn't available/)).toBeNull()
   expect(screen.queryByText(`newer ${APP_DISPLAY_NAME}`, { exact: false })).toBeNull()
 })
@@ -127,21 +135,32 @@ it("says a newer build's words alone", () => {
 
   expect(
     screen.getByText(
-      `Chats were saved by a newer ${APP_DISPLAY_NAME}. Update ${APP_DISPLAY_NAME} to keep using them.`
+      `This chat was saved by a newer ${APP_DISPLAY_NAME}. Update ${APP_DISPLAY_NAME} to open it.`
     )
   ).toBeTruthy()
   expect(screen.queryByText(/keeps trying/)).toBeNull()
+  expect(mocks.composerProps).toBeNull()
 })
 
-it('says only that it is reconnecting, not as an error, when a failure names nothing', () => {
+// Only a chat that never loaded stores a failure with no host refusal (the read owner drops it after load).
+it('says once that the history did not load beside a bubble of a chat that never loaded', () => {
   mocks.status = 'error'
 
-  renderPane()
+  render(
+    <NativeChatStructuredSession
+      isVisible
+      isFocusedGroup
+      tabId="structured-read-error-tab"
+      sessionId="read-error-session"
+      target={{ kind: 'environment', environmentId: 'remote-host' }}
+      agent="codex"
+    />
+  )
 
   expect(screen.getByTestId('message-list')).toBeTruthy()
-  const reconnecting = screen.getByText('Reconnecting to this chat…')
-  expect(reconnecting.className).not.toContain('text-destructive')
-  expect(screen.queryByText(/history couldn't be loaded/)).toBeNull()
+  expect(screen.getByTestId('structured-composer')).toBeTruthy()
+  expect(screen.getAllByText("This chat's history couldn't be loaded.")).toHaveLength(1)
+  expect(screen.queryByText(/reconnect/i)).toBeNull()
 })
 
 it('words a failed reconnect beside a transcript it keeps', () => {

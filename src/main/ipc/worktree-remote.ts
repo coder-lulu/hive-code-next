@@ -1517,6 +1517,9 @@ async function resolveRemoteTrackingBaseSsh(
   repoPath: string,
   baseBranch: string
 ): Promise<RemoteTrackingBase | null> {
+  if (baseBranch.startsWith('refs/') && !baseBranch.startsWith('refs/remotes/')) {
+    return null
+  }
   let remotes: string[]
   try {
     const { stdout } = await provider.exec(['remote'], repoPath)

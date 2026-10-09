@@ -1,3 +1,8 @@
+import {
+  closeTestJournalHostDatabases,
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 // What the host does with a second press of the same control, against the real host, store and
 // journal: under the first press's id it answers from that press and does nothing more, which is
 // why a client sends every press under a new id; under a new id it acts.
@@ -11,10 +16,6 @@ import { agentSessionRefusalOperationState } from '../../../shared/agent-session
 import type { AgentSessionThreadGoalChange } from '../../../shared/agent-session-wire'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
-import {
-  closeTestJournalHostDatabase,
-  openTestJournalHostDatabase
-} from '../agent-session-journal/journal-host-database-test-support'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
@@ -26,6 +27,8 @@ import {
   hostTestOperationId,
   resetHostTestOperationIds
 } from './structured-agent-session-host-test-data'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { claudeAndCodexAgents } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-1' }
 
@@ -45,31 +48,32 @@ beforeEach(async () => {
   stopBackgroundTasks = vi.fn(async () => ({ cancelled: true }))
   cancelTurn = vi.fn(async () => ({ cancelled: true }))
   store = await openTestAgentSessionRecordStore(root)
+  const adapter: StructuredAgentSessionAdapter = {
+    acquire: async ({ fence, spawnToken }) => ({
+      process: { hostId: 'local', pid: 4242, processStartTimeMs: 1_700_000_000_000, spawnToken },
+      acquisitionGeneration: 'generation-1',
+      link: {
+        linkId: `link-${fence}`,
+        handle: codexProviderHandle(THREAD),
+        origin: fence > 1 ? ('resumed' as const) : ('created' as const),
+        mintedAtFence: fence,
+        observedAt: NOW
+      }
+    }),
+    dispatch: vi.fn(async () => ({ state: 'admitted' as const })),
+    closeSession: vi.fn(async () => true),
+    releaseAcquisition: vi.fn(async () => true),
+    cancelTurn,
+    answerPrompt: vi.fn(async () => undefined),
+    setOption,
+    changeThreadGoal,
+    stopBackgroundTasks
+  }
   host = new StructuredAgentSessionHost({
+    agents: claudeAndCodexAgents(adapter),
     logger: createStructuredAgentSessionLogger(),
     store,
-    adapter: {
-      acquire: async ({ fence, spawnToken }) => ({
-        process: { hostId: 'local', pid: 4242, processStartTimeMs: 1_700_000_000_000, spawnToken },
-        acquisitionGeneration: 'generation-1',
-        link: {
-          linkId: `link-${fence}`,
-          handle: { provider: 'codex' as const, threadId: THREAD },
-          origin: fence > 1 ? ('resumed' as const) : ('created' as const),
-          mintedAtFence: fence,
-          observedAt: NOW
-        }
-      }),
-      dispatch: vi.fn(async () => ({ state: 'admitted' as const })),
-      closeSession: vi.fn(async () => true),
-      releaseAcquisition: vi.fn(async () => true),
-      cancelTurn,
-      answerPrompt: vi.fn(async () => undefined),
-      setOption,
-      changeThreadGoal,
-      supportsThreadGoal: () => true,
-      stopBackgroundTasks
-    },
+    adapter,
     journalDatabase: openTestJournalHostDatabase(root),
     claimKeyId: 'key-1',
     mintSpawnToken: () => 'spawn-1',
@@ -81,6 +85,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await host.flushAllStreamedEvents()
   closeTestJournalHostDatabase(root)
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 

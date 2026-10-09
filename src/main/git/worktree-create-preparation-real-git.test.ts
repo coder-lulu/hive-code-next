@@ -1,10 +1,15 @@
-import { execFileSync } from 'node:child_process'
-import { existsSync, realpathSync, watch, type FSWatcher } from 'node:fs'
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { existsSync, watch, type FSWatcher } from 'node:fs'
+import { mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as gitRunner from './runner'
+import {
+  createRepo,
+  git,
+  observeRegistration,
+  settlePreparationFixtures,
+  trackPreparationCleanup
+} from './worktree-preparation-real-git-fixture'
 import {
   createWorktreePreparationLockReason,
   isWorktreeCreatePreparation,
@@ -25,106 +30,99 @@ import {
 } from '../worktree-create-preparation-pool'
 import { hasPendingStalePreparationCleanup } from '../worktree-create-preparation-stale-cleanup'
 
-const tempRoots: string[] = []
-
-function git(cwd: string, args: string[]): string {
-  return execFileSync('git', args, {
-    cwd,
-    encoding: 'utf8',
-    stdio: ['pipe', 'pipe', 'pipe']
-  }).trim()
-}
-
-async function createRepo(): Promise<{ repoPath: string; root: string }> {
-  const root = realpathSync.native(await mkdtemp(join(tmpdir(), 'orca-prepared-worktree-')))
-  tempRoots.push(root)
-  const repoPath = join(root, 'repo')
-  execFileSync('git', ['init', '--quiet', repoPath])
-  git(repoPath, ['symbolic-ref', 'HEAD', 'refs/heads/main'])
-  git(repoPath, ['config', 'user.email', 'test@example.com'])
-  git(repoPath, ['config', 'user.name', 'Test User'])
-  git(repoPath, ['config', 'core.autocrlf', 'false'])
-  await writeFile(join(repoPath, 'version.txt'), 'one\n')
-  git(repoPath, ['add', 'version.txt'])
-  git(repoPath, ['commit', '--quiet', '-m', 'initial'])
-  return { repoPath, root }
-}
-
-afterEach(async () => {
-  await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
-})
+afterEach(settlePreparationFixtures)
 
 describe('prepared worktree creation with real Git', () => {
-  it('registers during fetch and materializes its settled tip only once before the final hook', async () => {
-    const { repoPath, root } = await createRepo()
-    const preparedPath = join(root, 'prepared-barrier')
-    const finalPath = join(root, 'final-barrier')
+  describe('registration while fetching', () => {
+    let fixture: Awaited<ReturnType<typeof createRepo>>
     const base = 'refs/remotes/origin/main'
     const reason = createWorktreePreparationLockReason('barrier-tip')
-    const originalHead = git(repoPath, ['rev-parse', 'HEAD'])
-    git(repoPath, ['update-ref', base, originalHead])
-    const hooksPath = join(root, 'hooks')
-    await mkdir(hooksPath)
-    await writeFile(
-      join(hooksPath, 'post-checkout'),
-      '#!/bin/sh\nprintf \'%s\\n\' "$@" >> checkout-hook.txt\n',
-      { mode: 0o755 }
-    )
-    git(repoPath, ['config', 'core.hooksPath', hooksPath])
-    let release!: () => void
-    const barrier = new Promise<void>((resolve) => {
-      release = resolve
+    beforeEach(async () => {
+      fixture = await createRepo()
+      const { repoPath, root } = fixture
+      const originalHead = git(repoPath, ['rev-parse', 'HEAD'])
+      git(repoPath, ['update-ref', base, originalHead])
+      const hooksPath = join(root, 'hooks')
+      await mkdir(hooksPath)
+      await writeFile(
+        join(hooksPath, 'post-checkout'),
+        '#!/bin/sh\nprintf \'%s\\n\' "$@" >> checkout-hook.txt\n',
+        { mode: 0o755 }
+      )
+      git(repoPath, ['config', 'core.hooksPath', hooksPath])
     })
-    const spy = vi.spyOn(gitRunner, 'gitExecFileAsync')
-    const preparing = prepareWorktreeCreateCheckout(
-      repoPath,
-      preparedPath,
-      base,
-      reason,
-      {},
-      barrier
-    )
-    await vi.waitFor(() => expect(existsSync(join(preparedPath, '.git'))).toBe(true))
-    await expect(readFile(join(preparedPath, 'version.txt'))).rejects.toMatchObject({
-      code: 'ENOENT'
-    })
-    expect(spy.mock.calls.some(([args]) => args.includes('reset'))).toBe(false)
-    await writeFile(join(repoPath, 'version.txt'), 'fetched\n')
-    git(repoPath, ['commit', '--quiet', '-am', 'fetched tip'])
-    const fetchedHead = git(repoPath, ['rev-parse', 'HEAD'])
-    git(repoPath, ['update-ref', base, fetchedHead])
-    release()
-    try {
-      await preparing
-      expect(git(preparedPath, ['rev-parse', 'HEAD'])).toBe(fetchedHead)
-      expect(await readFile(join(preparedPath, 'version.txt'), 'utf8')).toBe('fetched\n')
-      expect(existsSync(join(preparedPath, 'checkout-hook.txt'))).toBe(false)
-      await finalizePreparedWorktree(
+    it('registers during fetch and materializes its settled tip only once before the final hook', async ({
+      signal
+    }) => {
+      const { repoPath, root } = fixture
+      const preparedPath = join(root, 'prepared-barrier')
+      const finalPath = join(root, 'final-barrier')
+      let release!: () => void
+      const barrier = new Promise<void>((resolve) => {
+        release = resolve
+      })
+      const { registered, spy } = observeRegistration()
+      const preparing = prepareWorktreeCreateCheckout(
         repoPath,
         preparedPath,
-        finalPath,
-        'feature/barrier',
         base,
-        false,
-        {},
-        reason
+        reason,
+        { signal },
+        barrier
       )
-      const resets = spy.mock.calls.filter(([args]) => args.includes('reset'))
-      expect(resets).toHaveLength(1)
-      expect(resets[0]?.[0].at(-1)).toBe(fetchedHead)
-      expect(await readFile(join(finalPath, 'checkout-hook.txt'), 'utf8')).toBe(
-        `${fetchedHead}\n${fetchedHead}\n1\n`
-      )
-      expect(git(finalPath, ['symbolic-ref', '--short', 'HEAD'])).toBe('feature/barrier')
-      await rm(join(finalPath, 'checkout-hook.txt'))
-      expect(git(finalPath, ['status', '--porcelain'])).toBe('')
-    } finally {
-      release()
-      spy.mockRestore()
-    }
+      const operations: Promise<unknown>[] = [preparing]
+      const cleanup = async () => {
+        release()
+        await Promise.allSettled(operations)
+        spy.mockRestore()
+      }
+      trackPreparationCleanup(cleanup)
+      try {
+        await Promise.race([registered, preparing])
+        expect(existsSync(join(preparedPath, '.git'))).toBe(true)
+        await expect(readFile(join(preparedPath, 'version.txt'))).rejects.toMatchObject({
+          code: 'ENOENT'
+        })
+        expect(spy.mock.calls.some(([args]) => args.includes('reset'))).toBe(false)
+        await writeFile(join(repoPath, 'version.txt'), 'fetched\n')
+        git(repoPath, ['commit', '--quiet', '-am', 'fetched tip'])
+        const fetchedHead = git(repoPath, ['rev-parse', 'HEAD'])
+        git(repoPath, ['update-ref', base, fetchedHead])
+        release()
+        await preparing
+        expect(git(preparedPath, ['rev-parse', 'HEAD'])).toBe(fetchedHead)
+        expect(await readFile(join(preparedPath, 'version.txt'), 'utf8')).toBe('fetched\n')
+        expect(existsSync(join(preparedPath, 'checkout-hook.txt'))).toBe(false)
+        const finalizing = finalizePreparedWorktree(
+          repoPath,
+          preparedPath,
+          finalPath,
+          'feature/barrier',
+          base,
+          false,
+          { signal },
+          reason
+        )
+        operations.push(finalizing)
+        await finalizing
+        const resets = spy.mock.calls.filter(([args]) => args.includes('reset'))
+        expect(resets).toHaveLength(1)
+        expect(resets[0]?.[0].at(-1)).toBe(fetchedHead)
+        expect(await readFile(join(finalPath, 'checkout-hook.txt'), 'utf8')).toBe(
+          `${fetchedHead}\n${fetchedHead}\n1\n`
+        )
+        expect(git(finalPath, ['symbolic-ref', '--short', 'HEAD'])).toBe('feature/barrier')
+        await rm(join(finalPath, 'checkout-hook.txt'))
+        expect(git(finalPath, ['status', '--porcelain'])).toBe('')
+      } finally {
+        await cleanup()
+      }
+    })
   })
 
-  it('cancels a never-settling fetch barrier and cleans the registered checkout before it resolves', async () => {
+  it('cancels a never-settling fetch barrier and cleans the registered checkout before it resolves', async ({
+    signal
+  }) => {
     const { repoPath, root } = await createRepo()
     const preparedPath = join(root, 'canceled-barrier')
     const reason = createWorktreePreparationLockReason('barrier-cancel')
@@ -134,18 +132,27 @@ describe('prepared worktree creation with real Git', () => {
       release = resolve
     })
     const barrierSubscribed = vi.spyOn(barrier, 'then')
-    const spy = vi.spyOn(gitRunner, 'gitExecFileAsync')
+    const { registered, spy } = observeRegistration()
     const preparing = prepareWorktreeCreateCheckout(
       repoPath,
       preparedPath,
       'main',
       reason,
-      { signal: controller.signal },
+      { signal: AbortSignal.any([signal, controller.signal]) },
       barrier
     )
     const assertion = expect(preparing).rejects.toThrow('expired while fetching')
+    const cleanup = async () => {
+      controller.abort(new Error('expired while fetching'))
+      release()
+      await Promise.allSettled([preparing, assertion])
+      barrierSubscribed.mockRestore()
+      spy.mockRestore()
+    }
+    trackPreparationCleanup(cleanup)
     try {
-      await vi.waitFor(() => expect(existsSync(join(preparedPath, '.git'))).toBe(true))
+      await Promise.race([registered, preparing])
+      expect(existsSync(join(preparedPath, '.git'))).toBe(true)
       const lock = git(preparedPath, ['rev-parse', '--git-path', 'locked'])
       await vi.waitFor(async () => expect(await readFile(lock, 'utf8')).toBe(`${reason}\n`))
       await vi.waitFor(() =>
@@ -161,13 +168,13 @@ describe('prepared worktree creation with real Git', () => {
       await Promise.resolve()
       expect(spy.mock.calls.some(([args]) => args.includes('reset'))).toBe(false)
     } finally {
-      release()
-      barrierSubscribed.mockRestore()
-      spy.mockRestore()
+      await cleanup()
     }
   })
 
-  it('preserves a replacement owner after the fetch barrier before probing or materializing', async () => {
+  it('preserves a replacement owner after the fetch barrier before probing or materializing', async ({
+    signal
+  }) => {
     const { repoPath, root } = await createRepo()
     const preparedPath = join(root, 'replaced-barrier')
     const reason = createWorktreePreparationLockReason('barrier-replacement')
@@ -175,30 +182,42 @@ describe('prepared worktree creation with real Git', () => {
     const barrier = new Promise<void>((resolve) => {
       release = resolve
     })
+    const { registered, spy: registrationSpy } = observeRegistration()
     const preparing = prepareWorktreeCreateCheckout(
       repoPath,
       preparedPath,
       'main',
       reason,
-      {},
+      { signal },
       barrier
     )
     const assertion = expect(preparing).rejects.toThrow('lock owner changed')
-    await vi.waitFor(() => expect(existsSync(join(preparedPath, '.git'))).toBe(true))
-    const lock = git(preparedPath, ['rev-parse', '--git-path', 'locked'])
-    await vi.waitFor(async () => expect(await readFile(lock, 'utf8')).toBe(`${reason}\n`))
-    await writeFile(lock, 'manual barrier owner\n')
-    await writeFile(join(preparedPath, 'version.txt'), 'manual content\n')
-    const spy = vi.spyOn(gitRunner, 'gitExecFileAsync')
+    const cleanup = async () => {
+      release()
+      await Promise.allSettled([preparing, assertion])
+      registrationSpy.mockRestore()
+    }
+    trackPreparationCleanup(cleanup)
     try {
-      release()
-      await assertion
-      expect(spy).not.toHaveBeenCalled()
-      expect(await readFile(lock, 'utf8')).toBe('manual barrier owner\n')
-      expect(await readFile(join(preparedPath, 'version.txt'), 'utf8')).toBe('manual content\n')
+      await Promise.race([registered, preparing])
+      expect(existsSync(join(preparedPath, '.git'))).toBe(true)
+      const lock = git(preparedPath, ['rev-parse', '--git-path', 'locked'])
+      await vi.waitFor(async () => expect(await readFile(lock, 'utf8')).toBe(`${reason}\n`))
+      await writeFile(lock, 'manual barrier owner\n')
+      await writeFile(join(preparedPath, 'version.txt'), 'manual content\n')
+      registrationSpy.mockRestore()
+      const spy = vi.spyOn(gitRunner, 'gitExecFileAsync')
+      try {
+        release()
+        await assertion
+        expect(spy).not.toHaveBeenCalled()
+        expect(await readFile(lock, 'utf8')).toBe('manual barrier owner\n')
+        expect(await readFile(join(preparedPath, 'version.txt'), 'utf8')).toBe('manual content\n')
+      } finally {
+        spy.mockRestore()
+      }
     } finally {
-      release()
-      spy.mockRestore()
+      await cleanup()
     }
   })
 

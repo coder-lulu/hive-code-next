@@ -39,6 +39,10 @@ import {
 const reloadAccountPage = (): void => window.location.reload()
 
 document.title = `${APP_DISPLAY_NAME} Web`
+import { installOsFileDropCancellationGuard } from '../lib/os-file-drop-cancellation-guard'
+
+const disposeOsFileDropGuard = installOsFileDropCancellationGuard()
+import.meta.hot?.dispose(disposeOsFileDropGuard)
 const App = lazy(() => import('../App'))
 const initialCloudLaunch = readCloudLaunchFragment(window.location)
 if (initialCloudLaunch.kind !== 'absent') {

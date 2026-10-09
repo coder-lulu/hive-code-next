@@ -39,6 +39,10 @@ vi.mock('../components/dashboard/RetainedAgentsSyncGate', () => ({
   default: () => null
 }))
 
+vi.mock('../components/sidebar/SavedHostScopeWidenGate', () => ({
+  SavedHostScopeWidenGate: () => null
+}))
+
 vi.mock('../components/ports/WorkspacePortScanner', () => ({
   WorkspacePortScanner: () => null
 }))

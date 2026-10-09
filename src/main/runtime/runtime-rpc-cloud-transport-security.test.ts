@@ -44,7 +44,9 @@ async function openCloudSession(ttl = 60_000) {
     revalidateSession
   } as unknown as HiveRuntimeCloudWebLaunchService)
   await server.start()
-  const ws = new WebSocket(`${server.getWebSocketEndpoint()}${PATH}`, { origin: ORIGIN })
+  const ws = new WebSocket(`${server.getWebSocketEndpoint()}${PATH}`, {
+    headers: { Origin: ORIGIN }
+  })
   try {
     await new Promise<void>((resolve, reject) => {
       ws.once('open', resolve)

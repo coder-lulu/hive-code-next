@@ -1,3 +1,7 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener
+} from '../agent-session-journal/journal-host-database-test-support'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -5,20 +9,21 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSessionJournalIdentity } from '../../../shared/agent-session-journal-types'
 import type { AgentChildWorkView } from '../../../shared/agent-status-child-work-view'
-import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { performCancel, type AgentSessionTurnContext } from './structured-agent-session-turns'
 import { createDeferredStructuredAgentSessionEventSink } from './structured-agent-session-event-sink'
 import { agentJournalItemKey } from '../../../shared/agent-session-journal-item-key'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { testEventSinkLogging } from './structured-agent-session-logger-test-support'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const IDENTITY: AgentSessionJournalIdentity = {
   sessionId: 'session-1',
   workspaceId: 'workspace-1',
   hostId: 'host-1',
   agent: 'codex',
-  providerHandle: { kind: 'codex', threadId: 'thread-1' }
+  providerHandle: codexProviderHandle('thread-1')
 }
 
 let root: string | null = null
@@ -27,6 +32,7 @@ const journals = createTrackedJournalOpener()
 afterEach(async () => {
   await journals.closeAll()
   if (root) {
+    closeTestJournalHostDatabases()
     await rm(root, { recursive: true, force: true })
     root = null
   }
@@ -57,6 +63,8 @@ describe('performCancel', () => {
       sessionId: 'session-1',
       journal,
       fence: 1,
+      agents: NO_STRUCTURED_AGENTS,
+      agent: 'codex',
       adapter: { cancelTurn } as unknown as StructuredAgentSessionAdapter,
       persistOptions: async () => undefined,
       resolvedBy: 'client-1',
@@ -111,6 +119,8 @@ describe('performCancel', () => {
       sessionId: 'session-1',
       journal,
       fence: 1,
+      agents: NO_STRUCTURED_AGENTS,
+      agent: 'codex',
       adapter: { cancelTurn } as unknown as StructuredAgentSessionAdapter,
       persistOptions: async () => undefined,
       resolvedBy: 'client-1',
@@ -156,6 +166,8 @@ describe('performCancel', () => {
       sessionId: 'session-1',
       journal,
       fence: 1,
+      agents: NO_STRUCTURED_AGENTS,
+      agent: 'codex',
       adapter: {
         cancelTurn: vi.fn(async () => ({ cancelled: false }))
       } as unknown as StructuredAgentSessionAdapter,
@@ -190,6 +202,8 @@ describe('performCancel', () => {
       sessionId: 'session-1',
       journal,
       fence: 1,
+      agents: NO_STRUCTURED_AGENTS,
+      agent: 'codex',
       adapter: { cancelTurn, stopBackgroundTasks } as unknown as StructuredAgentSessionAdapter,
       persistOptions: async () => undefined,
       resolvedBy: 'client-1',
@@ -228,6 +242,8 @@ describe('performCancel', () => {
       sessionId: 'session-1',
       journal,
       fence: 1,
+      agents: NO_STRUCTURED_AGENTS,
+      agent: 'codex',
       adapter: { cancelTurn, stopBackgroundTasks } as unknown as StructuredAgentSessionAdapter,
       persistOptions: async () => undefined,
       resolvedBy: 'client-1',
@@ -309,6 +325,8 @@ describe('what a conversation Stop reports when the provider stopped nothing', (
       sessionId: 'session-1',
       journal,
       fence: 1,
+      agents: NO_STRUCTURED_AGENTS,
+      agent: 'codex',
       adapter: {
         acquire: vi.fn(),
         dispatch: vi.fn(),
@@ -392,6 +410,8 @@ describe('the note a Stop writes', () => {
       sessionId: 'session-1',
       journal,
       fence: 1,
+      agents: NO_STRUCTURED_AGENTS,
+      agent: 'codex',
       adapter: {
         acquire: vi.fn(),
         dispatch: vi.fn(),

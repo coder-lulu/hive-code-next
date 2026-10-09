@@ -154,8 +154,6 @@ describe('agent launch caller routing', () => {
 
       // Explicit CLI arguments must reach the PTY; structured launch would discard the model override.
       const structurallyBarred =
-        profile.id === 'floating-default-agent' ||
-        profile.id === 'home-temporary-session' ||
         profile.id === 'session-continuation' ||
         profile.id === 'source-control-action' ||
         profile.id === 'source-control-recovery' ||

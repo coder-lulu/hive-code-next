@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { spawnSync } from 'node:child_process'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   getFishCodexShellLaunchPreflight,
   getPosixCodexShellLaunchPreflight,
@@ -73,6 +73,7 @@ const isPowerShell = (shell: Shell): boolean => shell === 'pwsh' || shell === 'p
 const roots: string[] = []
 
 afterEach(() => {
+  vi.unstubAllEnvs()
   for (const root of roots.splice(0)) {
     rmSync(root, { recursive: true, force: true })
   }
@@ -86,8 +87,8 @@ function writeExecutable(path: string, content: string): void {
 type Sandbox = { bin: string; codex: string; helpFile: string; helpLog: string }
 
 /** Fake codex: `--help` prints the help file and logs the probe; any other call prints its argv. */
-function makeSandbox(help: string): Sandbox {
-  const root = mkdtempSync(join(tmpdir(), 'orca-codex-no-daemon-'))
+function makeSandbox(help: string, prefix = 'orca-codex-no-daemon-'): Sandbox {
+  const root = mkdtempSync(join(tmpdir(), prefix))
   roots.push(root)
   const bin = join(root, 'bin')
   mkdirSync(bin)
@@ -113,7 +114,21 @@ process.exit(Number(process.env.FAKE_CODEX_EXIT || 0))
 `
     )
     const codex = join(bin, 'codex.cmd')
-    writeFileSync(codex, '@node "%~dp0fake.js" %*\r\n')
+    writeFileSync(
+      codex,
+      [
+        '@echo off',
+        'if [%1]==[--help] if [%2]==[] goto :help',
+        '@node "%~dp0fake.js" %*',
+        'exit /b %errorlevel%',
+        ':help',
+        '>>"%~dp0..\\help.log" echo help',
+        'if errorlevel 1 exit /b 1',
+        'type "%~dp0..\\help.txt"',
+        'exit /b %errorlevel%',
+        ''
+      ].join('\r\n')
+    )
     return { bin, codex, helpFile, helpLog }
   }
   const codex = join(bin, 'codex')
@@ -180,10 +195,13 @@ function run(
         : shell === 'fish'
           ? [String(fishLookup.path), ['--no-config', '-c', body]]
           : [shell, ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', body]]
+  const fixtureEnv = { ...process.env }
+  delete fixtureEnv.ORCA_CODEX_LAUNCH_PREFLIGHT
   const result = spawnSync(command, args, {
     encoding: 'utf-8',
+    windowsHide: true,
     env: {
-      ...process.env,
+      ...fixtureEnv,
       PATH: `${sandbox.bin}${delimiter}${process.env.PATH ?? ''}`,
       CODEX_HOME: join(sandbox.bin, '..', 'codex-home'),
       ...env
@@ -322,6 +340,38 @@ describe('codex wrapper --no-daemon rule', () => {
   )
 
   for (const [shell, available] of shells.filter(([name]) => isPowerShell(name))) {
+    it.skipIf(!available)(
+      `${shell} reads fixture help from paths with spaces and metacharacters`,
+      () => {
+        const sandbox = makeSandbox(HELP_WITH_FLAG, 'orca codex & % ! ')
+        const result = run(shell, codexCall(shell, ['fix the bug']), sandbox)
+
+        expect(result.status, result.stderr).toBe(0)
+        expect(result.stderr).toBe('')
+        expect(result.stdout.trim()).toBe('ARGV|--no-daemon|fix the bug')
+        expect(helpProbes(sandbox)).toBe(1)
+      }
+    )
+
+    it.skipIf(!available)(`${shell} keeps inherited launch prep outside the fixture`, () => {
+      const sandbox = makeSandbox(HELP_WITH_FLAG)
+      const marker = join(sandbox.bin, 'ambient-prep-called')
+      const prep = join(sandbox.bin, isWindows ? 'inherited-prep.cmd' : 'inherited-prep')
+      writeExecutable(
+        prep,
+        isWindows
+          ? `@echo called>"${marker}"\r\n@exit /b 0\r\n`
+          : `#!/bin/sh\nprintf called > ${quote('bash', marker)}\nexit 0\n`
+      )
+      vi.stubEnv('ORCA_CODEX_LAUNCH_PREFLIGHT', prep)
+
+      const result = run(shell, 'codex x', sandbox)
+
+      expect(result.status, result.stderr).toBe(0)
+      expect(result.stdout.trim()).toBe('ARGV|--no-daemon|x')
+      expect(existsSync(marker)).toBe(false)
+    })
+
     it.skipIf(!available)(
       `${shell} runs under StrictMode and Stop with a failing, noisy hook prep`,
       () => {

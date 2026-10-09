@@ -1,3 +1,4 @@
+import { NO_STRUCTURED_AGENTS } from '../native-chat/agent-session-wire/structured-agent-session-adapter-router-test-support'
 import { join, resolve } from 'node:path'
 import { afterEach, vi } from 'vitest'
 import { taskDockerFixture } from './task-docker-boundary.test-fixture'
@@ -133,6 +134,7 @@ export async function taskCodexRuntimeFixture(
       stateDirectory: directory,
       hostId: 'local',
       claimKeyId: 'synthetic-claim',
+      resolveLaunchArgs: () => [],
       resolveWorkspacePath,
       resolveClaudeAuthPolicy: () => {
         throw new Error('unused-personal-Claude-policy')
@@ -157,6 +159,7 @@ export async function taskCodexRuntimeFixture(
       resolveWorkspacePath,
       resolveEnvironment: nativeEnvironment,
       resolveCommand: nativeCommand,
+      resolveLaunchArgs: () => [],
       resolveTaskLaunch: taskRuntime.resolveLaunch
     }),
     openConnection: nativeOpen,
@@ -164,6 +167,7 @@ export async function taskCodexRuntimeFixture(
     now: () => TASK_TEST_NOW
   })
   const flow: AttachFlowInput = {
+    agents: NO_STRUCTURED_AGENTS,
     logger: recordingStructuredAgentSessionLogger().logger,
     store,
     adapter,

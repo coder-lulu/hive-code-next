@@ -4,7 +4,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
 
-export function EditorFileTabCloseButton({ onClose }: { onClose: () => void }): React.JSX.Element {
+export function EditorFileTabCloseButton({
+  onClose
+}: {
+  onClose: () => void
+  fileIsDirty?: boolean
+  showsSelectionChrome?: boolean
+}): React.JSX.Element {
   const closeShortcut = useOptionalShortcutLabel('tab.close')
   const closeLabel = translate(
     'auto.components.tab.bar.EditorFileTabCloseButton.a768f428f1',

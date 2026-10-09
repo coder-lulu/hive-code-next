@@ -1,7 +1,9 @@
-import { parseExecutionHostId } from '../../../shared/execution-host'
+import { findWorktreeById } from '@/store/slices/worktree-helpers'
+import { parseExecutionHostId, type ExecutionHostId } from '../../../shared/execution-host'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
 import { parseWorkspaceKey } from '../../../shared/workspace-scope'
 import type { AppState } from '@/store/types'
+import { findFolderWorkspaceOwner } from './folder-workspace-runtime-owner'
 import {
   assertWorktreeOperationGenerationSnapshotCurrent,
   captureWorktreeOperationGenerationSnapshot,
@@ -23,6 +25,8 @@ export type EditorFileOperationProvenance = {
 type EditorOwnerState = Pick<
   AppState,
   | 'settings'
+  | 'activeWorktreeId'
+  | 'activeWorkspaceExecutionHostId'
   | 'repos'
   | 'worktreesByRepo'
   | 'detectedWorktreesByRepo'
@@ -66,7 +70,7 @@ export function captureEditorFileOperationProvenance(
                   : ('local' as const),
                 runtimeEnvironmentId: hintedRuntimeEnvironmentId
               }
-            : resolveWorktreeOperationRoute(state, worktreeId)
+            : resolveEditorOwnerRoute(state, worktreeId)
   if (!route || (ownerHintProvided && (ownerHint?.trim() || null) !== route.runtimeEnvironmentId)) {
     throw new Error(OWNER_CHANGED_MESSAGE)
   }
@@ -76,6 +80,29 @@ export function captureEditorFileOperationProvenance(
     ownershipProjection,
     ...(expectedSshConnectionGeneration === undefined ? {} : { expectedSshConnectionGeneration })
   }
+}
+
+function resolveEditorOwnerRoute(
+  state: EditorOwnerState,
+  worktreeId: string,
+  capturedHostId?: ExecutionHostId | null
+): WorktreeOperationRoute | null {
+  // Workspace focus cannot replace a file's catalog owner.
+  const ownerState = { ...state, activeWorktreeId: null, activeWorkspaceExecutionHostId: null }
+  const route = resolveWorktreeOperationRoute(ownerState, worktreeId)
+  const scope = parseWorkspaceKey(worktreeId)
+  const hostId =
+    capturedHostId ??
+    (state.activeWorktreeId === worktreeId ? state.activeWorkspaceExecutionHostId : null)
+  if (route || scope?.type !== 'folder' || !hostId) {
+    return route
+  }
+  // Same-id folders may use a host qualifier only when the catalog confirms that owner.
+  const folder = findFolderWorkspaceOwner(ownerState, scope.folderWorkspaceId, hostId)
+  const qualifiedRoute = folder
+    ? resolveWorktreeOperationRoute({ ...ownerState, folderWorkspaces: [folder] }, worktreeId)
+    : null
+  return qualifiedRoute?.executionHostId === hostId ? qualifiedRoute : null
 }
 
 export function assertEditorFileOperationCurrent(
@@ -115,7 +142,7 @@ function resolveCurrentEditorRoute(
   // Why: ordinary folder workspaces have no published worktree row, so re-resolve their live
   // folder owner after preserving the explicit-owner fail-closed contract above (#10251).
   if (parseWorkspaceKey(worktreeId)?.type === 'folder') {
-    return resolveWorktreeOperationRoute(state, worktreeId)
+    return resolveEditorOwnerRoute(state, worktreeId, provenance.generation.route.executionHostId)
   }
   return isWorktreePublished(state, worktreeId) ? provenance.generation.route : null
 }
@@ -213,4 +240,24 @@ function getExpectedSshConnectionGeneration(
         .get(route.runtimeEnvironmentId)
         ?.connectionStates.get(host.targetId)?.connectionGeneration
     : state.sshConnectionStates.get(host.targetId)?.connectionGeneration
+}
+
+/** Verify the saved owner's context again before publishing a successful save. */
+export function assertEditorFileSaveOwnerCurrent(
+  state: AppState,
+  file: Parameters<typeof getEditorFileOperationContext>[1],
+  previous: ReturnType<typeof getEditorFileOperationContext>
+): void {
+  const worktree = findWorktreeById(state.worktreesByRepo ?? {}, file.worktreeId)
+  const current = getEditorFileOperationContext(state, file, worktree?.path ?? null)
+  if (
+    current.worktreePath !== previous.worktreePath ||
+    current.connectionId !== previous.connectionId ||
+    current.expectedExecutionHostId !== previous.expectedExecutionHostId ||
+    current.expectedSshTargetId !== previous.expectedSshTargetId ||
+    current.expectedSshConnectionGeneration !== previous.expectedSshConnectionGeneration ||
+    current.settings?.activeRuntimeEnvironmentId !== previous.settings?.activeRuntimeEnvironmentId
+  ) {
+    throw new Error('The file owner changed while saving. Its edits were kept.')
+  }
 }

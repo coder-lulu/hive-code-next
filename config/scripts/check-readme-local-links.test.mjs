@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
 import { findBrokenReadmeLinks, main } from './check-readme-local-links.mjs'
 
@@ -55,9 +55,15 @@ afterEach(() => {
 })
 
 describe('public README local link check', () => {
-  it('accepts a public-only checkout with no private docs directory', () => {
-    vi.spyOn(console, 'log').mockImplementation(() => {})
-    expect(main(makeFixture(validReadmes))).toBe(0)
+  describe('public-only checkout', () => {
+    let root
+    beforeEach(() => {
+      root = makeFixture(validReadmes)
+    })
+    it('accepts a public-only checkout with no private docs directory', () => {
+      vi.spyOn(console, 'log').mockImplementation(() => {})
+      expect(main(root)).toBe(0)
+    })
   })
   it('accepts local links in every supported shape', () => {
     expect(findBrokenReadmeLinks(makeFixture(validReadmes))).toEqual([])

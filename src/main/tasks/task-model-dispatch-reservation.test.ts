@@ -1,3 +1,4 @@
+import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { describe, expect, it } from 'vitest'
 import { agentSessionLeaseAdmitsWriter } from '../../shared/agent-session-lease-adjudication'
 import { emptyState } from '../runtime/agent-session-store-parsing'
@@ -204,7 +205,7 @@ describe('fresh original Task and Session writer admission', () => {
         record.provider = 'claude'
         record.accountHome = { variable: 'CLAUDE_CONFIG_DIR', path: '/synthetic/foreign-home' }
         for (const link of record.providerHandleChain) {
-          link.handle = { provider: 'claude', sessionId: 'foreign-provider', leafUuid: null }
+          link.handle = claudeProviderHandle('foreign-provider', null)
         }
       },
       'IDEMPOTENCY_CONFLICT'

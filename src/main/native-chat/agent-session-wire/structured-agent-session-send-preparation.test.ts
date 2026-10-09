@@ -29,6 +29,8 @@ import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-1' }
 
@@ -55,7 +57,7 @@ beforeEach(async () => {
     acquisitionGeneration: `generation-${++generation}`,
     link: {
       linkId: `link-${fence}`,
-      handle: { provider: 'codex' as const, threadId: THREAD },
+      handle: codexProviderHandle(THREAD),
       origin: store.getRecord(SESSION)?.providerHandleChain.length
         ? ('resumed' as const)
         : ('created' as const),
@@ -75,6 +77,7 @@ beforeEach(async () => {
   }))
   store = await openTestAgentSessionRecordStore(root)
   host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
     logger: {
       warn: (_message, fields) => hostErrors.push(fields.error),
       error: (_message, fields) => hostErrors.push(fields.error)

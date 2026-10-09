@@ -782,3 +782,41 @@ export async function terminalStyleReach(page) {
     return { rules: sheet.cssRules.length, outside }
   })
 }
+
+export const HANDOFF_WORKTREE = {
+  workspaceKind: 'git',
+  worktreeId: 'render-worktree',
+  repoId: 'render-repo',
+  repo: 'render-repo',
+  branch: 'feature/render-check',
+  displayName: 'Render Worktree',
+  path: '/tmp/render-worktree',
+  liveTerminalCount: 0,
+  hasAttachedPty: false,
+  preview: '',
+  unread: false,
+  isPinned: false,
+  linkedPR: null,
+  status: 'inactive',
+  agents: []
+}
+export const HANDOFF_WORKTREE_REPLIES = {
+  'worktree.ps': { worktrees: [HANDOFF_WORKTREE], snapshotId: 'render-check-worktrees' }
+}
+export const HANDOFF_WORKTREE_ROUTE = `/h/render-check-host/session/${HANDOFF_WORKTREE.worktreeId}?name=Render%20Worktree`
+
+export const SHELL_SESSION_ID = 'render-check-session'
+export const SHELL_BUILD_ID = 'render-check-build'
+export const SHELL_HOST = {
+  id: 'render-check-host',
+  name: 'Render Check Host',
+  endpoint: 'ws://render-check',
+  lastConnected: 1
+}
+
+export const paintReports = (page, name) =>
+  page.evaluate(
+    (paint) =>
+      (globalThis.__orcaRenderCheckNotifies ?? []).filter((frame) => frame.name === paint).length,
+    name
+  )

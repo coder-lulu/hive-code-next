@@ -44,6 +44,7 @@ const PLAIN_NODE_ENTRY_NAMES = [
   'parcel-watcher-process-entry',
   'computer-sidecar',
   'wsl-transcript-fs-process-entry',
+  'orcad/orcad-local-serve-selection-entry',
   ...CLI_MAIN_ENTRY_NAMES
 ] as const
 
@@ -61,6 +62,7 @@ const WORKER_THREAD_ENTRY_NAMES = [
   'main-thread-hang-watchdog-entry',
   'port-scan-command-worker-entry',
   'usage-scan-worker-entry',
+  'claude-profile-setup-worker-entry',
   'profile-state-backup-worker-entry',
   'profile-state-writer-worker-entry'
 ] as const

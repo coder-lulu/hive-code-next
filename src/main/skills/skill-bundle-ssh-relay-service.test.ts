@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -13,6 +13,7 @@ import {
   installSkillBundleOnSshHost,
   previewSkillBundleInstallOnSshHost
 } from './skill-bundle-ssh-relay-service'
+import { downloadSkillPackageGrant } from './skill-package-download'
 
 const roots: string[] = []
 
@@ -21,7 +22,7 @@ afterEach(async () => {
 })
 
 async function userDataPath(): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'orca-bundle-ssh-client-test-'))
+  const root = await mkdtemp(join(tmpdir(), 'bundle-ssh-'))
   roots.push(root)
   return root
 }
@@ -262,6 +263,39 @@ describe('installSkillBundleOnSshHost', () => {
       'skills.installBundle',
       'skills.cancelUpload'
     ])
+  })
+
+  it('streams verified client-transfer bytes and removes them from a long temporary root', async () => {
+    const bytes = Buffer.from('private bundle archive')
+    const downloadRequest = request(bytes)
+    if (downloadRequest.ingress.kind !== 'download-grant') {
+      throw new Error('download grant fixture required')
+    }
+    let temporaryRoot = await userDataPath()
+    while (temporaryRoot.length < 260) {
+      temporaryRoot = join(temporaryRoot, 'long download with spaces 中文')
+    }
+    const downloaded = await downloadSkillPackageGrant({
+      url: downloadRequest.ingress.url,
+      expiresAt: downloadRequest.ingress.expiresAt,
+      expectedArchiveSha256: downloadRequest.package.archiveSha256,
+      expectedCompressedBytes: bytes.length,
+      temporaryRoot,
+      allowedOrigins: ['https://storage.googleapis.com'],
+      requireHttps: true,
+      fetcher: vi.fn(
+        async () => new Response(bytes, { headers: { 'content-type': SKILL_PACKAGE_CONTENT_TYPE } })
+      ) as typeof fetch
+    })
+    try {
+      expect(downloaded.archivePath.length).toBeGreaterThan(300)
+      expect(await readFile(downloaded.archivePath)).toEqual(bytes)
+      expect(downloaded.archiveSha256).toBe(downloadRequest.package.archiveSha256)
+      expect(downloaded.compressedBytes).toBe(bytes.length)
+    } finally {
+      await downloaded.cleanup()
+    }
+    await expect(readFile(downloaded.archivePath)).rejects.toMatchObject({ code: 'ENOENT' })
   })
 })
 

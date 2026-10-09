@@ -1,3 +1,4 @@
+import { tuiAgentToAgentKind } from '@/lib/telemetry'
 import type { AgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import type { AppState } from '@/store/types'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
@@ -42,6 +43,8 @@ export type LaunchAgentInNewTabArgs = LaunchAgentRequest & {
   launchPlatform?: NodeJS.Platform
   /** Called after the prompt is actually delivered to the agent input path. */
   onPromptDelivered?: () => void
+  onPromptDeliveryUnconfirmed?: () => void
+  activate?: boolean
   /** Keeps an activation-triggered empty-workspace launch pending until its surface opens. */
   pendingActivationSpawn?: boolean
   /** Lets a workspace reveal itself before the selected surface opens. */
@@ -104,4 +107,36 @@ export function shouldQueueTerminalFocusAfterMenuClose(
   result: NonNullable<LaunchAgentInNewTabResult>
 ): boolean {
   return result.surface.kind === 'host-published'
+}
+
+export function buildNewTabAgentStartupPayload(
+  args: LaunchAgentInNewTabArgs,
+  startupPlan: AgentStartupPlan,
+  prompt: string
+): Parameters<AppState['queueTabStartupCommand']>[1] {
+  const { agent, agentArgs, launchSource } = args
+  return {
+    command: startupPlan.launchCommand,
+    ...(startupPlan.env ? { env: startupPlan.env } : {}),
+    launchConfig: startupPlan.launchConfig,
+    launchAgent: agent,
+    ...(startupPlan.agentPermissionMode
+      ? { agentPermissionMode: startupPlan.agentPermissionMode }
+      : {}),
+    ...(agentArgs !== undefined ? { agentArgsOverride: agentArgs } : {}),
+    ...(startupPlan.sessionOptions ? { sessionOptions: startupPlan.sessionOptions } : {}),
+    ...(startupPlan.startupCommandDelivery
+      ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
+      : {}),
+    ...(agent === 'command-code' &&
+    prompt.length > 0 &&
+    (args.promptDelivery ?? 'auto-submit') === 'auto-submit'
+      ? { initialAgentStatus: { agent, prompt } }
+      : {}),
+    telemetry: {
+      agent_kind: tuiAgentToAgentKind(agent),
+      launch_source: launchSource ?? 'tab_bar_quick_launch',
+      request_kind: 'new'
+    }
+  }
 }

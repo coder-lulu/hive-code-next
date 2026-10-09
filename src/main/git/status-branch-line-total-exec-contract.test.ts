@@ -70,12 +70,14 @@ const BOGUS_MERGE_BASE = 'deadbeef'.repeat(5)
 // No fixture path here looks like test or generated code, so it is all source.
 const NO_LINES = { added: 0, removed: 0 }
 const tempRoots: string[] = []
+const pendingOperations: Promise<unknown>[] = []
 
 function git(repo: string, args: string[]): string {
   return execFileSync('git', args, {
     cwd: repo,
     encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe']
+    stdio: ['ignore', 'pipe', 'pipe'],
+    windowsHide: true
   }).trim()
 }
 
@@ -83,7 +85,7 @@ async function createFixtureRepo(): Promise<{ repo: string; mergeBase: string }>
   const root = await mkdtemp(path.join(tmpdir(), 'orca-branch-line-total-exec-'))
   tempRoots.push(root)
   const repo = path.join(root, 'repo')
-  execFileSync('git', ['init', '-q', repo])
+  execFileSync('git', ['init', '-q', repo], { windowsHide: true })
   git(repo, ['config', 'user.email', 'test@example.com'])
   git(repo, ['config', 'user.name', 'Test User'])
   git(repo, ['config', 'commit.gpgSign', 'false'])
@@ -155,6 +157,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
+  await Promise.allSettled(pendingOperations.splice(0))
   execHooks.beforeExec = undefined
   coalescerJoins.onJoin = undefined
   resetGitReadCaches()
@@ -162,17 +165,36 @@ afterEach(async () => {
 })
 
 describe('branch line total completeness', () => {
-  it('omits the total when the status listing hit its limit', async () => {
-    const { repo, mergeBase } = await createFixtureRepo()
-    await write(repo, 'u1.txt', 'a\n')
-    await write(repo, 'u2.txt', 'b\n')
-    await write(repo, 'u3.txt', 'c\n')
+  describe('limited status listing', () => {
+    let preparedFixture: Awaited<ReturnType<typeof createFixtureRepo>>
+    beforeEach(async () => {
+      const preparing = (async () => {
+        const fixture = await createFixtureRepo()
+        await write(fixture.repo, 'u1.txt', 'a\n')
+        await write(fixture.repo, 'u2.txt', 'b\n')
+        await write(fixture.repo, 'u3.txt', 'c\n')
+        return fixture
+      })()
+      pendingOperations.push(preparing)
+      preparedFixture = await preparing
+    })
+    it('omits the total when the status listing hit its limit', ({ signal }) => {
+      const operation = (async () => {
+        const { repo, mergeBase } = preparedFixture
 
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase, limit: 1 })
+        const result = await getStatus(repo, {
+          branchLineTotalMergeBase: mergeBase,
+          limit: 1,
+          signal
+        })
 
-    expect(result.didHitLimit).toBe(true)
-    expect(result.branchLineTotal).toBeUndefined()
-    expect(rangedDiffCalls()).toEqual([])
+        expect(result.didHitLimit).toBe(true)
+        expect(result.branchLineTotal).toBeUndefined()
+        expect(rangedDiffCalls()).toEqual([])
+      })()
+      pendingOperations.push(operation)
+      return operation
+    })
   })
 
   it('omits the total when the ranged numstat fails, rather than reporting zero', async () => {
@@ -189,6 +211,8 @@ describe('branch line total completeness', () => {
   it('omits the total for a directory that is not a git worktree', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'orca-branch-line-total-folder-'))
     tempRoots.push(root)
+    // Stop discovery at the fixture when TMP is inside the project checkout.
+    await writeFile(path.join(root, '.git'), 'gitdir: ./missing-git-directory\n')
 
     const result = await getStatus(root, { branchLineTotalMergeBase: BOGUS_MERGE_BASE })
 

@@ -2,7 +2,11 @@ import { mkdir, rm } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
 import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
-import { runtimeStub, rpcContext } from '../runtime/rpc/methods/agent-launch.test-fixture'
+import {
+  runtimeStub,
+  rpcContext,
+  setAgentLaunchRecordStore
+} from '../runtime/rpc/methods/agent-launch.test-fixture'
 import {
   AGENT_LAUNCH_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY
@@ -17,6 +21,7 @@ vi.mock('../native-chat/agent-session-wire/structured-agent-session-registry', (
 const { createTaskAgentLaunchPort } = await import('./task-agent-launch-port')
 let directory: string | undefined
 afterEach(async () => {
+  setAgentLaunchRecordStore(null)
   installedHost.mockReset()
   if (directory) {
     closeTestJournalHostDatabase(directory)
@@ -29,6 +34,7 @@ async function fixture() {
   directory = await taskTestDirectory()
   const now = Date.now()
   const store = await openTestAgentSessionRecordStore(directory)
+  setAgentLaunchRecordStore(store)
   const { record } = await store.tasks.admit({
     command: taskCommand({
       operationId: `${now}-${'b'.repeat(32)}`,
@@ -69,6 +75,7 @@ async function fixture() {
   })
   return {
     record,
+    store,
     runtime,
     authorization,
     launch,
@@ -81,15 +88,16 @@ async function fixture() {
 describe('task authority across asynchronous agent replay preparation', () => {
   it('does not spawn after authority is revoked while installing the launch ledger', async () => {
     const current = await fixture()
-    current.runtime.ensureStructuredAgentSessionHost.mockImplementationOnce(async () => {
+    current.runtime.openAgentSessionRecordStore.mockImplementationOnce(async () => {
       current.revoke()
+      return current.store
     })
     await expect(current.launch(current.record, current.authorization)).rejects.toThrow('FORBIDDEN')
     expect(current.runtime.createTerminal).not.toHaveBeenCalled()
   })
   it('does not spawn when replay resolves the workspace to a different directory after admission', async () => {
     const current = await fixture()
-    current.runtime.ensureStructuredAgentSessionHost.mockImplementationOnce(async () => {
+    current.runtime.openAgentSessionRecordStore.mockImplementationOnce(async () => {
       current.runtime.showTerminalWorkspaceLaunchScope.mockImplementation(async () => ({
         id: current.record.workspace.workspaceId,
         path: current.record.workspace.canonicalPath,
@@ -97,6 +105,7 @@ describe('task authority across asynchronous agent replay preparation', () => {
         repo: null,
         folderWorkspace: null
       }))
+      return current.store
     })
     await expect(current.launch(current.record, current.authorization)).rejects.toThrow('FORBIDDEN')
     expect(current.runtime.createTerminal).not.toHaveBeenCalled()

@@ -14,7 +14,7 @@ afterEach(async () => {
 })
 
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), 'orca-skill-request-test-'))
+  const root = await mkdtemp(join(tmpdir(), 'orca-sr-'))
   roots.push(root)
   const home = join(root, 'home')
   const source = join(root, 'source')

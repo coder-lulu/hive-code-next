@@ -1,3 +1,9 @@
+import { getWorktreeExecutionHostId } from '../../../../../../shared/execution-host'
+import {
+  getHostScopedWorktreeLineageInputs,
+  getWorktreeLineageAncestors
+} from '../../worktree-lineage-projection'
+import { getWorktreeRevealCollapsedGroupKeys } from './worktree-reveal-group-keys'
 import type React from 'react'
 import type { Virtualizer } from '@tanstack/react-virtual'
 import type { AppState } from '@/store/types'
@@ -8,7 +14,6 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import { getWorktreeExecutionHostId } from '../../../../../../shared/execution-host'
 import type { RenderRow } from '../listing/render-row'
 import { OFFLINE_RUNTIME_GROUP_KEY, getWorktreeLineageGroupKey } from '../grouping/group-keys'
 import {
@@ -17,17 +22,8 @@ import {
 } from '@/lib/runtime-offline-directory'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
-import { getGroupKeysForWorktree } from '../grouping/worktree-group-keys'
-import { isPinnedSectionWorktree } from '../../pinned-section-worktrees'
-import {
-  getHostScopedWorktreeLineageInputs,
-  getWorktreeLineageAncestors
-} from '../../worktree-lineage-projection'
 import { getFolderWorkspaceRevealGroupKeys } from './folder-reveal'
-import {
-  getPinnedWorktreeRevealCollapsedGroupKeys,
-  getSidebarRowRevealAncestorKeys
-} from './reveal-ancestors'
+import { getSidebarRowRevealAncestorKeys } from './reveal-ancestors'
 import { rowKeyMatchesRenderRow } from './render-row-lookup'
 
 export const MAX_REVEAL_RETRIES = 8
@@ -101,6 +97,9 @@ export function expandGroupsForWorktreeReveal(
   worktreeId: string,
   executionHostId?: ExecutionHostId
 ): void {
+  const hostScopedGroups = args.renderRows.some(
+    (row) => row.type === 'host-header' || (row.type === 'header' && row.collapseKey !== undefined)
+  )
   const folderGroupKeys = getFolderWorkspaceRevealGroupKeys(
     worktreeId,
     args.folderWorkspaces,
@@ -110,7 +109,8 @@ export function expandGroupsForWorktreeReveal(
       workspaceStatuses: args.workspaceStatuses,
       defaultHostId: args.defaultHostId,
       executionHostId,
-      offlineRuntimeEnvironmentIds: args.offlineRuntimeEnvironmentIds
+      offlineRuntimeEnvironmentIds: args.offlineRuntimeEnvironmentIds,
+      hostScopedGroups
     }
   )
   if (folderGroupKeys.length > 0) {
@@ -165,32 +165,15 @@ export function expandGroupsForWorktreeReveal(
     }
   }
 
-  const groupKeys =
-    args.pinnedDisplayPolicy === 'single-location' &&
-    isPinnedSectionWorktree(
-      targetWorktree,
-      args.worktrees,
-      args.worktreeLineageById,
-      args.worktreeMap
-    )
-      ? getPinnedWorktreeRevealCollapsedGroupKeys({
-          worktree: targetWorktree,
-          collapsedGroups: args.collapsedGroups,
-          inPinnedSection: true
-        })
-      : getGroupKeysForWorktree(
-          args.groupBy,
-          targetWorktree,
-          args.repoMap,
-          args.prCache,
-          args.workspaceStatuses,
-          args.settings,
-          args.projectGroups,
-          args.projectGrouping
-        )
+  const groupKeys = getWorktreeRevealCollapsedGroupKeys({
+    ...args,
+    worktree: targetWorktree,
+    hostScopedGroups
+  })
   for (const groupKey of groupKeys) {
-    if (args.collapsedGroups.has(groupKey)) {
-      args.toggleGroup(groupKey)
+    const collapseKey = groupKey
+    if (args.collapsedGroups.has(collapseKey)) {
+      args.toggleGroup(collapseKey)
     }
   }
 }

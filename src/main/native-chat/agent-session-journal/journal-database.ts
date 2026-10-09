@@ -99,7 +99,7 @@ export function journalDatabaseHoldsAgentSessions(dbPath: string): boolean | und
 
 export function openJournalDatabase(
   dbPath: string,
-  legacyRecords: JournalLegacyRecordImport
+  legacyRecords: JournalLegacyRecordImport = NO_LEGACY_JOURNAL_RECORDS
 ): OpenJournalDatabase {
   const probe = new Database(dbPath)
   let stored: number

@@ -159,6 +159,7 @@ export function useSettingsStoreModel() {
   const [remoteServerAddIntentSignal, setRemoteServerAddIntentSignal] = useState(0)
   const [hasUnsavedCommitPromptChanges, setHasUnsavedCommitPromptChanges] = useState(false)
   const [hasUnsavedBranchPromptChanges, setHasUnsavedBranchPromptChanges] = useState(false)
+  const [hasUnsavedChatPromptChanges, setHasUnsavedChatPromptChanges] = useState(false)
   const [sourceControlAiPromptDiscardSignal, setSourceControlAiPromptDiscardSignal] = useState(0)
   const confirm = useConfirmationDialog()
   // Why: session-only (deliberately not persisted) unlock — Option-click the Experimental page title reveals the hidden group.
@@ -235,6 +236,8 @@ export function useSettingsStoreModel() {
     setHasUnsavedCommitPromptChanges,
     hasUnsavedBranchPromptChanges,
     setHasUnsavedBranchPromptChanges,
+    hasUnsavedChatPromptChanges,
+    setHasUnsavedChatPromptChanges,
     sourceControlAiPromptDiscardSignal,
     setSourceControlAiPromptDiscardSignal,
     confirm,

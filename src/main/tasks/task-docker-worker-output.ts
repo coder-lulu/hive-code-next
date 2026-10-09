@@ -1,8 +1,8 @@
 import type { Readable, Writable } from 'node:stream'
 import {
-  createCodexAppServerRecordReader,
-  type CodexAppServerRecordReader
-} from '../codex/codex-app-server-record-reader'
+  createProviderRecordReader,
+  type ProviderRecordReader
+} from '../provider-process/provider-record-reader'
 import { NDJSON_MAX_LINE_BYTES } from '../../shared/main-process-ndjson-framer'
 import { TASK_MODEL_IDLE_TIMEOUT_MS, TASK_MODEL_RPC_ID_PREFIX } from './task-model-channel-protocol'
 
@@ -109,7 +109,7 @@ export function attachTaskDockerWorkerOutput(options: {
       partial = !chunk.endsWith('\n')
     }
   })
-  const reader: CodexAppServerRecordReader = createCodexAppServerRecordReader({
+  const reader: ProviderRecordReader = createProviderRecordReader({
     stdout: options.providerOutput,
     maxLineBytes: NDJSON_MAX_LINE_BYTES,
     onRecord: (value) => {

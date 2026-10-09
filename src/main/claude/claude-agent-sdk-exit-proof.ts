@@ -93,6 +93,7 @@ export type ClaudeChildTreeReaper = {
    * which no later caller may collapse into "unknown".
    */
   readonly treeVerdict: DescendantTreeVerdict
+  readonly forcedReapAttempted: boolean
 }
 
 /**
@@ -119,6 +120,7 @@ export function createClaudeChildTreeReaper(
   let queuedRefresh: Promise<void> | null = null
   let inFlight: Promise<DescendantTreeVerdict> | null = null
   let treeVerdict: DescendantTreeVerdict = 'unverifiable'
+  let forcedReapAttempted = false
 
   // Consulted only on win32: POSIX signals descendants by revalidated identity
   // and reaches the root solely through Node's handle, so neither needs a probe.
@@ -268,6 +270,9 @@ export function createClaudeChildTreeReaper(
       // Never spawned, so the OS never created a tree to orphan.
       return 'exited'
     }
+    if (!exited()) {
+      forcedReapAttempted = true
+    }
     await captureOnce()
     if (platform === 'win32') {
       // A termination request cannot prove exit; the original snapshot verifier owns that verdict.
@@ -345,6 +350,9 @@ export function createClaudeChildTreeReaper(
     },
     get treeVerdict() {
       return treeVerdict
+    },
+    get forcedReapAttempted() {
+      return forcedReapAttempted
     }
   }
 }
@@ -360,6 +368,8 @@ export function createClaudeChildTreeReaper(
  */
 export function proveClaudeChildExit(input: ClaudeChildExitProofInput): Promise<boolean> {
   return proveClaudeChildExitWithReaper(input, () =>
-    createClaudeChildTreeReaper(input.child, { exited: input.exited })
+    createClaudeChildTreeReaper(input.managed.child, {
+      exited: () => input.managed.rootVerdict === 'exited'
+    })
   )
 }

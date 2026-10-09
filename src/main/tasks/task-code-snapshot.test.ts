@@ -280,8 +280,16 @@ describe('host-owned complete code snapshots', () => {
       Reflect.set(changed.result ?? {}, boundary, foreign.record.result?.outcomeRef)
     } else if (boundary === 'ownershipEpoch') {
       changed.command.ownershipEpoch += 1
+    } else if (boundary === 'ownerScope') {
+      changed.command.ownerScope = foreign.record.command.ownerScope
+    } else if (boundary === 'task') {
+      changed.command.task = foreign.record.command.task
+    } else if (boundary === 'runtimeRecordId') {
+      changed.command.runtimeRecordId = foreign.record.command.runtimeRecordId
+    } else if (boundary === 'executionId') {
+      changed.command.executionId = foreign.record.command.executionId
     } else {
-      Reflect.set(changed.command, boundary, Reflect.get(foreign.record.command, boundary))
+      changed.command.operationId = foreign.record.command.operationId
     }
     await expect(f.snapshots.readSource(snapshot.version, changed)).rejects.toThrow()
   })

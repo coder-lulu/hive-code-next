@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AppState } from '@/store/types'
 import type {
   PendingWorktreeCreation,
   WorktreeCreationRequest
@@ -39,7 +40,9 @@ const store = {
   setActivePendingWorktreeCreation: vi.fn(),
   setActiveView: vi.fn(),
   setSidebarOpen: vi.fn(),
-  createWorktree: vi.fn(() => new Promise(() => {})),
+  createWorktree: vi.fn<(...args: Parameters<AppState['createWorktree']>) => Promise<unknown>>(
+    () => new Promise(() => {})
+  ),
   setupProjectExistingFolder: vi.fn(),
   refreshRuntimeEnvironmentStatus: vi.fn(),
   seedNativeChatLaunchDraft: vi.fn(),
@@ -309,7 +312,8 @@ describe('staged background worktree creation', () => {
       followupPrompt: 'implement the task',
       launchConfig: { agentCommand: 'goose', agentArgs: '', agentEnv: {} },
       launchToken: 'launch-token-1',
-      agentPermissionMode: 'manual' as const
+      agentPermissionMode: 'manual' as const,
+      sessionOptions: { model: 'gpt-5.4', effort: 'high' }
     }
 
     continueBackgroundWorktreeCreation(
@@ -327,6 +331,12 @@ describe('staged background worktree creation', () => {
     )
 
     await flushAsyncWorktreeCreation()
+    expect(store.createWorktree.mock.calls[0]?.[25]).toEqual(
+      expect.objectContaining({
+        requiresAgentLaunchPermissionCapability: true,
+        startupLaunchPreferences: { model: 'gpt-5.4', effort: 'high' }
+      })
+    )
     expect(ensureAgentStartupInTerminal).toHaveBeenCalledWith({
       worktreeId: 'wt-1',
       primaryTabId: 'agent-tab',

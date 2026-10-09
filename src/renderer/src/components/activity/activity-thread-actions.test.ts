@@ -112,7 +112,7 @@ describe('activity thread destination routing', () => {
       '11111111-1111-4111-8111-111111111111',
       { flashFocusedPane: true, scrollToBottomIfOutputSinceLastView: true }
     )
-    expect(acknowledgeAgents).toHaveBeenCalledWith([thread.paneKey])
+    expect(acknowledgeAgents).toHaveBeenCalledWith([thread.paneKey], undefined, 'explicit')
   })
 
   it('opens the temporary session list for a floating thread', () => {
@@ -203,9 +203,10 @@ describe('activity thread destination routing', () => {
 
     makeActions().jumpToWorkspace(thread)
 
-    expect(acknowledgeAgents).toHaveBeenCalledWith([thread.paneKey])
+    expect(acknowledgeAgents).toHaveBeenCalledWith([thread.paneKey], undefined, 'explicit')
     expect(mocks.activateAndRevealWorkspace).toHaveBeenCalledWith(thread.worktree.id, {
       navigationIntent: 'user-open',
+      showWorkspaceList: true,
       executionHostId: REMOTE_HOST
     })
   })
@@ -226,6 +227,6 @@ describe('activity thread destination routing', () => {
     // The handler keeps one identity while the set changes underneath it.
     markAllSet = [thread, readThread]
     actions.markAllThreadsRead()
-    expect(acknowledgeAgents).toHaveBeenCalledWith([thread.paneKey])
+    expect(acknowledgeAgents).toHaveBeenCalledWith([thread.paneKey], undefined, 'explicit')
   })
 })

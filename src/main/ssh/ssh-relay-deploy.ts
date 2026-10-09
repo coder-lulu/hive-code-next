@@ -3,7 +3,7 @@ import { APP_DISPLAY_NAME, applyProductBranding } from '../../shared/brand'
 import { existsSync } from 'node:fs'
 import { app } from 'electron'
 import { relayBundleCandidates } from './relay-bundle-paths'
-import { PinnedRelayFallbackError, resolveSshRemoteRuntime } from './ssh-relay-pinned-node'
+import { PinnedRelayFallbackError, resolveConnectRemoteRuntime } from './ssh-relay-pinned-node'
 import {
   ensurePinnedRelayRuntime,
   prebuiltRelayNodePath,
@@ -122,9 +122,13 @@ import { powerShellCommand, powerShellLiteral, powerShellNativeArg } from './ssh
 import {
   classifyWindowsRelayLaunchError,
   WINDOWS_RELAY_LAUNCH_LOG_PREFIX,
+  windowsRelayConnectCommand,
   windowsRelayLaunchCommand
 } from './ssh-relay-windows-launch-command'
-import { parseRelayWindowsLaunchReport } from '../../shared/relay-windows-breakaway-launch'
+import {
+  parseWindowsBreakawayLaunchReport,
+  RELAY_WINDOWS_BREAKAWAY_CONTRACT
+} from '../../shared/windows-breakaway-launch'
 import { relaySocketNameForInstanceId } from './ssh-relay-instance-id'
 import { resolveRelayEndpointBeforeRelaunch } from './ssh-relay-endpoint-takeover'
 import {
@@ -425,8 +429,10 @@ async function deployAndLaunchRelayInner(
   deploySignal?: AbortSignal
 ): Promise<RelayDeployResult> {
   const target = typeof conn.getTarget === 'function' ? conn.getTarget() : undefined
-  const ladder = relayRuntimeLadder(resolveSshRemoteRuntime(target))
   const registry = getSshTargetRegistryStore()
+  const ladder = relayRuntimeLadder(
+    resolveConnectRemoteRuntime(target, target && registry?.getTarget(target.id))
+  )
   const run = new RelayRuntimeLadderRun(
     target?.id ?? relayInstanceId ?? '',
     target && registry ? sshTargetRelayRuntimeDecisionStore(registry) : null
@@ -463,6 +469,9 @@ async function deployAndLaunchRelayInner(
         continue
       }
       if (!(err instanceof RelayDirectoryGcConflictError)) {
+        if (ladder.length > 1 && !deploySignal?.aborted) {
+          run.unresolved(step)
+        }
         throw err
       }
       // Why: GC atomically moves the old install aside; wait for its sibling claim to clear, then recompute install state.
@@ -2424,7 +2433,10 @@ async function launchWindowsRelay(
   ).catch((error: unknown) => {
     throw classifyWindowsRelayLaunchError(error)
   })
-  const launchReport = parseRelayWindowsLaunchReport(launchOutput)
+  const launchReport = parseWindowsBreakawayLaunchReport(
+    RELAY_WINDOWS_BREAKAWAY_CONTRACT,
+    launchOutput
+  )
   console.log(`${WINDOWS_RELAY_LAUNCH_LOG_PREFIX}${JSON.stringify(launchReport)}`)
 
   const POLL_INTERVAL_MS = 200
@@ -2488,21 +2500,6 @@ async function connectWindowsRelay(
     { wrapCommand: false, signal }
   )
   return waitForSentinel(channel, signal)
-}
-
-function windowsRelayConnectCommand(
-  hostPlatform: RemoteHostPlatform,
-  nodePath: string,
-  remoteDir: string,
-  sockPath: string,
-  credentialFile: string
-): string {
-  return commandWithNodePath(
-    hostPlatform,
-    nodePath,
-    remoteDir,
-    `& ${powerShellLiteral(nodePath)} relay.js --connect --sock-path ${powerShellLiteral(sockPath)} --credential-file ${powerShellLiteral(credentialFile)}`
-  )
 }
 
 async function probeWindowsRelayPipe(

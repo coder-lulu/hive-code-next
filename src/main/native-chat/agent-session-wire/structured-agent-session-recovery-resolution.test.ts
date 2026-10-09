@@ -11,11 +11,12 @@ import {
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import { closeTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
-import { supervisedPosixLaunch } from '../../codex/codex-app-server-posix-supervisor'
+import { supervisedPosixLaunch } from '../../provider-process/provider-process-supervisor'
 import {
   resolveStructuredSessionRecovery,
   type StructuredSessionRecoveryResolutionDeps
 } from './structured-agent-session-recovery-resolution'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 
 const NOW = 1_800_000_000_000
 const MATCHED: AgentSessionOwnerProbe = { outcome: 'identity-matched', matchedOn: ['spawn-token'] }
@@ -88,7 +89,7 @@ async function liveOwner(store: AgentSessionRecordStore, pid = 4242) {
     fence,
     link: {
       linkId: 'link-recovery',
-      handle: { provider: 'codex', threadId: 'thread-recovery' },
+      handle: codexProviderHandle('thread-recovery'),
       origin: 'created',
       mintedAtFence: fence,
       observedAt: NOW
@@ -193,7 +194,7 @@ describe('structured session recovery resolution', () => {
           alive
             ? { outcome: 'identity-matched', matchedOn: ['process-start-time'] }
             : { outcome: 'pid-absent' },
-        { stopOwnerProcess }
+        { stopOwnerProcess, platform: 'linux' }
       ),
       SESSION
     )
@@ -217,7 +218,8 @@ describe('structured session recovery resolution', () => {
     const before = store.getRecord(SESSION)
     const result = await resolveStructuredSessionRecovery(
       deps(store, () => ({ outcome: 'identity-matched', matchedOn: ['process-start-time'] }), {
-        stopOwnerProcess
+        stopOwnerProcess,
+        platform: 'linux'
       }),
       SESSION
     )
@@ -248,6 +250,30 @@ describe('structured session recovery resolution', () => {
     // The pid may have been reused by an unrelated process.
     expect(stopOwnerProcess).not.toHaveBeenCalled()
     expect(store.getRecord(SESSION)).toEqual(before)
+  })
+
+  it('keeps a Windows owner the probe matches without signalling its saved pid', async () => {
+    const store = await openStore()
+    await liveOwner(store)
+    await latch(store)
+    const stopOwnerProcess = vi.fn()
+
+    const result = await resolveStructuredSessionRecovery(
+      deps(store, () => ({ outcome: 'identity-matched', matchedOn: ['process-start-time'] }), {
+        stopOwnerProcess,
+        platform: 'win32'
+      }),
+      SESSION
+    )
+
+    expect(result).toBe('unresolved')
+    // Windows stops a tree only through a child it still holds; a saved pid is never signalled.
+    expect(stopOwnerProcess).not.toHaveBeenCalled()
+    expect(store.getRecord(SESSION)?.lease).toMatchObject({
+      claimStatus: 'live',
+      handoffStage: 'recovering',
+      deathEvidence: null
+    })
   })
 
   it('waits out a terminal owner an older build recorded, and never stops it', async () => {

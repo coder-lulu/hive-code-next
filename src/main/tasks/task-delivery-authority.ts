@@ -69,7 +69,9 @@ export function createTaskDeliveryAuthorizer(options: {
       const proof = parsed.data
       const remaining = Date.parse(proof.expiresAt) - Date.parse(proof.serverNow)
       if (
-        Object.entries(expected).some(([key, value]) => Reflect.get(proof, key) !== value) ||
+        Object.entries(expected).some(
+          ([key, value]) => proof[key as keyof typeof expected] !== value
+        ) ||
         remaining <= 0 ||
         remaining > 60_000
       ) {

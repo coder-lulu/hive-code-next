@@ -183,12 +183,14 @@ it('pins every foreground and background step to its selected phase', () => {
     (step) => !step.background && /outputs\.(static_analysis|typecheck)/.test(step.if ?? '')
   )
   expect(foreground.map((step) => [step.name ?? step.run ?? step.uses, step.if])).toEqual([
+    ['Set up Bun for localization checks', staticPhase],
     ['Reject low-evidence patterns', staticPhase],
     ['Enforce type-aware code-quality baseline', staticPhase],
     [
       './.github/actions/install-mobile-dependencies',
       `${staticPhase} && needs.code_paths.outputs.mobile_dependencies == 'true'`
     ],
+    ['Prepare pinned Paperclip types for changed kernel sources', staticPhase],
     ['Enforce React Doctor on changed lines', staticPhase],
     ['Check Zustand selector fan-out budget', staticPhase],
     ['Check reliability gate manifest', staticPhase],
@@ -200,6 +202,7 @@ it('pins every foreground and background step to its selected phase', () => {
     ['Check Node runtime pin', staticPhase],
     ['Boot orcad and round-trip a terminal', staticPhase],
     ['Verify the generated RPC params catalog', staticPhase],
+    ['Verify the generated ACP protocol schema', staticPhase],
     ['Verify bundled skill guides', staticPhase],
     ['Verify skill freshness manifest', staticPhase],
     ['Verify localization coverage', staticPhase],

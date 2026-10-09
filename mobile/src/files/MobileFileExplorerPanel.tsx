@@ -28,7 +28,8 @@ import {
   resetDirectoryLoadRevisions,
   type DirectoryLoadRevisions
 } from './directory-load-revisions'
-import { directoryCacheFromFileList, isMobileMethodUnavailableError } from './file-list-fallback'
+import { isMobileMethodUnavailableError } from '../transport/mobile-method-unavailable'
+import { directoryCacheFromFileList } from './file-list-fallback'
 import { createFileExplorerStyles } from './mobile-file-explorer-styles'
 import { fileDirectoryRead, legacyFileListRead } from './mobile-file-explorer-operations'
 import { MobileFileExplorerRow } from './mobile-file-explorer-row'

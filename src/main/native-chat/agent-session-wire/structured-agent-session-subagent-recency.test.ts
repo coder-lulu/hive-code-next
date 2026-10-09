@@ -1,3 +1,7 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener
+} from '../agent-session-journal/journal-host-database-test-support'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 // A subagent's work must not re-date the session that spawned it.
 //
@@ -16,12 +20,12 @@ import { projectStructuredAgentSessionStatusSummary } from '../../../shared/stru
 import { AgentHookServer, _internals } from '../../agent-hooks/server'
 import { createClaudeJournalTranslator } from '../../claude/claude-structured-journal-translation'
 import { createCodexJournalTranslator } from '../../codex/codex-structured-journal-translation'
-import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import { createDeferredStructuredAgentSessionEventSink } from './structured-agent-session-event-sink'
 import { StructuredAgentSessionStatusFeed } from './structured-agent-session-status-feed'
 import { indexedStatusFeedSession } from './structured-agent-session-status-feed-test-session'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { testEventSinkLogging } from './structured-agent-session-logger-test-support'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 
 const SESSION = 'recency-session'
 const CODEX_THREAD = 'thread-parent'
@@ -38,6 +42,7 @@ beforeEach(async () => {
 afterEach(async () => {
   vi.restoreAllMocks()
   await journals.closeAll()
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -54,7 +59,7 @@ async function openSession() {
       workspaceId: 'workspace-1',
       hostId: 'local',
       agent: 'claude',
-      providerHandle: { kind: 'codex', threadId: CODEX_THREAD }
+      providerHandle: codexProviderHandle(CODEX_THREAD)
     },
     now: tick,
     stateDirectory: join(root, SESSION)

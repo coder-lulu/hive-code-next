@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, test } from 'vitest'
+import { beforeAll, expect, test } from 'vitest'
 import {
   agentSessionLeaseFixture,
   agentSessionRecordFixture
@@ -20,6 +20,16 @@ import { importReleaseCheckoutModule, materializeReleaseCheckout } from './relea
 // Official v1.4.211, pinned independently of product release refs.
 const BASELINE_REF = '5534462b50c660888487a2108700d4cf284270db'
 const SESSION = 'session-alpha-1'
+let baseline: Awaited<ReturnType<typeof importReleaseCheckoutModule>>
+
+beforeAll(async () => {
+  const checkout = await materializeReleaseCheckout(BASELINE_REF)
+  expect(checkout.commit).toBe(BASELINE_REF)
+  baseline = await importReleaseCheckoutModule(
+    checkout,
+    'src/main/runtime/agent-session-record-store.ts'
+  )
+})
 
 test('an actual older record parser reads a committed proof of death naming its owner and last proof of life', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'orca-death-evidence-downgrade-'))
@@ -51,11 +61,6 @@ test('an actual older record parser reads a committed proof of death naming its 
     writeFileSync(readerPath, await readPersistedTestAgentSessionStoreText(directory))
     const readerBytes = readFileSync(readerPath)
 
-    const checkout = await materializeReleaseCheckout(BASELINE_REF)
-    const baseline = await importReleaseCheckoutModule(
-      checkout,
-      'src/main/runtime/agent-session-record-store.ts'
-    )
     const OldStore = baseline.AgentSessionRecordStore
     if (
       typeof OldStore !== 'function' ||

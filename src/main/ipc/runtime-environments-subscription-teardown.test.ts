@@ -113,6 +113,7 @@ describe('registerRuntimeEnvironmentHandlers', () => {
   let store: {
     getSettings: () => { activeRuntimeEnvironmentId: string | null }
     updateSettings: ReturnType<typeof vi.fn>
+    removeWorkspaceSessionHost: ReturnType<typeof vi.fn>
   }
 
   beforeEach(() => {
@@ -120,6 +121,7 @@ describe('registerRuntimeEnvironmentHandlers', () => {
     activeRuntimeEnvironmentId = null
     store = {
       getSettings: () => ({ activeRuntimeEnvironmentId }),
+      removeWorkspaceSessionHost: vi.fn(),
       updateSettings: vi.fn((updates: { activeRuntimeEnvironmentId: string | null }) => {
         activeRuntimeEnvironmentId = updates.activeRuntimeEnvironmentId
       })
@@ -510,7 +512,7 @@ describe('registerRuntimeEnvironmentHandlers', () => {
     expect(deliveredCloses).toEqual([])
   })
 
-  it('suppresses stale payloads from a retired transport but never re-sends its close', async () => {
+  it('fences late payloads and duplicate close after full retirement', async () => {
     registerRuntimeEnvironmentHandlers(store as never)
     let transportCallbacks: {
       onResponse: (response: Record<string, unknown>) => void
@@ -558,11 +560,16 @@ describe('registerRuntimeEnvironmentHandlers', () => {
       }
     )
 
-    invalidateRuntimeEnvironmentTransport(added.environment.id)
+    await invalidateRuntimeEnvironmentTransport(added.environment.id)
     expect(retirePairedRuntimeBrowserClientHostEnvironmentMock).toHaveBeenCalledWith(
       added.environment.id,
       expect.objectContaining({ message: 'Runtime environment transport was invalidated' })
     )
+    expect(closeRemoteRuntimeRequestConnectionMock).toHaveBeenCalledWith(added.environment.id)
+    expect(senderSend).toHaveBeenCalledWith('runtimeEnvironments:subscriptionEvent', {
+      subscriptionId: 'multiplex-stale',
+      type: 'close'
+    })
     senderSend.mockClear()
     // A late frame from the retired socket must not reach the renderer...
     transportCallbacks!.onResponse({

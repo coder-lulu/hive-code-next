@@ -14,16 +14,15 @@ import type { RuntimeRpcFailure, RuntimeRpcResponse } from '../../shared/runtime
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type { Store } from '../persistence'
 import { getHiveAccountRuntimeAccess } from '../hive-runtime-cloud/hive-account-runtime-access'
-import { clearBrowserRoutePartitionStorageForEnvironment } from '../browser/browser-route-partition-storage-runtime'
-import { retireBrowserRoutePartitionStorageForEnvironment } from '../browser/browser-route-partition-storage-retirement'
 import {
   callEnvironmentWithCloudFallback,
   getEnvironmentStatusWithCloudFallback,
   listRuntimeEnvironmentCatalog,
   resolveRuntimeEnvironmentCatalogEntry
 } from './runtime-environment-account-routing'
+import { retireRemovedRuntimeEnvironment } from './runtime-environment-removal-cleanup'
+import { readSettingsWithRuntimeEnvironmentPreference } from './runtime-environment-preference'
 import { verifyAndAddRuntimeEnvironmentFromPairingCode } from './runtime-environment-pairing-verification'
-import { clearRuntimeEnvironmentCapabilityEvidence } from './runtime-environment-capability-evidence'
 import {
   closeRemoteRuntimeRequestConnection,
   getRuntimeEnvironmentStatusOwner,
@@ -67,7 +66,10 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
   ipcMain.handle('runtimeEnvironments:getStatusSnapshots', () =>
     getRuntimeEnvironmentStatusSnapshots()
   )
-  ipcMain.handle('runtimeEnvironments:list', () => listRuntimeEnvironmentCatalog(getUserDataPath()))
+  ipcMain.handle('runtimeEnvironments:list', () => {
+    readSettingsWithRuntimeEnvironmentPreference(store, getUserDataPath())
+    return listRuntimeEnvironmentCatalog(getUserDataPath())
+  })
   ipcMain.handle(
     'runtimeEnvironments:addFromPairingCode',
     (
@@ -106,22 +108,10 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
         throw new Error('Choose another Active Server in Advanced before removing this server.')
       }
       const removed = removeEnvironment(getUserDataPath(), args.selector)
-      clearRuntimeEnvironmentCapabilityEvidence(removed.id)
-      clearRuntimeEnvironmentManualDisconnect(removed.id)
-      const retiring = Promise.resolve(invalidateTransport(removed.id))
+      void retireRemovedRuntimeEnvironment(removed.id, invalidateTransport, (hostId) =>
+        store.removeWorkspaceSessionHost(hostId)
+      )
       closeLegacySelectorTransport(args.selector, removed.id)
-      // Why: removal is an explicit lifecycle decision, so its client-hosted browser storage goes
-      // too -- but only once the client host releases its partitions, or every one refuses as live.
-      void retireBrowserRoutePartitionStorageForEnvironment({
-        environmentId: removed.id,
-        whenClientHostClosed: retiring,
-        clearStorage: clearBrowserRoutePartitionStorageForEnvironment,
-        onError: (error) => {
-          console.warn('[runtime-environments] browser partition storage clear failed:', error)
-        }
-      }).catch((error) => {
-        console.warn('[runtime-environments] browser partition storage clear failed:', error)
-      })
       return { removed: redactRuntimeEnvironment(removed) }
     }
   )

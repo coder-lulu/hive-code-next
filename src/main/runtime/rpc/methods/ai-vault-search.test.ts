@@ -7,8 +7,12 @@ import { AI_VAULT_METHODS } from './ai-vault'
 import { fakeSearchService } from '../../../../shared/ai-vault-search-test-fixture'
 import { createSessionSearchClient } from '../../../../shared/ai-vault-search-client'
 import { setSessionSearchService } from '../../../ai-vault-search/session-search-service-registry'
+import { stopStructuredAgentSessionRuntime } from '../../structured-agent-session-runtime'
 
-afterEach(() => setSessionSearchService(null))
+afterEach(async () => {
+  setSessionSearchService(null)
+  await stopStructuredAgentSessionRuntime()
+})
 
 function dispatcher(legacy = false) {
   return new RpcDispatcher({

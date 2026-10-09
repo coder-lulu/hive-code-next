@@ -13,7 +13,7 @@ import type { JournalOperationReceipt } from '../native-chat/agent-session-journ
 import { journalOpenRefusalError } from '../native-chat/agent-session-journal/journal-open-failure'
 import { AgentSessionJournalError } from '../native-chat/agent-session-journal/journal-write-guards'
 import { takeJournalTransactionFailureOutcome } from '../native-chat/agent-session-journal/journal-database'
-import type { AgentSessionStoreState } from './agent-session-record-store-file'
+import type { AgentSessionStoreState } from './agent-session-store-state'
 import { writeAgentSessionStoreRows } from './agent-session-record-rows'
 import { AgentSessionStoreCommittedRefresh } from './agent-session-store-committed-refresh'
 import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'

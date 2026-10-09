@@ -1,3 +1,4 @@
+import { taskModelRefusedPolicyKeyWithInvalidInput } from './task-model-response-field-diagnostics.test-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { createTaskModelPolicy } from './task-model-policy'
 import { taskDockerModelProfile } from './task-docker-model-profile'
@@ -183,7 +184,7 @@ describe('finite innermost response producer provenance', () => {
     }
     expect(getter).not.toHaveBeenCalled()
     for (const key of [Object('cyber'), Object.defineProperty({}, 'toString', { get: getter })]) {
-      expect(Reflect.apply(taskModelRefusedPolicyKey, undefined, [key])).toBe('other')
+      expect(taskModelRefusedPolicyKeyWithInvalidInput(key)).toBe('other')
     }
     expect(getter).not.toHaveBeenCalled()
   })

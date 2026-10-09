@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { spawnSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -13,9 +13,11 @@ import {
 
 restoreUserDataPathAfterEach()
 
+const describeLiveZsh = process.platform === 'win32' ? describePosix : describeIfZsh
+
 // End-to-end validation that wrapper ZDOTDIR discovery preserves top-level zsh semantics (spawns real zsh; gated on availability).
-describePosix('live zsh subprocess tests', () => {
-  describeIfZsh('terminal emulator edge cases', () => {
+describeLiveZsh('live zsh subprocess tests', () => {
+  describe('terminal emulator edge cases', () => {
     let testHome: string
     let userDataPath: string
 

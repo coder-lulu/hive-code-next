@@ -1,4 +1,4 @@
-import { normalizeLegacyHandoffRecord } from '../../shared/agent-session-legacy-handoff-lease'
+import { decodePersistedAgentSessionRecord } from '../../shared/agent-session-record-stored-form'
 import { isRecord } from '../../shared/agent-status-child-work-value-guards'
 import {
   agentSessionOperationKey,
@@ -146,7 +146,7 @@ export function parseState(
   if (typeof file.records === 'object' && file.records !== null) {
     for (const [sessionId, value] of Object.entries(file.records)) {
       const decoded = isPersistedAgentSessionRecord(value)
-        ? normalizeLegacyHandoffRecord(value)
+        ? decodePersistedAgentSessionRecord(value)
         : null
       const record = decoded?.record ?? null
       legacyHandoffLeasesNormalized ||= decoded?.normalized === true

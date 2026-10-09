@@ -6,13 +6,11 @@ import {
 import type { AppState } from '@/store/types'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
 import { requestsCwdOutsideWorkspaceRootForWorkspace } from '../../../shared/terminal-startup-cwd'
+import { hasExplicitTuiLaunchCommand } from '../../../shared/tui-agent-launch-command-override'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { AgentLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import { workspaceKindForWorktreeId } from '../../../shared/workspace-launch-kind'
-import {
-  hasExplicitTuiLaunchCommand,
-  type AgentLaunchRoutingInput
-} from '@/lib/agent-launch-routing'
+import type { AgentLaunchRoutingInput } from '@/lib/agent-launch-routing'
 // Why: the `connection-context` facade imports the store root; the resolver's own module keeps
 // this input builder importable from anywhere in the launch graph without a cycle.
 import {
@@ -32,6 +30,7 @@ import {
   structuredAgentSessionTargetForHost
 } from '@/runtime/structured-agent-session-owner'
 import { pairedHostClientCapabilities } from '@/runtime/paired-host-client-capabilities'
+import { readHostStructuredAgents } from '@/runtime/host-structured-agents'
 import { lastVerifiedRuntimeStatus } from '../../../shared/runtime-host-status'
 
 export type ProspectiveWorkspaceKind = NonNullable<AgentLaunchRoutingInput['workspaceKind']>
@@ -138,6 +137,14 @@ function resolveTranscriptIsLocalReadable(
   return host?.kind === 'ssh' ? isNativeChatTranscriptLocalReadable(host.targetId) : true
 }
 
+function hostStructuredAgentsInput(
+  store: AgentLaunchRouteStore,
+  executionHostId: string
+): Pick<AgentLaunchRoutingInput, 'hostStructuredAgents'> {
+  const agents = readHostStructuredAgents(executionHostId, store.runtimeStatusByEnvironmentId)
+  return agents ? { hostStructuredAgents: agents.map((row) => row.agent) } : {}
+}
+
 /** The one place that gathers what a launch route decision needs; only the planner resolves on it. */
 export function buildAgentLaunchRouteInput(
   store: AgentLaunchRouteStore,
@@ -192,6 +199,16 @@ export function buildAgentLaunchRouteInput(
       // A launch command override is this machine's; a paired host's createSupport reads its own.
       (executionHostId === LOCAL_EXECUTION_HOST_ID &&
         hasExplicitTuiLaunchCommand(store.settings, agent)),
-    initialSessionOptions: args.initialSessionOptions
+    startsOutsideWorkspaceRoot: requestsCwdOutsideWorkspaceRootForWorkspace({
+      workspaceId: workspace.worktreeId,
+      requestedCwd: tuiCustomization?.cwd,
+      workspacePath: workspace.worktreeId
+        ? findWorktreeById(store.worktreesByRepo ?? {}, workspace.worktreeId)?.path
+        : undefined,
+      resolveFolderWorkspacePath: (folderWorkspaceId) =>
+        store.folderWorkspaces?.find((entry) => entry.id === folderWorkspaceId)?.folderPath
+    }),
+    initialSessionOptions: args.initialSessionOptions,
+    ...hostStructuredAgentsInput(store, executionHostId)
   }
 }

@@ -1,3 +1,4 @@
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { vi } from 'vitest'
@@ -154,7 +155,7 @@ export async function commandEvidenceFixture(status: 'succeeded' | 'failed' = 's
     providerHandleChain: [
       {
         linkId: 'command-link',
-        handle: { provider: 'codex', threadId: COMMAND_THREAD },
+        handle: codexProviderHandle(COMMAND_THREAD),
         origin: 'created',
         mintedAtFence: 1,
         observedAt: TASK_TEST_NOW

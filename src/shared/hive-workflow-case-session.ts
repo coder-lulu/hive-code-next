@@ -4,12 +4,14 @@ import { JournalCursor, SessionId } from './rpc-contract/structured-agent-sessio
 import {
   AgentJournalSubagentEntrySchema,
   isAdmissibleAgentJournalRenderItem,
-  isAdmissibleAgentJournalSubmission
+  isAdmissibleAgentJournalItemBody
 } from './agent-session-journal-schemas'
+import { isAdmissibleAgentJournalSubmission } from './agent-session-journal-submission-schema'
 import {
   AGENT_JOURNAL_RESET_REASONS,
   type AgentJournalRenderItem,
-  type AgentJournalSubmission
+  type AgentJournalSubmission,
+  type AgentJournalTurnLifecycle
 } from './agent-session-journal-types'
 import { agentJournalSubmissionKey } from './agent-session-journal-item-key'
 import { compareAgentJournalItems } from './agent-session-journal-position'
@@ -30,6 +32,21 @@ const publicSubmission = z
     reason: value.reason,
     submittedAt: value.submittedAt,
     resolvedAt: value.resolvedAt,
+    ...(value.submittedSequence === undefined
+      ? {}
+      : { submittedSequence: value.submittedSequence }),
+    ...(value.answeredInTurn === undefined
+      ? {}
+      : {
+          answeredInTurn:
+            value.answeredInTurn === null
+              ? null
+              : {
+                  turnItemId: value.answeredInTurn.turnItemId,
+                  via: value.answeredInTurn.via
+                }
+        }),
+    ...(value.source === undefined ? {} : { source: { kind: value.source.kind } }),
     ...(value.rejection === undefined ? {} : { rejection: value.rejection }),
     ...(value.recovered === undefined ? {} : { recovered: value.recovered }),
     ...(value.handoverRecorded === undefined ? {} : { handoverRecorded: value.handoverRecorded }),
@@ -59,6 +76,20 @@ const page = z
     hasOlder: z.boolean(),
     hasNewer: z.boolean(),
     hostNow: z.number().finite().optional(),
+    latestTurn: z
+      .strictObject({
+        itemId: z.string().min(1),
+        observedAt: z.number().finite(),
+        turn: z.custom<AgentJournalTurnLifecycle>(
+          (value) =>
+            typeof value === 'object' &&
+            value !== null &&
+            !Array.isArray(value) &&
+            isAdmissibleAgentJournalItemBody({ ...value, kind: 'turn' })
+        )
+      })
+      .nullable()
+      .optional(),
     subagentRoster: z
       .array(
         z.strictObject({

@@ -220,7 +220,7 @@ describe('unified board views', () => {
     const ack = vi.spyOn(useAppStore.getState(), 'acknowledgeAgents').mockImplementation(() => {})
     render(<Probe />)
     fireEvent.click(await screen.findByRole('button', { name: 'Alpha task' }))
-    expect(ack).toHaveBeenCalledWith(['tab-0:leaf-0'])
+    expect(ack).toHaveBeenCalledExactlyOnceWith(['tab-0:leaf-0'], undefined, 'explicit')
     fireEvent.keyDown(document.body, { key: 'Escape' })
     expect(useAppStore.getState().workspaceBoardOpen).toBe(true)
     fireEvent.click(screen.getByRole('button', { name: 'Close preview' }))

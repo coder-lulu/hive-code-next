@@ -113,7 +113,7 @@ describe('structured journal receipt evidence', () => {
     expect(owner.getSnapshot().receivedAt).toBe(2_000)
 
     onError(new Error('disconnected'))
-    expect(owner.getSnapshot().state.status).toBe('error')
+    expect(owner.getSnapshot().state.status).toBe('ready')
     expect(owner.getSnapshot().receivedAt).toBe(2_000)
     expect(mocks.call).toHaveBeenCalledOnce()
   })

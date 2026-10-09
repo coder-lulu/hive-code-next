@@ -11,6 +11,7 @@ import { AGENT_SESSION_OPERATION_FUTURE_SKEW_MS } from '../../shared/agent-sessi
 
 import { nextAgentSessionFence } from '../../shared/agent-session-next-fence'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
+import { encodeAgentSessionRecord } from '../../shared/agent-session-record-stored-form'
 import {
   NO_LEGACY_JOURNAL_RECORDS,
   type JournalLegacyRecordImport
@@ -115,7 +116,9 @@ function importRows(
   for (const [sessionId, loaded] of records) {
     const setAside = state.unreadableRecords.get(sessionId)
     const record = setAside ? withFloorAboveSetAsideCopy(loaded, setAside.raw) : loaded
-    const json = JSON.stringify({ ...record, lease: withoutRetiredLeaseLatches(record.lease) })
+    const json = JSON.stringify(
+      encodeAgentSessionRecord({ ...record, lease: withoutRetiredLeaseLatches(record.lease) })
+    )
     // A record the load rules refuse is kept as its bytes, which every load then sets aside.
     rows.push([
       sessionId,

@@ -1,9 +1,13 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process'
+import { createConnection, type Socket } from 'node:net'
 import {
   RELAY_SENTINEL,
   FrameDecoder,
   encodeJsonRpcFrame,
+  encodeHandshakeFrame,
   parseJsonRpcMessage,
+  parseHandshakeMessage,
+  RELAY_VERSION,
   MessageType,
   type JsonRpcRequest,
   type JsonRpcResponse,
@@ -22,6 +26,55 @@ export type RelayProcess = {
   waitForExit: (timeoutMs?: number) => Promise<number | null>
 }
 
+export async function connectRelayTestSocket(
+  sockPath: string,
+  endpointCredential: string | undefined
+): Promise<{ socket: Socket; closed: Promise<void> }> {
+  const socket = createConnection({ path: sockPath })
+  const closed = new Promise<void>((resolve) => socket.once('close', resolve))
+  try {
+    await new Promise<void>((resolve, reject) => {
+      let accepted = false
+      const decoder = new FrameDecoder((frame) => {
+        try {
+          if (frame.type !== MessageType.Handshake) {
+            throw new Error('Expected a relay handshake frame')
+          }
+          const message = parseHandshakeMessage(frame.payload)
+          if (message.type !== 'orca-relay-handshake-ok' || message.version !== RELAY_VERSION) {
+            throw new Error(`Relay handshake refused: ${message.type}`)
+          }
+          accepted = true
+          resolve()
+        } catch (error) {
+          reject(error)
+        }
+      }, reject)
+      socket.on('data', (chunk: Buffer) => decoder.feed(chunk))
+      socket.once('error', reject)
+      socket.once('close', () => {
+        if (!accepted) {
+          reject(new Error('Relay socket closed before handshake acceptance'))
+        }
+      })
+      socket.once('connect', () => {
+        socket.write(
+          encodeHandshakeFrame({
+            type: 'orca-relay-handshake',
+            version: RELAY_VERSION,
+            endpointCredential
+          })
+        )
+      })
+    })
+    return { socket, closed }
+  } catch (error) {
+    socket.destroy()
+    await closed
+    throw error
+  }
+}
+
 export function spawnRelay(
   entryPath: string,
   args: string[] = [],
@@ -36,12 +89,33 @@ export function spawnRelay(
   let nextSeq = 1
   let sentinelResolved = false
   let stdoutBuffer = Buffer.alloc(0)
+  let stderrTail = ''
   let sentinelResolve: () => void
+  let sentinelReject: (error: Error) => void
   let decoderActive = false
 
-  const sentinelReceived = new Promise<void>((resolve) => {
+  const sentinelReceived = new Promise<void>((resolve, reject) => {
     sentinelResolve = resolve
+    sentinelReject = reject
   })
+  // Observe unused readiness failures without changing what an actual await receives.
+  void sentinelReceived.catch(() => {})
+  const rejectBeforeSentinel = (error: Error): void => {
+    if (!sentinelResolved) {
+      sentinelReject(error)
+    }
+  }
+  const rejectCloseBeforeSentinel = (code: number | null, signal: NodeJS.Signals | null): void => {
+    if (!sentinelResolved) {
+      sentinelReject(
+        new Error(
+          `Relay closed before readiness (code=${code}, signal=${signal})${stderrTail ? `: ${stderrTail.trim()}` : ''}`
+        )
+      )
+    }
+  }
+  proc.once('error', rejectBeforeSentinel)
+  proc.once('close', rejectCloseBeforeSentinel)
 
   const decoder = new FrameDecoder((frame) => {
     if (frame.type !== MessageType.Regular) {
@@ -62,6 +136,9 @@ export function spawnRelay(
       const idx = stdoutBuffer.indexOf(sentinelBuf)
       if (idx !== -1) {
         sentinelResolved = true
+        proc.off('error', rejectBeforeSentinel)
+        proc.off('close', rejectCloseBeforeSentinel)
+        stderrTail = ''
         decoderActive = true
         sentinelResolve()
         const remainder = stdoutBuffer.subarray(idx + sentinelBuf.length)
@@ -74,8 +151,10 @@ export function spawnRelay(
     }
   })
 
-  proc.stderr!.on('data', () => {
-    /* drain */
+  proc.stderr!.on('data', (chunk: Buffer) => {
+    if (!sentinelResolved) {
+      stderrTail = (stderrTail + chunk.toString('utf8')).slice(-8192)
+    }
   })
 
   const send = (method: string, params?: Record<string, unknown>): number => {

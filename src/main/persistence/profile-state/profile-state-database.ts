@@ -1,5 +1,6 @@
 import { applyProductBranding } from '../../../shared/brand'
 import { withProfileStateWriteTransaction } from './profile-state-write-transaction'
+import { hasProfileStateAuthorityMarker } from './profile-state-authority-marker'
 import Database, { isSqliteAvailable } from '../../sqlite/sync-database'
 import { migrateAutomationRunsStorage } from './profile-state-automation-runs-migration'
 import { hardenSqliteDatabaseFiles } from '../../sqlite/harden-database-files'
@@ -72,7 +73,7 @@ export function openProfileStateDatabase(
 
   let probe: Database.Database
   try {
-    probe = new Database(dbPath)
+    probe = new Database(dbPath, { fileMustExist: hasProfileStateAuthorityMarker(dbPath) })
   } catch (error) {
     throw new ProfileStateDatabaseOpenError(
       'unreadable',

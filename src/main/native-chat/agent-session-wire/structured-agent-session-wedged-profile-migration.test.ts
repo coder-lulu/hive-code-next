@@ -54,6 +54,11 @@ import {
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
+import {
+  claudeProviderHandle,
+  codexProviderHandle
+} from '../../../shared/agent-session-provider-handle-encoding'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-1' }
 const DEAD_OWNER: AgentSessionProcessIdentity = {
@@ -125,6 +130,8 @@ async function seedStore(record: PersistedAgentSessionRecord): Promise<void> {
 /** Every recorded owner in these fixtures is long gone; that is the present-time evidence. */
 function openHost(overrides: Partial<StructuredAgentSessionHostDeps> = {}): void {
   host = new StructuredAgentSessionHost({
+    platform: 'linux',
+    agents: NO_STRUCTURED_AGENTS,
     logger: createStructuredAgentSessionLogger(),
     store,
     adapter: {
@@ -162,7 +169,7 @@ beforeEach(async () => {
     },
     link: {
       linkId: `link-${fence}`,
-      handle: { provider: 'codex', threadId: THREAD },
+      handle: codexProviderHandle(THREAD),
       origin: 'resumed' as const,
       mintedAtFence: fence,
       observedAt: NOW
@@ -200,8 +207,8 @@ async function seedRunningTurn(provider: 'codex' | 'claude' = 'codex'): Promise<
       agent: provider,
       providerHandle:
         provider === 'codex'
-          ? { kind: 'codex', threadId: THREAD }
-          : { kind: 'claude', sessionId: 'provider-session-alpha-1', leafUuid: null }
+          ? codexProviderHandle(THREAD)
+          : claudeProviderHandle('provider-session-alpha-1', null)
     },
     database: openTestJournalHostDatabase(root)
   })
@@ -609,7 +616,7 @@ describe('already-wedged profiles become usable on load', () => {
     // The conversation survived: the codex thread was resumed, not recreated.
     expect(store.getRecord(SESSION)?.providerHandleChain[0]).toMatchObject({
       linkId: 'codex-13-link',
-      handle: { threadId: THREAD }
+      handle: { nativeId: THREAD }
     })
     // Why NOT acquired here: startup spawning a provider child for every recovered record is the
     // accumulation this stack removed. Unlatching is the migration's job; spawning is a hold's.
@@ -684,7 +691,7 @@ describe('already-wedged profiles become usable on load', () => {
         process: { hostId: 'local', pid: 4242, processStartTimeMs: 1, spawnToken: 'spawn-new' },
         link: {
           linkId: `link-${fence}`,
-          handle: { provider: 'codex' as const, threadId: THREAD },
+          handle: codexProviderHandle(THREAD),
           origin: 'resumed' as const,
           mintedAtFence: fence,
           observedAt: NOW

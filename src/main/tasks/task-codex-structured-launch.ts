@@ -1,7 +1,7 @@
 import { isDeepStrictEqual as same } from 'node:util'
 import { realpathSync } from 'node:fs'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
-import { isAgentSessionRecord } from '../../shared/agent-session-record'
+import { isTaskSessionRecord } from './task-codex-session-binding'
 import {
   TaskSessionSourceReferenceSchema,
   TaskStructuredBindingSchema
@@ -83,7 +83,7 @@ export function createTaskCodexStructuredLaunchResolver(
       !task ||
       !TaskExecutionRecordSchema.safeParse(task).success ||
       !parsed.success ||
-      !isAgentSessionRecord(record) ||
+      !isTaskSessionRecord(record) ||
       !same(deps.store.getRecord(record.sessionId), record)
     ) {
       return refuseTaskExecution('OUTCOME_UNKNOWN')

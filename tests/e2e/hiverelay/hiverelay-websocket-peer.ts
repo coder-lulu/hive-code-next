@@ -60,9 +60,13 @@ export function openWebSocket(
   return new WebSocketClient(webSocketUrl(cellUrl, path), {
     perMessageDeflate: false,
     maxPayload: 8_388_690,
-    ...(options.origin ? { origin: options.origin } : {}),
-    ...(options.authorization
-      ? { headers: { authorization: `Bearer ${options.authorization}` } }
+    ...(options.origin || options.authorization
+      ? {
+          headers: {
+            ...(options.origin ? { origin: options.origin } : {}),
+            ...(options.authorization ? { authorization: `Bearer ${options.authorization}` } : {})
+          }
+        }
       : {})
   })
 }

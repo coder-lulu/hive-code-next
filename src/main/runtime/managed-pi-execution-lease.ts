@@ -1,3 +1,4 @@
+import { managedPiProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { createHash, randomUUID } from 'node:crypto'
 import { isAbsolute, join } from 'node:path'
 import { isDeepStrictEqual } from 'node:util'
@@ -221,7 +222,7 @@ export async function reserveManagedPiExecutionLease(options: {
           leaseTtlMs: AGENT_SESSION_LEASE_TTL_MS,
           link: {
             linkId: randomUUID(),
-            handle: { provider: 'managed-pi', sessionId: scope.sessionId },
+            handle: managedPiProviderHandle(scope.sessionId),
             origin: record.providerHandleChain.length ? 'resumed' : 'created',
             mintedAtFence: fence,
             observedAt: now()

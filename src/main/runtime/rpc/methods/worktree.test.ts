@@ -22,8 +22,7 @@ function makeRequest(method: string, params?: unknown): RpcRequest {
 
 // worktree.create routes through the runtime's clientMutationId idempotency
 // wrapper; these unit mocks run the create straight through (no dedupe).
-const passthroughDedupe = <T>(_repo: string, _id: string | undefined, run: () => Promise<T>) =>
-  run()
+const passthroughDedupe = <T>(_repo: string, _id: unknown, run: () => Promise<T>) => run()
 
 describe('worktree RPC methods', () => {
   it('routes mobile session-only activation without notifying desktop clients', async () => {
@@ -132,10 +131,11 @@ describe('worktree RPC methods', () => {
       pushTarget: { remoteName: 'fork', branchName: 'feature' },
       runHooks: false,
       activate: false,
-      navigation: 'all',
+      navigation: 'host',
       setupDecision: 'skip',
       createdWithAgent: undefined,
       automationProvenance: undefined,
+      allowLocalBaseFallback: true,
       creatorProvenance: { kind: 'host' },
       startup: undefined,
       startupDraft: undefined,
@@ -253,6 +253,10 @@ describe('worktree RPC methods', () => {
           hostId: 'ssh:ssh-target-1'
         })
       })
+    )
+    // Why: an automation run has nobody to tell, so it keeps the network error offline.
+    expect(vi.mocked(runtime.createManagedWorktree).mock.calls[0]?.[0]).not.toHaveProperty(
+      'allowLocalBaseFallback'
     )
   })
 

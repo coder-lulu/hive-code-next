@@ -32,6 +32,10 @@ describe('serve desktop activation wiring', () => {
     join(process.cwd(), 'src/main/startup/main-window-core-services.ts'),
     'utf8'
   )
+  const headlessGraphSource = readFileSync(
+    join(process.cwd(), 'src/main/runtime/headless-runtime-graph.ts'),
+    'utf8'
+  )
 
   it('routes second-instance and windowless app activation through one safety gate', () => {
     expect(preflightSource).toContain('createServeDesktopActivationGate({')
@@ -76,10 +80,7 @@ describe('serve desktop activation wiring', () => {
 
   it('publishes the named headless sentinel and only enables promotion after RPC is ready', () => {
     const serveIndex = runtimeSource.indexOf('async function launchServeMode(')
-    const sentinelIndex = runtimeSource.indexOf(
-      'runtime.syncWindowGraph(HEADLESS_RUNTIME_WINDOW_ID',
-      serveIndex
-    )
+    const sentinelIndex = runtimeSource.indexOf('publishHeadlessRuntimeGraph(runtime)', serveIndex)
     const rpcIndex = runtimeSource.indexOf('await runtimeRpc.start()', serveIndex)
     const settleIndex = runtimeSource.indexOf('settleDesktopActivation()', rpcIndex)
 
@@ -87,7 +88,9 @@ describe('serve desktop activation wiring', () => {
     expect(sentinelIndex).toBeGreaterThan(serveIndex)
     expect(rpcIndex).toBeGreaterThan(sentinelIndex)
     expect(settleIndex).toBeGreaterThan(rpcIndex)
+    expect(headlessGraphSource).toContain('runtime.syncWindowGraph(HEADLESS_RUNTIME_WINDOW_ID,')
     expect(runtimeSource).not.toContain('runtime.syncWindowGraph(0,')
+    expect(headlessGraphSource).not.toContain('runtime.syncWindowGraph(0,')
   })
 
   it('keeps the headless install policy after desktop promotion', () => {

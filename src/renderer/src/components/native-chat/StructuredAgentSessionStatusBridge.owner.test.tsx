@@ -15,13 +15,17 @@ type MockState = Pick<
   | 'projectGroups'
   | 'setAgentStatus'
   | 'removeAgentStatus'
+  | 'setStructuredSessionLaunchDirectory'
+  | 'clearStructuredSessionLaunchDirectory'
 >
 
 const mocks = vi.hoisted(() => ({
   store: null as { setState: (patch: Partial<MockState>) => void } | null,
   subscribe: vi.fn(),
   setAgentStatus: vi.fn(),
-  removeAgentStatus: vi.fn()
+  removeAgentStatus: vi.fn(),
+  setStructuredSessionLaunchDirectory: vi.fn(),
+  clearStructuredSessionLaunchDirectory: vi.fn()
 }))
 vi.mock('@/store', async () => {
   const { create } = await import('zustand')
@@ -33,7 +37,9 @@ vi.mock('@/store', async () => {
     folderWorkspaces: [],
     projectGroups: [],
     setAgentStatus: mocks.setAgentStatus,
-    removeAgentStatus: mocks.removeAgentStatus
+    removeAgentStatus: mocks.removeAgentStatus,
+    setStructuredSessionLaunchDirectory: mocks.setStructuredSessionLaunchDirectory,
+    clearStructuredSessionLaunchDirectory: mocks.clearStructuredSessionLaunchDirectory
   }))
   mocks.store = useAppStore
   return { useAppStore }

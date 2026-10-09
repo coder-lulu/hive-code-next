@@ -7,7 +7,12 @@ import {
   type StructuredAgentSessionSinkBarrier
 } from './structured-agent-session-event-sink'
 import type { StructuredAgentSessionHostDeps } from './structured-agent-session-host'
+import { StructuredAgentSessionAcquireAborts } from './structured-agent-session-acquire-aborts'
 import { StructuredAgentSessionLeaseRenewer } from './structured-agent-session-lease-renewer'
+import {
+  heldProviderChildReader,
+  type ProviderChildSessions
+} from './structured-agent-session-provider-child'
 import {
   resolveStructuredSessionRecovery,
   commitStructuredSessionExecutionHostExit
@@ -15,11 +20,14 @@ import {
 
 export class StructuredAgentSessionHostRuntimeState {
   private readonly eventSinks = new Map<string, DeferredStructuredAgentSessionEventSink>()
+  readonly acquireAborts = new StructuredAgentSessionAcquireAborts()
   private readonly leaseRenewer: StructuredAgentSessionLeaseRenewer
   private readonly onEventSinkFailure?: (sessionId: string, error: unknown) => void
 
   constructor(
     private readonly deps: StructuredAgentSessionHostDeps,
+    /** Required: a child held here renews its lease without a PID probe. */
+    sessions: ProviderChildSessions,
     onEventSinkFailure?: (sessionId: string, error: unknown) => void
   ) {
     this.onEventSinkFailure = onEventSinkFailure
@@ -28,6 +36,7 @@ export class StructuredAgentSessionHostRuntimeState {
       owns: (record) => record.provider !== 'managed-pi',
       probe: (record) => this.probeRecord(record),
       ...(deps.probeOwners ? { probeMany: deps.probeOwners } : {}),
+      holdsLiveChild: heldProviderChildReader(sessions, deps.adapter),
       now: () => deps.now?.() ?? Date.now(),
       // Lease/ownership failures are transient and stay on the visible lease-error path.
       // Only deferred sink I/O failures are terminal and may force-close a provider.
@@ -130,6 +139,7 @@ export class StructuredAgentSessionHostRuntimeState {
       {
         store: this.deps.store,
         probeRecord: (record) => this.probeRecord(record),
+        platform: this.deps.platform ?? process.platform,
         now: () => this.deps.now?.() ?? Date.now(),
         ...(this.deps.stopOwnerProcess ? { stopOwnerProcess: this.deps.stopOwnerProcess } : {}),
         ...(this.deps.stopExecutionOwner

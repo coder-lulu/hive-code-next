@@ -16,7 +16,10 @@ import {
   managedPiExecutionRecordId
 } from '../../src/main/runtime/managed-pi-execution-lease'
 import { HiveAgentSessionHost } from '../../src/main/native-chat/hive-agent-session-host'
-import { createTrackedJournalOpener } from '../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabase,
+  createTrackedJournalOpener
+} from '../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
 import { HIVE_AGENT_METHODS } from '../../src/shared/hive-agent-session-methods'
 import { isAgentSessionRecord } from '../../src/shared/agent-session-record'
 import {
@@ -24,7 +27,9 @@ import {
   isAgentSessionProviderHandle,
   agentSessionProviderHandleRoot
 } from '../../src/shared/agent-session-provider-handle'
-import { adapterSupportsRecord } from '../../src/main/native-chat/agent-session-wire/structured-agent-session-provider-support'
+import { hostCanStartRecord } from '../../src/main/native-chat/agent-session-wire/structured-agent-session-provider-support'
+import { NO_STRUCTURED_AGENTS } from '../../src/main/native-chat/agent-session-wire/structured-agent-session-adapter-router-test-support'
+import { agentSessionRecordFixture } from '../../src/shared/agent-session-record.test-fixture'
 import { restoreStructuredAgentSessionRead } from '../../src/main/native-chat/agent-session-wire/structured-agent-session-read-restore'
 import { listStructuredProviderSessionOwnership } from '../../src/main/native-chat/agent-session-wire/structured-provider-session-ownership'
 import { StructuredAgentSessionHostRuntimeState } from '../../src/main/native-chat/agent-session-wire/structured-agent-session-host-runtime-state'
@@ -32,12 +37,18 @@ import { HiveAgentLocalPrincipal } from '../../src/main/native-chat/hive-agent-l
 import { EMPTY_HIVE_LOCAL_RUNTIME_OWNERSHIP } from '../../src/shared/hive-runtime-cloud'
 import type { ManagedPiTextInference } from '../../src/main/native-chat/managed-pi-inference-pump'
 import type { HiveAgentHostDependencies } from '../../src/main/native-chat/hive-agent-session-dependencies'
+import {
+  decodePersistedAgentSessionProviderHandle,
+  encodePersistedAgentSessionProviderHandle,
+  managedPiProviderHandle
+} from '../../src/shared/agent-session-provider-handle-encoding'
+import { proveManagedPiLongHome } from './managed-pi-long-home-test-support'
 
 let root: string
 let pack: Awaited<ReturnType<typeof loadManagedPiTextPack>>
 const disposers: (() => Promise<void>)[] = []
 beforeAll(async () => {
-  const base = resolve('logs/managed-pi-execution-tests')
+  const base = resolve('logs/pi-exec')
   await mkdir(base, { recursive: true })
   root = await mkdtemp(join(base, 'owned Pi with spaces 中文-'))
   const built = await produceManagedPiTextPack(resolve('.'), join(root, 'pack'))
@@ -129,10 +140,13 @@ async function fixture(
     }
   }
   const host = await HiveAgentSessionHost.open(deps)
-  disposers.push(async () => {
-    await host.close()
-    await journals.closeAll()
-  })
+  let closing: Promise<void> | undefined
+  const closeFixture = () =>
+    (closing ??= (async () => {
+      await host.close()
+      await journals.closeAll()
+    })())
+  disposers.push(closeFixture)
   const principal = () =>
     authorized
       ? {
@@ -186,6 +200,7 @@ async function fixture(
     host,
     execution,
     deps,
+    closeFixture,
     opened,
     run,
     create,
@@ -499,7 +514,22 @@ it('excludes owned Pi records from external-provider restoration and ownership i
   await f.host.drain()
   const record = f.record(id)
   expect(isAgentSessionHandleProvider('managed-pi')).toBe(false)
-  expect(adapterSupportsRecord({ supportsCreate: () => true }, record)).toBe(false)
+  const registered = NO_STRUCTURED_AGENTS.registration('codex')
+  if (!registered) {
+    throw new Error('canonical Codex registration missing')
+  }
+  const host = { adapter: registered.adapter, agents: NO_STRUCTURED_AGENTS }
+  expect(hostCanStartRecord(host, record)).toBe(false)
+  expect(
+    hostCanStartRecord(
+      host,
+      agentSessionRecordFixture({
+        provider: 'codex',
+        accountHome: { variable: 'CODEX_HOME', path: f.directory },
+        providerHandleChain: []
+      })
+    )
+  ).toBe(true)
   expect(listStructuredProviderSessionOwnership([record])).toEqual([])
   expect(
     await restoreStructuredAgentSessionRead(
@@ -522,9 +552,14 @@ it('excludes owned Pi records from external-provider restoration and ownership i
       lease: { ...record.lease, ownerProcess: { ...record.lease.ownerProcess, hostId: 'ssh:host' } }
     })
   ).toBe(false)
-  const handle = { provider: 'managed-pi', sessionId: id }
+  const storedHandle = { provider: 'managed-pi', sessionId: id }
+  const handle = managedPiProviderHandle(id)
+  expect(decodePersistedAgentSessionProviderHandle(storedHandle)).toEqual(handle)
+  expect(encodePersistedAgentSessionProviderHandle(handle)).toEqual(storedHandle)
   expect(isAgentSessionProviderHandle(handle)).toBe(true)
-  expect(isAgentSessionProviderHandle({ ...handle, threadId: 'not-codex' })).toBe(false)
+  expect(
+    decodePersistedAgentSessionProviderHandle({ ...storedHandle, threadId: 'not-codex' })
+  ).toBeNull()
   expect(agentSessionProviderHandleRoot(record.providerHandleChain[0].handle)).toBe(
     `managed-pi:${JSON.stringify(id)}`
   )
@@ -713,7 +748,7 @@ it('reconciles a released Pi lease on restart without touching external-provider
     operation: { callerKey: 'external-fixture', operationId, fingerprint: 'external-reservation' },
     now: Date.now()
   })
-  await f.host.close()
+  await f.closeFixture()
   const restarted = await openTestAgentSessionRecordStore(f.directory)
   expect(restarted.getRecord(managedPiExecutionRecordId(id))?.lease.unreconciled).toBe(true)
   const external = structuredClone(restarted.getRecord('external_session_1'))
@@ -728,7 +763,10 @@ it('reconciles a released Pi lease on restart without touching external-provider
     assertAuthorized: () => {},
     inference: { run: f.run }
   })
-  disposers.push(execution.close)
+  disposers.push(async () => {
+    await execution.close()
+    closeTestJournalHostDatabase(f.directory)
+  })
   expect(restarted.getRecord(managedPiExecutionRecordId(id))?.lease).toMatchObject({
     unreconciled: false,
     claimStatus: 'released',
@@ -752,4 +790,8 @@ it('serializes simultaneous identity challenges for the same actual owned child'
   expect(identities.every((identity) => identity.pid === supervisor.identity.pid)).toBe(true)
   lease.assertLive()
   expect(f.run).not.toHaveBeenCalled()
+})
+it('proves an actual owned child in a long managed home without changing its home environment', async () => {
+  const f = await fixture()
+  await proveManagedPiLongHome(f, pack, (dispose) => disposers.push(dispose))
 })

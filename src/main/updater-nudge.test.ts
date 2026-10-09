@@ -21,6 +21,7 @@ vi.mock('./product/product-external-service-endpoints', () => ({
 }))
 
 import { fetchNudge, versionMatchesRange, shouldApplyNudge } from './updater-nudge'
+import { isRolloutFlagActive, resetRolloutConfigForTests } from './updater/rollout-flags'
 
 function jsonResponse(body: unknown): Response {
   return {
@@ -37,6 +38,7 @@ describe('updater-nudge', () => {
     defaultNetFetchMock.mockImplementation((...args: unknown[]) => netFetchMock(...args))
     fromPartitionMock.mockReset()
     fromPartitionMock.mockReturnValue({ fetch: netFetchMock })
+    resetRolloutConfigForTests()
   })
 
   describe('fetchNudge', () => {
@@ -153,6 +155,39 @@ describe('updater-nudge', () => {
       await expect(fetchNudge()).resolves.toBeNull()
       expect(cancel).toHaveBeenCalledTimes(1)
       expect(text).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('rollout block on the same request', () => {
+    const install = { appVersion: '1.5.0', installId: 'install-a' }
+    const killSwitch = { version: 1, flags: { 'pinned-relay-default': { state: 'on' } } }
+
+    it('records the block without changing the nudge it rides on', async () => {
+      netFetchMock.mockResolvedValue(
+        jsonResponse({ id: 'campaign-1', minVersion: '1.0.0', rollout: killSwitch })
+      )
+
+      await expect(fetchNudge()).resolves.toEqual({ id: 'campaign-1', minVersion: '1.0.0' })
+      expect(isRolloutFlagActive('pinned-relay-default', install)).toBe(true)
+      expect(netFetchMock).toHaveBeenCalledTimes(1)
+    })
+
+    it('reads a block even when there is no nudge campaign', async () => {
+      netFetchMock.mockResolvedValue(jsonResponse({ rollout: killSwitch }))
+
+      await expect(fetchNudge()).resolves.toBeNull()
+      expect(isRolloutFlagActive('pinned-relay-default', install)).toBe(true)
+    })
+
+    it('keeps the last block when a later request fails', async () => {
+      netFetchMock.mockResolvedValueOnce(jsonResponse({ rollout: killSwitch }))
+      await fetchNudge()
+      netFetchMock.mockResolvedValueOnce({ ok: false })
+      await fetchNudge()
+      netFetchMock.mockRejectedValueOnce(new Error('network down'))
+      await fetchNudge()
+
+      expect(isRolloutFlagActive('pinned-relay-default', install)).toBe(true)
     })
   })
 

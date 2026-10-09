@@ -22,6 +22,7 @@ import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
 import { getLogicalRepoOrderRankById } from '../../project-header-drop'
 import { getEmptyProjectPlaceholderRepoIds } from '../../empty-project-placeholder-repos'
+import { deferHostSectionCollapse, scopeHostSectionCollapse } from '../../host-section-collapse'
 import { addHostSectionRows } from '../../host-section-rows'
 import { orderHostSectionOptions } from '../../host-section-order'
 import { buildSidebarHostOptions } from '../../sidebar-host-options'
@@ -150,6 +151,15 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
     () => new Map(hostOptions.map((host) => [host.id, host.label])),
     [hostOptions]
   )
+  const hostScopedGroups =
+    args.workspaceHostScope !== 'all' || args.visibleWorkspaceHostIds !== null
+  const rowCollapsedGroups = useMemo(
+    () =>
+      hostScopedGroups
+        ? deferHostSectionCollapse(effectiveCollapsedGroups)
+        : effectiveCollapsedGroups,
+    [effectiveCollapsedGroups, hostScopedGroups]
+  )
   const offlineRuntimeIds = useMemo(
     () =>
       getOfflineRuntimeEnvironmentIds(
@@ -171,7 +181,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
           worktrees,
           repoMap,
           args.prCache,
-          effectiveCollapsedGroups,
+          rowCollapsedGroups,
           repoOrder,
           args.workspaceStatuses,
           args.projectOrderBy,
@@ -199,7 +209,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
       worktrees,
       repoMap,
       args.prCache,
-      effectiveCollapsedGroups,
+      rowCollapsedGroups,
       defaultHostId,
       repoOrder,
       args.workspaceStatuses,
@@ -257,7 +267,12 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
     })
     return filterProjectTreeRows(
       appendRuntimeOfflineDirectory(
-        onlineSections,
+        hostScopedGroups
+          ? scopeHostSectionCollapse({
+              rows: onlineSections,
+              collapsedGroups: effectiveCollapsedGroups
+            })
+          : onlineSections,
         offlineRows,
         offlineCount,
         effectiveCollapsedGroups
@@ -273,6 +288,7 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
     defaultHostId,
     effectiveCollapsedGroups,
     hostDragActive,
+    hostScopedGroups,
     orderedHostOptions,
     rows,
     offlineRows,

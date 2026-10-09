@@ -1,16 +1,11 @@
-import { forwardRef, useLayoutEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import { TerminalPaneSurface } from './TerminalPaneSurface'
 import { useTerminalPaneController } from './use-terminal-pane-controller'
-import type { TerminalPaneHandle, TerminalPaneProps } from './terminal-pane-types'
+import type { TerminalPaneProps } from './terminal-pane-types'
 import { waitForTerminalVisibleRender } from './terminal-first-visible-render'
 
-export type { TerminalPaneHandle } from './terminal-pane-types'
-
-function TerminalPane(
-  props: TerminalPaneProps,
-  ref: React.ForwardedRef<TerminalPaneHandle>
-): React.JSX.Element {
-  const controller = useTerminalPaneController(props, ref)
+export default function TerminalPane(props: TerminalPaneProps): React.JSX.Element {
+  const controller = useTerminalPaneController(props)
   const { onReady } = props
   const notified = useRef<typeof onReady>(undefined)
   useLayoutEffect(() => {
@@ -29,5 +24,3 @@ function TerminalPane(
   }, [controller.managedPanes, controller.visibleTerminalError, controller.isChatViewMode, onReady])
   return <TerminalPaneSurface controller={controller} />
 }
-
-export default forwardRef(TerminalPane)

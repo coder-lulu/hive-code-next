@@ -52,7 +52,6 @@ export function HiveAgentConversation(props: {
           journalItems={chat.timeline.items}
           isWorking={false}
           expandSignal={false}
-          fontScale={1}
         />
       </div>
     </section>

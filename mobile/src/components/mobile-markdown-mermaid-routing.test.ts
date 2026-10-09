@@ -6,6 +6,7 @@ import { lightTheme, type MobileTheme } from '../theme/mobile-theme'
 
 vi.mock('react-native', () => ({
   Linking: { openURL: vi.fn() },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   StyleSheet: { create: <T>(styles: T) => styles, hairlineWidth: 1 },

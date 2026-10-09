@@ -1,5 +1,5 @@
 import { compileFunction } from 'node:vm'
-import ts from 'typescript'
+import ts from 'typescript-api'
 
 const compiled = new Map<string, ReturnType<typeof compileFunction>>()
 const MAX_COMPILED_MODULES = 512

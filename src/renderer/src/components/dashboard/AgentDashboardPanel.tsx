@@ -1,4 +1,5 @@
 import { useCallback } from 'react'
+import type { AgentSubjectReadIntent } from '@/attention/agent-subject-read-actions'
 import { useAppStore } from '@/store'
 import { AgentKanbanBoard, type AgentBoardViewState } from '../dashboard-popout/AgentKanbanBoard'
 import type { AgentRevealArgs } from '../dashboard-popout/AgentTerminalDialog'
@@ -15,8 +16,8 @@ export default function AgentDashboardPanel({
   onViewStateChange: (state: AgentBoardViewState) => void
 }): React.JSX.Element {
   const snapshot = useLiveDashboardSnapshot()
-  const onAckAgent = useCallback((paneKey: string) => {
-    useAppStore.getState().acknowledgeAgents([paneKey])
+  const onAckAgent = useCallback((paneKey: string, intent: AgentSubjectReadIntent) => {
+    useAppStore.getState().acknowledgeAgents([paneKey], undefined, intent)
   }, [])
   const onRevealAgent = useCallback(
     (args: AgentRevealArgs) => {

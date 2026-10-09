@@ -73,7 +73,8 @@ export function TerminalTabActivityIndicator({
         data-agent-activity-status={activityStatus}
         className="inline-flex shrink-0 items-center"
       >
-        <AgentStateDot state={dotState} size="md" />
+        {/* Why: the state glyph is self-describing and the tab title already has a tooltip; hover here stays quiet. */}
+        <AgentStateDot state={dotState} size="md" title={null} />
       </span>
     )
   }

@@ -10,6 +10,7 @@ import { applyPRBotAuthorOverride } from '../../shared/pr-bot-author-overrides'
 import { resolveEnvironment } from '../../shared/runtime-environment-store'
 import { resolveRuntimeEnvironmentCatalogEntry } from './runtime-environment-account-routing'
 import { registerSettingsMutationHandler } from './settings-mutation-handler'
+import { readSettingsWithRuntimeEnvironmentPreference } from './runtime-environment-preference'
 
 export function registerSettingsHandlers(
   store: Store,
@@ -38,7 +39,7 @@ export function registerSettingsHandlers(
   })
 
   ipcMain.handle('settings:get', () => {
-    return store.getSettings()
+    return readSettingsWithRuntimeEnvironmentPreference(store, app.getPath('userData'))
   })
 
   ipcMain.handle(
@@ -60,7 +61,7 @@ export function registerSettingsHandlers(
   // synchronously or pre-hydration bindings would always pick main authority
   // (terminal-side-effect-authority.md, migration switch).
   ipcMain.on('settings:get-sync', (event) => {
-    event.returnValue = store.getSettings()
+    event.returnValue = readSettingsWithRuntimeEnvironmentPreference(store, app.getPath('userData'))
   })
 
   registerSettingsMutationHandler(store, agentAwakeService)

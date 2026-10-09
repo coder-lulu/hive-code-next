@@ -58,4 +58,35 @@ describe('Windows terminal capability probe ordering', () => {
     await expect(olderProbe).resolves.toMatchObject(identityProof)
     expect(getCachedWindowsTerminalCapabilities('local')).toMatchObject(identityProof)
   })
+  it.each([true, false, undefined])(
+    'retains only the actual advertised identity capability: %s',
+    async (advertised) => {
+      const runtimeGetStatus = vi.fn().mockResolvedValue({
+        hostPlatform: 'win32',
+        ...(advertised === undefined ? {} : { windowsProcessStartTimeAvailable: advertised })
+      })
+      vi.stubGlobal('window', {
+        api: {
+          wsl: {
+            isAvailable: vi.fn().mockResolvedValue(false),
+            listDistros: vi.fn().mockResolvedValue([])
+          },
+          pwsh: { isAvailable: vi.fn().mockResolvedValue(false) },
+          gitBash: { isAvailable: vi.fn().mockResolvedValue(false) },
+          runtime: { getStatus: runtimeGetStatus }
+        }
+      })
+
+      const capabilities = await loadWindowsTerminalCapabilities({ ownerKey: 'local', force: true })
+
+      expect(runtimeGetStatus).toHaveBeenCalledOnce()
+      expect(capabilities.hostPlatform).toBe('win32')
+      if (advertised === undefined) {
+        expect(capabilities).not.toHaveProperty('windowsProcessStartTimeAvailable')
+      } else {
+        expect(capabilities.windowsProcessStartTimeAvailable).toBe(advertised)
+      }
+      expect(getCachedWindowsTerminalCapabilities('local')).toEqual(capabilities)
+    }
+  )
 })

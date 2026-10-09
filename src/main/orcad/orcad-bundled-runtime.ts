@@ -10,19 +10,10 @@ import {
   ORCAD_VERSION_FILENAME,
   orcadNodeRuntimeRelativePath
 } from '../../shared/orcad-artifacts'
-import {
-  NODE_RUNTIME_ASSETS,
-  NODE_RUNTIME_PIN,
-  SERVER_TARGETS,
-  type ServerTarget
-} from '../../shared/node-runtime-pin'
+import { NODE_RUNTIME_PIN, nodeRuntimeAsset } from '../../shared/node-runtime-pin'
 
 export class OrcadBundledRuntimeError extends Error {}
 export const ORCAD_BUNDLED_LAUNCHER_ENV = 'ORCA_BUNDLED_LAUNCHER_CHANNEL'
-
-function isServerTarget(value: string): value is ServerTarget {
-  return SERVER_TARGETS.some((target) => target === value)
-}
 
 /**
  * The pinned Node a packaged slot in `directory` runs on, or null for an unpackaged entry.
@@ -45,7 +36,9 @@ export function resolveBundledOrcadRuntime(directory: string): string | null {
     )
   }
   const target = readFileSync(targetPath, 'utf8').trim()
-  if (!isServerTarget(target)) {
+  // A compat target (design D6 rung B) runs the same Node version built for an older glibc.
+  const asset = nodeRuntimeAsset(target)
+  if (!asset) {
     throw new OrcadBundledRuntimeError(
       `The bundled ${APP_DISPLAY_NAME} runtime target is invalid: ${target}`
     )
@@ -53,7 +46,7 @@ export function resolveBundledOrcadRuntime(directory: string): string | null {
   const executableSha256 = readFileSync(markerPath, 'utf8').trim()
   // Why the pin and not only a digest shape: the marker becomes a path segment, and a slot
   // naming another runtime was not built by this code.
-  if (executableSha256 !== NODE_RUNTIME_ASSETS[target].executableSha256) {
+  if (executableSha256 !== asset.executableSha256) {
     throw new OrcadBundledRuntimeError(
       `The bundled ${APP_DISPLAY_NAME} runtime reference does not name Node ${NODE_RUNTIME_PIN.version}`
     )

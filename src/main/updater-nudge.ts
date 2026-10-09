@@ -3,6 +3,7 @@ import { getProductExternalServiceEndpoints } from './product/product-external-s
 import { fetchWithProductUpdaterSession } from './product/product-updater-session'
 import { compareVersions, isValidVersion } from './updater-fallback'
 import { readResponseTextWithLimit } from './updater-response-body'
+import { parseRolloutConfig, recordRolloutConfig } from './updater/rollout-flags'
 
 const MAX_NUDGE_RESPONSE_BYTES = 64 * 1024
 
@@ -32,6 +33,7 @@ export async function fetchNudge(): Promise<NudgeConfig | null> {
       return null
     }
     const json: unknown = JSON.parse(body)
+    recordRolloutConfig(parseRolloutConfig(json))
     if (!json || typeof json !== 'object' || Array.isArray(json)) {
       return null
     }

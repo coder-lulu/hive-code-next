@@ -7,8 +7,12 @@ import { scanNestedRepos } from './nested-repo-discovery'
 let tempDirs: string[] = []
 
 async function tempRoot(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'orca-nested-repos-'))
-  tempDirs.push(dir)
+  const sandbox = await mkdtemp(join(tmpdir(), 'orca-nested-repos-'))
+  tempDirs.push(sandbox)
+  // Stop Git from discovering the checkout that owns ignored test logs.
+  await writeFile(join(sandbox, '.git'), '')
+  const dir = join(sandbox, 'selected')
+  await mkdir(dir)
   return dir
 }
 

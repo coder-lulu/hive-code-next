@@ -68,9 +68,8 @@ function selfExtractingPowerShellScript(script: string): string {
   const payload = gzipSync(Buffer.from(script, 'utf-8'), { level: 9 }).toString('base64')
   return [
     `$OrcaScriptBytes = [Convert]::FromBase64String('${payload}')`,
-    '$OrcaScriptMemory = New-Object System.IO.MemoryStream -ArgumentList (,$OrcaScriptBytes)',
-    '$OrcaScriptGzip = New-Object System.IO.Compression.GZipStream -ArgumentList $OrcaScriptMemory, ([System.IO.Compression.CompressionMode]::Decompress)',
-    '$OrcaScriptReader = New-Object System.IO.StreamReader -ArgumentList $OrcaScriptGzip, ([System.Text.Encoding]::UTF8)',
+    // CompressionMode.Decompress is 0; keep the inline bootstrap below cmd.exe's limit.
+    '$OrcaScriptReader = [IO.StreamReader]::new([IO.Compression.GZipStream]::new([IO.MemoryStream]::new($OrcaScriptBytes), [IO.Compression.CompressionMode]0), [Text.Encoding]::UTF8)',
     '$OrcaScriptText = $OrcaScriptReader.ReadToEnd()',
     '$OrcaScriptReader.Dispose()',
     'Invoke-Expression $OrcaScriptText'

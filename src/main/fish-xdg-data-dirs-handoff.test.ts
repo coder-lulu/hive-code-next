@@ -122,7 +122,8 @@ describe.skipIf(!fish.available)('fish vendor snippet in a real fish', () => {
   })
 
   afterEach(() => {
-    rmSync(sandbox, { recursive: true, force: true })
+    // Fish may finish its universal-variable write after the shell exits.
+    rmSync(sandbox, { recursive: true, force: true, maxRetries: 8, retryDelay: 100 })
   })
 
   function runFish(args: string[], env: Record<string, string>): string {
@@ -131,6 +132,7 @@ describe.skipIf(!fish.available)('fish vendor snippet in a real fish', () => {
       env: {
         HOME: join(sandbox, 'home'),
         PATH: `${bin}:/usr/bin:/bin`,
+        TERM: 'dumb',
         ...env
       }
     })
@@ -184,11 +186,14 @@ describe.skipIf(!fish.available)('fish vendor snippet in a real fish', () => {
   })
 
   it('defines nothing in a non-interactive fish', () => {
-    const output = runFish(
-      ['-c', 'emit fish_prompt; type -t codex; functions -q __orca_define_codex; and echo hook'],
-      getFishXdgDataDirsLaunchEnv(root, undefined)
-    )
-    // Why a suffix: the emitted event also runs fish's own greeting handler.
-    expect(output.trim()).toMatch(/file$/)
+    const args = [
+      '-c',
+      'emit fish_prompt; type -t codex; functions -q __orca_define_codex; and echo hook'
+    ]
+    const withoutOrca = runFish(args, {})
+    const output = runFish(args, getFishXdgDataDirsLaunchEnv(root, undefined))
+    expect(output).toBe(withoutOrca)
+    expect(output).toContain('file\n')
+    expect(output).not.toContain('hook')
   })
 })

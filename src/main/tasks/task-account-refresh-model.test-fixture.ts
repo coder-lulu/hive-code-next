@@ -1,3 +1,4 @@
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import type { LocalTaskBindingIssuer } from './local-task-binding-issuer'
 import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
 import type { TaskExecutionStart } from '../../shared/task-execution/task-execution-command'
@@ -62,7 +63,7 @@ export async function addRefreshModelTestTask(
     fence: reserved.record.lease.runtimeFence,
     link: {
       linkId: `offline-link-${index}`,
-      handle: { provider: 'codex', threadId: `offline-thread-${index}` },
+      handle: codexProviderHandle(`offline-thread-${index}`),
       origin: 'created',
       mintedAtFence: 1,
       observedAt: TASK_TEST_NOW

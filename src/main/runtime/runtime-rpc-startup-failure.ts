@@ -4,6 +4,7 @@ import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import type { RuntimeRpcStartErrorClass } from '../../shared/telemetry-events'
 import { translateMain } from '../i18n/main-i18n'
 import { track } from '../telemetry/client'
+import { waitForWindowToShow } from '../window/wait-for-window-to-show'
 
 const MAX_VISIBLE_CAUSE_LENGTH = 500
 
@@ -121,32 +122,6 @@ export function recordRuntimeRpcStartFailure(error: unknown): void {
   } catch (telemetryError) {
     console.error('[runtime] Failed to record RPC startup failure telemetry:', telemetryError)
   }
-}
-
-function waitForWindowToShow(parentWindow: BrowserWindow): Promise<boolean> {
-  if (parentWindow.isDestroyed()) {
-    return Promise.resolve(false)
-  }
-  const parentWebContents = parentWindow.webContents
-  if (parentWebContents.isDestroyed()) {
-    return Promise.resolve(false)
-  }
-  if (parentWindow.isVisible()) {
-    return Promise.resolve(true)
-  }
-  return new Promise((resolve) => {
-    const settle = (visible: boolean): void => {
-      parentWindow.removeListener('show', onShow)
-      parentWebContents.removeListener('destroyed', onDestroyed)
-      resolve(visible)
-    }
-    const onShow = (): void =>
-      settle(!parentWindow.isDestroyed() && !parentWebContents.isDestroyed())
-    const onDestroyed = (): void => settle(false)
-    parentWindow.once('show', onShow)
-    // Why: keep this failure-only waiter off the crowded BrowserWindow `closed` event.
-    parentWebContents.once('destroyed', onDestroyed)
-  })
 }
 
 export async function showRuntimeRpcStartupFailureDialog(

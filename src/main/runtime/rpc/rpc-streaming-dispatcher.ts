@@ -23,6 +23,7 @@ import { needsLocalCallerFingerprint } from './dispatcher-caller-fingerprint'
 import { createDispatcherStreamingFeatureEmitter } from './dispatcher-streaming-feature-emitter'
 import type { HiveRuntimeCloudControl } from '../../hive-runtime-cloud/hive-runtime-cloud-control'
 import { assertRpcRequestAuthorized } from './dispatcher-authorization'
+import { resolveRpcCallerIdentity } from './rpc-caller-identity'
 import {
   needsOrchestrationCallerResolution,
   resolveOrchestrationSessionCaller,
@@ -160,6 +161,7 @@ export class RpcStreamingDispatcher {
             pairedDeviceId: options?.pairedDeviceId,
             authenticatedAccountRuntimeSessionId: options?.authenticatedAccountRuntimeSessionId,
             authenticatedAccountOperationCallerKey: options?.authenticatedAccountOperationCallerKey,
+            caller: resolveRpcCallerIdentity(options),
             clientKind: options?.clientKind,
             clientCapabilities: options?.clientCapabilities,
             updateClientCapabilities: options?.updateClientCapabilities,
@@ -218,6 +220,7 @@ export class RpcStreamingDispatcher {
           pairedDeviceId: options?.pairedDeviceId,
           authenticatedAccountRuntimeSessionId: options?.authenticatedAccountRuntimeSessionId,
           authenticatedAccountOperationCallerKey: options?.authenticatedAccountOperationCallerKey,
+          caller: resolveRpcCallerIdentity(options),
           clientKind: options?.clientKind,
           clientCapabilities: options?.clientCapabilities,
           updateClientCapabilities: options?.updateClientCapabilities,

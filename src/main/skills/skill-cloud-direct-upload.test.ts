@@ -61,6 +61,15 @@ describe('uploadSkillPackageToSignedPolicy', () => {
       fetcher: fetcher as typeof fetch,
       onProgress: progress
     })
+    let uploadSettled = false
+    const settled = upload.then(
+      () => {
+        uploadSettled = true
+      },
+      () => {
+        uploadSettled = true
+      }
+    )
 
     await started
     await waitForChunk(1)
@@ -72,10 +81,14 @@ describe('uploadSkillPackageToSignedPolicy', () => {
     expect(progress).toHaveBeenCalled()
     expect(fetcher.mock.calls[0]?.[1]?.signal?.aborted).toBe(false)
     await vi.advanceTimersByTimeAsync(29_000)
-    await waitForChunk(4)
-    await vi.advanceTimersByTimeAsync(30_000)
-    await waitForChunk(5)
-    await vi.advanceTimersByTimeAsync(30_000)
+    let drainedChunks = 3
+    while (!uploadSettled) {
+      await Promise.race([waitForChunk(drainedChunks + 1), settled])
+      if (!uploadSettled) {
+        drainedChunks = chunksSeen
+        await vi.advanceTimersByTimeAsync(30_000)
+      }
+    }
 
     await expect(upload).resolves.toBeUndefined()
   })

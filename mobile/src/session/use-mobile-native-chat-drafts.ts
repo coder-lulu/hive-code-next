@@ -8,6 +8,7 @@ import {
   type SetStateAction
 } from 'react'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
+import { appendReturnedDraftText } from '../../../src/shared/returned-draft-text'
 import {
   countUserTextOccurrences,
   findLandedImagePreviewEchoes,
@@ -178,13 +179,12 @@ export function useMobileNativeChatDrafts(args: {
   }, [])
 
   const restoreRejectedDraft = useCallback((origin: MobileNativeChatSendOrigin, text: string) => {
-    // Why: never clobber text the user typed while the rejection was in flight.
-    setDrafts((previous) =>
-      draftEditGenerationsRef.current.isCurrent(origin.draftKey, origin.draftEditGeneration) &&
-      (previous[origin.draftKey] ?? '') === ''
-        ? { ...previous, [origin.draftKey]: text }
-        : previous
-    )
+    // Appended, so typing done while the send was in flight stays and the returned text isn't dropped.
+    setDrafts((previous) => {
+      const current = previous[origin.draftKey] ?? ''
+      const next = appendReturnedDraftText(current, text)
+      return next === current ? previous : { ...previous, [origin.draftKey]: next }
+    })
   }, [])
 
   const acceptSend = useCallback(

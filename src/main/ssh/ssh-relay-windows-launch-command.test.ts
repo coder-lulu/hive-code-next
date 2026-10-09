@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
-  formatRelayWindowsLaunchReport,
-  parseRelayWindowsLaunchReport,
-  RELAY_WINDOWS_BREAKAWAY_LAUNCH_FLAG
-} from '../../shared/relay-windows-breakaway-launch'
+  formatWindowsBreakawayLaunchReport,
+  parseWindowsBreakawayLaunchReport,
+  RELAY_WINDOWS_BREAKAWAY_CONTRACT,
+  WINDOWS_BREAKAWAY_LAUNCH_FLAG,
+  type WindowsBreakawayLaunchReport
+} from '../../shared/windows-breakaway-launch'
+
+const formatRelayWindowsLaunchReport = (report: WindowsBreakawayLaunchReport): string =>
+  formatWindowsBreakawayLaunchReport(RELAY_WINDOWS_BREAKAWAY_CONTRACT, report)
+const parseRelayWindowsLaunchReport = (output: string): WindowsBreakawayLaunchReport | null =>
+  parseWindowsBreakawayLaunchReport(RELAY_WINDOWS_BREAKAWAY_CONTRACT, output)
 import {
   classifyWindowsRelayLaunchError,
   WINDOWS_RELAY_LAUNCH_REFUSED_MARKER,
@@ -32,7 +39,7 @@ function launchScript(): string {
 describe('windowsRelayLaunchCommand', () => {
   it('starts the relay through the breakaway launcher on the same node.exe', () => {
     const script = launchScript()
-    const launcher = `& '${opts.nodePath}' relay.js '${RELAY_WINDOWS_BREAKAWAY_LAUNCH_FLAG}' '--stdout-file' '${opts.logFile}' '--stderr-file' '${opts.errFile}' '--relay-args' '--detached' '--grace-time' '300' '--sock-path' '${opts.sockPath}'`
+    const launcher = `& '${opts.nodePath}' relay.js '${WINDOWS_BREAKAWAY_LAUNCH_FLAG}' '--stdout-file' '${opts.logFile}' '--stderr-file' '${opts.errFile}' '--relay-args' '--detached' '--grace-time' '300' '--sock-path' '${opts.sockPath}'`
     expect(script).toContain(launcher)
     expect(script.indexOf(launcher)).toBeLessThan(script.indexOf('Invoke-CimMethod'))
   })

@@ -403,7 +403,10 @@ function applyPhraseFixes(enValue, localeValue, locale, key = '') {
     if (fix.skipKeyPrefixes?.some((prefix) => key.startsWith(prefix))) {
       continue
     }
-    result = result.replace(fix.pattern, fix.replacement)
+    const repaired = result.replace(fix.pattern, fix.replacement)
+    if (!findGenericTermRegression(result, repaired, locale)) {
+      result = repaired
+    }
   }
   return result
 }
@@ -450,7 +453,10 @@ function repairLocaleValue({ key, enValue, localeValue, locale }) {
   }
 
   const valueOverride = LOCALE_VALUE_OVERRIDES[locale]?.[enValue]
-  if (isCompatibleOverride(enValue, valueOverride)) {
+  if (
+    isCompatibleOverride(enValue, valueOverride) &&
+    !findGenericTermRegression(localeValue, valueOverride, locale)
+  ) {
     let result = applyBrandMistranslationFixes(enValue, valueOverride, locale, key)
     result = applyPhraseFixes(enValue, result, locale, key)
     if (['zh', 'ja', 'ko'].includes(locale)) {

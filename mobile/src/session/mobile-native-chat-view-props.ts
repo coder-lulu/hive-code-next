@@ -20,6 +20,7 @@ export type MobileNativeChatViewProps = MobileQueuedSlotProps & {
   folded: NativeChatMessage[]
   status: MobileNativeChatStatus
   error?: string
+  readFailedFinally?: boolean
   agent?: string | null
   agentWorking?: boolean
   canStop?: boolean
@@ -63,6 +64,10 @@ export type MobileNativeChatViewProps = MobileQueuedSlotProps & {
   onAnswerAsk?: (prompt: AskPrompt, selections: AskAnswerSelection[]) => Promise<boolean>
   onCancelAsk?: () => Promise<boolean>
   onCancelPrompt?: (prompt?: { itemId: string; expectedRevision: number }) => Promise<boolean>
+  onCollapseAsk?: () => void
+  onCollapsePrompt?: () => void
+  collapsedPrompt?: { title: string; expand: () => void } | null
+  promptKey?: string | null
   question?: MobileChatQuestion | null
   onAnswerQuestion?: (text: string) => Promise<boolean>
   permission?: MobileChatPermission | null

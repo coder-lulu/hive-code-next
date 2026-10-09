@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { buildQuickCreationRequest, type QuickCreationRequestInput } from './quick-creation-request'
+import { buildQuickComposerStartup } from './quick-startup-plan'
 
 function createInput(
   overrides: Partial<QuickCreationRequestInput> = {}
@@ -49,6 +50,38 @@ function createInput(
 }
 
 describe('quick composer creation request', () => {
+  it.each(['manual', 'yolo'] as const)(
+    'retains the %s permission and session preferences used by current startup execution',
+    (agentPermissionMode) => {
+      const { startupPlan, backendStartup } = buildQuickComposerStartup({
+        agent: 'codex',
+        prompt: 'implement the task',
+        draftPrompt: null,
+        settings: undefined,
+        agentPermissionMode,
+        repoConnectionId: null,
+        platform: 'linux',
+        shell: 'posix',
+        isRemote: false,
+        telemetrySource: 'unknown'
+      })
+      if (!startupPlan || !backendStartup) {
+        throw new Error('Expected a planned terminal startup')
+      }
+      const request = buildQuickCreationRequest(
+        createInput({
+          startup: backendStartup,
+          startupPlan: { ...startupPlan, sessionOptions: { model: 'gpt-5.4', effort: 'high' } },
+          quickPrompt: '  implement the task  '
+        })
+      )
+      expect(request.startup?.agentPermissionMode).toBe(agentPermissionMode)
+      expect(request.quickPrompt.trim()).toBe('implement the task')
+      expect(request.startupPlan?.sessionOptions).toEqual({ model: 'gpt-5.4', effort: 'high' })
+      expect(request.startupPlan?.agentPermissionMode).toBe(agentPermissionMode)
+    }
+  )
+
   it('preserves omission semantics for unset optional creation fields', () => {
     const request = buildQuickCreationRequest(createInput())
 

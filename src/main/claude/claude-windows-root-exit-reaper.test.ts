@@ -1,3 +1,5 @@
+import { EventEmitter } from 'node:events'
+import { managedChild } from './claude-child-exit-proof-fixture'
 import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WindowsProcessIdentityRow } from '../windows/windows-process-table'
@@ -39,19 +41,24 @@ beforeEach(() => {
 function fixture(onRootExit: () => void = () => {}) {
   let exited = false
   const exit = Promise.withResolvers<void>()
-  const child = { pid: rootRow.pid, stdin: new PassThrough(), kill: vi.fn(() => true) }
+  const child = Object.assign(new EventEmitter(), {
+    pid: rootRow.pid,
+    stdin: new PassThrough(),
+    stderr: new PassThrough(),
+    kill: vi.fn(() => true)
+  })
   child.stdin.on('finish', () => {
     rows = rows.filter((row) => row.pid !== rootRow.pid)
     exited = true
     onRootExit()
+    child.emit('exit', 0, null)
     exit.resolve()
   })
   const tree = createClaudeChildTreeReaper(child, { platform: 'win32', exited: () => exited })
   return {
     child,
     tree,
-    prove: () =>
-      proveClaudeChildExit({ child, tree, exited: () => exited, exitPromise: exit.promise })
+    prove: () => proveClaudeChildExit({ managed: managedChild(child), tree })
   }
 }
 
@@ -162,12 +169,17 @@ describe('Windows Claude descendants after owned root exit', () => {
 
   it('does not infer ownership of an unobserved child after an already exited root', async () => {
     rows = [childRow, foreignRow]
-    const child = { pid: rootRow.pid, stdin: new PassThrough(), kill: vi.fn(() => true) }
+    const child = Object.assign(new EventEmitter(), {
+      pid: rootRow.pid,
+      stdin: new PassThrough(),
+      stderr: new PassThrough(),
+      kill: vi.fn(() => true)
+    })
     const tree = createClaudeChildTreeReaper(child, { platform: 'win32', exited: () => true })
 
-    await expect(
-      proveClaudeChildExit({ child, tree, exited: () => true, exitPromise: Promise.resolve() })
-    ).resolves.toBe(false)
+    const managed = managedChild(child)
+    child.emit('exit', 0, null)
+    await expect(proveClaudeChildExit({ managed, tree })).resolves.toBe(false)
 
     expect(windows.terminate).not.toHaveBeenCalled()
     expect(windows.request).not.toHaveBeenCalled()

@@ -1,3 +1,4 @@
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 // Per-chat close drains admitted writes and refuses new work. The shared host
 // database remains open for other chats and closes only at host teardown.
@@ -25,7 +26,7 @@ const IDENTITY: AgentSessionJournalIdentity = {
   workspaceId: 'ws-1',
   hostId: 'host-1',
   agent: 'codex',
-  providerHandle: { kind: 'codex', threadId: 'thread-1' }
+  providerHandle: codexProviderHandle('thread-1')
 }
 
 let root: string

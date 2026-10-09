@@ -15,7 +15,6 @@ import type { AgentSessionRecordStore } from '../../agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../agent-session-record-store-test-harness'
 import { closeTestJournalHostDatabase } from '../../../native-chat/agent-session-journal/journal-host-database-test-support'
 import { setStructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-registry'
-import type { StructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-host'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { RpcContext } from '../core'
 import { RpcDispatcher } from '../dispatcher'
@@ -25,6 +24,7 @@ import {
   methodNamed,
   rpcContext,
   runtimeStub,
+  setAgentLaunchRecordStore,
   type AgentLaunchRuntimeStub as RuntimeStub
 } from './agent-launch.test-fixture'
 
@@ -212,13 +212,13 @@ describe('a taken session id under a named operation', () => {
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'orca-agent-launch-session-'))
     store = await openTestAgentSessionRecordStore(directory)
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: `deps.store` is the only member `agent.launch` reads, and a member it omits throws on call.
-    setStructuredAgentSessionHost({ deps: { store } } as unknown as StructuredAgentSessionHost)
+    setAgentLaunchRecordStore(store)
   })
 
   afterEach(async () => {
     setStructuredAgentSessionHost(null)
     closeTestJournalHostDatabase(directory)
+    setAgentLaunchRecordStore(null)
     await rm(directory, { recursive: true, force: true })
   })
 

@@ -1,3 +1,8 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 // Attach is where the restart reconciler runs. These cover the wiring itself:
 // that the window the adapter reports reaches the journal, that what it settles
 // stops being reported unconfirmed, and that deciding never sends.
@@ -11,10 +16,6 @@ import type { AgentJournalMessageItem } from '../../../shared/agent-session-jour
 import { projectStructuredAgentSessionStatusState } from '../../../shared/structured-agent-session-projection'
 import { digestPayload } from '../agent-session-journal/journal-payload-bounds'
 import type { ProviderHistoryWindow } from '../agent-session-journal/journal-submission-reconciler'
-import {
-  createTrackedJournalOpener,
-  openTestJournalHostDatabase
-} from '../agent-session-journal/journal-host-database-test-support'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { openTestAttachConversation } from './structured-agent-session-attach-test-conversation'
 import {
@@ -98,6 +99,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await journals.closeAll()
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 

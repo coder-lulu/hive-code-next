@@ -25,8 +25,10 @@ import {
 import type { AgentSessionRecordStore } from './agent-session-record-store'
 import {
   openTestAgentSessionRecordStore,
-  readPersistedTestAgentSessionStore
+  readPersistedTestAgentSessionStore,
+  storedTestAgentSessionRecord
 } from './agent-session-record-store-test-harness'
+import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 
 const NOW = 1_800_000_000_000
 
@@ -90,7 +92,7 @@ async function liveChat(
     fence,
     link: {
       linkId: `link-${counter}`,
-      handle: { provider: 'claude', sessionId: `provider-${counter}`, leafUuid: null },
+      handle: claudeProviderHandle(`provider-${counter}`, null),
       origin: 'created',
       mintedAtFence: fence,
       observedAt: NOW
@@ -359,7 +361,12 @@ describe('one published store per live host database', () => {
     try {
       outsider
         .prepare('UPDATE agent_session_records SET record_json = ? WHERE session_id = ?')
-        .run(JSON.stringify({ ...original, conversationName: 'external' }), original.sessionId)
+        .run(
+          JSON.stringify(
+            storedTestAgentSessionRecord({ ...original, conversationName: 'external' })
+          ),
+          original.sessionId
+        )
       await writer.enqueue(row)
       expect(load).toHaveBeenCalledOnce()
       expect(store.getRecord(original.sessionId)?.conversationName).toBe('external')
@@ -370,10 +377,12 @@ describe('one published store per live host database', () => {
     load.mockClear()
     await writer.enqueue(row, (db) => {
       db.prepare('UPDATE agent_session_records SET record_json = ? WHERE session_id = ?').run(
-        JSON.stringify({
-          ...store.getRecord(original.sessionId),
-          conversationName: 'unknown-hook'
-        }),
+        JSON.stringify(
+          storedTestAgentSessionRecord({
+            ...store.getRecord(original.sessionId)!,
+            conversationName: 'unknown-hook'
+          })
+        ),
         original.sessionId
       )
     })
@@ -483,7 +492,7 @@ describe('one published store per live host database', () => {
       await expect(store.setConversationName(before.sessionId, 'stale')).rejects.toThrow()
       expect(store.getRecord(before.sessionId)).toBe(before)
       expect((await readPersistedTestAgentSessionStore(root)).records[before.sessionId]).toEqual(
-        before
+        storedTestAgentSessionRecord(before)
       )
     } finally {
       unsubscribe()

@@ -29,7 +29,10 @@ import {
   structuredAgentSessionRowStateStartedAt
 } from '../../../../shared/structured-agent-session-status-started-at'
 import type { Tab } from '../../../../shared/tab-types'
-import { isAgentSessionHandleProvider } from '../../../../shared/agent-session-provider-handle'
+import { isStructuredAgentId } from '../../../../shared/agent-session-provider-handle'
+import { agentMainAgentVerdict } from '../../../../shared/agent-main-agent-verdict'
+import { useStructuredAgentSessionLaunchLifecycle } from '@/lib/structured-agent-session-launch-registry'
+import { useStructuredAgentSessionLaunchFailedAt } from '@/lib/structured-agent-session-launch-failed-at'
 import { useAppStore } from '@/store'
 import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 import { getStructuredAgentSessionStatusFeed } from '@/runtime/structured-agent-session-status-feed'
@@ -40,7 +43,7 @@ type StructuredTab = Tab & { contentType: 'agent-session' }
 type OwnedStructuredTab = { tab: StructuredTab; bucket: string; uniquePaneKey: boolean }
 
 function isStructuredTab(tab: Tab): tab is StructuredTab {
-  return tab.contentType === 'agent-session' && isAgentSessionHandleProvider(tab.agentSessionAgent)
+  return tab.contentType === 'agent-session' && isStructuredAgentId(tab.agentSessionAgent)
 }
 
 const structuredTabsByUnifiedTabsSnapshot = new WeakMap<
@@ -122,6 +125,45 @@ export function useStructuredAgentSessionHostExecutionPhase(
   )
 }
 
+/** Whether the host says a person's Stop is still ending the work; an older host never does. */
+export function useStructuredAgentSessionHostStopping(
+  sessionId: string,
+  target: RuntimeClientTarget
+): boolean {
+  const feed = useMemo(() => getStructuredAgentSessionStatusFeed(target), [target])
+  useEffect(() => feed.activate(), [feed])
+  return useSyncExternalStore(
+    feed.subscribe,
+    () => feed.getSnapshot().get(sessionId)?.stopping === true,
+    () => false
+  )
+}
+
+/** The host's startup phase and its word on a Stop, each re-rendering the chat only on a change. */
+export function useStructuredAgentSessionHostExecution(
+  sessionId: string,
+  target: RuntimeClientTarget
+): { phase: ReturnType<typeof useStructuredAgentSessionHostExecutionPhase>; stopping: boolean } {
+  return {
+    phase: useStructuredAgentSessionHostExecutionPhase(sessionId, target),
+    stopping: useStructuredAgentSessionHostStopping(sessionId, target)
+  }
+}
+
+/** Only the host's rewind recovery latch, so a chat re-renders when that changes, not on every status. */
+export function useStructuredAgentSessionRewindBlockedReason(
+  sessionId: string,
+  target: RuntimeClientTarget
+): NonNullable<AgentSessionStatusSummary['rewindBlockedReason']> | null {
+  const feed = useMemo(() => getStructuredAgentSessionStatusFeed(target), [target])
+  useEffect(() => feed.activate(), [feed])
+  return useSyncExternalStore(
+    feed.subscribe,
+    () => feed.getSnapshot().get(sessionId)?.rewindBlockedReason ?? null,
+    () => null
+  )
+}
+
 /** The host's child records for the row, and the legacy roster readers of `subagents` keep. A host
  *  that publishes views is copied verbatim; only an older host's task list is converted here. */
 function childWorkFor(summary: AgentSessionStatusSummary): {
@@ -141,16 +183,60 @@ function childWorkFor(summary: AgentSessionStatusSummary): {
   return subagents ? { subagents } : {}
 }
 
+/** A start the host refused leaves it no session to publish, so the launch's own failure is the
+ *  row: the same failed verdict the host publishes for a send the agent's start refused. */
+function projectFailedStart(tab: StructuredTab, paneKey: string, failedAt: number): void {
+  const store = useAppStore.getState()
+  const current = store.agentStatusByPaneKey?.[paneKey]
+  if (
+    current?.state === 'done' &&
+    agentMainAgentVerdict(current) === 'failure' &&
+    current.updatedAt === failedAt &&
+    current.stateStartedAt === failedAt &&
+    current.agentType === tab.agentSessionAgent &&
+    current.terminalTitle === tab.label &&
+    current.tabId === tab.id &&
+    current.worktreeId === tab.worktreeId
+  ) {
+    return
+  }
+  const { state, mainAgent } = structuredAgentSessionAgentStatus({
+    status: 'idle',
+    turnOutcome: 'failure'
+  })
+  store.setAgentStatus(
+    paneKey,
+    {
+      state,
+      mainAgent: { ...mainAgent, stateStartedAt: failedAt },
+      interrupted: false,
+      prompt: '',
+      agentType: tab.agentSessionAgent,
+      sessionBoundary: false
+    },
+    tab.label,
+    // Dated by the failure, as a host row is by its journal: it ages the same, a restart does not
+    // refresh it, and it replaces whatever newer-dated row the pane key held.
+    { updatedAt: failedAt, allowOlderTimestamp: true, stateStartedAt: failedAt },
+    { tabId: tab.id, worktreeId: tab.worktreeId },
+    { terminalResumeEligible: false }
+  )
+}
+
 function projectStatus(
   tab: StructuredTab,
   summary: AgentSessionStatusSummary | null,
-  observation: 'live' | 'unverifiable'
+  observation: 'live' | 'unverifiable',
+  /** When the launch failed; null while it has not. */
+  launchFailedAt: number | null
 ): void {
   const paneKey = structuredAgentSessionPaneKey(tab.id, tab.entityId)
   const store = useAppStore.getState()
   // No persisted turn yet (or nothing known): the row shows no agent status at all.
   if (!summary?.status) {
-    if (store.agentStatusByPaneKey?.[paneKey]) {
+    if (launchFailedAt !== null) {
+      projectFailedStart(tab, paneKey, launchFailedAt)
+    } else if (store.agentStatusByPaneKey?.[paneKey]) {
       store.removeAgentStatus(paneKey)
     }
     return
@@ -160,7 +246,8 @@ function projectStatus(
   const agentStatus = structuredAgentSessionAgentStatus({
     status: summary.status,
     childWork: children ?? summary.backgroundTasks,
-    turnOutcome: summary.turnOutcome
+    turnOutcome: summary.turnOutcome,
+    ...(summary.stopping ? { stopping: summary.stopping } : {})
   })
   const current = store.agentStatusByPaneKey?.[paneKey]
   // Same continuity rule as the host ingest, on the main agent's own clock.
@@ -265,6 +352,12 @@ function StructuredAgentSessionStatusProjection({
     [catalog, bucket, tab]
   )
   const { summary, observation } = useStructuredAgentSessionStatusSummary(tab.entityId, target)
+  const launchFailed =
+    useStructuredAgentSessionLaunchLifecycle(tab.worktreeId, tab.entityId) === 'failed'
+  const failedAt = useStructuredAgentSessionLaunchFailedAt(tab.entityId)
+  // Only records saved by older builds lack the time; the tab's creation precedes any
+  // acknowledgement of it, so a failure seen before then stays read.
+  const launchFailedAt = launchFailed ? (failedAt ?? tab.createdAt) : null
   useEffect(() => {
     const ownedSummary =
       uniquePaneKey &&
@@ -272,8 +365,23 @@ function StructuredAgentSessionStatusProjection({
       getWorktreeIdFromHostIdentity(summary.workspaceId) === getWorktreeIdFromHostIdentity(bucket)
         ? summary
         : null
-    projectStatus(tab, ownedSummary, observation)
-  }, [summary, observation, tab, bucket, uniquePaneKey])
+    projectStatus(tab, ownedSummary, observation, launchFailedAt)
+  }, [summary, observation, tab, bucket, uniquePaneKey, launchFailedAt])
+  const launchDirectory = summary?.launchDirectory
+  useEffect(() => {
+    // Why local only: a remote host's path is in its syntax, and floating chats only run locally.
+    useAppStore
+      .getState()
+      .setStructuredSessionLaunchDirectory(
+        tab.id,
+        tab.entityId,
+        target?.kind === 'local' ? launchDirectory : undefined
+      )
+  }, [launchDirectory, target?.kind, tab.id, tab.entityId])
+  useEffect(
+    () => () => useAppStore.getState().clearStructuredSessionLaunchDirectory(tab.id, tab.entityId),
+    [tab.entityId, tab.id]
+  )
   useEffect(
     () => () =>
       useAppStore.getState().removeAgentStatus(structuredAgentSessionPaneKey(tab.id, tab.entityId)),

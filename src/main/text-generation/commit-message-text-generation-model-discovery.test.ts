@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process'
 import type * as ChildProcess from 'node:child_process'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   createSshDisposalError,
   SSH_MUX_REQUEST_TIMEOUT_CODE
@@ -9,9 +12,11 @@ import {
   discoverCommitMessageModelsLocal,
   discoverCommitMessageModelsRemote
 } from './commit-message-text-generation'
+import { PROVIDER_SPAWN_FAILURE_MARKER } from '../provider-process/provider-spawn-failure-report'
 import {
   createChildTerminationExpectation,
   createMockDiscoveryChild,
+  spawnedAgentArgv,
   withPlatform
 } from './commit-message-text-generation-test-harness'
 
@@ -33,15 +38,37 @@ vi.mock('child_process', async (importOriginal) => {
 
 const spawnMock = vi.mocked(spawn)
 
+function spawnError(errno: string): Error {
+  return Object.assign(new Error(`spawn claude ${errno}`), { code: errno })
+}
+
 const expectChildTerminated = createChildTerminationExpectation(terminateWindowsProcessTreeMock)
 
+// These suites drive fake children down the Windows direct-child path, taskkill included. The POSIX
+// supervised stop with the Codex home lock (generation: timeout, cancel, output limit; discovery:
+// timeout, output limit) is in source-control-local-process.test.ts.
+const hostPlatform = process.platform
+let commandDirectory: string | undefined
+
+afterEach(() => {
+  Object.defineProperty(process, 'platform', { configurable: true, value: hostPlatform })
+  vi.unstubAllEnvs()
+  if (commandDirectory) {
+    rmSync(commandDirectory, { recursive: true, force: true })
+    commandDirectory = undefined
+  }
+})
+
 beforeEach(() => {
+  Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
+  // Windows resolves a bare agent name on PATH; the host's own installs must not answer it.
+  vi.stubEnv('PATH', '')
   terminateWindowsProcessTreeMock.mockClear()
   terminateWindowsProcessTreeMock.mockResolvedValue(undefined)
   spawnMock.mockClear()
 })
 
-describe('discoverCommitMessageModelsLocal', () => {
+describe('discoverCommitMessageModelsLocal on the Windows direct-child path', () => {
   it('returns static catalog models without spawning for static agents', async () => {
     const result = await discoverCommitMessageModelsLocal('amp', undefined)
 
@@ -54,6 +81,8 @@ describe('discoverCommitMessageModelsLocal', () => {
   })
 
   it('discovers dynamic models through the agent CLI', async () => {
+    // The host's own spawn shape: supervised on POSIX, direct on Windows.
+    Object.defineProperty(process, 'platform', { configurable: true, value: hostPlatform })
     const listeners = new Map<string, (value: unknown) => void>()
     const child = {
       pid: 123,
@@ -78,14 +107,13 @@ describe('discoverCommitMessageModelsLocal', () => {
         { id: 'gpt-5.2', label: 'GPT-5.2' }
       ]
     })
-    expect(spawnMock).toHaveBeenCalledWith(
-      'cursor-agent',
-      ['--list-models'],
-      expect.objectContaining({ windowsHide: true })
-    )
+    expect(spawnedAgentArgv(spawnMock.mock.calls[0]!)).toEqual(['cursor-agent', '--list-models'])
+    expect(spawnMock.mock.calls[0]![2]).toMatchObject({ windowsHide: true })
   })
 
   it('writes the Claude list_models request to stdin and parses the control response', async () => {
+    // The host's own spawn shape: supervised on POSIX, direct on Windows.
+    Object.defineProperty(process, 'platform', { configurable: true, value: hostPlatform })
     const listeners = new Map<string, (value: unknown) => void>()
     const child = {
       pid: 123,
@@ -135,29 +163,19 @@ describe('discoverCommitMessageModelsLocal', () => {
         { id: 'haiku', label: 'Haiku' }
       ]
     })
-    const expectedArgs = [
+    expect(spawnedAgentArgv(spawnMock.mock.calls[0]!)).toEqual([
+      'claude',
       '-p',
       '--input-format',
       'stream-json',
       '--output-format',
       'stream-json',
       '--verbose'
-    ]
-    if (process.platform === 'win32') {
-      const [spawnCommand, spawnArgs, spawnOptions] = spawnMock.mock.calls[0]
-      expect(spawnCommand).toMatch(/cmd\.exe$/i)
-      expect(spawnArgs.slice(0, 3)).toEqual(['/d', '/c', expect.stringMatching(/claude\.cmd$/i)])
-      expect(spawnArgs.slice(3)).toEqual(expectedArgs)
-      expect(spawnOptions).toEqual(
-        expect.objectContaining({ windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
-      )
-    } else {
-      expect(spawnMock).toHaveBeenCalledWith(
-        'claude',
-        expectedArgs,
-        expect.objectContaining({ windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] })
-      )
-    }
+    ])
+    expect(spawnMock.mock.calls[0]![2]).toMatchObject({
+      windowsHide: true,
+      stdio: ['pipe', 'pipe', 'pipe']
+    })
     expect(child.stdin.end).toHaveBeenCalledWith(expect.stringContaining('"list_models"'))
   })
 
@@ -192,6 +210,13 @@ describe('discoverCommitMessageModelsLocal', () => {
   })
 
   it('discovers dynamic models through the configured agent command override', async () => {
+    // The host's own spawn shape: supervised on POSIX, direct on Windows.
+    Object.defineProperty(process, 'platform', { configurable: true, value: hostPlatform })
+    if (hostPlatform === 'win32') {
+      commandDirectory = mkdtempSync(join(tmpdir(), 'model-probe-command-'))
+      writeFileSync(join(commandDirectory, 'npx.cmd'), '@echo off\r\nexit /b 0\r\n')
+      vi.stubEnv('PATH', commandDirectory)
+    }
     const listeners = new Map<string, (value: unknown) => void>()
     const child = {
       pid: 123,
@@ -219,11 +244,11 @@ describe('discoverCommitMessageModelsLocal', () => {
         expect.objectContaining({ windowsHide: true })
       )
     } else {
-      expect(spawnMock).toHaveBeenCalledWith(
+      expect(spawnedAgentArgv(spawnMock.mock.calls[0]!)).toEqual([
         'npx',
-        ['cursor-agent', '--list-models'],
-        expect.objectContaining({ windowsHide: true })
-      )
+        'cursor-agent',
+        '--list-models'
+      ])
     }
   })
 
@@ -352,6 +377,51 @@ describe('discoverCommitMessageModelsLocal', () => {
     })
   })
 
+  const notFound = 'claude not found on PATH. Install Claude to discover models.'
+  const failedToStart =
+    'Claude model discovery failed to start. Check the agent CLI configuration and try again.'
+  const couldNotStart =
+    'Claude model discovery could not be started. Check the agent CLI configuration and try again.'
+  it.each([
+    ['ENOENT', false, notFound],
+    ['EACCES', false, failedToStart],
+    ['ENOTDIR', true, couldNotStart]
+  ])(
+    'reports a supervisor %s spawn failure as a direct spawn does',
+    async (errno, thrown, error) => {
+      const child = createMockDiscoveryChild()
+      spawnMock.mockReturnValue(child as never)
+
+      const pending = discoverCommitMessageModelsLocal('claude', undefined)
+      child.stderr.emit(
+        'data',
+        Buffer.from(
+          `Warning: an Electron startup notice\n${PROVIDER_SPAWN_FAILURE_MARKER}${JSON.stringify({
+            thrown,
+            code: errno,
+            message: `spawn claude ${errno}`
+          })}\n`
+        )
+      )
+      child.emit('close', 127)
+
+      await expect(pending).resolves.toEqual({ success: false, error })
+    }
+  )
+
+  it.each([
+    ['ENOENT', notFound],
+    ['EACCES', failedToStart]
+  ])('reports an emitted %s spawn error as before', async (errno, error) => {
+    const child = createMockDiscoveryChild()
+    spawnMock.mockReturnValue(child as never)
+
+    const pending = discoverCommitMessageModelsLocal('claude', undefined)
+    child.emit('error', spawnError(errno))
+
+    await expect(pending).resolves.toEqual({ success: false, error })
+  })
+
   it('settles and detaches model discovery when timeout kill is ignored', async () => {
     vi.useFakeTimers()
     const child = createMockDiscoveryChild()
@@ -463,7 +533,7 @@ describe('discoverCommitMessageModelsLocal', () => {
   })
 })
 
-describe('generateCommitMessageFromContext', () => {
+describe('generateCommitMessageFromContext on the Windows direct-child path', () => {
   it('discovers dynamic models through a remote execution plan', async () => {
     const execute = vi.fn(async (plan, cwd, timeoutMs) => {
       expect(plan).toEqual({

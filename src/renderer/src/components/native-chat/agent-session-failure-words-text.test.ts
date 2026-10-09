@@ -1,11 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { i18n, translate } from '@/i18n/i18n'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import type * as I18nModule from '@/i18n/i18n'
 import en from '@/i18n/locales/en.json'
 import zh from '@/i18n/locales/zh.json'
 import {
   AGENT_SESSION_ATTACHMENT_PROBLEM_REASONS,
   AGENT_SESSION_FAILURE_KINDS,
+  readWholeAgentSessionFailureFact,
   type AgentSessionFailureFact
 } from '../../../../shared/agent-session-failure'
 import {
@@ -45,7 +47,8 @@ const VALUES = {
   command: 'compact',
   detail: 'Image type .bmp',
   limit: '20',
-  size: '5'
+  size: '5',
+  option: '--remote'
 }
 
 function factsFor(kind: AgentSessionFailureFact['kind']): AgentSessionFailureFact[] {
@@ -86,6 +89,22 @@ describe('desktop words for a failure fact', () => {
         id,
         sayAgentSessionFailureEnglish(id, VALUES)
       ])
+    }
+  })
+
+  it('brands static copy without rewriting an agent name or provider detail', () => {
+    const agent = 'Orca agent https://example.test/Orca?q={{command}}'
+    const detail = 'Orca refused https://example.test/Orca?q={{agent}} $t(theAgent) <b>&</b>'
+    for (const say of [sayAgentSessionFailureEnglish, sayAgentSessionFailureTranslated]) {
+      expect(say('agentCommandNotRunnable', { agent })).toBe(
+        `${agent}'s Command in Settings → Agents must be a program path or name ${APP_DISPLAY_NAME} can find, with no arguments or variables. Change it or reset it.`
+      )
+      expect(say('hostStopped', { agent })).toBe(
+        `${agent} never finished starting, so ${APP_DISPLAY_NAME} stopped it.`
+      )
+      expect(say('providerRejectedQuoted', { detail })).toBe(
+        `The provider did not accept this message: ${detail}.`
+      )
     }
   })
 
@@ -219,6 +238,22 @@ describe('desktop words for a failure fact', () => {
     expect(sentence('totalTooLarge', 20)).toBe(
       "Les images de ce message dépassent 20 Mo au total, le message n'a donc pas été envoyé."
     )
+  })
+
+  it('uses the host sentence if the argument detail is newer than this reader', () => {
+    const sentence = 'Codex could not start. Edit saved Arguments in Settings > Agents.'
+    expect(
+      agentSessionWriteNoticeText(
+        structuredAgentSessionRejectionParts(
+          sentence,
+          'send',
+          readWholeAgentSessionFailureFact({
+            kind: 'startFailed',
+            argumentProblem: { agent: 'Codex', option: '--remote', problem: 'futureProblem' }
+          })
+        )
+      )
+    ).toBe(sentence)
   })
 
   it('shows a host sentence with no fact beside it as written', async () => {

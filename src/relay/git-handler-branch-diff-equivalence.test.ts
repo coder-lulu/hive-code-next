@@ -1,4 +1,3 @@
-import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
@@ -7,11 +6,45 @@ import { RelayContext } from './context'
 import { GitHandler } from './git-handler'
 import {
   createMockDispatcher,
-  gitCommit,
-  gitInit,
+  createGitTestRunner,
   type MockDispatcher,
   type RelayDispatcher
 } from './git-handler-test-setup'
+
+const fixtureGit = createGitTestRunner()
+const fixtureRoots: string[] = []
+let operationSignal: AbortSignal | undefined
+const pendingReads = new Set<Promise<unknown>>()
+let pendingPaths: Promise<void>[] = []
+
+function trackRead<T>(promise: Promise<T>): Promise<T> {
+  pendingReads.add(promise)
+  void promise.then(
+    () => pendingReads.delete(promise),
+    () => pendingReads.delete(promise)
+  )
+  return promise
+}
+
+async function gitInit(repo: string): Promise<void> {
+  await fixtureGit.git(repo, ['init'])
+  await fixtureGit.git(repo, ['config', 'user.email', 'test@test.com'])
+  await fixtureGit.git(repo, ['config', 'user.name', 'Test'])
+}
+
+async function gitCommit(repo: string, message: string): Promise<void> {
+  await fixtureGit.git(repo, ['add', '.'])
+  await fixtureGit.git(repo, [
+    '-c',
+    'user.email=test@test.com',
+    '-c',
+    'user.name=Test',
+    'commit',
+    '-m',
+    message,
+    '--allow-empty'
+  ])
+}
 
 // Why this file exists: the pinned route replaced the legacy route's own
 // `diff --name-status -M -C` rediscovery with values the caller already holds.
@@ -26,17 +59,18 @@ type BranchCompareResult = {
 
 type DiffEntry = Record<string, unknown>
 
-function git(repoPath: string, args: string[]): string {
-  return execFileSync('git', args, { cwd: repoPath, encoding: 'utf8' })
+async function git(repoPath: string, args: string[]): Promise<string> {
+  return fixtureGit.git(repoPath, args)
 }
 
 /**
  * Builds one repo whose base..head range exercises every shape the review
  * panel can hand to a single-file branch diff.
  */
-function buildScenarioRepo(): { repoPath: string; baseOid: string } {
+async function buildScenarioRepo(): Promise<{ repoPath: string; baseOid: string }> {
   const repoPath = mkdtempSync(path.join(tmpdir(), 'relay-branch-diff-equivalence-'))
-  gitInit(repoPath)
+  fixtureRoots.push(repoPath)
+  await gitInit(repoPath)
 
   const write = (relativePath: string, contents: string | Buffer): void => {
     const target = path.join(repoPath, relativePath)
@@ -57,14 +91,14 @@ function buildScenarioRepo(): { repoPath: string; baseOid: string } {
   write('emptied.txt', 'about to be emptied\n')
   write('crlf.txt', 'crlf before\r\nsecond line\r\n')
   write('mode-changed.sh', '#!/bin/sh\necho hi\n')
-  gitCommit(repoPath, 'base')
-  const baseOid = git(repoPath, ['rev-parse', 'HEAD']).trim()
+  await gitCommit(repoPath, 'base')
+  const baseOid = (await git(repoPath, ['rev-parse', 'HEAD'])).trim()
 
   write('modified.txt', 'after\n')
   rmSync(path.join(repoPath, 'deleted.txt'))
   rmSync(path.join(repoPath, 'binary-deleted.bin'))
-  git(repoPath, ['mv', 'renamed-from.txt', 'renamed-to.txt'])
-  git(repoPath, ['mv', 'renamed-and-edited-from.txt', 'renamed-and-edited-to.txt'])
+  await git(repoPath, ['mv', 'renamed-from.txt', 'renamed-to.txt'])
+  await git(repoPath, ['mv', 'renamed-and-edited-from.txt', 'renamed-and-edited-to.txt'])
   write('renamed-and-edited-to.txt', 'rename plus edit, line one\nline two CHANGED\nline three\n')
   write('copied-target.txt', 'copy me, line one\nline two\nline three\nline four\n')
   write('added.txt', 'brand new\n')
@@ -75,8 +109,8 @@ function buildScenarioRepo(): { repoPath: string; baseOid: string } {
   write('ünïcode-ページ.txt', 'unicode after\n')
   write('emptied.txt', '')
   write('crlf.txt', 'crlf after\r\nsecond line\r\n')
-  git(repoPath, ['update-index', '--chmod=+x', 'mode-changed.sh'])
-  gitCommit(repoPath, 'head')
+  await git(repoPath, ['update-index', '--chmod=+x', 'mode-changed.sh'])
+  await gitCommit(repoPath, 'head')
 
   return { repoPath, baseOid }
 }
@@ -86,122 +120,172 @@ describe('pinned and legacy branch diff equivalence against real Git', () => {
   let handler: GitHandler
   let repoPath = ''
   let baseOid = ''
+  let pendingSetup: Promise<{ repoPath: string; baseOid: string }> | undefined
+  let pendingSubject: Promise<void> | undefined
 
-  beforeEach(() => {
+  beforeEach(async ({ signal }) => {
+    operationSignal = signal
+    fixtureGit.useSignal(signal, null)
     dispatcher = createMockDispatcher()
     handler = new GitHandler(dispatcher as unknown as RelayDispatcher, new RelayContext())
-    const built = buildScenarioRepo()
+    pendingSetup = buildScenarioRepo()
+    const built = await pendingSetup
     repoPath = built.repoPath
     baseOid = built.baseOid
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await Promise.allSettled([
+      ...(pendingSetup ? [pendingSetup] : []),
+      ...(pendingSubject ? [pendingSubject] : []),
+      ...pendingPaths
+    ])
+    await Promise.allSettled(pendingReads)
+    await fixtureGit.settle()
     handler.dispose()
-    if (repoPath) {
-      rmSync(repoPath, { recursive: true, force: true })
+    for (const root of fixtureRoots.splice(0)) {
+      rmSync(root, { recursive: true, force: true })
     }
+    pendingSetup = undefined
+    pendingSubject = undefined
+    pendingPaths = []
+    repoPath = ''
   })
 
   async function branchCompare(): Promise<BranchCompareResult> {
-    return (await dispatcher.callRequest('git.branchCompare', {
-      worktreePath: repoPath,
-      baseRef: baseOid
-    })) as BranchCompareResult
+    return (await trackRead(
+      dispatcher.callRequest(
+        'git.branchCompare',
+        {
+          worktreePath: repoPath,
+          baseRef: baseOid
+        },
+        { signal: operationSignal, isStale: () => operationSignal?.aborted === true }
+      )
+    )) as BranchCompareResult
   }
 
   async function branchDiff(params: Record<string, unknown>): Promise<DiffEntry[]> {
-    return (await dispatcher.callRequest('git.branchDiff', {
-      worktreePath: repoPath,
-      baseRef: baseOid,
-      includePatch: true,
-      ...params
-    })) as DiffEntry[]
+    return (await trackRead(
+      dispatcher.callRequest(
+        'git.branchDiff',
+        {
+          worktreePath: repoPath,
+          baseRef: baseOid,
+          includePatch: true,
+          ...params
+        },
+        { signal: operationSignal, isStale: () => operationSignal?.aborted === true }
+      )
+    )) as DiffEntry[]
   }
 
-  it('produces identical results for every changed file the review panel can open', async () => {
-    const compare = await branchCompare()
-    expect(compare.summary.status).toBe('ready')
-    // Guard the guard: a truncated scenario set would make this test vacuously pass.
-    expect(compare.entries.length).toBeGreaterThanOrEqual(14)
+  it('produces identical results for every changed file the review panel can open', async ({
+    signal
+  }) => {
+    operationSignal = signal
+    fixtureGit.useSignal(signal)
+    pendingSubject = (async () => {
+      const compare = await branchCompare()
+      expect(compare.summary.status).toBe('ready')
+      // Guard the guard: a truncated scenario set would make this test vacuously pass.
+      expect(compare.entries.length).toBeGreaterThanOrEqual(14)
 
-    const divergences: string[] = []
-    for (const entry of compare.entries) {
-      // Exactly what the renderer sends: paths from the compare entry list,
-      // OIDs from the compare summary that produced that same list.
-      const callerParams = { filePath: entry.path, oldPath: entry.oldPath }
-      const legacy = await branchDiff(callerParams)
-      const pinned = await branchDiff({
-        ...callerParams,
+      const divergences: string[] = []
+      pendingPaths = compare.entries.map(async (entry) => {
+        // Exactly what the renderer sends: paths from the compare entry list,
+        // OIDs from the compare summary that produced that same list.
+        const callerParams = { filePath: entry.path, oldPath: entry.oldPath }
+        const legacy = await branchDiff(callerParams)
+        const pinned = await branchDiff({
+          ...callerParams,
+          baseRef: compare.summary.mergeBase,
+          headOid: compare.summary.headOid
+        })
+
+        if (JSON.stringify(legacy) !== JSON.stringify(pinned)) {
+          divergences.push(
+            `${entry.status} ${entry.path}${entry.oldPath ? ` (from ${entry.oldPath})` : ''}\n` +
+              `  legacy: ${JSON.stringify(legacy)}\n  pinned: ${JSON.stringify(pinned)}`
+          )
+        }
+      })
+      await Promise.all(pendingPaths)
+
+      expect(divergences.join('\n')).toBe('')
+    })()
+    await pendingSubject
+  })
+
+  it('agrees on content for renames, additions, deletions and binaries specifically', async ({
+    signal
+  }) => {
+    operationSignal = signal
+    fixtureGit.useSignal(signal)
+    pendingSubject = (async () => {
+      const compare = await branchCompare()
+      const byPath = new Map(compare.entries.map((entry) => [entry.path, entry]))
+
+      // Why assert content and not just equality: two identically-empty results
+      // would satisfy the equivalence test above while rendering nothing.
+      const rename = byPath.get('renamed-and-edited-to.txt')
+      expect(rename?.oldPath).toBe('renamed-and-edited-from.txt')
+      const [renamePinned] = await branchDiff({
         baseRef: compare.summary.mergeBase,
-        headOid: compare.summary.headOid
+        headOid: compare.summary.headOid,
+        filePath: rename!.path,
+        oldPath: rename!.oldPath
+      })
+      expect(renamePinned).toMatchObject({
+        originalContent: 'rename plus edit, line one\nline two\nline three\n',
+        modifiedContent: 'rename plus edit, line one\nline two CHANGED\nline three\n'
       })
 
-      if (JSON.stringify(legacy) !== JSON.stringify(pinned)) {
-        divergences.push(
-          `${entry.status} ${entry.path}${entry.oldPath ? ` (from ${entry.oldPath})` : ''}\n` +
-            `  legacy: ${JSON.stringify(legacy)}\n  pinned: ${JSON.stringify(pinned)}`
-        )
-      }
-    }
+      const [addedPinned] = await branchDiff({
+        baseRef: compare.summary.mergeBase,
+        headOid: compare.summary.headOid,
+        filePath: 'added.txt'
+      })
+      expect(addedPinned).toMatchObject({ originalContent: '', modifiedContent: 'brand new\n' })
 
-    expect(divergences.join('\n')).toBe('')
+      const [deletedPinned] = await branchDiff({
+        baseRef: compare.summary.mergeBase,
+        headOid: compare.summary.headOid,
+        filePath: 'deleted.txt'
+      })
+      expect(deletedPinned).toMatchObject({ originalContent: 'doomed\n', modifiedContent: '' })
+
+      const [binaryPinned] = await branchDiff({
+        baseRef: compare.summary.mergeBase,
+        headOid: compare.summary.headOid,
+        filePath: 'binary-modified.bin'
+      })
+      expect(binaryPinned).toMatchObject({ kind: 'binary' })
+    })()
+    await pendingSubject
   })
 
-  it('agrees on content for renames, additions, deletions and binaries specifically', async () => {
-    const compare = await branchCompare()
-    const byPath = new Map(compare.entries.map((entry) => [entry.path, entry]))
+  it('holds the pinned revision when HEAD moves mid-review, where legacy drifts', async ({
+    signal
+  }) => {
+    operationSignal = signal
+    fixtureGit.useSignal(signal)
+    pendingSubject = (async () => {
+      const compare = await branchCompare()
+      writeFileSync(path.join(repoPath, 'modified.txt'), 'drifted after the snapshot\n')
+      await gitCommit(repoPath, 'drift')
 
-    // Why assert content and not just equality: two identically-empty results
-    // would satisfy the equivalence test above while rendering nothing.
-    const rename = byPath.get('renamed-and-edited-to.txt')
-    expect(rename?.oldPath).toBe('renamed-and-edited-from.txt')
-    const [renamePinned] = await branchDiff({
-      baseRef: compare.summary.mergeBase,
-      headOid: compare.summary.headOid,
-      filePath: rename!.path,
-      oldPath: rename!.oldPath
-    })
-    expect(renamePinned).toMatchObject({
-      originalContent: 'rename plus edit, line one\nline two\nline three\n',
-      modifiedContent: 'rename plus edit, line one\nline two CHANGED\nline three\n'
-    })
+      const pinned = await branchDiff({
+        baseRef: compare.summary.mergeBase,
+        headOid: compare.summary.headOid,
+        filePath: 'modified.txt'
+      })
+      const legacy = await branchDiff({ filePath: 'modified.txt' })
 
-    const [addedPinned] = await branchDiff({
-      baseRef: compare.summary.mergeBase,
-      headOid: compare.summary.headOid,
-      filePath: 'added.txt'
-    })
-    expect(addedPinned).toMatchObject({ originalContent: '', modifiedContent: 'brand new\n' })
-
-    const [deletedPinned] = await branchDiff({
-      baseRef: compare.summary.mergeBase,
-      headOid: compare.summary.headOid,
-      filePath: 'deleted.txt'
-    })
-    expect(deletedPinned).toMatchObject({ originalContent: 'doomed\n', modifiedContent: '' })
-
-    const [binaryPinned] = await branchDiff({
-      baseRef: compare.summary.mergeBase,
-      headOid: compare.summary.headOid,
-      filePath: 'binary-modified.bin'
-    })
-    expect(binaryPinned).toMatchObject({ kind: 'binary' })
-  })
-
-  it('holds the pinned revision when HEAD moves mid-review, where legacy drifts', async () => {
-    const compare = await branchCompare()
-    writeFileSync(path.join(repoPath, 'modified.txt'), 'drifted after the snapshot\n')
-    gitCommit(repoPath, 'drift')
-
-    const pinned = await branchDiff({
-      baseRef: compare.summary.mergeBase,
-      headOid: compare.summary.headOid,
-      filePath: 'modified.txt'
-    })
-    const legacy = await branchDiff({ filePath: 'modified.txt' })
-
-    expect(pinned[0]).toMatchObject({ modifiedContent: 'after\n' })
-    // The divergence is the fix: legacy silently re-resolves live HEAD.
-    expect(legacy[0]).toMatchObject({ modifiedContent: 'drifted after the snapshot\n' })
+      expect(pinned[0]).toMatchObject({ modifiedContent: 'after\n' })
+      // The divergence is the fix: legacy silently re-resolves live HEAD.
+      expect(legacy[0]).toMatchObject({ modifiedContent: 'drifted after the snapshot\n' })
+    })()
+    await pendingSubject
   })
 })

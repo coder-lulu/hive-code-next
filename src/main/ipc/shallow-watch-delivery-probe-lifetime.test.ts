@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const h = vi.hoisted(() => ({
   watch: vi.fn(),
+  realpath: vi.fn(),
   mkdir: vi.fn(),
   write: vi.fn(),
   remove: vi.fn(),
@@ -11,7 +12,7 @@ const h = vi.hoisted(() => ({
   fail: () => {}
 }))
 
-vi.mock('node:fs', () => ({ watch: h.watch }))
+vi.mock('node:fs', () => ({ watch: h.watch, realpathSync: { native: h.realpath } }))
 vi.mock('node:fs/promises', () => ({
   mkdtemp: h.mkdir,
   writeFile: h.write,
@@ -31,6 +32,7 @@ beforeEach(() => {
   h.deliver = () => {}
   h.fail = () => {}
   h.mkdir.mockResolvedValue('/fake-shallow-probe')
+  h.realpath.mockImplementation((path: string) => path)
   h.write.mockResolvedValue(undefined)
   h.remove.mockResolvedValue(undefined)
   h.on.mockImplementation((_event: string, callback: () => void) => {
@@ -58,6 +60,23 @@ function expectReleased(): void {
 }
 
 describe('shallow probe resource ownership', () => {
+  it.runIf(process.platform === 'win32')(
+    'removes the directory when canonicalization fails',
+    async () => {
+      h.realpath.mockImplementation(() => {
+        throw new Error('EACCES')
+      })
+
+      await expect(measureShallowWatchDelivery()).resolves.toBe(false)
+
+      expect(h.watch).not.toHaveBeenCalled()
+      expect(h.remove).toHaveBeenCalledExactlyOnceWith('/fake-shallow-probe', {
+        recursive: true,
+        force: true
+      })
+      expect(vi.getTimerCount()).toBe(0)
+    }
+  )
   it.each([1, 2])('closes the watcher and clears the timer when write %i fails', async (write) => {
     if (write === 2) {
       h.write.mockResolvedValueOnce(undefined)

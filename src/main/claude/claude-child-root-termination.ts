@@ -1,11 +1,8 @@
-import type { SpawnedProcess } from '../../shared/child-process/run-process'
-import type { PosixProcessIdentity } from '../pty-descendant-termination'
 import type {
   WindowsDescendantSnapshot,
   WindowsProcessIdentity
 } from '../windows-descendant-exit-verification'
-
-export type ClaudeRootIdentity = PosixProcessIdentity | WindowsProcessIdentity
+import type { SpawnedProcess } from '../../shared/child-process/run-process'
 
 type RootTerminationInput = {
   child: Pick<SpawnedProcess, 'kill'>

@@ -1,17 +1,37 @@
 import { mkdir, mkdtemp, open, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join, relative, sep } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runProcess } from './child-process/run-process'
+import type * as GitCommonDirectory from './git-common-directory'
 import { createUntitledPlaceholderRetentionHost } from './untitled-placeholder-retention'
 import { resolveUntitledPlaceholderRetentionRoot } from './untitled-placeholder-recovery-directory'
 import type { UntitledPlaceholderRetentionHost } from './untitled-placeholder-retention-types'
 
-const environment = vi.hoisted(() => ({ userData: null as string | null }))
+const environment = vi.hoisted(() => ({
+  userData: null as string | null,
+  fixtureRoot: null as string | null
+}))
 vi.mock('./app-environment', () => ({
   hasAppEnvironment: () => environment.userData !== null,
   getAppEnvironment: () => ({ getPath: () => environment.userData })
 }))
+vi.mock('./git-common-directory', async (importOriginal) => {
+  const actual = await importOriginal<typeof GitCommonDirectory>()
+  return {
+    ...actual,
+    resolveGitCommonDirectory: async (path: string) => {
+      if (environment.fixtureRoot) {
+        const part = relative(environment.fixtureRoot, path)
+        // Model an external non-Git ancestor without bypassing any metadata inside the fixture.
+        if (isAbsolute(part) || part === '..' || part.startsWith(`..${sep}`)) {
+          return null
+        }
+      }
+      return actual.resolveGitCommonDirectory(path)
+    }
+  }
+})
 
 let directory: string
 let repo: string
@@ -27,6 +47,7 @@ async function git(cwd: string, args: string[]): Promise<string> {
 
 beforeEach(async () => {
   directory = await realpath(await mkdtemp(join(tmpdir(), 'untitled-private-git-')))
+  environment.fixtureRoot = directory
   repo = join(directory, 'repo')
   await mkdir(repo)
   hosts = []
@@ -37,6 +58,7 @@ afterEach(async () => {
   await Promise.all(hosts.map((host) => host.releaseOwner(OWNER)))
   environment.userData = null
   await rm(directory, { recursive: true, force: true })
+  environment.fixtureRoot = null
 })
 
 describe('untitled retained payloads are excluded from project commits', () => {

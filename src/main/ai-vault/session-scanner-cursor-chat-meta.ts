@@ -27,6 +27,7 @@ export type CursorChatMeta = {
 
 type CursorChatMetaIndexEntry = {
   signature: string
+  workspaceDirs: string[]
   metaPathByChatId: Map<string, string>
 }
 
@@ -34,6 +35,7 @@ const cursorChatMetaIndexCache = new Map<string, Promise<CursorChatMetaIndexEntr
 
 type CursorChatMetaScan = {
   index: Map<string, Promise<Map<string, string>>>
+  freshIndexes: Set<string>
   // Chats roots this scan could not read, reported once by the scan owner.
   refusals: Map<string, string>
   // Transcripts whose own meta.json read was refused, so the metadata merged
@@ -54,7 +56,12 @@ export function resetCursorChatMetaIndexCacheForTests(): void {
 /** Runs one whole scan, discovery and parse; every Cursor transcript in it shares one index read. */
 export function withCursorChatMetaScan<T>(fn: () => Promise<T>): Promise<T> {
   return scanScopedIndex.run(
-    { index: new Map(), refusals: new Map(), refusedTranscripts: new Set() },
+    {
+      index: new Map(),
+      freshIndexes: new Set(),
+      refusals: new Map(),
+      refusedTranscripts: new Set()
+    },
     fn
   )
 }
@@ -81,21 +88,43 @@ export async function cursorChatMetaPath(transcriptPath: string): Promise<string
   if (!chatsRoot || !chatId) {
     return undefined
   }
-  const index = await readCursorChatMetaIndexOncePerScan(chatsRoot)
+  const index = await readCursorChatMetaIndexOncePerScan(chatsRoot, chatId)
   return index.get(chatId)
 }
 
-function readCursorChatMetaIndexOncePerScan(chatsRoot: string): Promise<Map<string, string>> {
+async function readCursorChatMetaIndexOncePerScan(
+  chatsRoot: string,
+  chatId: string
+): Promise<Map<string, string>> {
   const scan = scanScopedIndex.getStore()
   if (!scan) {
-    return readCursorChatMetaIndexOrNone(chatsRoot)
+    return readCursorChatMetaIndexOrNone(chatsRoot, chatId)
   }
   let pending = scan.index.get(chatsRoot)
   if (!pending) {
-    pending = readCursorChatMetaIndexOrNone(chatsRoot)
+    pending = readCursorChatMetaIndexOrNone(chatsRoot, chatId)
     scan.index.set(chatsRoot, pending)
   }
-  return pending
+  const index = await pending
+  const current = scan.index.get(chatsRoot)
+  if (current && current !== pending) {
+    return current
+  }
+  if (index.has(chatId) || scan.freshIndexes.has(chatsRoot)) {
+    return index
+  }
+  const cached = await cursorChatMetaIndexCache.get(chatsRoot)
+  const latest = scan.index.get(chatsRoot)
+  if (latest && latest !== pending) {
+    return latest
+  }
+  if (!cached || cached.metaPathByChatId !== index || scan.freshIndexes.has(chatsRoot)) {
+    return index
+  }
+  // A new chat can share its workspace timestamp with the cached directory snapshot.
+  const refreshed = readCursorChatMetaIndexOrNone(chatsRoot, chatId, cached)
+  scan.index.set(chatsRoot, refreshed)
+  return refreshed
 }
 
 /**
@@ -106,9 +135,15 @@ function readCursorChatMetaIndexOncePerScan(chatsRoot: string): Promise<Map<stri
  * recorded as unknown, so the next healthy scan merges the real metadata in
  * without re-reading a byte of the transcript.
  */
-async function readCursorChatMetaIndexOrNone(chatsRoot: string): Promise<Map<string, string>> {
+async function readCursorChatMetaIndexOrNone(
+  chatsRoot: string,
+  chatId: string,
+  cached?: CursorChatMetaIndexEntry
+): Promise<Map<string, string>> {
   try {
-    return await readCursorChatMetaIndex(chatsRoot)
+    return cached
+      ? await buildAndStoreCursorChatMetaIndex(chatsRoot, cached.workspaceDirs, cached.signature)
+      : await readCursorChatMetaIndex(chatsRoot, chatId)
   } catch (error) {
     if (!(error instanceof WslTranscriptFsError)) {
       throw error
@@ -175,7 +210,10 @@ function cursorChatsRootFromTranscriptPath(transcriptPath: string): string | nul
   return null
 }
 
-async function readCursorChatMetaIndex(chatsRoot: string): Promise<Map<string, string>> {
+async function readCursorChatMetaIndex(
+  chatsRoot: string,
+  chatId: string
+): Promise<Map<string, string>> {
   let workspaceDirs: string[]
   try {
     workspaceDirs = (await wslGatedReaddir(chatsRoot, 'scan'))
@@ -192,11 +230,21 @@ async function readCursorChatMetaIndex(chatsRoot: string): Promise<Map<string, s
   }
   const signature = await readCursorChatsSignature(chatsRoot, workspaceDirs)
   const cached = await readCachedCursorChatMetaIndex(chatsRoot, signature)
-  if (cached) {
-    return cached
+  if (cached?.metaPathByChatId.has(chatId)) {
+    return cached.metaPathByChatId
   }
+  return buildAndStoreCursorChatMetaIndex(chatsRoot, workspaceDirs, signature)
+}
+
+async function buildAndStoreCursorChatMetaIndex(
+  chatsRoot: string,
+  workspaceDirs: string[],
+  signature: string
+): Promise<Map<string, string>> {
+  scanScopedIndex.getStore()?.freshIndexes.add(chatsRoot)
   const pending = buildCursorChatMetaIndex(chatsRoot, workspaceDirs).then((metaPathByChatId) => ({
     signature,
+    workspaceDirs,
     metaPathByChatId
   }))
   storeCursorChatMetaIndexEntry(chatsRoot, pending)
@@ -261,7 +309,7 @@ async function buildCursorChatMetaIndex(
 async function readCachedCursorChatMetaIndex(
   chatsRoot: string,
   signature: string
-): Promise<Map<string, string> | undefined> {
+): Promise<CursorChatMetaIndexEntry | undefined> {
   const cached = cursorChatMetaIndexCache.get(chatsRoot)
   if (!cached) {
     return undefined
@@ -276,7 +324,7 @@ async function readCachedCursorChatMetaIndex(
     cursorChatMetaIndexCache.delete(chatsRoot)
     cursorChatMetaIndexCache.set(chatsRoot, cached)
   }
-  return entry.metaPathByChatId
+  return entry
 }
 
 function storeCursorChatMetaIndexEntry(

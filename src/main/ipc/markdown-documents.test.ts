@@ -66,4 +66,25 @@ describe('markdownDocumentFromFilePath', () => {
       name: 'file'
     })
   })
+
+  it.each(['../sibling/file.md', 'nested/../../sibling/file.md'])(
+    'keeps local parent traversal outside the root after resolving %s',
+    (relativePath) => {
+      const filePath = `/workspace/${relativePath}`
+      expect(
+        markdownDocumentFromFilePath('/workspace', filePath, {
+          outsideRootRelativePath: 'basename'
+        })
+      ).toEqual({ filePath, relativePath: 'file.md', basename: 'file.md', name: 'file' })
+      expect(markdownDocumentFromFilePath('/workspace', filePath).relativePath).toBe(
+        '../sibling/file.md'
+      )
+    }
+  )
+
+  it('keeps a local dot-prefixed directory inside the root after normalization', () => {
+    expect(
+      markdownDocumentFromFilePath('/workspace', '/workspace/nested/../..notes/file.md')
+    ).toMatchObject({ relativePath: '..notes/file.md', basename: 'file.md' })
+  })
 })

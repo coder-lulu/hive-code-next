@@ -20,6 +20,7 @@ import {
 const MAX_SESSION_PAGES = 10
 const MAX_SESSION_ITEMS = 20_000
 const MAX_SESSION_BYTES = 8 * 1024 * 1024
+const SESSION_ACCESS_REVOKED_CODE = 'FORBIDDEN'
 type ReadState = {
   scope: string
   original: Pick<HiveWorkflowCaseSessionPage, 'sessionId' | 'workspaceId'> | null
@@ -63,7 +64,10 @@ export function useHiveWorkflowCaseSession(query: HiveWorkflowCaseSessionRead) {
     flight.current = null
     original.current = null
     pages.current = 0
-    publish({ ...emptyState(workflowCaseSessionKey(selected.current)), error: 'FORBIDDEN' })
+    publish({
+      ...emptyState(workflowCaseSessionKey(selected.current)),
+      error: SESSION_ACCESS_REVOKED_CODE
+    })
   }, [publish])
   const account = useHiveWorkflowCaseSessionAccount(invalidate)
   useLayoutEffect(() => {

@@ -2,7 +2,7 @@ import type { AgentSessionStoreTransactions } from '../runtime/agent-session-sto
 import { hasTaskFailureSummary } from './task-failure-diagnostic'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { isDeepStrictEqual as same } from 'node:util'
-import { isAgentSessionRecord } from '../../shared/agent-session-record'
+import { isTaskSessionRecord } from './task-codex-session-binding'
 import { taskSessionSourceReference } from '../../shared/task-execution/task-structured-binding'
 import type { AgentSessionStoreState } from '../runtime/agent-session-store-contract'
 import { refuseTaskExecution } from './task-execution-error'
@@ -35,7 +35,7 @@ export function assertTaskFailureSnapshotCurrent(
   if (
     state.unreadableRecords.has(binding.sessionId) ||
     !session ||
-    !isAgentSessionRecord(session)
+    !isTaskSessionRecord(session)
   ) {
     return refuseTaskExecution('OUTCOME_UNKNOWN')
   }

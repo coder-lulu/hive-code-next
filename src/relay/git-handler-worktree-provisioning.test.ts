@@ -12,6 +12,7 @@ import { GitHandler } from './git-handler'
 import { RelayContext } from './context'
 import {
   createMockDispatcher,
+  createGitTestRunner,
   gitInit,
   gitCommit,
   type MockDispatcher,
@@ -27,14 +28,38 @@ import {
 describe('GitHandler', () => {
   let dispatcher: MockDispatcher
   let tmpDir: string
+  const fixtureGit = createGitTestRunner()
+  const pending: Promise<unknown>[] = []
+  let preparedBranchRef: string
+  let preparedRemoteSha: string
   let settleHeldRefreshes: (() => Promise<void>) | undefined
 
-  beforeEach(() => {
+  beforeEach(async ({ signal, task }) => {
     tmpDir = createGitTempDir()
     ;({ dispatcher } = createGitHandlerRelay())
+    if (task.name === 'fast-forwards the owning worktree to the remote-tracking ref on the host') {
+      fixtureGit.useSignal(signal, null)
+      const setup = (async () => {
+        await fixtureGit.init(tmpDir)
+        await fixtureGit.git(tmpDir, ['config', 'core.autocrlf', 'false'])
+        writeFileSync(path.join(tmpDir, 'base.txt'), 'base')
+        await fixtureGit.commit(tmpDir, 'initial')
+        const localSha = (await fixtureGit.git(tmpDir, ['rev-parse', 'HEAD'])).trim()
+        writeFileSync(path.join(tmpDir, 'base.txt'), 'remote')
+        await fixtureGit.commit(tmpDir, 'remote update')
+        preparedRemoteSha = (await fixtureGit.git(tmpDir, ['rev-parse', 'HEAD'])).trim()
+        await fixtureGit.git(tmpDir, ['update-ref', 'refs/remotes/origin/main', preparedRemoteSha])
+        await fixtureGit.git(tmpDir, ['reset', '--hard', localSha])
+        preparedBranchRef = `refs/heads/${(await fixtureGit.git(tmpDir, ['rev-parse', '--abbrev-ref', 'HEAD'])).trim()}`
+      })()
+      pending.push(setup)
+      await setup
+    }
   })
 
   afterEach(async () => {
+    await Promise.allSettled(pending.splice(0))
+    await fixtureGit.settle()
     await settleHeldRefreshes?.()
     settleHeldRefreshes = undefined
     await removeGitTempDir(tmpDir)
@@ -51,12 +76,12 @@ describe('GitHandler', () => {
     return `refs/heads/${currentBranch(cwd)}`
   }
 
-  function reportedWorktreePath(cwd: string): string {
+  function reportedWorktreePath(cwd: string, listing?: string): string {
+    const output =
+      listing ??
+      execFileSync('git', ['worktree', 'list', '--porcelain'], { cwd, encoding: 'utf-8' })
     return (
-      execFileSync('git', ['worktree', 'list', '--porcelain'], {
-        cwd,
-        encoding: 'utf-8'
-      })
+      output
         .split(/\r?\n/)
         .find((line) => line.startsWith('worktree '))
         ?.slice('worktree '.length)
@@ -105,19 +130,32 @@ describe('GitHandler', () => {
       return { branchRef: currentBranchFullRef(tmpDir), localSha, remoteSha }
     }
 
-    it('fast-forwards the owning worktree to the remote-tracking ref on the host', async () => {
-      const { branchRef, remoteSha } = initBehindRepo()
-
-      await expect(
-        dispatcher.callRequest('git.refreshLocalBaseRefForWorktreeCreate', {
-          repoPath: tmpDir,
-          fullRef: branchRef,
-          remoteTrackingRef: 'refs/remotes/origin/main'
-        })
-      ).resolves.toEqual({ status: 'updated', ownerWorktreePath: reportedWorktreePath(tmpDir) })
-
-      expect(revParse('HEAD')).toBe(remoteSha)
-      await expect(fs.readFile(path.join(tmpDir, 'base.txt'), 'utf-8')).resolves.toBe('remote')
+    it('fast-forwards the owning worktree to the remote-tracking ref on the host', async ({
+      signal
+    }) => {
+      fixtureGit.useSignal(signal)
+      const subject = (async () => {
+        const branchRef = preparedBranchRef
+        const remoteSha = preparedRemoteSha
+        const response = dispatcher.callRequest(
+          'git.refreshLocalBaseRefForWorktreeCreate',
+          {
+            repoPath: tmpDir,
+            fullRef: branchRef,
+            remoteTrackingRef: 'refs/remotes/origin/main'
+          },
+          { signal, isStale: () => signal.aborted }
+        )
+        pending.push(response)
+        void response.catch(() => undefined)
+        const listing = await fixtureGit.git(tmpDir, ['worktree', 'list', '--porcelain'])
+        const ownerWorktreePath = reportedWorktreePath(tmpDir, listing)
+        await expect(response).resolves.toEqual({ status: 'updated', ownerWorktreePath })
+        expect((await fixtureGit.git(tmpDir, ['rev-parse', 'HEAD'])).trim()).toBe(remoteSha)
+        await expect(fs.readFile(path.join(tmpDir, 'base.txt'), 'utf-8')).resolves.toBe('remote')
+      })()
+      pending.push(subject)
+      await subject
     })
 
     it('fast-forwards a non-checked-out local branch via update-ref', async () => {

@@ -215,6 +215,7 @@ describe('updater product feed policy', () => {
   })
 
   it('does not let a stale release preflight overwrite a newer pinned feed', async () => {
+    appMock.getVersion.mockReturnValue('1.5.0-beta.24')
     let resolveBackgroundTags: (value: { tags: string[]; state: 'ready' }) => void = () => {}
     fetchNewerReleaseTagsMock.mockImplementationOnce(
       () =>
@@ -229,20 +230,42 @@ describe('updater product feed policy', () => {
     })
     await vi.waitFor(() => expect(fetchNewerReleaseTagsMock).toHaveBeenCalledTimes(1))
 
-    checkForUpdatesFromMenu({ channel: 'stable', targetTag: 'v1.0.60' })
+    checkForUpdatesFromMenu({ channel: 'stable', targetTag: 'v1.5.1' })
     await vi.waitFor(() => {
       expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
         provider: 'generic',
-        url: 'https://github.com/stablyai/orca/releases/download/v1.0.60'
+        url: 'https://github.com/stablyai/orca/releases/download/v1.5.1'
       })
     })
-    resolveBackgroundTags({ tags: ['v1.0.61'], state: 'ready' })
+    resolveBackgroundTags({ tags: ['v1.5.2'], state: 'ready' })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(autoUpdaterMock.setFeedURL).toHaveBeenLastCalledWith({
       provider: 'generic',
-      url: 'https://github.com/stablyai/orca/releases/download/v1.0.60'
+      url: 'https://github.com/stablyai/orca/releases/download/v1.5.1'
     })
+  })
+
+  it('rejects a legacy pinned target before replacing the configured product feed', async () => {
+    appMock.getVersion.mockReturnValue('1.5.0-beta.24')
+    const send = vi.fn()
+    const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
+    setupAutoUpdater({ webContents: { send } } as never, {
+      getLastUpdateCheckAt: () => Date.now()
+    })
+    const feedCallsBeforeCheck = autoUpdaterMock.setFeedURL.mock.calls.length
+
+    checkForUpdatesFromMenu({ channel: 'stable', targetTag: 'v1.0.60' })
+
+    await vi.waitFor(() =>
+      expect(send).toHaveBeenCalledWith('updater:status', {
+        state: 'error',
+        message: expect.stringContaining('SQLite profile baseline'),
+        userInitiated: true
+      })
+    )
+    expect(autoUpdaterMock.setFeedURL).toHaveBeenCalledTimes(feedCallsBeforeCheck)
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
   })
 
   it.each(['decision', 'error'] as const)(

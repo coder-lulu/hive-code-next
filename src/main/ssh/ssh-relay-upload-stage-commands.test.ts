@@ -162,6 +162,33 @@ describe.each([
   '%s relay upload stage commands',
   { timeout: SPAWNED_INTERPRETER_TIMEOUT_MS },
   (_label, host) => {
+    it('reserves and promotes an owned payload below the Windows SSH line limit on a long path', () => {
+      const root = createPool()
+      const pool = join(root, 'workspace'.repeat(Math.max(1, Math.floor((180 - root.length) / 9))))
+      mkdirSync(pool, { recursive: true })
+      createStages(host, pool, 7)
+      const destination = join(pool, 'destination')
+      mkdirSync(destination)
+      const stage = parseReservedRelayUploadStage(
+        host,
+        pool,
+        owner,
+        `__ORCA_UPLOAD_STAGE_SLOT__${owner}:slot-0`
+      )
+      const command = promoteOwnedRelayUploadStageCommand(host, stage, owner, destination)
+      if (host.commandDialect === 'powershell') {
+        expect(command.length).toBeLessThanOrEqual(8_000)
+      }
+      const result = runCommand(host, command)
+      expect(result.status, result.stderr).toBe(0)
+      expect(relayUploadStagePromotionConfirmed(owner, result.stdout)).toBe(true)
+      expect(readFileSync(join(destination, 'relay.js'), 'utf8')).toBe('relay-0')
+      expect(existsSync(stage.slotDir)).toBe(false)
+      expect(existsSync(stage.claimDir)).toBe(false)
+      expect(existsSync(stage.deleteDir)).toBe(false)
+      expect(existsSync(join(pool, 'slot-1', 'payload', 'relay.js'))).toBe(true)
+    })
+
     it.each([0, 1, 7, 8, 9])('bounds reservation with %i occupied entries', (count) => {
       const pool = createPool()
       createStages(host, pool, Math.min(count, RELAY_UPLOAD_STAGE_SLOT_COUNT))

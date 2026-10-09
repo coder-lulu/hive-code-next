@@ -35,6 +35,8 @@ export async function acquireOwner(
       await input.onAcquiring?.()
       await assertTaskAttachCurrent(input, record)
       assertTaskAttachAuthorityCurrent(input, record)
+      // A close or Stop that landed while the attach was still reconciling launches nothing.
+      input.acquireSignal?.throwIfAborted()
     } catch (error) {
       throw new AgentSessionPreSpawnError(error)
     }
@@ -55,6 +57,7 @@ export async function acquireOwner(
             taskOrigin: input.params.taskOrigin
           }
         : {}),
+      ...(input.acquireSignal ? { signal: input.acquireSignal } : {}),
       onSpawned: async (process) => {
         record = await input.store.commitProcessIdentity({
           sessionId: record.sessionId,
@@ -70,13 +73,19 @@ export async function acquireOwner(
     const options =
       providerChildPhase === 'starting'
         ? undefined
-        : await withAgentSessionCreatePhase('restore_options', input.recordPhase, () =>
-            readNativeSessionOptions({
-              adapter: input.adapter,
-              sessionId: record.sessionId,
-              fence,
-              ...(record.options ? { priorOptions: record.options } : {})
-            })
+        : await withAgentSessionCreatePhase('restore_options', input.recordPhase, async () =>
+            input.adapter.readAcquisitionOptions
+              ? input.adapter.readAcquisitionOptions({
+                  sessionId: record.sessionId,
+                  fence,
+                  ...(record.options ? { priorOptions: record.options } : {})
+                })
+              : readNativeSessionOptions({
+                  adapter: input.adapter,
+                  sessionId: record.sessionId,
+                  fence,
+                  ...(record.options ? { priorOptions: record.options } : {})
+                })
           )
     if (record.lease.ownerProcess === null) {
       await input.store.commitProcessIdentity({
@@ -104,6 +113,11 @@ export async function acquireOwner(
     if (isAgentSessionPreSpawnError(error)) {
       throw error
     }
-    return rethrowAfterAgentSessionAcquisitionCleanup(input.adapter, record.sessionId, error)
+    return rethrowAfterAgentSessionAcquisitionCleanup(
+      input.adapter,
+      record.sessionId,
+      error,
+      record.provider
+    )
   }
 }

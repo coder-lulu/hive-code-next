@@ -77,6 +77,8 @@ export class RuntimeRpcState {
   protected activeAskLongPolls = 0
   protected activeBrowserHostLongPolls = 0
   protected readonly activeBrowserHostLongPollsByDevice = new Map<string, number>()
+  protected clientRequestsInFlight = 0
+  protected lastClientRequestAt = Date.now()
 
   constructor({
     runtime,
@@ -121,5 +123,15 @@ export class RuntimeRpcState {
     )
     this.browserHostLongPollCapPerDevice = Math.max(1, Math.floor(this.browserHostLongPollCap / 2))
     this.specializedLongPollCap = Math.max(1, Math.floor(longPollCap * SPECIALIZED_LONG_POLL_SHARE))
+  }
+
+  /** Counts a client message for idle exit, from receipt until its dispatch settles. */
+  protected trackClientRequest<T>(work: () => Promise<T>): Promise<T> {
+    this.clientRequestsInFlight += 1
+    this.lastClientRequestAt = Date.now()
+    return work().finally(() => {
+      this.clientRequestsInFlight -= 1
+      this.lastClientRequestAt = Date.now()
+    })
   }
 }

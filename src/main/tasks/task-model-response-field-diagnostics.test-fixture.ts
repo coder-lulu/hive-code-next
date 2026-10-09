@@ -1,3 +1,11 @@
+import { taskFailure } from './task-failure-diagnostic'
+import {
+  addTaskModelPolicyLocation,
+  taskModelPolicyRefusal,
+  taskModelRefusedPolicyKey,
+  type TaskModelPolicyKey
+} from './task-model-stream-failure'
+
 // Public Response declarations plus the documented store request field; names only.
 export const publicTaskModelResponseFields = [
   'id',
@@ -45,3 +53,25 @@ export const refusedTaskModelResponseFields = publicTaskModelResponseFields.filt
       .split(' ')
       .includes(field)
 )
+
+// These test call surfaces retain the real producer function identity while admitting
+// deliberately invalid diagnostic values. They do not coerce getters, proxies or boxed inputs.
+type InvalidPolicyKeyInput = (key: unknown) => TaskModelPolicyKey
+type InvalidPolicyRefusalInput = (reason: string, key?: unknown) => Error
+type InvalidPolicyLocationInput = (error: unknown, location: unknown) => void
+type InvalidFailureDiagnosticsInput = (
+  error: Parameters<typeof taskFailure>[0],
+  phase: Parameters<typeof taskFailure>[1],
+  fallback: Parameters<typeof taskFailure>[2],
+  httpStatus?: number,
+  responseReason?: unknown,
+  contentTypeKind?: unknown
+) => ReturnType<typeof taskFailure>
+
+export const taskModelRefusedPolicyKeyWithInvalidInput =
+  taskModelRefusedPolicyKey as InvalidPolicyKeyInput
+export const taskModelPolicyRefusalWithInvalidInput =
+  taskModelPolicyRefusal as InvalidPolicyRefusalInput
+export const addTaskModelPolicyLocationWithInvalidInput =
+  addTaskModelPolicyLocation as InvalidPolicyLocationInput
+export const taskFailureWithInvalidDiagnostics = taskFailure as InvalidFailureDiagnosticsInput

@@ -1,3 +1,4 @@
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { mkdir, rename } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { probeAgentSessionProcessIdentities } from '../runtime/agent-session-process-identity-probe'
@@ -238,7 +239,7 @@ describe('Task Docker owner probes from the original binding', () => {
         workspaceId: record.location.workspaceId,
         hostId: 'local',
         agent: 'codex',
-        providerHandle: { kind: 'codex', threadId: 'thread-docker' }
+        providerHandle: codexProviderHandle('thread-docker')
       }
     })
     const cursor = journal.cursor()

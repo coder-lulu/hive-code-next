@@ -32,8 +32,6 @@ import { useStructuredAgentSessionOutbox } from './use-structured-agent-session-
 
 const NO_JOURNAL_ITEMS: readonly AgentJournalRenderItem[] = []
 
-const NO_CARDS: readonly string[] = []
-
 afterEach(cleanup)
 
 beforeEach(() => {
@@ -92,7 +90,7 @@ it('draws a send its reply rejected in place once, and leaves the composer empty
     body: { kind: 'message', role: 'user', blocks: [{ type: 'text', text: 'steer this way' }] }
   }
   const users = (outbox: typeof result.current.outbox) =>
-    projectStructuredAgentSessionMessages([hostItem], outbox, [submission], NO_CARDS)
+    projectStructuredAgentSessionMessages([hostItem], outbox, [submission])
       .filter((message) => message.role === 'user')
       .map((message) => ({ id: message.id, unsent: message.unsent }))
 

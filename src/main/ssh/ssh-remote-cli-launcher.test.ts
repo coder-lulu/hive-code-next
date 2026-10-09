@@ -128,20 +128,11 @@ describe('SSH remote Orca CLI launcher', () => {
         writeFileSync(file.path, file.contents, 'utf8')
       }
 
-      const encoded = plan.postWriteCommands[0]?.match(/-EncodedCommand\s+(\S+)/)?.[1]
+      const command = plan.postWriteCommands[0] ?? ''
+      const [program = '', ...args] = command.split(' ')
+      const encoded = command.match(/-EncodedCommand\s+(\S+)/)?.[1]
       expect(encoded).toBeTruthy()
-      const compile = spawnSync(
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-EncodedCommand',
-          encoded!
-        ],
-        { encoding: 'utf8' }
-      )
+      const compile = spawnSync(program, args, { encoding: 'utf8', windowsHide: true })
       expect(compile.status, `${compile.stdout}\n${compile.stderr}`).toBe(0)
 
       mkdirSync(relayDir, { recursive: true })
@@ -156,6 +147,7 @@ describe('SSH remote Orca CLI launcher', () => {
         ['orchestration', 'send', '--body', body, '--json'],
         {
           encoding: 'utf8',
+          windowsHide: true,
           env: {
             ...process.env,
             ORCA_RELAY_NODE_PATH: process.execPath,
@@ -182,6 +174,7 @@ describe('SSH remote Orca CLI launcher', () => {
 
       const defaulted = spawnSync(plan.launcherPath, ['status'], {
         encoding: 'utf8',
+        windowsHide: true,
         env: {
           ...process.env,
           ORCA_RELAY_NODE_PATH: process.execPath,
@@ -225,23 +218,19 @@ describe('SSH remote Orca CLI launcher', () => {
         writeFileSync(file.path, file.contents, 'utf8')
       }
 
-      const encoded = plan.postWriteCommands[0]?.match(/-EncodedCommand\s+(\S+)/)?.[1]
+      const command = plan.postWriteCommands[0] ?? ''
+      const [program = '', ...args] = command.split(' ')
+      const encoded = command.match(/-EncodedCommand\s+(\S+)/)?.[1]
       expect(encoded).toBeTruthy()
       // Point WINDIR at a directory with no csc.exe so compiler discovery fails.
-      const compile = spawnSync(
-        'powershell.exe',
-        [
-          '-NoProfile',
-          '-NonInteractive',
-          '-ExecutionPolicy',
-          'Bypass',
-          '-EncodedCommand',
-          encoded!
-        ],
-        { encoding: 'utf8', env: { ...process.env, WINDIR: root, SystemRoot: root } }
-      )
+      const compile = spawnSync(program, args, {
+        encoding: 'utf8',
+        windowsHide: true,
+        env: { ...process.env, WINDIR: root, SystemRoot: root }
+      })
 
       expect(compile.status).not.toBe(0)
+      expect(compile.stderr).toContain('Unable to find the .NET Framework C# compiler')
       expect(existsSync(legacyShimPath), 'existing orca.cmd must survive a failed install').toBe(
         true
       )

@@ -7,6 +7,15 @@ import { APP_DISPLAY_NAME } from '../../src/shared/brand'
 import { buildMobileWebAppBundle } from './build-mobile-web-app-bundle.mjs'
 import { mobileWebAppDependenciesPresent } from './mobile-web-app-bundle-dependencies.mjs'
 import {
+  SHELL_HOST,
+  SHELL_SESSION_ID,
+  SHELL_BUILD_ID,
+  HANDOFF_WORKTREE,
+  HANDOFF_WORKTREE_REPLIES,
+  HANDOFF_WORKTREE_ROUTE,
+  paintReports,
+  projectDir,
+  parseCspDirectives,
   createBundleServer,
   installShellDouble,
   readBridgeFaultGrant,
@@ -23,38 +32,8 @@ const HOST_ROUTE_PATTERN = '/h/[hostId]'
 
 // What the double answers `ready` with. Asserted on the document, so a page that mounted against
 // some other session, or against none, fails here rather than on a phone.
-const SHELL_SESSION_ID = 'render-check-session'
-const SHELL_BUILD_ID = 'render-check-build'
 // The host the shell opened the page for. Without it `expo-secure-store` is {} on web and the list
 // paints "Host not found" over a host that is right there.
-const SHELL_HOST = {
-  id: 'render-check-host',
-  name: 'Render Check Host',
-  endpoint: 'ws://render-check',
-  lastConnected: 1
-}
-const HANDOFF_WORKTREE = {
-  workspaceKind: 'git',
-  worktreeId: 'render-worktree',
-  repoId: 'render-repo',
-  repo: 'render-repo',
-  branch: 'feature/render-check',
-  displayName: 'Render Worktree',
-  path: '/tmp/render-worktree',
-  liveTerminalCount: 0,
-  hasAttachedPty: false,
-  preview: '',
-  unread: false,
-  isPinned: false,
-  linkedPR: null,
-  status: 'inactive',
-  agents: []
-}
-const HANDOFF_WORKTREE_REPLIES = {
-  'worktree.ps': { worktrees: [HANDOFF_WORKTREE], snapshotId: 'render-check-worktrees' }
-}
-const HANDOFF_WORKTREE_ROUTE = `${HOST_ROUTE}/session/${HANDOFF_WORKTREE.worktreeId}?name=Render%20Worktree`
-
 // The sharded `test` job does not install mobile dependencies, so the page cannot be built there.
 // The standalone CSP suite needs none of them and still runs. pr.yml's mobile_web_app job runs both.
 const bundles = mobileWebAppDependenciesPresent()
@@ -286,13 +265,6 @@ async function render(route, awaitText, { shellRoute = { pathname: route }, ...s
 }
 
 /** How many frames the double has heard under the paint name, which is what uncovers the view. */
-const paintReports = (page, name) =>
-  page.evaluate(
-    (paint) =>
-      (globalThis.__orcaRenderCheckNotifies ?? []).filter((frame) => frame.name === paint).length,
-    name
-  )
-
 /** The entry's state and what it painted, for a page that is never going to mount a route tree. */
 async function renderWithoutTree({ shellRoute } = {}) {
   const { page, errors } = await openPage({ shellRoute })
@@ -306,6 +278,38 @@ async function renderWithoutTree({ shellRoute } = {}) {
   await page.close()
   return { entry, errors, rootChildren, text, url }
 }
+
+describe('the shell policy this page is tested under', () => {
+  it('is the same on both platforms, so one render check covers both', async () => {
+    const swift = await readFile(
+      join(projectDir, 'mobile/modules/orca-mobile-web-shell/ios/MobileWebShellCsp.swift'),
+      'utf8'
+    )
+    expect(parseCspDirectives(swift, 'static let header = [', '].joined')).toBe(cspHeader)
+  })
+
+  it('admits only cached Blob URLs for media', () => {
+    expect(cspHeader.split('; ').filter((entry) => entry.startsWith('media-src'))).toEqual([
+      'media-src blob:'
+    ])
+  })
+
+  it('still refuses inline script, which is the directive that matters', () => {
+    expect(cspHeader).toContain("script-src 'self';")
+    expect(cspHeader).not.toContain("script-src 'self' 'unsafe-inline'")
+  })
+
+  it('admits data: and https: for images and for nothing else', () => {
+    expect(cspHeader.split('; ').filter((entry) => entry.includes('data:'))).toEqual([
+      "img-src 'self' data: https:"
+    ])
+    expect(cspHeader.split('; ').filter((entry) => entry.includes('https:'))).toEqual([
+      "img-src 'self' data: https:"
+    ])
+    // `http:` is not a substring of `https:`, so this still refuses a cleartext source.
+    expect(cspHeader).not.toContain('http:')
+  })
+})
 
 /** A 1x1 PNG: the smallest payload that proves an image decoded rather than merely being allowed. */
 const DATA_URI_IMAGE =

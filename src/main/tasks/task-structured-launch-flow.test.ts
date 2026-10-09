@@ -13,7 +13,11 @@ import {
   type AgentSessionAttachParams
 } from '../native-chat/agent-session-wire/structured-agent-session-attach'
 import { openTestAgentSessionRecordStore } from '../runtime/agent-session-record-store-test-harness'
-import { rpcContext, runtimeStub } from '../runtime/rpc/methods/agent-launch.test-fixture'
+import {
+  rpcContext,
+  runtimeStub,
+  setAgentLaunchRecordStore
+} from '../runtime/rpc/methods/agent-launch.test-fixture'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import { TaskExecutionError } from './task-execution-error'
 import { taskCommand, taskWorkspace } from './task-execution.test-fixture'
@@ -28,6 +32,7 @@ const { AGENT_LAUNCH_METHODS } = await import('../runtime/rpc/methods/agent-laun
 let directory: string | undefined
 afterEach(async () => {
   installedHost.mockReset()
+  setAgentLaunchRecordStore(null)
   if (directory) {
     closeTestJournalHostDatabases()
     await rm(directory, { recursive: true, force: true })
@@ -41,6 +46,7 @@ async function fixture() {
   directory = await mkdtemp(join(logs, 'launch-'))
   const now = Date.now()
   const store = await openTestAgentSessionRecordStore(directory)
+  setAgentLaunchRecordStore(store)
   const command = taskCommand({
     operationId: `${now}-${'b'.repeat(32)}`,
     expiresAt: new Date(now + 60_000).toISOString()

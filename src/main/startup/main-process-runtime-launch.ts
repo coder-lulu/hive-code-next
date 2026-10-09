@@ -8,7 +8,7 @@ import {
 import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
 import { getLocalPtyProvider, registerHeadlessPtyRuntime } from '../ipc/pty'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
-import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-types'
+import { publishHeadlessRuntimeGraph } from '../runtime/headless-runtime-graph'
 import { OffscreenBrowserBackend } from '../browser/offscreen-browser-backend'
 import { browserManager } from '../browser/browser-manager'
 import { getServeOptions, printServeReady } from './main-process-serve'
@@ -34,6 +34,7 @@ import { scheduleAllPendingHistoryTreeRemovals } from '../terminal-history-delet
 import { triggerStartupNotificationRegistration } from '../ipc/startup-notification-registration'
 import { mainProcessState as state } from './main-process-state'
 import { logStartupMilestone } from './startup-diagnostics'
+import { scheduleAgentLaunchRecordWarmup } from './agent-launch-record-warmup'
 import { emitServeBrowserIdentityActionLine } from '../server/serve-stdout-boundary'
 import { getBrowserIdentityModeStatus } from '../browser/browser-identity-mode-store'
 
@@ -90,13 +91,13 @@ async function launchServeMode(
       })
     )
   }
-  // Why: headless servers have no renderer graph publisher; publish an explicit empty graph so status clients see a ready server.
-  runtime.syncWindowGraph(HEADLESS_RUNTIME_WINDOW_ID, { tabs: [], leaves: [] })
+  publishHeadlessRuntimeGraph(runtime)
   await runtimeRpc.start().catch((error) => {
     console.error('[runtime] Failed to start headless RPC transport:', error)
     throw error
   })
   state.runtimeCloudPresence?.setRuntimeReady(true)
+  scheduleAgentLaunchRecordWarmup(null)
   settleDesktopActivation()
   // Why: every attempt must reach app.quit(); a page beforeunload can veto an earlier signal.
   registerServeSignalHandlers(process, () => app.quit())
@@ -170,6 +171,7 @@ async function launchDesktopMode(
         }
       )
   ])
+  scheduleAgentLaunchRecordWarmup(win)
   if (!runtimeRpcStartResult.ok) {
     // Why gated: this dialog is the only launch-phase text read through translateMain, and i18n
     // now settles alongside this phase — without the wait a non-English user could get the

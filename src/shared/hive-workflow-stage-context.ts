@@ -13,7 +13,7 @@ export function hiveWorkflowStageDependencies(view: HiveWorkflowCaseView, stageR
   const latest = (ref: string) =>
     view.handoffs
       .filter((item) => item.stageRef === ref)
-      .toSorted((a, b) => b.producer.task.attempt - a.producer.task.attempt)[0]
+      .sort((a, b) => b.producer.task.attempt - a.producer.task.attempt)[0]
   const dependencies = stage.dependsOn.map((ref) => {
     const handoff = latest(ref)
     if (
@@ -52,7 +52,7 @@ export function hiveWorkflowStageContext(view: HiveWorkflowCaseView, stageRef: s
     code = view.handoffs.find((item) => item.handoffRef === review?.subjectHandoffRef)
     const latestCode = view.handoffs
       .filter((item) => item.producer.role === 'developer')
-      .toSorted((a, b) => b.producer.task.attempt - a.producer.task.attempt)[0]
+      .sort((a, b) => b.producer.task.attempt - a.producer.task.attempt)[0]
     if (
       !review ||
       !code ||

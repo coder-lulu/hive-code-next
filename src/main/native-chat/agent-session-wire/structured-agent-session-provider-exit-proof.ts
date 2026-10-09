@@ -15,11 +15,16 @@ import {
 export async function rethrowAfterAgentSessionAcquisitionCleanup(
   adapter: Pick<StructuredAgentSessionAdapter, 'releaseAcquisition'>,
   sessionId: string,
-  cause: unknown
+  cause: unknown,
+  agent?: string
 ): Promise<never> {
   let released: boolean
   try {
-    released = (await adapter.releaseAcquisition?.({ sessionId })) === true
+    released =
+      (await adapter.releaseAcquisition?.({
+        sessionId,
+        ...(agent === undefined ? {} : { agent })
+      })) === true
   } catch (cleanupError) {
     // A root exit the cleanup observed first-hand keeps its classification and its
     // provider diagnostic; the failure that triggered cleanup rides along as cause.
@@ -50,16 +55,24 @@ function provenExitAcquisitionFailure(cause: unknown): unknown {
 }
 
 /** Whether a stop left the provider root gone. The lease follows the root, so a first-hand root
- *  exit or a processless child ends the session whatever its descendants did; any other
- *  failure still throws. */
-export async function stopAgentSessionProviderRoot(stop: () => Promise<boolean>): Promise<boolean> {
+ *  exit or a processless child ends the session whatever its descendants did. A descendant left
+ *  unconfirmed, or bookkeeping that failed after the proven exit, is only `report`ed. Any other
+ *  failure throws. */
+export async function stopAgentSessionProviderRoot(
+  stop: () => Promise<boolean>,
+  report?: (error: Error) => void
+): Promise<boolean> {
   try {
     return (await stop()) === true
   } catch (error) {
     if (
       error instanceof AgentSessionAcquisitionRootExitObservedError ||
-      isAgentSessionPreSpawnError(error)
+      error instanceof AgentSessionAcquisitionExitProvenError
     ) {
+      report?.(error)
+      return true
+    }
+    if (isAgentSessionPreSpawnError(error)) {
       return true
     }
     throw error

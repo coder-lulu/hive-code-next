@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button'
+import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { useCallback, useEffect, useState } from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { X, Minimize2, Pin } from 'lucide-react'
@@ -22,7 +23,6 @@ import { SortableTabContextMenu } from './SortableTabContextMenu'
 import { translate } from '@/i18n/i18n'
 import { TAB_LABEL_WIDTH_CLASSES } from './tab-width-rules'
 import { useTabStripSlotProps } from './use-tab-strip-slot-props'
-import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { useTabStripPointerActivation } from './tab-strip-pointer-activation'
 import { TerminalTabLeadingIcon, TerminalTabActivityIndicator } from './TerminalTabLeadingIcon'
 import {
@@ -30,6 +30,7 @@ import {
   resolveTerminalTabActivityStatus,
   terminalTabHasUnreadActivity
 } from './terminal-tab-activity-status'
+import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/lib/close-all-context-menus'
 
 type SortableTabProps = {
   tab: TerminalTab
@@ -60,8 +61,6 @@ type SortableTabProps = {
   onToggleViewMode?: () => void
   canSplitTerminal?: boolean
 }
-
-export const CLOSE_ALL_CONTEXT_MENUS_EVENT = 'orca-close-all-context-menus'
 
 export default function SortableTab({
   tab,
@@ -174,7 +173,10 @@ export default function SortableTab({
   })
   const slotProps = useTabStripSlotProps(tab.id, isActive)
   const closeShortcut = useOptionalShortcutLabel('tab.close')
-  const closeLabel = translate('auto.components.tab.bar.SortableTab.95db5f2f7d', 'Close tab')
+  const closeLabel = translate(
+    'auto.components.tab.bar.EditorFileTabCloseButton.a768f428f1',
+    'Close tab'
+  )
   const tabTitle = tab.customTitle ?? tab.title
   const tabRoot = (
     <div

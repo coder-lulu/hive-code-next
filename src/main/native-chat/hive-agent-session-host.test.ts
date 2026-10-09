@@ -1,3 +1,4 @@
+import { externalProviderHandle } from './hive-agent-existing-binding.test-fixture'
 import {
   openTestAgentSessionRecordStore,
   importTestLegacyAgentSessionRecordStore,
@@ -110,7 +111,7 @@ beforeEach(async () => {
         workspaceId: entry.projectScope,
         hostId: 'host-1',
         agent: 'pi',
-        providerHandle: { kind: 'opaque' as const, agent: 'pi', value: id }
+        providerHandle: { transport: 'managed-pi', agent: 'pi', nativeId: id }
       }
       const journal = await journals.open({
         identity,
@@ -453,10 +454,7 @@ describe('HiveAgent durable text facade', () => {
   it.each(['codex', 'claude'] as const)(
     'references %s without copying lease/history or enabling a fallback',
     async (provider) => {
-      const handle =
-        provider === 'codex'
-          ? { provider, threadId: 'external-thread' }
-          : { provider, sessionId: 'external-session', leafUuid: null }
+      const handle = externalProviderHandle(provider)
       const binding = referenceExistingAgentBinding({
         sessionId: 'runtime_record_01',
         provider,

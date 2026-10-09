@@ -51,37 +51,40 @@ export class GitHandlerSyncOperations extends GitHandlerOperationContext {
   ) {
     const worktreePath = params.worktreePath as string
     return runWithGitWorktreeOperationLock(worktreePath, signal, () =>
-      this.runPullWithArgsUnlocked(params, pullArgs)
+      this.runPullWithArgsUnlocked(params, pullArgs, signal)
     )
   }
 
   private async runPullWithArgsUnlocked(
     params: Record<string, unknown>,
-    pullArgs: string[]
+    pullArgs: string[],
+    signal?: AbortSignal
   ): Promise<void> {
     this.clearGitMutationReadCaches()
     const worktreePath = params.worktreePath as string
+    const git = this.gitForSignal(signal)
     const runPull = async (effectiveArgs: string[]): Promise<void> => {
+      signal?.throwIfAborted()
       if (params.pushTarget !== undefined) {
         assertValidGitPushTarget(params.pushTarget)
         const pushTarget = params.pushTarget as GitPushTarget
-        await this.git(['check-ref-format', '--branch', pushTarget.branchName], worktreePath)
-        await this.git(
+        await git(['check-ref-format', '--branch', pushTarget.branchName], worktreePath)
+        await git(
           ['pull', ...effectiveArgs, pushTarget.remoteName, pushTarget.branchName],
           worktreePath
         )
         return
       }
-      const upstream = await resolveEffectiveGitUpstream((args) => this.git(args, worktreePath))
+      const upstream = await resolveEffectiveGitUpstream((args) => git(args, worktreePath))
       if (upstream && !upstream.isConfiguredUpstream) {
         // Why: legacy Orca branches may track origin/main while pushes target origin/<branch>; pull the same effective branch the UI reports.
-        await this.git(
+        await git(
           ['pull', ...effectiveArgs, upstream.remoteName, upstream.branchName],
           worktreePath
         )
         return
       }
-      await this.git(['pull', ...effectiveArgs], worktreePath)
+      await git(['pull', ...effectiveArgs], worktreePath)
     }
 
     try {

@@ -31,7 +31,7 @@ type Head = {
   workspaceId: string
   tip: number
   repair: string
-  repairedFrom: number | null
+  repaired: boolean
 }
 const activeReaders = new WeakMap<JournalHostDatabase, number>()
 
@@ -75,7 +75,7 @@ function readHead(db: Database.Database, sessionId: string): Head {
     workspaceId: row.workspace_id,
     tip,
     repair: JSON.stringify(repair ?? null),
-    repairedFrom: repair?.epoch === row.epoch ? Number(repair.content_from) : null
+    repaired: repair?.epoch === row.epoch
   }
 }
 
@@ -114,6 +114,9 @@ export function createPassiveAgentSessionHistoryReader(
       if (head.workspaceId !== identity.workspaceId) {
         throw new AgentSessionPassiveJournalError('changed')
       }
+      if (head.repaired) {
+        throw new AgentSessionPassiveJournalError('unavailable')
+      }
       if (head.tip > limits.rows) {
         throw new AgentSessionPassiveJournalError('capacity')
       }
@@ -134,8 +137,7 @@ export function createPassiveAgentSessionHistoryReader(
       }
       const fold = startJournalRowFold({
         sessionId: identity.sessionId,
-        epoch: head.epoch,
-        repairedFrom: head.repairedFrom
+        epoch: head.epoch
       })
       let after = 0,
         rows = 0,
@@ -184,18 +186,12 @@ export function createPassiveAgentSessionHistoryReader(
         guard()
       }
       const load = fold.finish()
-      if (
-        load.readOnly ||
-        load.corrupt ||
-        load.malformedRows ||
-        load.truncateFrom !== undefined ||
-        load.state.lastSequence !== head.tip
-      ) {
+      if (load.newer || load.damage || load.state.lastSequence !== head.tip) {
         throw new AgentSessionPassiveJournalError('unavailable')
       }
       const snapshot = renderJournalState(load.state)
       const projection: AgentSessionJournalReader = {
-        isReadOnly: load.readOnly,
+        isReadOnly: false,
         cursor: () => snapshot.cursor,
         snapshot: () => snapshot,
         canonicalItemId: (itemId) => load.state.aliases.get(itemId) ?? itemId,

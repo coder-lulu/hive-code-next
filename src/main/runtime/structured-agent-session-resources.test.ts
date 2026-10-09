@@ -29,6 +29,7 @@ async function install() {
     claimKeyId: 'key',
     resolveWorkspacePath: async () => directory!,
     resolveEnvironment: async () => ({}),
+    resolveLaunchArgs: () => [],
     resolveClaudeAuthPolicy: () => ({ stripAuthEnv: true })
   })
 }

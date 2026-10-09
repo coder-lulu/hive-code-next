@@ -20,7 +20,7 @@ it('reads/projects 1000 events within 200ms and drops a failed consumer without 
       workspaceId: 'folder-1',
       hostId: 'host-1',
       agent: 'pi',
-      providerHandle: { kind: 'opaque', agent: 'pi', value: 'fixture' }
+      providerHandle: { transport: 'managed-pi', agent: 'pi', nativeId: 'fixture' }
     }
   })
   try {

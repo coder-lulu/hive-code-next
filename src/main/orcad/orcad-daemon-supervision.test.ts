@@ -47,13 +47,27 @@ describe('startOrcadDaemon', () => {
   })
 
   it('does not arm the macOS login-session death watch', async () => {
-    await startOrcadDaemon()
+    await startOrcadDaemon('darwin')
     // That watch retires the daemon when the spawning GUI login session dies. An orcad
     // daemon must survive its SSH session ending — arming it would kill every terminal the
     // moment the operator logged out, which is the opposite of the property being bought.
     expect(initDaemonPtyProviderMock).toHaveBeenCalledWith(undefined, {
       macosLoginSessionWatch: false
     })
+  })
+
+  it('gives a cold Windows daemon a longer startup budget', async () => {
+    await startOrcadDaemon('win32')
+    expect(initDaemonPtyProviderMock).toHaveBeenCalledWith(undefined, {
+      macosLoginSessionWatch: false,
+      startupTimeoutMs: 30_000
+    })
+  })
+
+  it('retries the daemon spawn once before falling back to in-process terminals', async () => {
+    initDaemonPtyProviderMock.mockRejectedValueOnce(new Error('Daemon startup timed out'))
+    await expect(startOrcadDaemon()).resolves.toEqual({ state: 'live', pid: 4242 })
+    expect(initDaemonPtyProviderMock).toHaveBeenCalledTimes(2)
   })
 
   it('reports degraded when fresh terminals would fall back to the local provider', async () => {
@@ -71,6 +85,7 @@ describe('startOrcadDaemon', () => {
       state: 'unavailable',
       reason: 'node-pty is missing'
     })
+    expect(initDaemonPtyProviderMock).toHaveBeenCalledTimes(2)
   })
 })
 

@@ -13,13 +13,7 @@ function validateTimingInputs(timings, overheadMs) {
   }
 }
 
-export function balanceFiles(files, count, timings, overheadMs = 0) {
-  if (!Number.isInteger(count) || count < 1) {
-    throw new Error('Invalid shard count')
-  }
-  if (new Set(files).size !== files.length) {
-    throw new Error('Duplicate discovered file')
-  }
+export function rankFilesByDuration(files, timings, overheadMs = 0) {
   validateTimingInputs(timings, overheadMs)
   const known = Object.values(timings).filter((value) => Number.isFinite(value) && value > 0)
   known.sort((a, b) => a - b)
@@ -31,6 +25,17 @@ export function balanceFiles(files, count, timings, overheadMs = 0) {
       overheadMs
   }))
   weighted.sort((a, b) => b.durationMs - a.durationMs || compareIds(a.file, b.file))
+  return { weighted, fallbackMs }
+}
+
+export function balanceFiles(files, count, timings, overheadMs = 0) {
+  if (!Number.isInteger(count) || count < 1) {
+    throw new Error('Invalid shard count')
+  }
+  if (new Set(files).size !== files.length) {
+    throw new Error('Duplicate discovered file')
+  }
+  const { weighted, fallbackMs } = rankFilesByDuration(files, timings, overheadMs)
   const shards = Array.from({ length: count }, () => ({ files: [], durationMs: 0 }))
   for (const entry of weighted) {
     const target = shards.reduce((best, shard) =>

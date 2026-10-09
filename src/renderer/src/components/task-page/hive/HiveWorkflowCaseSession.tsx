@@ -24,12 +24,7 @@ export function HiveWorkflowCaseSession({
   const pending = useDelayedStatus(workflowCaseSessionKey(query), model.pending, 200)
   const messages = useMemo(
     () =>
-      projectStructuredAgentSessionMessages(
-        model.timeline.items,
-        [],
-        model.timeline.submissions,
-        []
-      ),
+      projectStructuredAgentSessionMessages(model.timeline.items, [], model.timeline.submissions),
     [model.timeline.items, model.timeline.submissions]
   )
   const error = model.error?.includes('FORBIDDEN')
@@ -129,7 +124,6 @@ export function HiveWorkflowCaseSession({
               subagentRoster={model.timeline.subagentRoster}
               isWorking={false}
               expandSignal={false}
-              fontScale={1}
               allowFileUriLinks={false}
             />
           </div>

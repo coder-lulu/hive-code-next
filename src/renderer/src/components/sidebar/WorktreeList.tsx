@@ -183,10 +183,13 @@ const WorktreeList = React.memo(function WorktreeList({
     agentSendTargetWorktreeId
   })
   const savedEffectiveCollapsedGroups = useEffectiveCollapsedGroups({
+    hostScopedGroups:
+      filterState.workspaceHostScope !== 'all' || filterState.visibleWorkspaceHostIds !== null,
     collapsedGroups,
     agentSendTargetWorktreeId,
     groupBy,
     pinnedDisplayPolicy,
+    worktrees: allWorktrees,
     visibleWorktrees,
     repoMap,
     worktreeMap,

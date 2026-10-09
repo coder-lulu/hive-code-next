@@ -6,7 +6,6 @@ import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
 import { useAppStore } from '@/store'
 import { settleComposerSubmit } from '@/lib/composer-submit-cancellation'
-import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { runBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import { translate } from '@/i18n/i18n'
@@ -80,7 +79,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         submitCompareBaseRef,
         submitPushTarget,
         effectiveSetupDecision,
-        issueCommand,
+        hookPreparation,
         linkedLinearIssue,
         linkedLinearIssueWorkspaceId,
         linkedLinearIssueOrganizationUrlKey,
@@ -140,24 +139,6 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
       const activeEphemeralVmRecipeId = ephemeralVmsEnabled ? selectedEphemeralVmRecipeId : null
 
       if (activeEphemeralVmRecipeId && selectedWorkspaceTarget.status === 'ready') {
-        const vmRecipeTrustSettlement = await settleComposerSubmit(
-          ensureHooksConfirmed(
-            useAppStore.getState(),
-            repoId,
-            'vmRecipe',
-            selectedRepoExecutionHostId ?? undefined,
-            undefined,
-            isSubmissionCancelled
-          ),
-          isSubmissionCancelled
-        )
-        if (vmRecipeTrustSettlement.status === 'cancelled') {
-          return
-        }
-        const vmRecipeTrustDecision = vmRecipeTrustSettlement.value
-        if (vmRecipeTrustDecision === 'skip') {
-          return
-        }
         const selectedRecipe = ephemeralVmRecipes.find(
           (recipe) => recipe.id === activeEphemeralVmRecipeId
         )
@@ -224,7 +205,13 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         linkedGitLabIssue,
         includeGitLabLinks: smartGitHubResolution.kind === 'none',
         startup: structuredLaunch ? undefined : backendStartup,
-        issueCommand,
+        hookPreparation: ephemeralVmRecipe
+          ? {
+              ...hookPreparation,
+              executionHostId: selectedRepoExecutionHostId ?? undefined,
+              confirmVmRecipe: true
+            }
+          : hookPreparation,
         pendingFirstAgentMessageRename,
         note: trimmedNote,
         startupPlan,

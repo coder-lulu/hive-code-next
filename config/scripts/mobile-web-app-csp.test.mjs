@@ -59,3 +59,30 @@ describe('the shell policy this page is tested under', () => {
     expect(cspHeader).not.toContain('http:')
   })
 })
+
+describe('Swift source directive parser', () => {
+  it('reads directives from the source and not from the comments around them', () => {
+    const source = [
+      'static let header = [',
+      "  // React Native Web needs \"style-src 'self' 'unsafe-inline'\" and nothing more.",
+      '  "default-src \'none\'",',
+      '  "script-src \'self\'",',
+      "  \"style-src 'self' 'unsafe-inline'\",",
+      '  "img-src \'self\'",',
+      '  "connect-src \'self\'",',
+      '  "worker-src \'none\'",',
+      '  "frame-src \'none\'",',
+      '  "child-src \'none\'",',
+      '  "object-src \'none\'",',
+      '  "base-uri \'none\'",',
+      '  "form-action \'none\'",',
+      '  "frame-ancestors \'none\'"',
+      '].joined'
+    ].join('\n')
+    const parsed = parseCspDirectives(source, 'static let header = [', '].joined')
+    expect(parsed.split('; ')[0]).toBe("default-src 'none'")
+    expect(parsed.split('; ').filter((entry) => entry.includes('unsafe-inline'))).toEqual([
+      "style-src 'self' 'unsafe-inline'"
+    ])
+  })
+})

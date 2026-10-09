@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../shared/repo-types'
 import { tuiAgentToAgentKind } from '../../shared/agent-kind'
 
@@ -105,6 +105,52 @@ describe('buildWorktreeStartupForAgent host resolution', () => {
       launch_source: 'unknown',
       request_kind: 'new'
     })
+  })
+})
+
+describe('buildWorktreeStartupForAgent prompt carry', () => {
+  beforeEach(() => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+  })
+  afterEach(() => vi.restoreAllMocks())
+  const build = (onPromptCarry?: (carried: boolean) => void, terminalDefaultShell = '/bin/bash') =>
+    buildWorktreeStartupForAgent({
+      repo: makeRepo({}),
+      settings: Object.assign({}, settings, { terminalDefaultShell }),
+      agent: 'claude',
+      prompt: 'summarize the diff\nthen list the risks',
+      getLaunchPlatform: () => 'linux',
+      toSessionOptions: () => undefined,
+      ...(onPromptCarry ? { onPromptCarry } : {})
+    })
+
+  it('starts clean and reports it when a caller that pastes offers a prompt the line cannot carry', () => {
+    const onPromptCarry = vi.fn()
+    const result = build(onPromptCarry)
+
+    expect(result.startup.command).not.toContain('summarize')
+    expect(result.followup).toBeUndefined()
+    expect(onPromptCarry).toHaveBeenCalledWith(false)
+  })
+
+  it('carries a short-lined multi-line prompt on a local zsh line, as main typed it', () => {
+    const onPromptCarry = vi.fn()
+    const result = build(onPromptCarry, '/bin/zsh')
+
+    expect(result.startup.command).toContain('summarize the diff\nthen list the risks')
+    expect(onPromptCarry).toHaveBeenCalledWith(true)
+  })
+
+  it('keeps folding the prompt for a caller that delivers nothing afterwards', () => {
+    // `orca worktree create --prompt` has no post-start paste of its own for an argv agent.
+    expect(build().startup.command).toContain('summarize the diff')
+  })
+
+  it('carries the prompt on Windows when the host cannot prove a safe paste', () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    const onPromptCarry = vi.fn()
+    expect(build(onPromptCarry).startup.command).toContain('summarize the diff')
+    expect(onPromptCarry).toHaveBeenCalledWith(true)
   })
 })
 

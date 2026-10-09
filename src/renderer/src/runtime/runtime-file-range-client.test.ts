@@ -4,7 +4,7 @@ import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   readEditorCsvFileContent,
   CSV_PAGED_PREVIEW_BYTES
-} from '../components/editor/editor-csv-file-content'
+} from '../components/editor/csv/csv-file-content'
 import {
   fsReadFile,
   fsReadFileChunk,

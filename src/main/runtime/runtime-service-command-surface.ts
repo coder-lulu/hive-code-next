@@ -40,6 +40,8 @@ export type RuntimeServiceCommandSurface = {
   getMissedNotificationsSince: RuntimeMobileNotificationController['getMissedSince']
   getMobileNotificationEpoch: RuntimeMobileNotificationController['getEpoch']
   dismissMobileNotification: RuntimeMobileNotificationController['dismiss']
+  retireStructuredAttention: RuntimeMobileNotificationController['retireStructuredAttention']
+  reconcileStructuredPromptAttention: RuntimeMobileNotificationController['reconcileStructuredPromptAttention']
   dispatchPluginNotification: RuntimeMobileNotificationController['dispatchPlugin']
   setAccountServices: RuntimeAccountController['setServices']
   getDataAccountsSnapshot: RuntimeAccountController['dataAccountsSnapshot']
@@ -133,6 +135,9 @@ export function installRuntimeServiceCommandSurface(
     getMissedNotificationsSince: notifications.getMissedSince.bind(notifications),
     getMobileNotificationEpoch: notifications.getEpoch.bind(notifications),
     dismissMobileNotification: notifications.dismiss.bind(notifications),
+    retireStructuredAttention: notifications.retireStructuredAttention.bind(notifications),
+    reconcileStructuredPromptAttention:
+      notifications.reconcileStructuredPromptAttention.bind(notifications),
     dispatchPluginNotification: notifications.dispatchPlugin.bind(notifications),
     setAccountServices: accounts.setServices.bind(accounts),
     getDataAccountsSnapshot: accounts.dataAccountsSnapshot.bind(accounts),

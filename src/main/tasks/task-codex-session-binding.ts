@@ -1,6 +1,8 @@
 import { isDeepStrictEqual as same } from 'node:util'
 import { agentSessionLeaseAdmitsWriter } from '../../shared/agent-session-lease-adjudication'
-import { isAgentSessionRecord } from '../../shared/agent-session-record'
+import { isPersistedAgentSessionRecord } from '../../shared/agent-session-record'
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
+import { encodeAgentSessionRecord } from '../../shared/agent-session-record-stored-form'
 import { taskDockerSessionProbeForRecord } from './task-docker-session-owner'
 import {
   taskSessionSourceReference,
@@ -13,6 +15,15 @@ import {
   type TaskExecutionRecord
 } from './task-execution-record'
 import { refuseTaskExecution } from './task-execution-error'
+
+/** Task boundaries validate the current in-memory handle through its owned stored codec. */
+export function isTaskSessionRecord(record: AgentSessionRecord): boolean {
+  try {
+    return isPersistedAgentSessionRecord(encodeAgentSessionRecord(record))
+  } catch {
+    return false
+  }
+}
 
 /** Currentness of original validated records; the Host grant remains a separate requirement. */
 export function assertTaskCodexSessionBinding(
@@ -42,7 +53,7 @@ export function assertTaskCodexSessionBinding(
   if (!session) {
     return refuseTaskExecution('OUTCOME_UNKNOWN')
   }
-  if (!isAgentSessionRecord(session)) {
+  if (!isTaskSessionRecord(session)) {
     return refuseTaskExecution('INVALID_REQUEST')
   }
   if (
@@ -119,7 +130,7 @@ export function assertTaskCodexFailedBootBinding(
     state.hostId !== 'local' ||
     state.unreadableRecords.has(binding.sessionId) ||
     !session ||
-    !isAgentSessionRecord(session) ||
+    !isTaskSessionRecord(session) ||
     session.sessionId !== binding.sessionId ||
     session.provider !== 'codex' ||
     !same(taskSessionSourceReference(task), binding.source) ||

@@ -2,7 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
 
 const projectDir = resolve(import.meta.dirname, '../..')
@@ -10,7 +10,7 @@ const guardScript = join(projectDir, '.github/scripts/check-root-directory-entri
 const tempDirs = []
 
 function git(cwd, args) {
-  return execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
+  return execFileSync('git', args, { cwd, encoding: 'utf8', windowsHide: true }).trim()
 }
 
 function makeFixture() {
@@ -41,10 +41,14 @@ function commitFiles(root, files) {
 // invalid UTF-8), so build the tree in the object database instead of on disk.
 // git ls-tree -z emits exactly the record format git mktree -z reads back.
 function commitRawEntries(root, parent, entries) {
-  const parentTree = execFileSync('git', ['ls-tree', '-z', parent], { cwd: root })
+  const parentTree = execFileSync('git', ['ls-tree', '-z', parent], {
+    cwd: root,
+    windowsHide: true
+  })
   const records = entries.map((name) => {
     const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], {
       cwd: root,
+      windowsHide: true,
       encoding: 'utf8',
       input: 'too prominent\n'
     }).trim()
@@ -52,11 +56,13 @@ function commitRawEntries(root, parent, entries) {
   })
   const tree = execFileSync('git', ['mktree', '-z'], {
     cwd: root,
+    windowsHide: true,
     encoding: 'utf8',
     input: Buffer.concat([parentTree, ...records])
   }).trim()
   return execFileSync('git', ['commit-tree', tree, '-p', parent, '-m', 'head'], {
     cwd: root,
+    windowsHide: true,
     encoding: 'utf8'
   }).trim()
 }
@@ -68,12 +74,13 @@ function runGuard({ root, base, head }) {
 function runGuardArgs(root, args) {
   return spawnSync(process.execPath, [guardScript, ...args], {
     cwd: root,
+    windowsHide: true,
     encoding: 'utf8'
   })
 }
 
 function runGuardBytes({ root, base, head }) {
-  return spawnSync(process.execPath, [guardScript, base, head], { cwd: root })
+  return spawnSync(process.execPath, [guardScript, base, head], { cwd: root, windowsHide: true })
 }
 
 afterEach(() => {
@@ -83,14 +90,18 @@ afterEach(() => {
 })
 
 describe('root directory guard', () => {
-  it('allows additions inside an existing top-level directory', () => {
-    const fixture = makeFixture()
-    const head = commitFiles(fixture.root, [['config/new.txt', 'nested\n']])
-
-    const result = runGuard({ ...fixture, head })
-
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain('no new root-level files or folders')
+  describe('existing top-level directory', () => {
+    let preparedFixture
+    beforeEach(() => {
+      const fixture = makeFixture()
+      const head = commitFiles(fixture.root, [['config/new.txt', 'nested\n']])
+      preparedFixture = { ...fixture, head }
+    })
+    it('allows additions inside an existing top-level directory', () => {
+      const result = runGuard(preparedFixture)
+      expect(result.status).toBe(0)
+      expect(result.stdout).toContain('no new root-level files or folders')
+    })
   })
 
   it('rejects a new root-level file with the landing-page message', () => {

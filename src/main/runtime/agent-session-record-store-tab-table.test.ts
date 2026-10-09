@@ -3,9 +3,8 @@
  * Separate from the store's main suite only because that file is at its line cap.
  */
 
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-adjudication'
 import type { AgentSessionExecutionLocation } from '../../shared/agent-session-record'
@@ -16,7 +15,10 @@ import {
   readPersistedTestAgentSessionStore
 } from './agent-session-record-store-test-harness'
 import type { AgentSessionReserveRequest } from './agent-session-reservation-admission'
-import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import {
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../native-chat/agent-session-journal/journal-host-database-test-support'
 
 const NOW = 1_800_000_000_000
 const NATIVE: AgentSessionExecutionLocation = {
@@ -31,7 +33,9 @@ let directory: string
 let counter = 0
 
 beforeEach(async () => {
-  directory = await mkdtemp(join(tmpdir(), 'orca-agent-session-tab-table-'))
+  const evidence = resolve('logs/upstream-sync/20261007/unrecorded-tabs/tmp')
+  await mkdir(evidence, { recursive: true })
+  directory = await mkdtemp(join(evidence, 'orca-agent-session-tab-table-'))
 })
 
 afterEach(async () => {
@@ -157,5 +161,75 @@ describe('chat tab table', () => {
     await store.setSessionTabVisibility('session-alpha', false)
     await store.setSessionTabVisibility('session-alpha', true, 'tab-restored')
     expect(store.getSessionTabId('session-alpha')).toBe('tab-restored')
+  })
+
+  it('reads SQL tabs with an absent legacy index marker without changing any rows', async () => {
+    const store = await open()
+    await store.reserveOwner(reserveRequest())
+    await store.setSessionTabVisibility('session-alpha', true, 'tab-import-owed')
+    openTestJournalHostDatabase(directory)
+      .db.prepare("DELETE FROM agent_session_store_meta WHERE key = 'session_tabs_recorded'")
+      .run()
+    closeTestJournalHostDatabase(directory)
+    const db = openTestJournalHostDatabase(directory).db
+    const changes = () => db.prepare('SELECT total_changes() AS n').get()?.n
+    const before = changes()
+    const reopened = await open()
+
+    expect(reopened.getVisibleSessionTabIndex()).toEqual({
+      present: false,
+      sessionIds: ['session-alpha']
+    })
+    expect(reopened.listVisibleSessionIds()).toEqual(['session-alpha'])
+    expect(changes()).toBe(before)
+    expect(
+      db.prepare("SELECT 1 FROM agent_session_store_meta WHERE key = 'session_tabs_recorded'").get()
+    ).toBeUndefined()
+    expect(db.prepare('SELECT tab_id, session_id FROM agent_session_tabs').all()).toEqual([
+      { tab_id: 'tab-import-owed', session_id: 'session-alpha' }
+    ])
+  })
+
+  it('keeps the original SQL tab id when the legacy profile completes its index', async () => {
+    const store = await open()
+    await store.reserveOwner(reserveRequest())
+    await store.setSessionTabVisibility('session-alpha', true, 'tab-import-owed')
+    await store.reserveOwner(
+      reserveRequest({
+        sessionId: 'session-beta',
+        operation: { callerKey: 'client-1', operationId: operationId(), fingerprint: 'fp-beta' }
+      })
+    )
+    openTestJournalHostDatabase(directory)
+      .db.prepare("DELETE FROM agent_session_store_meta WHERE key = 'session_tabs_recorded'")
+      .run()
+    closeTestJournalHostDatabase(directory)
+    const reopened = await open()
+
+    await reopened.showSessionTabs(['session-alpha', 'session-beta'])
+
+    expect(reopened.getSessionTabId('session-alpha')).toBe('tab-import-owed')
+    expect(reopened.getVisibleSessionTabIndex()).toEqual({
+      present: true,
+      sessionIds: ['session-alpha', 'session-beta']
+    })
+    expect((await readPersistedTestAgentSessionStore(directory)).sessionTabs).toEqual([
+      { tabId: 'tab-import-owed', sessionId: 'session-alpha' },
+      { tabId: 'structured-agent-session-session-beta', sessionId: 'session-beta' }
+    ])
+  })
+
+  it('keeps an explicitly recorded empty index empty across a cold reopen', async () => {
+    const store = await open()
+    await store.reserveOwner(reserveRequest())
+    await store.setSessionTabVisibility('session-alpha', true, 'tab-import-owed')
+    await store.setSessionTabVisibility('session-alpha', false)
+    closeTestJournalHostDatabase(directory)
+    const reopened = await open()
+
+    expect(reopened.getVisibleSessionTabIndex()).toEqual({ present: true, sessionIds: [] })
+    expect(reopened.listVisibleSessionIds()).toEqual([])
+    expect(reopened.getSessionTabId('session-alpha')).toBeNull()
+    expect(reopened.getRecord('session-alpha')).not.toBeNull()
   })
 })

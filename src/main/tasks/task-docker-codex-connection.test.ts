@@ -141,6 +141,40 @@ describe('Docker Codex connection', () => {
     expect(connection.closed).toBe(true)
   })
 
+  it('keeps an expected transport exit inside the close that owns the container stop proof', async () => {
+    const f = fixture()
+    const onExit = vi.fn()
+    f.boundary.stop.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+    vi.mocked(f.raw.close).mockImplementationOnce(async () => {
+      f.getHandlers().onExit?.(new Error('transport closed'), { expected: true })
+      return true
+    })
+    const connection = await openTaskDockerCodexConnection({ ...f, handlers: { onExit } })
+
+    await expect(connection.close()).resolves.toBe(false)
+    expect(f.boundary.stop).toHaveBeenCalledTimes(1)
+    await expect(connection.close()).resolves.toBe(true)
+    expect(f.boundary.stop).toHaveBeenCalledTimes(2)
+    expect(f.raw.close).toHaveBeenCalledTimes(2)
+    expect(onExit).not.toHaveBeenCalled()
+  })
+
+  it.each([undefined, { expected: false }])(
+    'retains unexpected exit cleanup after an unproven close (%j)',
+    async (exit) => {
+      const f = fixture()
+      const onExit = vi.fn()
+      f.boundary.stop.mockResolvedValueOnce(false).mockResolvedValueOnce(true)
+      const connection = await openTaskDockerCodexConnection({ ...f, handlers: { onExit } })
+      await expect(connection.close()).resolves.toBe(false)
+
+      f.getHandlers().onExit?.(new Error('unexpected transport exit'), exit)
+      await vi.waitFor(() => expect(f.boundary.stop).toHaveBeenCalledTimes(2))
+      expect(onExit).not.toHaveBeenCalled()
+      await expect(connection.close()).resolves.toBe(true)
+    }
+  )
+
   it('preserves unknown and permits cleanup retries after daemon errors', async () => {
     const f = fixture()
     f.boundary.stop.mockRejectedValueOnce(new Error('daemon unavailable'))

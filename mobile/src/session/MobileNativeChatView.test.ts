@@ -56,6 +56,7 @@ vi.mock('../theme/mobile-theme-provider', async () => {
 
 vi.mock('./MobileNativeChatTurnStatus', () => ({ MobileNativeChatTurnActivity: 'TurnActivity' }))
 vi.mock('./MobileNativeChatMessage', () => ({ MobileNativeChatMessage: 'ChatMessage' }))
+vi.mock('./MobileNativeChatLiveLine', () => ({ MobileNativeChatLiveLine: 'LiveStatus' }))
 vi.mock('./MobileNativeChatAsk', () => ({ MobileNativeChatAsk: 'ChatAsk' }))
 vi.mock('./MobileNativeChatPermission', () => ({ MobileNativeChatPermission: 'ChatPermission' }))
 vi.mock('./MobileNativeChatQuestion', () => ({ MobileNativeChatQuestion: 'ChatQuestion' }))
@@ -136,6 +137,55 @@ describe('MobileNativeChatView', () => {
     })
   }
 
+  it("holds Stop and says Stopping while this phone's own Stop request is in flight", async () => {
+    await render({
+      structuredActivityUi: true,
+      agentWorking: true,
+      canStop: true,
+      turnIndicator: {
+        thinking: false,
+        activityText: null,
+        stopping: true,
+        stopRequestInFlight: true
+      }
+    })
+    const stop = renderer!.root.find(
+      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === '正在停止…'
+    )
+    expect(stop.props.disabled).toBe(true)
+  })
+
+  it.each([
+    ['queue', 'Queue a message to run after the stop'],
+    ['send', 'Send a message to run after the stop']
+  ] as const)(
+    'tells the composer a message sent now runs after the stop (%s)',
+    async (afterStop, placeholder) => {
+      await render({
+        structuredActivityUi: true,
+        agentWorking: true,
+        canStop: true,
+        turnIndicator: { thinking: false, activityText: null, stopping: true, afterStop }
+      })
+      const composer = renderer!.root.find((node) => node.type === 'Composer')
+      expect(composer.props.placeholder).toBe(placeholder)
+    }
+  )
+
+  // A Stop the provider took and never answered ends only at a repeat Stop.
+  it('keeps Stop for the repeat that escalates while the host alone says Stopping', async () => {
+    await render({
+      structuredActivityUi: true,
+      agentWorking: true,
+      canStop: true,
+      turnIndicator: { thinking: false, activityText: null, stopping: true }
+    })
+    const stop = renderer!.root.find(
+      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === '停止 Agent'
+    )
+    expect(stop.props.disabled).toBe(false)
+  })
+
   /** Ids of the rows the list is currently rendering. */
   it('keeps Stop hidden during a structured dispatch until a provider turn can be cancelled', async () => {
     const props = { structuredActivityUi: true, agentWorking: true, canStop: false }
@@ -202,6 +252,39 @@ describe('MobileNativeChatView', () => {
       })
     })
   }
+
+  // A read no retry gets past takes the whole pane, even over a transcript already on screen: its
+  // words alone, and nothing that could only be refused again.
+  it('leaves only the words of a read that failed for good, over a loaded transcript', async () => {
+    const loaded = [assistantTurn('m1', 'earlier reply')]
+    const words = 'This chat was saved by a newer Orca. Update Orca to open it.'
+    const shown = (text: string) =>
+      renderer!.root.findAll((node) => node.type === 'Text' && node.props.children === text)
+    const composers = () => renderer!.root.findAll((node) => node.type === 'Composer')
+    const lists = () => renderer!.root.findAll((node) => node.type === 'FlatList')
+    const failure = {
+      messages: loaded,
+      folded: loaded,
+      status: 'error' as const,
+      error: words,
+      canStop: true,
+      permission: { title: 'Approve?', options: [{ label: 'Allow', send: '1' }] },
+      // A resend answered unknown says nothing beside the read's words.
+      sendErrorMessage: 'Message unconfirmed — check chat before retrying'
+    }
+    await render({ ...failure, readFailedFinally: true })
+    expect(shown(words)).toHaveLength(1)
+    expect(composers()).toHaveLength(0)
+    expect(lists()).toHaveLength(0)
+    expect(banners()).toHaveLength(0)
+    expect(renderer!.root.findAllByProps({ accessibilityLabel: 'Stop the agent' })).toHaveLength(0)
+
+    // A failure that can clear keeps the transcript and the composer.
+    await update({ ...failure, error: "Orca couldn't open this chat's history right now." })
+    expect(listIds()).toEqual(['m1'])
+    expect(composers()).toHaveLength(1)
+    expect(banners()).toHaveLength(1)
+  })
 
   it('renders the route-reported failure verbatim', async () => {
     await render({ sendErrorMessage: 'Permission reply failed' })
@@ -665,5 +748,37 @@ describe('MobileNativeChatView', () => {
     } finally {
       vi.useRealTimers()
     }
+  })
+  // Why: a terminal-backed send types into the agent's prompt and could answer it; drafting cannot.
+  describe('a prompt card owns Send in terminal-backed chat', () => {
+    const permission = { title: 'Approve?', options: [{ label: 'Allow', send: '1' }] }
+
+    it('blocks only Send while the card shows, and frees it when the card clears', async () => {
+      await render({ permission })
+      expect(composer().props.sendDisabled).toBe(true)
+      expect(composer().props.disabled).toBe(false)
+      expect(composer().props.placeholder).toBe('输入消息，支持 @文件、/命令')
+
+      await update({ permission: null })
+      expect(composer().props.sendDisabled).toBe(false)
+    })
+
+    it('blocks Send for an ask and a heuristic question too', async () => {
+      await render({
+        ask: {
+          questions: [{ question: 'Tabs?', multiSelect: false, options: [{ label: 'Tabs' }] }]
+        }
+      })
+      expect(composer().props.sendDisabled).toBe(true)
+      await update({
+        question: { question: 'Name?', options: [], multiSelect: false, optionTokens: [] }
+      })
+      expect(composer().props.sendDisabled).toBe(true)
+    })
+
+    it('leaves a structured chat composer open: its host queues the send behind the prompt', async () => {
+      await render({ permission, structuredActivityUi: true })
+      expect(composer().props.sendDisabled).toBe(false)
+    })
   })
 })

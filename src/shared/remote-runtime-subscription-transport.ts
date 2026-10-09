@@ -1,4 +1,6 @@
 import { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
+import { closeRemoteRuntimeSocket } from './remote-runtime-socket-close'
+import { throwIfSignalAborted, abortSignalReason } from './abort-signal-reason'
 import { randomUUID } from 'node:crypto'
 import WebSocket from 'ws'
 import { APP_DISPLAY_NAME } from './brand'
@@ -51,6 +53,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
   callbacks: RemoteRuntimeTransportSubscriptionCallbacks<TResult>,
   options?: RemoteRuntimeSubscriptionOptions
 ): Promise<RemoteRuntimeTransportSubscription> {
+  throwIfSignalAborted(options?.signal)
   const requestId = randomUUID()
   const serializedRequest = serializeRemoteRuntimeRpcRequest({
     requestId,
@@ -99,6 +102,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
     })
 
     const cleanupSocketListeners = (): WebSocket | null => {
+      options?.signal?.removeEventListener('abort', onAbort)
       liveness?.stop()
       liveness = null
       outbound.releaseQueues()
@@ -124,12 +128,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
     }
 
     const closeSocketAfterCleanup = (): void => {
-      const socket = cleanupSocketListeners()
-      try {
-        socket?.close()
-      } catch {
-        // ignore best-effort close
-      }
+      closeRemoteRuntimeSocket(cleanupSocketListeners())
     }
 
     const timeout = setTimeout(() => {
@@ -145,6 +144,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
       if (closing) {
         return
       }
+      options?.signal?.removeEventListener('abort', onAbort)
       closing = true
       requestChannel.rejectAll(
         new RemoteRuntimeClientError(
@@ -158,11 +158,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
       } else if (!outbound.hasRetainedCloseSource) {
         outbound.releaseSocketMemory()
       }
-      try {
-        ws?.close()
-      } catch {
-        // ignore best-effort close
-      }
+      closeRemoteRuntimeSocket(ws)
     }
 
     const sendBinary = (bytes: Uint8Array<ArrayBufferLike>): boolean => {
@@ -204,6 +200,21 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
       callbacks.onClose?.()
     }
 
+    const onAbort = (): void => {
+      if (settled) {
+        close()
+      } else {
+        settled = true
+        clearTimeout(timeout)
+        closeSocketAfterCleanup()
+        reject(abortSignalReason(options!.signal!))
+      }
+    }
+    options?.signal?.addEventListener('abort', onAbort, { once: true })
+    if (options?.signal?.aborted) {
+      onAbort()
+      return
+    }
     const connectOptions = remoteRuntimeConnectOptions(
       {
         maxPayload: REMOTE_RUNTIME_MAX_WEBSOCKET_FRAME_BYTES,

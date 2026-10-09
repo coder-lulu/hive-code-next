@@ -41,7 +41,8 @@ const CARD = {
   state: 'waiting' as const,
   paused: false,
   needsAttention: false,
-  caption: null
+  caption: null,
+  attribution: null
 }
 
 function Slot({

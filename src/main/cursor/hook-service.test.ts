@@ -67,17 +67,18 @@ function requireRegisteredCommand(config: InstalledCursorHooks, eventName: strin
   return command
 }
 
-function runRegisteredCursorHook(
+async function runRegisteredCursorHook(
   command: string,
   input: string,
   extraEnv: NodeJS.ProcessEnv = {}
-): { stdout: string; stderr: string; status: number | null } {
+): Promise<{ stdout: string; stderr: string; status: number | null }> {
   const executable = process.platform === 'win32' ? 'cmd.exe' : '/bin/sh'
   const args = process.platform === 'win32' ? ['/d', '/s', '/c', command] : ['-c', command]
-  const result = spawnSync(executable, args, {
-    encoding: 'utf8',
+  const result = await runProcess({
+    program: executable,
+    args,
     input,
-    timeout: HOOK_RUN_TIMEOUT_MS,
+    timeoutMs: HOOK_RUN_TIMEOUT_MS,
     env: {
       ...process.env,
       ORCA_AGENT_HOOK_ENDPOINT: '',
@@ -87,8 +88,8 @@ function runRegisteredCursorHook(
       ...extraEnv
     }
   })
-  expect(result.error, result.stderr).toBeUndefined()
-  return { stdout: result.stdout, stderr: result.stderr, status: result.status }
+  expect(result.timedOut, result.stderr).toBe(false)
+  return { stdout: result.stdout, stderr: result.stderr, status: result.code }
 }
 
 describe('CursorHookService', () => {
@@ -220,7 +221,7 @@ describe('CursorHookService', () => {
   // invalid JSON and fails closed (#15462). This runs the registered command.
   it(
     'emits protocol-valid JSON on stdout for every managed event, including empty stdin (#15462)',
-    () => {
+    async () => {
       expect(new CursorHookService().install().state).toBe('installed')
       const config = readInstalledCursorHooks(homeDir)
       const payloads = [
@@ -230,13 +231,19 @@ describe('CursorHookService', () => {
 
       for (const eventName of CURSOR_EVENTS) {
         const command = requireRegisteredCommand(config, eventName)
-        for (const payloadFor of payloads) {
-          const result = runRegisteredCursorHook(command, payloadFor(eventName))
+        // Independent stdin/env per real launcher; join both children before cleanup even on failure.
+        const jobs = payloads.map(async (payloadFor) => {
+          const result = await runRegisteredCursorHook(command, payloadFor(eventName))
           expect(result.status, `${eventName} exit`).toBe(0)
           expect(result.stderr, `${eventName} stderr`).toBe('')
           expect(JSON.parse(result.stdout), `${eventName} stdout`).toEqual(
             EXPECTED_CURSOR_HOOK_STDOUT[eventName]
           )
+        })
+        try {
+          await Promise.all(jobs)
+        } finally {
+          await Promise.allSettled(jobs)
         }
       }
     },
@@ -245,7 +252,7 @@ describe('CursorHookService', () => {
 
   it.each(['ordinary', 'spaced'] as const)(
     'emits protocol-valid JSON when the script is missing in a %s profile (#15462)',
-    (profileKind) => {
+    async (profileKind) => {
       const installHome = profileKind === 'spaced' ? join(homeDir, 'profile with spaces') : homeDir
       mkdirSync(installHome, { recursive: true })
       homedirMock.mockReturnValue(installHome)
@@ -255,7 +262,7 @@ describe('CursorHookService', () => {
 
       for (const eventName of CURSOR_EVENTS) {
         const command = requireRegisteredCommand(config, eventName)
-        const result = runRegisteredCursorHook(command, '')
+        const result = await runRegisteredCursorHook(command, '')
         expect(result.status, `${eventName} missing-script exit`).toBe(0)
         expect(result.stderr, `${eventName} missing-script stderr`).toBe('')
         expect(JSON.parse(result.stdout), `${eventName} missing-script stdout`).toEqual(
@@ -268,13 +275,13 @@ describe('CursorHookService', () => {
 
   it(
     'keeps curl failure off stdout when the listener is unreachable (#15462)',
-    () => {
+    async () => {
       expect(new CursorHookService().install().state).toBe('installed')
       const config = readInstalledCursorHooks(homeDir)
 
       for (const eventName of ['beforeSubmitPrompt', 'preToolUse', 'stop'] as const) {
         const command = requireRegisteredCommand(config, eventName)
-        const result = runRegisteredCursorHook(
+        const result = await runRegisteredCursorHook(
           command,
           JSON.stringify({ hook_event_name: eventName, tool_name: 'Write' }),
           {

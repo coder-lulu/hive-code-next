@@ -1,16 +1,20 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener
+} from '../agent-session-journal/journal-host-database-test-support'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentChildWorkEvidence } from '../../../shared/agent-status-child-work-evidence'
 import { makeStructuredAgentStatusSubject } from '../../../shared/agent-status-subject'
-import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import {
   StructuredAgentSessionStatusFeed,
   type StructuredAgentSessionStatusSink
 } from './structured-agent-session-status-feed'
 import { indexedStatusFeedSession } from './structured-agent-session-status-feed-test-session'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 
 const SESSION = 'status-session'
 const EVIDENCE: AgentChildWorkEvidence[] = [{ type: 'session-ended', observedAt: 5 }]
@@ -23,6 +27,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await journals.closeAll()
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -33,7 +38,7 @@ async function feedWith(sink: StructuredAgentSessionStatusSink) {
       workspaceId: 'workspace-1',
       hostId: 'local',
       agent: 'codex',
-      providerHandle: { kind: 'codex', threadId: 'thread-1' }
+      providerHandle: codexProviderHandle('thread-1')
     },
     stateDirectory: join(root, SESSION)
   })

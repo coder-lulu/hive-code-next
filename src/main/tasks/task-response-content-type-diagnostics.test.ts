@@ -1,3 +1,4 @@
+import { taskFailureWithInvalidDiagnostics } from './task-model-response-field-diagnostics.test-fixture'
 import { closeTestJournalHostDatabases } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { once } from 'node:events'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
@@ -8,7 +9,7 @@ import { createTaskCodexModelChannel } from './task-codex-model-channel'
 import { createTaskModelDispatchFixture } from './task-model-dispatch.test-fixture'
 import { modelStartParams } from './task-model-broker.test-fixture'
 import { taskDockerModelProfile } from './task-docker-model-profile'
-import { taskFailure, taskFailureSummary, type TaskFailureError } from './task-failure-diagnostic'
+import { taskFailureSummary, type TaskFailureError } from './task-failure-diagnostic'
 import { readPersistedTestAgentSessionStore } from '../runtime/agent-session-record-store-test-harness'
 import { TASK_TEST_NOW } from './task-execution.test-fixture'
 
@@ -188,9 +189,7 @@ describe('finite refused Content-Type header metadata on the original Task', () 
     }
   )
   it('keeps the first trusted header classification through later cleanup reasons', () => {
-    const make = (...args: unknown[]): TaskFailureError =>
-      Reflect.apply(taskFailure, undefined, args)
-    const first = make(
+    const first = taskFailureWithInvalidDiagnostics(
       undefined,
       'response',
       'TASK_MODEL_STREAM_REFUSED',
@@ -199,9 +198,16 @@ describe('finite refused Content-Type header metadata on the original Task', () 
       'json'
     )
     expect(first.diagnostic).toMatchObject({ contentTypeKind: 'json' })
-    expect(make(first, 'response', 'TASK_MODEL_STREAM_REFUSED', 200, 'content_type', 'html')).toBe(
-      first
-    )
+    expect(
+      taskFailureWithInvalidDiagnostics(
+        first,
+        'response',
+        'TASK_MODEL_STREAM_REFUSED',
+        200,
+        'content_type',
+        'html'
+      )
+    ).toBe(first)
   })
   it('cannot persist a forged classification or raw header prose on the original Task', async () => {
     const owner = await createTaskModelDispatchFixture(directory)
@@ -212,14 +218,14 @@ describe('finite refused Content-Type header metadata on the original Task', () 
       'contentTypeKind',
       { get: getter }
     )
-    const failure: TaskFailureError = Reflect.apply(taskFailure, undefined, [
+    const failure: TaskFailureError = taskFailureWithInvalidDiagnostics(
       forged,
       'response',
       'TASK_MODEL_STREAM_REFUSED',
       200,
       'content_type',
       raw
-    ])
+    )
     await owner.store.tasks.recordModelFailure(owner.task, failure, TASK_TEST_NOW)
     const task = (await readPersistedTestAgentSessionStore(directory)).taskExecutions[owner.key]
     expect(task.events.at(-1)?.summary).toBe(
@@ -231,14 +237,12 @@ describe('finite refused Content-Type header metadata on the original Task', () 
     expect(task.status).toBe(owner.task.status)
   })
   it('drops forged/raw labels without fabricating missing evidence or widening the valid phase/code/reason', () => {
-    const make = (...args: unknown[]): TaskFailureError =>
-      Reflect.apply(taskFailure, undefined, args)
     for (const kind of [
       'https://private.invalid/token-secret',
       'json_token-secret',
       Object('json')
     ]) {
-      const failure = make(
+      const failure = taskFailureWithInvalidDiagnostics(
         { contentTypeKind: kind },
         'response',
         'TASK_MODEL_STREAM_REFUSED',
@@ -252,17 +256,26 @@ describe('finite refused Content-Type header metadata on the original Task', () 
     const getter = vi.fn(() => 'json')
     const forged = Object.defineProperty({}, 'contentTypeKind', { get: getter })
     expect(
-      make(forged, 'response', 'TASK_MODEL_STREAM_REFUSED', 200, 'content_type').diagnostic
+      taskFailureWithInvalidDiagnostics(
+        forged,
+        'response',
+        'TASK_MODEL_STREAM_REFUSED',
+        200,
+        'content_type'
+      ).diagnostic
     ).not.toHaveProperty('contentTypeKind')
     expect(getter).not.toHaveBeenCalled()
-    for (const args of [
+    const cases: Parameters<typeof taskFailureWithInvalidDiagnostics>[] = [
       [undefined, 'stream', 'TASK_MODEL_STREAM_REFUSED', 200, 'content_type', 'json'],
       [undefined, 'response', 'TASK_MODEL_STREAM_REFUSED', 429, 'content_type', 'json'],
       [undefined, 'response', 'TASK_MODEL_STREAM_REFUSED', 200, 'content_encoding', 'json'],
       [undefined, 'response', 'TASK_MODEL_UPSTREAM_UNAVAILABLE', 200, 'content_type', 'json'],
       [undefined, 'response', 'TASK_MODEL_STREAM_REFUSED', 200, 'content_type']
-    ]) {
-      expect(make(...args).diagnostic).not.toHaveProperty('contentTypeKind')
+    ]
+    for (const args of cases) {
+      expect(taskFailureWithInvalidDiagnostics(...args).diagnostic).not.toHaveProperty(
+        'contentTypeKind'
+      )
     }
   })
 })

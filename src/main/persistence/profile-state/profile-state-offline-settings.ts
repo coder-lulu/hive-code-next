@@ -19,6 +19,7 @@ import { writeProfileStateDomain } from './profile-state-domain-writes'
 import { assertProfileStateCanInitialize } from './profile-state-recovery-required'
 import { classifyProfileStateStorage } from './profile-state-storage-classification'
 import { migrateProfileStateToSqlite } from './profile-state-migration'
+import { ensureProfileStateAuthorityMarker } from './profile-state-authority-marker'
 
 export type ProfileStateOfflineLocation = {
   dataFile: string
@@ -74,6 +75,7 @@ export function updateAgentHookSettingsInProfileState(
   assertAcceptedLegacyJson(location, classification)
   const opened = openProfileStateDatabase(location.databaseFile, location.profileId)
   try {
+    ensureProfileStateAuthorityMarker(location.databaseFile)
     const domains = readProfileStateDomainsWithRevisionFromDatabase(opened.db, ['settings'])
     if (domains.kind === 'unreadable') {
       throw domains.error

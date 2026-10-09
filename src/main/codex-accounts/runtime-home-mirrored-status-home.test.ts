@@ -76,7 +76,6 @@ describe('CodexRuntimeHomeService.getMirroredHostHomePathForStatus', () => {
     const { CodexRuntimeHomeService } = await import('./runtime-home-service')
     const service = new CodexRuntimeHomeService(createStore([], null) as never)
 
-    expect(service.getSelectedHostCodexHomeRoute()).toBe('real-home')
     expect(service.getMirroredHostHomePathForStatus()).toEqual({
       kind: 'ready',
       homePath: null

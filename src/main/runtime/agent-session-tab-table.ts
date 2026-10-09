@@ -1,8 +1,8 @@
 import { isAgentSessionId, type AgentSessionRecord } from '../../shared/agent-session-record'
-import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import { isAgentSessionSurfaceTabId } from '../../shared/agent-session-surface-tab-id'
+import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import { structuredAgentSessionTabId } from '../../shared/structured-agent-session-projection'
-import type { AgentSessionStoreState } from './agent-session-record-store-file'
+import type { AgentSessionStoreState } from './agent-session-store-state'
 
 /**
  * Which conversation each structured chat tab shows, keyed by the host tab id.
@@ -114,6 +114,20 @@ function reopenedTabId(sessionId: string, held: (tabId: string) => boolean): str
   return tabId
 }
 
+/** The sessions whose chat tab is shown, in tab order, skipping any without a record. */
+export function listVisibleAgentSessionIds(state: AgentSessionStoreState): string[] {
+  return ((state.sessionTabs ?? state.unrecordedSessionTabs)?.sessionIds() ?? []).filter(
+    (sessionId) => state.records.has(sessionId)
+  )
+}
+
+export function agentSessionVisibleTabIndex(state: AgentSessionStoreState): {
+  present: boolean
+  sessionIds: string[]
+} {
+  return { present: state.sessionTabs !== null, sessionIds: listVisibleAgentSessionIds(state) }
+}
+
 export function setAgentSessionTabVisibility(
   state: AgentSessionStoreState,
   sessionId: string,
@@ -149,11 +163,6 @@ export function showAgentSessionTabs(
 
 export type PersistedAgentSessionTab = { tabId: string; sessionId: string }
 
-/**
- * Reads the records file's table, or seeds it from what older builds wrote: the visible session list
- * and, for a chat created by a build that recorded one, the tab id on its record. That record field
- * is read here and nowhere else, and only when the file carries no table.
- */
 export function parseAgentSessionTabTable(
   file: { sessionTabs?: unknown; visibleSessionIds?: unknown },
   records: ReadonlyMap<string, AgentSessionRecord>,

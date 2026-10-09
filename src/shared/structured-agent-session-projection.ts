@@ -10,6 +10,8 @@ import {
 } from './agent-status-field-normalization'
 import {
   AGENT_JOURNAL_MESSAGE_SEND_MODES,
+  AGENT_JOURNAL_MESSAGE_STATES,
+  type AgentJournalMessageItem,
   type AgentJournalMessageSendMode,
   type AgentJournalRenderItem,
   type AgentJournalSubmission
@@ -34,6 +36,7 @@ import {
 
 import type { NativeChatMessage } from './native-chat-types'
 import { sha256 } from './sha256'
+import { readAgentMessageSource } from './agent-session-message-source'
 import { structuredAgentSessionStatusStartedAt } from './structured-agent-session-status-started-at'
 import { owesStructuredAgentSessionWork } from './structured-agent-session-owed-work'
 
@@ -65,6 +68,20 @@ function isAgentJournalMessageSendMode(value: string): value is AgentJournalMess
   return AGENT_JOURNAL_MESSAGE_SEND_MODES.some((mode) => mode === value)
 }
 
+/** A state this build cannot name reads as completed: a newer host's row is never live here. */
+function messageLifecycle(
+  body: AgentJournalMessageItem
+): Pick<NativeChatMessage, 'state' | 'completedAt'> {
+  const state: string | undefined = body.state
+  if (state === undefined) {
+    return {}
+  }
+  return {
+    state: AGENT_JOURNAL_MESSAGE_STATES.find((known) => known === state) ?? 'completed',
+    ...(body.completedAt !== undefined ? { completedAt: body.completedAt } : {})
+  }
+}
+
 const projectedItems = new WeakMap<AgentJournalRenderItem, NativeChatMessage | null>()
 
 /** Deliberately NOT scoped by producer: every agent's rows are projected, and
@@ -94,6 +111,10 @@ export function projectStructuredItemToNativeChat(
   // Reducer updates replace journal items, so unchanged rows keep their render caches.
   const projected = itemBlocks(item)
   const sentAs = item.body.kind === 'message' ? item.body.sentAs : undefined
+  const lifecycle = item.body.kind === 'message' ? messageLifecycle(item.body) : {}
+  const command = item.body.kind === 'message' ? item.body.command : undefined
+  // Read here too: a client's journal comes off the wire, from a host of any version.
+  const from = item.body.kind === 'message' ? readAgentMessageSource(item.body.from) : undefined
   const message: NativeChatMessage | null = projected
     ? {
         ...agentJournalItemRowOrigin(item),
@@ -101,7 +122,10 @@ export function projectStructuredItemToNativeChat(
         role: projected.role,
         blocks: projected.blocks,
         // A send mode this build cannot name renders as an ordinary message.
-        ...(sentAs !== undefined && isAgentJournalMessageSendMode(sentAs) ? { sentAs } : {})
+        ...(sentAs !== undefined && isAgentJournalMessageSendMode(sentAs) ? { sentAs } : {}),
+        ...lifecycle,
+        ...(command ? { command } : {}),
+        ...(from && projected.role === 'user' ? { from } : {})
       }
     : null
   projectedItems.set(item, message)
@@ -114,18 +138,19 @@ export function structuredAgentSessionTabId(sessionId: string): string {
   return `structured-agent-session-${sessionId}`
 }
 
+function isPendingStructuredAgentSessionPrompt(item: AgentJournalRenderItem): boolean {
+  return (
+    (item.body.kind === 'approval' || item.body.kind === 'question') &&
+    item.body.resolution.state === 'pending'
+  )
+}
+
 export function projectStructuredAgentSessionStatus(
   items: readonly AgentJournalRenderItem[],
   submissions: readonly AgentJournalSubmission[] = [],
   currentFence?: number | null
 ): StructuredAgentSessionProjectedStatus {
-  if (
-    items.some(
-      (item) =>
-        (item.body.kind === 'approval' || item.body.kind === 'question') &&
-        item.body.resolution.state === 'pending'
-    )
-  ) {
+  if (items.some(isPendingStructuredAgentSessionPrompt)) {
     return 'attention'
   }
   return owesStructuredAgentSessionWork(items, submissions, currentFence) ? 'working' : 'idle'
@@ -176,18 +201,21 @@ export function projectStructuredAgentSessionStatusState(
   latestRequest: StructuredAgentSessionLatestRequest | null
   /** Whether a running turn or an unanswered send is still owed, even beneath a pending prompt. */
   owesWork: boolean
+  /** Item ids of the approvals and questions waiting on the user: what makes the status `attention`. */
+  pendingPromptIds: string[]
 } {
+  if (!hasStructuredAgentSessionRequest(items, submissions, currentFence)) {
+    return {
+      summary: { status: null, latestPrompt: '' },
+      latestRequest: null,
+      owesWork: false,
+      pendingPromptIds: []
+    }
+  }
   const status = projectStructuredAgentSessionStatus(items, submissions, currentFence)
   const activityFields = structuredSessionListActivityFields(
     structuredSessionListActivity(status, items, submissions, currentFence)
   )
-  if (!hasStructuredAgentSessionRequest(items, submissions, currentFence)) {
-    return {
-      summary: { status: null, latestPrompt: '', ...activityFields },
-      latestRequest: null,
-      owesWork: false
-    }
-  }
   const statusToolCall = status === 'working' ? statusStructuredAgentSessionToolCall(items) : null
   const toolName = statusToolCall
     ? normalizeOptionalField(statusToolCall.name, AGENT_STATUS_TOOL_NAME_MAX_LENGTH)
@@ -218,6 +246,10 @@ export function projectStructuredAgentSessionStatusState(
   return {
     latestRequest,
     owesWork: status !== 'idle' && owesStructuredAgentSessionWork(items, submissions, currentFence),
+    pendingPromptIds:
+      status === 'attention'
+        ? items.filter(isPendingStructuredAgentSessionPrompt).map((item) => item.itemId)
+        : [],
     summary: {
       status,
       ...activityFields,

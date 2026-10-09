@@ -1,8 +1,31 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as NodeFsPromises from 'node:fs/promises'
 import { workspaceMayOverrideDefaultModel } from './agent-project-model-override'
+
+const repositoryBoundary = vi.hoisted(() => ({ root: null as string | null }))
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof NodeFsPromises>()
+  return {
+    ...actual,
+    stat: async (...args: Parameters<typeof actual.stat>) => {
+      const path = args[0]
+      const normalized = typeof path === 'string' ? path.replaceAll('\\', '/') : null
+      if (
+        normalized?.endsWith('/.git') &&
+        repositoryBoundary.root &&
+        !normalized.startsWith(`${repositoryBoundary.root}/`)
+      ) {
+        throw Object.assign(new Error('outside the isolated repository fixture'), {
+          code: 'ENOENT'
+        })
+      }
+      return actual.stat(...args)
+    }
+  }
+})
 
 let root: string
 
@@ -22,9 +45,11 @@ function mayOverride(
 describe('workspaceMayOverrideDefaultModel', () => {
   beforeEach(() => {
     root = mkdtempSync(join(tmpdir(), 'orca-project-model-'))
+    repositoryBoundary.root = root.replaceAll('\\', '/')
   })
 
   afterEach(() => {
+    repositoryBoundary.root = null
     rmSync(root, { recursive: true, force: true })
   })
 

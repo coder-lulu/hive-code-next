@@ -7,6 +7,7 @@ import { parse } from 'yaml'
 import { peImage } from './windows-pe-image-fixture.mjs'
 import { canReusePreparedRelayAddon } from './relay-windows-process-tree-prepared-addon.mjs'
 import { runProcessSync } from './script-child-process.mjs'
+import { resolveGitBashPath } from '../../src/main/git-bash'
 
 const directories = []
 afterEach(() => {
@@ -129,8 +130,14 @@ it.each(['x64', 'arm64'])('passes the optional reuse flag safely to the %s build
     directories.push(directory)
     const output = join(directory, 'arguments.txt')
     const script = `node() { printf '%s\n' "$@" > "$ARGUMENTS_FILE"; }\n${build.run.replaceAll('${{ matrix.arch }}', arch)}`
+    const bashProgram = process.platform === 'win32' ? resolveGitBashPath() : 'bash'
+    if (!bashProgram) {
+      throw new Error(
+        'Git Bash is required to execute the relay builder argument fixture on Windows'
+      )
+    }
     const result = runProcessSync({
-      program: 'bash',
+      program: bashProgram,
       args: ['-e', '-c', script],
       cwd: directory,
       env: { ...process.env, ARGUMENTS_FILE: output, REUSE_PREPARED_RUNTIME: enabled },

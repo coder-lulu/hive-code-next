@@ -30,11 +30,19 @@ export function buildAgentResumeStartupPlan(args: {
   sessionOptionsOverrideAgentArgs?: boolean
   isRemote?: boolean
   agentPermissionMode?: AgentLaunchPermissionMode
+  /** The caller chose the terminal folder on purpose, so Codex must not ask for the recorded one. */
+  resumeInLaunchCwd?: boolean
 }): AgentStartupPlan | null {
-  const argv = getAgentResumeArgv(args.agent, args.providerSession, args.ompResumeFilePath)
-  if (!argv) {
+  const resumeArgv = getAgentResumeArgv(args.agent, args.providerSession, args.ompResumeFilePath)
+  if (!resumeArgv) {
     return null
   }
+  // Why: Codex otherwise prompts for the folder, defaulting to the recorded one even once it was
+  // deleted (#17745). Kept before `resume` so dropAgentResumeArgvFromCommand strips only that.
+  const argv =
+    args.agent === 'codex' && args.resumeInLaunchCwd
+      ? [resumeArgv[0], '-c', 'tui.resume_cwd=current', ...resumeArgv.slice(1)]
+      : resumeArgv
   const shell = resolveStartupShell(args.platform, args.shell)
   const permissionConfig = resolveTuiAgentLaunchPermission({
     agent: args.agent,

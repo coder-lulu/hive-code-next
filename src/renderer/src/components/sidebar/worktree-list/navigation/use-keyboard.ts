@@ -3,6 +3,7 @@ import {
   WorkspaceActivatedContext,
   OpenWorkspaceInSurfaceContext
 } from './workspace-activation-context'
+import { fileSearchClaimsTextKey } from '@/lib/file-search-shortcut-policy'
 import type React from 'react'
 import type { Virtualizer } from '@tanstack/react-virtual'
 import { useAppStore } from '@/store'
@@ -23,26 +24,6 @@ import {
   resolveCycledWorktreeId
 } from '../../worktree-keyboard-cycle'
 import { findPreferredRenderRowIndexForWorktreeIdentity } from './render-row-lookup'
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false
-  }
-
-  // xterm's hidden input textarea isn't a real text field; treating it as one would block sidebar shortcuts.
-  if (target.classList.contains('xterm-helper-textarea')) {
-    return false
-  }
-
-  if (target.isContentEditable) {
-    return true
-  }
-
-  return (
-    target.closest('input, textarea, select, [contenteditable=""], [contenteditable="true"]') !==
-    null
-  )
-}
 
 export function useWorktreeListKeyboardNavigation(args: {
   rows: HostSectionRow[]
@@ -144,7 +125,12 @@ export function useWorktreeListKeyboardNavigation(args: {
       scrollRef.current?.removeAttribute('data-keyboard-navigation')
     }
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeModal !== 'none' || isEditableTarget(e.target)) {
+      if (
+        e.defaultPrevented ||
+        e.isComposing ||
+        activeModal !== 'none' ||
+        fileSearchClaimsTextKey(e)
+      ) {
         return
       }
 

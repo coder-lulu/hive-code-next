@@ -12,6 +12,7 @@ import type { PtyShellLaunchPlan } from '../daemon/pty-subprocess/shell-launch-p
 import type { PtySubprocessOptions } from '../daemon/pty-subprocess'
 import { isGitForWindowsBashLauncherPath, resolveGitBashPath } from '../git-bash'
 import { readWindowsPtyJobProcessIds } from './windows-pty-job-membership'
+import { HeadlessEmulator } from '../daemon/headless-emulator'
 
 const describeOnWindows = process.platform === 'win32' ? describe : describe.skip
 
@@ -31,8 +32,14 @@ async function proveIdlePromptCycle(
   const proc = spawned.process
   let output = ''
   let dead = false
+  const terminal = new HeadlessEmulator({
+    cols: 120,
+    rows: 30,
+    onQueryReply: (reply) => proc.write(reply)
+  })
   proc.onData((chunk) => {
     output += chunk
+    void terminal.write(chunk, { forwardQueryReplies: true })
   })
   proc.onExit(() => {
     dead = true
@@ -74,6 +81,7 @@ async function proveIdlePromptCycle(
     await vi.waitFor(async () => expect(await confirm()).toBe(false), { timeout: 10_000 })
   } finally {
     proc.kill()
+    terminal.dispose()
   }
 }
 

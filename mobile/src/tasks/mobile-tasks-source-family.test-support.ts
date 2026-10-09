@@ -1,6 +1,6 @@
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import ts from 'typescript'
+import ts from 'typescript-api'
 
 const TASKS_DIRECTORY = __dirname
 const TASKS_ROUTE = '../../app/h/[hostId]/tasks.tsx'

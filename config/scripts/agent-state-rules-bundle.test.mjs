@@ -12,11 +12,7 @@ import {
 } from '../../src/main/runtime/agent-state-rules/agent-state-rules-bundle.ts'
 import { BUNDLED_AGENT_STATE_RULE_FILES } from '../../src/main/runtime/agent-state-rules/agent-state-rules-catalog.ts'
 import { agentStateRulesDownloadUrl } from '../../src/main/runtime/agent-state-rules/agent-state-rules-live-update.ts'
-import {
-  AGENT_STATE_RULES_ENGINE_VERSION,
-  UNKNOWN_PANE_RULES_ID
-} from '../../src/main/runtime/agent-state-rules/agent-state-rules-schema.ts'
-import { CENSUS_TRANSCRIPTS } from '../../src/main/runtime/readiness-census-transcript-catalog.ts'
+import { AGENT_STATE_RULES_ENGINE_VERSION } from '../../src/main/runtime/agent-state-rules/agent-state-rules-schema.ts'
 import {
   AGENT_STATE_RULES_ASSET,
   buildAgentStateRulesBundle,
@@ -46,11 +42,23 @@ describe('agent state rules bundle build', () => {
     expect(JSON.parse(buildAgentStateRulesBundle({ bundledOnly: true })).bundledOnly).toBe(true)
   })
 
-  it('lets a rules release change only agents the readiness census replays', () => {
-    const replayed = new Set(CENSUS_TRANSCRIPTS.flatMap((transcript) => transcript.agent ?? []))
-    // Why unknown-pane: the census replays every recording on an agent-unknown pane too.
-    replayed.add(UNKNOWN_PANE_RULES_ID)
-    expect([...LIVE_UPDATABLE_AGENT_STATE_RULE_IDS].filter((id) => !replayed.has(id))).toEqual([])
+  it('rejects bundled-only agent rules from live-updatable releases', () => {
+    const bundledOnly = BUNDLED_AGENT_STATE_RULE_FILES.filter(
+      (file) => !LIVE_UPDATABLE_AGENT_STATE_RULE_IDS.has(file.id)
+    )
+    expect(bundledOnly.map((file) => file.id)).toEqual(['gemini', 'opencode2', 'pi'])
+    for (const file of bundledOnly) {
+      const text = JSON.stringify({
+        version: BUNDLED_AGENT_STATE_RULES_VERSION + 1,
+        engineVersion: AGENT_STATE_RULES_ENGINE_VERSION,
+        files: [file]
+      })
+      expect(parseAgentStateRulesBundle(text, 'live-updatable')).toEqual({
+        ok: false,
+        error: `carries ${file.id}, which has no transcript suite to gate it`
+      })
+      expect(parseAgentStateRulesBundle(text, 'any-agent').ok).toBe(true)
+    }
   })
 
   it('reports the unavailable rules endpoint in the current owned update source', () => {

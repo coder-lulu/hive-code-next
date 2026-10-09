@@ -1,3 +1,4 @@
+import { NO_STRUCTURED_AGENTS } from '../native-chat/agent-session-wire/structured-agent-session-adapter-router-test-support'
 import { resolve } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import { vi } from 'vitest'
@@ -100,6 +101,7 @@ export async function fatalModelFixture() {
   })
   const disposeSession = vi.fn(() => connection.close())
   const host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
     logger: recordingStructuredAgentSessionLogger().logger,
     store: f.store,
     adapter: {

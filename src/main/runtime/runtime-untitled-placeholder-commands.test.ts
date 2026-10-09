@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { isAbsolute, join, relative, sep } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Mock } from 'vitest'
 import {
@@ -11,13 +11,32 @@ import {
 import { RuntimeUntitledPlaceholderCommands } from './runtime-untitled-placeholder-commands'
 import type { RuntimeFileExplorerPath } from './runtime-file-command-target'
 import type { Store } from '../persistence'
+import type * as GitCommonDirectory from '../../shared/git-common-directory'
 
 const ports = vi.hoisted(() => ({
   authorize: vi.fn<(path: string) => Promise<string>>(),
   userData: null as string | null,
+  fixtureRoot: null as string | null,
   environmentError: null as Error | null
 }))
 vi.mock('../ipc/filesystem-auth', () => ({ resolveAuthorizedPath: ports.authorize }))
+vi.mock('../../shared/git-common-directory', async (importOriginal) => {
+  const actual = await importOriginal<typeof GitCommonDirectory>()
+  return {
+    ...actual,
+    resolveGitCommonDirectory: async (
+      ...args: Parameters<typeof actual.resolveGitCommonDirectory>
+    ) => {
+      if (ports.fixtureRoot) {
+        const part = relative(ports.fixtureRoot, args[0])
+        if (isAbsolute(part) || part === '..' || part.startsWith(`..${sep}`)) {
+          return null
+        }
+      }
+      return actual.resolveGitCommonDirectory(...args)
+    }
+  }
+})
 vi.mock('../../shared/app-environment', () => ({
   hasAppEnvironment: () => ports.userData !== null || ports.environmentError !== null,
   getAppEnvironment: () => ({
@@ -57,6 +76,7 @@ function create(): Promise<string | null> {
 
 beforeEach(async () => {
   directory = await realpath(await mkdtemp(join(tmpdir(), 'untitled-runtime-fallback-')))
+  ports.fixtureRoot = directory
   workspace = join(directory, 'workspace')
   await mkdir(workspace)
   filePath = join(workspace, 'untitled.md')
@@ -94,6 +114,7 @@ afterEach(async () => {
   service.releaseUntitledPlaceholdersForClient(CLIENT)
   ports.userData = null
   ports.environmentError = null
+  ports.fixtureRoot = null
   await rm(directory, { recursive: true, force: true })
   expect(existsSync(directory)).toBe(false)
 })

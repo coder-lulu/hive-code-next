@@ -1,3 +1,11 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener,
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -11,11 +19,6 @@ import {
 } from '../../runtime/agent-session-record-store-test-harness'
 import { taskStructuredFixture } from '../../tasks/task-structured-reservation.test-fixture'
 import { taskWorkspace, TASK_TEST_NOW } from '../../tasks/task-execution.test-fixture'
-import {
-  createTrackedJournalOpener,
-  closeTestJournalHostDatabase,
-  openTestJournalHostDatabase
-} from '../agent-session-journal/journal-host-database-test-support'
 import {
   AgentSessionPreSpawnError,
   type StructuredAgentSessionAdapter
@@ -44,6 +47,7 @@ afterEach(async () => {
   await journals.closeAll()
   vi.restoreAllMocks()
   if (directory) {
+    closeTestJournalHostDatabases()
     await rm(directory, { recursive: true, force: true })
   }
   directory = undefined
@@ -87,7 +91,7 @@ async function fixture() {
       process: { hostId: 'local', pid: 4242, processStartTimeMs: TASK_TEST_NOW, spawnToken },
       link: {
         linkId: 'task-test-link',
-        handle: { provider: 'codex', threadId: 'task-test-thread' },
+        handle: codexProviderHandle('task-test-thread'),
         origin: 'created',
         mintedAtFence: fence,
         observedAt: TASK_TEST_NOW
@@ -100,6 +104,7 @@ async function fixture() {
     releaseAcquisition: vi.fn(async () => true)
   }
   const input: AttachFlowInput = {
+    agents: NO_STRUCTURED_AGENTS,
     logger: recordingStructuredAgentSessionLogger().logger,
     store,
     adapter,

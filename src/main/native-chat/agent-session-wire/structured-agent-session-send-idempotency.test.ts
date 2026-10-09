@@ -1,3 +1,7 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener
+} from '../agent-session-journal/journal-host-database-test-support'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -5,12 +9,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentJournalMessageItem } from '../../../shared/agent-session-journal-types'
 import { hasUnansweredStructuredAgentSessionDispatch } from '../../../shared/structured-agent-session-projection'
 import { structuredAgentSessionPayloadFingerprint } from '../../../shared/structured-agent-session-mutation'
-import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import { performSend, type AgentSessionTurnContext } from './structured-agent-session-turns'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { recordingStructuredAgentSessionLogger } from './structured-agent-session-logger-test-support'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const journals = createTrackedJournalOpener()
 
@@ -25,7 +30,7 @@ beforeEach(async () => {
       workspaceId: 'workspace-1',
       hostId: 'local',
       agent: 'codex',
-      providerHandle: { kind: 'codex', threadId: 'thread-1' }
+      providerHandle: codexProviderHandle('thread-1')
     },
     stateDirectory: root
   })
@@ -33,6 +38,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await journals.closeAll()
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -62,6 +68,8 @@ describe('structured send idempotency', () => {
         sessionId: 'session-1',
         journal,
         fence: 2,
+        agents: NO_STRUCTURED_AGENTS,
+        agent: 'codex',
         adapter: { dispatch } as unknown as StructuredAgentSessionAdapter,
         persistOptions: async () => undefined,
         resolvedBy: 'caller',
@@ -103,6 +111,8 @@ describe('structured send idempotency', () => {
       sessionId: 'session-1',
       journal,
       fence: 1,
+      agents: NO_STRUCTURED_AGENTS,
+      agent: 'codex',
       adapter: { dispatch } as unknown as StructuredAgentSessionAdapter,
       persistOptions: async () => undefined,
       resolvedBy: 'caller',

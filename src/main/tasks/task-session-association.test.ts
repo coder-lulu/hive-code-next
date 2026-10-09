@@ -7,9 +7,9 @@ import { closeTestJournalHostDatabases } from '../native-chat/agent-session-jour
 afterEach(closeTestJournalHostDatabases)
 import { releaseStoredAgentSessionOwnerAfterSurfaceClose } from '../runtime/agent-session-surface-release-transition'
 import {
-  settleUnexpectedStructuredAgentSessionExit,
-  type StructuredAgentSessionUnexpectedExitSession
-} from '../native-chat/agent-session-wire/structured-agent-session-unexpected-exit'
+  settleStructuredAgentSessionChildExit,
+  type StructuredAgentSessionChildExitSession
+} from '../native-chat/agent-session-wire/structured-agent-session-child-exit'
 
 async function strippedFixture(live = true) {
   const f = await dockerSessionFixture(live)
@@ -95,7 +95,7 @@ describe('original Task association after source loss', () => {
     'does not publish a new fence or root death on an unexpected CLI exit with a %s record',
     async (mode) => {
       const f = await strippedFixture()
-      const session: StructuredAgentSessionUnexpectedExitSession = {
+      const session: StructuredAgentSessionChildExitSession = {
         child: {
           generation: 'offline-generation',
           fence: f.record.lease.runtimeFence,
@@ -104,6 +104,7 @@ describe('original Task association after source loss', () => {
         journal: {
           cursor: () => ({ epoch: 'offline-epoch', sequence: 0 }),
           itemBody: () => null,
+          itemFence: () => undefined,
           snapshot: () => ({ items: [] }),
           appendLifecycleBatch: vi.fn(async () => ({ epoch: 'offline-epoch', sequence: 1 })),
           markPendingSubmissionsUnknown: vi.fn(async () => []),
@@ -120,7 +121,7 @@ describe('original Task association after source loss', () => {
             associationVisible && f.store.tasks.hasSessionBinding(sessionId)
         }
       }
-      await settleUnexpectedStructuredAgentSessionExit(
+      await settleStructuredAgentSessionChildExit(
         {
           logger: recordingStructuredAgentSessionLogger().logger,
           store,

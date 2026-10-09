@@ -66,9 +66,10 @@ export async function collectTaskCodexCommandEvidence(
   if (
     session.sessionId !== sessionId ||
     snapshot.sessionId !== sessionId ||
-    handle?.provider !== 'codex' ||
+    handle?.transport !== 'codex-app-server' ||
+    handle.agent !== 'codex' ||
     promptIdentity?.provider !== 'codex' ||
-    promptIdentity.threadId !== handle.threadId ||
+    promptIdentity.threadId !== handle.nativeId ||
     promptIdentity.turnId !== turn.turnId ||
     promptIdentity.ordinal !== 0 ||
     turnItem.itemId !== agentJournalItemKey(codexTurnLifecycleIdentity(sessionId, turn.turnId)) ||
@@ -115,7 +116,7 @@ export async function collectTaskCodexCommandEvidence(
       entry.itemId !==
         agentJournalItemKey({
           provider: 'orca',
-          clientMessageId: `codex-item:${handle.threadId}:${body.callId}`
+          clientMessageId: `codex-item:${handle.nativeId}:${body.callId}`
         }) ||
       (body.state !== 'completed' && body.state !== 'failed') ||
       !Number.isSafeInteger(body.exitCode)

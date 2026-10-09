@@ -1,4 +1,4 @@
-import { watch } from 'node:fs'
+import { realpathSync, watch } from 'node:fs'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,7 +18,8 @@ export async function measureShallowWatchDelivery(timeoutMs = PROBE_TIMEOUT_MS):
   try {
     directory = await mkdtemp(join(tmpdir(), 'orca-shallow-probe-'))
     const { promise, resolve } = Promise.withResolvers<boolean>()
-    const watcher = watch(directory, { persistent: false }, () => resolve(true))
+    const watchPath = process.platform === 'win32' ? realpathSync.native(directory) : directory
+    const watcher = watch(watchPath, { persistent: false }, () => resolve(true))
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
       watcher.on('error', () => resolve(false))

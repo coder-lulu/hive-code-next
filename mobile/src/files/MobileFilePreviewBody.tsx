@@ -1,3 +1,5 @@
+import { MobileFileMediaPreview } from './MobileFileMediaPreview'
+import type { MobileFilePreviewRpcSender } from './mobile-file-preview-operations'
 import { ActivityIndicator, Image, Pressable, ScrollView, Text, View } from 'react-native'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import type { MobileFilePreviewResult } from './mobile-file-preview-request'
@@ -9,6 +11,7 @@ import { createFilePreviewStyles } from './mobile-file-preview-styles'
 
 type Props = {
   preview: MobileFilePreviewResult
+  client?: MobileFilePreviewRpcSender | null
   relativePath: string
   title: string
   editable: boolean
@@ -53,6 +56,15 @@ export function MobileFilePreviewBody({ preview, ...options }: Props) {
       <View style={styles.state}>
         <Text style={styles.stateText}>空文件</Text>
       </View>
+    )
+  }
+  if (preview.kind === 'media') {
+    return (
+      <MobileFileMediaPreview
+        media={preview.media}
+        client={options.client ?? null}
+        title={options.title}
+      />
     )
   }
   if (preview.kind === 'image') {

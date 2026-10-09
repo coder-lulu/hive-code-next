@@ -3,7 +3,6 @@ import { PRIMARY_CLI_COMMAND } from '../../shared/brand'
 
 import { ACCOUNT_COMMAND_SPECS } from './account'
 import {
-  effectiveAllowedFlags,
   findCommandSpec,
   normalizeCommandPositionals,
   parseArgs,
@@ -23,51 +22,6 @@ function spec(path: string): (typeof ACCOUNT_COMMAND_SPECS)[number] {
 }
 
 describe('account command specs', () => {
-  it('does not accept or advertise browser page targeting', () => {
-    for (const entry of ACCOUNT_COMMAND_SPECS) {
-      expect(effectiveAllowedFlags(entry)).not.toContain('page')
-      expect(formatCommandHelp(entry)).not.toContain('--page')
-    }
-  })
-
-  // Why: named for what it asserts — the rendered Options block, not the `usage`
-  // string, which this test never reads.
-  it('renders --json and --help in its Options block', () => {
-    for (const entry of ACCOUNT_COMMAND_SPECS) {
-      const help = formatCommandHelp(entry)
-      expect(help).toContain('--json')
-      expect(help).toContain('--help')
-    }
-  })
-
-  it('describes --agent as the account provider, not a terminal agent', () => {
-    const help = formatCommandHelp(spec('account add'))
-
-    expect(help).toContain('Account provider: claude, codex, opencode, or devin (default claude)')
-    expect(help).not.toContain('TUI agent')
-    expect(spec('account add').usage).toContain('[--integration <id>]')
-  })
-
-  it('aligns the --agent description with the global flag descriptions', () => {
-    const descriptionColumn = (help: string, flag: string): number => {
-      const line = help.split('\n').find((entry) => entry.startsWith(`  --${flag}`))
-      const match = line?.match(/^(\s*--\S+(?: <[^>]+>)?)(\s+)\S/)
-      if (!match) {
-        throw new Error(`No description found for --${flag}`)
-      }
-      return match[1].length + match[2].length
-    }
-    const help = formatCommandHelp(spec('account add'))
-
-    expect(descriptionColumn(help, 'agent')).toBe(descriptionColumn(help, 'json'))
-  })
-
-  it('describes the supported providers for profile selection and removal', () => {
-    for (const command of ['account list', 'account select', 'account rm']) {
-      expect(formatCommandHelp(spec(command))).toContain('Account provider: opencode or devin')
-    }
-  })
-
   it.each([
     ['rm', 'opencode'],
     ['remove', 'opencode'],

@@ -46,6 +46,7 @@ import type { TaskCreationDraftsSlice } from './slices/task-creation-drafts'
 import type { RemoteServerUpdatesSlice } from './slices/remote-server-updates'
 import type { TerminalQuickCommandHostsSlice } from './slices/terminal-quick-command-hosts'
 import type { AccountRuntimeCloudSlice } from './slices/account-runtime-cloud'
+import type { StructuredSessionLaunchDirectorySlice } from './slices/structured-session-launch-directories'
 
 export type AppState = RepoSlice &
   SparsePresetsSlice &
@@ -92,4 +93,5 @@ export type AppState = RepoSlice &
   TaskCreationDraftsSlice &
   RemoteServerUpdatesSlice &
   TerminalQuickCommandHostsSlice &
-  AccountRuntimeCloudSlice
+  AccountRuntimeCloudSlice &
+  StructuredSessionLaunchDirectorySlice

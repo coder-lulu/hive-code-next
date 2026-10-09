@@ -8,9 +8,10 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
+import type * as NodeModule from 'node:module'
 import { join } from 'node:path'
 import process from 'node:process'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { isFlattenedNodePtyLoaderMessage } from '../main/orcad/node-pty-loader-diagnosis'
 import {
   collectNodePtyUnavailableDiagnosis,
@@ -19,6 +20,38 @@ import {
   surveyNodePtyBinding
 } from './node-pty-binding-survey'
 import { formatNodePtyUnavailableMessage } from './node-pty-unavailable-diagnosis'
+
+const missingFixture = vi.hoisted(() => ({
+  filename: null as string | null,
+  refusals: vi.fn<(...args: unknown[]) => void>()
+}))
+
+vi.mock('node:module', async (importOriginal) => {
+  const actual = await importOriginal<typeof NodeModule>()
+  return {
+    ...actual,
+    createRequire: function (this: unknown, ...args: Parameters<typeof actual.createRequire>) {
+      const loader = actual.createRequire.apply(this, args)
+      if (args[0] !== missingFixture.filename) {
+        return loader
+      }
+      const originalResolve = loader.resolve
+      loader.resolve = Object.assign(function (
+        this: unknown,
+        ...request: Parameters<typeof originalResolve>
+      ) {
+        if (request[0] === 'node-pty/package.json') {
+          missingFixture.refusals(args[0], ...request)
+          throw Object.assign(new Error("Cannot find module 'node-pty/package.json'"), {
+            code: 'MODULE_NOT_FOUND'
+          })
+        }
+        return originalResolve.apply(this, request)
+      }, originalResolve)
+      return loader
+    }
+  }
+})
 
 const HOST = { platform: process.platform, arch: process.arch }
 /** What node-pty throws once its loader has replaced the real cause with its last miss. */
@@ -50,6 +83,8 @@ function fixture(options: { binding?: boolean; configGypi?: string } = {}): stri
 }
 
 afterEach(() => {
+  missingFixture.filename = null
+  missingFixture.refusals.mockClear()
   while (roots.length > 0) {
     rmSync(roots.pop()!, { recursive: true, force: true })
   }
@@ -94,11 +129,17 @@ describe('resolveNodePtyInstallDir', () => {
     expect(resolveNodePtyInstallDir(join(root, 'relay', 'abc123'))).toBe(installDir)
   })
 
-  it('answers nothing when no node_modules up the tree holds node-pty', () => {
+  it('handles a module-not-found resolver refusal', () => {
     const root = mkdtempSync(join(tmpdir(), 'orca-node-pty-'))
     roots.push(root)
+    // Why a port: tmpdir may have a real ancestor install; this case checks the refusal path.
+    missingFixture.filename = join(root, 'relay.js')
 
     expect(resolveNodePtyInstallDir(root)).toBeNull()
+    expect(missingFixture.refusals).toHaveBeenCalledExactlyOnceWith(
+      missingFixture.filename,
+      'node-pty/package.json'
+    )
   })
 })
 

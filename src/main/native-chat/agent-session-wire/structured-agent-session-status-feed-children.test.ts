@@ -1,3 +1,7 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener
+} from '../agent-session-journal/journal-host-database-test-support'
 // The status summary reads a session's child records from the sink its row landed in, and derives
 // the legacy task list an older client folds from those same records.
 
@@ -13,7 +17,6 @@ import type {
 } from '../../../shared/agent-session-wire'
 import type { AgentChildWorkEvidence } from '../../../shared/agent-status-child-work-evidence'
 import type { AgentChildWorkView } from '../../../shared/agent-status-child-work-view'
-import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import {
   StructuredAgentSessionStatusFeed,
   type StructuredAgentSessionStatusSink
@@ -23,6 +26,7 @@ import {
   statusFeedChildView as childView
 } from './structured-agent-session-status-feed-test-session'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 
 const SESSION = 'status-session'
 const USER_IDENTITY = {
@@ -51,6 +55,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await journals.closeAll()
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -61,7 +66,7 @@ async function feedWithChildren(provider: AgentSessionHandleProvider = 'codex') 
       workspaceId: 'workspace-1',
       hostId: 'local',
       agent: 'codex',
-      providerHandle: { kind: 'codex', threadId: 'thread-1' }
+      providerHandle: codexProviderHandle('thread-1')
     },
     stateDirectory: join(root, SESSION)
   })

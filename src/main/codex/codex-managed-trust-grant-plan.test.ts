@@ -38,8 +38,7 @@ function fixture(enabled?: boolean) {
         ...(enabled === undefined ? {} : { enabled })
       }
     ],
-    host: { kind: 'native' },
-    telemetryLane: 'real-home'
+    host: { kind: 'wsl', distro: 'fixture', linuxRuntimeHome: '/managed' }
   }
   const expected = buildExpectedEntries(plan)
   readLedger.mockReturnValue({

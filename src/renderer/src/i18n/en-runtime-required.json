@@ -129,9 +129,8 @@
         "manualSummary": "HiveCode downloaded the system package. Quit HiveCode before finishing the update from a terminal."
       },
       "NativeChatResumeFailureGuidance": {
-        "conflict": "Another HiveCode window or terminal still owns this session. Close it, then retry.",
+        "conflict": "This chat is open in another HiveCode window or terminal. Close it there, then retry.",
         "fallback": "HiveCode couldn’t resume this chat. Open it to continue manually.",
-        "ownershipUnknown": "HiveCode is still working out which process owns this session. Wait a moment, then retry.",
         "superseded": "Open the chat and reply. New work arrived in it right after the restart, so HiveCode didn’t send its “continue” message.",
         "unconfirmed": "HiveCode couldn’t confirm the “continue” message was delivered. Open the chat and check before sending another.",
         "unsupported": "This chat can’t be resumed by HiveCode. Open it to see where it stopped."
@@ -141,8 +140,6 @@
         "continueRefused": "{{value0}} chats could not be continued. Open them to continue manually.",
         "continueRefused_one": "{{value0}} chat could not be continued. Open it to continue manually.",
         "continueRefused_other": "{{value0}} chats could not be continued. Open them to continue manually.",
-        "continueUnconfirmed_one": "Continuation delivery is unconfirmed for {{value0}} chat. Open it to check before sending another message.",
-        "continueUnconfirmed_other": "Continuation delivery is unconfirmed for {{value0}} chats. Open them to check before sending another message.",
         "manyAgents": "{{value0}} agents",
         "notNow": "Not now",
         "notNowHint": "Not now keeps everything — you can reopen any chat later and carry on from the same point.",
@@ -321,6 +318,14 @@
         },
         "ActivityScopeFilterControls": {
           "hiddenCount": "{{value0}} hidden"
+        },
+        "ActivityThreadContextMenu": {
+          "clearMany_one": "Clear {{count}} Agent from List",
+          "clearMany_other": "Clear {{count}} Agents from List",
+          "markManyRead_one": "Mark {{count}} Agent Read",
+          "markManyRead_other": "Mark {{count}} Agents Read",
+          "markManyUnread_one": "Mark {{count}} Agent Unread",
+          "markManyUnread_other": "Mark {{count}} Agents Unread"
         }
       },
       "artifacts": {
@@ -866,7 +871,8 @@
             "ab1a2c357d": "Roadmap (unsupported)",
             "b787682111": "Browse all",
             "ba0ab9a117": "Browse all (loading…)",
-            "cafb908f34": "TABLE_LAYOUT"
+            "cafb908f34": "TABLE_LAYOUT",
+            "d34ef9b554": "Board (unsupported)"
           },
           "ProjectRoadmap": {
             "be52f7b6db": "This roadmap view has no date or iteration field to place items on, so HiveCode is listing them instead."
@@ -1952,7 +1958,7 @@
           "nativeChat": {
             "copy": "Adds a Chat UI view you can switch to from supported agent terminal panes. Experimental while we tune transcript fidelity, streaming, and terminal parity.",
             "resumeCopy": "When HiveCode quits or installs an update, chats that were working are automatically resumed when HiveCode is reopened.",
-            "structuredScope": "Runs on this machine and on paired HiveCode servers running a version that supports it; older servers keep terminal chat. WSL and SSH hosts continue to use terminal chat, and Windows falls back to it unless HiveCode can read process start times."
+            "structuredScope": "Runs on this machine and on paired HiveCode servers running a version that supports it; older servers keep terminal chat. WSL and SSH hosts continue to use terminal chat."
           },
           "newWorktreeCardStyle": {
             "copy": "Preview updated worktree-card layout, metadata placement, card-display menu options, and status presentation."
@@ -2993,6 +2999,12 @@
             "62826efbe9": "Add a new remote SSH target.",
             "74c6d90d78": "Manage remote SSH targets."
           }
+        },
+        "sshHostServer": {
+          "terminalsElsewhere_one": "Runs the relay while {{count}} terminal another Orca desktop or session opened on this host is running.",
+          "terminalsElsewhere_other": "Runs the relay while {{count}} terminals another Orca desktop or session opened on this host are running.",
+          "terminalsLive_one": "Runs the relay until its {{count}} open terminal is closed, then moves to a managed server.",
+          "terminalsLive_other": "Runs the relay until its {{count}} open terminals are closed, then moves to a managed server."
         },
         "terminal": {
           "search": {
@@ -4360,6 +4372,16 @@
         "remoteHostDisconnected": "The workspace is not connected to a remote HiveCode host."
       }
     },
+    "ssh": {
+      "managedServerMove": {
+        "offer_one": "Move {{host}} to a managed Orca server for more reliable connections. Its {{count}} open terminal will restart.",
+        "offer_other": "Move {{host}} to a managed Orca server for more reliable connections. Its {{count}} open terminals will restart.",
+        "refusedLive_one": "Not moved: {{count}} terminal on {{host}} is still running.",
+        "refusedLive_other": "Not moved: {{count}} terminals on {{host}} are still running.",
+        "refusedUnverifiable_one": "Not moved: Orca couldn’t confirm that {{count}} terminal on {{host}} stopped.",
+        "refusedUnverifiable_other": "Not moved: Orca couldn’t confirm that {{count}} terminals on {{host}} stopped."
+      }
+    },
     "store": {
       "slices": {
         "orca": {
@@ -4601,7 +4623,12 @@
       },
       "failureWords": {
         "accountSwitchInProgress": "A Claude account switch is in progress. Try again after it finishes.",
+        "agentCommandNotRunnable": "{{agent}}'s Command in Settings → Agents must be a program path or name HiveCode can find, with no arguments or variables. Change it or reset it.",
         "answerUnconfirmed": "Your answer was recorded but the agent did not confirm it.",
+        "argumentsMissingValue": "Saved Arguments need a value for {{option}}.",
+        "argumentsMultipleValues": "Saved Arguments give {{option}} more than one value.",
+        "argumentsPositionalPrompt": "Saved Arguments include a prompt.",
+        "argumentsUnsupportedOption": "Saved Arguments contain an unsupported option ({{option}}).",
         "attachmentAtMost": "{{agent}} accepts at most {{limit}} images in one message, so this message was not sent.",
         "attachmentEmpty": "An image on this message is empty, so the message was not sent.",
         "attachmentInvalid": "An attachment on this message can't be sent to the agent.",
@@ -4627,30 +4654,38 @@
         "compactionUnconfirmed": "Compaction completion is unconfirmed.",
         "couldNotRestart": "{{agent}} couldn't restart.",
         "couldNotStart": "{{agent}} couldn't start.",
+        "editSavedArguments": "Edit them in Settings > Agents > Arguments.",
         "emptyMessage": "This message is empty, so it was not sent.",
+        "historyInOtherAccount": "This chat's history is in another Claude account. Switch back to that account to continue it.",
         "historyTooLarge": "This conversation's history is too large to restore here.",
         "hostFault": "HiveCode ran into a problem, so this didn't go through.",
         "hostFaultTryAgain": "HiveCode ran into a problem, so this didn't go through. Try again.",
         "hostRestarted": "HiveCode restarted before this message was sent.",
         "hostStopped": "{{agent}} never finished starting, so HiveCode stopped it.",
+        "launchFolderMissing": "The folder this chat ran in no longer exists. Restore it to continue this chat.",
         "managedAccountEnvOverride": "This Claude launch sets its own Anthropic sign-in variables. Remove them to use a managed Claude account.",
         "managedAccountUnsupported": "While a Claude account is added in WSL, Claude chats need a Windows Claude account.",
         "noTurnToStop": "{{agent}} had no turn running to stop.",
         "notDelivered": "This message was not delivered.",
         "notDeliveredSendAgain": "This message was not delivered. Send it again to continue.",
         "notSignedIn": "{{agent}} is not signed in for the selected account.",
-        "previousExitUnverifiable": "{{agent}} from before may still be running. Your messages will send once it stops.",
+        "previousExitUnverifiable": "Couldn't stop {{agent}} from before.",
         "providerExitedRejection": "{{agent}} stopped before this message was sent.",
         "providerExitedRow": "{{agent}} stopped while this response was in progress. You can continue in this conversation.",
         "providerRateLimited": "{{agent}} is rate-limited and retrying.",
         "providerRejected": "The provider did not accept this message.",
         "providerRejectedQuoted": "The provider did not accept this message: {{detail}}.",
+        "providerRetryLastError": "Last error: {{detail}}.",
+        "providerRetryNumber": "Retry {{attempt}}.",
+        "providerRetryNumberOf": "Retry {{attempt}} of {{maxRetries}}.",
         "providerRetrying": "{{agent}} hit a temporary problem and is retrying.",
         "providerRetryingQuoted": "{{agent}} is retrying: {{detail}}.",
         "providerStartFailed": "{{agent}} stopped before it finished starting.",
         "queueFull": "Too many messages were waiting for the agent, so this one was not sent.",
         "runCommandAgain": "Run /{{command}} again.",
+        "sendAgainToTryOnceMore": "Send your message again to try once more.",
         "sendToTryAgain": "Send your message to try again.",
+        "sessionNotRestored": "{{agent}} couldn't reopen its earlier session, so this chat continues in a new one. {{agent}} doesn't remember the earlier messages.",
         "signInFirst": "Sign in first.",
         "signInThenRunCommand": "Sign in, then run /{{command}} again.",
         "signInThenSend": "Sign in, then send your message again.",
@@ -4699,7 +4734,9 @@
         "other": "Other…"
       },
       "queuedMessages": {
-        "queuePausedRestarted": "Queue paused because HiveCode restarted"
+        "queuePausedRestarted": "Queue paused because HiveCode restarted",
+        "sendConfirmBody_one": "You are about to send a message. Do you want to clear the {{count}} message previously queued?",
+        "sendConfirmBody_other": "You are about to send a message. Do you want to clear the {{count}} messages previously queued?"
       },
       "state": {
         "empty": {
@@ -4723,7 +4760,9 @@
       "status": {
         "failedAfter": "Failed after {{value0}}",
         "interruptedAfter": "Interrupted after {{value0}}",
+        "queueAfterStop": "Queue a message to run after the stop",
         "responding": "Agent is responding",
+        "sendAfterStop": "Send a message to run after the stop",
         "toggleDetails": "Toggle turn details",
         "workedFor": "Worked for {{value0}}",
         "workingFor": "Working for {{value0}}"
@@ -4741,6 +4780,8 @@
         "countOne": "1 tool call",
         "failedCallsLabel": "Failed tool calls: {{value0}}",
         "failedCount": "{{value0}} failed",
+        "interruptedCallsLabel": "Interrupted tool calls: {{value0}}",
+        "interruptedCount": "{{value0}} interrupted",
         "moreCalls": "+{{value0}} more",
         "ranCommandManyToolsSummary": "Ran {{commandCount}} command and used {{toolCount}} tools",
         "ranCommandOneToolSummary": "Ran {{commandCount}} command and used {{toolCount}} tool",
@@ -4759,8 +4800,10 @@
         "agentStarting": "The agent is still starting.",
         "answerFirst": "Answer the question or approval first.",
         "backgroundTasksRunning": "Background tasks are still running.",
+        "cannotRunHere": "Orca can't run this agent in a chat here.",
         "capacity": "HiveCode has received too many requests in the last day.",
         "chatNotFound": "HiveCode can't find this chat.",
+        "chatSavedByNewerOrca": "This chat was saved by a newer Orca.",
         "clearUnfinished": "The last /clear didn't finish.",
         "commandRunning": "A /compact or /clear is still running.",
         "conversationCleared": "This conversation has been cleared.",
@@ -4803,6 +4846,7 @@
         "unreachable": "HiveCode couldn't reach the agent.",
         "unsupported": "This needs a newer HiveCode on the computer running this chat. Update HiveCode there, then try again.",
         "updateOrcaToKeepUsing": "Update HiveCode to keep using them.",
+        "updateOrcaToOpenChat": "Update Orca to open it.",
         "waitForBackgroundTasks": "Wait for the background tasks to finish.",
         "waitForCommand": "Wait for the /compact or /clear to finish.",
         "waitForStart": "Wait for the agent to finish starting.",
@@ -5248,6 +5292,8 @@
       "unknownDependency": "A dependency refers to a removed stage. Select an existing stage."
     },
     "flowView": "Stage dependencies",
+    "graphInvalidLayout": "These dependencies cannot be drawn as a valid graph. Review the stage references and dependency errors.",
+    "graphLegend": "Solid arrows show prerequisites; dashed arrows show configured return stages.",
     "historical": "This saved version is read-only. Load the current version to make changes.",
     "listLabel": "{{name}} · Version {{revision}}",
     "loadLatest": "Load current version",
@@ -5285,28 +5331,9 @@
     "title": "Delivery workflows",
     "unknownStage": "Missing stage",
     "version": "Saved version",
-    "viewingVersion": "Viewing version {{revision}} · Current version {{latest}}",
-    "graphLegend": "Solid arrows show prerequisites; dashed arrows show configured return stages.",
-    "graphInvalidLayout": "These dependencies cannot be drawn as a valid graph. Review the stage references and dependency errors."
+    "viewingVersion": "Viewing version {{revision}} · Current version {{latest}}"
   },
   "hiveWorkflowCases": {
-    "session": {
-      "historyReset": "The journal window changed. Refresh the snapshot before reading older history.",
-      "open": "View original session",
-      "title": "Original session",
-      "description": "Read-only journal snapshot from this original stage run. Reading or refreshing does not change its execution status.",
-      "refresh": "Refresh snapshot",
-      "close": "Close session",
-      "loading": "Reading original journal…",
-      "empty": "No transcript items were returned in this journal snapshot.",
-      "limit": "This reader has reached its history window limit. Refresh to read the latest snapshot.",
-      "errors": {
-        "forbidden": "Session access is no longer available for the current account or device ownership.",
-        "invalidResponse": "The original session response could not be verified. Retry the read.",
-        "unsupported": "Original session reading is unavailable in this environment.",
-        "unavailable": "The original journal could not be read. Retry the read."
-      }
-    },
     "assignedStages": "Assigned stage tasks",
     "browser": {
       "board": "Stage board",
@@ -5404,6 +5431,11 @@
     },
     "executionUnavailable": "Stage execution is unavailable until a Docker Linux execution environment is verified.",
     "fixedVersion": "This request uses: {{name}} · Version {{revision}}",
+    "graph": {
+      "businessStatus": "Business task: {{status}}",
+      "currentStage": "Current stage",
+      "statusUnavailable": "Business task status unavailable"
+    },
     "loadMore": "Load more requests",
     "newRequirement": "New feature request",
     "pending": {
@@ -5416,6 +5448,23 @@
     "requirementHelp": "Describe the expected behavior, constraints and acceptance criteria. The saved workflow determines the stage tasks.",
     "requirementPlaceholder": "Describe the feature and how to verify it…",
     "requirementTitle": "Feature title",
+    "session": {
+      "close": "Close session",
+      "description": "Read-only journal snapshot from this original stage run. Reading or refreshing does not change its execution status.",
+      "empty": "No transcript items were returned in this journal snapshot.",
+      "errors": {
+        "forbidden": "Session access is no longer available for the current account or device ownership.",
+        "invalidResponse": "The original session response could not be verified. Retry the read.",
+        "unavailable": "The original journal could not be read. Retry the read.",
+        "unsupported": "Original session reading is unavailable in this environment."
+      },
+      "historyReset": "The journal window changed. Refresh the snapshot before reading older history.",
+      "limit": "This reader has reached its history window limit. Refresh to read the latest snapshot.",
+      "loading": "Reading original journal…",
+      "open": "View original session",
+      "refresh": "Refresh snapshot",
+      "title": "Original session"
+    },
     "statuses": {
       "backlog": "Backlog",
       "blocked": "Blocked",
@@ -5429,12 +5478,7 @@
     "submitted": "Requirements submitted.",
     "teamNotConfigured": "Save all four employees before submitting requirements. Existing requests remain available to view.",
     "title": "Feature requests",
-    "usingVersion": "New requests use: {{name}} · Version {{revision}}",
-    "graph": {
-      "businessStatus": "Business task: {{status}}",
-      "currentStage": "Current stage",
-      "statusUnavailable": "Business task status unavailable"
-    }
+    "usingVersion": "New requests use: {{name}} · Version {{revision}}"
   },
   "menu": {
     "exploreOrca": "Explore HiveCode",
@@ -5446,6 +5490,12 @@
     "manage": "Manage phone connections",
     "open": "Open Phone connection",
     "settingsDescription": "Manage HiveCloud connections, address pairing, authorized devices, and phone preferences on the Phone connection page."
+  },
+  "projectViews": {
+    "unsupported": {
+      "description": "Orca renders table, board, and roadmap project views. This view uses a layout it cannot render yet.",
+      "switchLayout": "Switch to a Table, Board, or Roadmap view to work with this project in Orca."
+    }
   },
   "rendererRecovery": {
     "crashLoopDetail": "HiveCode tried to recover {{recoveryCount}} times in a row without success.",

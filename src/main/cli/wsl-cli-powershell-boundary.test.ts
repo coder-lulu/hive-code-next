@@ -24,6 +24,10 @@ const FORWARDED_ARGS = [
   '["task_907c556bfed6"]',
   '--quoted-text',
   'tell me "what is next"',
+  '--powershell-expression',
+  '$(Write-Output "injected"); exit 99',
+  '--literal-switch',
+  '-NoProfile',
   '--empty',
   '',
   '--trailing-backslash',
@@ -180,7 +184,7 @@ describe('WSL CLI PowerShell boundary', () => {
             '-File',
             bridgePath,
             process.execPath,
-            '-e',
+            '--eval',
             'process.exit(23)'
           ],
           { encoding: 'utf8', windowsHide: true }

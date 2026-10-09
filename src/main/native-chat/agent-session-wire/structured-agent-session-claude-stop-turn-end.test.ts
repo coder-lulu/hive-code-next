@@ -1,3 +1,8 @@
+import {
+  closeTestJournalHostDatabases,
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 // Which turn a Claude Stop's event makes the person's cancellation, on the shipping adapter: the
 // Stop ends the child, so whatever its event binds is what the child's end cut. Older CLIs end an
 // interrupted turn with an error result that names no reason, and the journal's Stop rule decides
@@ -14,15 +19,12 @@ import { ClaudeStructuredSessionAdapter } from '../../claude/claude-structured-s
 import {
   fakeClaude,
   PROVIDER_SESSION_ID,
-  type FakeConnection
+  type FakeConnection,
+  claudeStartupSettled
 } from '../../claude/claude-structured-session-test-support'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import { structuredClaudeLifecycleEvent } from '../../runtime/structured-claude-runtime-adapter'
-import {
-  closeTestJournalHostDatabase,
-  openTestJournalHostDatabase
-} from '../agent-session-journal/journal-host-database-test-support'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import {
@@ -33,6 +35,7 @@ import {
   hostTestOperationId,
   resetHostTestOperationIds
 } from './structured-agent-session-host-test-data'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-1' }
 // As Claude Code 2.1.280 advertises them on a turn's system/init frame.
@@ -73,6 +76,7 @@ beforeEach(async () => {
   })
   store = await openTestAgentSessionRecordStore(root)
   host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
     store,
     adapter: Object.assign(adapter, { supportsCreate: () => true }),
     journalDatabase: openTestJournalHostDatabase(root),
@@ -88,7 +92,7 @@ beforeEach(async () => {
     providerHandle: { kind: 'claude', sessionId: PROVIDER_SESSION_ID, leafUuid: null }
   })
   expect(await host.attach(CALLER, params)).toMatchObject({ ok: true })
-  await adapter.awaitStarted(SESSION)
+  await claudeStartupSettled(adapter, SESSION)
   await Promise.all(lifecycle)
 })
 
@@ -96,6 +100,7 @@ afterEach(async () => {
   await adapter.closeAll()
   await host.flushAllStreamedEvents()
   closeTestJournalHostDatabase(root)
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 

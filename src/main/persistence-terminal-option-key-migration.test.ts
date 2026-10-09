@@ -8,9 +8,10 @@ import {
 } from './persistence-test-harness'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, mkdtempSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { PersistedState } from '../shared/persisted-state-types'
+import { profileStateDatabaseFile } from '../shared/profile-state-storage-paths'
 
 // Stub the ~/.ssh/config parser so the SSH-import test drives the real Store with deterministic hosts, not the operator's actual ~/.ssh/config.
 const { loadUserSshConfigMock, sshConfigHostsToTargetsMock } = vi.hoisted(() => ({
@@ -52,6 +53,30 @@ vi.mock('./telemetry/cohort-classifier', () => ({
   getCohortAtEmit: getCohortAtEmitMock
 }))
 
+async function withProfileDatabasePlatform<T>(
+  platform: NodeJS.Platform,
+  fn: () => Promise<T>
+): Promise<T> {
+  if (platform !== 'win32' || process.platform === 'win32') {
+    return withPlatform(platform, fn)
+  }
+  const physicalDatabaseFile = profileStateDatabaseFile(testState.dir)
+  const originalNamespacePath = win32.toNamespacedPath
+  const namespacePathSpy = vi.spyOn(win32, 'toNamespacedPath').mockImplementation(function (
+    this: unknown,
+    ...args
+  ) {
+    return args[0] === physicalDatabaseFile
+      ? physicalDatabaseFile
+      : originalNamespacePath.apply(this, args)
+  })
+  try {
+    return await withPlatform(platform, fn)
+  } finally {
+    namespacePathSpy.mockRestore()
+  }
+}
+
 describe('Store', () => {
   beforeEach(() => {
     testState.dir = mkdtempSync(join(tmpdir(), 'orca-test-'))
@@ -88,7 +113,7 @@ describe('Store', () => {
       ['darwin', false],
       ['linux', false]
     ] as const) {
-      await withPlatform(platform, async () => {
+      await withProfileDatabasePlatform(platform, async () => {
         writeDataFile({
           schemaVersion: 1,
           repos: [],
@@ -106,7 +131,7 @@ describe('Store', () => {
   })
 
   it('preserves an explicit Windows right-click paste opt-out during migration', async () => {
-    await withPlatform('win32', async () => {
+    await withProfileDatabasePlatform('win32', async () => {
       writeDataFile({
         schemaVersion: 1,
         repos: [],

@@ -8,7 +8,7 @@ src/main/browser/browser-route-tcp-egress-fixture.ts
 src/main/browser/cdp-ws-proxy.ts
 src/main/emulator/emulator-gesture-sender.test.ts
 src/main/runtime/rpc/ws-transport.ts
-src/renderer/src/web/web-runtime-client.test.ts
+src/renderer/src/web/web-runtime-client-binary.test.ts
 src/shared/remote-runtime-client.test.ts
 src/shared/remote-runtime-client.test.ts
 src/shared/remote-runtime-client.test.ts

@@ -32,6 +32,8 @@ const AUDITED_GLOBAL_FETCH_LINES = new Map<string, number>([
   ['main/rate-limits/codex-fetcher.ts', 3],
   ['main/rate-limits/zcode-usage-fetcher.ts', 1],
   ['main/source-control/hosted-review-api-request.ts', 1],
+  // Test HTTP body is read or cancelled by the real model channel's bounded stream owner.
+  ['main/tasks/task-model-stream-fetch.test-fixture.ts', 1],
   ['main/speech/openai-transcription-client.ts', 1],
   // Main HTTP port: one type declaration plus the Node fallback call. The fallback
   // returns the Response to its caller without inspecting it, so the consume/cancel

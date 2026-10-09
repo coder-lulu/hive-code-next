@@ -16,13 +16,14 @@ import { digestPayload } from './journal-payload-bounds'
 import { reconcileJournalSubmissionsAgainstHistory } from './journal-restart-reconciliation'
 import type { ProviderHistoryItem, ProviderHistoryWindow } from './journal-submission-reconciler'
 import { createTrackedJournalOpener } from './journal-host-database-test-support'
+import { claudeProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 
 const IDENTITY: AgentSessionJournalIdentity = {
   sessionId: 'session-1',
   workspaceId: 'ws-1',
   hostId: 'host-1',
   agent: 'claude',
-  providerHandle: { kind: 'claude', sessionId: 'provider-1', leafUuid: null }
+  providerHandle: claudeProviderHandle('provider-1', null)
 }
 
 function claudeIdentity(uuid: string): AgentJournalItemIdentity {

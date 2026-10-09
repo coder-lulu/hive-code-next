@@ -1,18 +1,16 @@
+import { MobileThemeProvider } from '../theme/mobile-theme-provider'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MobileNativeChatQuestion } from './MobileNativeChatQuestion'
 
-vi.mock('../theme/mobile-theme-provider', async () => {
-  const { lightTheme } = await import('../theme/mobile-theme')
-  return {
-    useMobileTheme: () => lightTheme,
-    useMobileThemeStyles: (factory: (theme: typeof lightTheme) => unknown) => factory(lightTheme)
-  }
-})
-
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
+  AccessibilityInfo: {
+    isReduceMotionEnabled: async () => false,
+    addEventListener: () => ({ remove: () => {} })
+  },
+  useColorScheme: () => 'light',
   StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
   Text: 'Text',
   TextInput: 'TextInput',
@@ -22,6 +20,8 @@ vi.mock('react-native', () => ({
 vi.mock('lucide-react-native', () => ({
   ArrowUp: 'ArrowUp',
   Check: 'Check',
+  ChevronDown: 'ChevronDown',
+  ChevronUp: 'ChevronUp',
   CircleHelp: 'CircleHelp',
   X: 'X'
 }))
@@ -39,16 +39,20 @@ describe('MobileNativeChatQuestion', () => {
 
     await act(async () => {
       renderer = create(
-        createElement(MobileNativeChatQuestion, {
-          question: {
-            question: 'Pick regions',
-            options: ['Region', 'Region'],
-            multiSelect: true,
-            allowOther: false,
-            optionTokens: ['first-token', 'second-token']
-          },
-          onAnswer
-        })
+        createElement(
+          MobileThemeProvider,
+          { preference: 'light' },
+          createElement(MobileNativeChatQuestion, {
+            question: {
+              question: 'Pick regions',
+              options: ['Region', 'Region'],
+              multiSelect: true,
+              allowOther: false,
+              optionTokens: ['first-token', 'second-token']
+            },
+            onAnswer
+          })
+        )
       )
     })
 
@@ -65,16 +69,20 @@ describe('MobileNativeChatQuestion', () => {
 
     await act(async () => {
       renderer = create(
-        createElement(MobileNativeChatQuestion, {
-          question: {
-            question: 'Pick one',
-            options: ['Choice', 'Choice'],
-            multiSelect: false,
-            allowOther: false,
-            optionTokens: ['first-token', null]
-          },
-          onAnswer
-        })
+        createElement(
+          MobileThemeProvider,
+          { preference: 'light' },
+          createElement(MobileNativeChatQuestion, {
+            question: {
+              question: 'Pick one',
+              options: ['Choice', 'Choice'],
+              multiSelect: false,
+              allowOther: false,
+              optionTokens: ['first-token', null]
+            },
+            onAnswer
+          })
+        )
       )
     })
 
@@ -89,17 +97,21 @@ describe('MobileNativeChatQuestion', () => {
 
     await act(async () => {
       renderer = create(
-        createElement(MobileNativeChatQuestion, {
-          question: {
-            question: 'Pick regions',
-            options: ['us-east', 'eu-west'],
-            multiSelect: true,
-            allowOther: true,
-            optionTokens: ['east-token', 'west-token'],
-            freeTextToken: 'other-token'
-          },
-          onAnswer
-        })
+        createElement(
+          MobileThemeProvider,
+          { preference: 'light' },
+          createElement(MobileNativeChatQuestion, {
+            question: {
+              question: 'Pick regions',
+              options: ['us-east', 'eu-west'],
+              multiSelect: true,
+              allowOther: true,
+              optionTokens: ['east-token', 'west-token'],
+              freeTextToken: 'other-token'
+            },
+            onAnswer
+          })
+        )
       )
     })
 
@@ -117,21 +129,25 @@ describe('MobileNativeChatQuestion', () => {
     const onCancel = vi.fn(async () => true)
     await act(async () => {
       renderer = create(
-        createElement(MobileNativeChatQuestion, {
-          question: {
-            question: 'Pick one',
-            prompt: { itemId: 'question-1', expectedRevision: 7 },
-            options: ['Choice'],
-            multiSelect: false,
-            allowOther: false,
-            optionTokens: ['choice-token']
-          },
-          onAnswer: vi.fn(async () => true),
-          onCancel
-        })
+        createElement(
+          MobileThemeProvider,
+          { preference: 'light' },
+          createElement(MobileNativeChatQuestion, {
+            question: {
+              question: 'Pick one',
+              prompt: { itemId: 'question-1', expectedRevision: 7 },
+              options: ['Choice'],
+              multiSelect: false,
+              allowOther: false,
+              optionTokens: ['choice-token']
+            },
+            onAnswer: vi.fn(async () => true),
+            onCancel
+          })
+        )
       )
     })
-    const cancel = renderer.root.findByProps({ accessibilityLabel: '取消问题' })
+    const cancel = renderer.root.findByProps({ accessibilityLabel: '取消请求' })
     await act(async () => cancel.props.onPress())
     expect(onCancel).toHaveBeenCalledWith({ itemId: 'question-1', expectedRevision: 7 })
   })

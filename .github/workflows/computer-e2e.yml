@@ -11,14 +11,14 @@ on:
       - 'config/scripts/pnpm-cli-invocation.mjs'
       - 'config/scripts/build-windows-cli-launcher.mjs'
       - 'config/scripts/build-windows-cli-launcher.test.mjs'
-      - 'config/scripts/computer-e2e-workflow.test.mjs'
       - 'config/scripts/macos-computer-helper-owner-loss-benchmark.mjs'
       - 'config/scripts/macos-computer-helper-owner-loss-group-recovery.test.mjs'
       - 'config/scripts/macos-computer-helper-owner-loss-metrics.mjs'
       - 'config/scripts/macos-computer-helper-owner-loss-processes.mjs'
       - 'config/scripts/macos-computer-helper-owner-loss-processes.test.mjs'
       - 'config/scripts/macos-computer-helper-owner-loss-trial-cleanup.mjs'
-      - 'config/scripts/computer-use-modifier-safety.test.mjs'
+      - 'config/scripts/computer-e2e-workflow.test.mjs'
+      - 'config/scripts/computer-use-safety-contract.test.mjs'
       - 'config/scripts/computer-use-skill-guidance.test.mjs'
       - 'config/scripts/computer-use-smoke.mjs'
       - 'config/scripts/computer-use-smoke.test.mjs'
@@ -40,6 +40,7 @@ on:
       - 'native/computer-use-windows/**'
       - 'native/windows-cli-launcher/**'
       - 'skills/computer-use/SKILL.md'
+      - 'skill-guides/computer-use.md'
       - 'src/cli/**'
       - 'src/main/computer/**'
       - 'src/main/runtime/rpc/dispatcher.ts'
@@ -88,10 +89,10 @@ jobs:
       - run: >-
           pnpm vitest run --config config/vitest.config.ts
           src/main/ssh/ssh-remote-cli-launcher.test.ts
-          config/scripts/computer-e2e-workflow.test.mjs
           config/scripts/macos-computer-helper-owner-loss-group-recovery.test.mjs
           config/scripts/macos-computer-helper-owner-loss-processes.test.mjs
-          config/scripts/computer-use-modifier-safety.test.mjs
+          config/scripts/computer-e2e-workflow.test.mjs
+          config/scripts/computer-use-safety-contract.test.mjs
           config/scripts/computer-use-skill-guidance.test.mjs
           config/scripts/computer-use-smoke.test.mjs
           src/main/computer/computer-provider-lifecycle.test.ts
@@ -115,7 +116,6 @@ jobs:
           src/cli/handlers/computer-action-routing.test.ts
           src/cli/handlers/computer-action-validation.test.ts
           src/cli/handlers/computer-state-formatting.test.ts
-          src/cli/specs/computer.test.ts
           src/cli/index.test.ts
           src/main/runtime/rpc/dispatcher-computer-errors.test.ts
           src/main/runtime/rpc/errors.test.ts

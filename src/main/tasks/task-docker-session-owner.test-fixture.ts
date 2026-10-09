@@ -1,3 +1,4 @@
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { closeTestJournalHostDatabases } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import { lstat, mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -103,7 +104,7 @@ export async function dockerSessionFixture(
       fence: reserved.record.lease.runtimeFence,
       link: {
         linkId: 'link-docker',
-        handle: { provider: 'codex', threadId: 'thread-docker' },
+        handle: codexProviderHandle('thread-docker'),
         origin: 'created',
         mintedAtFence: reserved.record.lease.runtimeFence,
         observedAt: TASK_TEST_NOW

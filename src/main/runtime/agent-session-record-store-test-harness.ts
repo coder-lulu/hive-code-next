@@ -19,6 +19,11 @@ import type { AgentSessionOperationRow } from '../../shared/agent-session-operat
 import type { PersistedAgentSessionRecord } from '../../shared/agent-session-legacy-handoff-lease'
 import type { HiveAgentSessionEntry } from '../../shared/hive-agent-session-entry'
 import type { TaskExecutionRecord } from '../tasks/task-execution-record'
+import {
+  encodePersistedAgentSessionProviderHandle,
+  isAgentSessionProviderHandle
+} from '../../shared/agent-session-provider-handle-encoding'
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import { JOURNAL_DB_SCHEMA_VERSION } from '../native-chat/agent-session-journal/journal-database-schema'
 import {
   closeTestJournalHostDatabase,
@@ -26,17 +31,15 @@ import {
 } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 import type Database from '../sqlite/sync-database'
 import { AgentSessionRecordStore } from './agent-session-record-store'
-import {
-  AGENT_SESSION_STORE_SCHEMA_VERSION,
-  type RetiredAgentSessionClaimKey
-} from './agent-session-record-store-file'
+import type { RetiredAgentSessionClaimKey } from './agent-session-store-state'
+import { AGENT_SESSION_STORE_SCHEMA_VERSION } from './agent-session-store-contract'
 
 const TEST_HOST_ID = 'local'
 
 /** One committed state of the store, as tests seed it and read it back. */
 export type PersistedTestAgentSessionStore = {
-  schemaVersion: number
-  hostId: string
+  schemaVersion?: number
+  hostId?: string
   /** Every record row as stored, including one this build cannot read. */
   records: Record<string, PersistedAgentSessionRecord>
   operations: Record<string, AgentSessionOperationRow>
@@ -124,7 +127,7 @@ function writePersisted(db: Database.Database, persisted: PersistedTestAgentSess
     writeHiveRuntimeState(
       db,
       serializeHiveRuntimeState({
-        ...emptyState(persisted.hostId),
+        ...emptyState(persisted.hostId ?? TEST_HOST_ID),
         hiveSessions: new Map(Object.entries(persisted.hiveSessions)),
         taskExecutions: new Map(Object.entries(persisted.taskExecutions)),
         hiveRecoveryFenceAt: persisted.hiveRecoveryFenceAt,
@@ -138,20 +141,40 @@ function writePersisted(db: Database.Database, persisted: PersistedTestAgentSess
   }
 }
 
-/** Leaves `records` behind as an earlier run of the app would have, before anything opens it. */
+/** A seed may be an in-memory fixture or a hand-written row; a row holds handles in stored form. */
+export function storedTestAgentSessionRecord(
+  record: AgentSessionRecord | PersistedAgentSessionRecord
+): PersistedAgentSessionRecord {
+  return {
+    ...record,
+    providerHandleChain: record.providerHandleChain.map((link) => ({
+      ...link,
+      handle: isAgentSessionProviderHandle(link.handle)
+        ? encodePersistedAgentSessionProviderHandle(link.handle)
+        : link.handle
+    }))
+  }
+}
+
+/** Leaves `records`, and any tab index, behind as an earlier run of the app would have, before
+ *  anything opens it. */
 export async function seedTestAgentSessionRecordStore(
   stateDirectory: string,
-  seed: { records: readonly PersistedAgentSessionRecord[] }
+  seed: {
+    records: readonly (AgentSessionRecord | PersistedAgentSessionRecord)[]
+    sessionTabs?: { tabId: string; sessionId: string }[]
+  }
 ): Promise<void> {
   writePersisted(databaseFor(stateDirectory), {
-    schemaVersion: AGENT_SESSION_STORE_SCHEMA_VERSION,
-    hostId: TEST_HOST_ID,
-    records: Object.fromEntries(seed.records.map((record) => [record.sessionId, record])),
+    records: Object.fromEntries(
+      seed.records.map((record) => [record.sessionId, storedTestAgentSessionRecord(record)])
+    ),
     operations: {},
     retiredClaimKeys: [],
     unusableRecords: {},
     hiveSessions: {},
-    taskExecutions: {}
+    taskExecutions: {},
+    ...(seed.sessionTabs ? { sessionTabs: seed.sessionTabs } : {})
   })
 }
 
@@ -220,7 +243,7 @@ export async function readPersistedTestAgentSessionStore(
       .all()
       .map((row) => ({ tabId: String(row.tab_id), sessionId: String(row.session_id) }))
   }
-  const hiveState = emptyState(persisted.hostId)
+  const hiveState = emptyState(persisted.hostId ?? TEST_HOST_ID)
   loadHiveRuntimeState(db, hiveState)
   persisted.hiveSessions = Object.fromEntries(hiveState.hiveSessions ?? [])
   persisted.taskExecutions = Object.fromEntries(hiveState.taskExecutions ?? [])

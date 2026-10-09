@@ -1,3 +1,6 @@
+import { encodeAgentSessionRecord } from '../../shared/agent-session-record-stored-form'
+import { NO_STRUCTURED_AGENTS } from '../native-chat/agent-session-wire/structured-agent-session-adapter-router-test-support'
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { rm } from 'node:fs/promises'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WorkflowCommandEvidenceSchema } from '../../shared/task-workflow/workflow-command-evidence'
@@ -225,10 +228,7 @@ describe('original Task Codex command facts', () => {
         f.session.sessionId = 'foreign-session'
       }
       if (fault === 'thread') {
-        first(f.session.providerHandleChain).handle = {
-          provider: 'codex',
-          threadId: 'foreign-thread'
-        }
+        first(f.session.providerHandleChain).handle = codexProviderHandle('foreign-thread')
       }
       expect(await collectTaskCodexCommandEvidence(f.record)).toMatchObject({
         kind: 'unavailable',
@@ -423,7 +423,7 @@ describe('original Task Codex command facts', () => {
       workspaceId: f.record.workspace.workspaceId,
       hostId: 'local',
       agent: 'codex',
-      providerHandle: { kind: 'codex', threadId: 'thread-command-evidence' }
+      providerHandle: codexProviderHandle('thread-command-evidence')
     } as const
     const journal = await journals.open({ identity, stateDirectory: f.root })
     await journal.appendSubmission({
@@ -484,7 +484,7 @@ describe('original Task Codex command facts', () => {
       updatedAt: TASK_TEST_NOW
     }
     await editPersistedTestAgentSessionStore(f.root, (persisted) => {
-      persisted.records[COMMAND_SESSION] = session
+      persisted.records[COMMAND_SESSION] = encodeAgentSessionRecord(session)
     })
     const acquire = vi.fn(async () => {
       throw new Error('Provider startup is forbidden in this fixture')
@@ -493,6 +493,7 @@ describe('original Task Codex command facts', () => {
       throw new Error('Provider dispatch is forbidden in this fixture')
     })
     const realHostOptions = {
+      agents: NO_STRUCTURED_AGENTS,
       logger: recordingStructuredAgentSessionLogger().logger,
       store: await openTestAgentSessionRecordStore(f.root),
       journalDatabase: openTestJournalHostDatabase(f.root),

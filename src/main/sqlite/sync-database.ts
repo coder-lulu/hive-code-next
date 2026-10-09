@@ -1,4 +1,5 @@
 import { existsSync } from 'node:fs'
+import { win32 } from 'node:path'
 import type { backup, BackupOptions, DatabaseSync, SQLInputValue } from 'node:sqlite'
 import { hasNodeSqliteReaderApi } from './node-sqlite-reader-api'
 import { NodeSqliteStatement } from './node-sqlite-statement'
@@ -78,7 +79,15 @@ class SyncDatabase {
       throw new Error(`SQLite database does not exist: ${String(path)}`)
     }
     const DatabaseSync = loadDatabaseSync()
-    this.db = new DatabaseSync(path, {
+    // SQLite's Windows VFS needs the namespace prefix for ordinary long filesystem paths.
+    const filename =
+      process.platform === 'win32' &&
+      typeof path === 'string' &&
+      path !== ':memory:' &&
+      !path.startsWith('file:')
+        ? win32.toNamespacedPath(path)
+        : path
+    this.db = new DatabaseSync(filename, {
       readOnly: options.readonly,
       timeout: options.timeout
     })
@@ -140,7 +149,11 @@ class SyncDatabase {
     if (!hasBackup(sqlite)) {
       throw new Error('Asynchronous SQLite backup is unavailable in this Node.js runtime')
     }
-    await sqlite.backup(this.db, path, options ?? {})
+    const destination =
+      process.platform === 'win32' && path !== ':memory:' && !path.startsWith('file:')
+        ? win32.toNamespacedPath(path)
+        : path
+    await sqlite.backup(this.db, destination, options ?? {})
   }
 
   close(): void {

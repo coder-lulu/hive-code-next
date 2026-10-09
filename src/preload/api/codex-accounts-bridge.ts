@@ -12,10 +12,25 @@ export const codexAccountsApi: PreloadApi['codexAccounts'] = {
     ipcRenderer.on(CODEX_PENDING_LOGIN_URL_CHANGED_CHANNEL, listener)
     return () => ipcRenderer.removeListener(CODEX_PENDING_LOGIN_URL_CHANGED_CHANNEL, listener)
   },
-  reauthenticate: (args) => ipcRenderer.invoke('codexAccounts:reauthenticate', args),
-  remove: (args) => ipcRenderer.invoke('codexAccounts:remove', args),
-  select: (args) => ipcRenderer.invoke('codexAccounts:select', args),
-  listStalePanes: (args) => ipcRenderer.invoke('codexAccounts:listStalePanes', args),
-  listRecordedPaneLanes: (args) => ipcRenderer.invoke('codexAccounts:listRecordedPaneLanes', args),
-  forgetStalePanes: (args) => ipcRenderer.invoke('codexAccounts:forgetStalePanes', args)
-}
+  reauthenticate: (args: { accountId: string; activateIfSelectionWasEmpty?: boolean }) =>
+    ipcRenderer.invoke('codexAccounts:reauthenticate', args),
+  remove: (args: { accountId: string }) => ipcRenderer.invoke('codexAccounts:remove', args),
+  select: (args: {
+    accountId: string | null
+    runtime?: 'host' | 'wsl'
+    wslDistro?: string | null
+  }) => ipcRenderer.invoke('codexAccounts:select', args),
+  listStalePanes: (args: {
+    ptyIds: string[]
+  }): Promise<
+    {
+      ptyId: string
+      launchAccountId: string | null
+      activeAccountId: string | null
+    }[]
+  > => ipcRenderer.invoke('codexAccounts:listStalePanes', args),
+  listRecordedPaneLanes: (args: { ptyIds: string[] }): Promise<Record<string, string>> =>
+    ipcRenderer.invoke('codexAccounts:listRecordedPaneLanes', args),
+  forgetStalePanes: (args: { ptyIds: string[] }): Promise<void> =>
+    ipcRenderer.invoke('codexAccounts:forgetStalePanes', args)
+} satisfies PreloadApi['codexAccounts']

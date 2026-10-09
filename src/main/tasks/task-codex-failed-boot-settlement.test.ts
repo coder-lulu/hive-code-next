@@ -17,7 +17,11 @@ import { attachParamsForRecord } from '../native-chat/agent-session-wire/structu
 import { StructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-host'
 import { setStructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-registry'
 import { hostTestMessage } from '../native-chat/agent-session-wire/structured-agent-session-host-test-data'
-import { StructuredAgentSessionAdapterRouter } from '../native-chat/agent-session-wire/structured-agent-session-adapter-router'
+import {
+  NO_STRUCTURED_AGENTS,
+  claudeAndCodexRouter
+} from '../native-chat/agent-session-wire/structured-agent-session-adapter-router-test-support'
+import { AgentSessionJournal } from '../native-chat/agent-session-journal/journal-store'
 import {
   AgentSessionAcquisitionRootExitObservedError,
   AgentSessionPreSpawnError
@@ -106,10 +110,11 @@ async function failedBootFixture(
     acknowledgeSessionRelease: acknowledge
   }
   const host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
     logger: recordingStructuredAgentSessionLogger().logger,
     store: f.store,
     adapter: options.router
-      ? new StructuredAgentSessionAdapterRouter(
+      ? claudeAndCodexRouter(
           {
             codex: adapter,
             claude: { ...adapter, releaseAcquisition: claudeRelease }
@@ -410,13 +415,16 @@ describe('original cancelled Codex Task failed-boot settlement', () => {
 
   it('rechecks the exact original Task after the conversation open awaited', async () => {
     const f = await failedBootFixture()
-    f.host.deps.adapter.historyFilePath = async () => {
+    const open = AgentSessionJournal.prototype.open
+    vi.spyOn(AgentSessionJournal.prototype, 'open').mockImplementationOnce(async function (
+      this: AgentSessionJournal
+    ) {
+      await open.call(this)
       await editPersistedTestAgentSessionStore(f.directory, (persisted) => {
         const task = persisted.taskExecutions[taskExecutionRecordKey(f.command)]!
         task.structuredBinding!.spawnToken = 'replacement-task-spawn'
       })
-      return null
-    }
+    })
     expect(await f.evidence.stop(f.task)).toBeNull()
     expect(f.stop).not.toHaveBeenCalled()
     expect(f.acquire).not.toHaveBeenCalled()
@@ -497,10 +505,7 @@ describe('original cancelled Codex Task failed-boot settlement', () => {
       expect(await f.evidence.stop(f.task)).toBeNull()
       const session = f.host.collaboratorsForTests().sessions.get(f.record().sessionId)!
       expect(session.child).toMatchObject({ generation: 'original-indexed-child', fence: 1 })
-      expect(session.owesProviderChildWindDown).toMatchObject({
-        generation: 'original-indexed-child',
-        fence: 1
-      })
+      expect(session.child?.close).toMatchObject({ cause: 'evict' })
       expect(f.stop).not.toHaveBeenCalled()
       expect(f.record().lease.deathEvidence).toBeNull()
       expect(f.store.tasks.get(f.command)?.result).toBeNull()

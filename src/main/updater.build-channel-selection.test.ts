@@ -134,19 +134,19 @@ describe('updater', () => {
     }
   })
 
-  // The way back to a configured stable channel must stay in-app: an unsigned
-  // build carries no publisherName, so electron-updater skips verification.
+  // Legacy hourly versions are replaced by the current product version contract.
+  // Both builds meet the SQLite floor, while stable remains a real downgrade.
   it('still pins stable from an unsigned Windows dev build', async () => {
     const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     try {
-      appMock.getVersion.mockReturnValue('1.4.160-hourly.202607281400')
+      appMock.getVersion.mockReturnValue('1.5.1-beta.1')
       const send = vi.fn()
       const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
       setupAutoUpdater({ webContents: { send } } as never, {
         getLastUpdateCheckAt: () => Date.now()
       })
 
-      checkForUpdatesFromMenu({ channel: 'stable', targetTag: 'v1.4.160' })
+      checkForUpdatesFromMenu({ channel: 'stable', targetTag: 'v1.5.0' })
 
       expect(send).not.toHaveBeenCalledWith('updater:status', {
         state: 'error',

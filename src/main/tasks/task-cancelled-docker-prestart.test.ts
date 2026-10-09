@@ -1,3 +1,4 @@
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import {
@@ -87,7 +88,7 @@ describe('original durable cancelled Docker prestart settlement', () => {
           now: TASK_TEST_NOW,
           link: {
             linkId: 'synthetic-link',
-            handle: { provider: 'codex', threadId: 'synthetic-thread' },
+            handle: codexProviderHandle('synthetic-thread'),
             origin: 'created',
             mintedAtFence: f.session.lease.runtimeFence,
             observedAt: TASK_TEST_NOW

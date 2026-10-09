@@ -1,7 +1,7 @@
+import { isAgentSessionAccountHome } from './agent-session-account-home'
 import { isAgentSessionRewindRecord, type AgentSessionRewindRecord } from './agent-session-rewind'
 import { isAgentSessionLaunchArgs } from './agent-session-launch-args'
 import { isAgentSessionConversationName } from './agent-session-conversation-name'
-import { isAgentSessionAccountHome } from './agent-session-account-home'
 import {
   isAgentSessionDeathEvidence,
   agentSessionExecutionHostWitnessMatchesRecord
@@ -34,10 +34,13 @@ import {
   type AgentSessionConversationCommandRecord
 } from './agent-session-conversation-command'
 import {
-  isAgentSessionProviderHandleChain,
-  type AgentSessionRecordProvider,
+  decodePersistedAgentSessionProviderHandleChain,
   type AgentSessionProviderHandleLink
 } from './agent-session-provider-handle'
+import {
+  isAgentSessionProviderHandleInNamespace,
+  isStructuredAgentId
+} from './agent-session-provider-handle-encoding'
 
 export const AGENT_SESSION_RECORD_SCHEMA_VERSION = 2 as const
 
@@ -114,10 +117,11 @@ export type AgentSessionLease = {
   /** True from load until the host adjudicates it; no writer is granted while set. */
   unreconciled: boolean
   /**
-   * Lowest fence a future grant may use. Set only when the records file's copy came from its backup,
-   * or sat beside a set-aside copy of the same chat: either may hide a fence already granted. The
-   * CURRENT fence is deliberately left alone: `live` means a handle proven at exactly that number,
-   * so rewriting it would invalidate the record it is trying to save.
+   * Lowest fence a future grant may use. Set only by an earlier build's import of its records file,
+   * when the copy came from its backup or sat beside a set-aside copy of the same chat: either may
+   * hide a fence already granted. The CURRENT fence is deliberately left alone: `live` means a
+   * handle proven at exactly that number, so rewriting it would invalidate the record it is trying
+   * to save.
    */
   minimumNextFence?: number
   /** Null on a released lease when nothing proved its owner gone. */
@@ -130,11 +134,14 @@ export type AgentSessionRecord = {
   schemaVersion: typeof AGENT_SESSION_RECORD_SCHEMA_VERSION
   sessionId: string
   location: AgentSessionExecutionLocation
-  provider: AgentSessionRecordProvider
+  /** The agent this session names, whether this build can run it or not. */
+  provider: string
   providerHandleChain: AgentSessionProviderHandleLink[]
   accountHome: AgentSessionAccountHome
-  /** Original task provenance; authorization is checked against the task store at acquisition. */
   taskSource?: TaskSessionSourceReference
+  /** The directory the provider first launched in, in the execution host's path syntax. Floating
+   *  sessions resume here; worktree and folder ids still resolve by id to their durable place. */
+  launchDirectory?: string
   /** Provider options the user chose, replayed whenever a new owner starts the session. */
   options?: Record<string, string>
   rewind?: AgentSessionRewindRecord
@@ -155,6 +162,9 @@ export type AgentSessionOptionsReplacement = {
 }
 
 const MAX_ID_LENGTH = 512
+/** A death evidence's `detail` past this fails a load, so whoever writes one cuts it here. */
+export const MAX_AGENT_SESSION_DEATH_DETAIL_CHARS = MAX_ID_LENGTH
+const MAX_PATH_LENGTH = 4096
 const MAX_LAUNCH_ENV_ENTRIES = 256
 const MAX_LAUNCH_ENV_VALUE_LENGTH = 65_536
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/
@@ -163,9 +173,8 @@ function isBoundedString(value: unknown, max: number): value is string {
   return typeof value === 'string' && value.length > 0 && value.length <= max
 }
 
-export function isAgentSessionId(value: unknown): value is string {
-  return typeof value === 'string' && SESSION_ID_PATTERN.test(value)
-}
+export const isAgentSessionId = (value: unknown): value is string =>
+  typeof value === 'string' && SESSION_ID_PATTERN.test(value)
 
 /** NUL cannot occur in a host id, distro name, or workspace id, so no component can forge a join. */
 const SCOPE_KEY_SEPARATOR = '\u0000'
@@ -304,8 +313,7 @@ function isPersistedAgentSessionLease(value: unknown): value is PersistedAgentSe
   )
 }
 
-/** The on-disk shape, which still admits the removed terminal handoff's lease values. Decode
- *  through `normalizeLegacyHandoffRecord` before anything reads the lease. */
+/** Stored identity is independent of registrations; availability is checked only at start. */
 export function isPersistedAgentSessionRecord(
   value: unknown
 ): value is PersistedAgentSessionRecord {
@@ -317,13 +325,12 @@ export function isPersistedAgentSessionRecord(
     record.schemaVersion === AGENT_SESSION_RECORD_SCHEMA_VERSION &&
     isAgentSessionId(record.sessionId) &&
     isAgentSessionExecutionLocation(record.location) &&
-    (record.provider === 'claude' ||
-      record.provider === 'codex' ||
-      record.provider === 'managed-pi') &&
-    isAgentSessionProviderHandleChain(record.providerHandleChain) &&
-    isAgentSessionAccountHome(record.accountHome) &&
+    isStructuredAgentId(record.provider) &&
     (!Object.hasOwn(record, 'taskSource') ||
       TaskSessionSourceReferenceSchema.safeParse(record.taskSource).success) &&
+    isAgentSessionAccountHome(record.accountHome) &&
+    (record.launchDirectory === undefined ||
+      isBoundedString(record.launchDirectory, MAX_PATH_LENGTH)) &&
     (record.options === undefined || isAgentSessionOptions(record.options)) &&
     (record.rewind === undefined || isAgentSessionRewindRecord(record.rewind)) &&
     (record.conversationCommand === undefined ||
@@ -356,9 +363,18 @@ export function isPersistedAgentSessionRecord(
   ) {
     return false
   }
-  const head = validated.providerHandleChain.at(-1)
+  // The row holds stored handles; validate the chain they decode to.
+  const chain = decodePersistedAgentSessionProviderHandleChain(validated.providerHandleChain)
+  const head = chain?.at(-1)
+  // One namespace, owned by the record's own agent; which transport is the chain's own fact.
+  const transport = chain?.[0]?.handle.transport
+  const namespace = transport === undefined ? null : { transport, agent: validated.provider }
   return (
-    validated.providerHandleChain.every((link) => link.handle.provider === validated.provider) &&
+    chain !== null &&
+    chain.every(
+      (link) =>
+        namespace !== null && isAgentSessionProviderHandleInNamespace(link.handle, namespace)
+    ) &&
     (validated.lease.claimStatus !== 'live' ||
       (validated.lease.ownerProcess !== null &&
         head?.linkId === validated.lease.provenHandleLinkId &&

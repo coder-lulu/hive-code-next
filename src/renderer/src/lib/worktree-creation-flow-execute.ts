@@ -1,3 +1,4 @@
+import { prepareWorktreeCreationHooks } from '@/lib/worktree-creation-hook-preparation'
 import { toast } from 'sonner'
 import { useAppStore } from '@/store'
 import { activateAndRevealWorktree, type ActivateAndRevealResult } from '@/lib/worktree-activation'
@@ -12,14 +13,17 @@ import {
   formatWorkspaceCreateError,
   getWorkspaceCreateErrorToastMessage
 } from '@/lib/workspace-create-error-format'
-import { isAgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
 import type { CreateWorktreeResult } from '../../../shared/worktree/create-types'
 import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
 import { createBrowserUuid } from '@/lib/browser-uuid'
 import { resolveBackendDraftStartup } from '@/lib/worktree-draft-startup-view-mode'
-import { buildWorktreeCreationStartupOpt } from '@/lib/worktree-creation-flow-startup'
+import {
+  buildWorktreeCreationHostOptions,
+  buildWorktreeCreationStartupOpt,
+  ensureWorktreeCreationLaunchToken
+} from '@/lib/worktree-creation-flow-startup'
 import { prepareBackendFollowupStartup } from '@/lib/worktree-creation-followup-startup'
-import { toAgentLaunchPreferences } from '../../../shared/agent-launch-preferences'
+import { isAgentSessionHandleProvider } from '../../../shared/agent-session-provider-handle'
 import {
   launchStructuredWorktreeSession,
   type WorktreeCreationStructuredSessionResult
@@ -51,7 +55,13 @@ export async function executeWorktreeCreation(
   creationId: string,
   request: WorktreeCreationRequest
 ): Promise<void> {
-  const preparedRequest = await prepareRequestForCreate(creationId, request)
+  const trustedRequest = request.hookPreparation
+    ? await prepareWorktreeCreationHooks(creationId, request)
+    : request
+  if (!trustedRequest) {
+    return
+  }
+  const preparedRequest = await prepareRequestForCreate(creationId, trustedRequest)
   if (!preparedRequest) {
     return
   }
@@ -68,9 +78,6 @@ export async function executeWorktreeCreation(
     }
     const backendStartup =
       provisionedRoot || structuredLaunch ? undefined : resolveBackendDraftStartup(preparedRequest)
-    const startupLaunchPreferences = toAgentLaunchPreferences(
-      preparedRequest.startupPlan?.sessionOptions
-    )
     result = await useAppStore
       .getState()
       .createWorktree(
@@ -99,33 +106,12 @@ export async function executeWorktreeCreation(
         preparedRequest.linkedAzureDevOpsPR,
         preparedRequest.linkedGiteaPR,
         preparedRequest.compareBaseRef,
-        {
-          ...(preparedRequest.nameWasGenerated ? { nameWasGenerated: true } : {}),
-          ...(preparedRequest.displayNameKind
-            ? { displayNameKind: preparedRequest.displayNameKind }
-            : {}),
-          ...(preparedRequest.linkedWorkItem !== undefined
-            ? { linkedWorkItem: preparedRequest.linkedWorkItem }
-            : {}),
-          ...(preparedRequest.linkedTaskSourceContext !== undefined
-            ? { linkedTaskSourceContext: preparedRequest.linkedTaskSourceContext }
-            : {}),
-          // Why: the remote host must own task-draft startup so its initial terminal is the agent, not an idle fallback shell.
-          ...(!structuredLaunch &&
-          (!backendStartup || backendStartup.agentPermissionMode) &&
-          preparedRequest.agent &&
-          preparedRequest.launchDraftPrompt
-            ? { startupDraft: preparedRequest.launchDraftPrompt }
-            : {}),
-          ...(backendStartup?.agentPermissionMode && preparedRequest.quickPrompt.trim()
-            ? { startupPrompt: preparedRequest.quickPrompt.trim() }
-            : {}),
-          ...(startupLaunchPreferences ? { startupLaunchPreferences } : {}),
-          ...(provisionedRoot ? { provisionedRoot } : {}),
-          ...(preparedRequest.parentWorktreeId
-            ? { parentWorktreeId: preparedRequest.parentWorktreeId }
-            : {})
-        }
+        buildWorktreeCreationHostOptions(
+          preparedRequest,
+          backendStartup,
+          structuredLaunch,
+          provisionedRoot
+        )
       )
   } catch (error) {
     // Why: a missing entry means the user cancelled mid-flight — abandon
@@ -164,11 +150,7 @@ export async function executeWorktreeCreation(
   await attachEphemeralVmRuntimeToWorkspace(preparedRequest, worktree.id)
 
   const backendSpawned = result.startupTerminal?.spawned === true
-  if (preparedRequest.startupPlan && !backendSpawned && !preparedRequest.startupPlan.launchToken) {
-    // Why: delayed delivery must target the exact pane spawned from this queued
-    // startup, so both halves of the handoff share one renderer-session token.
-    preparedRequest.startupPlan.launchToken = createBrowserUuid()
-  }
+  ensureWorktreeCreationLaunchToken(preparedRequest, backendSpawned)
   const startupOpt = structuredLaunch
     ? undefined
     : buildWorktreeCreationStartupOpt(preparedRequest, backendSpawned)

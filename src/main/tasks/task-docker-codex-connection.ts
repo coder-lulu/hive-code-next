@@ -47,7 +47,7 @@ export async function openTaskDockerCodexConnection(options: {
   }
   const handlers = options.handlers ?? {}
   const dispatch = options.dispatch
-  const exitProof = new RetryableProcessExitProof()
+  const exitProof = new RetryableProcessExitProof<boolean>((proven) => proven)
   let raw: CodexAppServerConnection | undefined
   let pid: number | undefined
   let closing = false
@@ -188,7 +188,10 @@ export async function openTaskDockerCodexConnection(options: {
           await handlers.onSpawned?.(observedPid)
           assertUsable()
         },
-        onExit: (error) => {
+        onExit: (error, exit) => {
+          if (exit?.expected && closing) {
+            return
+          }
           const modelClosing = modelPort.close()
           void stopBoundary()
             .then(async (stopped) => {

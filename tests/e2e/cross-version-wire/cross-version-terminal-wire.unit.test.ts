@@ -1,6 +1,11 @@
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { UPSTREAM_BASELINE_PINS } from '../../../config/scripts/prepare-cross-version-baselines.mjs'
 import { comparePublishedFieldOccurrences, publishedFieldNames } from './published-field-shape'
-import { resolveBaselineReleaseRef, selectLatestStableReleaseTag } from './release-checkout'
+import {
+  resolveBaselineReleaseRef,
+  resolveReleaseCheckoutCommit,
+  selectLatestStableReleaseTag
+} from './release-checkout'
 import {
   CrossVersionJourneyStall,
   JOURNEY_INPUTS,
@@ -144,7 +149,16 @@ describe('cross-version remote terminal wire', () => {
   it(
     'skews current code against a real published release',
     () => {
-      expect(baselineRef).toMatch(/^v?\d/)
+      const publishedLabel =
+        Object.entries(UPSTREAM_BASELINE_PINS).find(
+          ([releaseTag, commit]) =>
+            commit === baselineRef && selectLatestStableReleaseTag([releaseTag]) === releaseTag
+        )?.[0] ?? baselineRef
+      expect(selectLatestStableReleaseTag([publishedLabel])).toBe(publishedLabel)
+      expect(resolveReleaseCheckoutCommit(publishedLabel)).toBe(baseline.revision)
+      if (/^[0-9a-f]{40}$/.test(baselineRef)) {
+        expect(baselineRef).toBe(baseline.revision)
+      }
       expect(baseline.revision).toMatch(/^[0-9a-f]{40}$/)
       expect(baseline.revision).not.toBe(current.revision)
     },

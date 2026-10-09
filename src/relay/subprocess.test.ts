@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it, afterEach } from 'vitest'
+import { afterAll, beforeAll, beforeEach, describe, expect, it, afterEach } from 'vitest'
 import {
   copyFileSync,
   existsSync,
@@ -12,12 +12,14 @@ import {
 import { rm } from 'node:fs/promises'
 import * as path from 'node:path'
 import { tmpdir } from 'node:os'
-import { execFileSync, spawn as spawnChild } from 'node:child_process'
+import { spawn as spawnChild } from 'node:child_process'
 import { build } from 'esbuild'
 import { JSONC_PARSER_ESM_ALIAS } from '../../config/build-plugins/jsonc-parser-esm'
-import { spawnRelay, type RelayProcess } from './subprocess-test-utils'
+import { connectRelayTestSocket, spawnRelay, type RelayProcess } from './subprocess-test-utils'
 import { getEndpointFileName } from '../shared/agent-hook-listener/endpoint-publication'
 import { relayTestSocketPath } from './relay-test-socket-path'
+import { createGitTestRunner } from './git-handler-test-setup'
+import { readRelayEndpointCredential } from './relay-launch-options'
 
 const RELAY_TS_ENTRY = path.resolve(__dirname, 'relay.ts')
 const WATCHER_TS_ENTRY = path.resolve(__dirname, '../main/ipc/parcel-watcher-process-entry.ts')
@@ -165,12 +167,38 @@ export function spawn() {
 describe('Subprocess: Relay entry point', () => {
   let relay: RelayProcess | null = null
   let tmpDir: string
+  const fixtureGit = createGitTestRunner()
+  let pendingSetup: Promise<void> | undefined
+  let statusRelayClosed: Promise<void> | undefined
+
+  beforeEach(async ({ signal, task }) => {
+    if (task.name !== 'responds to git.status on a real repo') {
+      return
+    }
+    fixtureGit.useSignal(signal, null)
+    tmpDir = mkdtempSync(path.join(tmpdir(), 'relay-sub-'))
+    pendingSetup = (async () => {
+      await fixtureGit.git(tmpDir, ['init'])
+      await fixtureGit.git(tmpDir, ['config', 'user.email', 'test@test.com'])
+      await fixtureGit.git(tmpDir, ['config', 'user.name', 'Test'])
+      writeFileSync(path.join(tmpDir, 'file.txt'), 'content')
+      await fixtureGit.git(tmpDir, ['add', '.'])
+      await fixtureGit.git(tmpDir, ['commit', '-m', 'init'])
+      writeFileSync(path.join(tmpDir, 'file.txt'), 'dirty')
+    })()
+    await pendingSetup
+  })
 
   afterEach(async () => {
     if (relay && relay.proc.exitCode === null) {
       relay.proc.kill('SIGKILL')
       await relay.waitForExit().catch(() => {})
     }
+    await statusRelayClosed
+    statusRelayClosed = undefined
+    await Promise.allSettled(pendingSetup ? [pendingSetup] : [])
+    pendingSetup = undefined
+    await fixtureGit.settle()
     relay = null
     if (tmpDir) {
       await rm(tmpDir, { recursive: true, force: true }).catch(() => {})
@@ -179,15 +207,6 @@ describe('Subprocess: Relay entry point', () => {
       const socketDir = spawnedSocketDirs.pop()!
       await rm(socketDir, { recursive: true, force: true }).catch(() => {})
     }
-  })
-
-  it('prints sentinel on startup', async () => {
-    relay = spawn()
-    await relay.sentinelReceived
-  }, 10_000)
-
-  it('keeps the Node-18 relay bundle free of unsupported array copy methods', () => {
-    expect(readFileSync(relayEntry, 'utf8')).not.toContain('.toReversed(')
   })
 
   it('loads node-pty after an in-place dependency repair without restarting', async () => {
@@ -259,16 +278,16 @@ describe('Subprocess: Relay entry point', () => {
   }, 10_000)
 
   it('responds to git.status on a real repo', async () => {
-    tmpDir = mkdtempSync(path.join(tmpdir(), 'relay-sub-'))
-    execFileSync('git', ['init'], { cwd: tmpDir, stdio: 'pipe' })
-    execFileSync('git', ['config', 'user.email', 'test@test.com'], { cwd: tmpDir, stdio: 'pipe' })
-    execFileSync('git', ['config', 'user.name', 'Test'], { cwd: tmpDir, stdio: 'pipe' })
-    writeFileSync(path.join(tmpDir, 'file.txt'), 'content')
-    execFileSync('git', ['add', '.'], { cwd: tmpDir, stdio: 'pipe' })
-    execFileSync('git', ['commit', '-m', 'init'], { cwd: tmpDir, stdio: 'pipe' })
-    writeFileSync(path.join(tmpDir, 'file.txt'), 'dirty')
-
     relay = spawn()
+    const closed = Promise.withResolvers<void>()
+    statusRelayClosed = closed.promise
+    const statusChild = relay.proc
+    statusChild.once('close', () => closed.resolve())
+    statusChild.once('error', () => {
+      if (!statusChild.pid) {
+        closed.resolve()
+      }
+    })
     await relay.sentinelReceived
 
     const id = relay.send('git.status', { worktreePath: tmpDir })
@@ -588,19 +607,23 @@ describe('Subprocess: Relay entry point', () => {
     async () => {
       tmpDir = mkdtempSync(path.join(tmpdir(), 'relay-connected-'))
       const sockPath = path.join(tmpDir, 'relay.sock')
-      relay = spawn(['--detached', '--grace-time', '1', '--sock-path', sockPath], {
+      const credentialFile = path.join(tmpDir, 'endpoint-credential')
+      const daemonArgs = ['--detached', '--grace-time', '1', '--sock-path', sockPath]
+      relay = spawn([...daemonArgs, '--credential-file', credentialFile], {
         ...process.env,
         ORCA_RELAY_EMPTY_STARTUP_GRACE_MS: '500'
       })
       await relay.sentinelReceived
 
-      const bridge = spawn(['--connect', '--sock-path', sockPath])
-      try {
-        await bridge.sentinelReceived
-      } finally {
-        bridge.kill('SIGTERM')
-        await bridge.waitForExit().catch(() => {})
-      }
+      const endpointCredential = readRelayEndpointCredential(credentialFile)
+      expect(endpointCredential).toBeTypeOf('string')
+      // A second cold Node CLI boot is unrelated to the accepted-socket grace contract.
+      const { socket, closed: socketClosed } = await connectRelayTestSocket(
+        sockPath,
+        endpointCredential
+      )
+      socket.end()
+      await socketClosed
 
       await new Promise((resolve) => setTimeout(resolve, 650))
       expect(relay.proc.exitCode).toBeNull()

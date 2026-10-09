@@ -116,6 +116,14 @@ describe('loaded request presentation without execution claims', () => {
       'done',
       'cancelled'
     ])
+    expect(groups.map((group) => group.querySelector('h4')?.textContent)).toEqual([
+      'Product requirements',
+      'Development',
+      'Independent testing',
+      'Release preparation',
+      'Completed',
+      'Cancelled'
+    ])
     for (const [index, group] of groups.entries()) {
       expect(
         group.querySelector('[data-workflow-case-id]')?.getAttribute('data-workflow-case-id')

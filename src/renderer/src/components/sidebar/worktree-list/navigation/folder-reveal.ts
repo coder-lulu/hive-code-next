@@ -13,6 +13,7 @@ import {
 } from '../grouping/folder-workspace-lanes'
 import type { WorktreeGroupBy } from '../grouping/row-types'
 import { getFolderWorkspaceHostId } from '../../folder-workspace-host-id'
+import { getHostSectionCollapseKey } from '../../host-section-collapse'
 
 function findFolderWorkspaceByKey(
   worktreeId: string,
@@ -72,6 +73,7 @@ export function getFolderWorkspaceRevealGroupKeys(
     defaultHostId?: ExecutionHostId
     executionHostId?: ExecutionHostId
     offlineRuntimeEnvironmentIds?: ReadonlySet<string>
+    hostScopedGroups?: boolean
   }
 ): string[] {
   const scope = parseWorkspaceKey(worktreeId)
@@ -119,12 +121,18 @@ export function getFolderWorkspaceRevealGroupKeys(
   // lane and host headers are the ones actually hiding the row (#15362). Lane
   // keys come from the same function grouping uses, so the two cannot disagree.
   if (options?.groupBy && options.groupBy !== 'repo' && owningGroup) {
+    const laneKey = getFolderWorkspaceLaneKey(
+      { folderWorkspace, projectGroup: owningGroup },
+      options.groupBy,
+      options.workspaceStatuses ?? []
+    )
     keys.push(
-      getFolderWorkspaceLaneKey(
-        { folderWorkspace, projectGroup: owningGroup },
-        options.groupBy,
-        options.workspaceStatuses ?? []
-      )
+      options.hostScopedGroups && options.defaultHostId
+        ? getHostSectionCollapseKey(
+            laneKey,
+            getFolderWorkspaceHostId(folderWorkspace, owningGroup, options.defaultHostId)
+          )
+        : laneKey
     )
   }
   if (owningGroup && options?.defaultHostId) {

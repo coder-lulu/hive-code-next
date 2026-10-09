@@ -1,4 +1,5 @@
 import { spawnProcess, type ChildProcessHandle } from '../../shared/child-process/run-process'
+import { win32 } from 'node:path'
 import {
   signalProcessTree,
   forceTerminateProcessTree
@@ -49,7 +50,7 @@ export class ManagedPiProcessTransport {
     this.child = spawnProcess({
       program: options.files.node,
       args: ['-e', 'require(process.argv[1]).startManagedTextProcess()', options.files.runner],
-      cwd: options.home,
+      cwd: process.platform === 'win32' ? win32.toNamespacedPath(options.home) : options.home,
       env: {
         ...createManagedPiEnvironment(process.env, options.home),
         ORCA_AGENT_SESSION_SPAWN_TOKEN: options.spawnToken

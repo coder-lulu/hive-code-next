@@ -1,3 +1,8 @@
+import {
+  closeTestJournalHostDatabases,
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 // A Stop ends Claude's child on the shipping adapter, whatever Claude answered the interrupt. The
 // Stop answers on the interrupt; its next serialized step ends the child once Claude has wound down
 // what it had in flight, or the grace runs out. The chat rests; the next send resumes it.
@@ -22,6 +27,8 @@ import { CLAUDE_STOP_GRACE_MS } from '../../claude/claude-request-end-wait'
 import { ClaudeStructuredSessionAdapter } from '../../claude/claude-structured-session-adapter'
 import type { ClaudeStructuredSessionEvent } from '../../claude/claude-structured-session-state'
 import {
+  claudeFrame as frame,
+  claudeWasSent as wrote,
   fakeClaude,
   PROVIDER_SESSION_ID,
   type FakeConnection
@@ -30,10 +37,6 @@ import { invokeCanUseTool } from '../../claude/claude-can-use-tool-test-support'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import { structuredClaudeLifecycleEvent } from '../../runtime/structured-claude-runtime-adapter'
-import {
-  closeTestJournalHostDatabase,
-  openTestJournalHostDatabase
-} from '../agent-session-journal/journal-host-database-test-support'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import { createStoppedClaudeDeadline } from './structured-agent-session-stop-deadline.test-fixture'
 import { recordingStructuredAgentSessionLogger } from './structured-agent-session-logger-test-support'
@@ -45,6 +48,7 @@ import {
   hostTestOperationId,
   resetHostTestOperationIds
 } from './structured-agent-session-host-test-data'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const CALLER = { callerKey: 'client-1' }
 // As Claude Code 2.1.280 advertises them on a turn's system/init frame.
@@ -107,6 +111,7 @@ beforeEach(async () => {
   })
   store = await openTestAgentSessionRecordStore(root)
   host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
     store,
     adapter: Object.assign(adapter, { supportsCreate: () => true }),
     journalDatabase: openTestJournalHostDatabase(root),
@@ -132,7 +137,7 @@ beforeEach(async () => {
     providerHandle: { kind: 'claude', sessionId: PROVIDER_SESSION_ID, leafUuid: null }
   })
   expect(await host.attach(CALLER, params)).toMatchObject({ ok: true })
-  await adapter.awaitStarted(SESSION)
+  await adapter['sessions'].get(SESSION)?.startup.settled
   await Promise.all(lifecycle)
 })
 
@@ -142,6 +147,7 @@ afterEach(async () => {
   await adapter.closeAll()
   await host.flushAllStreamedEvents()
   closeTestJournalHostDatabase(root)
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -183,10 +189,6 @@ async function dispatch(clientMessageId: string) {
     (entry) => entry.clientMessageId === clientMessageId
   )
   return { state: submission?.dispatchState, reason: submission?.reason }
-}
-
-function frame(connection: FakeConnection, message: Record<string, unknown>): void {
-  connection.handlers.onMessage?.({ session_id: PROVIDER_SESSION_ID, ...message })
 }
 
 /** Sends a message and lets Claude open its turn and write one reply; returns the turn's id. */
@@ -245,10 +247,6 @@ function stopEventsAtClose(connection: FakeConnection): () => number | undefined
     return close()
   }
   return () => atClose
-}
-
-function wrote(connection: FakeConnection, text: string): boolean {
-  return connection.sent.some((message) => JSON.stringify(message).includes(text))
 }
 
 const INTERRUPTED_RESULT = {
@@ -525,7 +523,7 @@ it('starts a new child for the next send after a Stop, on the same Claude conver
   })
   // The wake resumes the same Claude conversation; the first test pins the leaf it resumes after.
   expect(store.getRecord(SESSION)?.providerHandleChain.at(-1)?.handle).toMatchObject({
-    sessionId: PROVIDER_SESSION_ID
+    nativeId: PROVIDER_SESSION_ID
   })
   expect(resumed.closed).toBe(false)
   expect(await dispatch(next)).toMatchObject({ state: 'pending' })
@@ -591,8 +589,7 @@ it('sends a queue-if-active message issued while the Stop ends the child directl
   const sent = host.send(CALLER, {
     envelope: envelope('agentSession.send', { body, delivery: 'queue-if-active' }, fence),
     body,
-    delivery: 'queue-if-active',
-    userSend: true
+    delivery: 'queue-if-active'
   })
   frame(connection, INTERRUPTED_RESULT)
 

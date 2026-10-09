@@ -156,7 +156,8 @@ async function runBuiltCli(
       ...process.env,
       ORCA_USER_DATA_PATH: userDataPath,
       ORCA_TERMINAL_HANDLE: TERMINAL_HANDLE,
-      ORCA_PANE_KEY: PANE_KEY
+      ORCA_PANE_KEY: PANE_KEY,
+      ORCA_AGENT_LAUNCH_TOKEN: LAUNCH_TOKEN
     },
     stdio: ['ignore', 'pipe', 'pipe']
   })

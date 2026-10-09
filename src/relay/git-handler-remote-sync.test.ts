@@ -22,6 +22,9 @@ describe('GitHandler', () => {
   let dispatcher: MockDispatcher
   let tmpDir: string
   let gitTarget: GitSpyTarget
+  let upstreamStatusRequest: Promise<unknown> | undefined
+  let linkedRebaseOperation: Promise<void> | undefined
+  let remoteAheadOperation: Promise<void> | undefined
 
   beforeEach(() => {
     tmpDir = createGitTempDir()
@@ -31,28 +34,50 @@ describe('GitHandler', () => {
   })
 
   afterEach(async () => {
+    await Promise.allSettled(upstreamStatusRequest ? [upstreamStatusRequest] : [])
+    upstreamStatusRequest = undefined
+    await Promise.allSettled(linkedRebaseOperation ? [linkedRebaseOperation] : [])
+    linkedRebaseOperation = undefined
+    await Promise.allSettled(remoteAheadOperation ? [remoteAheadOperation] : [])
+    remoteAheadOperation = undefined
     await removeGitTempDir(tmpDir)
   })
 
   describe('remote operations', () => {
-    it('returns upstream divergence for tracked branches', async () => {
-      gitInit(tmpDir)
-      writeFileSync(path.join(tmpDir, 'base.txt'), 'base')
-      gitCommit(tmpDir, 'initial')
+    describe('without an upstream', () => {
+      beforeEach(() => {
+        gitInit(tmpDir)
+        writeFileSync(path.join(tmpDir, 'base.txt'), 'base')
+        gitCommit(tmpDir, 'initial')
+      })
 
-      const result = (await dispatcher.callRequest('git.upstreamStatus', {
-        worktreePath: tmpDir
-      })) as { hasUpstream: boolean; upstreamName?: string; ahead: number; behind: number }
+      it('returns upstream divergence for tracked branches', async ({ signal }) => {
+        upstreamStatusRequest = dispatcher.callRequest(
+          'git.upstreamStatus',
+          {
+            worktreePath: tmpDir
+          },
+          { isStale: () => signal.aborted, signal }
+        )
+        const result = (await upstreamStatusRequest) as {
+          hasUpstream: boolean
+          upstreamName?: string
+          ahead: number
+          behind: number
+        }
 
-      expect(result.hasUpstream).toBe(false)
-      expect(result.ahead).toBe(0)
-      expect(result.behind).toBe(0)
+        expect(result.hasUpstream).toBe(false)
+        expect(result.ahead).toBe(0)
+        expect(result.behind).toBe(0)
+      })
     })
 
-    it('reports ahead/behind counts against a real upstream remote', async () => {
-      // Why: exercise the configured-upstream happy path (rev-parse HEAD@{u} + rev-list --left-right) the no-upstream test misses.
-      const bareDir = mkdtempSync(path.join(tmpdir(), 'relay-git-bare-'))
-      try {
+    describe('real remote upstream divergence', () => {
+      let bareDir = ''
+      let branch = ''
+      let operation: Promise<void> | undefined
+      beforeEach(() => {
+        bareDir = mkdtempSync(path.join(tmpdir(), 'relay-git-bare-'))
         execFileSync('git', ['init', '--bare'], { cwd: bareDir, stdio: 'pipe' })
 
         gitInit(tmpDir)
@@ -62,7 +87,7 @@ describe('GitHandler', () => {
           cwd: tmpDir,
           encoding: 'utf-8'
         }).trim()
-        const branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
+        branch = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], {
           cwd: tmpDir,
           encoding: 'utf-8'
         }).trim()
@@ -85,18 +110,30 @@ describe('GitHandler', () => {
         execFileSync('git', ['push', 'origin', branch], { cwd: tmpDir, stdio: 'pipe' })
         // Reset local back to the first commit: 0 ahead, 2 behind.
         execFileSync('git', ['reset', '--hard', firstSha], { cwd: tmpDir, stdio: 'pipe' })
-
-        const result = (await dispatcher.callRequest('git.upstreamStatus', {
-          worktreePath: tmpDir
-        })) as { hasUpstream: boolean; upstreamName?: string; ahead: number; behind: number }
-
-        expect(result.hasUpstream).toBe(true)
-        expect(result.upstreamName).toBe(`origin/${branch}`)
-        expect(result.ahead).toBe(0)
-        expect(result.behind).toBe(2)
-      } finally {
+      })
+      afterEach(async () => {
+        await Promise.allSettled(operation ? [operation] : [])
+        operation = undefined
         await fs.rm(bareDir, { recursive: true, force: true })
-      }
+      })
+      it('reports ahead/behind counts against a real upstream remote', ({ signal }) => {
+        operation = (async () => {
+          const result = (await dispatcher.callRequest(
+            'git.upstreamStatus',
+            {
+              worktreePath: tmpDir
+            },
+            { isStale: () => signal.aborted, signal }
+          )) as { hasUpstream: boolean; upstreamName?: string; ahead: number; behind: number }
+
+          expect(result.hasUpstream).toBe(true)
+          expect(result.upstreamName).toBe(`origin/${branch}`)
+          expect(result.ahead).toBe(0)
+          expect(result.behind).toBe(2)
+        })()
+        remoteAheadOperation = operation
+        return operation
+      })
     })
 
     it('reports ahead/behind counts against a configured local-branch upstream', async () => {
@@ -158,16 +195,21 @@ describe('GitHandler', () => {
       }
     })
 
-    it('rebases from the original fork point after a remote force-push', async () => {
-      const bareDir = mkdtempSync(path.join(tmpdir(), 'relay-git-rebase-bare-'))
-      const producerParent = mkdtempSync(path.join(tmpdir(), 'relay-git-rebase-producer-'))
-      const producerDir = path.join(producerParent, 'repo')
-      try {
+    describe('rebase after a remote force-push', () => {
+      let bareDir = ''
+      let producerParent = ''
+      let producerDir = ''
+      let branch = ''
+
+      beforeEach(() => {
+        bareDir = mkdtempSync(path.join(tmpdir(), 'relay-git-rebase-bare-'))
+        producerParent = mkdtempSync(path.join(tmpdir(), 'relay-git-rebase-producer-'))
+        producerDir = path.join(producerParent, 'repo')
         execFileSync('git', ['init', '--bare'], { cwd: bareDir, stdio: 'pipe' })
         gitInit(tmpDir)
         writeFileSync(path.join(tmpDir, 'base.txt'), 'base')
         gitCommit(tmpDir, 'base')
-        const branch = execFileSync('git', ['branch', '--show-current'], {
+        branch = execFileSync('git', ['branch', '--show-current'], {
           cwd: tmpDir,
           encoding: 'utf-8'
         }).trim()
@@ -201,7 +243,17 @@ describe('GitHandler', () => {
           cwd: producerDir,
           stdio: 'pipe'
         })
+      })
 
+      afterEach(async () => {
+        await Promise.all(
+          [bareDir, producerParent]
+            .filter(Boolean)
+            .map((dir) => fs.rm(dir, { recursive: true, force: true }))
+        )
+      })
+
+      it('rebases from the original fork point after a remote force-push', async () => {
         await dispatcher.callRequest('git.rebaseFromBase', {
           worktreePath: tmpDir,
           baseRef: `origin/${branch}`
@@ -227,26 +279,30 @@ describe('GitHandler', () => {
             encoding: 'utf-8'
           }).trim()
         ).toBe('')
-      } finally {
-        await Promise.all([
-          fs.rm(bareDir, { recursive: true, force: true }),
-          fs.rm(producerParent, { recursive: true, force: true })
-        ])
-      }
-    }, 15_000)
+      }, 15_000)
+    })
 
-    it('rebases the selected linked worktree without moving the source worktree', async () => {
-      const bareDir = mkdtempSync(path.join(tmpdir(), 'relay-git-linked-rebase-bare-'))
-      const producerParent = mkdtempSync(path.join(tmpdir(), 'relay-git-linked-rebase-producer-'))
-      const producerDir = path.join(producerParent, 'repo')
-      const targetParent = mkdtempSync(path.join(tmpdir(), 'relay-git-linked-rebase-target-'))
-      const targetDir = path.join(targetParent, 'feature')
-      try {
+    describe('linked worktree rebase isolation', () => {
+      let bareDir = ''
+      let producerParent = ''
+      let targetParent = ''
+      let targetDir = ''
+      let baseBranch = ''
+      let sourceHeadBefore = ''
+      let sourceStatusBefore = ''
+      let latestBaseOid = ''
+      let operation: Promise<void> | undefined
+      beforeEach(() => {
+        bareDir = mkdtempSync(path.join(tmpdir(), 'relay-git-linked-rebase-bare-'))
+        producerParent = mkdtempSync(path.join(tmpdir(), 'relay-git-linked-rebase-producer-'))
+        const producerDir = path.join(producerParent, 'repo')
+        targetParent = mkdtempSync(path.join(tmpdir(), 'relay-git-linked-rebase-target-'))
+        targetDir = path.join(targetParent, 'feature')
         execFileSync('git', ['init', '--bare'], { cwd: bareDir, stdio: 'pipe' })
         gitInit(tmpDir)
         writeFileSync(path.join(tmpDir, 'base.txt'), 'base')
         gitCommit(tmpDir, 'base')
-        const baseBranch = execFileSync('git', ['branch', '--show-current'], {
+        baseBranch = execFileSync('git', ['branch', '--show-current'], {
           cwd: tmpDir,
           encoding: 'utf-8'
         }).trim()
@@ -262,11 +318,11 @@ describe('GitHandler', () => {
         writeFileSync(path.join(targetDir, 'topic.txt'), 'topic')
         gitCommit(targetDir, 'topic')
         writeFileSync(path.join(tmpDir, 'source-dirty.txt'), 'leave me alone')
-        const sourceHeadBefore = execFileSync('git', ['rev-parse', 'HEAD'], {
+        sourceHeadBefore = execFileSync('git', ['rev-parse', 'HEAD'], {
           cwd: tmpDir,
           encoding: 'utf-8'
         }).trim()
-        const sourceStatusBefore = execFileSync('git', ['status', '--short'], {
+        sourceStatusBefore = execFileSync('git', ['status', '--short'], {
           cwd: tmpDir,
           encoding: 'utf-8'
         })
@@ -276,46 +332,63 @@ describe('GitHandler', () => {
         })
         writeFileSync(path.join(producerDir, 'latest.txt'), 'latest')
         gitCommit(producerDir, 'latest base')
-        const latestBaseOid = execFileSync('git', ['rev-parse', 'HEAD'], {
+        latestBaseOid = execFileSync('git', ['rev-parse', 'HEAD'], {
           cwd: producerDir,
           encoding: 'utf-8'
         }).trim()
         execFileSync('git', ['push', 'origin', baseBranch], { cwd: producerDir, stdio: 'pipe' })
-
-        await dispatcher.callRequest('git.rebaseFromBase', {
-          worktreePath: targetDir,
-          baseRef: `origin/${baseBranch}`
-        })
-
-        expect(execFileSync('git', ['rev-parse', 'HEAD'], { cwd: tmpDir }).toString().trim()).toBe(
-          sourceHeadBefore
-        )
-        expect(execFileSync('git', ['status', '--short'], { cwd: tmpDir, encoding: 'utf-8' })).toBe(
-          sourceStatusBefore
-        )
-        expect(
-          execFileSync('git', ['rev-parse', 'HEAD~1'], { cwd: targetDir, encoding: 'utf-8' }).trim()
-        ).toBe(latestBaseOid)
-        expect(
-          execFileSync('git', ['reflog', '-1', '--format=%gs'], {
-            cwd: targetDir,
-            encoding: 'utf-8'
-          })
-        ).toContain('rebase (finish)')
-        expect(
-          execFileSync('git', ['for-each-ref', '--format=%(refname)', 'refs/orca/rebase'], {
-            cwd: targetDir,
-            encoding: 'utf-8'
-          }).trim()
-        ).toBe('')
-      } finally {
+      })
+      afterEach(async () => {
+        await Promise.allSettled(operation ? [operation] : [])
+        operation = undefined
         await Promise.all([
           fs.rm(bareDir, { recursive: true, force: true }),
           fs.rm(producerParent, { recursive: true, force: true }),
           fs.rm(targetParent, { recursive: true, force: true })
         ])
-      }
-    }, 15_000)
+      })
+      it('rebases the selected linked worktree without moving the source worktree', ({
+        signal
+      }) => {
+        operation = (async () => {
+          await dispatcher.callRequest(
+            'git.rebaseFromBase',
+            {
+              worktreePath: targetDir,
+              baseRef: `origin/${baseBranch}`
+            },
+            { isStale: () => signal.aborted, signal }
+          )
+
+          expect(
+            execFileSync('git', ['rev-parse', 'HEAD'], { cwd: tmpDir }).toString().trim()
+          ).toBe(sourceHeadBefore)
+          expect(
+            execFileSync('git', ['status', '--short'], { cwd: tmpDir, encoding: 'utf-8' })
+          ).toBe(sourceStatusBefore)
+          expect(
+            execFileSync('git', ['rev-parse', 'HEAD~1'], {
+              cwd: targetDir,
+              encoding: 'utf-8'
+            }).trim()
+          ).toBe(latestBaseOid)
+          expect(
+            execFileSync('git', ['reflog', '-1', '--format=%gs'], {
+              cwd: targetDir,
+              encoding: 'utf-8'
+            })
+          ).toContain('rebase (finish)')
+          expect(
+            execFileSync('git', ['for-each-ref', '--format=%(refname)', 'refs/orca/rebase'], {
+              cwd: targetDir,
+              encoding: 'utf-8'
+            }).trim()
+          ).toBe('')
+        })()
+        linkedRebaseOperation = operation
+        return operation
+      }, 15_000)
+    })
 
     it('fast-forwards an unborn branch from the selected remote base', async () => {
       const bareDir = mkdtempSync(path.join(tmpdir(), 'relay-git-unborn-bare-'))
@@ -730,6 +803,7 @@ describe('GitHandler', () => {
       // Why: the catch only swallows "no upstream"; other errors must surface so auth/corruption failures aren't masked.
       const nonRepoDir = path.join(tmpDir, 'not-a-repo')
       await fs.mkdir(nonRepoDir, { recursive: true })
+      await fs.writeFile(path.join(nonRepoDir, '.git'), 'gitdir: ./missing-git-directory\n')
 
       await expect(
         dispatcher.callRequest('git.upstreamStatus', { worktreePath: nonRepoDir })

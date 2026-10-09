@@ -1,8 +1,10 @@
 import { execFileSync } from 'node:child_process'
+import type * as childProcess from 'node:child_process'
+import { createGitTestRunner } from '../../relay/git-handler-test-setup'
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { countLooseRefs } from '../../shared/loose-ref-count'
 import { RepoRefMaintenance } from '../../shared/repo-ref-maintenance'
 import { PACK_INDEX_MAINTENANCE_COOLDOWN_MS } from '../../shared/repo-pack-index-maintenance-policy'
@@ -16,6 +18,37 @@ import { forceDeleteLocalBranch } from './worktree-branch-removal'
 import { maintainRepoPackIndex, PACK_INDEX_THRESHOLD } from './repo-pack-index-maintenance'
 
 const roots: string[] = []
+const fixtureGit = createGitTestRunner()
+const ownedMaintenance = new Set<RepoRefMaintenance>()
+let pendingSetup: Promise<void> | undefined
+let pendingSubject: Promise<void> | undefined
+let preparedRepoPath: string
+let preparedPacks: string
+let preparedBlobs: string[]
+let preparedOriginalPacks: string[]
+
+const subjectChildren = vi.hoisted<{ closed: Promise<void>[] }>(() => ({ closed: [] }))
+
+// Track actual close events while preserving the subject's default Git execution path.
+vi.mock('node:child_process', async (importOriginal) => {
+  const real = await importOriginal<typeof childProcess>()
+  const execFile = new Proxy(real.execFile, {
+    apply(target, receiver, args: Parameters<typeof real.execFile>) {
+      const child = target.apply(receiver, args)
+      const closed = Promise.withResolvers<void>()
+      subjectChildren.closed.push(closed.promise)
+      child.once('close', () => closed.resolve())
+      child.once('error', () => {
+        if (!child.pid) {
+          closed.resolve()
+        }
+      })
+      return child
+    }
+  })
+  return { ...real, execFile }
+})
+
 // Large enough that the deferral ladder (1x, 2x, 4x ... capped at 8x) outlasts
 // three real `pack-refs` runs before the deferral budget is spent.
 const QUIET_MS = 25
@@ -44,7 +77,9 @@ function hasWriteOption(option: string): boolean {
   return false
 }
 
-async function createFragmentedPacks(repoPath: string): Promise<string[]> {
+type TestGit = (cwd: string, args: string[], input?: string) => string | Promise<string>
+
+async function createFragmentedPacks(repoPath: string, runGit: TestGit = git): Promise<string[]> {
   const objects = join(repoPath, '.git', 'objects')
   const inputsDirectory = join(dirname(repoPath), 'pack-inputs')
   await mkdir(inputsDirectory)
@@ -56,10 +91,12 @@ async function createFragmentedPacks(repoPath: string): Promise<string[]> {
       return JSON.stringify(input.replaceAll('\\', '/'))
     })
   )
-  const blobs = git(
-    repoPath,
-    ['hash-object', '-w', '--stdin-paths', '--no-filters'],
-    `${inputs.join('\n')}\n`
+  const blobs = (
+    await runGit(
+      repoPath,
+      ['hash-object', '-w', '--stdin-paths', '--no-filters'],
+      `${inputs.join('\n')}\n`
+    )
   ).split(/\r?\n/)
   expect(blobs).toHaveLength(PACK_INDEX_THRESHOLD)
   expect(new Set(blobs).size).toBe(PACK_INDEX_THRESHOLD)
@@ -67,9 +104,9 @@ async function createFragmentedPacks(repoPath: string): Promise<string[]> {
     .map((content, index) => `${blobs[index]} blob ${Buffer.byteLength(content)}\n${content}\n`)
     .join('')
     .trim()
-  expect(git(repoPath, ['cat-file', '--batch'], `${blobs.join('\n')}\n`)).toBe(expected)
+  expect(await runGit(repoPath, ['cat-file', '--batch'], `${blobs.join('\n')}\n`)).toBe(expected)
   for (const blob of blobs) {
-    git(repoPath, ['pack-objects', join(objects, 'pack', 'pack')], `${blob}\n`)
+    await runGit(repoPath, ['pack-objects', join(objects, 'pack', 'pack')], `${blob}\n`)
     await rm(join(objects, blob.slice(0, 2), blob.slice(2)))
   }
   return blobs
@@ -86,18 +123,21 @@ function maintainIndex(repoPath: string) {
 }
 
 /** A repo whose only loose-ref backlog is the one the test asks for. */
-async function createRepo(looseRefs: number): Promise<{ repoPath: string; refsDir: string }> {
+async function createRepo(
+  looseRefs: number,
+  runGit: TestGit = git
+): Promise<{ repoPath: string; refsDir: string }> {
   const root = await mkdtemp(join(tmpdir(), 'orca-ref-maintenance-git-'))
   roots.push(root)
   const repoPath = join(root, 'repo')
-  execFileSync('git', ['init', '--quiet', repoPath])
-  git(repoPath, ['symbolic-ref', 'HEAD', 'refs/heads/main'])
-  git(repoPath, ['config', 'user.email', 'test@example.com'])
-  git(repoPath, ['config', 'user.name', 'Test User'])
+  await runGit(process.cwd(), ['init', '--quiet', repoPath])
+  await runGit(repoPath, ['symbolic-ref', 'HEAD', 'refs/heads/main'])
+  await runGit(repoPath, ['config', 'user.email', 'test@example.com'])
+  await runGit(repoPath, ['config', 'user.name', 'Test User'])
   await writeFile(join(repoPath, 'file.txt'), 'one\n')
-  git(repoPath, ['add', 'file.txt'])
-  git(repoPath, ['commit', '--quiet', '-m', 'initial'])
-  const head = git(repoPath, ['rev-parse', 'HEAD'])
+  await runGit(repoPath, ['add', 'file.txt'])
+  await runGit(repoPath, ['commit', '--quiet', '-m', 'initial'])
+  const head = await runGit(repoPath, ['rev-parse', 'HEAD'])
   // Written directly: `update-ref` for thousands of refs is the slow part of the fixture.
   const namespace = join(repoPath, '.git', 'refs', 'remotes', 'origin')
   await mkdir(namespace, { recursive: true })
@@ -119,6 +159,7 @@ function createMaintenance(
     looseRefThreshold: THRESHOLD,
     ...(now ? { now } : {})
   })
+  ownedMaintenance.add(maintenance)
   return {
     maintenance,
     arm: (repoPath: string) => {
@@ -155,88 +196,135 @@ async function settleUntil(
   }
 }
 
+beforeEach(async ({ signal, task }) => {
+  const indexesFragmentedPacks =
+    task.name === 'indexes fragmented packs without rewriting objects or requiring loose-ref debt'
+  if (
+    !indexesFragmentedPacks &&
+    task.name !== 'refreshes new packs during ref cooldown and keeps readers working between writes'
+  ) {
+    return
+  }
+  fixtureGit.useSignal(signal, null)
+  const runGit: TestGit = async (cwd, args, input) =>
+    (await fixtureGit.git(cwd, args, { input })).trim()
+  pendingSetup = (async () => {
+    preparedRepoPath = (await createRepo(0, runGit)).repoPath
+    if (indexesFragmentedPacks) {
+      await runGit(preparedRepoPath, ['config', 'maintenance.auto', 'true'])
+      await runGit(preparedRepoPath, ['config', 'gc.auto', '6700'])
+    }
+    preparedPacks = join(preparedRepoPath, '.git', 'objects', 'pack')
+    preparedBlobs = await createFragmentedPacks(preparedRepoPath, runGit)
+    if (indexesFragmentedPacks) {
+      preparedOriginalPacks = (await readdir(preparedPacks)).sort()
+    }
+  })()
+  await pendingSetup
+})
+
 afterEach(async () => {
+  await Promise.allSettled([
+    ...(pendingSetup ? [pendingSetup] : []),
+    ...(pendingSubject ? [pendingSubject] : [])
+  ])
+  for (const maintenance of ownedMaintenance) {
+    maintenance.dispose()
+    await maintenance.whenAttemptSettled()
+  }
+  ownedMaintenance.clear()
+  await fixtureGit.settle()
+  await Promise.all(subjectChildren.closed.splice(0))
+  pendingSetup = undefined
+  pendingSubject = undefined
   _resetLocalRepoRefMaintenanceForTests()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
 describe('idle ref maintenance against real Git', () => {
-  it('indexes fragmented packs without rewriting objects or requiring loose-ref debt', async () => {
-    const { repoPath } = await createRepo(0)
-    git(repoPath, ['config', 'maintenance.auto', 'true'])
-    git(repoPath, ['config', 'gc.auto', '6700'])
-    const objects = join(repoPath, '.git', 'objects')
-    const packs = join(objects, 'pack')
-    const blobs = await createFragmentedPacks(repoPath)
-    const originalPacks = (await readdir(packs)).sort()
-    const lock = join(packs, 'multi-pack-index.lock')
-    await writeFile(lock, 'another writer')
-    const blocked = createMaintenance()
-    blocked.arm(repoPath)
-    await settle(blocked.maintenance)
-    blocked.maintenance.dispose()
-    await expect(readFile(lock, 'utf8')).resolves.toBe('another writer')
-    await expect(readFile(join(packs, 'multi-pack-index'))).rejects.toMatchObject({
-      code: 'ENOENT'
-    })
-    await rm(lock)
-    const { maintenance, arm } = createMaintenance()
-    arm(repoPath)
-    await settle(maintenance)
-    maintenance.dispose()
-    const index = await readFile(join(packs, 'multi-pack-index'))
-    expect(index.subarray(0, 4).toString()).toBe('MIDX')
-    expect((await readdir(packs)).filter((name) => name !== 'multi-pack-index').sort()).toEqual(
-      originalPacks
-    )
-    expect(git(repoPath, ['multi-pack-index', 'verify'])).toBe('')
-    expect(git(repoPath, ['-c', 'core.multiPackIndex=true', 'cat-file', '-p', blobs[0]])).toBe(
-      'packed-0'
-    )
-    expect(
-      git(repoPath, [
-        '-c',
-        'core.multiPackIndex=true',
-        'cat-file',
-        '-p',
-        blobs[PACK_INDEX_THRESHOLD - 1]
-      ])
-    ).toBe(`packed-${PACK_INDEX_THRESHOLD - 1}`)
-    await expect(readFile(join(repoPath, '.git', 'packed-refs'))).rejects.toMatchObject({
-      code: 'ENOENT'
-    })
+  it('indexes fragmented packs without rewriting objects or requiring loose-ref debt', async ({
+    signal
+  }) => {
+    fixtureGit.useSignal(signal)
+    pendingSubject = (async () => {
+      const repoPath = preparedRepoPath
+      const packs = preparedPacks
+      const blobs = preparedBlobs
+      const originalPacks = preparedOriginalPacks
+      const verifyGit = async (args: string[]) => (await fixtureGit.git(repoPath, args)).trim()
+      const lock = join(packs, 'multi-pack-index.lock')
+      await writeFile(lock, 'another writer')
+      const blocked = createMaintenance()
+      blocked.arm(repoPath)
+      await settle(blocked.maintenance)
+      blocked.maintenance.dispose()
+      await expect(readFile(lock, 'utf8')).resolves.toBe('another writer')
+      await expect(readFile(join(packs, 'multi-pack-index'))).rejects.toMatchObject({
+        code: 'ENOENT'
+      })
+      await rm(lock)
+      const { maintenance, arm } = createMaintenance()
+      arm(repoPath)
+      await settle(maintenance)
+      maintenance.dispose()
+      const index = await readFile(join(packs, 'multi-pack-index'))
+      expect(index.subarray(0, 4).toString()).toBe('MIDX')
+      expect((await readdir(packs)).filter((name) => name !== 'multi-pack-index').sort()).toEqual(
+        originalPacks
+      )
+      expect(await verifyGit(['multi-pack-index', 'verify'])).toBe('')
+      expect(await verifyGit(['-c', 'core.multiPackIndex=true', 'cat-file', '-p', blobs[0]])).toBe(
+        'packed-0'
+      )
+      expect(
+        await verifyGit([
+          '-c',
+          'core.multiPackIndex=true',
+          'cat-file',
+          '-p',
+          blobs[PACK_INDEX_THRESHOLD - 1]
+        ])
+      ).toBe(`packed-${PACK_INDEX_THRESHOLD - 1}`)
+      await expect(readFile(join(repoPath, '.git', 'packed-refs'))).rejects.toMatchObject({
+        code: 'ENOENT'
+      })
+    })()
+    await pendingSubject
   })
 
   it('refreshes new packs during ref cooldown and keeps readers working between writes', async () => {
-    const { repoPath } = await createRepo(0)
-    const blobs = await createFragmentedPacks(repoPath)
-    const packs = join(repoPath, '.git', 'objects', 'pack')
-    let clock = 0
-    const { maintenance, arm } = createMaintenance(
-      () => {},
-      () => clock
-    )
-    arm(repoPath)
-    await settle(maintenance)
-    expect((await readFile(join(packs, 'multi-pack-index'))).readUInt32BE(8)).toBe(
-      PACK_INDEX_THRESHOLD
-    )
-    const added = git(repoPath, ['hash-object', '-w', '--stdin'], 'new fetched object\n')
-    git(repoPath, ['pack-objects', join(packs, 'pack')], `${added}\n`)
-    await rm(join(repoPath, '.git', 'objects', added.slice(0, 2), added.slice(2)))
-    expect(git(repoPath, ['cat-file', '-p', added])).toBe('new fetched object')
-    expect(git(repoPath, ['cat-file', '-p', blobs[0]])).toBe('packed-0')
-    clock = PACK_INDEX_MAINTENANCE_COOLDOWN_MS + 1
-    arm(repoPath)
-    await settle(maintenance)
-    maintenance.dispose()
-    expect((await readFile(join(packs, 'multi-pack-index'))).readUInt32BE(8)).toBe(
-      PACK_INDEX_THRESHOLD + 1
-    )
-    expect(git(repoPath, ['multi-pack-index', 'verify'])).toBe('')
-    await expect(readFile(join(repoPath, '.git', 'packed-refs'))).rejects.toMatchObject({
-      code: 'ENOENT'
-    })
+    pendingSubject = (async () => {
+      const repoPath = preparedRepoPath
+      const blobs = preparedBlobs
+      const packs = preparedPacks
+      let clock = 0
+      const { maintenance, arm } = createMaintenance(
+        () => {},
+        () => clock
+      )
+      arm(repoPath)
+      await settle(maintenance)
+      expect((await readFile(join(packs, 'multi-pack-index'))).readUInt32BE(8)).toBe(
+        PACK_INDEX_THRESHOLD
+      )
+      const added = git(repoPath, ['hash-object', '-w', '--stdin'], 'new fetched object\n')
+      git(repoPath, ['pack-objects', join(packs, 'pack')], `${added}\n`)
+      await rm(join(repoPath, '.git', 'objects', added.slice(0, 2), added.slice(2)))
+      expect(git(repoPath, ['cat-file', '-p', added])).toBe('new fetched object')
+      expect(git(repoPath, ['cat-file', '-p', blobs[0]])).toBe('packed-0')
+      clock = PACK_INDEX_MAINTENANCE_COOLDOWN_MS + 1
+      arm(repoPath)
+      await settle(maintenance)
+      maintenance.dispose()
+      expect((await readFile(join(packs, 'multi-pack-index'))).readUInt32BE(8)).toBe(
+        PACK_INDEX_THRESHOLD + 1
+      )
+      expect(git(repoPath, ['multi-pack-index', 'verify'])).toBe('')
+      await expect(readFile(join(repoPath, '.git', 'packed-refs'))).rejects.toMatchObject({
+        code: 'ENOENT'
+      })
+    })()
+    await pendingSubject
   })
 
   it.skipIf(!hasWriteOption('bitmap'))(
@@ -339,6 +427,7 @@ describe('idle ref maintenance against real Git', () => {
       quietPeriodMs: QUIET_MS,
       looseRefThreshold: THRESHOLD
     })
+    ownedMaintenance.add(maintenance)
     for (const { repoPath } of repos) {
       const target = createLocalRepoRefMaintenanceTarget({
         key: `local::${repoPath}`,

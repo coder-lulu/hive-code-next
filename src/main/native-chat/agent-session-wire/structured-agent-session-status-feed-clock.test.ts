@@ -1,3 +1,7 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener
+} from '../agent-session-journal/journal-host-database-test-support'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 // Which journal changes republish a session's status now that the summary carries its own state
 // clock: a moved clock always does, and row activity alone does not once the clock dates the state.
@@ -11,10 +15,10 @@ import type {
   AgentJournalItemIdentity
 } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionStatusSummary } from '../../../shared/agent-session-wire'
-import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import { StructuredAgentSessionStatusFeed } from './structured-agent-session-status-feed'
 import { indexedStatusFeedSession } from './structured-agent-session-status-feed-test-session'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 
 const SESSION = 'clock-session'
 const THREAD = 'thread-1'
@@ -28,6 +32,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await journals.closeAll()
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -55,7 +60,7 @@ async function openFeed() {
       workspaceId: 'workspace-1',
       hostId: 'local',
       agent: 'codex',
-      providerHandle: { kind: 'codex', threadId: THREAD }
+      providerHandle: codexProviderHandle(THREAD)
     },
     now: () => (clock += 100),
     stateDirectory: join(root, SESSION)

@@ -58,7 +58,15 @@ vi.mock('node:fs', async () => {
   }
 })
 
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync, appendFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+  appendFileSync,
+  utimesSync
+} from 'node:fs'
 import { scanCodexUsageFiles } from './scanner'
 import type { CodexUsagePersistedFile } from './types'
 
@@ -546,8 +554,17 @@ describe('scanCodexUsageFiles incremental append', () => {
     expect(recordedResumeOffset(first.processedFiles, rolloutPath)).toBeGreaterThan(0)
 
     writeFileSync(rolloutPath, replacement, 'utf-8')
+    const cachedFile = first.processedFiles.find((file) => file.path === rolloutPath)
+    if (!cachedFile) {
+      throw new Error('Expected the rollout in the cached scan')
+    }
+    // Reach the digest guard even when both writes land in one filesystem clock tick.
+    utimesSync(rolloutPath, statSync(rolloutPath).atime, new Date(cachedFile.mtimeMs + 1000))
+    expect(statSync(rolloutPath).mtimeMs).not.toBe(cachedFile.mtimeMs)
 
+    streamReads.length = 0
     const second = await scanCodexUsageFiles([], first.processedFiles)
+    expect(parseReadOffsets(rolloutPath)).toEqual([0])
     const fromScratch = await scanCodexUsageFiles([], [])
     expect(second.dailyAggregates).toEqual(fromScratch.dailyAggregates)
     expect(totalTokens(second.dailyAggregates)).toBe(swappedFrom + 10 * 3)

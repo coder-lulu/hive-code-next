@@ -1,4 +1,4 @@
-import { statSync, watch, type FSWatcher } from 'node:fs'
+import { realpathSync, statSync, watch, type FSWatcher } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { join } from 'node:path'
 import type { Event as ParcelWatcherEvent } from '@parcel/watcher'
@@ -81,7 +81,9 @@ export function startShallowWatcher(
     }
     const directoryPath = join(rootPath, parent)
     try {
-      const watcher = watch(directoryPath, { persistent: false }, (eventType, fileName) => {
+      const watchPath =
+        process.platform === 'win32' ? realpathSync.native(directoryPath) : directoryPath
+      const watcher = watch(watchPath, { persistent: false }, (eventType, fileName) => {
         if (disposed) {
           return
         }

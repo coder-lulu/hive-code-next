@@ -13,6 +13,7 @@ import { GitHandler } from './git-handler'
 import { RelayContext } from './context'
 import {
   createMockDispatcher,
+  createGitTestRunner,
   gitInit,
   gitCommit,
   type MockDispatcher,
@@ -48,38 +49,67 @@ function createPathspecCollisionChanges(dir: string): void {
 describe('GitHandler — commit & staging', () => {
   let dispatcher: MockDispatcher
   let tmpDir: string
+  const fixtureGit = createGitTestRunner()
+  let pendingSetup: Promise<void> | undefined
+  let pendingSubject: Promise<void> | undefined
 
-  beforeEach(() => {
+  beforeEach(async ({ signal, task }) => {
     tmpDir = mkdtempSync(path.join(tmpdir(), 'relay-git-staging-'))
     dispatcher = createMockDispatcher()
     const ctx = new RelayContext()
     // eslint-disable-next-line no-new
     new GitHandler(dispatcher as unknown as RelayDispatcher, ctx)
+    if (task.name === 'commits staged changes and returns success') {
+      fixtureGit.useSignal(signal, null)
+      pendingSetup = (async () => {
+        await fixtureGit.git(tmpDir, ['init'])
+        await fixtureGit.git(tmpDir, ['config', 'user.email', 'test@test.com'])
+        await fixtureGit.git(tmpDir, ['config', 'user.name', 'Test'])
+        writeFileSync(path.join(tmpDir, 'file.txt'), 'content')
+        await fixtureGit.git(tmpDir, ['add', '.'])
+        await fixtureGit.git(tmpDir, [
+          '-c',
+          'user.email=test@test.com',
+          '-c',
+          'user.name=Test',
+          'commit',
+          '-m',
+          'initial',
+          '--allow-empty'
+        ])
+        writeFileSync(path.join(tmpDir, 'file.txt'), 'changed')
+        await fixtureGit.git(tmpDir, ['add', 'file.txt'])
+      })()
+      await pendingSetup
+    }
   })
 
   afterEach(async () => {
+    await Promise.allSettled([
+      ...(pendingSetup ? [pendingSetup] : []),
+      ...(pendingSubject ? [pendingSubject] : [])
+    ])
+    await fixtureGit.settle()
+    pendingSetup = undefined
+    pendingSubject = undefined
+
     await fs.rm(tmpDir, { recursive: true, force: true })
   })
 
   describe('commit', () => {
-    it('commits staged changes and returns success', async () => {
-      gitInit(tmpDir)
-      writeFileSync(path.join(tmpDir, 'file.txt'), 'content')
-      gitCommit(tmpDir, 'initial')
-      writeFileSync(path.join(tmpDir, 'file.txt'), 'changed')
-      execFileSync('git', ['add', 'file.txt'], { cwd: tmpDir, stdio: 'pipe' })
+    it('commits staged changes and returns success', async ({ signal }) => {
+      fixtureGit.useSignal(signal)
+      pendingSubject = (async () => {
+        const result = (await dispatcher.callRequest('git.commit', {
+          worktreePath: tmpDir,
+          message: 'feat: relay commit'
+        })) as { success: boolean; error?: string }
 
-      const result = (await dispatcher.callRequest('git.commit', {
-        worktreePath: tmpDir,
-        message: 'feat: relay commit'
-      })) as { success: boolean; error?: string }
-
-      expect(result).toEqual({ success: true })
-      const latestMessage = execFileSync('git', ['log', '-1', '--format=%s'], {
-        cwd: tmpDir,
-        encoding: 'utf-8'
-      }).trim()
-      expect(latestMessage).toBe('feat: relay commit')
+        expect(result).toEqual({ success: true })
+        const latestMessage = (await fixtureGit.git(tmpDir, ['log', '-1', '--format=%s'])).trim()
+        expect(latestMessage).toBe('feat: relay commit')
+      })()
+      await pendingSubject
     })
 
     // Why: covers the error-extraction path in commitChangesRelay

@@ -5,6 +5,14 @@ import { cn } from '@/lib/utils'
 import type { HiveWorkflowCaseSummary } from '../../../../../shared/hive-workflow-cases'
 
 const boardGroups = ['product', 'developer', 'tester', 'ops', 'done', 'cancelled'] as const
+const boardLabelKeys = {
+  product: 'hiveWorkflow.roles.product',
+  developer: 'hiveWorkflow.roles.developer',
+  tester: 'hiveWorkflow.roles.tester',
+  ops: 'hiveWorkflow.roles.ops',
+  done: 'hiveWorkflowCases.caseStatuses.done',
+  cancelled: 'hiveWorkflowCases.caseStatuses.cancelled'
+} as const
 
 function CaseEntry({
   item,
@@ -108,11 +116,7 @@ export function HiveWorkflowCaseBrowser({
                 const grouped = items.filter(
                   (item) => (item.terminalKind ?? item.currentStageRole) === group
                 )
-                const label = t(
-                  group === 'done' || group === 'cancelled'
-                    ? `hiveWorkflowCases.caseStatuses.${group}`
-                    : `hiveWorkflow.roles.${group}`
-                )
+                const label = t(boardLabelKeys[group])
                 return (
                   <section
                     key={group}

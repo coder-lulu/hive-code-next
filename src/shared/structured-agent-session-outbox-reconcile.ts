@@ -22,8 +22,7 @@ export function reconcileStructuredAgentSessionOutbox(
   // none changed: a caller re-reading every journal batch writes nothing then.
   const next = entries.flatMap((entry) => {
     const submission = settled.get(entry.clientMessageId)
-    // Settled by the host: its history shows one delivered; a withdrawn one goes back to the
-    // composer.
+    // Settled by the host: its history shows one delivered, and one a Stop took back in place.
     if (submission?.dispatchState === 'accepted' || dispatchWasWithdrawn(submission)) {
       return []
     }
@@ -34,6 +33,13 @@ export function reconcileStructuredAgentSessionOutbox(
       return entry.state === 'unconfirmed' && entry.retryAfterUnknownSubmittedAt === -1
         ? [entry]
         : [{ ...entry, state: 'unconfirmed' as const, retryAfterUnknownSubmittedAt: -1 }]
+    }
+    // The host kept it as a card, which carries the text from here, edited or deleted included.
+    if (
+      submission?.dispatchState === 'rejected' &&
+      submission.keptAsQueuedMessageId !== undefined
+    ) {
+      return []
     }
     if (submission?.dispatchState === 'rejected') {
       // Its row draws it once loaded; until then the entry does, as the host recorded it. An older

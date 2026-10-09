@@ -23,6 +23,8 @@ export const jiraApi: PreloadApi['jira'] = {
   listCreateFields: (args) => ipcRenderer.invoke('jira:listCreateFields', args),
   listPriorities: (args) => ipcRenderer.invoke('jira:listPriorities', args),
   listAssignableUsers: (args) => ipcRenderer.invoke('jira:listAssignableUsers', args),
+  listAssignableUsersForProject: (args) =>
+    ipcRenderer.invoke('jira:listAssignableUsersForProject', args),
   searchUsers: (args) => ipcRenderer.invoke('jira:searchUsers', args),
   listTransitions: (args) => ipcRenderer.invoke('jira:listTransitions', args),
   getProjectStatusOrder: (args) => ipcRenderer.invoke('jira:getProjectStatusOrder', args)

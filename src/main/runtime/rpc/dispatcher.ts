@@ -26,6 +26,7 @@ import { RpcStreamingDispatcher } from './rpc-streaming-dispatcher'
 import type { HiveRuntimeCloudControl } from '../../hive-runtime-cloud/hive-runtime-cloud-control'
 import { invokeDispatcherUnaryMethod } from './dispatcher-unary-method-invocation'
 import { assertRpcRequestAuthorized } from './dispatcher-authorization'
+import { resolveRpcCallerIdentity } from './rpc-caller-identity'
 import {
   needsOrchestrationCallerResolution,
   resolveOrchestrationSessionCaller,
@@ -132,6 +133,7 @@ export class RpcDispatcher {
           pairedDeviceId: options?.pairedDeviceId,
           authenticatedAccountRuntimeSessionId: options?.authenticatedAccountRuntimeSessionId,
           authenticatedAccountOperationCallerKey: options?.authenticatedAccountOperationCallerKey,
+          caller: resolveRpcCallerIdentity(options),
           clientKind: options?.clientKind,
           clientCapabilities: options?.clientCapabilities,
           updateClientCapabilities: options?.updateClientCapabilities,

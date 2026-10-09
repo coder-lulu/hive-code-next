@@ -133,7 +133,7 @@ beforeEach(async () => {
         workspaceId: entry.projectScope,
         hostId: 'host-1',
         agent: 'pi',
-        providerHandle: { kind: 'opaque' as const, agent: 'pi', value: id }
+        providerHandle: { transport: 'managed-pi', agent: 'pi', nativeId: id }
       }
       const journal = await journals.open({
         identity,

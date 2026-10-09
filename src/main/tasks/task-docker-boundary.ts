@@ -63,7 +63,7 @@ export function createTaskDockerBoundary(options: {
   )
   const run = options.run ?? runProcess
   const dispatch = options.dispatch
-  const exitProof = new RetryableProcessExitProof()
+  const exitProof = new RetryableProcessExitProof<boolean>((proven) => proven)
   let containerId = recovery?.containerId ?? null
   let imageEnv: Record<string, string> | null = null
   let daemon: TaskDockerDaemonIdentity | null = options.expectedDaemon ?? recovery?.daemon ?? null

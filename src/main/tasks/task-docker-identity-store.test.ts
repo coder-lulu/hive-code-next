@@ -285,14 +285,22 @@ describe('Docker identity checkpoints in the original Task transaction', () => {
       const before = await admission()
       const text = await readPersistedTestAgentSessionStoreText(directory)
       const write = vi.spyOn(openTestJournalHostDatabase(directory), 'transaction')
-      await expect(
-        Reflect.apply(store.tasks.persistDockerIdentity, store.tasks, [
-          taskCommand(),
-          dockerIdentity(before),
-          TASK_TEST_NOW,
-          ...values
-        ])
-      ).rejects.toThrow('INVALID_REQUEST')
+      type PersistIdentity = AgentSessionRecordStore['tasks']['persistDockerIdentity']
+      type InvalidValidatorInput = (
+        identity: Parameters<PersistIdentity>[0],
+        dockerIdentity: Parameters<PersistIdentity>[1],
+        now: number,
+        validate?: unknown
+      ) => ReturnType<PersistIdentity>
+      // Keep omitted and present-undefined calls distinct while exercising the real guard.
+      const persistIdentity = store.tasks.persistDockerIdentity.bind(
+        store.tasks
+      ) as InvalidValidatorInput
+      const attempt =
+        values.length === 0
+          ? persistIdentity(taskCommand(), dockerIdentity(before), TASK_TEST_NOW)
+          : persistIdentity(taskCommand(), dockerIdentity(before), TASK_TEST_NOW, values[0])
+      await expect(attempt).rejects.toThrow('INVALID_REQUEST')
       expect(store.tasks.get(taskCommand())).toEqual(before)
       expect(write).not.toHaveBeenCalled()
       expect(await readPersistedTestAgentSessionStoreText(directory)).toBe(text)

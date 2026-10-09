@@ -22,6 +22,7 @@ import {
 } from '../shared/product-update-source'
 import * as productUpdateSourceModule from '../shared/product-update-source'
 import { isProductVersion } from '../shared/product-version'
+import { profileStateBuildCompatibilityError } from '../shared/profile-state-build-compatibility'
 import {
   APP_DISPLAY_NAME,
   PRIMARY_CLI_COMMAND,
@@ -2303,6 +2304,11 @@ async function checkForLocalBuildFromMenu(): Promise<void> {
     if (!candidate) {
       return
     }
+    const compatibilityError = profileStateBuildCompatibilityError(app.getVersion(), candidate.version)
+    if (compatibilityError) {
+      await candidate.close()
+      throw new Error(compatibilityError)
+    }
     closeLocalBuildFeed()
     const feed = await startLocalBuildFeed(candidate)
     advanceUpdateAuthorityEpoch()
@@ -2406,6 +2412,10 @@ async function checkForPinnedBuild(channel: ReleaseChannel, tag: string): Promis
   pinnedBuildSelectionInProgress = true
   try {
     const target = resolveTargetBuild(channel, tag)
+    const compatibilityError = profileStateBuildCompatibilityError(app.getVersion(), target.version)
+    if (compatibilityError) {
+      throw new Error(compatibilityError)
+    }
     if (compareVersions(target.version, app.getVersion()) === 0) {
       sendSettledCheckStatus({ state: 'not-available', userInitiated: true })
       return

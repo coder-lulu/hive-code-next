@@ -1,3 +1,8 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -10,10 +15,6 @@ import type { AgentSessionMutationEnvelope } from '../../../shared/agent-session
 import type { AgentChildWorkView } from '../../../shared/agent-status-child-work-view'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
-import {
-  createTrackedJournalOpener,
-  openTestJournalHostDatabase
-} from '../agent-session-journal/journal-host-database-test-support'
 import type {
   AgentSessionDispatchOutcome,
   StructuredAgentSessionAdapter
@@ -30,6 +31,8 @@ import {
   resetHostTestOperationIds
 } from './structured-agent-session-host-test-data'
 import { recordingProductionStructuredAgentSessionLogger } from './structured-agent-session-logger-test-support'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { claudeAndCodexDeclared } from './structured-agent-session-adapter-router-test-support'
 
 const journals = createTrackedJournalOpener()
 
@@ -141,7 +144,7 @@ beforeEach(async () => {
     },
     link: {
       linkId: `link-${fence}`,
-      handle: { provider: 'codex', threadId: THREAD },
+      handle: codexProviderHandle(THREAD),
       origin: store.getRecord(SESSION)?.providerHandleChain.length ? 'resumed' : 'created',
       mintedAtFence: fence,
       observedAt: NOW
@@ -156,6 +159,7 @@ beforeEach(async () => {
   recoveryCapsule = new TrackedTestRecoveryCapsule(root)
   log = recordingProductionStructuredAgentSessionLogger()
   host = new StructuredAgentSessionHost({
+    agents: claudeAndCodexDeclared(),
     logger: log.logger,
     store,
     adapter: adapter(),
@@ -172,6 +176,7 @@ afterEach(async () => {
   await journals.closeAll()
   // A host a test replaced can still hold the capsule's lock directory under `root`.
   await recoveryCapsule.settled()
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 

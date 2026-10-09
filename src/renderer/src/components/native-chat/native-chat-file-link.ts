@@ -1,5 +1,5 @@
-import { routeNativeChatHref } from '../../../../shared/native-chat-href-routing'
 import type { Worktree } from '../../../../shared/worktree/types'
+import { routeNativeChatHref } from '../../../../shared/native-chat-href-routing'
 import {
   parseExplicitFileLinkTarget,
   resolveExplicitFileLinkTarget
@@ -9,6 +9,7 @@ import type { AppState } from '@/store/types'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { resolveWorktreeOperationRouteResult } from '@/lib/worktree-operation-route'
 import { getExecutionHostIdFromWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
+import { resolveNativeChatTabDirectory } from './native-chat-tab-directory'
 
 export type NativeChatFileLinkContext = {
   worktreeId: string
@@ -33,6 +34,8 @@ type NativeChatFileLinkState = Pick<
   | 'worktreesByRepo'
 > & {
   unifiedTabsByWorktree?: AppState['unifiedTabsByWorktree']
+  floatingWorkspacePath?: AppState['floatingWorkspacePath']
+  structuredSessionLaunchDirectoryByTabId?: AppState['structuredSessionLaunchDirectoryByTabId']
 }
 
 export function findTerminalTabWorktreeId(
@@ -60,6 +63,24 @@ function findWorktreeFallback(
     }
   }
   return null
+}
+
+/** The workspace that owns a native chat tab, independent of whether its directory is known. */
+export function findNativeChatTabOwnerWorktreeId(
+  state: Pick<NativeChatFileLinkState, 'tabsByWorktree' | 'unifiedTabsByWorktree'>,
+  tabId: string
+): string | null {
+  const owners = [
+    ...Object.entries(state.tabsByWorktree).flatMap(([bucket, tabs]) =>
+      tabs.filter((tab) => tab.id === tabId).map(() => bucket)
+    ),
+    ...Object.entries(state.unifiedTabsByWorktree ?? {}).flatMap(([bucket, tabs]) =>
+      tabs
+        .filter((tab) => tab.id === tabId && tab.contentType === 'agent-session')
+        .map(() => bucket)
+    )
+  ]
+  return owners.length === 1 ? owners[0] : null
 }
 
 export function resolveNativeChatFileLinkContext(
@@ -115,6 +136,7 @@ export function resolveNativeChatFileLinkContext(
     : findWorktreeFallback(state.worktreesByRepo, worktreeId)
   const workspaceScope = parseWorkspaceKey(worktreeId)
   const worktreePath =
+    resolveNativeChatTabDirectory(state, terminalTabId, worktreeId) ??
     worktree?.path ??
     (workspaceScope?.type === 'folder'
       ? (state.folderWorkspaces.find(

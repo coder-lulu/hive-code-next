@@ -6,6 +6,8 @@ import type { NativeChatMessageList } from '@/components/native-chat/NativeChatM
 import type { HiveAccountState } from '../../../../../shared/hive-account'
 import type { HiveWorkflowCaseView } from '../../../../../shared/hive-workflow-cases'
 import type { HiveWorkflowCaseRun } from '../../../../../shared/hive-workflow-case-runs'
+import type { AgentJournalSubmission } from '../../../../../shared/agent-session-journal-types'
+import { agentJournalSubmissionKey } from '../../../../../shared/agent-session-journal-item-key'
 import { HiveWorkflowCaseRuns } from './HiveWorkflowCaseRuns'
 import type { HiveWorkflowCaseRunsModel } from './use-hive-workflow-case-runs'
 import { executableWorkflowCase, workflowCaseRun } from './hive-workflow-case-run.test-fixtures'
@@ -135,6 +137,62 @@ describe('original stage session entry and passive panel', () => {
       expect(model.cancel).not.toHaveBeenCalled()
     }
   )
+  it('projects an original rejected submission in place without losing its journal identity', async () => {
+    const page = workflowSessionPage()
+    const rejected: AgentJournalSubmission = {
+      clientMessageId: 'original-rejected-send',
+      fence: 1,
+      payloadFingerprint: 'original-fingerprint',
+      dispatchState: 'rejected',
+      providerItemId: null,
+      reason: 'Original provider refused the send',
+      submittedAt: 41,
+      resolvedAt: 42
+    }
+    const rejectedItem = {
+      ...page.history.page.items[0],
+      itemId: agentJournalSubmissionKey(rejected.clientMessageId),
+      body: {
+        kind: 'message',
+        role: 'user',
+        blocks: [{ type: 'text', text: 'Original rejected send' }]
+      }
+    }
+    api.getWorkflowCaseSessionPage.mockResolvedValue({
+      ...page,
+      history: {
+        ...page.history,
+        page: {
+          ...page.history.page,
+          items: [rejectedItem, page.history.page.items[1]],
+          submissions: [rejected]
+        }
+      }
+    })
+    await mount()
+    await openSession()
+    const props = list.mock.calls.at(-1)![0]
+    expect(props.session.sessionId).toBe(page.sessionId)
+    expect(props.journalSubmissions).toEqual([rejected])
+    expect(props.journalItems?.[0]?.itemId).toBe(rejectedItem.itemId)
+    expect(props.session.messages).toHaveLength(2)
+    expect(props.session.messages.map((message) => message.id)).toEqual(
+      expect.arrayContaining([rejectedItem.itemId, page.history.page.items[1].itemId])
+    )
+    expect(
+      props.session.messages.find((message) => message.id === rejectedItem.itemId)
+    ).toMatchObject({
+      id: rejectedItem.itemId,
+      role: 'user',
+      blocks: [{ type: 'text', text: 'Original rejected send' }],
+      unsent: true
+    })
+    expect(props.allowFileUriLinks).toBe(false)
+    expect(props).not.toHaveProperty('runtimeContext')
+    expect(props).not.toHaveProperty('onLinkClick')
+    expect(api.startWorkflowCase).not.toHaveBeenCalled()
+    expect(api.cancel).not.toHaveBeenCalled()
+  })
   it('disables duplicate row selection during reading and closes without changing the selected Case', async () => {
     const pending = deferredWorkbenchValue<unknown>()
     api.getWorkflowCaseSessionPage.mockReturnValue(pending.promise)
@@ -190,6 +248,27 @@ describe('original stage session entry and passive panel', () => {
     })
     expect(container.querySelector('[role=alert]')).toBeNull()
     expect(list).toHaveBeenCalled()
+  })
+  it('maps owner revocation to localized forbidden copy and prevents further history reads', async () => {
+    await mount()
+    await openSession()
+    expect(container.querySelector('[data-passive-transcript]')).not.toBeNull()
+    const readsBeforeRevocation = api.getWorkflowCaseSessionPage.mock.calls.length
+    await act(async () => {
+      listeners.forEach((listener) =>
+        listener({ configured: true, status: 'signed-out', persistence: 'none' })
+      )
+    })
+    expect(container.querySelector('[role=alert]')?.textContent).toBe(
+      'hiveWorkflowCases.session.errors.forbidden'
+    )
+    expect(container.textContent).not.toContain('FORBIDDEN')
+    expect(container.querySelector('[data-passive-transcript]')).toBeNull()
+    expect(button('hiveWorkflowCases.session.refresh').disabled).toBe(true)
+    act(() => button('hiveWorkflowCases.session.refresh').click())
+    expect(api.getWorkflowCaseSessionPage).toHaveBeenCalledTimes(readsBeforeRevocation)
+    expect(api.startWorkflowCase).not.toHaveBeenCalled()
+    expect(api.cancel).not.toHaveBeenCalled()
   })
   it('disables the row while the original Case model is busy', async () => {
     model = { ...model, busy: true }

@@ -27,6 +27,8 @@ describe('isGitRepo', () => {
 
   beforeEach(() => {
     tmpDir = mkdtempSync(path.join(tmpdir(), 'orca-repo-detect-'))
+    // Offline marker discovery must not inherit the repository containing the test's TEMP.
+    writeFileSync(path.join(tmpDir, '.git'), 'invalid test fixture boundary\n')
   })
 
   afterEach(() => {

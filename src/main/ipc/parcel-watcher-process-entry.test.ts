@@ -2,18 +2,29 @@ import { EventEmitter } from 'node:events'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { detectShallowWatchDeliveryMock, statMock, subscribeMock, watchMock, writeFileSyncMock } =
-  vi.hoisted(() => ({
-    detectShallowWatchDeliveryMock: vi.fn(),
-    statMock: vi.fn(),
-    subscribeMock: vi.fn(),
-    watchMock: vi.fn(),
-    writeFileSyncMock: vi.fn()
-  }))
+const {
+  detectShallowWatchDeliveryMock,
+  realpathSyncMock,
+  statMock,
+  statSyncMock,
+  subscribeMock,
+  watchMock,
+  writeFileSyncMock
+} = vi.hoisted(() => ({
+  detectShallowWatchDeliveryMock: vi.fn(),
+  realpathSyncMock: vi.fn(),
+  statMock: vi.fn(),
+  statSyncMock: vi.fn(),
+  subscribeMock: vi.fn(),
+  watchMock: vi.fn(),
+  writeFileSyncMock: vi.fn()
+}))
 
 vi.mock('node:fs', () => ({
   mkdtempSync: vi.fn(() => '/tmp/orca-watcher-canary-test'),
+  realpathSync: Object.assign(realpathSyncMock, { native: realpathSyncMock }),
   rmSync: vi.fn(),
+  statSync: statSyncMock,
   watch: watchMock,
   writeFileSync: writeFileSyncMock
 }))
@@ -33,7 +44,9 @@ describe('parcel watcher process canary', () => {
     vi.useFakeTimers()
     vi.resetModules()
     subscribeMock.mockReset()
+    realpathSyncMock.mockReset()
     statMock.mockReset()
+    statSyncMock.mockReset()
     watchMock.mockReset()
     writeFileSyncMock.mockReset()
     originalMessageListeners = process.listeners('message')
@@ -87,13 +100,28 @@ describe('parcel watcher process canary', () => {
     await vi.advanceTimersByTimeAsync(0)
 
     expect(sendMock).toHaveBeenCalledWith(
-      expect.objectContaining({ op: 'subscribe-failed', id: 7 })
+      expect.objectContaining({ op: 'subscribe-failed', id: 7 }),
+      expect.any(Function)
     )
+    const failedSend = sendMock.mock.calls.find(([message]) => message.op === 'subscribe-failed')
+    expect(() =>
+      failedSend![1](Object.assign(new Error('host disconnected'), { code: 'EPIPE' }))
+    ).not.toThrow()
     expect(watchMock).not.toHaveBeenCalledWith('/repo/.git', expect.anything(), expect.anything())
   })
 
   it('hosts shallow subscriptions without invoking the recursive native watcher', async () => {
     detectShallowWatchDeliveryMock.mockResolvedValue(true)
+    const directoryEntry = {
+      isDirectory: () => true,
+      dev: 1n,
+      ino: 2n,
+      birthtimeNs: 3n,
+      ctimeNs: 4n
+    }
+    realpathSyncMock.mockImplementation((path: string) => path)
+    statSyncMock.mockReturnValue(directoryEntry)
+    statMock.mockResolvedValue(directoryEntry)
     const watcherCallbacks = new Map<
       string,
       (eventType: string, fileName: string | Buffer | null) => void
@@ -314,10 +342,13 @@ describe('parcel watcher process canary', () => {
     finishActiveCrawl?.({ unsubscribe: vi.fn().mockResolvedValue(undefined) })
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(sendMock).toHaveBeenCalledWith({ op: 'unsubscribed', id: 2 })
+    expect(sendMock).toHaveBeenCalledWith({ op: 'unsubscribed', id: 2 }, expect.any(Function))
     expect(subscribeMock).toHaveBeenCalledTimes(2)
-    expect(sendMock).not.toHaveBeenCalledWith({ op: 'subscribe-started', id: 2 })
-    expect(sendMock).not.toHaveBeenCalledWith({ op: 'subscribed', id: 2 })
+    expect(sendMock).not.toHaveBeenCalledWith(
+      { op: 'subscribe-started', id: 2 },
+      expect.any(Function)
+    )
+    expect(sendMock).not.toHaveBeenCalledWith({ op: 'subscribed', id: 2 }, expect.any(Function))
   })
 
   it('unsubscribes a late cancel after the crawl already finished', async () => {
@@ -333,13 +364,16 @@ describe('parcel watcher process canary', () => {
     process.emit('message', { op: 'subscribe', id: 1, dir: '/finished', opts: {} })
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(sendMock).toHaveBeenCalledWith({ op: 'subscribed', id: 1 })
+    expect(sendMock).toHaveBeenCalledWith({ op: 'subscribed', id: 1 }, expect.any(Function))
     process.emit('message', { op: 'cancel-subscribe', id: 1 })
     await vi.advanceTimersByTimeAsync(0)
 
     expect(unsubscribe).toHaveBeenCalledTimes(1)
-    expect(sendMock).toHaveBeenCalledWith({ op: 'unsubscribed', id: 1 })
-    expect(sendMock).not.toHaveBeenCalledWith({ op: 'cancel-requires-restart', id: 1 })
+    expect(sendMock).toHaveBeenCalledWith({ op: 'unsubscribed', id: 1 }, expect.any(Function))
+    expect(sendMock).not.toHaveBeenCalledWith(
+      { op: 'cancel-requires-restart', id: 1 },
+      expect.any(Function)
+    )
   })
 
   it('reports native unsubscribe rejection without acknowledging handle release', async () => {
@@ -357,12 +391,15 @@ describe('parcel watcher process canary', () => {
     process.emit('message', { op: 'unsubscribe', id: 1 })
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(sendMock).toHaveBeenCalledWith({
-      op: 'unsubscribe-failed',
-      id: 1,
-      message: 'native handle still active'
-    })
-    expect(sendMock).not.toHaveBeenCalledWith({ op: 'unsubscribed', id: 1 })
+    expect(sendMock).toHaveBeenCalledWith(
+      {
+        op: 'unsubscribe-failed',
+        id: 1,
+        message: 'native handle still active'
+      },
+      expect.any(Function)
+    )
+    expect(sendMock).not.toHaveBeenCalledWith({ op: 'unsubscribed', id: 1 }, expect.any(Function))
   })
 
   it('asks the host to restart when an active crawl is cancelled', async () => {
@@ -381,10 +418,13 @@ describe('parcel watcher process canary', () => {
     await vi.advanceTimersByTimeAsync(0)
     process.emit('message', { op: 'cancel-subscribe', id: 1 })
 
-    expect(sendMock).toHaveBeenCalledWith({ op: 'cancel-requires-restart', id: 1 })
+    expect(sendMock).toHaveBeenCalledWith(
+      { op: 'cancel-requires-restart', id: 1 },
+      expect.any(Function)
+    )
     finishCrawl?.({ unsubscribe: vi.fn().mockResolvedValue(undefined) })
     await vi.advanceTimersByTimeAsync(0)
-    expect(sendMock).not.toHaveBeenCalledWith({ op: 'subscribed', id: 1 })
+    expect(sendMock).not.toHaveBeenCalledWith({ op: 'subscribed', id: 1 }, expect.any(Function))
   })
 
   it('still restarts after consecutive missed events once every subscription is live', async () => {
@@ -482,11 +522,14 @@ describe('parcel watcher process canary', () => {
     callback?.(null, [{ type: 'update', path: '/repo/after-overflow.txt' }])
     await vi.advanceTimersByTimeAsync(0)
 
-    expect(sendMock).toHaveBeenCalledWith({
-      op: 'watch-error',
-      id: 1,
-      message: 'Events were dropped by the FSEvents client. File system must be re-scanned.'
-    })
+    expect(sendMock).toHaveBeenCalledWith(
+      {
+        op: 'watch-error',
+        id: 1,
+        message: 'Events were dropped by the FSEvents client. File system must be re-scanned.'
+      },
+      expect.any(Function)
+    )
     expect(sendMock).toHaveBeenCalledWith(
       {
         op: 'events',

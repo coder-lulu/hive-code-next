@@ -15,13 +15,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { UPSTREAM_BASELINE_PINS } from '../../../config/scripts/prepare-cross-version-baselines.mjs'
 import type { StructuredAgentSessionAdapter } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-adapter'
 import type { StructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-host'
-import { abandonStructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-host-test-abandon'
 import { setStructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-registry'
 import type { AgentSessionRecordStore } from '../../../src/main/runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../../src/main/runtime/agent-session-record-store-test-harness'
-import { RuntimeSubscriptionRegistry } from '../../../src/main/runtime/runtime-subscription-registry'
 import type { AgentSessionSubscribeEvent } from '../../../src/shared/agent-session-wire'
 import {
   AGENT_SESSION_ACCEPTED_SEND_RUNTIME_CAPABILITY,
@@ -34,7 +33,16 @@ import {
   STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
 } from '../../../src/shared/protocol-version'
-import { resolveBaselineReleaseRef } from './release-checkout'
+import {
+  resolveBaselineReleaseRef,
+  resolveReleaseCheckoutCommit,
+  selectLatestStableReleaseTag
+} from './release-checkout'
+import {
+  callBuild,
+  expectDeclaredSurfaceExecutes,
+  runtimeStub
+} from './structured-agent-session-surface-execution'
 import {
   createStructuredHostFixture,
   installableHost,
@@ -66,12 +74,18 @@ import {
 } from './versioned-agent-session-wire'
 import {
   closeTestJournalHostDatabases,
+  closeTestJournalHostDatabase,
   openTestJournalHostDatabase
 } from '../../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-logger'
+import { codexProviderHandle } from '../../../src/shared/agent-session-provider-handle-encoding'
+import { NO_STRUCTURED_AGENTS } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-adapter-router-test-support'
+import { describeReleasedStopNoteProjection } from './cross-version-stop-note-scenarios'
 
 // Why: a cold CI run extracts the baseline checkout before the first pairing.
 const SUITE_TIMEOUT_MS = 180_000
+
+describeReleasedStopNoteProjection({ build: () => current, callBuild, runtimeStub })
 
 const CLIENT_CAPABILITY_UPDATE_METHOD = 'runtime.clientCapabilities.update'
 
@@ -84,31 +98,6 @@ beforeAll(async () => {
   current = await loadAgentSessionWireBuild(WORKING_TREE)
   baseline = await loadAgentSessionWireBuild(baselineRef)
 }, SUITE_TIMEOUT_MS)
-
-function runtimeStub(overrides: Record<string, unknown> = {}): unknown {
-  const subscriptions = new RuntimeSubscriptionRegistry()
-  return {
-    getRuntimeId: () => 'runtime-1',
-    getClientSettings: () => ({ experimentalStructuredNativeChat: true }),
-    ensureStructuredAgentSessionHost: async () => undefined,
-    getStructuredAgentSessionCreateSupport: async () => ({ supported: true }),
-    structuredAgentSessionLaunchSeedOptions: () => undefined,
-    resolveStructuredAgentSessionCreateIntent: async () => {
-      const {
-        envelope: _envelope,
-        providerHandle: _providerHandle,
-        ...resolved
-      } = attachParams(null)
-      return resolved
-    },
-    publishStructuredAgentSessionTab: () => {},
-    registerSubscriptionCleanup: subscriptions.register.bind(subscriptions),
-    registerOwnedSubscriptionCleanup: subscriptions.registerOwned.bind(subscriptions),
-    cleanupSubscription: subscriptions.cleanup.bind(subscriptions),
-    cleanupSubscriptionsByPrefix: subscriptions.cleanupByPrefix.bind(subscriptions),
-    ...overrides
-  }
-}
 
 /**
  * What a client too old to know the structured surface advertises: the baseline's
@@ -128,78 +117,20 @@ function baselineStructuredMethods(): string[] {
   return baseline.methodNames.filter((name) => name.startsWith('agentSession.'))
 }
 
-/** Every reply one call produced. Streaming methods answer more than once, and a
- *  refusal has to arrive as a reply rather than as silence. */
-async function callBuild(
-  build: AgentSessionWireBuild,
-  method: string,
-  params: unknown,
-  client: RpcClientIdentity,
-  runtime: unknown = runtimeStub()
-): Promise<RpcReply[]> {
-  const replies: RpcReply[] = []
-  await build
-    .createDispatcher(runtime)
-    .dispatchStreaming(
-      { id: `request-${method}`, authToken: 'cross-version-token', method, params },
-      (raw) => replies.push(JSON.parse(raw) as RpcReply),
-      client
-    )
-  return replies
-}
-
-/**
- * The one thing this suite exists to guarantee, written once and applied per
- * build: every method the manifest declares is not merely registered but reaches
- * its host method on this call, answers, and answers with its declared result.
- *
- * Written as a helper rather than inline because a build passing it is the claim,
- * and each skew that registers the surface owes the same claim — a check that
- * covers one method leaves the rest registered-but-unusable behind a green suite.
- */
-async function expectDeclaredSurfaceExecutes(
-  build: AgentSessionWireBuild,
-  hostCalls: Record<string, ReturnType<typeof vi.fn>>,
-  clientCapabilities: readonly string[]
-): Promise<void> {
-  for (const { method, hostMethod, result } of STRUCTURED_CALLS) {
-    // Two methods share one host method, so "has been called" would already be
-    // true from the earlier one: only this call's own delta pins the pairing.
-    const before = hostMethod ? hostCalls[hostMethod].mock.calls.length : 0
-    const replies = await callBuild(build, method, paramsFor(method), {
-      clientKind: 'runtime',
-      clientCapabilities
-    })
-    if (hostMethod) {
-      expect(
-        hostCalls[hostMethod].mock.calls.length - before,
-        `${build.label}: ${method} did not reach the host`
-      ).toBe(1)
-    }
-    for (const reply of replies) {
-      expect(
-        reply,
-        `${build.label}: ${method} was refused: ${JSON.stringify(reply)}`
-      ).toMatchObject({ ok: true })
-    }
-    if (result) {
-      // The declared answer, not merely a non-refusal: a handler that is
-      // registered and returns an execution error, or hands back someone else's
-      // envelope, fails here rather than passing as "reached the host".
-      expect(replies, `${build.label}: ${method} must answer exactly once`).toHaveLength(1)
-      expect(replies[0], `${build.label}: ${method} answered off-contract`).toMatchObject({
-        ok: true,
-        result
-      })
-    }
-  }
-}
-
 describe('cross-version structured agent sessions', () => {
   it(
     'skews current code against a real published release',
     () => {
-      expect(baselineRef).toMatch(/^v?\d/)
+      const publishedLabel =
+        Object.entries(UPSTREAM_BASELINE_PINS).find(
+          ([releaseTag, commit]) =>
+            commit === baselineRef && selectLatestStableReleaseTag([releaseTag]) === releaseTag
+        )?.[0] ?? baselineRef
+      expect(selectLatestStableReleaseTag([publishedLabel])).toBe(publishedLabel)
+      expect(resolveReleaseCheckoutCommit(publishedLabel)).toBe(baseline.revision)
+      if (/^[0-9a-f]{40}$/.test(baselineRef)) {
+        expect(baselineRef).toBe(baseline.revision)
+      }
       expect(baseline.revision).toMatch(/^[0-9a-f]{40}$/)
       expect(baseline.revision).not.toBe(current.revision)
       // The anti-vacuous oracle for the source scan: a scan that found nothing
@@ -557,6 +488,7 @@ describe('cross-version structured agent sessions', () => {
       root = await mkdtemp(join(tmpdir(), 'orca-cross-version-ai-vault-'))
       store = await openTestAgentSessionRecordStore(root)
       const host = fixtureHosts.createHost({
+        agents: NO_STRUCTURED_AGENTS,
         logger: createStructuredAgentSessionLogger(),
         store,
         adapter: {
@@ -569,7 +501,7 @@ describe('cross-version structured agent sessions', () => {
             },
             link: {
               linkId: `link-${fence}`,
-              handle: { provider: 'codex', threadId: THREAD },
+              handle: codexProviderHandle(THREAD),
               origin: 'created',
               mintedAtFence: fence,
               observedAt: NOW
@@ -753,7 +685,7 @@ describe('cross-version structured agent sessions', () => {
             },
             link: {
               linkId: `link-${fence}`,
-              handle: { provider: 'codex', threadId: THREAD },
+              handle: codexProviderHandle(THREAD),
               // A restarted host re-proves the thread it inherited; only the first
               // owner of a session may claim to have created it.
               origin: store.getRecord(SESSION)?.providerHandleChain.length ? 'resumed' : 'created',
@@ -775,14 +707,26 @@ describe('cross-version structured agent sessions', () => {
     /** Reopens the store from disk and installs a fresh host over the same journal
      *  root — what a process restart actually leaves behind. */
     async function bootHost(generation: string): Promise<StructuredAgentSessionHost> {
+      let previousStore: AgentSessionRecordStore | undefined
       if (runningHost) {
         // A crashed host cannot renew or release its old fence after the next host starts.
         // Drop its memory/handles while leaving the on-disk lease and journal untouched;
         // graceful flush would release that lease and stop testing crash recovery.
-        await abandonStructuredAgentSessionHost(runningHost)
+        previousStore = store
+        const previousDatabase = openTestJournalHostDatabase(root)
+        await fixtureHosts.abandonHost(runningHost)
+        setStructuredAgentSessionHost(null)
+        closeTestJournalHostDatabase(root)
+        expect(previousDatabase.isClosed).toBe(true)
+        expect(openTestJournalHostDatabase(root)).not.toBe(previousDatabase)
       }
       store = await openTestAgentSessionRecordStore(root)
+      if (previousStore) {
+        expect(store).not.toBe(previousStore)
+        expect(store.getRecord(SESSION)?.lease.unreconciled).toBe(true)
+      }
       const host = fixtureHosts.createHost({
+        agents: NO_STRUCTURED_AGENTS,
         logger: createStructuredAgentSessionLogger(),
         store,
         adapter: adapter(),

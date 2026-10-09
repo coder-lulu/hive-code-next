@@ -7,7 +7,7 @@ import {
 } from '../../../shared/agent-session-lease-adjudication'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
 import { agentSessionExecutionHostProbeMatchesRecord } from '../../../shared/agent-session-execution-host-proof'
-import { PROVIDER_SUPERVISOR_MAX_STOP_MS } from '../../codex/codex-app-server-posix-supervisor'
+import { PROVIDER_SUPERVISOR_MAX_STOP_MS } from '../../provider-process/provider-process-supervisor'
 import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 
 export type StructuredSessionRecoveryStopSignal = 'SIGTERM' | 'SIGKILL'
@@ -19,11 +19,13 @@ export type StructuredSessionRecoveryResolutionDeps = {
   stopOwnerProcess?: (pid: number, signal: StructuredSessionRecoveryStopSignal) => void
   stopExecutionOwner?: (record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe | null>
   delay?: (ms: number) => Promise<void>
+  platform?: NodeJS.Platform
 }
 
 const STOP_PROBE_INTERVAL_MS = 250
-// A POSIX structured owner is its provider supervisor, which exits only after its provider
-// group. A SIGKILL that lands first leaves the group running, so SIGTERM outlasts its stop.
+// POSIX only: Windows never signals a recorded owner. The owner is its provider supervisor, which
+// exits only after its provider group. A SIGKILL that lands first leaves the group running, so
+// SIGTERM outlasts its stop.
 const STOP_PROBES: Record<StructuredSessionRecoveryStopSignal, number> = {
   SIGTERM: Math.ceil(PROVIDER_SUPERVISOR_MAX_STOP_MS / STOP_PROBE_INTERVAL_MS) + 1,
   SIGKILL: 4
@@ -61,7 +63,9 @@ export async function resolveStructuredSessionRecovery(
     if (owner.hostId !== deps.store.hostId) {
       return 'unresolved'
     }
-    probe = await stopOwnerAndReprobe(deps, record, owner.pid)
+    if ((deps.platform ?? process.platform) !== 'win32') {
+      probe = await stopOwnerAndReprobe(deps, record, owner.pid)
+    }
   }
   try {
     await deps.store.evictProvenDeadOwner({

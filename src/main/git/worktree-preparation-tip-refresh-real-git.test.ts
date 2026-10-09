@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWorktreePreparationLockReason } from '../../shared/worktree/create-preparation'
 import * as runner from './runner'
 import {
@@ -19,7 +19,9 @@ import {
 } from '../worktree-create-preparation-pool'
 
 const roots: string[] = []
+const pendingOperations: Promise<unknown>[] = []
 afterEach(async () => {
+  await Promise.allSettled(pendingOperations.splice(0))
   vi.restoreAllMocks()
   await _resetPreparationPoolForTests()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
@@ -29,7 +31,7 @@ async function git(cwd: string, args: string[]): Promise<string> {
   return (await runner.gitExecFileAsync(args, { cwd })).stdout.trim()
 }
 
-async function fixture() {
+async function fixtureRepo() {
   const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-fetched-preparation-')))
   roots.push(root)
   const repo = join(root, 'repo')
@@ -52,8 +54,13 @@ async function fixture() {
   const base = 'refs/remotes/origin/main'
   await git(repo, ['update-ref', base, 'HEAD'])
   const reason = createWorktreePreparationLockReason('fetched-tip')
-  await prepareWorktreeCreateCheckout(repo, prepared, base, reason)
   return { root, repo, prepared, final, base, reason }
+}
+
+async function fixture() {
+  const result = await fixtureRepo()
+  await prepareWorktreeCreateCheckout(result.repo, result.prepared, result.base, result.reason)
+  return result
 }
 
 async function advance(repo: string, base: string, text: string): Promise<string> {
@@ -64,22 +71,46 @@ async function advance(repo: string, base: string, text: string): Promise<string
   return head
 }
 
-it('moves changed tip work into prefetch while submit still runs exactly one checkout hook', async () => {
-  const { repo, prepared, final, base, reason } = await fixture()
-  const target = await advance(repo, base, 'fetched\n')
-  const spy = vi.spyOn(runner, 'gitExecFileAsync')
-  await refreshPreparedWorktreeTip(repo, prepared, base, reason)
-  expect(await readFile(join(prepared, 'version.txt'), 'utf8')).toBe('fetched\n')
-  expect(await git(prepared, ['rev-parse', 'HEAD'])).toBe(target)
-  expect(existsSync(join(prepared, 'checkout-hook.txt'))).toBe(false)
-  expect(spy.mock.calls.filter(([args]) => args.includes('reset'))).toHaveLength(1)
-  spy.mockClear()
-  await refreshPreparedWorktreeTip(repo, prepared, base, reason)
-  await finalizePreparedWorktree(repo, prepared, final, 'feature', base, false, {}, reason)
-  expect(spy.mock.calls.filter(([args]) => args.includes('reset'))).toHaveLength(0)
-  expect(await readFile(join(final, 'checkout-hook.txt'), 'utf8')).toBe('checkout\n')
-  expect(await git(final, ['rev-parse', 'HEAD'])).toBe(target)
-  expect(await git(final, ['status', '--porcelain', '--untracked-files=no'])).toBe('')
+describe('fetched tip preparation', () => {
+  let preparedFixture: Awaited<ReturnType<typeof fixtureRepo>>
+  beforeEach(async () => {
+    const preparing = fixtureRepo()
+    pendingOperations.push(preparing)
+    preparedFixture = await preparing
+  })
+  it('moves changed tip work into prefetch while submit still runs exactly one checkout hook', ({
+    signal
+  }) => {
+    const operation = (async () => {
+      const { repo, prepared, final, base, reason } = preparedFixture
+      await prepareWorktreeCreateCheckout(repo, prepared, base, reason, { signal })
+      const target = await advance(repo, base, 'fetched\n')
+      const spy = vi.spyOn(runner, 'gitExecFileAsync')
+      await refreshPreparedWorktreeTip(repo, prepared, base, reason, { signal })
+      expect(await readFile(join(prepared, 'version.txt'), 'utf8')).toBe('fetched\n')
+      expect(await git(prepared, ['rev-parse', 'HEAD'])).toBe(target)
+      expect(existsSync(join(prepared, 'checkout-hook.txt'))).toBe(false)
+      expect(spy.mock.calls.filter(([args]) => args.includes('reset'))).toHaveLength(1)
+      spy.mockClear()
+      await refreshPreparedWorktreeTip(repo, prepared, base, reason, { signal })
+      await finalizePreparedWorktree(
+        repo,
+        prepared,
+        final,
+        'feature',
+        base,
+        false,
+        { signal },
+        reason
+      )
+      expect(spy.mock.calls.filter(([args]) => args.includes('reset'))).toHaveLength(0)
+      expect(await readFile(join(final, 'checkout-hook.txt'), 'utf8')).toBe('checkout\n')
+      expect(await git(final, ['rev-parse', 'HEAD'])).toBe(target)
+      expect(await git(final, ['status', '--porcelain', '--untracked-files=no'])).toBe('')
+    })()
+    pendingOperations.push(operation)
+    return operation
+  })
 })
 
 it('revalidates a newer fetched tip that arrives after the background refresh', async () => {

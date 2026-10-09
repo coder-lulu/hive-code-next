@@ -2,6 +2,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { AppState } from '@/store/types'
 import type { HiveAccountState } from '../../../../../shared/hive-account'
 import type {
   HiveWorkbenchCompanyPage,
@@ -21,8 +22,10 @@ import {
 import { workflowSnapshot } from './hive-workflow.test-fixtures'
 import { workflowCaseSummary, workflowCaseView } from './hive-workflow-cases.test-fixtures'
 
+type WorkbenchStoreState = Pick<AppState, 'folderWorkspaces' | 'openSpacePage'>
+
 vi.mock('@/store', () => ({
-  useAppStore: (select: (state: object) => unknown) =>
+  useAppStore: <Selected,>(select: (state: WorkbenchStoreState) => Selected) =>
     select({ folderWorkspaces: [], openSpacePage: vi.fn() })
 }))
 vi.mock('@/store/selectors', () => ({ useAllWorktrees: () => [] }))
@@ -194,6 +197,14 @@ function change(id: string, value: string) {
 }
 async function choose(id: string, value: string) {
   await act(async () => {
+    if (id === 'hive-workflow-case-picker') {
+      const entry = container.querySelector<HTMLButtonElement>(
+        `button[data-workflow-case-id="${value}"]`
+      )
+      expect(entry).not.toBeNull()
+      entry!.click()
+      return
+    }
     const picker = container.querySelector<HTMLSelectElement>(`#${id}`)!
     picker.value = value
     picker.dispatchEvent(new Event('change', { bubbles: true }))
@@ -317,9 +328,11 @@ describe('outer workbench refresh preserves the actual workflow and requirement 
     await act(async () => refreshedTeam.resolve(structuredClone(team)))
     assertDrafts(name, title, requirement)
     expect(container.querySelector('[data-case-fixed-version]')).toBe(detail)
-    expect(container.querySelector<HTMLSelectElement>('#hive-workflow-case-picker')?.value).toBe(
-      view.id
-    )
+    expect(
+      container
+        .querySelector(`button[data-workflow-case-id="${view.id}"]`)
+        ?.getAttribute('aria-pressed')
+    ).toBe('true')
     expect(api.getTeam).toHaveBeenCalledTimes(2)
     expect(api.listWorkflows).toHaveBeenCalledOnce()
     expect(api.listWorkflowCases).toHaveBeenCalledOnce()
@@ -363,9 +376,11 @@ describe('outer workbench refresh preserves the actual workflow and requirement 
     expect(api.createWorkflowCase).toHaveBeenCalledOnce()
     await act(async () => pending.reject(new Error('SERVICE_UNAVAILABLE')))
     expect(field('hive-workflow-case-title').value).toBe('Private requirement draft')
-    expect(container.querySelector<HTMLSelectElement>('#hive-workflow-case-picker')?.value).toBe(
-      view.id
-    )
+    expect(
+      container
+        .querySelector(`button[data-workflow-case-id="${view.id}"]`)
+        ?.getAttribute('aria-pressed')
+    ).toBe('true')
     await submit('hive-workflow-case-title')
     expect(api.createWorkflowCase.mock.calls[1][0]).toEqual(first)
   })

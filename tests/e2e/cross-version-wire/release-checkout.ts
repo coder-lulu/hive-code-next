@@ -3,7 +3,10 @@ import { constants } from 'node:fs'
 import { access, copyFile, mkdtemp, mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
 import { lock } from 'proper-lockfile'
-import { resolvePinnedUpstreamRef } from '../../../config/scripts/prepare-cross-version-baselines.mjs'
+import {
+  resolvePinnedUpstreamRef,
+  UPSTREAM_BASELINE_PINS
+} from '../../../config/scripts/prepare-cross-version-baselines.mjs'
 import {
   extractReleaseCheckoutTree,
   scavengeReleaseCheckoutStaging
@@ -16,8 +19,9 @@ export const REPO_ROOT = resolve(import.meta.dirname, '..', '..', '..')
 const DEFAULT_CACHE_ROOT = join(REPO_ROOT, 'logs', 'cross-version-checkouts')
 const EXISTING_CACHE_ROOT = join(REPO_ROOT, 'tests', 'e2e', '.cross-version-checkouts')
 
+// Released sources still import @streamparser/json; retain its pinned test-only dependency.
 // Bump when extraction or the alias rewrite changes so cached trees are rebuilt.
-const CHECKOUT_FORMAT = 4
+const CHECKOUT_FORMAT = 7
 
 const BASELINE_REF_ENV = 'ORCA_CROSS_VERSION_BASELINE_REF'
 
@@ -122,6 +126,11 @@ export function resolveBaselineReleaseRef(): string {
   return latest
 }
 
+/** Structured-chat skews need a published reader; the legacy protocol baseline predates it. */
+export function resolveStructuredAgentBaselineReleaseRef(): string {
+  return process.env.ORCA_STRUCTURED_AGENT_BASELINE_REF?.trim() || 'v1.4.221'
+}
+
 export function resolveReleaseCheckoutCommit(ref: string, readGit = git): string {
   try {
     const pinned = resolvePinnedUpstreamRef(ref)
@@ -162,6 +171,28 @@ async function assertCheckoutWireSurface(root: string, ref: string): Promise<voi
         'the wire surface moved and the harness needs updating.'
     )
   }
+}
+
+async function verifiedDefaultAlias(commit: string, requestedLabel: string) {
+  const labels = Object.entries(UPSTREAM_BASELINE_PINS)
+    .filter(([, pinned]) => pinned === commit)
+    .map(([ref]) => ref.replace(/[^A-Za-z0-9._-]/g, '_'))
+    .filter((label) => label !== requestedLabel)
+  for (const cacheRoot of [DEFAULT_CACHE_ROOT, EXISTING_CACHE_ROOT]) {
+    for (const label of labels) {
+      const root = join(cacheRoot, label, `${commit}-format-${CHECKOUT_FORMAT}`)
+      if (!(await checkoutMatches(root, commit))) {
+        continue
+      }
+      try {
+        await assertCheckoutWireSurface(root, label)
+        return { label, root }
+      } catch {
+        // A stamp alone cannot turn an incomplete alias into an importable checkout.
+      }
+    }
+  }
+  return null
 }
 
 function checkoutModulePath(root: string, rootRelativePath: string): string {
@@ -240,6 +271,10 @@ export async function materializeReleaseCheckout(
     const existingRoot = join(EXISTING_CACHE_ROOT, label, `${commit}-format-${CHECKOUT_FORMAT}`)
     if (await checkoutMatches(existingRoot, commit)) {
       return { ref, commit, label, root: existingRoot }
+    }
+    const alias = await verifiedDefaultAlias(commit, label)
+    if (alias) {
+      return { ref, commit, ...alias }
     }
   }
 

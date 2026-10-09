@@ -1,13 +1,16 @@
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
+import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import { hiveRuntimeStateChanged, serializeHiveRuntimeState } from './agent-session-hive-state-rows'
 /**
  * A transaction applies to a draft of the published store state, and the store publishes the draft
  * only once its rows have committed, so no reader ever sees a change that might still roll back.
  */
 
+import { encodeAgentSessionRecord } from '../../shared/agent-session-record-stored-form'
 import type {
   AgentSessionStoreState,
   RetiredAgentSessionClaimKey
-} from './agent-session-record-store-file'
+} from './agent-session-store-state'
 import {
   isReadableAgentSessionStoreOperation,
   isReadableAgentSessionStoreRecord,
@@ -46,7 +49,8 @@ export type AgentSessionStoreRowWrites = {
 function serializeChangedRows<V>(
   published: ReadonlyMap<string, V>,
   next: ReadonlyMap<string, V>,
-  readable: (key: string, written: unknown) => boolean
+  readable: (key: string, written: unknown) => boolean,
+  stored: (value: V) => unknown = (value) => value
 ): KeyedRowWrites {
   const writes: KeyedRowWrites = { upsert: [], remove: [] }
   let added = 0
@@ -55,7 +59,7 @@ function serializeChangedRows<V>(
     if (prior === value) {
       continue
     }
-    const json = JSON.stringify(value)
+    const json = JSON.stringify(stored(value))
     if (json === undefined || !readable(key, JSON.parse(json))) {
       throw new Error('agent_session_store_write_invalid')
     }
@@ -89,8 +93,11 @@ export function agentSessionStoreDraftRowWrites(
   published: AgentSessionStoreState,
   draft: AgentSessionStoreState
 ): AgentSessionStoreRowWrites | null {
-  const records = serializeChangedRows(published.records, draft.records, (sessionId, written) =>
-    isReadableAgentSessionStoreRecord(sessionId, written)
+  const records = serializeChangedRows(
+    published.records,
+    draft.records,
+    (sessionId, written) => isReadableAgentSessionStoreRecord(sessionId, written),
+    encodeAgentSessionRecord
   )
   const operations = serializeChangedRows(published.operations, draft.operations, (key, written) =>
     isReadableAgentSessionStoreOperation(key, written)
@@ -141,4 +148,20 @@ export function agentSessionStoreDraftRowWrites(
     retiredClaimKeys,
     sessionTabs: tabsChanged ? { recorded: draft.sessionTabs !== null, tabs } : null
   }
+}
+
+export function mutateAgentSessionDraftRecord(
+  draft: AgentSessionStoreState,
+  sessionId: string,
+  apply: (record: AgentSessionRecord, draft: AgentSessionStoreState) => AgentSessionRecord
+): AgentSessionRecord {
+  const record = draft.records.get(sessionId)
+  if (!record) {
+    throw draft.unreadableRecords.has(sessionId)
+      ? agentSessionRefusalError('execution_owner_reconciling', { reason: 'recordUnreadable' })
+      : agentSessionRefusalError('agent_session_identity_required', { reason: 'recordMissing' })
+  }
+  const next = apply(record, draft)
+  draft.records.set(sessionId, next)
+  return next
 }

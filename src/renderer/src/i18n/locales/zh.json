@@ -34,10 +34,10 @@
       "add": "复制添加账户命令",
       "cancel": "取消",
       "copied": "已复制",
-      "description": "在 HiveCode 主机的终端中运行此命令以添加账户。选择适用于该主机上新启动的代理；直接 SSH 连接和 Windows 托管的 WSL 使用各自的凭据。",
+      "description": "在 HiveCode 主机的终端中运行此命令以添加账户。选择适用于该主机上新启动的智能体；直接 SSH 连接和 Windows 托管的 WSL 使用各自的凭据。",
       "refresh": "刷新账户",
       "remove": "移除",
-      "removeDescription": "请先停止使用此配置的代理。移除将删除其保存的凭据和对话数据。系统登录不受影响。",
+      "removeDescription": "请先停止使用此配置的智能体。移除将删除其保存的凭据和对话数据。系统登录不受影响。",
       "removeTitle": "移除托管账户？",
       "select": "选择",
       "system": "系统默认",
@@ -213,9 +213,9 @@
     "continueInCli": "在 CLI 中继续",
     "continueInCliNewTab": "在新选项卡中继续使用 CLI",
     "subagents": {
-      "empty": "未找到子代理。",
-      "loadError": "无法加载所有子代理。",
-      "loading": "正在加载子代理..."
+      "empty": "未找到子智能体。",
+      "loadError": "无法加载所有子智能体。",
+      "loading": "正在加载子智能体..."
     }
   },
   "app": {
@@ -296,16 +296,12 @@
         "streamRestartFailed": "重启远程浏览器流失败。"
       },
       "CodexRestartChip": {
-        "3ea91b5c07": "此 Codex 会话正在使用过时的配置",
         "6133594b12": "保留旧账户",
-        "7b1d20f4c8": "保留当前会话",
-        "8f0d5c92a1": "Codex 配置已更改",
         "9263e75f49": "Codex 正在使用之前的账户",
         "9375620cc3": "重启此会话以使用 {{value0}}。在重启之前，它将继续使用旧账户。",
         "a4c8e1b2f7": "Codex 仍以 {{value0}} 身份登录",
         "c72a5fb234": "重新启动",
-        "d3e8a1f4b2": "账户已切换",
-        "e6b7139d2a": "重启此会话以加载当前 Codex 配置。"
+        "d3e8a1f4b2": "账户已切换"
       },
       "ComposerParentWorktreePicker": {
         "description": "在侧边栏中将此工作区嵌套到另一个工作树下。不会更改基础分支。",
@@ -782,11 +778,11 @@
         "manualTrustNote": "复制的命令会创建由 root 拥有的副本，验证其 SHA-512 摘要，并安装经过验证的副本。"
       },
       "NativeChatResumeFailureGuidance": {
-        "conflict": "另一个 HiveCode 窗口或终端仍持有此会话。请将其关闭，然后重试。",
-        "dispatchRejected": "代理拒绝了“continue”消息。请打开聊天并自行发送一条。",
+        "conflict": "此聊天已在另一个 HiveCode 窗口或终端中打开。请在那里关闭后重试。",
+        "dispatchRejected": "智能体拒绝了“continue”消息。请打开聊天并自行发送一条。",
         "fallback": "HiveCode 无法恢复此聊天。请将其打开以手动继续。",
         "notAttached": "聊天未能重新连接。请重试，或将其打开以开始新的轮次。",
-        "ownershipUnknown": "HiveCode 仍在确认哪个进程持有此会话。请稍候，然后重试。",
+        "ownershipUnknown": "此聊天尚未准备好恢复。请稍等片刻后重试。",
         "superseded": "请打开聊天并回复。重启后紧接着有新的工作到达，因此 HiveCode 未发送其“continue”消息。",
         "unconfirmed": "HiveCode 无法确认“continue”消息已送达。请打开聊天进行检查，确认后再发送其他消息。",
         "unsupported": "此聊天无法由 HiveCode 恢复。请将其打开以查看停止位置。"
@@ -797,18 +793,13 @@
         "activityMonitorMany": "正在监控 {{value0}} 个后台任务",
         "activityMonitorOne": "正在监控：{{value0}}",
         "activityQuestion": "等待您的回答：{{value0}}",
-        "activitySubagentMany": "{{value0}} 个子代理运行中",
-        "activitySubagentOne": "子代理运行中：{{value0}}",
+        "activitySubagentMany": "{{value0}} 个子智能体运行中",
+        "activitySubagentOne": "子智能体运行中：{{value0}}",
         "activityUnnamed": "未命名",
-        "body": "当 HiveCode 关闭时，这些聊天正在工作。恢复会将每个聊天还原到停止的位置及其完整上下文，并要求代理在继续之前检查它正在做的事情。您自己的提示不会重新发送。",
-        "continueUnconfirmed": "对于 {{value0}} 聊天，未确认继续传送。在发送另一条消息之前打开它们进行检查。",
-        "continueUnconfirmed_one": "对于 {{value0}} 聊天，未确认继续传送。在发送另一条消息之前打开它进行检查。",
-        "continueUnconfirmed_other": "对于 {{value0}} 聊天，未确认继续传送。在发送另一条消息之前打开它们进行检查。",
-        "continuedMany": "恢复 {{value0}} 聊天并要求他们继续",
-        "continuedOne": "恢复了 1 次聊天并要求继续",
-        "dismiss": "关闭",
+        "body": "当 HiveCode 关闭时，这些聊天正在工作。恢复会将每个聊天还原到停止的位置及其完整上下文，并要求智能体在继续之前检查它正在做的事情。您自己的提示不会重新发送。",
+        "continuedMany": "已恢复 {{value0}} 个聊天",
+        "continuedOne": "已恢复 1 个聊天",
         "dismissAll": "全部关闭",
-        "dismissUnconfirmed": "拒绝简历邀请尚未得到确认——它可能仍在状态栏中。",
         "dontAskAgain": "不再询问（自动恢复）",
         "dontAskAgainHint": "您可以在“设置”→“实验”→“聊天 UI”中关闭此功能。",
         "listLabel": "将恢复的聊天",
@@ -825,7 +816,7 @@
         "show": "显示",
         "title": "恢复中断的聊天？",
         "untitled": "无标题聊天",
-        "updateBody": "当 HiveCode 安装更新时，这些聊天正在工作。恢复会将每个聊天还原到停止的位置及其完整上下文，并要求代理在继续之前检查它正在做的事情。您自己的提示不会重新发送。"
+        "updateBody": "当 HiveCode 安装更新时，这些聊天正在工作。恢复会将每个聊天还原到停止的位置及其完整上下文，并要求智能体在继续之前检查它正在做的事情。您自己的提示不会重新发送。"
       },
       "NativeChatResumeOutcomeRow": {
         "dismiss": "关闭",
@@ -927,8 +918,6 @@
         "fa90f739a5": "创建工作区之前选择项目、工作区名称和智能体。"
       },
       "PullRequestPage": {
-        "2560588245": "请求评审人失败",
-        "3450247584": "评论",
         "000f90afcf": "已完成",
         "00b7b82329": "源分支",
         "00d3be6bcd": "评审人",
@@ -954,6 +943,7 @@
         "1e6d089420": "已移除评审人",
         "1ff5d979df": "未分配任何人",
         "246b2c6456": "刷新检查失败",
+        "2560588245": "请求评审人失败",
         "25690a3855": "从 PR 启动工作区",
         "2760fa29a4": "其他人",
         "2b4fdb880c": "取消标记已查看",
@@ -962,6 +952,7 @@
         "2f5195c6a0": "重新开启",
         "319cf2d54b": "显示文件树",
         "31a7b202f2": "回复@{{value0}}",
+        "3450247584": "评论",
         "345b68254c": "帖子串",
         "3463d10a63": "评论",
         "347034903a": "复制 GitHub 链接",
@@ -1673,12 +1664,17 @@
             "waiting": "等待输入",
             "working": "工作中"
           },
-          "threadListOptionsFiltered": "线程列表选项，筛选器已启用",
-          "viewSection": "视图"
+          "viewSection": "视图",
+          "threadListOptionsActive": "线程列表选项（{{value0}} 个生效）",
+          "activityOptionsActive": "活动选项（{{value0}}）"
         },
         "ActivityScopeFilterControls": {
           "hiddenCount": "{{value0}} 已隐藏",
-          "resetScope": "显示所有主机和项目"
+          "resetScope": "显示所有主机和项目",
+          "hideAutomationCreated": "隐藏自动化创建的工作区",
+          "hideCliCreated": "隐藏 CLI 创建的工作区",
+          "hideOtherClientsAria": "隐藏共享远程服务器上由其他 Orca 客户端创建的工作区中的智能体",
+          "hideOtherClients": "隐藏其他客户端的智能体"
         },
         "ActivityThreadHoverCard": {
           "copyPath": "复制路径",
@@ -1703,6 +1699,25 @@
         "standaloneWorktree": {
           "floatingTerminal": "浮动终端",
           "standaloneTerminal": "独立终端"
+        },
+        "ActivityThreadContextMenu": {
+          "copyTitle": "复制标题",
+          "copyPath": "复制路径",
+          "open": "打开",
+          "markRead": "标记为已读",
+          "markUnread": "标记为未读",
+          "goToWorkspace": "转到工作区",
+          "clear": "从列表中清除",
+          "agentSection": "智能体",
+          "markManyRead_one": "将 {{count}} 个智能体标记为已读",
+          "markManyRead_other": "将 {{count}} 个智能体标记为已读",
+          "markManyUnread_one": "将 {{count}} 个智能体标记为未读",
+          "markManyUnread_other": "将 {{count}} 个智能体标记为未读",
+          "clearMany_one": "从列表中清除 {{count}} 个智能体",
+          "clearMany_other": "从列表中清除 {{count}} 个智能体",
+          "markManyRead": "将 {{count}} 个智能体标记为已读",
+          "markManyUnread": "将 {{count}} 个智能体标记为未读",
+          "clearMany": "从列表中清除 {{count}} 个智能体"
         }
       },
       "agent": {
@@ -2040,7 +2055,6 @@
           "aa593eb5e2": "小时"
         },
         "AutomationsPage": {
-          "2695883141": "删除",
           "02a33e3204": "从",
           "0329f9bef1": "关闭 · Esc",
           "080dcb5fbb": "删除自动化",
@@ -2057,6 +2071,7 @@
           "2430fecf53": "选择运行位置并在保存前输入提示。",
           "244727e655": "自动化已更新。",
           "25060635c6": "添加新的",
+          "2695883141": "删除",
           "295698292f": "重新运行",
           "2a20596d6b": "自动化已保存。",
           "2faecab10b": "立即运行",
@@ -2421,7 +2436,8 @@
             "highlight": "高亮",
             "pen": "画笔",
             "rect": "矩形",
-            "text": "文字"
+            "text": "文字",
+            "eraser": "橡皮擦"
           },
           "undo": "撤销",
           "widthOption": "{{value0}} px"
@@ -2586,7 +2602,8 @@
             "d053db279d": "角色=",
             "eb98a0971a": "”",
             "effd75e330": "附近的环境",
-            "f3575229df": "抓住"
+            "f3575229df": "抓住",
+            "accessibleNameOpenQuote": "“"
           },
           "annotate": {
             "browser": {
@@ -3099,10 +3116,7 @@
           "c98ce191da": "此差异没有可打开的修改端文件",
           "e836faacfa": "切换到并排差异",
           "f0fd4174b5": "打开文件选项卡以使用富文本 Markdown 编辑",
-          "fb8331694e": "打开侧面预览",
-          "openContainingFolder": "打开所在文件夹",
-          "revealInFileExplorer": "在文件资源管理器中显示",
-          "revealInFinder": "在 Finder 中显示"
+          "fb8331694e": "打开侧面预览"
         },
         "EditorPanelMarkdownActionsMenu": {
           "10c39d58c1": "隐藏前面的内容",
@@ -4267,20 +4281,13 @@
             "25d7817f79": "终端",
             "2a3c5ddf5e": "启用编排",
             "3215fc73e9": "新终端",
-            "5ddc688c52": "“{{value0}}”有未保存的更改。您想在关闭前保存吗？",
             "629528690b": "新的 Markdown 笔记",
-            "690b6fb98a": "未保存的更改",
             "88ffb502e5": "打开 Markdown 笔记",
             "8b07759314": "新浏览器",
             "8b14ba6c17": "新浏览器选项卡",
             "8cf80db43b": "设置 HiveCode CLI 和智能体技能，以便智能体可以通过 HiveCode 进行协调。",
-            "918c2139f3": "不保存",
             "adc281394d": "关闭",
-            "b085fb58b5": "该文件有未保存的更改。",
             "bbc177f98f": "启用",
-            "d6b563ae24": "正在加载编辑器...",
-            "da508bd7f5": "保存",
-            "e7bf09d4d4": "取消",
             "fc1042e92b": "最小化"
           },
           "FloatingTerminalToggleButton": {
@@ -5136,7 +5143,7 @@
             "2c69728c2a": "在浏览器中打开链接",
             "2cfc6be192": "GitLab",
             "2e4c7c95fe": "分支",
-            "34ca97bce3": "”",
+            "34ca97bce3": "“",
             "370a1faf67": "在浏览器中打开",
             "3e8bb1176a": "在设置中连接 Linear 以搜索议题。",
             "4bd98f1091": "切换项目？",
@@ -5214,7 +5221,7 @@
           "d7b3ef168b": "在系统中已检测",
           "e6a369bd04": "热门智能体",
           "hideAgents": "隐藏智能体",
-          "showMoreAgents": "显示另外 {{value0}} 个智能体→",
+          "showMoreAgents": "显示另外 {{value0}} 个智能体 →",
           "yoloModeLabel": "Yolo 模式",
           "yoloPermissionsDescription": "智能体会在不询问的情况下运行命令和编辑文件，部分智能体还会绕过沙箱。仅在你信任的项目中使用。",
           "yoloPermissionsInfo": "智能体权限信息",
@@ -5258,7 +5265,7 @@
           "3bede04483": "发送测试通知",
           "3cd5374e22": "通知设置仍在加载中",
           "4f6a1da718": "打开系统设置",
-          "4f7bce5644": "当代理完成或终端需要处理时，macOS 会提醒你。",
+          "4f7bce5644": "当智能体完成或终端需要处理时，macOS 会提醒你。",
           "53aaffe49a": "通知声音",
           "56b836215c": "正在检查通知权限…",
           "8124d085a6": "打开 Mac 设置",
@@ -5873,9 +5880,9 @@
             "4a8d9e0c1f": "隐藏提交{{value0}}中的文件：{{value1}}"
           },
           "GitHubPRStackMap": {
-            "3511405914": "关闭",
             "0c1645ebd0": "展开堆栈 #{{value0}}",
             "316039b5db": "检查等待中",
+            "3511405914": "关闭",
             "4b1e5ee9d3": "已请求更改",
             "525259fa17": "堆栈详情暂时不可用。",
             "568c647ccd": "草稿",
@@ -6023,7 +6030,6 @@
             "cc06595a3b": "复制线路径"
           },
           "SourceControl": {
-            "1406954883": "清除所有笔记...",
             "011f9713fc": "提交被阻止",
             "02d8c04339": "使用 AI 生成 {{value0}} 详细信息",
             "03194cfff4": "本地会话状态源自您在此处打开的冲突。",
@@ -6040,6 +6046,7 @@
             "0fad573938": "未提交",
             "11463f7a98": "删除未跟踪的文件",
             "11b5dd8e41": "比较",
+            "1406954883": "清除所有笔记...",
             "15b6e834ac": "无法在浏览器中打开提交",
             "15b7f210d7": "启动智能体前请查看并编辑完整提示词。",
             "1623bf4e19": "复制备注",
@@ -6225,7 +6232,7 @@
             "entryStageFailed": "无法暂存“{{value0}}”",
             "entryUnstageFailed": "无法取消暂存“{{value0}}”",
             "f0a2dc9e46": "自定义启动...",
-            "f394c6128a": "没有可用于解释此提交的代理",
+            "f394c6128a": "没有可用于解释此提交的智能体",
             "f3a1b8c204": "upstream",
             "f3a8b2c1d0e5": "请输入 {{value0}} 标题。",
             "f4c766f1ca": "为此运行选择智能体和提示词模板。",
@@ -6267,7 +6274,6 @@
             "013c9ac04a": "保存范围",
             "15c5d85706": "智能体",
             "1bb611240f": "使用 {basePrompt} 作为 HiveCode 的默认提示词。",
-            "1bc0bdbb5e": "启动：",
             "1d47db9bf0": "没有启用智能体",
             "23280cbab1": "此模板不包含 {basePrompt}，因此智能体不会收到 HiveCode 的默认提示词。",
             "3e8f21954f": "错误",
@@ -6326,7 +6332,6 @@
           "checks": {
             "panel": {
               "content": {
-                "3916814392": "落后（基础提交：",
                 "00e1c1658a": "已完成",
                 "02ca4f9074": "通过",
                 "03ca88f623": "编辑",
@@ -6344,6 +6349,7 @@
                 "2ba0a32bdd": "机器人",
                 "2dd5ddabc4": "工作流程#",
                 "365254cc1b": "未解决",
+                "3916814392": "落后（基础提交：",
                 "3a71a6ed0b": "在检查和合并完成之前解决冲突。",
                 "3fff651d32": "添加PR评论",
                 "49731703ea": "任务",
@@ -6424,10 +6430,10 @@
               },
               "empty": {
                 "state": {
-                  "3322603418": "PR 状态不可用",
                   "05e4aec17b": "{{value0}} 检查将在操作完成后可用",
                   "13e1c7d5ed": "未找到 {{value0}}",
                   "2bdd7aaf2d": "GitHub 状态无法刷新。现有的缓存数据被保留。",
+                  "3322603418": "PR 状态不可用",
                   "3d4af82ff4": "正在刷新此分支的 GitHub 状态",
                   "41252bc53f": "分支未发布",
                   "5b0cfae9a5": "创建 {{value0}} 以开始检查和评审。",
@@ -7050,7 +7056,7 @@
           "0b3a9f6c2e": "选择与你的账户匹配的端点。海外 (platform.minimax.io) 和中国 (platform.minimaxi.com) 均支持会话 Cookie 或 API 密钥。",
           "0b4591ff93": "选择要检查的本地环境以及添加新的托管 Claude 和 Codex 账户的位置。",
           "0b8c1c7e02": "已存储在本地",
-          "0c64dc2a64": "Gemini",
+          "0c64dc2a64": "Gemini CLI（旧版）",
           "0c67a2a1aa": "WSL 在此计算机上不可用。",
           "0c7f915b01": "使用 Gemini CLI 凭据",
           "0d47394635": "删除 Codex 账户？",
@@ -7124,7 +7130,7 @@
           "93c47b333a": "需要登录",
           "94d351af4a": "账户",
           "96f3649526": "使用 Gemini CLI 凭据（实验）",
-          "973741a871": "配置 Gemini 提供商设置。",
+          "973741a871": "保留现有的 Gemini CLI 会话可用。Gemini 凭据不会让您登录 Antigravity。",
           "9baf45d071": "当前设备",
           "9dd50d3f75": "高级",
           "9fec52de4b": "如何复制 Cookie",
@@ -7417,13 +7423,13 @@
           "advanced": "高级"
         },
         "AppearancePane": {
-          "3057983501": "未分配",
           "0cd9b8228f": "选择 Dock 和窗口切换器中显示的应用程序图标。",
           "0f28e7b30c": "选择 HiveCode 在应用程序窗口中的外观。",
           "0fafabcf35": "显示 Git 忽略的文件",
           "102d6b5f9b": "IDE字体",
           "2df8f79aa5": "在标题栏中显示 HiveCode。",
           "2edf606c46": "关闭时最小化到托盘",
+          "3057983501": "未分配",
           "3e4175e5c6": "状态栏",
           "42554f615f": "选择 HiveCode 界面使用的字体。",
           "4de76f6902": "控制应用程序标题栏中显示的内容。",
@@ -7483,9 +7489,9 @@
           "usagePercentageDisplayUsed": "已用"
         },
         "AutoRenameBranchFromWorkSetting": {
-          "1626524572": "Nautilus",
           "0de9fda203": "放弃",
           "12ea4a408d": "当智能体开始在新工作区中工作时，HiveCode 会重命名其自动生成的分支（例如",
+          "1626524572": "Nautilus",
           "2ee2779c05": "{firstPrompt}",
           "40e7be7850": "已保存",
           "56580dcf60": "。您还可以参考",
@@ -7634,7 +7640,7 @@
           "1188e56af4": "复制示例提示",
           "1199258ace": "复制",
           "2a180694f7": "尝试一下 - 示例提示",
-          "59722f31b4": "”",
+          "59722f31b4": "“",
           "5ec620ccc4": "复制失败。",
           "a602d43069": "复制{{value0}}。",
           "b84807f228": "”",
@@ -7781,10 +7787,10 @@
           "fdee745b87": "合并请求"
         },
         "ComputerUsePane": {
-          "1735461723": "使智能体能够检查和操作本地桌面应用程序。",
           "07bbe4c4cb": "截图",
           "0c29da5805": "就绪",
           "0c9a33f468": "捕获应用程序窗口，以便智能体可以检查视觉状态。",
+          "1735461723": "使智能体能够检查和操作本地桌面应用程序。",
           "2168fa5ab0": "无法加载计算机使用权限",
           "3383ea1aab": "无法重置计算机使用权限",
           "45f8e22c2e": "打开",
@@ -7901,7 +7907,7 @@
           "6326a4c5cc": "当 CLI、本地应用程序或自动化工具需要 macOS 隐私访问时，请使用这些控件。 HiveCode 在启动时不会询问。",
           "66e94d6cf3": "已发送权限请求",
           "6f011b9bf6": "终端工具继承了 HiveCode 的 macOS 隐私信封。",
-          "7ca17b62c8": "当 HiveCode 运行的代理读取其他应用的数据时，macOS 会显示 HiveCode，因为 HiveCode 是执行终端命令的进程。请为 HiveCode 授予此权限，以减少此类提示。然后退出并重新打开 HiveCode。",
+          "7ca17b62c8": "当 HiveCode 运行的智能体读取其他应用的数据时，macOS 会显示 HiveCode，因为 HiveCode 是执行终端命令的进程。请为 HiveCode 授予此权限，以减少此类提示。然后退出并重新打开 HiveCode。",
           "9f35980756": "击键注入、窗口控制和 UI 自动化工具。",
           "a552887288": "无法加载开发者权限",
           "actionOpenSettings": "打开设置",
@@ -8072,8 +8078,8 @@
             "shellEnvNamesLabel": "从 shell 传递的变量",
             "shellEnvTitle": "使用 shell 环境",
             "shellEnvToggleLabel": "切换使用 shell 环境",
-            "structuredCopy": "将新的 Codex 和 Claude 代理作为结构化聊天打开。关闭时会在终端支持的聊天中打开。已有的聊天保持不变。",
-            "structuredScope": "在本机和运行支持该功能版本的已配对 HiveCode 服务器上运行；较旧的服务器保留终端聊天。WSL 和 SSH 主机继续使用终端聊天，Windows 会回退到它，除非 HiveCode 可以读取进程启动时间。",
+            "structuredCopy": "在支持的情况下，将新的智能体作为结构化聊天打开。关闭时会在基于终端的聊天中打开。已有的聊天保持不变。",
+            "structuredScope": "在本机和运行支持该功能版本的已配对 HiveCode 服务器上运行；较旧的服务器保留终端聊天。WSL 和 SSH 主机继续使用终端聊天。",
             "structuredTitle": "使用新版结构化原生聊天",
             "structuredToggleLabel": "切换新版结构化原生聊天",
             "title": "聊天界面",
@@ -8132,14 +8138,14 @@
           "d21136d9ef": "配置 HiveCode 如何保留文件编辑。",
           "d6cf227ca0": "自动保存延迟",
           "f1b3ceeb98": "在差异中显示空白字符",
-          "f80603d293": "在所有 Markdown 视图中显示 Markdown 注释控件，并在智能体切换操作中包含这些注释。",
+          "f80603d293": "在所有 Markdown 视图中显示 Markdown 笔记控件，并在智能体交接操作中包含这些笔记。",
           "fc5c5306ff": "ms。"
         },
         "GeneralPane": {
           "36b2a5dc6d": "关闭固定标签页前显示确认对话框。",
           "5cb5475664": "关闭固定标签页前确认",
           "confirm_running_terminal_close": "关闭运行终端前确认",
-          "confirm_running_terminal_close_description": "关闭终端时，在停止正在运行的代理或命令之前询问。",
+          "confirm_running_terminal_close_description": "关闭终端时，在停止正在运行的智能体或命令之前询问。",
           "d58fccfd84": "导航",
           "editor_preview_tabs": "浏览文件时重复使用预览选项卡",
           "editor_preview_tabs_description": "单击资源管理器中的文件，或点击 Markdown 源中的链接，可以重复使用每组一个斜体预览选项卡，而不是打开一个新选项卡。编辑、双击或固定可以使该选项卡保持打开状态。关闭此选项可为每个文件提供自己的选项卡。",
@@ -8534,7 +8540,7 @@
           "1f608e7d60": "复制提示失败。",
           "2b077b5544": "已复制提示。",
           "4daa95f25a": "将其中任何内容粘贴到安装了 HiveCode CLI 技能的项目中的 Claude Code、Codex 或其他智能体中。",
-          "b525ff2b12": "”",
+          "b525ff2b12": "“",
           "c12b253997": "复制示例提示",
           "d151e25078": "”",
           "edf13dd03b": "复制"
@@ -9725,7 +9731,7 @@
           "084d8fac5b": "隐私与安全",
           "11faa2f7dd": "任务来源",
           "13d4fe30ad": "快捷命令",
-          "17bdee4ff1": "放弃未保存的 Git AI Author 更改？",
+          "17bdee4ff1": "放弃未保存的 AI 设置？",
           "1c87f8d024": "高级",
           "21f09426ea": "可选。 {{value0}} 可与您现有的提供商登录配合使用；仅当您希望 {{value0}} 帮助在账户之间切换时才添加账户。",
           "2309068a6f": "破坏性操作",
@@ -9738,7 +9744,7 @@
           "3d9adfe6a5": "全局终端、浏览器和 Markdown 选项卡。",
           "3de4bbb841": "终端",
           "3eb22a3ada": "浮动工作区",
-          "43b68e10f0": "您有未保存的 Git AI Author 更改。离开将丢弃它们。",
+          "43b68e10f0": "你有未保存的 AI 设置。离开后这些更改将被放弃。",
           "475980f53d": "通过 {{value0}} 协调多个编码智能体。",
           "499c1cd7f9": "用于故障排除的低级兼容性设置。",
           "5063bb47a5": "语音",
@@ -9910,10 +9916,10 @@
           "tooltipTitle": "仓库覆盖"
         },
         "SourceControlAiActionRecipeDefaults": {
-          "2576299196": "参数",
           "06a9dab64d": "检查",
           "0740d30915": "自定义命令",
           "2037c78a6f": "模板",
+          "2576299196": "参数",
           "2cb4bb7e5d": "CLI 参数",
           "4f549a5fa8": "保存中...",
           "673369fe0c": "命令行",
@@ -10382,7 +10388,6 @@
           "target_title": "主题模式"
         },
         "TerminalWindowSection": {
-          "1705318506": "ANSI 洋红色",
           "00eaa6b881": "窗口外观和背景设置。",
           "026a0b8013": "主文本颜色",
           "03acb60aa0": "控制终端背景的透明度。",
@@ -10392,6 +10397,7 @@
           "0ffb02f921": "ANSI 亮绿色",
           "1601140f03": "ANSI 亮青色",
           "16948119cb": "亮白",
+          "1705318506": "ANSI 洋红色",
           "1846f6ee6a": "终端网格周围的垂直填充（以像素为单位）。",
           "1afcc1d973": "垂直内边距",
           "1be593d3e8": "ANSI 明亮",
@@ -10740,7 +10746,7 @@
           "lidNoteMac": "开盖时防止空闲休眠；合上盖子仍会使此 Mac 进入睡眠状态。",
           "lidNoteWindows": "合盖行为遵循该设备的电源设置。",
           "modeDescriptionDefault": "选择「开启」「智能体」或「关闭」。「智能体」模式在智能体工作时防止电脑休眠。HiveCode 还会在合盖时请求设备保持唤醒，具体取决于设备的电源策略。",
-          "modeDescriptionMac": "选择“打开”、“代理”或“关闭”。代理模式会在代理工作时防止空闲休眠，因此开盖即可完成长时间任务。合上盖子仍会使此 Mac 进入睡眠状态。",
+          "modeDescriptionMac": "选择“打开”、“智能体”或“关闭”。智能体模式会在智能体工作时防止空闲休眠，因此开盖即可完成长时间任务。合上盖子仍会使此 Mac 进入睡眠状态。",
           "modeDescriptionWindows": "选择「开启」「智能体」或「关闭」。「智能体」模式在智能体工作时防止电脑休眠；合盖行为遵循此设备的电源设置。",
           "modeTitle": "防止电脑休眠"
         },
@@ -10758,13 +10764,13 @@
         },
         "agents": {
           "search": {
-            "2814401339": "已安装",
             "01926b9d8c": "配置 AI 编码智能体、默认智能体和命令覆盖。",
             "042c551bc5": "配置",
             "0d1c334987": "合盖",
             "0d752916f8": "钩子",
             "13b20636a6": "等待",
             "167daeb5e9": "命令",
+            "2814401339": "已安装",
             "2afd3b5858": "启用",
             "2e188c771c": "隐藏",
             "32836788b0": "生成的标题",
@@ -11318,7 +11324,6 @@
           "message": {
             "ai": {
               "search": {
-                "3766941527": "智能体",
                 "001ca3f2af": "创建 PR 编辑器打开时使用的默认值。",
                 "0b946b2abe": "为源代码管理的提交、拉取请求、分支命名和修复操作添加操作配方。",
                 "0f29331fed": "论点",
@@ -11327,6 +11332,7 @@
                 "181cdb0637": "打开",
                 "18b6d38835": "每个源代码管理 AI 按钮使用的智能体、CLI 参数和提示词模板。",
                 "24dbdfca78": "显示源代码控制 AI 操作",
+                "3766941527": "智能体",
                 "37c65bbb44": "修复",
                 "3c4e5e5938": "操作方案",
                 "402f101af8": "提示词",
@@ -11398,7 +11404,6 @@
         "developer": {
           "permissions": {
             "search": {
-              "3363889768": "局域网、USB 和蓝牙",
               "00e954319e": "耳语",
               "05ab708ee5": "打开 macOS 隐私窗格，以访问受保护的项目和 worktree 文件。",
               "08f8039ca9": "可达性",
@@ -11410,6 +11415,7 @@
               "259b829b84": "相机",
               "2e5d98ab56": "允许屏幕截图、屏幕检查、击键和窗口自动化。",
               "302c0c42f9": "麦克风和摄像头",
+              "3363889768": "局域网、USB 和蓝牙",
               "39bb49e662": "屏幕录制和辅助功能",
               "3cd51d18a1": "屏幕录制",
               "3e0131e45d": "iCloud",
@@ -11664,7 +11670,7 @@
             "ae98c9cf36": "删除工作区之前显示确认对话框。",
             "aea7d2cccb": "openclaude",
             "afa37a34e1": "关闭",
-            "agent": "代理",
+            "agent": "智能体",
             "b2601a778c": "缓存",
             "b2799ba622": "毫秒",
             "b65665703a": "支持",
@@ -11960,11 +11966,11 @@
         "mobile": {
           "emulator": {
             "search": {
-              "2348045036": "选择 HiveCode 默认打开的模拟器设备。",
               "04c5f5d901": "设备",
               "0b95dfd5b3": "模拟器可用性",
               "1ad6fb6230": "默认设备",
               "1dc8c52ffa": "默认 iPhone",
+              "2348045036": "选择 HiveCode 默认打开的模拟器设备。",
               "25159de808": "手机模拟器",
               "25d7bfbcd4": "乌迪德",
               "27397fe8e9": "xcode 命令行工具",
@@ -12299,12 +12305,12 @@
         },
         "privacy": {
           "search": {
-            "3922051573": "数据",
             "058550f6bc": "不跟踪",
             "10124159f1": "隐私",
             "1686c07fee": "支持",
             "27a27b2f63": "选择退出",
             "2b5a5c312f": "邮差",
+            "3922051573": "数据",
             "4104f6f0f3": "分析",
             "4d4bb76bf4": "选择加入",
             "57b283461a": "共享匿名使用数据",
@@ -13164,7 +13170,7 @@
           "resetStillBlocked": "重置后仍然被阻止。",
           "resetting": "正在重置...",
           "restart": "重新启动",
-          "restartConsequence": "打开终端，代理将重新启动。",
+          "restartConsequence": "打开终端，智能体将重新启动。",
           "restartFailed": "重启失败。从设置 → 终端 → 管理会话重试。",
           "restarting": "正在重新启动...",
           "stepAllow": "在文件和文件夹下允许 HiveCode",
@@ -13182,7 +13188,7 @@
         },
         "useDaemonActions": {
           "01af244097": "取消",
-          "01d6b7c64e": "打开终端，代理将重新启动。远程主机上的终端不受影响。",
+          "01d6b7c64e": "打开终端，智能体将重新启动。远程主机上的终端不受影响。",
           "0e9da1b98e": "守护进程重新启动。",
           "1bbea41a77": "终止所有终端会话？",
           "1f0d8ac762": "终端清理完成，但有错误。",
@@ -13680,8 +13686,8 @@
           "e8c1f4a2b9": "。"
         },
         "RemoteFileBrowser": {
-          "2300612806": "键入要搜索的内容或输入路径...",
           "00c4235c10": "没有匹配“{{value0}}”",
+          "2300612806": "键入要搜索的内容或输入路径...",
           "51001182e3": "空目录",
           "971d85cc84": "作为远程项目打开 · {{value0}}",
           "9e060f5815": "选择文件夹",
@@ -13769,7 +13775,8 @@
         "SidebarFeedbackImageAttachments": {
           "attachImages": "添加附件",
           "removeImage": "移除 {{fileName}}",
-          "screenshotsHint": "最多附加 {{count}} 张截图，总计 {{maxSize}}"
+          "screenshotsHint": "最多附加 {{count}} 张截图，总计 {{maxSize}}",
+          "preparing": "正在准备附件…"
         },
         "SidebarFilter": {
           "139877b384": "选择全部",
@@ -15612,12 +15619,12 @@
             "tooltip": "打开可恢复的中断聊天"
           },
           "PetStatusSegment": {
-            "3668339495": "删除 {{value0}}",
             "0608ad02a2": "选择宠物",
             "1fbc51cc77": "隐藏宠物",
             "2021d4f6db": "Pet 包导入需要完全重启应用（不仅是重新加载）。",
             "2f7bbaa457": "尺寸",
             "34c25dfe9c": "宠物",
+            "3668339495": "删除 {{value0}}",
             "59b5955621": "上传您自己的...",
             "6d0a8cd179": "显示宠物",
             "aec479308a": "宠物菜单",
@@ -15832,7 +15839,8 @@
             "grokUsageMenu": "Grok 使用情况",
             "hiddenUsageProviders": "另有：{{value0}}",
             "remoteServerLabel": "远程服务器",
-            "zcodeUsageMenu": "ZCode 用量"
+            "zcodeUsageMenu": "ZCode 用量",
+            "4fba7dc1e7": "余额 {{value0}}"
           },
           "StatusBarUsageEmptyCta": {
             "828c764a79": "连接账户",
@@ -15892,7 +15900,6 @@
             "f5e1a84d79": "刷新"
           },
           "WorkspaceSpaceManagerPanel": {
-            "2965415393": "强制删除失败",
             "02b27c2230": "工作区",
             "0990a63160": "尚无扫描的工作区大小。",
             "09960d86bd": "已扫描",
@@ -15909,6 +15916,7 @@
             "20a4204dce": "最后的成功结果仍然可见。",
             "243287ac60": "名称",
             "265d956765": "{{value0}}。您可以离开此页面。",
+            "2965415393": "强制删除失败",
             "2b501ee391": "保留：主工作树",
             "33653dbac2": "正在删除",
             "33aef3e9cc": "尺寸",
@@ -16068,6 +16076,15 @@
           "usagePercentageLabel": {
             "remaining": "剩余 {{value0}}%",
             "used": "已用 {{value0}}%"
+          },
+          "provider": {
+            "extra": {
+              "usage": {
+                "section": {
+                  "135d51c19f": "限额 {{value0}}"
+                }
+              }
+            }
           }
         }
       },
@@ -16105,10 +16122,7 @@
             "e3ff145b98": "向左拆分",
             "e5ff31ccaf": "关闭右侧的选项卡",
             "f7c3d7d5af": "向右拆分",
-            "fdd29eb669": "固定标签",
-            "openContainingFolder": "打开所在文件夹",
-            "revealInFileExplorer": "在文件资源管理器中显示",
-            "revealInFinder": "在 Finder 中显示"
+            "fdd29eb669": "固定标签"
           },
           "QuickLaunchButton": {
             "348a04c1ad": "智能体设置...",
@@ -16226,7 +16240,7 @@
             "up": "上"
           },
           "TerminalTabLeadingIcon": {
-            "7ab2964bea": "未读的代理完成"
+            "7ab2964bea": "未读的智能体完成"
           },
           "TerminalTabSplitMenuSection": {
             "splitTerminal": "拆分终端"
@@ -16541,7 +16555,8 @@
             "retrying": "正在重试...",
             "sessionUnavailable": "HiveCode 无法重新连接此窗格在主机上的终端会话。请打开新终端以继续。",
             "sourceRestoring": "正在重新连接此终端并恢复其输出。会话仍在运行。",
-            "terminalProcessLimit": "系统无法再启动终端进程。请关闭不用的终端或退出不用的进程，然后重试。"
+            "terminalProcessLimit": "系统无法再启动终端进程。请关闭不用的终端或退出不用的进程，然后重试。",
+            "heldByPreviousRelay": "该终端仍在主机上以先前版本的 Orca 运行，当前版本无法连接到它。它会一直运行直到退出。请打开新终端以继续在此工作。"
           },
           "TerminalLinkActionPopover": {
             "copied": "已复制",
@@ -16649,8 +16664,8 @@
             "agent": {
               "session": {
                 "fork": {
-                  "2317900211": "无法复制派生上下文。",
                   "046e8d853c": "没有要派生的终端上下文",
+                  "2317900211": "无法复制派生上下文。",
                   "373a3103e7": "已复制上下文",
                   "38e41edc6e": "该工作区无法派生为 Git 工作树。",
                   "3fc568a49d": "无法复制上下文。",
@@ -16710,6 +16725,14 @@
                 "title": "此 ZCode 版本不包含终端界面"
               }
             }
+          },
+          "AgentLaunchPaneNotice": {
+            "commandNotFound": "在此计算机上找不到其命令。",
+            "copyPrompt": "复制提示",
+            "exitedDuringStart": "它在启动时退出了。",
+            "notStarted": "智能体无法启动。",
+            "unconfirmed": "无法确认智能体已启动。",
+            "workspaceGone": "其工作区已不可用。"
           }
         },
         "quick": {
@@ -16809,7 +16832,6 @@
       "workspace": {
         "cleanup": {
           "WorkspaceCleanupDialog": {
-            "3828408538": "删除 {{value0}}",
             "06cf78521e": "选择 {{value0}} 中的所有内容",
             "0a2e3c7cba": "查看",
             "0b1766738a": "仓库",
@@ -16824,6 +16846,7 @@
             "2ddbd6fe8a": "检查过",
             "352f15d6fc": "最后活跃",
             "37ab28277e": "不建议",
+            "3828408538": "删除 {{value0}}",
             "38ca0b1400": "这将永久删除他们的本地文件。您无法撤销此操作。",
             "3d957ff117": "没有工作区匹配这些筛选条件。",
             "41d594d01e": "{{value0}} 工作区{{value1}} 无法删除",
@@ -17004,7 +17027,6 @@
       "useComposerState": {
         "3db83fc58a": "没有可用于附件的远程项目路径。",
         "5f3d2c8a1b": "解析 MR 基础分支失败",
-        "7eb3f44ff7": "所选智能体已禁用。创建之前选择启用的智能体。",
         "attachSkipMissing": "不再走原来的路。",
         "attachSkipPermissionDenied": "没有权限。",
         "attachSkipSymlink": "无法附加符号链接。",
@@ -17072,7 +17094,7 @@
         "title": "macOS 权限可能未作用于 HiveCode 终端"
       },
       "useMacosTccPromptNotice": {
-        "description": "当 HiveCode 中运行的代理或终端工具尝试访问受保护的文件时，macOS 可能会显示权限信息。请在“设置”中授予“完全磁盘访问权限”，以减少此类提示。",
+        "description": "当 HiveCode 中运行的智能体或终端工具尝试访问受保护的文件时，macOS 可能会显示权限信息。请在“设置”中授予“完全磁盘访问权限”，以减少此类提示。",
         "dismiss": "不再显示",
         "openSettings": "打开设置",
         "title": "看到“HiveCode 想要访问…”提示？"
@@ -17299,11 +17321,11 @@
         "changed": "HiveCode 复制时文件发生了变化。请重新拖放。",
         "generic": "请重新拖放。",
         "outOfSpace": "磁盘空间不足，无法复制拖放的文件。",
-        "storageFull": "HiveCode 用于拖放文件的存储空间已满，因此 HiveCode 无法将其交给代理。",
+        "storageFull": "HiveCode 用于拖放文件的存储空间已满，因此 HiveCode 无法将其交给智能体。",
         "storageNotPrivate": "HiveCode 用于拖放文件的存储位置可被其他用户读取，因此未复制任何内容。",
         "storageUnavailable": "HiveCode 无法为拖放的文件创建存储位置。",
         "timedOut": "复制耗时过长。请重新拖放。",
-        "tooLarge": "文件太大，无法复制，因此 HiveCode 无法将其交给代理。"
+        "tooLarge": "文件太大，无法复制，因此 HiveCode 无法将其交给智能体。"
       },
       "ensure": {
         "simulator": {
@@ -17330,7 +17352,8 @@
             "tooLarge": "{{fileName}} 大于 {{maxSize}}。",
             "tooMany": "最多可附加 {{maxCount}} 张图片。",
             "totalTooLarge": "{{fileName}} 将使附件总大小超过 {{maxSize}}。",
-            "unsupportedType": "{{fileName}} 不是受支持的图片类型。"
+            "unsupportedType": "{{fileName}} 不是受支持的图片类型。",
+            "compressed": "已将 {{fileName}} 从 {{originalSize}} 压缩到 {{size}}，以符合附件大小限制。"
           }
         }
       },
@@ -17638,6 +17661,16 @@
       },
       "worktreeJumpNavigation": {
         "filteredNotice": "此工作树已被侧边栏筛选条件隐藏。工作区已打开，但不会在“空间”中显示。"
+      },
+      "reveal": {
+        "in": {
+          "file": {
+            "manager": {
+              "notFound": "未找到文件。它可能已被移动或删除。",
+              "launchFailed": "无法显示该文件。"
+            }
+          }
+        }
       }
     },
     "main": {
@@ -17739,8 +17772,8 @@
           }
         },
         "repos": {
-          "2975400634": "请更新 HiveCode 服务器，以便在此运行时打开非 Git 文件夹。",
           "15cf5319ec": "已在 {{hostName}} 上检查 {{path}}，但该主机未报告可用文件夹。",
+          "2975400634": "请更新 HiveCode 服务器，以便在此运行时打开非 Git 文件夹。",
           "2dcd706774": "该项目也存在于另一个配置文件中",
           "3be0f7df04": "无法在所选运行时打开文件夹",
           "6d3318e813": "导入存储库失败",
@@ -17945,7 +17978,9 @@
       "popupBlocked": "已阻止弹出窗口：{{origin}}",
       "preparationFailed": "无法在此桌面端启动远程浏览器。请检查配对连接后重试。",
       "unavailableDescription": "此页面附属于另一台桌面设备，或已不可用。",
-      "unavailableTitle": "客户端托管的浏览器不可用"
+      "unavailableTitle": "客户端托管的浏览器不可用",
+      "unavailableOtherDesktopDescription": "此页面已在另一台桌面上打开。",
+      "unavailableHostOfflineDescription": "{{host}} 已离线。重新连接后，此页面将在此处重新加载。"
     },
     "guestRecovery": {
       "failed": "浏览器页面意外停止。请重试以恢复。",
@@ -18407,15 +18442,15 @@
     "native-chat": {
       "approval": {
         "allow": "允许",
-        "askRule": "询问规则",
-        "blockedPath": "路径受阻",
         "cancel": "取消",
         "deny": "拒绝",
         "plan": {
           "file": "计划文件"
         },
         "reason": "原因",
-        "title": "允许 {{value0}}？"
+        "title": "允许 {{value0}}？",
+        "needsNewerOrca": "此请求需要更新版本的 Orca。",
+        "needsAccess": "需要访问的路径"
       },
       "ask": {
         "asked": "问：",
@@ -18454,15 +18489,21 @@
         "stateDone": "完成",
         "stateIdle": "已停止",
         "stateMonitoring": "监视中",
-        "stateUnverifiable": "暂无近期更新",
-        "stateUnverifiableCount": "{{value0}} 暂无近期更新",
+        "stateUnverifiable": "状态不可用",
+        "stateUnverifiableCount": "{{value0}} 状态不可用",
         "stateWaiting": "等待",
         "stateWorking": "处理中",
         "stop": "停止",
         "stopAll": "停止后台任务",
         "stopTask": "停止 {{value0}}",
         "task": "后台任务",
-        "workflow": "后台工作流"
+        "workflow": "后台工作流",
+        "stateWorkingCount": "{{value0}} 处理中",
+        "stateMonitoringCount": "{{value0}} 监控",
+        "stateWaitingCount": "{{value0}} 等待",
+        "stateBlockedCount": "{{value0}} 被阻止",
+        "stateDoneCount": "{{value0}} 完毕",
+        "stateIdleCount": "{{value0}} 停止了"
       },
       "composer": {
         "attach": "附加文件",
@@ -18481,7 +18522,6 @@
         "loadingSkills": "正在加载技能…",
         "localAttachmentUnsupported": "远程会话不支持本地附件。",
         "locked": "输入正被另一台设备占用。",
-        "mentionHint": "引用文件：",
         "model": "模型",
         "noCommands": "没有匹配的命令",
         "noCommandsOrSkills": "没有匹配的命令或技能",
@@ -18503,7 +18543,7 @@
         "pastedImageLabel": "粘贴的图片",
         "pendingAttachmentLimit": "等待中的附件过多。请完成当前编写后再添加附件。",
         "pillAccessibleName": "{{value0}} {{value1}}",
-        "placeholder": "发送消息…",
+        "placeholder": "随便问，@ 提及文件，/ 使用命令",
         "removeAttachment": "移除附件",
         "retrySkills": "重试",
         "send": "发送",
@@ -18529,7 +18569,26 @@
         "valueNotReported": "未报告",
         "viewAttachment": "查看图片",
         "workspaceAttachmentMismatch": "文件只能附加到其源工作区。",
-        "worktreeNotReady": "工作树未就绪 — 请稍后重试。"
+        "worktreeNotReady": "工作树未就绪 — 请稍后重试。",
+        "loadingFiles": "正在加载文件...",
+        "noFiles": "没有匹配的文件",
+        "filesLoadFailed": "无法加载文件",
+        "draftNotSaved": "此草稿尚未保存成功。Orca 会继续尝试。",
+        "imageNotBroughtBack": "无法随此草稿恢复 {{name}}。请重新附加或将其移除。",
+        "pastedImageNotBroughtBack": "无法随此草稿恢复这张粘贴的图片。请将其移除，如仍需要请重新粘贴。",
+        "removeImageToSend": "有一张图片无法恢复。请将其移除后再发送。",
+        "removeImagesToSend": "有些图片无法恢复。请将其移除后再发送。",
+        "imageAttachAgainLabel": "重新附加",
+        "pastedImageNotKeptLabel": "未保留",
+        "searchModels": "搜索模型…",
+        "noModelsMatch": "没有符合搜索条件的模型。",
+        "copyImage": "复制图片",
+        "copyImageFailed": "无法复制图片",
+        "copyImageTooLarge": "图片太大，无法复制。",
+        "imageCopied": "已复制图片",
+        "tooManyAttachments": "每次最多附加 {{value0}} 个文件。",
+        "pasteFailed": "粘贴失败。",
+        "commandAttachmentsUnsupported": "使用聊天会话命令前，请先移除附件。"
       },
       "contextMenu": {
         "copyOrcaSessionId": "复制 HiveCode 会话 ID",
@@ -18554,7 +18613,7 @@
       "deliveryUnconfirmed": "无法确认送达 — 重试前请检查聊天",
       "dismissDeliveryNotice": "关闭",
       "drop": {
-        "subtitle": "文件将作为代理可以读取的路径添加到您的消息中。",
+        "subtitle": "文件将作为智能体可以读取的路径添加到您的消息中。",
         "title": "拖放以附加到此聊天"
       },
       "failureWords": {
@@ -18597,7 +18656,7 @@
         "notDelivered": "此消息未送达。",
         "notDeliveredSendAgain": "此消息未送达。请重新发送以继续。",
         "notSignedIn": "{{agent}} 未使用所选账户登录。",
-        "previousExitUnverifiable": "之前的 {{agent}} 可能仍在运行。它停止后，您的消息就会发送。",
+        "previousExitUnverifiable": "无法停止之前的 {{agent}}。",
         "providerExitedRejection": "{{agent}} 在发送此消息前已停止。",
         "providerExitedRow": "{{agent}} 在生成此回复时停止了。您可以在此对话中继续。",
         "providerRateLimited": "{{agent}} 已被限流，正在重试。",
@@ -18615,7 +18674,20 @@
         "stopRefused": "{{agent}} 未停止。",
         "stopRefusedQuoted": "{{agent}} 未停止：{{detail}}。",
         "theAgent": "智能体",
-        "writeFailed": "HiveCode 无法将此消息交给智能体，因此消息未发送。"
+        "writeFailed": "HiveCode 无法将此消息交给智能体，因此消息未发送。",
+        "sendAgainToTryOnceMore": "请重新发送您的消息，再试一次。",
+        "editSavedArguments": "请在设置 > 智能体 > 参数中编辑。",
+        "launchFolderMissing": "此聊天运行所在的文件夹已不存在。请恢复该文件夹以继续此聊天。",
+        "historyInOtherAccount": "此聊天的历史记录位于另一个 Claude 账户中。请切换回该账户以继续此聊天。",
+        "agentCommandNotRunnable": "{{agent}} 在设置 → 智能体中的命令必须是 Orca 能找到的程序路径或名称，且不能包含参数或变量。请修改或重置。",
+        "argumentsMissingValue": "已保存的参数需要为 {{option}} 指定一个值。",
+        "argumentsMultipleValues": "已保存的参数为 {{option}} 指定了多个值。",
+        "argumentsPositionalPrompt": "已保存的参数中包含提示词。",
+        "argumentsUnsupportedOption": "已保存的参数包含不支持的选项（{{option}}）。",
+        "providerRetryNumber": "第 {{attempt}} 次重试。",
+        "providerRetryNumberOf": "第 {{attempt}} 次重试，共 {{maxRetries}} 次。",
+        "providerRetryLastError": "上次错误：{{detail}}。",
+        "sessionNotRestored": "{{agent}} 无法重新打开之前的会话，因此此聊天将在新会话中继续。{{agent}} 不记得之前的消息。"
       },
       "fileLinks": {
         "notFound": "未找到文件：{{value0}}",
@@ -18682,7 +18754,10 @@
         "details": "详情",
         "historyItemTooLarge": "聊天的这一部分过大，无法显示。",
         "historyRepaired": "此聊天的部分历史记录无法加载。",
-        "plan": "计划"
+        "plan": "计划",
+        "stoppedBeforeStart": "在智能体开始前已停止",
+        "dismiss": "关闭",
+        "copyError": "复制错误"
       },
       "providerFrame": {
         "byteLength": "{{value0}} 字节"
@@ -18718,7 +18793,15 @@
         "steer": "立即发送",
         "steerHint": "提交且不中断模型",
         "turnOffQueueing": "关闭排队",
-        "withdrawnHold": "在发送前已停止"
+        "withdrawnHold": "在发送前已停止",
+        "pausedKept": "尚未发送。点按发送即可发送。",
+        "sendConfirmTitle": "发送消息？",
+        "sendConfirmBody": "你即将发送一条消息。是否清除之前排队的 {{count}} 条消息？",
+        "sendConfirmBody_one": "你即将发送一条消息。是否清除之前排队的 {{count}} 条消息？",
+        "sendConfirmBody_other": "你即将发送一条消息。是否清除之前排队的 {{count}} 条消息？",
+        "sendConfirmClear": "清空队列",
+        "sendConfirmSend": "发送消息",
+        "from": "来自 {{names}}"
       },
       "railEmptyMessage": "信息",
       "railImageMessage": "图片附件",
@@ -18750,8 +18833,7 @@
           "subtitle": "此终端未运行可识别的编码智能体。",
           "title": "这里没有对话"
         },
-        "pairHost": "配对主机以查看智能体聊天记录。",
-        "reconnecting": "正在重新连接此聊天…"
+        "pairHost": "配对主机以查看智能体聊天记录。"
       },
       "status": {
         "failedAfter": "{{value0}} 后失败",
@@ -18761,7 +18843,10 @@
         "toggleDetails": "切换本轮详情",
         "workedFor": "工作用时 {{value0}}",
         "working": "处理中…",
-        "workingFor": "已工作 {{value0}}"
+        "workingFor": "已工作 {{value0}}",
+        "stopping": "正在停止…",
+        "queueAfterStop": "将消息加入队列，在停止后运行",
+        "sendAfterStop": "发送消息，在停止后运行"
       },
       "stop": "停止智能体",
       "structuredSessionCloseFailed": "无法关闭此聊天会话",
@@ -18785,13 +18870,13 @@
           "idleCount": "{{value0}} 空闲",
           "stopped": "已停止",
           "stoppedCount": "{{value0}} 已停止",
-          "unverifiable": "暂无近期更新",
-          "unverifiableCount": "{{value0}} 暂无近期更新",
+          "unverifiable": "状态不可用",
+          "unverifiableCount": "{{value0}} 状态不可用",
           "working": "处理中",
           "workingCount": "{{value0}} 正在工作"
         },
         "tokens": "{{value0}} 个 token",
-        "unnamed": "子代理",
+        "unnamed": "子智能体",
         "writtenBy": "由子代理 {{value0}} 输出"
       },
       "taskList": {
@@ -18815,14 +18900,11 @@
         "showTerminal": "显示终端"
       },
       "tool": {
-        "addedFile": "已添加文件",
         "copyDiff": "复制差异",
         "countN": "{{value0}} 次工具调用",
         "countOne": "1 次工具调用",
-        "deletedFile": "已删除文件",
         "diffGap": "未显示的行",
         "diffTruncated": "差异已截断",
-        "editedFile": "已编辑文件",
         "exitCode": "退出码 {{value0}}",
         "failedCallsLabel": "失败的工具调用：{{value0}}",
         "failedCount": "{{value0}} 失败",
@@ -18832,10 +18914,9 @@
         "ranCommandOneToolSummary": "已运行 {{commandCount}} 条命令并使用 {{toolCount}} 个工具",
         "ranCommandsManyToolsSummary": "已运行 {{commandCount}} 条命令并使用 {{toolCount}} 个工具",
         "ranCommandsOneToolSummary": "已运行 {{commandCount}} 条命令并使用 {{toolCount}} 个工具",
-        "renamedFile": "已重命名文件",
         "result": "结果",
         "runAgentMany": "然 {{value0}} 智能体",
-        "runAgentOne": "然 1 代理",
+        "runAgentOne": "然 1 智能体",
         "runCommandMany": "运行 {{value0}} 命令",
         "runCommandOne": "运行 1 个命令",
         "runFileChangeMany": "编辑 {{value0}} 文件",
@@ -18845,8 +18926,8 @@
         "runList": "{{value0}} 和 {{value1}}",
         "runListFilesMany": "列出 {{value0}} 目录",
         "runListFilesOne": "列出1个目录",
-        "runLiveAgentMany": "运行 {{value0}} 代理",
-        "runLiveAgentOne": "运行 1 个代理",
+        "runLiveAgentMany": "运行 {{value0}} 智能体",
+        "runLiveAgentOne": "运行 1 个智能体",
         "runLiveCommandMany": "运行 {{value0}} 命令",
         "runLiveCommandOne": "运行 1 个命令",
         "runLiveFileChangeMany": "编辑 {{value0}} 文件",
@@ -18882,7 +18963,35 @@
         "runningNamedPreview": "正在运行 {{toolName}} {{preview}}",
         "runningPreview": "正在运行 {{preview}}",
         "usedManySummary": "已使用 {{toolCount}} 个工具",
-        "usedOneSummary": "已使用 1 个工具"
+        "usedOneSummary": "已使用 1 个工具",
+        "interruptedCount": "{{value0}} 已中断",
+        "interruptedCallsLabel": "已中断的工具调用：{{value0}}",
+        "row": {
+          "running": "正在运行",
+          "reading": "正在读取",
+          "editing": "正在编辑",
+          "searching": "正在搜索",
+          "searchingWeb": "正在搜索网页",
+          "fetching": "正在获取",
+          "listed": "列出了",
+          "listing": "正在列出",
+          "ran": "运行了",
+          "read": "读取了",
+          "edited": "编辑了",
+          "searched": "搜索了",
+          "searchedWeb": "搜索了网页",
+          "fetched": "获取了",
+          "added": "添加了",
+          "deleted": "删除了",
+          "renamed": "重命名了",
+          "subagent": "子智能体",
+          "triedRead": "尝试读取",
+          "triedEdit": "尝试编辑",
+          "triedSearch": "尝试搜索",
+          "triedList": "尝试列出",
+          "triedFetch": "尝试获取",
+          "triedSearchWeb": "尝试搜索网页"
+        }
       },
       "turnDiff": {
         "many": "{{count}} 个已更改文件",
@@ -18929,7 +19038,7 @@
         "reopenChat": "请重新打开聊天以再次检查。",
         "restartFailed": "智能体无法重新启动。",
         "savedByNewerOrca": "这些聊天由更新版本的 HiveCode 保存。",
-        "sendOutcomeLost": "HiveCode 无法确认你的消息已送达代理。请查看聊天，如有需要请重新发送。",
+        "sendOutcomeLost": "HiveCode 无法确认你的消息已送达智能体。请查看聊天，如有需要请重新发送。",
         "settleEarlierMessage": "请等待之前的消息送达，或重试该消息。",
         "startNewChat": "请开始新的聊天以继续。",
         "terminalAgentHoldsChat": "此聊天仍在终端智能体中打开。",
@@ -18943,7 +19052,33 @@
         "waitForCommand": "请等待 /compact 或 /clear 完成。",
         "waitForStart": "请等待智能体完成启动。",
         "waitForTurn": "请等待智能体完成回复，或将其停止。",
-        "waitMoment": "请稍候。"
+        "waitMoment": "请稍候。",
+        "chatSavedByNewerOrca": "此聊天由更新版本的 Orca 保存。",
+        "updateOrcaToOpenChat": "请更新 Orca 以打开它。",
+        "cannotRunHere": "Orca 无法在此处以聊天方式运行此智能体。"
+      },
+      "reasoning": "推理",
+      "transcriptLabel": "对话",
+      "prompt": {
+        "collapse": "收起",
+        "expand": "展开"
+      },
+      "context": {
+        "unavailable": "上下文用量暂时未知，将在智能体下次响应后提供。",
+        "summary": "上下文：{{used}}/{{window}} token（{{percent}}%），根据上一次响应的估算值。",
+        "used": "上下文：已用 {{used}} token，根据上一次响应的估算值。",
+        "unreported": "此会话无法提供上下文用量。"
+      },
+      "agentMessage": {
+        "messageFrom": "消息来自",
+        "unnamedSender": "一个智能体"
+      },
+      "thought": "已思考",
+      "thoughtForDuration": "思考了 {{duration}}",
+      "hostOutage": {
+        "offline": "{{hostName}} 已离线",
+        "reconnecting": "正在重新连接 {{hostName}}…",
+        "reconnect": "重新连接"
       }
     },
     "nativeChat": {
@@ -19130,7 +19265,7 @@
     "settings": {
       "TerminalInteraction": {
         "copyTrimsGutter": "修剪副本上的装订线",
-        "copyTrimsGutterDescription": "将左侧装订线代理输出绘制在后面，因此复制的文本不会缩进。仅删除每个选定行共享的缩进。"
+        "copyTrimsGutterDescription": "将左侧装订线智能体输出绘制在后面，因此复制的文本不会缩进。仅删除每个选定行共享的缩进。"
       },
       "loadingPane": "正在加载设置…",
       "nativeChat": {
@@ -19341,7 +19476,7 @@
             "has": "有",
             "idleDays": "闲置 {{value0}} 天以上",
             "kind": {
-              "agent": "代理",
+              "agent": "智能体",
               "archived": "已归档",
               "blocker": "阻塞项",
               "comment": "评论",
@@ -19353,7 +19488,7 @@
               "pinned": "已固定",
               "prunable": "可修剪",
               "repo": "仓库",
-              "retainedAgents": "已完成的代理",
+              "retainedAgents": "已完成的智能体",
               "review": "审查",
               "reviewProvider": "提供方",
               "reviewState": "审查状态",
@@ -19556,6 +19691,16 @@
         "goToWorktree": "转到工作树",
         "workspaceReadyToast": "工作区 {{name}} 已就绪",
         "worktreeReadyToast": "工作树 {{name}} 已就绪"
+      },
+      "delete": {
+        "changes": {
+          "permanentLoss": "Git 工作区中任何未提交或未跟踪的更改都将被永久删除。",
+          "clean": "没有未提交或未跟踪的更改",
+          "unavailable": "无法检查更改",
+          "checking": "正在检查更改…",
+          "checkingDetails": "检查…",
+          "unavailableDetails": "详细信息不可用"
+        }
       }
     },
     "worktreeCard": {
@@ -19587,6 +19732,11 @@
       "active": "活跃",
       "inactive": "未活跃",
       "permission": "需要授权"
+    },
+    "jiraIssueAssigneeField": {
+      "label": "负责人",
+      "automatic": "自动",
+      "assignToMe": "分配给我（{{name}}）"
     }
   },
   "dashboard": {
@@ -19727,7 +19877,7 @@
       "ageHours": "2小时",
       "ageMinutes": "12分钟",
       "ageYesterday": "1天",
-      "agentsInstruction": "您的代理也可以搜索。让它“找到我们修复登录超时的那次会话”。",
+      "agentsInstruction": "您的智能体也可以搜索。让它“找到我们修复登录超时的那次会话”。",
       "consentInstruction": "随时可在以下位置更改或关闭",
       "continueInBackground": "在后台继续",
       "demoHit1Age": "3天",
@@ -19753,10 +19903,10 @@
       "demoRoleAssistant": "助手",
       "demoRoleUser": "用户",
       "enableFailed": "无法开启会话搜索。请重试。",
-      "indexingDescription": "HiveCode 正在读取您过去的代理会话记录，以便您可以搜索它们。这可能需要几分钟。",
-      "indexingTitle": "正在索引您的代理会话",
+      "indexingDescription": "HiveCode 正在读取您过去的智能体会话记录，以便您可以搜索它们。这可能需要几分钟。",
+      "indexingTitle": "正在索引您的智能体会话",
       "progressStarting": "正在查找您的会话…",
-      "readyDescription": "现在可以通过会话内容找到此电脑上的每个代理会话。",
+      "readyDescription": "现在可以通过会话内容找到此电脑上的每个智能体会话。",
       "readyTitle": "会话搜索已就绪",
       "readyToast": "会话搜索已就绪",
       "readyToastOpen": "打开",
@@ -19766,7 +19916,7 @@
       "recent2Title": "更新 lockfile",
       "recent3Text": "这是按领域分组的记录初稿。",
       "recent3Title": "发布说明草稿",
-      "settingsLink": "设置 → 代理会话搜索",
+      "settingsLink": "设置 → 智能体会话搜索",
       "startSearching": "开始搜索"
     },
     "voice": {
@@ -20142,7 +20292,7 @@
     "lowCommitAdvice": "通过关闭未使用的应用程序或 HiveCode 工作区来释放内存，或增加 Windows 页面文件大小，然后单击“重新加载”。",
     "lowCommitDetail": "Windows 只剩下 {{availableMB}} MB 内存供应用程序使用，因此窗口在重新加载后再次耗尽内存。",
     "lowCommitMessage": "Windows 内存不足。",
-    "processLimitDetail": "由于你的用户帐户已达到进程数上限，系统拒绝创建新进程。这通常由失控的终端、开发服务器或代理导致。请关闭其中一些，然后点击“重试”。",
+    "processLimitDetail": "由于你的用户帐户已达到进程数上限，系统拒绝创建新进程。这通常由失控的终端、开发服务器或智能体导致。请关闭其中一些，然后点击“重试”。",
     "quit": "退出",
     "reload": "重新加载",
     "stalledDetail": "Orca 在崩溃后重新加载了窗口，但始终未完成加载。",
@@ -20204,16 +20354,16 @@
       "clearedAndTurnedOff": "搜索已关闭，搜索数据已清除。",
       "computersConsent": "每台电脑保存自己的搜索索引，包含完整智能体对话和每次工具输出的最多 3,072 个字符。内容不会脱敏。获授权的远程客户端可以搜索并接收匹配文本。每个开关只控制对应的电脑。",
       "delete": "清除",
-      "deleteDisabled": "从此计算机中删除可搜索副本。您的代理会话不受影响。",
-      "deleteEnabled": "关闭搜索并从此计算机中删除可搜索副本。您的代理会话不受影响。",
+      "deleteDisabled": "从此计算机中删除可搜索副本。您的智能体会话不受影响。",
+      "deleteEnabled": "关闭搜索并从此计算机中删除可搜索副本。您的智能体会话不受影响。",
       "deleteIndexCopy": "清除搜索数据",
       "deleteTitle": "清除这台计算机上的搜索数据吗？",
-      "description": "在此计算机和任何配对的 HiveCode 服务器上搜索您的代理所说和所做的一切。",
+      "description": "在此计算机和任何配对的 HiveCode 服务器上搜索您的智能体所说和所做的一切。",
       "enableOnAll": "在所有计算机上启用",
       "indexComputers": "在会话内搜索",
       "open": "打开",
       "openInSidebar": "在侧边栏中打开",
-      "openInSidebarCopy": "输入您记得的内容，或询问代理：“找到我们修复登录超时的会话。”",
+      "openInSidebarCopy": "输入您记得的内容，或询问智能体：“找到我们修复登录超时的会话。”",
       "remoteServers": "HiveCode 远程服务器",
       "rowSwitchLabel": "搜索 {{host}} 上的会话",
       "saveError": "无法保存。再试一次。",
@@ -20225,7 +20375,7 @@
       "showFewer": "显示较少",
       "showMore": "显示 {{count}} 更多",
       "thisComputer": "这台电脑",
-      "title": "代理会话搜索",
+      "title": "智能体会话搜索",
       "updateServer": "更新服务器",
       "webUnsupported": "从该计算机上的 HiveCode 桌面应用程序打开会话搜索。"
     },
@@ -20269,13 +20419,13 @@
       "sortResultsAriaLabel": "排序结果：{{value0}}",
       "sortSessionsAriaLabel": "对会话进行排序：{{value0}}",
       "truncated": "某些结果或匹配文本受到限制。缩小搜索范围以获得更精确的结果。",
-      "unsupportedAgent": "此计算机不支持所选代理的历史搜索。更新该计算机上的 HiveCode 或选择其他代理。"
+      "unsupportedAgent": "此计算机不支持所选智能体的历史搜索。更新该计算机上的 HiveCode 或选择其他智能体。"
     }
   },
   "settings": {
     "agents": {
       "codexSharedServerWarning": {
-        "description": "当您自己启动的 Codex 与其他选项卡共享服务器时，在您自己启动的 Codex 上显示一条通知，因为它的代理状态可能是错误的。",
+        "description": "当您自己启动的 Codex 与其他选项卡共享服务器时，在您自己启动的 Codex 上显示一条通知，因为它的智能体状态可能是错误的。",
         "title": "当 Codex 选项卡共享服务器时发出警告"
       },
       "codexTerminalServerIsolation": {
@@ -20318,6 +20468,30 @@
         "resourceUsageToggleDescription": "显示资源管理器。点击可查看 CPU、内存、会话、守护进程控制和工作区磁盘扫描。",
         "sshToggleDescription": "当有可用的已配置 SSH 和远程 HiveCode 主机时显示它们。",
         "zcodeToggleDescription": "显示 ZCode Coding Plan 配额用量。"
+      },
+      "chat": {
+        "title": "聊天",
+        "textSize": "文字大小",
+        "textSizeDescription": "消息、工具活动和消息输入框。在聊天中按 {{increase}} / {{decrease}} 也会更改此设置。",
+        "codeTextSize": "代码文字大小",
+        "codeTextSizeDescription": "代码块、行内代码、命令和工具输出。",
+        "width": "宽度",
+        "widthDescription": "消息和输入框在宽窗格中可以扩展到的最大宽度。",
+        "resetAppearance": "重置聊天外观",
+        "resetDescription": "恢复上述默认设置。",
+        "comfortable": "舒适",
+        "wide": "宽",
+        "full": "全宽",
+        "pixels": "px",
+        "reset": "重置",
+        "matchTerminalInterface": "匹配终端外观",
+        "matchTerminalInterfaceDescription": "整个聊天使用与终端相同的字体和配色。更改终端主题后，聊天会自动同步。",
+        "contrast": "对比度",
+        "contrastDescription": "调整聊天文字相对于背景的亮度。滑到最右端可恢复以前更明亮的外观。",
+        "softer": "更柔和",
+        "sharper": "更清晰",
+        "terminalControlledHint": "由终端界面设置。",
+        "terminalControlledTooltip": "正在匹配终端外观。要更改此项，请关闭“匹配终端外观”。"
       }
     },
     "browser": {
@@ -20370,6 +20544,20 @@
       "optionLayoutCompose": "此布局使用 Option 键输入 @、€、[、] 等字符",
       "optionLayoutUnknown": "未知布局 — Option 键输入字符（安全的默认设置）",
       "optionShortcutHint": "选择“两个都”使用 Option 快捷键，选择“关”输入重音字符和符号，或选择“左边”/“右边”让两个 Option 键各司其职。"
+    },
+    "chat": {
+      "description": "选择聊天的外观和命名方式。",
+      "names": {
+        "title": "聊天名称",
+        "description": "使用智能体根据首条消息为新聊天生成名称。未生成名称时，聊天仍显示为 Claude Chat 或 Codex Chat。",
+        "enable": "自动为聊天命名",
+        "recipe": "聊天名称",
+        "recipeDescription": "根据新聊天的首条消息生成简短名称。",
+        "customCommandDescription": "选择自定义命令的配置共用此命令行。使用 {prompt} 将输入作为参数传递，否则通过标准输入传递。",
+        "saveFailed": "无法保存聊天命名设置。",
+        "searchAgent": "智能体",
+        "searchTemplate": "命令模板"
+      }
     }
   },
   "sidebar": {
@@ -20433,13 +20621,13 @@
   },
   "terminal": {
     "codexSharedServerBanner": {
-      "body": "会话可能会意外结束，并且代理状态可能会错误。",
+      "body": "会话可能会意外结束，并且智能体状态可能会错误。",
       "cancel": "取消",
       "confirmStopDescription": "这将关闭所有共享它的开放 Codex 会话，包括 HiveCode 之外的会话。",
       "confirmStopTitle": "停止共享服务器？",
       "copied": "已复制",
       "copy": "复制",
-      "dialogDescription": "Codex 会话直接在共享一台后台服务器的终端中启动。 HiveCode 将其启动的 Codex 会话分开保存。当会话共享一台服务器时，关闭一个服务器可能会结束其他服务器，并且代理状态可能会错误。",
+      "dialogDescription": "Codex 会话直接在共享一台后台服务器的终端中启动。 HiveCode 将其启动的 Codex 会话分开保存。当会话共享一台服务器时，关闭一个服务器可能会结束其他服务器，并且智能体状态可能会错误。",
       "dialogTitle": "为每个 Codex 选项卡提供自己的服务器",
       "dismiss": "关闭",
       "done": "完成",
@@ -20447,7 +20635,7 @@
       "fix": "使固定",
       "learnMore": "了解更多",
       "oldTerminalDialogCause": "较旧的终端仍然共享 Codex 服务器。打开一个新终端以在单独的服务器上运行 Codex。",
-      "oldTerminalDialogRisk": "共享服务器的 Codex 会话可能会一起结束，并且代理状态可能会错误。",
+      "oldTerminalDialogRisk": "共享服务器的 Codex 会话可能会一起结束，并且智能体状态可能会错误。",
       "oldTerminalDialogTitle": "为什么此 Codex 共享服务器",
       "openNewTerminal": "打开新终端",
       "openedBeforeUpdateBody": "这个终端是在 HiveCode 开始为每个 Codex 提供自己的服务器之前打开的。",
@@ -20829,5 +21017,59 @@
     },
     "graphLegend": "实线箭头表示前置依赖，虚线箭头表示配置的退回方向。",
     "graphInvalidLayout": "当前依赖无法构成有效流程图。检查阶段引用和依赖错误后重试。"
+  },
+  "csv": {
+    "detectingDelimiter": "正在检测分隔符…",
+    "indexProgress": "正在为 CSV 建立索引… {{percent}}%",
+    "loadingCell": "加载中…",
+    "nextRows": "下一批行",
+    "previousRows": "上一批行",
+    "readOnlyPreview": "大文件预览 · 只读",
+    "resizeColumn": "调整列 {{column}} 的大小",
+    "rowWindow": "行 {{first}}–{{last}}",
+    "editor": "CSV 编辑器",
+    "editCell": "编辑第 {{row}} 行，第 {{column}} 列",
+    "filterRows": "筛选行",
+    "edit": "编辑单元格",
+    "copy": "复制",
+    "paste": "粘贴",
+    "rows": "行",
+    "insertRowAbove": "在上方插入行",
+    "insertRowBelow": "在下方插入行",
+    "deleteRows": "删除选中的行",
+    "columns": "列",
+    "newColumn": "第 {{column}} 列",
+    "insertColumnBefore": "在左侧插入列",
+    "insertColumnAfter": "在右侧插入列",
+    "moveColumnLeft": "向左移动列",
+    "moveColumnRight": "向右移动列",
+    "deleteColumns": "删除选中的列",
+    "sort": "排序",
+    "sortAscending": "对选中的列升序排序",
+    "sortDescending": "对选中的列降序排序",
+    "originalOrder": "原始行顺序",
+    "save": "保存",
+    "inspectionOnly": "仅查看 · 文件行顺序不变"
+  },
+  "worktree": {
+    "nestedRemoval": {
+      "refreshFailed": "无法刷新工作区列表",
+      "review": "连同嵌套工作树一起删除…",
+      "title": "删除工作区和嵌套工作树？",
+      "description": "这将永久删除“{{name}}”、下面列出的每个嵌套工作树及其中的所有文件（包括未提交的更改）。它们的终端和智能体将被停止。",
+      "detached": "分离 HEAD",
+      "loading": "正在检查嵌套工作树…",
+      "order": "嵌套工作树会先被删除。如果其中一个失败，删除将停止并保留父工作树。分支遵循您现有的删除设置。",
+      "cancel": "取消",
+      "retry": "重新检查",
+      "deleting": "正在删除…",
+      "confirm": "删除所有列出的工作树",
+      "preservedBranches": "部分嵌套工作树分支已保留"
+    }
+  },
+  "mediaPreview": {
+    "unavailable": "无法播放此媒体文件。文件可能不可用或使用了不支持的编解码器。",
+    "openFailed": "无法在默认应用中打开此文件。",
+    "openDefault": "在默认应用中打开"
   }
 }

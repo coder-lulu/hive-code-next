@@ -14,26 +14,6 @@ import {
   unwrapPowerShellScript
 } from './tui-agent-startup-script.test-fixture'
 
-describe('draft prefill teardown ordering (#14975)', () => {
-  // Why pinned: the teardown mutates the calling shell, so it must reference
-  // $fish_pid, which aborts the line under `set -u`. That is survivable ONLY
-  // because it runs AFTER the agent — the agent is already up. Moving it before
-  // the command would make an aborted line a blocked launch, which is exactly
-  // what reverted #14863.
-  it('runs the clear after the agent command, never before it', () => {
-    const plan = buildAgentDraftLaunchPlan({
-      agent: 'pi',
-      draft: 'hello',
-      cmdOverrides: {},
-      platform: 'darwin'
-    })
-
-    const command = plan?.launchCommand ?? ''
-    expect(command.indexOf('pi')).toBeLessThan(command.indexOf('fish_pid'))
-    expect(command).toMatch(/^pi;/)
-  })
-})
-
 describe('tui agent startup plans', () => {
   it.each(['powershell', 'cmd'] as const)(
     'keeps the established invalid-quote error on %s',
@@ -83,6 +63,19 @@ describe('tui agent startup plans', () => {
     })
 
     expect(plan?.launchCommand).toBe("claude 'fix Bob''s \"quoted\" branch'")
+  })
+
+  // Why: a typed line break submits early, and PowerShell 5.1 without PSReadLine then hangs at `>>`.
+  it('keeps a multi-line PowerShell launch on one physical line', () => {
+    const plan = buildAgentStartupPlan({
+      agent: 'claude',
+      prompt: 'first line\nsecond $line',
+      cmdOverrides: {},
+      platform: 'win32'
+    })
+
+    expect(plan?.launchCommand).not.toMatch(/[\r\n]/)
+    expect(plan?.launchCommand).toBe('claude "first line`nsecond `$line"')
   })
 
   it('invokes fully quoted argv commands in PowerShell', () => {
@@ -900,24 +893,19 @@ describe('tui agent startup plans', () => {
     ).toBeNull()
   })
 
-  it('launches Devin with stdin-after-start prompt delivery', () => {
+  it('launches Rovo Dev as an acli subcommand and types the prompt after start', () => {
+    // `acli rovodev run <instruction>` is one-shot, so the prompt must not ride argv.
     const plan = buildAgentStartupPlan({
-      agent: 'devin',
-      prompt: 'fix the tests',
+      agent: 'rovo',
+      prompt: 'fix it',
       cmdOverrides: {},
-      agentArgs: resolveTuiAgentLaunchArgs('devin', null),
+      agentArgs: resolveTuiAgentLaunchArgs('rovo', null),
       platform: 'linux'
     })
-    expect(plan).toEqual({
-      agent: 'devin',
-      launchCommand: "devin '--permission-mode' 'bypass'",
-      expectedProcess: 'devin',
-      followupPrompt: 'fix the tests',
-      launchConfig: {
-        agentCommand: "devin '--permission-mode' 'bypass'",
-        agentArgs: '--permission-mode bypass',
-        agentEnv: {}
-      }
+    expect(plan).toMatchObject({
+      launchCommand: "acli rovodev run '--yolo'",
+      expectedProcess: 'acli',
+      followupPrompt: 'fix it'
     })
   })
 

@@ -102,7 +102,57 @@ it('automatically starts Host with server-selected placement and wires local con
   expect(entry.indexOf('runtimeCloud.rpcReady(rpc)')).toBeGreaterThan(
     entry.indexOf('await rpc.start()')
   )
-  const cloudStop = entry.indexOf('await runtimeCloud.stop()')
-  expect(cloudStop).toBeGreaterThanOrEqual(0)
-  expect(entry.indexOf('await rpc.stop()', cloudStop)).toBeGreaterThan(cloudStop)
+  const cleanup = entry.indexOf(
+    'registerCleanup(() => Promise.all([runtimeCloud?.stop(), rpc.stop()]).then(() => undefined))'
+  )
+  expect(cleanup).toBeGreaterThanOrEqual(0)
+  expect(cleanup).toBeLessThan(entry.indexOf('await rpc.start()'))
 })
+
+it.each(['host', 'presence'] as const)(
+  'waits for both shutdown owners when %s stops first',
+  async (first) => {
+    let finishHost!: () => void
+    let finishPresence!: () => void
+    const hostStopped = new Promise<void>((resolve) => {
+      finishHost = resolve
+    })
+    const presenceStopped = new Promise<void>((resolve) => {
+      finishPresence = resolve
+    })
+    mock.hostStop.mockImplementationOnce(() => hostStopped)
+    mock.stop.mockImplementationOnce(() => presenceStopped)
+    const cloud = createOrcadRuntimeCloud({
+      userDataPath: '/unused',
+      runtimeVersion: '1.0.0',
+      runtime: { getStartedAt: () => 1, getStatus: () => ({ graphStatus: 'ready' }) },
+      env: {}
+    })
+    cloud.rpcReady({} as OrcaRuntimeRpcServer)
+    let completed = false
+    const stopping = cloud.stop()
+    void stopping.then(() => {
+      completed = true
+    })
+    try {
+      expect(mock.ready).toHaveBeenLastCalledWith(false)
+      expect(mock.hostStop).toHaveBeenCalledOnce()
+      expect(mock.stop).toHaveBeenCalledOnce()
+      if (first === 'host') {
+        finishHost()
+      } else {
+        finishPresence()
+      }
+      await Promise.resolve()
+      expect(completed).toBe(false)
+      finishHost()
+      finishPresence()
+      await stopping
+      expect(completed).toBe(true)
+    } finally {
+      finishHost()
+      finishPresence()
+      await Promise.allSettled([stopping])
+    }
+  }
+)

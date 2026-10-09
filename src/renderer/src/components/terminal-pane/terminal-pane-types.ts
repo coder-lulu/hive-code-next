@@ -13,7 +13,3 @@ export type TerminalPaneProps = {
   onCloseTab: () => void
   onReady?: () => void
 }
-
-export type TerminalPaneHandle = {
-  closeActivePane: () => void
-}

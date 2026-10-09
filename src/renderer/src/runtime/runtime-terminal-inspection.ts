@@ -1,8 +1,8 @@
 import type { GlobalSettings } from '../../../shared/global-settings-types'
-import type { RuntimeTerminalResolvePane, RuntimeTerminalSend } from '../../../shared/runtime-types'
-import { resolvePaneKeyForPtyId } from './runtime-terminal-pane-owner'
+import type { RuntimeTerminalSend } from '../../../shared/runtime-types'
 import { isTerminalInputTooLargeWithDeferredMeasurement } from '../../../shared/terminal-input'
-import { useAppStore } from '../store'
+import { recordRuntimeTerminalInputForPtyId } from './runtime-terminal-input-recording'
+export { recordRuntimeTerminalInputForPtyId } from './runtime-terminal-input-recording'
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
 import {
   getRemoteRuntimePtyEnvironmentId,
@@ -67,22 +67,6 @@ function normalizeInspectionResult(
     return clientOnlyUnverifiableInspection('terminal_gone')
   }
   return result
-}
-
-export function recordRuntimeTerminalInputForPtyId(ptyId: string, timestamp = Date.now()): void {
-  const state = useAppStore.getState()
-  const paneKey = resolvePaneKeyForPtyId(state.terminalLayoutsByTabId, ptyId)
-  if (!paneKey) {
-    return
-  }
-  try {
-    // Why: paired/runtime sends can bypass xterm.onData, so hibernation
-    // needs the same user-input marker from the PTY-id route.
-    state.recordTerminalInput(paneKey, timestamp)
-  } catch {
-    // Ignore malformed legacy layout data; the planner will stay
-    // conservative when a live PTY cannot be matched to an eligible pane.
-  }
 }
 
 export async function inspectRuntimeTerminalProcess(
@@ -225,83 +209,4 @@ function sendRuntimePtyInputWithinLimit(
   return true
 }
 
-export async function sendRuntimePtyInputVerified(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
-  ptyId: string,
-  data: string,
-  inputKind: TerminalInputKind,
-  options?: { requireAgentStatus: 'sendable'; signal?: AbortSignal }
-): Promise<boolean> {
-  if (options?.signal?.aborted) {
-    return false
-  }
-  const tooLarge = isRuntimePtyInputTooLarge(data)
-  if (typeof tooLarge === 'boolean' ? tooLarge : await tooLarge) {
-    return false
-  }
-  const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
-  let target = ownerEnvironmentId
-    ? ({ kind: 'environment', environmentId: ownerEnvironmentId } as const)
-    : getActiveRuntimeTarget(settings)
-  let terminal = getRemoteRuntimeTerminalHandle(ptyId)
-  const local = target.kind !== 'environment' || !terminal
-  if (local && !options?.requireAgentStatus) {
-    const accepted = await window.api.pty.writeAccepted(ptyId, data, inputKind)
-    if (!accepted) {
-      window.api.pty.write(ptyId, data, inputKind)
-    }
-    recordRuntimeTerminalInputForPtyId(ptyId)
-    return true
-  }
-  try {
-    if (local) {
-      target = { kind: 'local' }
-      const paneKey = resolvePaneKeyForPtyId(useAppStore.getState().terminalLayoutsByTabId, ptyId)
-      if (!paneKey) {
-        return false
-      }
-      const resolved = await callRuntimeRpc<{ terminal: RuntimeTerminalResolvePane }>(
-        target,
-        'terminal.resolvePane',
-        { paneKey },
-        { timeoutMs: 15_000, signal: options?.signal }
-      )
-      if (
-        !resolved.terminal.connected ||
-        !resolved.terminal.handle ||
-        resolved.terminal.ptyId !== ptyId ||
-        resolvePaneKeyForPtyId(useAppStore.getState().terminalLayoutsByTabId, ptyId) !== paneKey
-      ) {
-        return false
-      }
-      terminal = resolved.terminal.handle
-    }
-    if (options?.signal?.aborted) {
-      return false
-    }
-    const result = await callRuntimeRpc<{ send: RuntimeTerminalSend }>(
-      target,
-      'terminal.send',
-      {
-        terminal,
-        text: data,
-        client: DESKTOP_RUNTIME_CLIENT,
-        ...(options ? { requireAgentStatus: options.requireAgentStatus } : {})
-      },
-      { timeoutMs: 15_000, ...(options?.signal ? { signal: options.signal } : {}) }
-    )
-    if (result.send.accepted === true) {
-      recordRuntimeTerminalInputForPtyId(ptyId)
-      return true
-    }
-    return false
-  } catch (error) {
-    if (
-      options?.requireAgentStatus ||
-      classifyTerminalProcessInspectionFailure(error) === 'terminal_gone'
-    ) {
-      return false
-    }
-    throw error
-  }
-}
+export { sendRuntimePtyInputVerified } from './runtime-terminal-verified-input'

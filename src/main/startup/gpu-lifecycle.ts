@@ -1,3 +1,4 @@
+import { enableMainProcessGpuFeatures } from './configure-process'
 import { app, type BrowserWindow } from 'electron'
 import { relaunchApp } from '../app-relaunch'
 import { destroySystemTray } from '../tray/system-tray'
@@ -16,6 +17,7 @@ import { promptForGpuFallbackRestart } from '../crash-reporting/gpu-fallback-res
 import { engageGpuFallbackAfterCrashBurst } from '../crash-reporting/gpu-fallback-engagement'
 import { recordCrashBreadcrumb } from '../crash-reporting/crash-breadcrumb-store'
 import { recordDurableCrashBreadcrumb } from '../crash-reporting/durable-crash-breadcrumb'
+import { GpuCrashDiagnosticsRecorder } from '../crash-reporting/gpu-crash-diagnostics'
 import {
   isInstallDirAclRepairExhausted,
   isInstallDirAclRepairPending,
@@ -24,6 +26,19 @@ import {
 } from './windows-install-dir-acl-recovery'
 import { mainProcessState as state, gpuFallbackEnvironment } from './main-process-state'
 import { createGpuAccelerationAboutPanelOptions } from '../menu/gpu-acceleration-about-panel'
+
+export function createGpuCrashDiagnosticsRecorder(): GpuCrashDiagnosticsRecorder | null {
+  if (process.platform !== 'win32') {
+    return null
+  }
+  return new GpuCrashDiagnosticsRecorder({
+    provider: {
+      getGPUInfo: (infoType) => app.getGPUInfo(infoType),
+      getGPUFeatureStatus: () => app.getGPUFeatureStatus()
+    },
+    recordBreadcrumb: (data) => recordDurableCrashBreadcrumb('gpu_crash_hardware', data)
+  })
+}
 
 export function updateGpuAccelerationAboutPanel(): void {
   app.setAboutPanelOptions(
@@ -269,4 +284,11 @@ export function registerGpuLifecycleHandlers(): void {
       updateGpuAccelerationAboutPanel()
     }
   })
+}
+
+export function configureGpuAccelerationForThisLaunch(): void {
+  maybeApplyGpuFallbackForThisLaunch()
+  if (!state.gpuFallbackActiveThisLaunch) {
+    enableMainProcessGpuFeatures()
+  }
 }

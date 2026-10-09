@@ -11,13 +11,11 @@ import {
   isPersistedAgentSessionRecord,
   type AgentSessionLease
 } from '../../shared/agent-session-record'
-import { normalizeLegacyHandoffRecord } from '../../shared/agent-session-legacy-handoff-lease'
+import { decodePersistedAgentSessionRecord } from '../../shared/agent-session-record-stored-form'
 import type Database from '../sqlite/sync-database'
 import type { SqliteRow } from '../sqlite/sqlite-statement'
-import {
-  AGENT_SESSION_STORE_SCHEMA_VERSION,
-  type AgentSessionStoreState
-} from './agent-session-record-store-file'
+import type { AgentSessionStoreState } from './agent-session-store-state'
+import { AGENT_SESSION_STORE_SCHEMA_VERSION } from './agent-session-store-contract'
 import type { AgentSessionStoreRowWrites } from './agent-session-store-draft'
 import {
   isReadableAgentSessionStoreOperation,
@@ -115,7 +113,7 @@ export function loadAgentSessionStoreRows(
     const parsed = parseJson(text(row, 'record_json'))
     const value = parsed.ok ? parsed.value : text(row, 'record_json')
     if (parsed.ok && isReadableAgentSessionStoreRecord(sessionId, value)) {
-      const { record } = normalizeLegacyHandoffRecord(value)
+      const { record } = decodePersistedAgentSessionRecord(value)
       const prior = previous?.records.get(sessionId)
       const candidate = {
         ...record,
@@ -131,7 +129,10 @@ export function loadAgentSessionStoreRows(
           : { ...candidate, lease: { ...candidate.lease, unreconciled: true } }
       )
     } else {
-      state.unreadableRecords.set(sessionId, { reason: unreadableRecordReason(value), raw: value })
+      state.unreadableRecords.set(sessionId, {
+        reason: unreadableRecordReason(value),
+        raw: value
+      })
     }
   }
   for (const row of db

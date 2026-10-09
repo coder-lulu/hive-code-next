@@ -5,6 +5,7 @@ import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-c
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { TEXT_INPUT_FONT_SIZE } from '../platform/text-input-font-size'
+import { MobileNativeChatCardHeaderAction } from './MobileNativeChatCardHeaderAction'
 
 type Props = {
   prompt: AskPrompt
@@ -13,6 +14,8 @@ type Props = {
    *  option's stable number instead of pasted label text (STA-1860). */
   onAnswer: (selections: AskAnswerSelection[]) => Promise<boolean>
   onCancel?: () => Promise<boolean>
+  /** Fold the card to a strip and free Send, writing nothing. */
+  onCollapse?: () => void
 }
 
 // Sentinel index for the free-text "Other…" row (never a real option index).
@@ -22,7 +25,12 @@ const OTHER = -1
  *  question per step with tabs across the top, a Next button that advances (Send
  *  on the last step), and a Cancel that dismisses the prompt. Neutral styling
  *  with a subtle green accent on the active choice to match the rest of the app. */
-export function MobileNativeChatAsk({ prompt, onAnswer, onCancel }: Props): React.JSX.Element {
+export function MobileNativeChatAsk({
+  prompt,
+  onAnswer,
+  onCancel,
+  onCollapse
+}: Props): React.JSX.Element {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   const [index, setIndex] = useState(0)
@@ -130,7 +138,10 @@ export function MobileNativeChatAsk({ prompt, onAnswer, onCancel }: Props): Reac
       ) : null}
 
       <ScrollView style={styles.scroll} keyboardShouldPersistTaps="always">
-        <Text style={styles.questionText}>{q.question}</Text>
+        <View style={styles.questionRow}>
+          <Text style={styles.questionText}>{q.question}</Text>
+          <MobileNativeChatCardHeaderAction onCollapse={onCollapse} disabled={submitting} />
+        </View>
         {q.options.map((opt, optIndex) => (
           <OptionRow
             key={`${optIndex}:${opt.label}`}
@@ -253,6 +264,7 @@ function OptionRow({
 
 function createStyles(theme: MobileTheme) {
   return StyleSheet.create({
+    questionRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space8 },
     card: {
       maxHeight: 380,
       backgroundColor: theme.color.bg.surface,

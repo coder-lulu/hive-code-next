@@ -9,6 +9,11 @@ import type {
   AgentSessionStatusEvent,
   AgentSessionStatusSummary
 } from '../../../shared/agent-session-wire'
+import {
+  foldAgentSessionStatusEvent,
+  revokeAgentSessionStatusLive,
+  type AgentSessionStatusSnapshot
+} from '../../../shared/agent-session-status-snapshot-fold'
 import { AGENT_SESSION_STATUS_FEED_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import {
   runtimeEnvironmentSupportsCapability,
@@ -16,7 +21,7 @@ import {
 } from './runtime-rpc-client'
 import { subscribeStructuredAgentSessionStatus } from './structured-agent-session-client'
 
-export type StructuredAgentSessionStatusSnapshot = ReadonlyMap<string, AgentSessionStatusSummary>
+export type StructuredAgentSessionStatusSnapshot = AgentSessionStatusSnapshot
 export type StructuredAgentSessionStatusEvidence = {
   summary: AgentSessionStatusSummary
   receivedAt: number
@@ -69,12 +74,11 @@ function createOwner(target: RuntimeClientTarget): OwnedStatusFeed {
       return
     }
     // An empty restart snapshot neither retracts cached rows nor renews their receipt.
-    const next = new Map(snapshot)
+    const next = foldAgentSessionStatusEvent(snapshot, event)
     const nextEvidence = new Map(evidenceSnapshot)
     const receivedAt = Date.now()
     for (const session of sessions) {
       confirmedSessions.add(session.sessionId)
-      next.set(session.sessionId, session)
       nextEvidence.set(session.sessionId, { summary: session, receivedAt })
     }
     snapshot = next
@@ -93,18 +97,8 @@ function createOwner(target: RuntimeClientTarget): OwnedStatusFeed {
     handle = null
   }
   const revokeSnapshotOwnership = (): void => {
-    let next: Map<string, AgentSessionStatusSummary> | null = null
-    for (const [sessionId, summary] of snapshot) {
-      if (!summary.hostExecutionOwned) {
-        continue
-      }
-      if (!next) {
-        next = new Map(snapshot)
-      }
-      const { hostExecutionOwned: _owned, hostExecutionPhase: _phase, ...retained } = summary
-      next.set(sessionId, retained)
-    }
-    if (next) {
+    const next = revokeAgentSessionStatusLive(snapshot)
+    if (next !== snapshot) {
       snapshot = next
       const nextEvidence = new Map(evidenceSnapshot)
       for (const [sessionId, evidence] of evidenceSnapshot) {

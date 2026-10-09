@@ -1,3 +1,4 @@
+import { taskFailureWithInvalidDiagnostics } from './task-model-response-field-diagnostics.test-fixture'
 import { createServer, type Server, type ServerResponse } from 'node:http'
 import { once } from 'node:events'
 import { brotliCompressSync, deflateSync, gzipSync } from 'node:zlib'
@@ -186,13 +187,13 @@ describe('Fetch-decoded controlled model responses', () => {
     expect(
       taskFailure(first, 'response', 'TASK_MODEL_STREAM_REFUSED', 200, 'content_encoding')
     ).toBe(first)
-    const forged: TaskFailureError = Reflect.apply(taskFailure, undefined, [
+    const forged: TaskFailureError = taskFailureWithInvalidDiagnostics(
       { responseReason: 'private/header/token-secret' },
       'response',
       'TASK_MODEL_STREAM_REFUSED',
       200,
       'content_type_private_token_secret'
-    ])
+    )
     expect(forged.diagnostic).not.toHaveProperty('responseReason')
     expect(JSON.stringify(forged)).not.toContain('secret')
   })

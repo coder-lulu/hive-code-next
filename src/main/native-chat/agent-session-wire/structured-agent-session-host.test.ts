@@ -32,6 +32,9 @@ import {
   openTestJournalHostDatabase
 } from '../agent-session-journal/journal-host-database-test-support'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 let root: string
 let store: AgentSessionRecordStore
@@ -58,6 +61,27 @@ beforeEach(() => {
 })
 
 describe('attach', () => {
+  it('founds a client-location floating chat with the host folder and keeps it on replay', async () => {
+    const resolveWorkspacePath = vi.fn(async () => '/host/original-folder')
+    host.deps.resolveWorkspacePath = resolveWorkspacePath
+    const params = attachParams({
+      location: {
+        executionHostId: 'local',
+        wslDistro: null,
+        workspaceId: FLOATING_TERMINAL_WORKTREE_ID,
+        workspaceKind: 'folder'
+      }
+    })
+
+    expect(await host.attach(CALLER, params)).toMatchObject({ ok: true })
+    expect(store.getRecord(SESSION)?.launchDirectory).toBe('/host/original-folder')
+    resolveWorkspacePath.mockResolvedValue('/host/changed-folder')
+
+    expect(await host.attach(CALLER, params)).toMatchObject({ ok: true, replayed: true })
+    expect(store.getRecord(SESSION)?.launchDirectory).toBe('/host/original-folder')
+    expect(resolveWorkspacePath).toHaveBeenCalledTimes(1)
+  })
+
   it('reserves the lease, spawns through the adapter, and opens the journal', async () => {
     const result = await host.attach(CALLER, attachParams())
     expect(result).toMatchObject({ ok: true, replayed: false })
@@ -114,7 +138,7 @@ describe('attach', () => {
         },
         link: {
           linkId: 'stale-link',
-          handle: { provider: 'codex', threadId: THREAD },
+          handle: codexProviderHandle(THREAD),
           origin: 'created',
           mintedAtFence: fence + 1,
           observedAt: NOW
@@ -129,13 +153,14 @@ describe('attach', () => {
         },
         link: {
           linkId: `link-${fence}`,
-          handle: { provider: 'codex', threadId: THREAD },
+          handle: codexProviderHandle(THREAD),
           origin: 'created',
           mintedAtFence: fence,
           observedAt: NOW
         }
       }))
     host = new StructuredAgentSessionHost({
+      agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
       adapter: { ...adapter(), acquire },
@@ -163,7 +188,7 @@ describe('attach', () => {
     expect(await host.attach(CALLER, ensureParams(releasedFence))).toMatchObject({ ok: true })
     expect(acquire).toHaveBeenCalledTimes(2)
     expect(store.getRecord(SESSION)?.lease.claimStatus).toBe('live')
-    expect(releaseAcquisition).toHaveBeenCalledWith({ sessionId: SESSION })
+    expect(releaseAcquisition).toHaveBeenCalledWith({ sessionId: SESSION, agent: 'codex' })
   })
 
   it('reaps an acquisition when process identity commit fails', async () => {
@@ -177,7 +202,7 @@ describe('attach', () => {
       }
     })
 
-    expect(releaseAcquisition).toHaveBeenCalledWith({ sessionId: SESSION })
+    expect(releaseAcquisition).toHaveBeenCalledWith({ sessionId: SESSION, agent: 'codex' })
   })
 
   it('drains writes captured by the old journal before acquiring its replacement', async () => {
@@ -555,6 +580,7 @@ describe('restart', () => {
     closeTestJournalHostDatabase(root)
     store = await openTestAgentSessionRecordStore(root)
     host = new StructuredAgentSessionHost({
+      agents: NO_STRUCTURED_AGENTS,
       logger: createStructuredAgentSessionLogger(),
       store,
       adapter: { ...adapter(), ...adapterOverrides },
@@ -695,13 +721,13 @@ describe('restart', () => {
     expect(status).toMatchObject({ owner: 'native' })
   })
 
-  it('vouches for no owner of a chat this host cannot run', async () => {
+  it('reads stored ownership even when this host cannot start the provider', async () => {
     await attach()
 
     await reboot(async () => ({ outcome: 'pid-absent' }), undefined, {
       supportsCreate: () => false
     })
-    expect(() => host.handoffStatus(SESSION)).toThrow('structured_agent_session_unsupported')
+    expect(host.handoffStatus(SESSION)).toMatchObject({ owner: 'native' })
   })
 
   it('does not remember a failed adjudication as done', async () => {

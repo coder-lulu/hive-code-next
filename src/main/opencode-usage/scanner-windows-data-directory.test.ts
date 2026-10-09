@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { opencodeDiscoveries } from '../ai-vault/session-scanner-opencode-sources'
 import Database from '../sqlite/sync-database'
@@ -60,8 +60,16 @@ describe('OpenCode usage discovery on Windows', () => {
     const dataDirectory = join(homeDirectory, '.local', 'share', 'opencode')
     mkdirSync(dataDirectory, { recursive: true })
     const databasePath = join(dataDirectory, 'opencode.db')
-    const database = new Database(databasePath)
-    database.exec(`
+    const originalNamespacePath = win32.toNamespacedPath
+    const namespacePathSpy =
+      originalPlatform.value === 'win32'
+        ? undefined
+        : vi.spyOn(win32, 'toNamespacedPath').mockImplementation(function (this: unknown, ...args) {
+            return args[0] === databasePath ? databasePath : originalNamespacePath.apply(this, args)
+          })
+    try {
+      const database = new Database(databasePath)
+      database.exec(`
       CREATE TABLE session (
         id TEXT PRIMARY KEY,
         directory TEXT,
@@ -81,15 +89,18 @@ describe('OpenCode usage discovery on Windows', () => {
         100, 20, 0, 0, 1777777700000, 1777777800000
       );
     `)
-    database.close()
+      database.close()
 
-    const result = await scanOpenCodeUsageDatabases([], [])
-    const issues = []
-    const [discovery] = await Promise.all(opencodeDiscoveries({}, [], 25, issues))
+      const result = await scanOpenCodeUsageDatabases([], [])
+      const issues = []
+      const [discovery] = await Promise.all(opencodeDiscoveries({}, [], 25, issues))
 
-    expect(discovery?.files.map(({ path }) => path)).toEqual([`${databasePath}#windows-session`])
-    expect(issues).toEqual([])
-    expect(result.processedDatabases.map(({ path }) => path)).toEqual([databasePath])
-    expect(result.sessions.map(({ sessionId }) => sessionId)).toEqual(['windows-session'])
+      expect(discovery?.files.map(({ path }) => path)).toEqual([`${databasePath}#windows-session`])
+      expect(issues).toEqual([])
+      expect(result.processedDatabases.map(({ path }) => path)).toEqual([databasePath])
+      expect(result.sessions.map(({ sessionId }) => sessionId)).toEqual(['windows-session'])
+    } finally {
+      namespacePathSpy?.mockRestore()
+    }
   })
 })

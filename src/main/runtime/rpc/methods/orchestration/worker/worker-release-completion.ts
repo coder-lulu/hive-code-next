@@ -6,10 +6,7 @@ import type {
   WorkerTerminalResourceRow,
   WorkerTerminalRetainedReason
 } from '../../../../orchestration/worker-terminal-ownership'
-import {
-  captureWorkerOutputArchive,
-  summarizeWorkerOutputArchive
-} from '../../../../orchestration/worker-output-archive'
+import { summarizeWorkerOutputArchive } from '../../../../orchestration/worker-output-archive'
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import { describeUnconfirmedAgentStop } from '../../../../../../shared/pty-liveness-verdict'
 import { inspectWorkerTerminal } from './worker-observation'
@@ -20,6 +17,7 @@ import { workerTerminalLeaseIsCurrent } from './worker-terminal-release-lease'
 import { resolveStructuredWorkerForDispatch } from '../../orchestration-structured-worker-lifecycle'
 import { stopStructuredWorkerForRelease } from './structured-worker-release-stop'
 import { isStructuredWorkerHandle } from '../../../../structured-worker-identity'
+import { captureWorkerReleaseArchive } from './worker-release-archive-capture'
 
 export {
   archiveSummary,
@@ -209,13 +207,19 @@ async function completeWorkerTerminalReleaseOnce(
   let capturedArchive: { kind: WorkerTerminalArchiveKind; content: string } | undefined
   const structured = resolveStructuredWorkerForDispatch(db, dispatchId)
   if (!archive) {
-    const captured = await captureWorkerOutputArchive({
+    const capture = await captureWorkerReleaseArchive({
+      db,
+      resource,
       runtime,
       dispatchId,
       terminalHandle,
       attachedAtMs: orchestrationTimestampToMs(worker.created_at),
       structuredWorker: structured
     })
+    if ('receipt' in capture) {
+      return capture.receipt
+    }
+    const { captured } = capture
     capturedArchive = { kind: captured.kind, content: JSON.stringify(captured.content) }
     archiveSource = captured.kind === 'terminal_tail' ? 'terminal' : 'transcript'
     archiveStatus = captured.status

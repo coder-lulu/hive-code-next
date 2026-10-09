@@ -1,3 +1,4 @@
+import { agentJournalToolCallLifecycle } from './agent-journal-tool-call-lifecycle'
 import { structuredAgentSessionStatusBlock } from './structured-agent-session-status-block'
 import type { AgentJournalRenderItem } from './agent-session-journal-types'
 import type { NativeChatBlock, NativeChatMessage } from './native-chat-types'
@@ -19,11 +20,13 @@ export function itemBlocks(item: AgentJournalRenderItem): {
     return { role: body.role, blocks: body.blocks }
   }
   if (isStructuredAgentSessionToolAction(body)) {
-    const call = structuredAgentSessionToolCallBlock(body)
+    const call = structuredAgentSessionToolCallBlock(body, item.itemId)
+    // The call and its output are one journal row, so the result names its call.
+    const { callId } = call
     if (body.kind === 'diff') {
       return {
         role: 'assistant',
-        blocks: [call, { type: 'tool-result', output: boundedText(body.patch) }]
+        blocks: [call, { type: 'tool-result', output: boundedText(body.patch), callId }]
       }
     }
     return {
@@ -35,8 +38,9 @@ export function itemBlocks(item: AgentJournalRenderItem): {
               {
                 type: 'tool-result' as const,
                 output: boundedText(body.output),
-                isError: body.state === 'failed',
-                ...(body.callId !== undefined ? { callId: body.callId } : {})
+                // Output a call left when it was cut short is not an error it reported.
+                isError: agentJournalToolCallLifecycle(body) === 'failed',
+                callId
               }
             ]
           : [])

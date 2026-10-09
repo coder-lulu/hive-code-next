@@ -3,7 +3,18 @@ import { reserveNotificationCooldown } from '../../shared/notification-burst-coo
 import type { AgentStatusState } from '../../shared/agent-status-types'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { HiveMobilePushTestResult } from '../../shared/hive-mobile-push-contract'
+import {
+  agentSessionAttentionSubjectPrefix,
+  attentionOriginWasRead,
+  type StructuredAttentionOrigin,
+  type StructuredAttentionRead,
+  type StructuredAttentionState
+} from '../../shared/agent-session-attention'
 import { MobileNotificationReplayBuffer } from './mobile-notification-replay'
+import {
+  MobileNotificationDismissalStore,
+  type DeliveredNotificationIdentity
+} from './mobile-notification-dismissal-store'
 import { notifyRuntimeListeners } from './runtime-async-boundaries'
 import { getRuntimeDesktopSurface } from './runtime-desktop-surface'
 
@@ -27,6 +38,9 @@ export type MobileNotificationDispatchEvent = {
   // Why: background push must tell "needs input" from "finished" without re-deriving
   // it from the title. Optional and additive — old clients ignore it.
   agentState?: AgentStatusState
+  /** See `NotificationDispatchRequest.attentionKey`: cooldowns key on it instead of the workspace. */
+  attentionKey?: string
+  structuredOrigin?: StructuredAttentionOrigin
 }
 
 export type MobileNotificationDismissEvent = {
@@ -34,6 +48,7 @@ export type MobileNotificationDismissEvent = {
   notificationId: string
   notificationSeq?: number
   notificationEpoch?: string
+  dismissedDelivery?: DeliveredNotificationIdentity
 }
 
 export type MobileNotificationEvent =
@@ -56,6 +71,17 @@ export class RuntimeMobileNotificationController {
   private readonly legacyCooldown = new Map<string, number>()
   private readonly replay = new MobileNotificationReplayBuffer()
   private remotePushSink: MobileNotificationRemotePushSink | null = null
+  private dismissalStore: MobileNotificationDismissalStore | null = null
+
+  configureDismissalStore(userDataPath: string): void {
+    this.dismissalStore = new MobileNotificationDismissalStore(userDataPath)
+  }
+
+  reconcileDismissedPushes(
+    delivered: readonly DeliveredNotificationIdentity[]
+  ): DeliveredNotificationIdentity[] {
+    return this.dismissalStore?.reconcile(delivered) ?? []
+  }
 
   setRemotePushSink(sink: MobileNotificationRemotePushSink | null): void {
     this.remotePushSink = sink
@@ -100,7 +126,7 @@ export class RuntimeMobileNotificationController {
         (event.emittedAt === undefined ||
           reserveNotificationCooldown(
             this.legacyCooldown,
-            event.worktreeId ?? 'global',
+            event.attentionKey ?? event.worktreeId ?? 'global',
             event.emittedAt
           ))
       event = {
@@ -116,6 +142,11 @@ export class RuntimeMobileNotificationController {
       ...event,
       notificationSeq: seq,
       notificationEpoch: this.replay.epoch
+    }
+    try {
+      this.dismissalStore?.record(dispatchedEvent)
+    } catch {
+      console.warn('[notifications] Could not persist dismissal recovery state')
     }
     notifyRuntimeListeners(
       this.listeners,
@@ -147,6 +178,37 @@ export class RuntimeMobileNotificationController {
 
   dismiss(notificationId: string): void {
     this.dispatch({ type: 'dismiss', notificationId })
+  }
+
+  private retireDelivery(delivery: DeliveredNotificationIdentity): void {
+    this.dispatch({
+      type: 'dismiss',
+      notificationId: delivery.notificationId,
+      dismissedDelivery: {
+        notificationId: delivery.notificationId,
+        notificationEpoch: delivery.notificationEpoch,
+        notificationSeq: delivery.notificationSeq
+      }
+    })
+  }
+
+  retireStructuredAttention(read: StructuredAttentionRead): void {
+    for (const delivery of this.dismissalStore?.liveDeliveries() ?? []) {
+      if (attentionOriginWasRead(delivery.structuredOrigin, read)) {
+        this.retireDelivery(delivery)
+      }
+    }
+  }
+
+  reconcileStructuredPromptAttention(state: StructuredAttentionState): void {
+    const prefix = agentSessionAttentionSubjectPrefix(state.scope, state.sessionId)
+    const pending = new Set(state.pendingPromptIds)
+    for (const delivery of this.dismissalStore?.liveDeliveries(prefix) ?? []) {
+      const cause = delivery.structuredOrigin?.cause
+      if (cause?.kind === 'prompt' && !pending.has(cause.promptId)) {
+        this.retireDelivery(delivery)
+      }
+    }
   }
 
   async dispatchPlugin(input: {

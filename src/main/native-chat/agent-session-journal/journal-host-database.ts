@@ -6,7 +6,6 @@
 
 import { mkdirSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AgentSessionJournalIdentity } from '../../../shared/agent-session-journal-types'
 import type Database from '../../sqlite/sync-database'
 import {
   JOURNAL_SYNCHRONOUS,
@@ -19,7 +18,6 @@ import {
   type OpenJournalDatabase
 } from './journal-database'
 import { journalOpenRefusalError } from './journal-open-failure'
-import { journalDirectoryFor } from './journal-paths'
 import { AgentSessionJournalError } from './journal-write-guards'
 
 const JOURNAL_DATABASE_FILE = 'agent-session-journal.db'
@@ -51,7 +49,8 @@ export class JournalHostDatabase {
   /** `readLegacyRecords` runs only when this open migrates to version 4, before any transaction. */
   static async open(
     stateDirectory: string,
-    readLegacyRecords: () => Promise<JournalLegacyRecordImport>
+    readLegacyRecords: () => Promise<JournalLegacyRecordImport> = async () =>
+      NO_LEGACY_JOURNAL_RECORDS
   ): Promise<JournalHostDatabase> {
     mkdirSync(stateDirectory, { recursive: true })
     const migrates = journalDatabaseMigratesRecords(
@@ -147,13 +146,6 @@ export class JournalHostDatabase {
         db.pragma(`synchronous = ${JOURNAL_SYNCHRONOUS}`)
       }
     }
-  }
-
-  /** Where this chat's history lived before the journal was one database per host. */
-  legacyDirectoryFor(
-    identity: Pick<AgentSessionJournalIdentity, 'workspaceId' | 'sessionId'>
-  ): string {
-    return journalDirectoryFor(this.stateDirectory, identity)
   }
 
   /** Last, after every store has drained. A close that fails keeps the handle, so the retried

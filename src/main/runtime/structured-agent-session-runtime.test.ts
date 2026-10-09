@@ -1,6 +1,6 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AgentSessionClaimStatus,
@@ -11,14 +11,9 @@ import type {
 import { __setWindowsProcessTreeLoaderForTests } from '../windows/windows-process-table'
 import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent-model-catalog-store'
 import {
-  NO_LEGACY_JOURNAL_RECORDS,
-  type JournalLegacyRecordImport
-} from '../native-chat/agent-session-journal/journal-database'
-import {
   JournalHostDatabase,
   journalDatabasePath
 } from '../native-chat/agent-session-journal/journal-host-database'
-import { legacyAgentSessionStorePath } from './agent-session-record-store-file'
 import {
   createStructuredAgentSessionOwnerProbe,
   createStructuredAgentSessionOwnerProbes
@@ -72,17 +67,9 @@ describe('structured agent-session store presence', () => {
     }
   })
 
-  async function openProfileDatabase(
-    legacyRecords: JournalLegacyRecordImport = NO_LEGACY_JOURNAL_RECORDS
-  ): Promise<JournalHostDatabase> {
+  async function openProfileDatabase(): Promise<JournalHostDatabase> {
     profile = await mkdtemp(join(tmpdir(), 'orca-session-presence-'))
-    return JournalHostDatabase.openWith(profile, legacyRecords)
-  }
-
-  async function writeRecordsFile(): Promise<void> {
-    const filePath = legacyAgentSessionStorePath(profile)
-    await mkdir(dirname(filePath), { recursive: true })
-    await writeFile(filePath, '{}')
+    return JournalHostDatabase.open(profile)
   }
 
   // Every host install creates the database, chats or not; startup restore must not wait on one.
@@ -102,14 +89,6 @@ describe('structured agent-session store presence', () => {
     expect(hasPersistedStructuredAgentSessionStore(profile)).toBe(true)
   })
 
-  it('lets the records file answer while the database still owes its copy', async () => {
-    ;(await openProfileDatabase({ owed: true })).close()
-    expect(hasPersistedStructuredAgentSessionStore(profile)).toBe(false)
-
-    await writeRecordsFile()
-    expect(hasPersistedStructuredAgentSessionStore(profile)).toBe(true)
-  })
-
   it('reports a database it cannot read present', async () => {
     profile = await mkdtemp(join(tmpdir(), 'orca-session-presence-'))
     await writeFile(journalDatabasePath(profile), 'not a database')
@@ -117,26 +96,11 @@ describe('structured agent-session store presence', () => {
     expect(hasPersistedStructuredAgentSessionStore(profile)).toBe(true)
   })
 
-  // A profile from before the records moved into the database still holds a chat to import.
-  it('checks the records file and its backup when the database is absent', () => {
-    const fileExists = vi.fn((path: string) => path.endsWith('.bak'))
-
-    expect(hasPersistedStructuredAgentSessionStore('/profile', fileExists)).toBe(true)
-    expect(fileExists).toHaveBeenNthCalledWith(
-      2,
-      join('/profile', 'agent-sessions', 'agent-sessions.json')
-    )
-    expect(fileExists).toHaveBeenNthCalledWith(
-      3,
-      join('/profile', 'agent-sessions', 'agent-sessions.json.bak')
-    )
-  })
-
-  it('reports a fresh profile absent after three bounded presence checks', () => {
+  it('reports a fresh profile absent when no journal or migration records exist', () => {
     const fileExists = vi.fn(() => false)
 
     expect(hasPersistedStructuredAgentSessionStore('/profile', fileExists)).toBe(false)
-    expect(fileExists).toHaveBeenCalledTimes(3)
+    expect(fileExists).toHaveBeenCalledWith(journalDatabasePath('/profile'))
   })
 })
 
@@ -264,6 +228,7 @@ describe('structured agent-session runtime install', () => {
       hostId: HOST_ID,
       claimKeyId: 'key-1',
       resolveWorkspacePath: async () => stateDirectory!,
+      resolveLaunchArgs: () => [],
       resolveClaudeAuthPolicy: () => ({ stripAuthEnv: true }),
       resolveEnvironment: async () => ({})
     })
@@ -286,9 +251,22 @@ describe('structured agent-session runtime install', () => {
     expect(stopped).toBe(true)
   })
 
-  it('does not infer Windows process identity support from an injected reader', async () => {
+  it('supports native Windows creation without the process-table addon', async () => {
     stateDirectory = await mkdtemp(join(tmpdir(), 'orca-structured-runtime-'))
     const originalPlatform = process.platform
+    const physicalJournalPath = journalDatabasePath(stateDirectory)
+    const originalToNamespacedPath = win32.toNamespacedPath
+    const namespace =
+      originalPlatform === 'win32'
+        ? undefined
+        : vi.spyOn(win32, 'toNamespacedPath').mockImplementation(function (
+            this: unknown,
+            ...args: Parameters<typeof win32.toNamespacedPath>
+          ) {
+            return args[0] === physicalJournalPath
+              ? physicalJournalPath
+              : originalToNamespacedPath.apply(this, args)
+          })
     const location: AgentSessionExecutionLocation = {
       executionHostId: 'local',
       wslDistro: null,
@@ -305,12 +283,17 @@ describe('structured agent-session runtime install', () => {
         claimKeyId: 'key-1',
         resolveWorkspacePath: async () => stateDirectory!,
         resolveEnvironment: async () => ({}),
+        resolveLaunchArgs: () => [],
         resolveClaudeAuthPolicy: () => ({ stripAuthEnv: true }),
         readProcessStartTime: async () => 1_700_000_000_000
       })
 
-      expect(host.supportsCreate(location, 'codex')).toBe(false)
+      expect((await lstat(physicalJournalPath)).isFile()).toBe(true)
+      // No addon means no creation times; chat no longer depends on them.
+      expect(host.supportsCreate(location, 'codex')).toBe(true)
+      expect(host.supportsCreate(location, 'claude')).toBe(true)
     } finally {
+      namespace?.mockRestore()
       __setWindowsProcessTreeLoaderForTests()
       Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform })
     }

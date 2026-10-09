@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
@@ -18,6 +18,15 @@ function open(path: string): SyncDatabase {
   const db = new SyncDatabase(path)
   databases.push(db)
   return db
+}
+
+function longDatabasePath(directory: string): string {
+  let parent = directory
+  while (join(parent, 'snapshot.db').length < 300) {
+    parent = join(parent, 'long directory with spaces')
+  }
+  mkdirSync(parent, { recursive: true })
+  return join(parent, 'snapshot.db')
 }
 
 afterEach(() => {
@@ -52,6 +61,41 @@ describe('SQLite runtime contract', () => {
 
   it('admits the actual runtime driver', () => {
     expect(isSqliteAvailable()).toBe(true)
+  })
+
+  it('creates and reopens a file database beyond the legacy Windows path limit', () => {
+    const path = longDatabasePath(fixture())
+    const db = open(path)
+    db.exec('CREATE TABLE proof(id INTEGER PRIMARY KEY, text TEXT NOT NULL)')
+    db.prepare('INSERT INTO proof VALUES (?, ?)').run(1, 'committed 路径 with spaces')
+    db.close()
+    const reopened = new SyncDatabase(path, { readonly: true, fileMustExist: true })
+    databases.push(reopened)
+    expect(reopened.prepare('SELECT id, text FROM proof').all()).toEqual([
+      { id: 1, text: 'committed 路径 with spaces' }
+    ])
+    expect(reopened.pragma('integrity_check', { simple: true })).toBe('ok')
+  })
+
+  it('backs up complete rows to an existing staged file beyond the legacy Windows path limit', async () => {
+    const directory = fixture()
+    const target = longDatabasePath(directory)
+    const db = open(join(directory, 'source.db'))
+    db.pragma('journal_mode = WAL')
+    db.exec('CREATE TABLE proof(id INTEGER PRIMARY KEY, text TEXT NOT NULL)')
+    db.prepare('INSERT INTO proof VALUES (?, ?)').run(1, 'first committed row')
+    db.prepare('INSERT INTO proof VALUES (?, ?)').run(2, 'second committed 路径')
+    writeFileSync(target, '', { flag: 'wx', mode: 0o600 })
+    await db.backup(target)
+    const snapshot = new SyncDatabase(target, { readonly: true, fileMustExist: true })
+    databases.push(snapshot)
+    const expected = [
+      { id: 1, text: 'first committed row' },
+      { id: 2, text: 'second committed 路径' }
+    ]
+    expect(snapshot.prepare('SELECT id, text FROM proof ORDER BY id').all()).toEqual(expected)
+    expect(db.prepare('SELECT id, text FROM proof ORDER BY id').all()).toEqual(expected)
+    expect(snapshot.pragma('integrity_check', { simple: true })).toBe('ok')
   })
 
   it('enforces foreign keys by default', () => {

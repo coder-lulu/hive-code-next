@@ -1,6 +1,5 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
+import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWorktreeWithNameRetry } from './worktree-create-retry'
 import type { RpcClient } from '../transport/rpc-client'
@@ -10,18 +9,19 @@ import {
   AGENT_SESSION_MAX_NEW_OPERATION_AGE_MS,
   AGENT_SESSION_OPERATION_FUTURE_SKEW_MS
 } from '../../../src/shared/agent-session-host-authority'
-import { setStructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-registry'
-import type { StructuredAgentSessionHost } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-host'
 import type { AgentSessionRecordStore } from '../../../src/main/runtime/agent-session-record-store'
 import { openTestAgentSessionRecordStore } from '../../../src/main/runtime/agent-session-record-store-test-harness'
 import { closeTestJournalHostDatabase } from '../../../src/main/native-chat/agent-session-journal/journal-host-database-test-support'
 import type { OrcaRuntimeService } from '../../../src/main/runtime/orca-runtime'
 import { RpcDispatcher } from '../../../src/main/runtime/rpc/dispatcher'
-import { runtimeStub } from '../../../src/main/runtime/rpc/methods/agent-launch.test-fixture'
+import {
+  runtimeStub,
+  setAgentLaunchRecordStore
+} from '../../../src/main/runtime/rpc/methods/agent-launch.test-fixture'
 import {
   AGENT_LAUNCH_REPLAY_REQUIRED_RUNTIME_CAPABILITY,
   AGENT_LAUNCH_RUNTIME_CAPABILITY
-} from '../../../src/shared/protocol-version'
+} from '../../../src/shared/agent-launch-runtime-capability'
 import {
   launchAgentInExistingWorkspace,
   reserveMobileAgentLaunch
@@ -39,15 +39,16 @@ let store: AgentSessionRecordStore
 beforeEach(async () => {
   createStructuredSession.mockReset()
   createStructuredSession.mockResolvedValue({ ok: true, value: { sessionId: 'session-1' } })
-  directory = await mkdtemp(join(tmpdir(), 'orca-mobile-launch-replay-'))
+  const evidence = resolve('logs/upstream-sync/20261007/mobile-task-replay/tmp')
+  await mkdir(evidence, { recursive: true })
+  directory = await mkdtemp(join(evidence, 'orca-mobile-launch-replay-'))
   store = await openTestAgentSessionRecordStore(directory)
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the launch reads only deps.store; structured session creation is the injected boundary above.
-  setStructuredAgentSessionHost({ deps: { store } } as unknown as StructuredAgentSessionHost)
+  setAgentLaunchRecordStore(store)
 })
 
 afterEach(async () => {
   vi.restoreAllMocks()
-  setStructuredAgentSessionHost(null)
+  setAgentLaunchRecordStore(null)
   closeTestJournalHostDatabase(directory)
   await rm(directory, { recursive: true, force: true })
 })

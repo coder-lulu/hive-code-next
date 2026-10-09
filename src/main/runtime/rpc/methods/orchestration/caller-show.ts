@@ -1,6 +1,7 @@
 import { APP_DISPLAY_NAME } from '../../../../../shared/brand'
 import type {
   OrchestrationCallerShowResult,
+  OrchestrationPartyLocationResult,
   OrchestrationSessionAddressResult
 } from '../../../../../shared/orchestration-caller-status'
 import {
@@ -8,9 +9,14 @@ import {
   isOrcaSessionId
 } from '../../../../../shared/orca-session-address'
 import { ORCHESTRATION_SESSION_CALLER_ERROR_CODES as CODES } from '../../../../../shared/orchestration-session-caller-codes'
-import { SessionAddressParams } from '../../../../../shared/rpc-contract/orchestration-params'
+import {
+  PartyLocationParams,
+  SessionAddressParams
+} from '../../../../../shared/rpc-contract/orchestration-params'
 import { OrchestrationError } from '../../../orchestration/orchestration-error'
 import { resolveOrcaSessionParty } from '../../../orchestration/orchestration-party'
+import { locateOrchestrationParty } from '../../../orchestration/orchestration-party-location'
+import { readAgentSessionRecordStore } from '../../../orchestration/structured-session-lineage'
 import { defineMethod } from '../../core'
 
 export const ORCHESTRATION_CALLER_METHODS = [
@@ -40,5 +46,21 @@ export const ORCHESTRATION_CALLER_METHODS = [
       const party = resolveOrcaSessionParty(params.sessionId, runtime.getOrchestrationDb())
       return { orcaSessionId: formatOrcaSessionAddress(party.orcaSessionId) }
     }
+  }),
+  defineMethod({
+    name: 'orchestration.partyLocation',
+    params: PartyLocationParams,
+    // Why host-side: a chat sender's live session follows its `/clear` lineage on this host.
+    handler: (params, { runtime }): OrchestrationPartyLocationResult =>
+      locateOrchestrationParty(
+        params.address,
+        {
+          db: runtime.getOrchestrationDb(),
+          records: readAgentSessionRecordStore(),
+          terminalPaneKey: (handle) => runtime.getTerminalPaneKey(handle),
+          terminalHandleForPaneKey: (paneKey) => runtime.getTerminalHandleForPaneKey(paneKey)
+        },
+        params.messageIds
+      )
   })
 ]

@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { runProcess } from '../../shared/child-process/run-process'
 import { ReviewDraftContextError } from '../../shared/review-draft-context-error'
 import { RelayContext } from '../../relay/context'
@@ -29,8 +29,10 @@ const input = {
 const mergeBase = 'a'.repeat(40)
 const disposals: (() => void)[] = []
 const directories: string[] = []
+const pendingOperations: Promise<unknown>[] = []
 
 afterEach(async () => {
+  await Promise.allSettled(pendingOperations.splice(0))
   disposals.splice(0).forEach((dispose) => dispose())
   await Promise.all(directories.splice(0).map(removeGitTempDir))
   vi.restoreAllMocks()
@@ -99,8 +101,8 @@ function createWireProvider() {
   return { provider: providerForMux(mux), mux, dispatcher, notifications }
 }
 
-async function git(cwd: string, args: string[]) {
-  const result = await runProcess({ program: 'git', args, cwd, timeoutMs: 10_000 })
+async function git(cwd: string, args: string[], signal?: AbortSignal) {
+  const result = await runProcess({ program: 'git', args, cwd, timeoutMs: 10_000, signal })
   if (result.code !== 0) {
     throw Object.assign(new Error(result.stderr), { code: result.code })
   }
@@ -140,42 +142,56 @@ async function createReviewFixture(large: boolean) {
 }
 
 describe('SSH review draft through the real relay dispatcher', () => {
-  it.each([false, true])('matches complete local context with streamed patch=%s', async (large) => {
-    const { worktree, originalBase } = await createReviewFixture(large)
-    const local = await getPullRequestDraftContext((args) => git(worktree, args), input)
-    expect(local).toMatchObject({
-      branch: 'feature/review',
-      commitSummary: '- Add review evidence',
-      changeSummary: expect.stringContaining('new file.txt'),
-      patch: expect.stringContaining('+Committed review evidence')
+  describe.each([false, true])('streamed patch=%s', (large) => {
+    let preparedFixture: Awaited<ReturnType<typeof createReviewFixture>>
+    beforeEach(async () => {
+      const preparing = createReviewFixture(large)
+      pendingOperations.push(preparing)
+      preparedFixture = await preparing
     })
-    await git(worktree, ['update-ref', 'refs/remotes/origin/main', originalBase])
-    const { provider, mux, notifications } = createWireProvider()
+    it(`matches complete local context with streamed patch=${large}`, ({ signal }) => {
+      const operation = (async () => {
+        const { worktree, originalBase } = preparedFixture
+        const local = await getPullRequestDraftContext((args) => git(worktree, args, signal), input)
+        expect(local).toMatchObject({
+          branch: 'feature/review',
+          commitSummary: '- Add review evidence',
+          changeSummary: expect.stringContaining('new file.txt'),
+          patch: expect.stringContaining('+Committed review evidence')
+        })
+        await git(worktree, ['update-ref', 'refs/remotes/origin/main', originalBase], signal)
+        const { provider, mux, notifications } = createWireProvider()
 
-    const remote = await getPullRequestDraftContext(
-      (args, options) => execSshReviewDraft(provider, args, worktree, options),
-      input
-    )
+        const remote = await getPullRequestDraftContext((args, options) => {
+          signal.throwIfAborted()
+          return execSshReviewDraft(provider, args, worktree, options)
+        }, input)
 
-    expect(remote).toEqual(local)
-    expect(remote?.patch).not.toContain('Uncommitted content')
-    expect(mux.request).toHaveBeenCalledWith('git.fetchRemoteTrackingRef', {
-      worktreePath: worktree,
-      remote: 'origin',
-      branch: 'main',
-      ref: 'refs/remotes/origin/main'
+        expect(remote).toEqual(local)
+        expect(remote?.patch).not.toContain('Uncommitted content')
+        expect(mux.request).toHaveBeenCalledWith('git.fetchRemoteTrackingRef', {
+          worktreePath: worktree,
+          remote: 'origin',
+          branch: 'main',
+          ref: 'refs/remotes/origin/main'
+        })
+        expect(
+          mux.request.mock.calls.filter(([method]) => method === 'git.reviewDiff')
+        ).toHaveLength(2)
+        expect(
+          mux.request.mock.calls.some(
+            ([method, params]) =>
+              method === 'git.exec' && (params.args[0] === 'fetch' || params.args[0] === 'diff')
+          )
+        ).toBe(false)
+        expect([...notifications.values()].every((listeners) => listeners.size === 0)).toBe(true)
+        if (large) {
+          expect(mux.notify).toHaveBeenCalledWith('git.responseAck', expect.any(Object))
+        }
+      })()
+      pendingOperations.push(operation)
+      return operation
     })
-    expect(mux.request.mock.calls.filter(([method]) => method === 'git.reviewDiff')).toHaveLength(2)
-    expect(
-      mux.request.mock.calls.some(
-        ([method, params]) =>
-          method === 'git.exec' && (params.args[0] === 'fetch' || params.args[0] === 'diff')
-      )
-    ).toBe(false)
-    expect([...notifications.values()].every((listeners) => listeners.size === 0)).toBe(true)
-    if (large) {
-      expect(mux.notify).toHaveBeenCalledWith('git.responseAck', expect.any(Object))
-    }
   })
 })
 

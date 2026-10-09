@@ -4,7 +4,7 @@ import type {
   RuntimeSyncedLeaf
 } from '../../shared/runtime-types'
 import type { RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
-import { terminalLayoutContainsLeaf } from './headless-terminal-split-layout'
+import { terminalLayoutContainsLeaf } from '../../shared/workspace-session-pane-ownership'
 
 type NativeSurface = Pick<
   RuntimePtyWorktreeRecord,

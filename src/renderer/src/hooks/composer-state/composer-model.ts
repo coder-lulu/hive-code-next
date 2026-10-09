@@ -20,34 +20,6 @@ export type ComposerTargetModel = ComposerTargetStoreModel &
 
 export type ComposerModel = ComposerTargetModel & ComposerSourceModel & ComposerSubmitModel
 
-export type FullCreationExecutionInput = Pick<
-  ComposerModel,
-  | 'applyWorktreeMeta'
-  | 'clearNewWorkspaceDraft'
-  | 'createWorktree'
-  | 'effectivePresetId'
-  | 'isSubmissionCancelled'
-  | 'linkedGitLabIssue'
-  | 'linkedGitLabMR'
-  | 'normalizedSparseDirectories'
-  | 'note'
-  | 'onCreated'
-  | 'parentWorktreeId'
-  | 'persistDraft'
-  | 'persistSetupAgentStartupPolicy'
-  | 'prepareFullSubmit'
-  | 'resolvedInitialWorkspaceStatus'
-  | 'selectedRepoExecutionHostId'
-  | 'selectedRepoIsGit'
-  | 'selectedRepoIsRemote'
-  | 'setSidebarOpen'
-  | 'settings'
-  | 'sparseEnabled'
-  | 'taskSourceContext'
-  | 'telemetrySource'
-  | 'tuiAgent'
->
-
 export type QuickCreationExecutionInput = Pick<
   ComposerModel,
   | 'clearNewWorkspaceDraft'

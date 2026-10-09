@@ -88,7 +88,7 @@ export class HiveAgentCloudHost {
         workspaceId: entry.projectScope,
         hostId: 'local',
         agent: 'pi',
-        providerHandle: { kind: 'opaque' as const, agent: 'pi', value: sessionId }
+        providerHandle: { transport: 'managed-pi', agent: 'pi', nativeId: sessionId }
       }
       const journal = new AgentSessionJournal({
         identity: journalIdentity,

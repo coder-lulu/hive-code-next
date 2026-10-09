@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { taskFailure, taskFailureSummary } from './task-failure-diagnostic'
-import { publicTaskModelResponseFields } from './task-model-response-field-diagnostics.test-fixture'
+import {
+  publicTaskModelResponseFields,
+  taskModelRefusedPolicyKeyWithInvalidInput,
+  taskModelPolicyRefusalWithInvalidInput,
+  addTaskModelPolicyLocationWithInvalidInput
+} from './task-model-response-field-diagnostics.test-fixture'
 import { object } from './task-model-policy-json'
 import {
   addTaskModelPolicyLocation,
@@ -77,8 +82,8 @@ describe('finite public response field diagnostic labels', () => {
       }
     )
     for (const key of [Object('instructions'), getter, proxy, undefined, null, 1]) {
-      expect(Reflect.apply(taskModelRefusedPolicyKey, undefined, [key])).toBe('other')
-      const error = Reflect.apply(taskModelPolicyRefusal, undefined, ['UNKNOWN_FIELD', key])
+      expect(taskModelRefusedPolicyKeyWithInvalidInput(key)).toBe('other')
+      const error = taskModelPolicyRefusalWithInvalidInput('UNKNOWN_FIELD', key)
       addTaskModelPolicyLocation(error, 'response')
       expect(refused(error).diagnostic).not.toHaveProperty('policyKey')
     }
@@ -140,7 +145,7 @@ describe('finite public response field diagnostic labels', () => {
           }
         )
       ]) {
-        Reflect.apply(addTaskModelPolicyLocation, undefined, [original, value])
+        addTaskModelPolicyLocationWithInvalidInput(original, value)
       }
       expect(taskModelStreamDiagnostic(original)).not.toHaveProperty('policyLocation')
       const fake = Object.assign(new Error('TASK_MODEL_POLICY_REFUSED:UNKNOWN_FIELD'), {
@@ -148,9 +153,9 @@ describe('finite public response field diagnostic labels', () => {
         policyKey: 'instructions',
         metadata: { policyLocation: location, policyKey: 'instructions' }
       })
-      Reflect.apply(addTaskModelPolicyLocation, undefined, [fake, location])
+      addTaskModelPolicyLocationWithInvalidInput(fake, location)
       expect(refused(fake).diagnostic).not.toHaveProperty('policyLocation')
-      Reflect.apply(addTaskModelPolicyLocation, undefined, [original, location])
+      addTaskModelPolicyLocationWithInvalidInput(original, location)
       addTaskModelPolicyLocation(original, 'response')
       expect(refused(original).diagnostic.policyLocation).toBe(location)
       expect(getter).not.toHaveBeenCalled()

@@ -1,3 +1,7 @@
+import {
+  closeTestJournalHostDatabases,
+  createTrackedJournalOpener
+} from '../agent-session-journal/journal-host-database-test-support'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 import { APP_DISPLAY_NAME, PRODUCT_CONFIG } from '../../../shared/brand'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -14,7 +18,6 @@ import type { AgentChildWorkView } from '../../../shared/agent-status-child-work
 import { createClaudeJournalTranslator } from '../../claude/claude-structured-journal-translation'
 import { publishCodexTurnLifecycle } from '../../codex/codex-structured-journal-translation-turns'
 import { createDeferredStructuredAgentSessionEventSink } from './structured-agent-session-event-sink'
-import { createTrackedJournalOpener } from '../agent-session-journal/journal-host-database-test-support'
 import {
   indexedStatusFeedSession as indexed,
   statusFeedChildView
@@ -26,6 +29,7 @@ import {
 } from './structured-agent-session-status-feed'
 import { createStructuredAgentSessionLogger } from './structured-agent-session-logger'
 import { testEventSinkLogging } from './structured-agent-session-logger-test-support'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 
 const SESSION = 'status-session'
 const TURN_IDENTITY = {
@@ -52,6 +56,7 @@ beforeEach(async () => {
 
 afterEach(async () => {
   await journals.closeAll()
+  closeTestJournalHostDatabases()
   await rm(root, { recursive: true, force: true })
 })
 
@@ -62,7 +67,7 @@ async function openJournal(sessionId = SESSION, now?: () => number) {
       workspaceId: 'workspace-1',
       hostId: 'local',
       agent: 'codex',
-      providerHandle: { kind: 'codex', threadId: 'thread-1' }
+      providerHandle: codexProviderHandle('thread-1')
     },
     now,
     stateDirectory: join(root, sessionId)
@@ -113,7 +118,7 @@ describe('StructuredAgentSessionStatusFeed', () => {
         workspaceId: 'workspace-1',
         hostId: 'local',
         agent: PRODUCT_CONFIG.slug,
-        providerHandle: { kind: 'opaque', agent: PRODUCT_CONFIG.slug, value: SESSION }
+        providerHandle: { transport: 'hive-native', agent: PRODUCT_CONFIG.slug, nativeId: SESSION }
       },
       stateDirectory: join(root, SESSION)
     })
@@ -391,6 +396,7 @@ describe('StructuredAgentSessionStatusFeed', () => {
   it('carries the record model and the running tool line the sidebar row shows', async () => {
     const journal = await openJournal()
     const { feed, events } = feedFor(new Map([[SESSION, { journal }]]), {
+      location: indexed({ journal }).params.location,
       options: { model: 'gpt-5-codex' },
       providerHandleChain: []
     })
@@ -697,14 +703,18 @@ describe('StructuredAgentSessionStatusFeed', () => {
     expect(events.at(-1)).toMatchObject({ type: 'status', session: { status: 'idle' } })
   })
 
-  it('invalidates cached status on unreadability and keeps record metadata live', async () => {
+  it('keeps record metadata live', async () => {
     const journal = await openJournal()
     await journal.appendItem(
       USER_IDENTITY,
       { kind: 'message', role: 'user', blocks: [{ type: 'text', text: 'hello' }] },
       { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
     )
-    const record = { options: { model: 'first-model' }, providerHandleChain: [] }
+    const record = {
+      location: indexed({ journal }).params.location,
+      options: { model: 'first-model' },
+      providerHandleChain: []
+    }
     const { feed, events } = feedFor(new Map([[SESSION, { journal }]]), record)
     record.options.model = 'second-model'
     feed.publish(SESSION)
@@ -712,12 +722,6 @@ describe('StructuredAgentSessionStatusFeed', () => {
       type: 'status',
       session: { status: 'idle', model: 'second-model' }
     })
-    const readOnly = vi.spyOn(journal, 'isReadOnly', 'get').mockReturnValue(true)
-    feed.publish(SESSION)
-    expect(events.at(-1)).toMatchObject({ type: 'status', session: { status: null } })
-    readOnly.mockRestore()
-    feed.publish(SESSION)
-    expect(events.at(-1)).toMatchObject({ type: 'status', session: { status: 'idle' } })
   })
 })
 

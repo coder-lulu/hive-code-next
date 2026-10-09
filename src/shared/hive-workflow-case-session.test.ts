@@ -49,6 +49,90 @@ function response() {
   }
 }
 describe('original workflow session read contract', () => {
+  it('keeps current submission turn attribution while stripping private sender and queue metadata', () => {
+    const value = response()
+    const submission = {
+      clientMessageId: 'original-client-message',
+      fence: 1,
+      payloadFingerprint: 'original-digest',
+      dispatchState: 'succeeded',
+      providerItemId: null,
+      reason: null,
+      submittedAt: 1,
+      resolvedAt: 2,
+      submittedSequence: 3,
+      answeredInTurn: { turnItemId: 'original-turn-item', via: 'future-join', sender: 'private' },
+      source: { kind: 'future-source', sender: 'private' },
+      queuedMessageId: 'private-queue',
+      keptAsQueuedMessageId: 'private-kept-queue'
+    }
+    const parsed = HiveWorkflowCaseSessionPageSchema.parse({
+      ...value,
+      history: {
+        ...value.history,
+        page: {
+          ...value.history.page,
+          items: [
+            {
+              ...value.history.page.items[0],
+              itemId: agentJournalSubmissionKey(submission.clientMessageId)
+            }
+          ],
+          submissions: [submission]
+        }
+      }
+    })
+    expect(parsed.history.page.submissions[0].submittedSequence).toBe(3)
+    expect(parsed.history.page.submissions[0].answeredInTurn).toEqual({
+      turnItemId: 'original-turn-item',
+      via: 'future-join'
+    })
+    expect(parsed.history.page.submissions[0].source).toEqual({ kind: 'future-source' })
+    expect(JSON.stringify(parsed)).not.toContain('private')
+  })
+
+  it('preserves the canonical latest turn when its journal row is outside the page', () => {
+    const value = response()
+    const latestTurn = {
+      itemId: 'off-page-original-turn',
+      observedAt: 1,
+      turn: { turnId: 'original-turn', state: 'completed', outcome: 'future-verdict' }
+    }
+    for (const latest of [latestTurn, null]) {
+      const parsed = HiveWorkflowCaseSessionPageSchema.parse({
+        ...value,
+        history: { ...value.history, page: { ...value.history.page, latestTurn: latest } }
+      })
+      expect(parsed.history.page.latestTurn).toEqual(latest)
+    }
+  })
+
+  it('rejects malformed latest-turn and submission fields through their canonical validators', () => {
+    const value = response()
+    for (const latestTurn of [
+      {
+        itemId: 'original-turn',
+        observedAt: 'private',
+        turn: { turnId: 'original', state: 'running' }
+      },
+      { itemId: 'original-turn', observedAt: 1, turn: { turnId: 'original', state: {} } },
+      { itemId: 'original-turn', observedAt: 1, turn: { kind: 'future-body', state: 'running' } }
+    ]) {
+      expect(
+        HiveWorkflowCaseSessionPageSchema.safeParse({
+          ...value,
+          history: { ...value.history, page: { ...value.history.page, latestTurn } }
+        }).success
+      ).toBe(false)
+    }
+    expect(
+      HiveWorkflowCaseSessionPageSchema.safeParse({
+        ...value,
+        history: { ...value.history, page: { ...value.history.page, submissions: [{}] } }
+      }).success
+    ).toBe(false)
+  })
+
   it('keeps actual pending handover facts while dropping host-only and queue control metadata', () => {
     const value = response()
     const row = {

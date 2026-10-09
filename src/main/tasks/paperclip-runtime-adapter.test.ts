@@ -7,6 +7,7 @@ let fixture: Awaited<ReturnType<typeof taskAdapterFixture>> | undefined
 afterEach(async () => {
   await fixture?.close()
   fixture = undefined
+  vi.restoreAllMocks()
   vi.unstubAllEnvs()
 })
 
@@ -108,21 +109,48 @@ describe('hive_runtime external adapter execution', () => {
     const current = fixture
     current.ports.waitTimeoutMs = 60
     current.deps.stop = vi.fn(async () => null)
-    let notifyRunning!: () => void
-    const running = new Promise<void>((resolve) => {
-      notifyRunning = resolve
+    const start = current.client.start.bind(current.client)
+    vi.spyOn(current.client, 'start').mockImplementation(async (...args) => {
+      const accepted = await start(...args)
+      await current.host.drain()
+      current.controller.abort()
+      return accepted
     })
-    current.context.onLog = vi.fn(async () => {
-      notifyRunning()
-    })
-    const execution = createServerAdapter(async () => current.ports).execute(current.context)
-    await running
-    current.controller.abort()
-    const result = await execution
+    const result = await createServerAdapter(async () => current.ports).execute(current.context)
     expect(result.exitCode).toBeNull()
     expect(result.errorCode).toBe('OUTCOME_UNKNOWN')
     expect(result.sessionParams?.executionId).toBe(current.binding.command.executionId)
     expect(current.store.tasks.get(current.binding.command)?.result).toBeNull()
+    expect(current.controller.signal.aborted).toBe(true)
+    expect(current.deps.launch).toHaveBeenCalledOnce()
+    expect(current.deps.stop).toHaveBeenCalled()
+    expect(current.store.tasks.get(current.binding.command)?.cancellationKey).toBeTruthy()
+  })
+  it('retains an admitted unknown task when its start acknowledgement exceeds the wait budget', async () => {
+    fixture = await taskAdapterFixture()
+    const current = fixture
+    current.ports.waitTimeoutMs = 60
+    current.deps.stop = vi.fn(async () => null)
+    const start = current.client.start.bind(current.client)
+    const release = Promise.withResolvers<void>()
+    vi.spyOn(current.client, 'start').mockImplementation(async (...args) => {
+      const accepted = await start(...args)
+      await release.promise
+      return accepted
+    })
+    const result = await createServerAdapter(async () => current.ports)
+      .execute(current.context)
+      .finally(() => release.resolve())
+    expect(result.timedOut).toBe(true)
+    expect(result.exitCode).toBeNull()
+    expect(result.errorCode).toBe('OUTCOME_UNKNOWN')
+    expect(result.signal).toBeNull()
+    expect(result.resultJson?.status).toBe('outcome_unknown')
+    expect(result.sessionParams?.executionId).toBe(current.binding.command.executionId)
+    expect(current.store.tasks.get(current.binding.command)?.result).toBeNull()
+    expect(current.deps.launch).toHaveBeenCalledOnce()
+    expect(current.deps.stop).toHaveBeenCalled()
+    expect(current.store.tasks.get(current.binding.command)?.cancellationKey).toBeTruthy()
   })
   it.each([
     'runtimeCommandSpec',

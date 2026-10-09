@@ -3,13 +3,13 @@ import { memo, useCallback, useMemo, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
 import type { Tab, TabGroup } from '../../../../shared/tab-types'
-import { isAgentSessionHandleProvider } from '../../../../shared/agent-session-provider-handle'
 import { useAppStore } from '@/store'
 import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 import { useActivityTerminalPortals } from '../activity/activity-terminal-portal'
 import { RetainedPaneHost } from '../tab-group/RetainedPaneHost'
 import NativeChatView from './NativeChatView'
 import { resolveStructuredSessionRuntimeTarget } from './structured-session-runtime-target'
+import { isStructuredTab } from './structured-agent-session-tabs'
 
 type StructuredAgentSessionTab = Tab & {
   contentType: 'agent-session'
@@ -129,11 +129,7 @@ const StructuredAgentSessionPaneOverlayLayer = memo(
     const structuredTabs = useMemo(
       () =>
         unifiedTabs.flatMap((tab) => {
-          if (
-            tab.contentType !== 'agent-session' ||
-            (tab.agentSessionAgent !== 'hivecode' &&
-              !isAgentSessionHandleProvider(tab.agentSessionAgent))
-          ) {
+          if (!isStructuredTab(tab)) {
             return []
           }
           const target = resolveStructuredSessionRuntimeTarget(

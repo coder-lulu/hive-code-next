@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   compareBenchmarkArtifacts,
@@ -419,6 +419,8 @@ describe('benchmark artifact comparison', () => {
 
   it('redacts absolute input paths from generated reports', () => {
     const dir = makeTempDir()
+    const consumerDirectory = join(dir, 'consumer')
+    mkdirSync(consumerDirectory)
     const baselinePath = writeArtifact(dir, 'absolute-baseline.json', {
       label: 'baseline',
       summaryMedianMs: { totalToDidFinishLoad: 100 }
@@ -433,7 +435,7 @@ describe('benchmark artifact comparison', () => {
     const result = spawnSync(
       process.execPath,
       [
-        scriptPath,
+        resolve(scriptPath),
         '--baseline',
         baselinePath,
         '--candidate',
@@ -443,7 +445,7 @@ describe('benchmark artifact comparison', () => {
         '--json-output',
         jsonPath
       ],
-      { cwd: process.cwd(), encoding: 'utf8' }
+      { cwd: consumerDirectory, encoding: 'utf8' }
     )
     const json = JSON.parse(readFileSync(jsonPath, 'utf8'))
     const markdown = readFileSync(markdownPath, 'utf8')

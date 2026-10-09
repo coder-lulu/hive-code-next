@@ -14,6 +14,7 @@ import {
   openTestAgentSessionRecordStore,
   seedTestAgentSessionRecordStore
 } from './agent-session-record-store-test-harness'
+import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 
 const SESSION = 'session-alpha-1'
 /** The fixture lease's last renewal. */
@@ -165,7 +166,7 @@ describe('a failed acquisition', () => {
           fence,
           link: {
             linkId: 'link-1',
-            handle: { provider: 'claude', sessionId: 'provider-session-1', leafUuid: null },
+            handle: claudeProviderHandle('provider-session-1', null),
             origin: 'created',
             mintedAtFence: fence,
             observedAt: NOW
@@ -205,7 +206,7 @@ describe('a failed acquisition', () => {
                 fence,
                 link: {
                   linkId: 'link-1',
-                  handle: { provider: 'claude', sessionId: 'provider-session-1', leafUuid: null },
+                  handle: claudeProviderHandle('provider-session-1', null),
                   origin: 'created',
                   mintedAtFence: fence,
                   observedAt: NOW

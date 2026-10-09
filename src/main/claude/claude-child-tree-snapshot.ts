@@ -126,3 +126,14 @@ export function mergeClaudeCapturedTrees(
   }
   return null
 }
+
+export function mergeClaudeDescendantSnapshots(
+  previous: DescendantSnapshot,
+  next: DescendantSnapshot
+): DescendantSnapshot | null {
+  const merged = mergeClaudeCapturedTrees(
+    { platform: 'posix', tree: previous },
+    { platform: 'posix', tree: next }
+  )
+  return merged?.platform === 'posix' ? merged.tree : null
+}

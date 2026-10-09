@@ -15,7 +15,7 @@ import type {
   RuntimeSyncWindowGraph
 } from '../../shared/runtime-types'
 import type { RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
-import { terminalLayoutContainsLeaf } from './headless-terminal-split-layout'
+import { terminalLayoutContainsLeaf } from '../../shared/workspace-session-pane-ownership'
 import { buildMaterializedHeadlessParentLayout } from './mobile-session-layout-projection'
 
 /** The runtime indexes graph tabs by bare id, so duplicate ids cannot be routed safely. */

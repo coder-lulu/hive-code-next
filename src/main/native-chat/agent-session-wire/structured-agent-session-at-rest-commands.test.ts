@@ -1,3 +1,8 @@
+import {
+  closeTestJournalHostDatabases,
+  closeTestJournalHostDatabase,
+  openTestJournalHostDatabase
+} from '../agent-session-journal/journal-host-database-test-support'
 // A Claude chat whose Claude is not running offers the `/` commands and skills Claude would read
 // from its folders on the host that runs it: after a /clear, after a relaunch, as files change.
 
@@ -27,10 +32,8 @@ import {
   hostTestOperationId,
   resetHostTestOperationIds
 } from './structured-agent-session-host-test-data'
-import {
-  closeTestJournalHostDatabase,
-  openTestJournalHostDatabase
-} from '../agent-session-journal/journal-host-database-test-support'
+import { claudeProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
+import { NO_STRUCTURED_AGENTS } from './structured-agent-session-adapter-router-test-support'
 
 const caller = { callerKey: 'desktop' }
 const CLAUDE_SESSION = '819cf9f8-e43c-4ad7-b50f-54aa158a726a'
@@ -59,7 +62,7 @@ function adapter(catalog: ClaudeAtRestCommandCatalog): StructuredAgentSessionAda
         mintedAtFence: input.fence,
         observedAt: HOST_TEST_NOW,
         origin: 'created' as const,
-        handle: { provider: 'claude' as const, sessionId: CLAUDE_SESSION, leafUuid: null }
+        handle: claudeProviderHandle(CLAUDE_SESSION, null)
       }
     })),
     atRestCommands: catalog,
@@ -87,6 +90,7 @@ function catalogFor(workspacePath: string): ClaudeAtRestCommandCatalog {
 async function openHost(catalog = catalogFor(workspace)): Promise<void> {
   store = await openTestAgentSessionRecordStore(directory)
   host = new StructuredAgentSessionHost({
+    agents: NO_STRUCTURED_AGENTS,
     store,
     adapter: adapter(catalog),
     journalDatabase: openTestJournalHostDatabase(directory),
@@ -149,6 +153,7 @@ beforeEach(async () => {
 afterEach(async () => {
   await host.flushAllStreamedEvents()
   closeTestJournalHostDatabase(directory)
+  closeTestJournalHostDatabases()
   await rm(directory, { recursive: true, force: true })
 })
 

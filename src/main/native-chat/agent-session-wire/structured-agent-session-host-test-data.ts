@@ -1,3 +1,4 @@
+import type { AgentSessionSubscribeEvent } from '../../../shared/agent-session-wire'
 import type {
   AgentJournalMessageItem,
   AgentJournalSnapshot
@@ -97,4 +98,22 @@ export function hostTestProviderIdentity(itemId: string) {
     turnId: `turn-${itemId}`,
     ordinal: 0
   }
+}
+
+/** What an open chat was told about one message, in frame order. */
+export function hostTestFramedSubmissionStates(
+  events: AgentSessionSubscribeEvent[],
+  id: string
+): string[] {
+  return events.flatMap((event) =>
+    event.type === 'batch'
+      ? event.batch.submissions
+          .filter((entry) => entry.clientMessageId === id)
+          .map((entry) =>
+            entry.dispatchState === 'pending' && entry.handedOverAt !== undefined
+              ? 'handed-over'
+              : entry.dispatchState
+          )
+      : []
+  )
 }

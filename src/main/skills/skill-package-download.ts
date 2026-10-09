@@ -1,6 +1,6 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, mkdir, mkdtemp, open, readdir, rm } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import {
   SKILL_PACKAGE_CONTENT_TYPE,
   SKILL_PACKAGE_MAX_COMPRESSED_BYTES
@@ -206,7 +206,10 @@ async function downloadSkillPackageGrantUnobserved(
     }
 
     const processRoot = await prepareTemporaryRoot(input.temporaryRoot)
-    const temporaryDirectory = await mkdtemp(join(processRoot, '.orca-skill-download-'))
+    const temporaryPrefix = join(processRoot, '.orca-skill-download-')
+    const temporaryDirectory = await mkdtemp(
+      process.platform === 'win32' ? win32.toNamespacedPath(temporaryPrefix) : temporaryPrefix
+    )
     const archivePath = join(temporaryDirectory, 'package.tar.gz')
     try {
       const handle = await open(archivePath, 'wx', 0o600)

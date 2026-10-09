@@ -81,6 +81,35 @@ describe('original journal head survives final Case authorization rereads', () =
       role: 'assistant',
       blocks: [{ type: 'text', text: 'Authentic synthetic journal body' }]
     })
+    expect(page.history.page.latestTurn).toBeNull()
+  })
+  it('publishes the original running turn from the canonical real journal reader', async () => {
+    const f = composedFixture()
+    insertJournalRow(database.db, f.identity.sessionId, {
+      ...f.anchor,
+      kind: 'item',
+      seq: 3,
+      itemId: 'original-running-turn',
+      revision: 1,
+      body: { kind: 'turn', turnId: 'original-turn', state: 'running', startedAt: 1 }
+    })
+    const before = database
+      .readConnection()
+      .prepare('SELECT row_json FROM journal_rows WHERE session_id = ? ORDER BY seq')
+      .all(f.identity.sessionId)
+    const page = await f.facade().getWorkflowCaseSessionPage(f.query)
+    expect(page.history.ok).toBe(true)
+    expect(page.history.page.latestTurn).toEqual({
+      itemId: 'original-running-turn',
+      observedAt: 1,
+      turn: { turnId: 'original-turn', state: 'running', startedAt: 1 }
+    })
+    expect(
+      database
+        .readConnection()
+        .prepare('SELECT row_json FROM journal_rows WHERE session_id = ? ORDER BY seq')
+        .all(f.identity.sessionId)
+    ).toEqual(before)
   })
   it.each(['epoch', 'tip', 'repair', 'workspace'] as const)(
     'refuses %s drift during final Case read',

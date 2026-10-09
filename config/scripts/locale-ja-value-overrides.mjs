@@ -12,16 +12,16 @@ const JA_AUDIT_OVERRIDES = {
   'Pick your default agent': 'デフォルトの Agent を選択',
   'Complete {{artifact_url}}': '{{artifact_url}} を完了',
   'Control terminals and agents from your phone.':
-    'スマートフォンからターミナルと Agent を操作します。',
+    'スマートフォンからターミナルとエージェントを操作します。',
   'Add reviewer': 'レビュアーを追加',
   Reviewer: 'レビュアー',
   Reviewers: 'レビュアー',
   'Fix broken checks': '失敗したチェックを修正',
   'No broken checks to fix.': '修正が必要なチェックはありません。',
   'Started an AI agent for the broken checks.':
-    '失敗したチェックに対して AI Agent を開始しました。',
+    '失敗したチェックに対して AI エージェントを開始しました。',
   'Failed to start an AI agent for the broken checks: {{value0}}':
-    '失敗したチェックのため AI Agent を開始できませんでした: {{value0}}',
+    '失敗したチェックのため AI エージェントを開始できませんでした: {{value0}}',
   'Checks unavailable': 'チェックは利用できません',
   'Checks pending': '保留中のチェック',
   checks: 'チェック',

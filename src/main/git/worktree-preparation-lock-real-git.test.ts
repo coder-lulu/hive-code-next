@@ -1,7 +1,7 @@
 import { mkdtemp, open, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWorktreePreparationLockReason } from '../../shared/worktree/create-preparation'
 import * as runner from './runner'
 import {
@@ -20,7 +20,9 @@ import {
 } from '../worktree-create-preparation-pool'
 
 const roots: string[] = []
+const pendingOperations: Promise<unknown>[] = []
 afterEach(async () => {
+  await Promise.allSettled(pendingOperations.splice(0))
   vi.restoreAllMocks()
   await _resetPreparationPoolForTests()
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
@@ -54,27 +56,50 @@ async function fixture(
   return { root, repo, prepared: join(root, 'prepared'), final: join(root, 'final') }
 }
 
-it('creates and consumes its marker without worktree lock or unlock inventory scans', async () => {
-  const { repo, prepared, final } = await fixture()
-  const reason = createWorktreePreparationLockReason('targeted')
-  const spy = vi.spyOn(runner, 'gitExecFileAsync')
-  await prepareWorktreeCreateCheckout(repo, prepared, 'main', reason)
-  const lock = await git(prepared, ['rev-parse', '--git-path', 'locked'])
-  expect(await readFile(lock, 'utf8')).toBe(`${reason}\n`)
-  spy.mockClear()
-  await finalizePreparedWorktree(repo, prepared, final, 'feature', 'main', false, {}, reason)
-  const lockQueries = spy.mock.calls.filter(
-    ([args]) => args.includes('--git-path') || args.includes('--git-common-dir')
-  )
-  expect(lockQueries).toHaveLength(1)
-  expect(lockQueries[0]?.[0]).toEqual(['rev-parse', '--git-path', 'locked', '--git-common-dir'])
-  expect(await git(final, ['symbolic-ref', '--short', 'HEAD'])).toBe('feature')
-  expect(await git(final, ['status', '--porcelain'])).toBe('')
-  expect(await readFile(join(final, 'tracked.txt'), 'utf8')).toBe('original\n')
-  await expect(readFile(lock, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
-  expect(spy.mock.calls.some(([args]) => args.includes('lock') || args.includes('unlock'))).toBe(
-    false
-  )
+describe('preparation marker ownership', () => {
+  let preparedFixture: Awaited<ReturnType<typeof fixture>>
+  beforeEach(async () => {
+    const preparing = fixture()
+    pendingOperations.push(preparing)
+    preparedFixture = await preparing
+  })
+  it('creates and consumes its marker without worktree lock or unlock inventory scans', ({
+    signal
+  }) => {
+    const operation = (async () => {
+      const { repo, prepared, final } = preparedFixture
+      const reason = createWorktreePreparationLockReason('targeted')
+      const spy = vi.spyOn(runner, 'gitExecFileAsync')
+      await prepareWorktreeCreateCheckout(repo, prepared, 'main', reason, { signal })
+      const lock = await git(prepared, ['rev-parse', '--git-path', 'locked'])
+      expect(await readFile(lock, 'utf8')).toBe(`${reason}\n`)
+      spy.mockClear()
+      await finalizePreparedWorktree(
+        repo,
+        prepared,
+        final,
+        'feature',
+        'main',
+        false,
+        { signal },
+        reason
+      )
+      const lockQueries = spy.mock.calls.filter(
+        ([args]) => args.includes('--git-path') || args.includes('--git-common-dir')
+      )
+      expect(lockQueries).toHaveLength(1)
+      expect(lockQueries[0]?.[0]).toEqual(['rev-parse', '--git-path', 'locked', '--git-common-dir'])
+      expect(await git(final, ['symbolic-ref', '--short', 'HEAD'])).toBe('feature')
+      expect(await git(final, ['status', '--porcelain'])).toBe('')
+      expect(await readFile(join(final, 'tracked.txt'), 'utf8')).toBe('original\n')
+      await expect(readFile(lock, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
+      expect(
+        spy.mock.calls.some(([args]) => args.includes('lock') || args.includes('unlock'))
+      ).toBe(false)
+    })()
+    pendingOperations.push(operation)
+    return operation
+  })
 })
 
 it.runIf(process.platform !== 'win32')(

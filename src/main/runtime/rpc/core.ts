@@ -9,6 +9,7 @@ import type { OrchestrationSessionCaller } from '../orchestration/orchestration-
 import type { AgentLaunchIntent } from '../../../shared/agent-launch-intent'
 import type { TerminalSpawnScope } from '../runtime-terminal-contracts'
 import type { TaskStructuredLaunchOrigin } from '../../tasks/task-structured-launch-origin'
+import type { RpcCallerIdentity } from './rpc-caller-identity'
 
 export type RpcEnvelopeMeta = {
   runtimeId: string
@@ -79,6 +80,8 @@ export type RpcContext = {
   // Bound by the activated account relay session, never supplied in RPC params.
   authenticatedAccountRuntimeSessionId?: string
   authenticatedAccountOperationCallerKey?: string
+  // Why: host-assigned from the transport (rpc-caller-identity.ts); absent when the transport could not name its caller.
+  caller?: RpcCallerIdentity
   // Why: lets handlers gate mobile payload truncation to phones only; undefined for in-process callers → treat as full-class (no clip).
   clientKind?: 'mobile' | 'runtime'
   // Why: negotiation is bound to the authenticated socket, never asserted by a destructive request.

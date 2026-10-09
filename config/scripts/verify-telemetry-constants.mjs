@@ -50,6 +50,10 @@ import {
 // "could not parse TELEMETRY_ENABLED flag" parse error into a clear
 // file-not-found error, and decouples the script from the caller's cwd.
 const repoRoot = resolve(import.meta.dirname, '..', '..')
+const productManifest = JSON.parse(
+  readFileSync(join(repoRoot, 'config/product/hivecode.product.json'), 'utf8')
+)
+const productTelemetryConfigured = productManifest.endpoints.telemetry != null
 
 function findAsar(rootDir) {
   // Why: electron-builder produces one `app.asar` per platform-arch combo.
@@ -101,14 +105,7 @@ if (!enabledMatch) {
   console.error(`::error::could not parse TELEMETRY_ENABLED flag from ${clientSrcPath}`)
   process.exit(1)
 }
-if (enabledMatch[1] === 'false') {
-  console.log(
-    'TELEMETRY_ENABLED is false in source — transport is dead-code-eliminated, ' +
-      'so the BUILD_IDENTITY/WRITE_KEY constants are not expected in the binary. ' +
-      'Skipping asar grep. (Once the flag flips to true, this verify becomes enforcing.)'
-  )
-  process.exit(0)
-}
+const productTelemetryEnabled = enabledMatch[1] === 'true' && productTelemetryConfigured
 
 const asarMatches = findAsar(distDir)
 if (asarMatches.length === 0) {
@@ -157,6 +154,22 @@ function verifyAsar(asarPath) {
       return extractFile(asarPath, internal).toString('utf8')
     })
     .join('\n')
+
+  // Disabled product services still verify every packaged payload. A stale key or
+  // upstream diagnostics URL must not become a hidden dependency in a portable bundle.
+  if (!productTelemetryEnabled) {
+    if (
+      /["'`]phc_[A-Za-z0-9_-]+["'`]/.test(indexJs) ||
+      (productManifest.endpoints.diagnostics == null &&
+        indexJs.includes('https://www.onorca.dev/diagnostics/token'))
+    ) {
+      console.error(
+        `::error::disabled product services contain foreign build credentials in ${asarPath}`
+      )
+      return null
+    }
+    return { asarPath, buildIdentity: null, writeKey: null }
+  }
 
   const buildIdentityMatch = BUILD_IDENTITY_RE.exec(indexJs)
   const writeKeyMatch = WRITE_KEY_RE.exec(indexJs)
@@ -223,6 +236,11 @@ if (distinctWriteKeys.size > 1) {
     console.error(`  - ${r.asarPath}: ${r.writeKey.slice(0, 8)}... (length=${r.writeKey.length})`)
   }
   process.exit(1)
+}
+
+if (!productTelemetryEnabled) {
+  console.log(`Disabled product telemetry verified across ${results.length} packaged payload(s)`)
+  process.exit(0)
 }
 
 const [first] = results

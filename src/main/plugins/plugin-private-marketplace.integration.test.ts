@@ -1,17 +1,55 @@
-import { execFile } from 'node:child_process'
+import type * as childProcess from 'node:child_process'
 import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { promisify } from 'node:util'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginMarketplaceGitSource } from '../../shared/plugins/plugin-marketplace'
+import { runProcess } from '../../shared/child-process/run-process'
 import { getUserPluginsDir } from './plugin-discovery'
 import { readPluginLockfile } from './plugin-install'
 import { PluginMarketplaceInstaller } from './plugin-marketplace-installer'
 import { PluginMarketplaceService } from './plugin-marketplace-service'
 
-const execFileAsync = promisify(execFile)
+const children = vi.hoisted<{ closed: Promise<void>[] }>(() => ({ closed: [] }))
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const real = await importOriginal<typeof childProcess>()
+  function trackChild(child: childProcess.ChildProcess): void {
+    const closed = Promise.withResolvers<void>()
+    children.closed.push(closed.promise)
+    child.once('close', () => closed.resolve())
+    child.once('error', () => {
+      if (!child.pid) {
+        closed.resolve()
+      }
+    })
+  }
+  const execFile = new Proxy(real.execFile, {
+    apply(target, receiver, args: Parameters<typeof real.execFile>) {
+      const child = target.apply(receiver, args)
+      trackChild(child)
+      return child
+    }
+  })
+  const spawn = new Proxy(real.spawn, {
+    apply(target, receiver, args: Parameters<typeof real.spawn>) {
+      const child = target.apply(receiver, args)
+      trackChild(child)
+      return child
+    }
+  })
+  return { ...real, execFile, spawn }
+})
+
 const temporaryRoots: string[] = []
+const fixtureTerminations: Promise<void>[] = []
+const pluginKey = 'private.private-locale'
+const pluginUrl = 'ssh://git@example.invalid/private/locale.git'
+const marketplaceUrl = 'ssh://git@example.invalid/private/marketplace.git'
+let userDataPath: string
+let setupSignal: AbortSignal
+let pendingSetup: Promise<void> | undefined
+let pendingSubject: Promise<void> | undefined
 const savedEnvironment = {
   GIT_SSH_COMMAND: process.env.GIT_SSH_COMMAND,
   GIT_SSH_VARIANT: process.env.GIT_SSH_VARIANT,
@@ -19,7 +57,22 @@ const savedEnvironment = {
 }
 
 async function runGit(cwd: string, args: string[]): Promise<void> {
-  await execFileAsync('git', args, { cwd })
+  setupSignal.throwIfAborted()
+  const terminated = Promise.withResolvers<void>()
+  fixtureTerminations.push(terminated.promise)
+  const result = await runProcess({
+    program: 'git',
+    args,
+    cwd,
+    signal: setupSignal,
+    timeoutMs: null,
+    terminationBarrier: true,
+    onChildTerminated: terminated.resolve
+  })
+  setupSignal.throwIfAborted()
+  if (result.code !== 0 || result.signal !== null || result.timedOut) {
+    throw new Error(`Git fixture command failed: ${args.join(' ')}\n${result.stderr}`)
+  }
 }
 
 async function createGitRepository(
@@ -55,6 +108,14 @@ function shellQuote(value: string): string {
 }
 
 afterEach(async () => {
+  await Promise.allSettled([
+    ...(pendingSetup ? [pendingSetup] : []),
+    ...(pendingSubject ? [pendingSubject] : [])
+  ])
+  await Promise.all(fixtureTerminations.splice(0))
+  await Promise.all(children.closed.splice(0))
+  pendingSetup = undefined
+  pendingSubject = undefined
   for (const [key, value] of Object.entries(savedEnvironment)) {
     if (value === undefined) {
       delete process.env[key]
@@ -68,12 +129,15 @@ afterEach(async () => {
 })
 
 describe('private Git marketplace integration', () => {
-  it('uses the caller SSH environment for marketplace preview and install', async () => {
+  beforeEach(async ({ signal }) => {
+    setupSignal = signal
+    pendingSetup = prepareMarketplaceFixture()
+    await pendingSetup
+  })
+
+  async function prepareMarketplaceFixture(): Promise<void> {
     const root = await mkdtemp(join(tmpdir(), 'orca-private-marketplace-'))
     temporaryRoots.push(root)
-    const pluginKey = 'private.private-locale'
-    const pluginUrl = 'ssh://git@example.invalid/private/locale.git'
-    const marketplaceUrl = 'ssh://git@example.invalid/private/marketplace.git'
     const pluginRepository = await createGitRepository(root, 'locale-source', {
       'orca-plugin.json': JSON.stringify({
         manifestVersion: 1,
@@ -118,7 +182,15 @@ describe('private Git marketplace integration', () => {
       '/private/marketplace.git': marketplaceRepository
     })
 
-    const userDataPath = join(root, 'user-data')
+    userDataPath = join(root, 'user-data')
+  }
+
+  it('uses the caller SSH environment for marketplace preview and install', async () => {
+    pendingSubject = exercisePrivateMarketplace()
+    await pendingSubject
+  })
+
+  async function exercisePrivateMarketplace(): Promise<void> {
     const marketplace = new PluginMarketplaceService({
       pluginsDataDir: join(userDataPath, 'plugins-data')
     })
@@ -149,5 +221,5 @@ describe('private Git marketplace integration', () => {
       marketplace: { url: marketplaceUrl },
       plugin: { url: pluginUrl }
     })
-  })
+  }
 })

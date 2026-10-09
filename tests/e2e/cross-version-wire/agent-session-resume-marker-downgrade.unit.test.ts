@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { expect, test } from 'vitest'
+import { beforeAll, expect, test } from 'vitest'
 import { structuredAgentSessionWorkingAtStop } from '../../../src/main/native-chat/agent-session-wire/structured-agent-session-working-at-teardown'
 import {
   journal,
@@ -17,6 +17,16 @@ import { importReleaseCheckoutModule, materializeReleaseCheckout } from './relea
 // A release whose marker parser still requires the chat's newest message id.
 // Official v1.4.211, pinned independently of product release refs.
 const BASELINE_REF = '5534462b50c660888487a2108700d4cf284270db'
+let baseline: Awaited<ReturnType<typeof importReleaseCheckoutModule>>
+
+beforeAll(async () => {
+  const checkout = await materializeReleaseCheckout(BASELINE_REF)
+  expect(checkout.commit).toBe(BASELINE_REF)
+  baseline = await importReleaseCheckoutModule(
+    checkout,
+    'src/main/runtime/agent-session-recovery-capsule.ts'
+  )
+})
 
 test('an older build reads the restart offer this build records at quit', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'orca-resume-marker-downgrade-'))
@@ -37,11 +47,6 @@ test('an older build reads the restart offer this build records at quit', async 
     await new AgentSessionRecoveryCapsule(directory).record([marker], NOW)
 
     // The older build, after a downgrade, still lists it.
-    const checkout = await materializeReleaseCheckout(BASELINE_REF)
-    const baseline = await importReleaseCheckoutModule(
-      checkout,
-      'src/main/runtime/agent-session-recovery-capsule.ts'
-    )
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the pinned release exports this class with the constructor and `list` called below; a missing one fails the test.
     const OldCapsule = baseline.AgentSessionRecoveryCapsule as new (directory: string) => {
       list: (now: number) => Promise<{ sessionId: string }[]>

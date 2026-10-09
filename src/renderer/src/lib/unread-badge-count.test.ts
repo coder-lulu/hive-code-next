@@ -1,137 +1,170 @@
 import { describe, expect, it } from 'vitest'
-import type { TerminalTab } from '../../../shared/terminal-tab-types'
-import type { Tab } from '../../../shared/tab-types'
+import { makeTab } from '../store/slices/store-session-test-harness'
+import { makeWorktree, TEST_REPO } from '../store/slices/worktrees-slice-test-fixtures'
+import { makeFolderWorkspace } from '@/store/slices/worktrees-slice-test-fixtures'
+import type { ProjectGroup } from '../../../shared/project-group-types'
 import type { Worktree } from '../../../shared/worktree/types'
 import { getUnreadBadgeCount, type UnreadBadgeCountSources } from './unread-badge-count'
-import { createUnreadBadgeCountSelector } from './unread-badge-count-selector'
 
-function worktree(id: string, isUnread: boolean): Worktree {
-  return { id, isUnread } as Worktree
+function worktree(id: string, overrides: Partial<Worktree> = {}): Worktree {
+  return makeWorktree({ id, repoId: TEST_REPO.id, isUnread: true, ...overrides })
 }
 
-function tab(id: string): TerminalTab {
-  return { id } as TerminalTab
+function projectGroup(overrides: Partial<ProjectGroup> = {}): ProjectGroup {
+  return {
+    id: 'group-1',
+    name: 'platform',
+    parentPath: '/work',
+    parentGroupId: null,
+    createdFrom: 'manual',
+    tabOrder: 0,
+    isCollapsed: false,
+    color: null,
+    createdAt: 0,
+    updatedAt: 0,
+    ...overrides
+  }
 }
 
-function unifiedTab(id: string, worktreeId: string, entityId = id): Tab {
-  return { id, entityId, worktreeId } as Tab
+function count(overrides: Partial<UnreadBadgeCountSources>): number {
+  return getUnreadBadgeCount({
+    worktreesByRepo: {},
+    folderWorkspaces: [],
+    projectGroups: [projectGroup()],
+    repoMap: new Map([[TEST_REPO.id, TEST_REPO]]),
+    visibleHostIds: null,
+    defaultHostId: 'local',
+    hiddenOtherDevicePairings: null,
+    ...overrides,
+    // These visibility fixtures represent folder bells with live tab owners.
+    tabsByWorktree:
+      overrides.tabsByWorktree ??
+      Object.fromEntries(
+        (overrides.folderWorkspaces ?? []).map((folder) => [
+          `folder:${folder.id}`,
+          [makeTab({ id: `bell:${folder.id}`, worktreeId: `folder:${folder.id}` })]
+        ])
+      ),
+    unreadTerminalTabs:
+      overrides.unreadTerminalTabs ??
+      Object.fromEntries(
+        (overrides.folderWorkspaces ?? []).map((folder) => [
+          `bell:${folder.id}`,
+          'terminal-bell' as const
+        ])
+      )
+  })
 }
 
 describe('getUnreadBadgeCount', () => {
   it('counts unread worktrees', () => {
     expect(
-      getUnreadBadgeCount({
-        worktreesByRepo: { repo: [worktree('wt-1', true), worktree('wt-2', false)] },
-        tabsByWorktree: {},
-        unreadTerminalTabs: {}
+      count({
+        worktreesByRepo: { repo1: [worktree('wt-1'), worktree('wt-2', { isUnread: false })] }
       })
     ).toBe(1)
   })
 
-  it('dedupes unread terminal tabs against their worktree', () => {
-    expect(
-      getUnreadBadgeCount({
-        worktreesByRepo: { repo: [worktree('wt-1', true)] },
-        tabsByWorktree: { 'wt-1': [tab('tab-1'), tab('tab-2')] },
-        unreadTerminalTabs: { 'tab-1': true, 'tab-2': true }
-      })
-    ).toBe(1)
+  it('skips archived worktrees, which the sidebar never shows', () => {
+    expect(count({ worktreesByRepo: { repo1: [worktree('wt-1', { isArchived: true })] } })).toBe(0)
   })
 
-  it('counts tab-only unread activity by owning worktree', () => {
-    expect(
-      getUnreadBadgeCount({
-        worktreesByRepo: { repo: [worktree('wt-1', false), worktree('wt-2', false)] },
-        tabsByWorktree: { 'wt-1': [tab('tab-1')], 'wt-2': [tab('tab-2')] },
-        unreadTerminalTabs: { 'tab-1': true, 'tab-2': true }
-      })
-    ).toBe(2)
+  it('preserves id-only deduplication across execution hosts', () => {
+    const rows = [worktree('wt-1', { hostId: 'local' }), worktree('wt-1', { hostId: 'ssh:remote' })]
+    expect(count({ worktreesByRepo: { repo1: rows } })).toBe(1)
+    expect(count({ worktreesByRepo: { repo1: rows }, visibleHostIds: new Set(['local']) })).toBe(1)
   })
 
-  it('uses each unseen task completion when a pane has multiple completions', () => {
+  it('counts a row repeated across repo buckets once', () => {
     expect(
-      getUnreadBadgeCount({
-        worktreesByRepo: { repo: [worktree('wt-1', true)] },
-        tabsByWorktree: { 'wt-1': [tab('tab-1')] },
-        unreadTerminalTabs: { 'tab-1': true },
-        unreadAgentCompletionCountByPane: {
-          'tab-1:leaf-1': 2,
-          'tab-2:leaf-1': 1
+      count({
+        worktreesByRepo: {
+          'repo-a': [worktree('wt-1', { hostId: 'local' })],
+          'repo-b': [worktree('wt-1', { hostId: 'local' })]
         }
       })
-    ).toBe(3)
+    ).toBe(1)
   })
 
-  it('keeps completion attention when no legacy tab unread marker exists', () => {
+  it('counts unread folder workspaces alongside worktrees', () => {
     expect(
-      getUnreadBadgeCount({
-        worktreesByRepo: { repo: [worktree('wt-1', false)] },
-        tabsByWorktree: { 'wt-1': [tab('tab-1')] },
-        unreadTerminalTabs: {},
-        unreadAgentCompletionCountByPane: { 'tab-1:leaf-1': 2 }
+      count({
+        worktreesByRepo: { repo1: [worktree('wt-1')] },
+        folderWorkspaces: [
+          makeFolderWorkspace({ id: 'folder-1', isUnread: true }),
+          makeFolderWorkspace({ id: 'folder-2' })
+        ]
       })
     ).toBe(2)
   })
 
-  it('adds task completions to unrelated legacy unread attention', () => {
+  it('uses the same other-device policy for git worktrees as for folder rows', () => {
+    const foreign = worktree('foreign', {
+      creatorProvenance: { kind: 'paired-device', deviceId: 'phone' }
+    })
+    expect(count({ worktreesByRepo: { repo1: [foreign] } })).toBe(1)
     expect(
-      getUnreadBadgeCount({
-        worktreesByRepo: {
-          repo: [worktree('wt-1', true), worktree('wt-2', true), worktree('wt-3', false)]
-        },
-        tabsByWorktree: { 'wt-3': [tab('tab-3')] },
-        unreadTerminalTabs: {},
-        unreadAgentCompletionCountByPane: { 'tab-3:leaf-1': 1 }
+      count({ worktreesByRepo: { repo1: [foreign] }, hiddenOtherDevicePairings: new Map() })
+    ).toBe(0)
+    const runtimeOwned = { ...foreign, runtimeOwnerEnvironmentId: 'env' }
+    expect(
+      count({
+        worktreesByRepo: { repo1: [runtimeOwned] },
+        hiddenOtherDevicePairings: new Map([['env', 'phone']])
       })
-    ).toBe(3)
+    ).toBe(1)
+    expect(
+      count({
+        worktreesByRepo: { repo1: [runtimeOwned] },
+        hiddenOtherDevicePairings: new Map([['env', 'other']])
+      })
+    ).toBe(0)
   })
 
-  it('does not double count legacy attention owned by a completed task', () => {
+  it('adds no flag-only folder or orphan-marker counts', () => {
+    const folderWorkspaces = [makeFolderWorkspace({ isUnread: true })]
+    expect(count({ folderWorkspaces, unreadTerminalTabs: {} })).toBe(0)
     expect(
-      getUnreadBadgeCount({
-        worktreesByRepo: {
-          repo: [worktree('wt-1', true), worktree('wt-2', true)]
-        },
-        tabsByWorktree: { 'wt-1': [tab('tab-1')] },
-        unreadTerminalTabs: { 'tab-1': true },
-        unreadAgentCompletionCountByPane: { 'tab-1:leaf-1': 2 }
-      })
-    ).toBe(3)
-  })
-
-  it('does not double count a structured-session completion against its worktree', () => {
-    expect(
-      getUnreadBadgeCount({
-        worktreesByRepo: { repo: [worktree('wt-1', true)] },
+      count({
+        folderWorkspaces,
         tabsByWorktree: {},
-        unifiedTabsByWorktree: {
-          'wt-1': [unifiedTab('structured-tab', 'wt-1', 'provider-session')]
-        },
-        unreadTerminalTabs: {},
-        unreadAgentCompletionCountByPane: { 'structured-tab:leaf-1': 2 }
+        unreadTerminalTabs: { orphan: 'terminal-bell' }
       })
-    ).toBe(2)
+    ).toBe(0)
   })
-})
 
-describe('Dock badge completion updates', () => {
-  it('updates completion counts and dedupes a structured tab when its inventory arrives', () => {
-    const select = createUnreadBadgeCountSelector()
-    const state: UnreadBadgeCountSources = {
-      worktreesByRepo: { repo: [worktree('wt-1', true)] },
-      tabsByWorktree: {},
-      unreadTerminalTabs: {},
-      unreadAgentCompletionCountByPane: {}
+  it('skips an unread folder workspace the sidebar has no row for', () => {
+    const localOnly = { visibleHostIds: new Set(['local'] as const) }
+    const remoteFolderInLocalGroup = {
+      folderWorkspaces: [makeFolderWorkspace({ isUnread: true, executionHostId: 'ssh:ssh-1' })]
     }
-    expect(select(state)).toBe(1)
+    const localFolderInRemoteGroup = {
+      folderWorkspaces: [makeFolderWorkspace({ isUnread: true, executionHostId: 'local' })],
+      projectGroups: [projectGroup({ connectionId: 'ssh-1' })]
+    }
 
-    const completed = { ...state, unreadAgentCompletionCountByPane: { 'session-1:leaf-1': 2 } }
-    expect(select(completed)).toBe(3)
+    expect(count(remoteFolderInLocalGroup)).toBe(0)
+    expect(count({ ...remoteFolderInLocalGroup, ...localOnly })).toBe(0)
+    expect(count(localFolderInRemoteGroup)).toBe(0)
+    expect(count({ ...localFolderInRemoteGroup, ...localOnly })).toBe(0)
+    // A group with no folder on disk renders no rows.
     expect(
-      select({
-        ...completed,
-        unifiedTabsByWorktree: { 'wt-1': [unifiedTab('ui-session-1', 'wt-1', 'session-1')] }
+      count({
+        folderWorkspaces: [makeFolderWorkspace({ isUnread: true })],
+        projectGroups: [projectGroup({ parentPath: null })]
       })
-    ).toBe(2)
+    ).toBe(0)
+  })
+
+  it('skips a folder workspace from another device while the sidebar hides those', () => {
+    const fromOtherDevice = makeFolderWorkspace({
+      isUnread: true,
+      creatorProvenance: { kind: 'paired-device', deviceId: 'phone' }
+    })
+
+    expect(count({ folderWorkspaces: [fromOtherDevice] })).toBe(1)
+    expect(
+      count({ folderWorkspaces: [fromOtherDevice], hiddenOtherDevicePairings: new Map() })
+    ).toBe(0)
   })
 })

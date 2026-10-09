@@ -1,22 +1,30 @@
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 
-const mocks = vi.hoisted(() => {
+const mocks = await vi.hoisted(async () => {
+  const { APP_DISPLAY_NAME } = await import('../../shared/brand')
+  const appName = `${APP_DISPLAY_NAME} Development`
+  let currentName: string = APP_DISPLAY_NAME
+  const paths = new Map([
+    ['appData', 'C:\\Users\\fixture\\AppData\\Roaming'],
+    ['userData', '/canonical-user-data']
+  ])
   const events: string[] = []
-  // Why a two-word app token: this file sets the dev app name to "Orca Development", and Electron
+  // Why a multi-word app token: this file sets the configured dev app name, and Electron
   // builds the app token from that name. A single-token fixture could not exhibit the multi-word
   // leak the cleaner exists to handle, so it disagreed with the scenario it set up.
   // Why the engine comment: a real app.userAgentFallback always carries it, and the cleaner only
   // touches identities that do — a fixture without it models a string Electron cannot produce.
-  let userAgent =
-    'Mozilla/5.0 (Test) AppleWebKit/537.36 (KHTML, like Gecko) Orca Development/0.0.0 Chrome/150.0.0.0 Electron/43.0.0 Safari/537.36'
+  let userAgent = `Mozilla/5.0 (Test) AppleWebKit/537.36 (KHTML, like Gecko) ${appName}/0.0.0 Chrome/150.0.0.0 Electron/43.0.0 Safari/537.36`
   const app = {
     isPackaged: false,
     exit: vi.fn(),
     // Real `app` always carries this; preflight reads it to decide the Linux keyring backend.
     commandLine: { hasSwitch: vi.fn(() => false), appendSwitch: vi.fn() },
     getVersion: vi.fn(() => '1.0.0'),
-    getPath: vi.fn(() => '/canonical-user-data'),
+    getPath: vi.fn((name: string) => paths.get(name) ?? '/canonical-user-data'),
+    setPath: vi.fn((name: string, value: string) => paths.set(name, value)),
+    getName: vi.fn(() => currentName),
     get userAgentFallback(): string {
       events.push('read-user-agent')
       return userAgent
@@ -31,11 +39,13 @@ const mocks = vi.hoisted(() => {
     }),
     whenReady: vi.fn(() => Promise.resolve()),
     setName: vi.fn((name: string) => {
+      currentName = name
       events.push(`set-name:${name}`)
     })
   }
   return {
     app,
+    appName,
     events,
     userAgent: () => userAgent,
     showErrorBox: vi.fn(),
@@ -45,7 +55,8 @@ const mocks = vi.hoisted(() => {
     afterIdentity: vi.fn((): void => {
       throw new Error('preflight-test-stop')
     }),
-    recoverMoves: vi.fn()
+    recoverMoves: vi.fn(),
+    profileLock: vi.fn((): { state: string; message?: string } => ({ state: 'unavailable' }))
   }
 })
 
@@ -98,7 +109,7 @@ vi.mock('../updater', () => ({
 vi.mock('./dev-instance-identity', () => ({
   getDevInstanceIdentity: () => ({
     isDev: true,
-    appName: 'Orca Development',
+    appName: mocks.appName,
     appUserModelId: 'com.orca.development'
   }),
   shouldApplyPreReadyAppName: () => true
@@ -117,6 +128,9 @@ vi.mock('../server/serve-stdout-boundary')
 vi.mock('./serve-desktop-activation', () => ({
   createServeDesktopActivationGate: () => ({})
 }))
+vi.mock('./desktop-profile-instance-lock', () => ({
+  acquireDesktopProfileInstanceLock: mocks.profileLock
+}))
 vi.mock('./single-instance-lock', () => ({
   shouldBypassSingleInstanceLock: () => false,
   shouldSkipSingleInstanceLock: () => false,
@@ -126,7 +140,7 @@ vi.mock('./single-instance-lock', () => ({
   },
   logSingleInstanceLockBypass: vi.fn(),
   logSingleInstanceLockFailure: vi.fn(),
-  SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE: 1
+  SINGLE_INSTANCE_ALREADY_RUNNING_EXIT_CODE: 3
 }))
 vi.mock('../../shared/app-environment', () => ({ setAppEnvironment: vi.fn() }))
 vi.mock('../host/electron-app-environment', () => ({ ElectronAppEnvironment: class {} }))
@@ -235,6 +249,33 @@ describe('browser process user-agent startup ordering', () => {
     }
   })
 
+  it('explains an orcad holding the profile instead of exiting silently', async () => {
+    const { runMainProcessPreflight } = await import('./main-process-preflight')
+    const platform = vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin')
+    mocks.backgroundLaunch.mockReturnValueOnce(false)
+    mocks.profileLock.mockReturnValueOnce({ state: 'held', message: 'Another orcad (pid 7)' })
+    mocks.app.exit.mockClear()
+    mocks.events.length = 0
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(
+        runMainProcessPreflight({ focusExistingWindow: vi.fn(), requestDesktopActivation: vi.fn() })
+      ).toBe(false)
+      expect(mocks.showErrorBox).toHaveBeenCalledWith(
+        `${APP_DISPLAY_NAME} could not start`,
+        'Another orcad (pid 7)'
+      )
+      expect(mocks.app.exit.mock.calls).toEqual([[3]])
+      expect(mocks.events).not.toContain('admission:/canonical-user-data')
+    } finally {
+      error.mockRestore()
+      platform.mockRestore()
+      mocks.showErrorBox.mockClear()
+      mocks.app.exit.mockClear()
+      mocks.events.length = 0
+    }
+  })
+
   it('does not acquire profile admission for a duplicate launch', async () => {
     const { runMainProcessPreflight } = await import('./main-process-preflight')
     mocks.events.length = 0
@@ -244,7 +285,7 @@ describe('browser process user-agent startup ordering', () => {
     ).toBe(false)
     expect(mocks.events).not.toContain('admission:/canonical-user-data')
     expect(mocks.events).not.toContain('read-mode:/canonical-user-data')
-    expect(mocks.app.exit).toHaveBeenCalledWith(1)
+    expect(mocks.app.exit).toHaveBeenCalledWith(3)
     mocks.events.length = 0
   })
 
@@ -260,7 +301,7 @@ describe('browser process user-agent startup ordering', () => {
       })
     ).toBe(false)
 
-    const nameIndex = mocks.events.indexOf('set-name:Orca Development')
+    const nameIndex = mocks.events.indexOf(`set-name:${mocks.appName}`)
     const modeIndex = mocks.events.indexOf('read-mode:/canonical-user-data')
     const writeIndex = mocks.events.indexOf('write-user-agent')
     const continuationIndex = mocks.events.indexOf('continued-after-browser-identity')
@@ -276,9 +317,10 @@ describe('browser process user-agent startup ordering', () => {
       mode: 'clean',
       userAgent: mocks.userAgent()
     })
-    // Both app-name words must be gone, not just the last: a single \S+ would have left "Orca".
+    // Every app-name word must be gone; a single \S+ would leave the configured product name.
     expect(mocks.userAgent()).not.toMatch(/Electron/)
     expect(mocks.userAgent()).not.toMatch(/Orca|Development/)
+    expect(mocks.userAgent()).not.toContain(APP_DISPLAY_NAME)
   })
 
   it('exits without reading profile state or revealing a window when recovery holds admission', async () => {
@@ -295,7 +337,7 @@ describe('browser process user-agent startup ordering', () => {
       expect(mocks.app.exit).toHaveBeenCalledWith(1)
       expect(mocks.events).toEqual([
         'init-data-path',
-        'set-name:Orca Development',
+        `set-name:${mocks.appName}`,
         'single-instance-lock',
         'admission:/canonical-user-data'
       ])

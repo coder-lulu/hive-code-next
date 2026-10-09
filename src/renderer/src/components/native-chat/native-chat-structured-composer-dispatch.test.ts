@@ -22,6 +22,6 @@ it.each([true, false])(
     expect(settled).not.toHaveBeenCalled()
     finish(accepted)
     await result
-    expect(settled).toHaveBeenCalledWith({ accepted, error: null })
+    expect(settled).toHaveBeenCalledWith({ accepted, error: null, revealsTranscript: accepted })
   }
 )

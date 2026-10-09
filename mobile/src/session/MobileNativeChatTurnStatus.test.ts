@@ -1,3 +1,4 @@
+import { MobileThemeProvider } from '../theme/mobile-theme-provider'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -14,18 +15,16 @@ vi.mock('react-native', async () => {
     Text,
     View: ({ children, ...props }: { children?: unknown }) =>
       React.createElement('View', props, children),
+    AccessibilityInfo: {
+      isReduceMotionEnabled: async () => false,
+      addEventListener: () => ({ remove: () => {} })
+    },
+    useColorScheme: () => 'light',
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 }
   }
 })
 vi.mock('lucide-react-native', () => ({ ChevronRight: 'ChevronRight', Circle: 'Circle' }))
 vi.mock('../hooks/use-reduced-motion-enabled', () => ({ useReducedMotionEnabled: () => false }))
-vi.mock('../theme/mobile-theme-provider', async () => {
-  const { lightTheme } = await import('../theme/mobile-theme')
-  return {
-    useMobileTheme: () => lightTheme,
-    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
-  }
-})
 
 import {
   MobileNativeChatTurnActivity,
@@ -60,7 +59,13 @@ describe('MobileNativeChatTurnStatus', () => {
     onToggleExpanded?: () => void
   }): ReactTestRenderer {
     act(() => {
-      renderer = create(createElement(MobileNativeChatTurnStatus, props))
+      renderer = create(
+        createElement(
+          MobileThemeProvider,
+          { preference: 'light' },
+          createElement(MobileNativeChatTurnStatus, props)
+        )
+      )
     })
     return renderer!
   }
@@ -130,7 +135,13 @@ describe('MobileNativeChatTurnStatus', () => {
 describe('MobileNativeChatTurnActivity', () => {
   function render(props: { thinking: boolean; activityText?: string | null }): ReactTestRenderer {
     act(() => {
-      renderer = create(createElement(MobileNativeChatTurnActivity, props))
+      renderer = create(
+        createElement(
+          MobileThemeProvider,
+          { preference: 'light' },
+          createElement(MobileNativeChatTurnActivity, props)
+        )
+      )
     })
     return renderer!
   }

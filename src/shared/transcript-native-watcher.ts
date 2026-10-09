@@ -1,4 +1,4 @@
-import { watch, type FSWatcher } from 'node:fs'
+import { realpathSync, watch, type FSWatcher } from 'node:fs'
 import { basename, dirname } from 'node:path'
 
 export type TranscriptNativeWatcher = {
@@ -42,20 +42,23 @@ export function createTranscriptNativeWatcher(
       }
       let nextWatcher: FSWatcher
       try {
+        const watchPath =
+          options.watchParent === false
+            ? filePath
+            : process.platform === 'win32'
+              ? realpathSync.native(dirname(filePath))
+              : dirname(filePath)
         // Parent watches survive replacement; append-only readers can watch one file to avoid sibling events.
-        nextWatcher = watch(
-          options.watchParent === false ? filePath : dirname(filePath),
-          (event, changedName) => {
-            if (changedName !== null && changedName.toString() !== watchedName) {
-              return
-            }
-            // Why: a parent replacement may emit rename without a watcher error.
-            if (event === 'rename') {
-              invalidateCandidate(nextWatcher)
-            }
-            onEvent()
+        nextWatcher = watch(watchPath, (event, changedName) => {
+          if (changedName !== null && changedName.toString() !== watchedName) {
+            return
           }
-        )
+          // Why: a parent replacement may emit rename without a watcher error.
+          if (event === 'rename') {
+            invalidateCandidate(nextWatcher)
+          }
+          onEvent()
+        })
       } catch {
         rebindNeeded = true
         return false

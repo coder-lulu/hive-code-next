@@ -8,8 +8,9 @@ import {
 } from './persistence-test-harness'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, mkdtempSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { tmpdir } from 'node:os'
+import { profileStateDatabaseFile } from '../shared/profile-state-storage-paths'
 
 // Stub the ~/.ssh/config parser so the SSH-import test drives the real Store with deterministic hosts, not the operator's actual ~/.ssh/config.
 const { loadUserSshConfigMock, sshConfigHostsToTargetsMock } = vi.hoisted(() => ({
@@ -333,22 +334,36 @@ describe('Store', () => {
   })
 
   it('keeps the primary-selection default disabled on Windows profiles', async () => {
-    await withPlatform('win32', async () => {
-      writeDataFile({
-        schemaVersion: 1,
-        repos: [],
-        worktreeMeta: {},
-        settings: { primarySelectionMiddleClickPaste: false },
-        ui: {},
-        githubCache: { pr: {}, issue: {} },
-        workspaceSession: {}
-      })
+    const physicalDatabaseFile = profileStateDatabaseFile(testState.dir)
+    const originalNamespacePath = win32.toNamespacedPath
+    const namespacePathSpy =
+      process.platform === 'win32'
+        ? undefined
+        : vi.spyOn(win32, 'toNamespacedPath').mockImplementation(function (this: unknown, ...args) {
+            return args[0] === physicalDatabaseFile
+              ? physicalDatabaseFile
+              : originalNamespacePath.apply(this, args)
+          })
+    try {
+      await withPlatform('win32', async () => {
+        writeDataFile({
+          schemaVersion: 1,
+          repos: [],
+          worktreeMeta: {},
+          settings: { primarySelectionMiddleClickPaste: false },
+          ui: {},
+          githubCache: { pr: {}, issue: {} },
+          workspaceSession: {}
+        })
 
-      const store = await createStore()
-      expect(store.getSettings().primarySelectionMiddleClickPaste).toBe(false)
-      expect(store.getSettings().primarySelectionMiddleClickPasteDefaultedForTerminalDefaults).toBe(
-        false
-      )
-    })
+        const store = await createStore()
+        expect(store.getSettings().primarySelectionMiddleClickPaste).toBe(false)
+        expect(
+          store.getSettings().primarySelectionMiddleClickPasteDefaultedForTerminalDefaults
+        ).toBe(false)
+      })
+    } finally {
+      namespacePathSpy?.mockRestore()
+    }
   })
 })

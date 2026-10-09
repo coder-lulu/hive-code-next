@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { rmSync, mkdtempSync, mkdirSync, existsSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, win32 } from 'node:path'
 import { tmpdir } from 'node:os'
 import type { PersistedState } from '../shared/persisted-state-types'
 import type { Repo } from '../shared/repo-types'
@@ -19,6 +19,7 @@ import {
 } from './persistence-test-harness'
 import { TEST_LEAF_1, TEST_LEAF_2 } from './persistence-session-fixtures'
 import { getDefaultPersistedState, getDefaultWorkspaceSession } from '../shared/constants'
+import { profileStateDatabaseFile } from '../shared/profile-state-storage-paths'
 import type { WorkspaceSessionState } from '../shared/workspace-session-state-types'
 import { _resetTracerForTests, setActiveSink } from './observability/tracer'
 import { _resetPtyBindingSpanSamplingForTests } from './persistence/loading-store/pty-binding-span'
@@ -327,10 +328,24 @@ describe('Store', () => {
       }
     })
 
-    await withPlatform('win32', async () => {
-      const store = await createStore()
-      expect(Object.keys(store.getAllWorktreeMeta())).toContain(wslLinkedKey)
-    })
+    const physicalDatabaseFile = profileStateDatabaseFile(testState.dir)
+    const originalNamespacePath = win32.toNamespacedPath
+    const namespacePathSpy =
+      process.platform === 'win32'
+        ? undefined
+        : vi.spyOn(win32, 'toNamespacedPath').mockImplementation(function (this: unknown, ...args) {
+            return args[0] === physicalDatabaseFile
+              ? physicalDatabaseFile
+              : originalNamespacePath.apply(this, args)
+          })
+    try {
+      await withPlatform('win32', async () => {
+        const store = await createStore()
+        expect(Object.keys(store.getAllWorktreeMeta())).toContain(wslLinkedKey)
+      })
+    } finally {
+      namespacePathSpy?.mockRestore()
+    }
   })
 
   it.each([null, [], 5])('repairs a corrupt worktreeMeta map (%#)', async (worktreeMeta) => {

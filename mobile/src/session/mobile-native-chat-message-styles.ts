@@ -50,9 +50,27 @@ export function createMobileNativeChatMessageStyles(theme: MobileTheme) {
       ...theme.typography.body,
       color: theme.color.text.secondary
     },
-    reasoning: {
-      opacity: 0.72
+    reasoning: { opacity: 0.72, paddingLeft: theme.spacing.space24 },
+    reasoningToggle: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      minHeight: theme.size.minimumTouchTarget
     },
+    reasoningPressed: { opacity: 0.6 },
+    reasoningHeadline: {
+      ...theme.typography.body,
+      color: theme.color.text.tertiary,
+      flexShrink: 1
+    },
+    reasoningCaretOpen: { transform: [{ rotate: '90deg' }] },
+    reasoningBody: { maxHeight: 240 },
+    agentMessage: {
+      paddingLeft: theme.spacing.space16,
+      borderLeftWidth: 2,
+      borderLeftColor: theme.color.border.subtle
+    },
+    agentAttribution: { ...theme.typography.meta, color: theme.color.text.tertiary },
     subagent: {
       borderLeftWidth: 2,
       borderLeftColor: theme.color.border.subtle,
