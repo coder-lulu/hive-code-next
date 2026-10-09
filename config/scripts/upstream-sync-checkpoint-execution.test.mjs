@@ -73,6 +73,10 @@ describe('checkpoint Git execution boundary', () => {
       '7468e9cccb35a8494f76dc95a37627121113ee80',
       '75ea50273328d9bd5465170d10a098711d61b5a4',
       'e705cac04a1db7e7e2184746e912142d34ca838b',
+      'a7927b28ce45cbb044add478d957abe36c99ccd8',
+      '9dd8812384db85d0b4ede2d1e37f9d73bdb4ea8c',
+      '5a56636f6679071d6ec68b851ef7932cd3222560',
+      'e817b0e23747ffd6f16f2ddefea861950d82a3c0',
       '3727100cc9dbcea6201f8a3e506676a3c4b53b18',
       'aac38d698ff75ac4c8658addab48ef5a83617619',
       'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c',
@@ -84,7 +88,7 @@ describe('checkpoint Git execution boundary', () => {
       '4bb337741c335cfcc428d3b4271023566e2dadb8',
       'fd9125ea8c7b347cd8b675a4095e31cd3c865d25'
     ])
-    expect(execution.run).toHaveBeenCalledTimes(34)
+    expect(execution.run).toHaveBeenCalledTimes(42)
     for (const [, , options] of execution.run.mock.calls) {
       expect(options.env.GIT_DIR).toBeUndefined()
       expect(options.env.GIT_WORK_TREE).toBeUndefined()
