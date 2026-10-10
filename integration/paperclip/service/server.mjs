@@ -14,6 +14,7 @@ import { createTeamWorkbenchRepository } from './team-workbench-repository.mjs'
 import { createWorkflowDefinitionRepository } from './workflow-definition-repository.mjs'
 import { createWorkflowCaseRepository } from './workflow-case-repository.mjs'
 import { createWorkflowCaseRunRepository } from './workflow-case-run-repository.mjs'
+import { createWorkflowPlanApplicationRepository } from './workflow-plan-application-repository.mjs'
 import { WORKBENCH_PATHS, handleTeamWorkbenchRequest } from './team-workbench-routes.mjs'
 import {
   EXTERNAL_EXECUTION_PATH,
@@ -51,13 +52,17 @@ await sql.unsafe(await readFile(new URL('./workflow-case-tables.sql', import.met
 await sql.unsafe(
   await readFile(new URL('./workflow-plan-intent-tables.sql', import.meta.url), 'utf8')
 )
+await sql.unsafe(
+  await readFile(new URL('./workflow-plan-application-tables.sql', import.meta.url), 'utf8')
+)
 const repository = createTaskRepository(sql),
   dispatch = createTaskDispatch(repository)
 const workbenchRepository = {
   ...createTeamWorkbenchRepository(sql),
   ...createWorkflowDefinitionRepository(sql),
   ...createWorkflowCaseRepository(sql),
-  ...createWorkflowCaseRunRepository(sql)
+  ...createWorkflowCaseRunRepository(sql),
+  ...createWorkflowPlanApplicationRepository(sql)
 }
 const secret = randomBytes(32).toString('base64url'),
   expected = Buffer.from(secret)

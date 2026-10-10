@@ -1,5 +1,9 @@
 import { z } from 'zod'
 import {
+  HiveWorkflowPlanQuerySchema,
+  HiveWorkflowPlanApplySchema
+} from '../../../src/shared/hive-workflow-plan-application.ts'
+import {
   HiveWorkflowCaseStartSchema,
   HiveWorkflowCaseRunReadSchema
 } from '../../../src/shared/hive-workflow-case-runs.ts'
@@ -24,6 +28,8 @@ import {
 } from '../../../src/shared/hive-workflow-cases.ts'
 
 export const WORKBENCH_PATHS = Object.freeze([
+  '/hive/workbench/plans/read',
+  '/hive/workbench/plans/apply',
   '/hive/workbench/companies/list',
   '/hive/workbench/companies/create',
   '/hive/workbench/projects/list',
@@ -45,6 +51,13 @@ const TeamRead = z.strictObject({ projectId: HiveWorkbenchObjectIdInputSchema })
 /** The authenticated Hive facade supplies account identity and the validated workspace binding. */
 export function handleTeamWorkbenchRequest(repository, accountId, path, body) {
   switch (path) {
+    case '/hive/workbench/plans/read':
+      return repository.getWorkflowPlanApplication(
+        accountId,
+        HiveWorkflowPlanQuerySchema.parse(body)
+      )
+    case '/hive/workbench/plans/apply':
+      return repository.applyWorkflowPlan(accountId, HiveWorkflowPlanApplySchema.parse(body))
     case '/hive/workbench/cases/run-read':
       return repository.getWorkflowCaseRunAdmission(
         accountId,

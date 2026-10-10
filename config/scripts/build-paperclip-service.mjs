@@ -93,7 +93,8 @@ for (const tableFile of [
   'team-workbench-tables.sql',
   'workflow-definition-tables.sql',
   'workflow-case-tables.sql',
-  'workflow-plan-intent-tables.sql'
+  'workflow-plan-intent-tables.sql',
+  'workflow-plan-application-tables.sql'
 ]) {
   await copyFile(join(root, 'integration/paperclip/service', tableFile), join(output, tableFile))
 }

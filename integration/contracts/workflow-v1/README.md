@@ -1,8 +1,8 @@
 # 工程团队与成果交接契约 v1
 
-状态：2026-10-10。首条四角色工程链已接入存储、Facade、本机隔离执行、独立审核及原生页面；PlanProposal 已接入原 Product 规划请求、草稿保存与默认可见的原生只读预览，本切片真实执行和客户端验收已通过。一般业务任务图、计划采纳和任务工具消费者仍待接入。契约测试不替代真实执行、部署或多人权限验收。
+状态：2026-10-10。首条四角色工程链、Product 计划草稿采集及原生预览已通过验收；计划差异、幂等采纳与真实业务任务/依赖的事务创建已接入默认原生入口并完成真实验收。新任务保持阻塞，任务图派发、计划替换及任务工具消费者仍待接入。契约测试不替代真实执行、部署或多人权限验收。
 
-TypeScript 唯一来源为 [src/shared/task-workflow](../../../src/shared/task-workflow/)。[task-workflow.schema.json](task-workflow.schema.json) 由该来源生成；[test-vectors.json](test-vectors.json) 给出固定示例和成果/批准失效向量。它是业务对象与证据绑定合同，不替代 [P0 execution v1](../v1/README.md)，不新增启动器、运行账本或业务调度器。
+TypeScript 的流程与提案来源为 [src/shared/task-workflow](../../../src/shared/task-workflow/)，采纳 API 来源为 [hive-workflow-plan-application.ts](../../../src/shared/hive-workflow-plan-application.ts)。[task-workflow.schema.json](task-workflow.schema.json) 由同源生成；[test-vectors.json](test-vectors.json) 给出固定示例和成果/批准失效向量。它是业务对象与证据绑定合同，不替代 [P0 execution v1](../v1/README.md)，不新增启动器、运行账本或业务调度器。
 
 | 对象                            | 固定约束                                                                                                                         | 权威与接入位置                                                            |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -47,7 +47,11 @@ requestedLimits 限制最多 4 并发、最长 24 小时；可选预算只接受
 
 `WorkflowPlanDraft` 复用认证后的原成果与终态结算链，在 outcome_consumed 事务中保存 validated、rejected 或 unavailable/plan_artifact_missing 投影，以及原意图、生产者、输入摘要和成果版本。来源校验先于内容解析；内容拒绝保留原成果身份，来源不匹配拒绝业务变更。原生 Case 详情提供只读版本、来源及缺口预览。历史运行没有规划意图时不补造草稿；重复结算与取消仍遵循原执行边界。
 
-草稿检查通过不表示计划已采纳，也不触发一般业务任务图派发。计划差异页、proposePlan/plan-apply API、TaskToolFacade、资源/知识加载及硬预算消费者仍待接入；后续动作须重新授权，不得把模型字段或检查结果当作能力凭证。本次自动化验证、真实客户端验收和三轮独立复核已通过，发布提交以仓库 Git 历史为准。[plan-proposal-test-vectors.json](plan-proposal-test-vectors.json) 使用纯合成数据固定有效示例与拒绝向量。JSON Schema 只表达字段约束，图语义与策略检查必须运行同源 TypeScript。
+草稿检查通过不表示计划已采纳，也不触发一般业务任务图派发。用户从原需求详情查看差异并采纳，服务在同一事务创建真实 Paperclip issues、父子引用和 blocks 依赖，返回含 planRevision、原 requestId 及 createdTaskRefs 的固定回执。相同请求或相同计划的其他请求返回原回执；修改同一请求内容拒绝。每个 Case 当前只允许一个不可变采纳，替换已有任务明确不可用。
+
+采纳要求原 Product 成功、草案仍为当前规划意图、原始摘要一致，且当前拥有者、项目和职责绑定有效；源 Case 取消、未知、未结算或仍有执行占用时拒绝新采纳。原固定流程终态与历史不会被重新执行或改写。已采纳任务状态为 blocked，没有运行或派发记录；资源、知识和硬预算需求完整保留，后续执行仍须独立通过能力与授权门槛。读取旧采纳时会对照其准确原草案核对版本、完整任务映射与依赖，不能用当前查看的另一版本替代来源。
+
+`PlanDiff` 按提案内 taskRef 比较新增、删除、字段和计划要求变化，不把顺序调整当作依赖变化。窄 API 为 `/hive/workbench/plans/read` 和 `/hive/workbench/plans/apply`；请求携带目标、预期 Case/项目版本、planRevision 与完整 draftDigest，不接受模型自选任务 ID 或执行参数。公开 schema 提供查询、采纳请求/回执/视图/回复字段，跨对象语义仍必须运行同源校验。一般图派发、proposePlan、TaskToolFacade、资源/知识加载及硬预算消费者仍待接入。本切片自动化、真实客户端验收和三轮独立复核已通过，发布提交以 Git 历史为准。[plan-proposal-test-vectors.json](plan-proposal-test-vectors.json) 固定纯合成提案向量。
 
 从项目根生成和核对：
 

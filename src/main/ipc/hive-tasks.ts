@@ -5,6 +5,10 @@ import type { HiveTaskCreate, HiveTasksApi } from '../../shared/hive-tasks'
 import type { HiveWorkflowCaseStart } from '../../shared/hive-workflow-case-runs'
 import type { HiveWorkflowCaseSessionRead } from '../../shared/hive-workflow-case-session'
 import type {
+  HiveWorkflowPlanApply,
+  HiveWorkflowPlanQuery
+} from '../../shared/hive-workflow-plan-application'
+import type {
   HiveWorkflowCaseCodePageQuery,
   HiveWorkflowCaseCodeFileQuery
 } from '../../shared/hive-workflow-case-code'
@@ -75,6 +79,12 @@ export function registerHiveTaskHandlers() {
   )
   bind('startWorkflowCase', (facade, input: HiveWorkflowCaseStart) =>
     facade.startWorkflowCase(input)
+  )
+  bind('getWorkflowPlanApplication', (facade, query: HiveWorkflowPlanQuery) =>
+    facade.getWorkflowPlanApplication(query)
+  )
+  bind('applyWorkflowPlan', (facade, input: HiveWorkflowPlanApply) =>
+    facade.applyWorkflowPlan(input)
   )
   bind('getWorkflowCaseRuns', (facade, query: HiveWorkflowCaseReadQuery) =>
     facade.getWorkflowCaseRuns(query)

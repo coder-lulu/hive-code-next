@@ -20999,6 +20999,59 @@
         "plan_json_invalid": "计划产物不是有效 JSON。",
         "plan_request_too_large": "计划产物超过大小上限。"
       }
+    },
+    "planApply": {
+      "title": "计划采纳",
+      "help": "采纳会创建业务任务及依赖。这些任务保持阻塞，等待任务图派发能力就绪。源流程历史继续绑定原始运行。",
+      "inspect": "查看差异与采纳",
+      "refresh": "刷新",
+      "apply": "采纳为业务任务",
+      "compare": "与计划 {{revision}} 的差异",
+      "firstPlan": "首个计划：全部任务为新增",
+      "diffCounts": "新增 {{added}} · 删除 {{removed}} · 修改 {{changed}}",
+      "added": "新增",
+      "removed": "删除",
+      "created": "已采纳计划 {{revision}}，创建 {{count}} 个任务",
+      "dispatchUnavailable": "任务图派发尚未就绪，未排队执行。",
+      "receipt": "原始采纳回执",
+      "applicationRef": "采纳引用",
+      "requestId": "请求引用",
+      "draftDigest": "来源草案摘要",
+      "appliedAt": "采纳时间",
+      "reasons": {
+        "draft_rejected": "该提案已被拒绝。",
+        "draft_unavailable": "原始提案不可用。",
+        "plan_not_current": "已有更新的规划尝试，请查看其原始提案。",
+        "case_cancelled": "源流程已取消。",
+        "case_busy": "源流程仍有未结算运行，请先处理原始执行。",
+        "project_binding_changed": "项目绑定已变更，该原始计划不能授权新建任务。",
+        "role_unavailable": "所需职责不可用或已失去授权。",
+        "already_applied": "该计划已采纳。",
+        "plan_replacement_unavailable": "已有另一计划被采纳，暂不支持替换其任务。"
+      },
+      "fields": {
+        "title": "标题",
+        "requestedRole": "职责",
+        "outputKind": "成果类型",
+        "dependsOn": "依赖",
+        "acceptance": "验收标准",
+        "maxAttempts": "尝试次数上限",
+        "requestedLimits": "并发、时长或预算",
+        "resourceSelectionRefs": "所需资源",
+        "requiredCoverage": "所需覆盖范围",
+        "knowledgeRequirements": "知识需求"
+      },
+      "pending": {
+        "read": "正在核对原始计划…",
+        "apply": "正在创建业务任务…"
+      },
+      "errors": {
+        "forbidden": "当前账号无权访问此计划，请检查登录和项目授权。",
+        "unsupported": "当前环境不支持计划采纳。",
+        "changed": "计划或项目版本已变更，请刷新后重试。",
+        "conflict": "该请求已绑定其他内容，请刷新原计划后重试。",
+        "unavailable": "任务服务或返回结果不可用，请刷新确认当前结果后重试。"
+      }
     }
   },
   "hiveWorkflow": {

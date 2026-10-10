@@ -17,9 +17,13 @@ export const HIVE_WORKFLOW_CASE_RESPONSE_BYTES = 8 * 1024 * 1024
 export const HIVE_WORKFLOW_CASE_RESPONSE_STRUCTURAL_TOKENS = 262_144
 export const HIVE_WORKFLOW_CASE_RESPONSE_BYTES_BY_PATH = {
   '/hive/workbench/cases/read': HIVE_WORKFLOW_CASE_RESPONSE_BYTES,
-  '/hive/workbench/cases/create': HIVE_WORKFLOW_CASE_RESPONSE_BYTES
+  '/hive/workbench/cases/create': HIVE_WORKFLOW_CASE_RESPONSE_BYTES,
+  '/hive/workbench/plans/read': 1024 * 1024,
+  '/hive/workbench/plans/apply': 1024 * 1024
 } as const
 export const HIVE_WORKFLOW_CASE_RESPONSE_TOKENS_BY_PATH = {
   '/hive/workbench/cases/read': HIVE_WORKFLOW_CASE_RESPONSE_STRUCTURAL_TOKENS,
-  '/hive/workbench/cases/create': HIVE_WORKFLOW_CASE_RESPONSE_STRUCTURAL_TOKENS
+  '/hive/workbench/cases/create': HIVE_WORKFLOW_CASE_RESPONSE_STRUCTURAL_TOKENS,
+  '/hive/workbench/plans/read': 32_768,
+  '/hive/workbench/plans/apply': 32_768
 } as const

@@ -54,7 +54,7 @@ export async function replayWorkbenchRequest(db, accountId, input, operation, re
         ? response.companyId
         : operation === 'workflows.save'
           ? response.definition.scope.companyRef
-          : operation === 'cases.create'
+          : operation === 'cases.create' || operation === 'plans.apply'
             ? response.binding.scope.companyRef
             : response.company.id
   if (

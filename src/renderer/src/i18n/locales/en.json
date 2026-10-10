@@ -21280,6 +21280,59 @@
         "plan_json_invalid": "The plan artifact is not valid JSON.",
         "plan_request_too_large": "The plan artifact exceeds the size limit."
       }
+    },
+    "planApply": {
+      "title": "Adopt a plan",
+      "help": "Adoption creates business tasks and dependencies. These tasks remain blocked until task graph dispatch is available. The source workflow history stays attached to its original runs.",
+      "inspect": "Compare and inspect",
+      "refresh": "Refresh",
+      "apply": "Adopt as business tasks",
+      "compare": "Changes from plan {{revision}}",
+      "firstPlan": "First plan: all tasks are new",
+      "diffCounts": "Added {{added}} · Removed {{removed}} · Changed {{changed}}",
+      "added": "Added",
+      "removed": "Removed",
+      "created": "Plan {{revision}} adopted: {{count}} tasks created",
+      "dispatchUnavailable": "Task graph dispatch is unavailable. No execution has been queued.",
+      "receipt": "Original adoption receipt",
+      "applicationRef": "Adoption reference",
+      "requestId": "Request reference",
+      "draftDigest": "Source draft digest",
+      "appliedAt": "Adopted at",
+      "reasons": {
+        "draft_rejected": "This proposal was rejected.",
+        "draft_unavailable": "The original proposal is unavailable.",
+        "plan_not_current": "A newer planning attempt exists. Inspect its original proposal.",
+        "case_cancelled": "The source workflow was cancelled.",
+        "case_busy": "The source workflow still has an unsettled run. Resolve its original execution first.",
+        "project_binding_changed": "The project binding has changed. This original plan cannot authorize new tasks.",
+        "role_unavailable": "A requested role is unavailable or no longer authorized.",
+        "already_applied": "This plan has already been adopted.",
+        "plan_replacement_unavailable": "A different plan has already been adopted. Replacing its tasks is not available yet."
+      },
+      "fields": {
+        "title": "Title",
+        "requestedRole": "Role",
+        "outputKind": "Output",
+        "dependsOn": "Dependencies",
+        "acceptance": "Acceptance criteria",
+        "maxAttempts": "Attempt limit",
+        "requestedLimits": "Concurrency, duration or budget",
+        "resourceSelectionRefs": "Requested resources",
+        "requiredCoverage": "Required coverage",
+        "knowledgeRequirements": "Knowledge requirements"
+      },
+      "pending": {
+        "read": "Checking the original plan…",
+        "apply": "Creating business tasks…"
+      },
+      "errors": {
+        "forbidden": "The current account cannot access this plan. Check login and project authorization.",
+        "unsupported": "Plan adoption is unavailable in this environment.",
+        "changed": "The plan or project version changed. Refresh before retrying.",
+        "conflict": "This request is already bound to different content. Refresh the original plan before retrying.",
+        "unavailable": "The task service or its response is unavailable. Refresh to check the current result before retrying."
+      }
     }
   },
   "hiveWorkflow": {

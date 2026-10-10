@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { hiveTasksApi } from './hive-tasks-bridge'
+import { workflowPlanApplicationFixture } from '../../shared/hive-workflow-plan-application.test-fixture'
 
 const { invoke } = vi.hoisted(() => ({ invoke: vi.fn() }))
 vi.mock('electron', () => ({ ipcRenderer: { invoke } }))
@@ -9,6 +10,20 @@ beforeEach(() => {
 })
 
 describe('Hive task run bridge', () => {
+  it('keeps plan adoption on its scoped read and materialization channels', async () => {
+    const f = workflowPlanApplicationFixture()
+    const query = {
+      projectId: f.input.projectId,
+      caseId: f.input.caseId,
+      draftRef: f.input.draftRef
+    }
+    await hiveTasksApi.getWorkflowPlanApplication(query)
+    await hiveTasksApi.applyWorkflowPlan(f.input)
+    expect(invoke.mock.calls).toEqual([
+      ['hiveTasks:getWorkflowPlanApplication', query],
+      ['hiveTasks:applyWorkflowPlan', f.input]
+    ])
+  })
   it('requests only the original business run and bounded page controls for session reading', async () => {
     const query = {
       projectId: '11111111-1111-4111-8111-111111111111',

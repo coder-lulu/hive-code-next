@@ -19,6 +19,7 @@ import {
 } from './hive-team-workbench-facade'
 import { createHiveTaskWorkflowFacade } from './hive-task-workflow-facade'
 import { createHiveWorkflowCaseFacade } from './hive-workflow-case-facade'
+import { createHiveWorkflowPlanApplicationFacade } from './hive-workflow-plan-application-facade'
 import { createHiveWorkflowCaseRunFacade } from './hive-workflow-case-run-facade'
 import {
   createHiveWorkflowCaseSessionFacade,
@@ -75,6 +76,7 @@ export function createHiveTaskFacade(options: {
     ...workbench,
     ...workflows,
     ...cases,
+    ...createHiveWorkflowPlanApplicationFacade({ context, getWorkflowCase: cases.getWorkflowCase }),
     ...createHiveWorkflowCaseCodeFacade({
       context,
       getWorkflowCase: cases.getWorkflowCase,
