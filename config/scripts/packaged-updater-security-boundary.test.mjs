@@ -1,14 +1,16 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
 import { afterEach, describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
 const { writePackagedUpdaterConfig } = require('../packaged-updater-config.cjs')
 const {
+  EXPECTED_ELECTRON_UPDATER_VERSION,
   verifyPackagedUpdaterSecurityBoundary
 } = require('../packaged-updater-security-boundary.cjs')
+const PINNED_UPDATER_VERSION = require('../../package.json').dependencies['electron-updater']
 
 const roots = []
 
@@ -166,7 +168,7 @@ async function createFixture({
   packageMetadata = validPackagedMetadata(),
   renderer = 'const productName = "HiveCode"',
   productLogo = null,
-  electronUpdaterVersion = '6.8.9',
+  electronUpdaterVersion = PINNED_UPDATER_VERSION,
   mainChunks = {},
   publicEntries = {}
 } = {}) {
@@ -255,6 +257,11 @@ afterEach(async () => {
 })
 
 describe('packaged updater security boundary', () => {
+  it('requires the packaged updater guard to match the exact project dependency pin', () => {
+    expect(PINNED_UPDATER_VERSION).toMatch(/^\d+\.\d+\.\d+$/)
+    expect(EXPECTED_ELECTRON_UPDATER_VERSION).toBe(PINNED_UPDATER_VERSION)
+  })
+
   it('verifies the actual packaged main entry and updater dependency callback chain', async () => {
     const fixture = await createFixture()
 
@@ -264,12 +271,70 @@ describe('packaged updater security boundary', () => {
         mainBundle: 'out/main/index.js',
         productConfigBundle: 'out/main/chunks/product-config-fixture.js',
         generatedProductConfigBundle: 'out/shared/generated/product-config.js',
-        electronUpdaterVersion: '6.8.9',
+        electronUpdaterVersion: PINNED_UPDATER_VERSION,
         builderUtilRuntimeVersion: '9.7.0',
         rendererBrandMarker: 'HiveCode',
         approvedProductLogoEntry: 'out/renderer/assets/product-logo-test.png',
         appUpdateYmlExists: false
       }
+    )
+  })
+
+  it('verifies the installed pinned updater and runtime callback sources', async () => {
+    const fixture = await createFixture()
+    const updaterDir = dirname(require.resolve('electron-updater/package.json'))
+    const runtimeDir = dirname(
+      require.resolve('builder-util-runtime/package.json', { paths: [updaterDir] })
+    )
+    for (const [name, sourceDir, files] of [
+      ['electron-updater', updaterDir, ['package.json', 'out/electronHttpExecutor.js']],
+      ['builder-util-runtime', runtimeDir, ['package.json', 'out/httpExecutor.js']]
+    ]) {
+      for (const file of files) {
+        await writeFile(
+          join(fixture.resourcesDir, 'node_modules', name, file),
+          await readFile(join(sourceDir, file))
+        )
+      }
+    }
+
+    expect(verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toMatchObject(
+      {
+        passed: true,
+        electronUpdaterVersion: PINNED_UPDATER_VERSION,
+        builderUtilRuntimeVersion: '9.7.0'
+      }
+    )
+  })
+
+  it.each([
+    ['electron-updater', 'electronHttpExecutor.js', 'function getNetSession()'],
+    ['electron-updater', 'electronHttpExecutor.js', 'createRequest(options, callback)'],
+    ['electron-updater', 'electronHttpExecutor.js', 'this.cachedSession = getNetSession()'],
+    [
+      'electron-updater',
+      'electronHttpExecutor.js',
+      'addRedirectHandlers(request, options, reject, redirectCount, handler)'
+    ],
+    ['electron-updater', 'electronHttpExecutor.js', 'request.on("redirect"'],
+    [
+      'electron-updater',
+      'electronHttpExecutor.js',
+      'handler(builder_util_runtime_1.HttpExecutor.prepareRedirectUrlOptions'
+    ],
+    ['builder-util-runtime', 'httpExecutor.js', 'doApiRequest(options'],
+    ['builder-util-runtime', 'httpExecutor.js', 'doDownload('],
+    ['builder-util-runtime', 'httpExecutor.js', 'this.addRedirectHandlers('],
+    ['builder-util-runtime', 'httpExecutor.js', 'static prepareRedirectUrlOptions(']
+  ])('rejects %s callback source missing %s marker %s', async (name, file, marker) => {
+    const fixture = await createFixture()
+    const sourcePath = join(fixture.resourcesDir, 'node_modules', name, 'out', file)
+    const source = await readFile(sourcePath, 'utf8')
+    expect(source).toContain(marker)
+    await writeFile(sourcePath, source.replaceAll(marker, ''), 'utf8')
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /callback contract is missing/i
     )
   })
 
@@ -544,6 +609,14 @@ describe('packaged updater security boundary', () => {
 
     expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
       /electron-updater version/i
+    )
+  })
+
+  it('rejects the previous packaged updater version despite valid security markers', async () => {
+    const fixture = await createFixture({ electronUpdaterVersion: '6.8.9' })
+
+    expect(() => verifyPackagedUpdaterSecurityBoundary(fixture.resourcesDir, fixture.asar)).toThrow(
+      /Unexpected packaged electron-updater version: 6\.8\.9/
     )
   })
 

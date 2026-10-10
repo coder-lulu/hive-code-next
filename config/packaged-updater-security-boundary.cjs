@@ -8,7 +8,7 @@ const { $schema: _productSchema, ...EXPECTED_PRODUCT_CONFIG } = require(
   join(__dirname, 'product', 'hivecode.product.json')
 )
 
-const EXPECTED_ELECTRON_UPDATER_VERSION = '6.8.9'
+const EXPECTED_ELECTRON_UPDATER_VERSION = '6.8.10'
 const EXPECTED_BUILDER_UTIL_RUNTIME_VERSION = '9.7.0'
 const EXPECTED_PRODUCT_LOGO_SHA256 =
   '46325bf9d05755d2b412f0a2e720cb1944d69abb7f6e3c07b59ed304f4e81950'
