@@ -14,10 +14,19 @@ export function retainTaskModelFatalFailure(
   snapshot: TaskExecutionRecord,
   failure: TaskFailureError
 ) {
+  if (taskFailure(failure, 'channel', 'OUTCOME_UNKNOWN') !== failure) {
+    return
+  }
+  const diagnostic = failure.diagnostic
+  const terminalChannelFailure =
+    (diagnostic.phase === 'stream' && diagnostic.httpStatus === 200) ||
+    (diagnostic.phase === 'fetch' &&
+      diagnostic.category === 'network' &&
+      diagnostic.code === 'TASK_MODEL_UPSTREAM_UNAVAILABLE' &&
+      diagnostic.networkCode === 'UND_ERR_SOCKET' &&
+      diagnostic.httpStatus === undefined)
   if (
-    taskFailure(failure, 'channel', 'OUTCOME_UNKNOWN') !== failure ||
-    failure.diagnostic.phase !== 'stream' ||
-    failure.diagnostic.httpStatus !== 200 ||
+    !terminalChannelFailure ||
     snapshot.cancellationKey ||
     snapshot.result ||
     !snapshot.modelDispatchAttempts

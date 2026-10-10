@@ -80,9 +80,11 @@ describe('exact locally issued queued workflow binding', () => {
     }
     if (field === 'context') {
       command.workflowContext!.employeeRef = randomUUID()
+      command.workflowContext!.planIntent!.employeeRef = command.workflowContext!.employeeRef
     }
     if (field === 'attempt') {
       command.task.attempt++
+      command.workflowContext!.planIntent!.sourceTask = structuredClone(command.task)
     }
     if (field === 'input') {
       command.inputRef = 'input:foreign'
@@ -98,6 +100,7 @@ describe('exact locally issued queued workflow binding', () => {
     }
     if (field === 'revision') {
       command.task.taskRevision = '2'
+      command.workflowContext!.planIntent!.sourceTask = structuredClone(command.task)
     }
     f.task.binding = HiveRuntimeAdapterBinding.parse(binding)
     const changed = structuredClone(f.task)

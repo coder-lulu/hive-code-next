@@ -20935,7 +20935,7 @@
     },
     "plans": {
       "title": "Product 计划草案",
-      "readonly": "草案仅供预览。通过数据校验不会采纳计划，通用任务图执行尚不可用。",
+      "readonly": "此处保留原始草案及检查结果。通过数据校验不会自动采纳或执行计划；采纳后核对下方当前执行条件。",
       "empty": "此案例尚未记录 Product 计划草案。",
       "revision": "计划修订 {{revision}}",
       "states": {
@@ -20958,7 +20958,7 @@
       "artifactRef": "计划产物引用",
       "artifactRevision": "计划产物修订",
       "artifactDigest": "计划产物摘要",
-      "gaps": "尚不可用的能力",
+      "gaps": "草稿检查时记录的能力缺口",
       "blocking": "阻塞",
       "optional": "可选",
       "required": "必需",
@@ -21002,7 +21002,7 @@
     },
     "planApply": {
       "title": "计划采纳",
-      "help": "采纳会创建业务任务及依赖。这些任务保持阻塞，等待任务图派发能力就绪。源流程历史继续绑定原始运行。",
+      "help": "采纳会创建业务任务及依赖。核对执行条件后可启动已采纳计划，源流程历史保留原始运行。",
       "inspect": "查看差异与采纳",
       "refresh": "刷新",
       "apply": "采纳为业务任务",
@@ -21012,7 +21012,6 @@
       "added": "新增",
       "removed": "删除",
       "created": "已采纳计划 {{revision}}，创建 {{count}} 个任务",
-      "dispatchUnavailable": "任务图派发尚未就绪，未排队执行。",
       "receipt": "原始采纳回执",
       "applicationRef": "采纳引用",
       "requestId": "请求引用",
@@ -21051,6 +21050,78 @@
         "changed": "计划或项目版本已变更，请刷新后重试。",
         "conflict": "该请求已绑定其他内容，请刷新原计划后重试。",
         "unavailable": "任务服务或返回结果不可用，请刷新确认当前结果后重试。"
+      }
+    },
+    "planGraph": {
+      "title": "计划任务执行",
+      "help": "按已采纳计划的依赖推进任务。开发成果须经独立测试通过，发布准备只生成方案。",
+      "report": "查看原始报告",
+      "reportTruncated": "报告较长，当前显示开头部分。",
+      "start": "执行已采纳计划",
+      "cancel": "取消计划执行",
+      "retry": "重试此任务",
+      "resume": "恢复依赖推进",
+      "identity": "任务与运行引用",
+      "limits": "最多并行 {{parallel}} 个任务 · 本次时限 {{seconds}} 秒",
+      "attempts": "尝试 {{current}} / {{max}}",
+      "deadline": "本次执行期限：{{at}}",
+      "runState": "原运行：{{state}}",
+      "errors": {
+        "forbidden": "当前账号无权执行此计划，请检查登录和项目授权。",
+        "unsupported": "当前环境不支持此计划的执行。",
+        "changed": "计划或项目状态已变更，请刷新后重试。",
+        "conflict": "该请求已绑定其他内容，请刷新原计划后重试。",
+        "unavailable": "计划执行服务或结果不可用，请刷新确认当前状态。"
+      },
+      "states": {
+        "running": "执行中",
+        "paused": "已暂停",
+        "cancel_requested": "等待停止证明",
+        "done": "已完成",
+        "cancelled": "已取消"
+      },
+      "pending": {
+        "read": "正在核对计划执行…",
+        "start": "正在受理计划执行…",
+        "cancel": "正在请求取消…",
+        "retry": "正在受理重试…",
+        "resume": "正在核对恢复条件…",
+        "report": "正在读取原始报告…"
+      },
+      "reasons": {
+        "graph_not_started": "尚未启动计划任务。",
+        "source_case_cancelled": "源流程已取消。",
+        "source_busy": "源流程仍有未结算执行。",
+        "project_binding_changed": "项目绑定已变更。",
+        "role_unavailable": "所需团队职责不可用。",
+        "resource_loading_unavailable": "计划所需资源尚不能加载。",
+        "knowledge_access_unavailable": "计划所需知识尚不能访问。",
+        "hard_budget_unavailable": "计划要求的硬预算限制尚不能执行。",
+        "unsupported_graph": "此任务图包含当前不支持的交接关系。",
+        "independent_review_required": "开发任务缺少独立测试交接。",
+        "deadline_exceeded": "执行期限已到，不能启动新的任务。",
+        "graph_paused": "计划已暂停，查看任务原因后重试或取消。",
+        "graph_cancelled": "计划已取消。",
+        "authorization_unavailable": "后继任务的执行授权不可用。",
+        "capability_unavailable": "后继任务的执行能力不可用。",
+        "revision_conflict": "任务状态已变更，请核对后恢复依赖推进。"
+      },
+      "blocked": {
+        "waiting_dependency": "等待依赖任务完成。",
+        "capability_unavailable": "执行能力不可用。",
+        "authorization_unavailable": "执行授权不可用。",
+        "unknown": "执行结果未知，占用仍保留。",
+        "cancel_requested": "已请求取消，等待原 Runtime 的停止证明。",
+        "failed": "此任务失败，可在次数和时限内重试。",
+        "review_rejected": "独立测试未通过，计划已暂停。",
+        "attempts_exhausted": "尝试次数已用尽。",
+        "deadline_exceeded": "执行期限已到。",
+        "retry_backoff": "等待重试间隔，请稍后刷新。"
+      },
+      "reviews": {
+        "approved": "独立测试已通过。",
+        "changes_requested": "独立测试要求修改。",
+        "rejected": "独立测试已拒绝。"
       }
     }
   },

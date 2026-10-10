@@ -36,40 +36,45 @@ export function createLocalTaskFacadeAssembly(options: {
       }
     }
   })
+  const prepare = async (value: unknown, caller: TaskExecutionCaller, kind: 'case' | 'plan') => {
+    const observedAccount = options.currentAccount(),
+      observedOwner = options.currentRuntime()
+    const account = observedAccount ? { ...observedAccount } : null,
+      owner = observedOwner ? { ...observedOwner } : null
+    const assertCurrent = () => {
+      assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
+      assertTaskAuthorizationCurrent(options.assertCurrent)
+      const current = options.currentAccount(),
+        runtime = options.currentRuntime()
+      if (
+        caller.operationCallerKey !== 'trusted-local:runtime' ||
+        !account ||
+        !owner ||
+        !current ||
+        !runtime ||
+        account.accountId !== owner.accountId ||
+        current.sessionExpiresAt <= Date.now() ||
+        current.accountId !== account.accountId ||
+        current.authorityId !== account.authorityId ||
+        current.sessionGeneration !== account.sessionGeneration ||
+        runtime.accountId !== owner.accountId ||
+        runtime.runtimeRecordId !== owner.runtimeRecordId ||
+        runtime.ownershipEpoch !== owner.ownershipEpoch
+      ) {
+        return refuseTaskExecution('FORBIDDEN')
+      }
+    }
+    assertCurrent()
+    const refs = await (kind === 'case' ? service.prepareCaseRun : service.preparePlanRun)(
+      value,
+      assertCurrent
+    )
+    assertCurrent()
+    return refs
+  }
   return {
     facade: service.facade,
-    async prepareCaseRun(value: unknown, caller: TaskExecutionCaller) {
-      const observedAccount = options.currentAccount(),
-        observedOwner = options.currentRuntime()
-      const account = observedAccount ? { ...observedAccount } : null,
-        owner = observedOwner ? { ...observedOwner } : null
-      const assertCurrent = () => {
-        assertTaskAuthorizationCurrent(() => caller.assertCurrent?.())
-        assertTaskAuthorizationCurrent(options.assertCurrent)
-        const current = options.currentAccount(),
-          runtime = options.currentRuntime()
-        if (
-          caller.operationCallerKey !== 'trusted-local:runtime' ||
-          !account ||
-          !owner ||
-          !current ||
-          !runtime ||
-          account.accountId !== owner.accountId ||
-          current.sessionExpiresAt <= Date.now() ||
-          current.accountId !== account.accountId ||
-          current.authorityId !== account.authorityId ||
-          current.sessionGeneration !== account.sessionGeneration ||
-          runtime.accountId !== owner.accountId ||
-          runtime.runtimeRecordId !== owner.runtimeRecordId ||
-          runtime.ownershipEpoch !== owner.ownershipEpoch
-        ) {
-          return refuseTaskExecution('FORBIDDEN')
-        }
-      }
-      assertCurrent()
-      const refs = await service.prepareCaseRun(value, assertCurrent)
-      assertCurrent()
-      return refs
-    }
+    prepareCaseRun: (value: unknown, caller: TaskExecutionCaller) => prepare(value, caller, 'case'),
+    preparePlanRun: (value: unknown, caller: TaskExecutionCaller) => prepare(value, caller, 'plan')
   }
 }

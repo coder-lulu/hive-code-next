@@ -66,6 +66,7 @@ export function createTaskCodexEvidence(directory: string) {
       const originalHost = getStructuredAgentSessionHost()
       if (
         record.dispatch === 'dispatching' ||
+        (record.dispatch === 'bound' && record.cancellationKey !== null) ||
         (originalHost && readTaskModelFatalFailure(originalHost.deps.store.tasks, record))
       ) {
         const host = getStructuredAgentSessionHost()

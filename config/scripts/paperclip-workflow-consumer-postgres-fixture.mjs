@@ -70,13 +70,13 @@ export async function workflowConsumerDelivery(h, f, admission, options = {}) {
   }
   if (!options.missingReport) {
     artifact(
-      names[role],
+      options.reportDirectory ? `${options.reportDirectory}/${names[role]}` : names[role],
       options.reportText ?? `Synthetic accepted ${role} output for ${task.runId}`
     )
   }
   if (role === 'tester' && !options.missingProposal) {
     artifact(
-      'review.json',
+      options.reportDirectory ? `${options.reportDirectory}/review.json` : 'review.json',
       JSON.stringify({
         contractVersion: 1,
         kind: 'workflow.review-proposal',
@@ -108,7 +108,7 @@ export async function workflowConsumerDelivery(h, f, admission, options = {}) {
     usageFactRefs: [],
     stopProof: {
       proofRef: 'stop:synthetic-consumer-pg',
-      evidenceKind: 'stopped',
+      evidenceKind: options.notStarted ? 'not_started' : 'stopped',
       managedToolsSettled: true,
       writersFenced: true,
       recordedAt
@@ -235,7 +235,7 @@ export async function workflowConsumerDelivery(h, f, admission, options = {}) {
       task.runId,
       token,
       observation,
-      delivery
+      options.notStarted ? undefined : delivery
     )
   const next = async (targetRole) => {
     const records = await f.runs.getWorkflowCaseRuns(f.accountId, {

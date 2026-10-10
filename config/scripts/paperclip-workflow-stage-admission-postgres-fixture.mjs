@@ -29,7 +29,12 @@ const version = (text) => {
 }
 
 /** Synthetic, closed native database facts; this fixture does not execute a Provider or a Core kernel. */
-export async function workflowStageAdmissionFixture(h, duration = 600_000) {
+export async function workflowStageAdmissionFixture(
+  h,
+  duration = 600_000,
+  maxParallelism = 1,
+  requirement
+) {
   const workbench = createTeamWorkbenchRepository(h.sql)
   const workflows = createWorkflowDefinitionRepository(h.sql)
   const cases = createWorkflowCaseRepository(h.sql)
@@ -40,9 +45,15 @@ export async function workflowStageAdmissionFixture(h, duration = 600_000) {
     requestId: randomUUID(),
     workflowId: f.workflow.workflowId,
     expectedRevision: 1,
-    maxDurationMs: duration
+    maxDurationMs: duration,
+    maxParallelism
   })
-  const input = { ...f.input, workflowRevision: 2, definitionDigest: workflow.definitionDigest }
+  const input = {
+    ...f.input,
+    workflowRevision: 2,
+    definitionDigest: workflow.definitionDigest,
+    ...(requirement ? { requirement } : {})
+  }
   const { view } = await cases.createWorkflowCase(f.accountId, input)
   const product = view.stageTasks.find((item) => item.role === 'product')
   const first = await runs.startWorkflowCase(f.accountId, {

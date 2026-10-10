@@ -110,7 +110,7 @@ describe('strict workflow outcome client metadata and byte digests', () => {
   it('keeps all client response limits bounded by their route', async () => {
     const f = await outcomeAccessFixture()
     await expect(
-      clientFor({ padding: 'x'.repeat(64 * 1024) }).workflowOutcome(f.query)
+      clientFor({ padding: 'x'.repeat(1024 * 1024) }).workflowOutcome(f.query)
     ).rejects.toThrow('SERVICE_UNAVAILABLE')
     await expect(clientFor({ padding: 'x'.repeat(64 * 1024) }).capabilities()).rejects.toThrow(
       'SERVICE_UNAVAILABLE'

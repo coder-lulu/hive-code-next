@@ -5,6 +5,8 @@ import {
   HiveWorkflowPlanApplicationViewSchema
 } from '../../../src/shared/hive-workflow-plan-application.ts'
 import { compareWorkflowPlans } from '../../../src/shared/task-workflow/workflow-plan-diff.ts'
+import { WorkflowPlanDraftSchema } from '../../../src/shared/task-workflow/workflow-plan-draft.ts'
+import { workflowPlanApplicationMatchesDraft } from '../../../src/shared/hive-workflow-plan-application-source.ts'
 import {
   requireWorkbenchProject,
   readWorkbenchTeam,
@@ -67,7 +69,8 @@ export async function readPlanApplication(db, accountId, source) {
   const [request] =
     await db`SELECT operation,payload_fingerprint,response_json,company_id FROM hive_workbench_request_receipts
     WHERE account_id=${accountId} AND request_id=${application.requestId} FOR SHARE`
-  const draft = view.planDrafts.find((item) => item.draftRef === application.draftRef)
+  const draft = WorkflowPlanDraftSchema.parse(row.draft_json)
+  const published = view.planDrafts.find((item) => item.draftRef === application.draftRef)
   if (
     producer?.result_receipt?.status !== 'succeeded' ||
     !original.success ||
@@ -83,7 +86,9 @@ export async function readPlanApplication(db, accountId, source) {
     original.data.draftDigest !== application.draftDigest ||
     original.data.planRevision !== application.planRevision ||
     original.data.expectedProjectRevision !== application.projectBindingRevision ||
-    !draft ||
+    !published ||
+    digest(published.intent) !== digest(draft.intent) ||
+    !workflowPlanApplicationMatchesDraft(application, draft) ||
     draft.inspection.kind !== 'validated' ||
     row.account_id !== accountId ||
     row.company_id !== project.companyId ||
@@ -157,6 +162,7 @@ export async function readPlanApplication(db, accountId, source) {
   }
   return {
     application,
+    originalDraft: draft,
     taskStates: application.createdTaskRefs.map((item) => {
       const row = mappings.find((mapping) => mapping.issue_id === item.taskId)
       return { taskId: item.taskId, status: row.status, taskRevision: Number(row.status_version) }
@@ -244,6 +250,7 @@ export async function planApplicationView(db, accountId, source, record) {
         ? compareWorkflowPlans(draft.inspection.proposal, baseline?.inspection.proposal ?? null)
         : null,
     eligibility: reason ? { available: false, reason } : { available: true },
-    ...record
+    application: record.application,
+    taskStates: record.taskStates
   })
 }

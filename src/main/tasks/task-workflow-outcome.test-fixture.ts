@@ -1,3 +1,5 @@
+import type { TaskExecutionStart } from '../../shared/task-execution/task-execution-command'
+import type { TaskExecutionWorkspace } from './task-execution-record'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
@@ -17,6 +19,8 @@ import { TaskArtifactIndex, taskResultManifestName } from './task-artifact-index
 
 export async function workflowOutcomeFixture(
   options: {
+    command?: TaskExecutionStart
+    workspace?: TaskExecutionWorkspace
     status?: 'succeeded' | 'failed'
     context?: WorkflowExecutionContext
     caseView?: HiveWorkflowCaseView
@@ -42,28 +46,32 @@ export async function workflowOutcomeFixture(
     assertCurrent: () => undefined
   })
   const store = await openTestAgentSessionRecordStore(join(root, 'records')),
-    command = taskCommand({
-      ownerScope: view.team.company.ownerScope,
-      executionAccountRef: view.team.company.ownerAccountRef,
-      executionId: `execution:${randomUUID()}`,
-      ...(options.caseView ? { workspaceRef: options.caseView.team.project.hiveWorkspaceRef } : {}),
-      task: options.task ?? {
-        spaceId: context.binding.scope.companyRef,
-        taskId: `task:${randomUUID()}`,
-        runId: `run:${randomUUID()}`,
-        attempt: 1,
-        taskRevision: '1'
-      },
-      workflowContext: context,
-      executionDeadlineAt: new Date(TASK_TEST_NOW + 60_000).toISOString(),
-      executionPolicy: {
-        trustMode: 'enforced_autonomous',
-        executionPolicyRef: 'docker-local-linux',
-        executionPolicyRevision: '1',
-        enforcementEvidenceRef: `docker-enforcement:${'a'.repeat(64)}`
-      }
-    })
-  const workspace = {
+    command =
+      options.command ??
+      taskCommand({
+        ownerScope: view.team.company.ownerScope,
+        executionAccountRef: view.team.company.ownerAccountRef,
+        executionId: `execution:${randomUUID()}`,
+        ...(options.caseView
+          ? { workspaceRef: options.caseView.team.project.hiveWorkspaceRef }
+          : {}),
+        task: options.task ?? {
+          spaceId: context.binding.scope.companyRef,
+          taskId: `task:${randomUUID()}`,
+          runId: `run:${randomUUID()}`,
+          attempt: 1,
+          taskRevision: '1'
+        },
+        workflowContext: context,
+        executionDeadlineAt: new Date(TASK_TEST_NOW + 60_000).toISOString(),
+        executionPolicy: {
+          trustMode: 'enforced_autonomous',
+          executionPolicyRef: 'docker-local-linux',
+          executionPolicyRevision: '1',
+          enforcementEvidenceRef: `docker-enforcement:${'a'.repeat(64)}`
+        }
+      })
+  const workspace = options.workspace ?? {
     canonicalPath: copy.canonicalPath,
     executionPath: copy.executionPath,
     directoryIdentity: copy.directoryIdentity,
@@ -117,9 +125,9 @@ export async function workflowOutcomeFixture(
   const running = store.tasks.get(command)!,
     artifacts = new TaskArtifactIndex(join(root, 'artifacts')),
     status = options.status ?? 'succeeded'
-  await writeFile(join(copy.executionPath, 'report.md'), 'Original result report\n')
+  await writeFile(join(workspace.executionPath, 'report.md'), 'Original result report\n')
   await writeFile(
-    join(copy.executionPath, taskResultManifestName(running.commandFingerprint)),
+    join(workspace.executionPath, taskResultManifestName(running.commandFingerprint)),
     JSON.stringify({
       schemaVersion: 1,
       executionId: command.executionId,

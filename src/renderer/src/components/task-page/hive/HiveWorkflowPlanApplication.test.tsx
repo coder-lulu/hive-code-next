@@ -19,7 +19,11 @@ vi.mock('react-i18next', () => ({
   })
 }))
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
-const api = { getWorkflowPlanApplication: vi.fn(), applyWorkflowPlan: vi.fn() }
+const api = {
+  getWorkflowPlanApplication: vi.fn(),
+  applyWorkflowPlan: vi.fn(),
+  getWorkflowPlanGraph: vi.fn()
+}
 const listeners = new Set<(state: HiveAccountState) => void>()
 let root: Root, container: HTMLDivElement
 let f: ReturnType<typeof workflowPlanApplicationFixture>
@@ -62,6 +66,27 @@ beforeEach(() => {
   document.body.append(container)
   root = createRoot(container)
   api.getWorkflowPlanApplication.mockResolvedValue(available())
+  api.getWorkflowPlanGraph.mockImplementation(async () => ({
+    caseId: f.caseView.id,
+    projectId: f.input.projectId,
+    application: f.receipt,
+    draft: f.draft,
+    graph: null,
+    tasks: f.receipt.createdTaskRefs.map((mapping, index) => ({
+      proposalTaskRef: mapping.proposalTaskRef,
+      taskId: mapping.taskId,
+      employeeRef: mapping.employeeRef,
+      role: f.proposal.tasks[index].requestedRole,
+      taskRevision: 0,
+      status: 'blocked',
+      maxAttempts: f.proposal.tasks[index].maxAttempts,
+      latestRun: null,
+      blockedReason: null
+    })),
+    runs: [],
+    outcomes: [],
+    availability: { available: true }
+  }))
   api.applyWorkflowPlan.mockImplementation(async (input) => ({
     admission: {
       requestId: input.requestId,
@@ -88,7 +113,7 @@ describe('native plan comparison and adoption', () => {
     expect(container.querySelectorAll('[data-plan-created-task]')).toHaveLength(
       f.receipt.createdTaskRefs.length
     )
-    expect(container.textContent).toContain('planApply.dispatchUnavailable')
+    expect(container.textContent).toContain('planGraph.title')
     expect(container.textContent).toContain('statuses.blocked')
     for (const task of f.receipt.createdTaskRefs) {
       expect(container.textContent).toContain(task.taskId)

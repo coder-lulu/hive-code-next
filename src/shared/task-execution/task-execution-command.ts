@@ -59,7 +59,7 @@ export const TaskExecutionStartSchema = z
     ) {
       issue.addIssue({ code: 'custom', message: 'workflow_controlled_admission_required' })
     }
-    const plannedTask = context.planIntent?.sourceTask
+    const plannedTask = context.planIntent?.sourceTask ?? context.planExecution?.sourceTask
     if (
       plannedTask &&
       (['spaceId', 'taskId', 'runId', 'attempt', 'taskRevision'] as const).some(

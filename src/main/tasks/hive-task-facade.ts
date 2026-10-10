@@ -20,6 +20,7 @@ import {
 import { createHiveTaskWorkflowFacade } from './hive-task-workflow-facade'
 import { createHiveWorkflowCaseFacade } from './hive-workflow-case-facade'
 import { createHiveWorkflowPlanApplicationFacade } from './hive-workflow-plan-application-facade'
+import { createHiveWorkflowPlanRunFacade } from './hive-workflow-plan-run-facade'
 import { createHiveWorkflowCaseRunFacade } from './hive-workflow-case-run-facade'
 import {
   createHiveWorkflowCaseSessionFacade,
@@ -72,6 +73,14 @@ export function createHiveTaskFacade(options: {
     issuer: options.issuer,
     enforcement: options.enforcement
   })
+  const plans = createHiveWorkflowPlanRunFacade({
+    context,
+    getWorkflowCase: cases.getWorkflowCase,
+    getTeam: workbench.getTeam,
+    validateWorkspace: options.validateWorkspace,
+    issuer: options.issuer,
+    enforcement: options.enforcement
+  })
   const facade: HiveTasksApi = {
     ...workbench,
     ...workflows,
@@ -88,6 +97,7 @@ export function createHiveTaskFacade(options: {
       source: options.sessionInspection
     }),
     ...runs.facade,
+    ...plans.facade,
     async list() {
       const caller = await context()
       return z
@@ -155,6 +165,22 @@ export function createHiveTaskFacade(options: {
         })
         task = parseTaskRun(await caller.request(`${path}/cancel`, {}), id, runId)
       }
+      if (!task.binding && !task.result_receipt && task.run_scope?.kind === 'workbenchPlan') {
+        if (!task.cancel_requested) {
+          return refuseTaskExecution('REVISION_CONFLICT')
+        }
+        await plans.preparePlanRun(
+          {
+            projectId: task.run_scope.projectId,
+            caseId: task.run_scope.caseId,
+            applicationRef: task.run_scope.applicationRef,
+            taskId: id,
+            runId
+          },
+          () => caller.assertCurrent()
+        )
+        task = parseTaskRun(await caller.request(`${path}/cancel`, {}), id, runId)
+      }
       return project(task)
     },
     async artifact(id, runId, ref) {
@@ -169,5 +195,5 @@ export function createHiveTaskFacade(options: {
       return artifact
     }
   }
-  return { facade, prepareCaseRun: runs.prepareCaseRun }
+  return { facade, prepareCaseRun: runs.prepareCaseRun, preparePlanRun: plans.preparePlanRun }
 }

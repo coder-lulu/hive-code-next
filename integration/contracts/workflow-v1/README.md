@@ -1,8 +1,8 @@
 # 工程团队与成果交接契约 v1
 
-状态：2026-10-10。首条四角色工程链、Product 计划草稿采集及原生预览已通过验收；计划差异、幂等采纳与真实业务任务/依赖的事务创建已接入默认原生入口并完成真实验收。新任务保持阻塞，任务图派发、计划替换及任务工具消费者仍待接入。契约测试不替代真实执行、部署或多人权限验收。
+状态：2026-10-11。首条四角色工程链、Product 草稿及幂等采纳已验收。有限已采纳任务图已通过受控 Docker 真实执行、独立审核、原运行取消恢复、原生报告/界面及服务重启留存验证，相关自动化和构建通过；三轮源码复核通过，提交前实现与验收验证完成；文档交付复核和实际 Git 发布回执待补齐。计划替换、任务工具、资源/知识加载及硬预算仍待接入；本切片不代表部署、远程或完整持续自治验收。
 
-TypeScript 的流程与提案来源为 [src/shared/task-workflow](../../../src/shared/task-workflow/)，采纳 API 来源为 [hive-workflow-plan-application.ts](../../../src/shared/hive-workflow-plan-application.ts)。[task-workflow.schema.json](task-workflow.schema.json) 由同源生成；[test-vectors.json](test-vectors.json) 给出固定示例和成果/批准失效向量。它是业务对象与证据绑定合同，不替代 [P0 execution v1](../v1/README.md)，不新增启动器、运行账本或业务调度器。
+TypeScript 的流程与提案来源为 [src/shared/task-workflow](../../../src/shared/task-workflow/)，采纳 API 来源为 [hive-workflow-plan-application.ts](../../../src/shared/hive-workflow-plan-application.ts)，图控制与运行视图来源为 [hive-workflow-plan-runs.ts](../../../src/shared/hive-workflow-plan-runs.ts)。[task-workflow.schema.json](task-workflow.schema.json) 由同源生成；[test-vectors.json](test-vectors.json) 给出固定示例和成果/批准失效向量。它是业务对象与证据绑定合同，不替代 [P0 execution v1](../v1/README.md)，不新增启动器、运行账本或独立业务调度平面。
 
 | 对象                            | 固定约束                                                                                                                         | 权威与接入位置                                                            |
 | ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
@@ -41,7 +41,7 @@ requestedLimits 限制最多 4 并发、最长 24 小时；可选预算只接受
 
 可选 resourceSelectionRefs 和 requiredCoverage 必须同时完整出现；最多 16 个唯一 opaque 选择器。可选 knowledgeRequirements 最多 16 个唯一 sourceRef，明确 required。选择器不是 URL、路径、命令或授权，消费者仍须准确解析与重新验权。普通无资源/知识计划可以省略它们；已声明的需求不可静默丢弃。
 
-`inspectWorkflowPlanProposalJson` 在 JSON.parse 前检查 128 KiB UTF-8 上限，保留 Unicode 字节语义。`inspectWorkflowPlanProposal` 对照调用方从认证存储取得的固定目标、允许角色与更窄策略上限，返回具体拒绝原因或保留原提案的 validated 投影。validated 仅表示这些数据检查通过，不是授权或采纳；当前总是明确报告一般业务 DAG 派发缺口。资源加载和硬预算需求有阻断缺口；必需知识有阻断缺口，可选知识缺失明确披露。
+`inspectWorkflowPlanProposalJson` 在 JSON.parse 前检查 128 KiB UTF-8 上限，保留 Unicode 字节语义。`inspectWorkflowPlanProposal` 对照调用方从认证存储取得的固定目标、允许角色与更窄策略上限，返回具体拒绝原因或保留原提案的 validated 投影。validated 仅表示这些数据检查通过，不是授权或采纳；草稿 inspection 保留采集时的一般业务 DAG 派发缺口，不能用作当前图执行资格。资源加载和硬预算需求有阻断缺口；必需知识有阻断缺口，可选知识缺失明确披露。
 
 `WorkflowPlanIntent` 由服务端在新 Product 受理事务中封存，包含原 TaskRef、员工、固定目标与校验策略；planRevision 按原 Case 的实际意图记录独立分配。启动命令要求意图中的 spaceId、taskId、runId、attempt、taskRevision 与原命令一致。规划提示词沿用原 Product 运行，要求在原成果清单中提交 requirements.md 和 plan-proposal.json。
 
@@ -49,9 +49,21 @@ requestedLimits 限制最多 4 并发、最长 24 小时；可选预算只接受
 
 草稿检查通过不表示计划已采纳，也不触发一般业务任务图派发。用户从原需求详情查看差异并采纳，服务在同一事务创建真实 Paperclip issues、父子引用和 blocks 依赖，返回含 planRevision、原 requestId 及 createdTaskRefs 的固定回执。相同请求或相同计划的其他请求返回原回执；修改同一请求内容拒绝。每个 Case 当前只允许一个不可变采纳，替换已有任务明确不可用。
 
-采纳要求原 Product 成功、草案仍为当前规划意图、原始摘要一致，且当前拥有者、项目和职责绑定有效；源 Case 取消、未知、未结算或仍有执行占用时拒绝新采纳。原固定流程终态与历史不会被重新执行或改写。已采纳任务状态为 blocked，没有运行或派发记录；资源、知识和硬预算需求完整保留，后续执行仍须独立通过能力与授权门槛。读取旧采纳时会对照其准确原草案核对版本、完整任务映射与依赖，不能用当前查看的另一版本替代来源。
+采纳要求原 Product 成功、草案仍为当前规划意图、原始摘要一致，且当前拥有者、项目和职责绑定有效；源 Case 取消、未知、未结算或仍有执行占用时拒绝新采纳。原固定流程终态与历史不会被重新执行或改写。采纳创建的任务初始状态为 blocked，不自动派发；资源、知识和硬预算需求完整保留，显式图启动仍须独立通过能力与授权门槛。读取旧采纳时会对照其准确原草案核对版本、完整任务映射与依赖，不能用当前查看的另一版本替代来源。
 
-`PlanDiff` 按提案内 taskRef 比较新增、删除、字段和计划要求变化，不把顺序调整当作依赖变化。窄 API 为 `/hive/workbench/plans/read` 和 `/hive/workbench/plans/apply`；请求携带目标、预期 Case/项目版本、planRevision 与完整 draftDigest，不接受模型自选任务 ID 或执行参数。公开 schema 提供查询、采纳请求/回执/视图/回复字段，跨对象语义仍必须运行同源校验。一般图派发、proposePlan、TaskToolFacade、资源/知识加载及硬预算消费者仍待接入。本切片自动化、真实客户端验收和三轮独立复核已通过，发布提交以 Git 历史为准。[plan-proposal-test-vectors.json](plan-proposal-test-vectors.json) 固定纯合成提案向量。
+`PlanDiff` 按提案内 taskRef 比较新增、删除、字段和计划要求变化，不把顺序调整当作依赖变化。窄 API 为 `/hive/workbench/plans/read` 和 `/hive/workbench/plans/apply`；请求携带目标、预期 Case/项目版本、planRevision 与完整 draftDigest，不接受模型自选任务 ID 或执行参数。公开 schema 提供查询、采纳请求/回执/视图/回复字段，跨对象语义仍必须运行同源校验。[plan-proposal-test-vectors.json](plan-proposal-test-vectors.json) 固定纯合成提案向量。
+
+## 已采纳有限任务图
+
+图按已认证 application 映射真实业务任务，使用独立的 plan runScope 和原 Runtime 执行链。每个 application 只有一个控制记录；来源、开始时间、申请时长及截止时间固定，状态与 revision 可更新。显式启动重新核对当前账号、项目/职责绑定、源 Case 完成、占用和能力；要求资源、必需知识或硬预算时在排队前拒绝。封存的草稿 inspection、采纳回执 dispatch 与当前图 availability 分别表达各自事实。
+
+最多 32 任务、8 层依赖、4 并发和每任务 3 次尝试。申请时长不超过提案限制及 24 小时；所有运行、重试和恢复共用原图截止时间。每个 Developer 必须恰有一个直接独立 Tester；Tester 固定唯一 Developer，Ops 直接依赖唯一通过审核的 Tester 及其对应代码快照。支持 Product 研究图；不支持返工边、递归提案或自动创建 Developer 返工。审核拒绝暂停图，完成必须核对所有任务最新成功、业务 done、准确快照及唯一独立审核。
+
+查询、启动、取消、重试和恢复分别使用 `/hive/workbench/plans/graph-read`、`graph-start`、`graph-cancel`、`graph-retry`、`graph-resume`，均绑定当前账号及原 application；变更核对 revision 与请求幂等。私有 run-read/prepare 不暴露给 renderer，renderer 不读取原始 prompt。原生成果报告固定 task/run/outcome/artifact/digest；最新尝试变化或退出账号后清除旧报告。角色成果从完整认证 manifest 选择唯一规范 leaf，拒绝不安全路径、多匹配及不完整清单子集，保留原完整 name/version/digest；不创建别名或读取 latest。计划提案仍严格匹配 `plan-proposal.json`。图执行复用原 Case 的角色完成合同，Tester 必须提交有效 review 和独立测试命令证据。已绑定运行核对原冻结输入摘要、完整命令指纹及原执行范围，不用更新后的 prompt 模板替换原输入；未绑定受理仍严格校验当前构造结果。
+
+未知和取消待证据的运行持续占用槽位，不用 TTL 或 PID 缺失推定停止。取消精确对应原 native run 集合。绑定运行恢复取消须使用持久化原请求、准确 binding、原 stopping snapshot 与执行宿主正向停止证明；冷启动复用已验证的原停止/释放证据，保持幂等。连接中断不能替代停止证明，cancel_requested 不显示为 cancelled。人工重试要求最新失败已结算且有 stopped/not_started 证明、至少 1000 ms 退避、剩余次数和有效原截止时间。成功父成果后的依赖受理整批使用 savepoint；拒绝回滚该批 checkout/排队并保留父成果。仅带可信 admission_unavailable 原因的暂停可显式恢复，重新验权与检查期限/依赖/占用，拒绝失败、未知、取消或审核拒绝的最新状态，不重放生产者。
+
+容量边界见 [hive-workflow-plan-response-budget.ts](../../../src/shared/hive-workflow-plan-response-budget.ts) 和 [task-native-transport-limits.ts](../../../src/shared/task-execution/task-native-transport-limits.ts)：图响应 4 MiB/65,536 structural tokens，私有运行输入最多 1,500,000 字符、run-read 12 MiB/8,192 tokens；workflow start/binding/outcome 为 1 MiB/65,536 tokens，普通命令保留 64 KiB，嵌套深度仍为 16。容量回归不代表真实规模性能验证。proposePlan、TaskToolFacade、计划替换、资源/知识消费者和硬预算仍未接入。
 
 从项目根生成和核对：
 

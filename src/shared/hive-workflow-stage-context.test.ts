@@ -9,6 +9,7 @@ import { workflowTestVectors } from './task-workflow/workflow.test-fixture'
 import { workflowPlanIntentFixture } from './task-workflow/workflow-plan-draft.test-fixture'
 import { WorkflowPlanProposalSchema } from './task-workflow/workflow-plan-proposal'
 import { inspectWorkflowPlanProposal } from './task-workflow/workflow-plan-validation'
+import { workflowRoleCompletion } from './task-workflow/workflow-role-completion'
 
 function plannedProduct() {
   const f = workflowCaseFixture()
@@ -240,6 +241,7 @@ describe('accepted workflow business inputs', () => {
     expect(prompt).toContain('review.json')
     expect(prompt).toContain('workflow.review-proposal')
     expect(prompt).toContain('testedCodeVersion')
+    expect(prompt).toContain(workflowRoleCompletion(context).join('\n\n'))
   })
   it('never falls back to an earlier accepted attempt when the latest targets another stage', () => {
     const f = handoff('developer', 1)

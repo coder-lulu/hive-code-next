@@ -19,7 +19,7 @@ export function createTaskDispatchRecovery({ repository, createClient, recover, 
         const page = await repository.listRecoverableRuns(owner.accountId, { after, limit: 32 })
         const awaitingStart = (task) =>
           task.binding &&
-          task.run_scope?.kind === 'workbenchCase' &&
+          ['workbenchCase', 'workbenchPlan'].includes(task.run_scope?.kind) &&
           task.generation == null &&
           task.run_status === 'queued' &&
           !task.cancel_requested &&
@@ -31,7 +31,9 @@ export function createTaskDispatchRecovery({ repository, createClient, recover, 
                 task.generation != null ||
                 task.run_status !== 'queued' ||
                 task.cancel_requested)
-            : Boolean(task.prepareRefs) && task.run_status === 'queued' && !task.cancel_requested
+            : Boolean(task.prepareRefs) &&
+              task.run_status === 'queued' &&
+              (!task.cancel_requested || task.run_scope?.kind === 'workbenchPlan')
         )
         let index = 0
         await Promise.allSettled(

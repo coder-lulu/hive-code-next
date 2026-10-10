@@ -23,6 +23,19 @@ describe.skipIf(!configPath)('original native inbox and actual Case kernel trans
     const tester = await advance(f, dev, 'tester')
     return { f, dev, tester }
   }
+  it('projects original nested role reports and independent review through the complete Case', async () => {
+    const f = await workflowStageAdmissionFixture(h)
+    const options = { reportDirectory: 'deliverables/original-v1' }
+    const developer = await advance(f, f.first, 'developer', options)
+    const tester = await advance(f, developer, 'tester', options)
+    const ops = await advance(f, tester, 'ops', options)
+    await advance(f, ops, undefined, options)
+    const view = await f.read()
+    expect(view.terminalKind).toBe('done')
+    expect(view.handoffs).toHaveLength(3)
+    expect(view.reviews[0].decision).toBe('approved')
+    expect(view.reviews[0].testReport).toEqual(view.handoffs[2].artifact)
+  })
   it('executes Product -> Developer -> Tester -> Ops -> done through the actual kernel', async () => {
     const { f, tester } = await testerFixture()
     const ops = await advance(f, tester, 'ops')

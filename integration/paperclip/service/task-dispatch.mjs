@@ -10,6 +10,7 @@ import { refuseTaskRepository as refuse } from './task-delivery-repository.mjs'
 import { createTaskDispatchRecovery } from './task-dispatch-recovery.mjs'
 import { createTaskDispatchControl } from './task-dispatch-control.mjs'
 import { HiveWorkflowCaseRunReadSchema } from '../../../src/shared/hive-workflow-case-runs.ts'
+import { HiveWorkflowPlanRunReadSchema } from '../../../src/shared/hive-workflow-plan-runs.ts'
 
 /** Durable claims own delivery, while the Runtime retains the original process and workspace claim. */
 export function createTaskDispatch(repository, options = {}) {
@@ -72,23 +73,25 @@ export function createTaskDispatch(repository, options = {}) {
         refuse('FORBIDDEN')
       }
       if (!task.binding) {
+        const plan = task.run_scope?.kind === 'workbenchPlan'
         if (
-          recoveryOnly ||
-          task.run_scope?.kind !== 'workbenchCase' ||
+          (recoveryOnly && !(plan && task.cancel_requested)) ||
+          !['workbenchCase', 'workbenchPlan'].includes(task.run_scope?.kind) ||
           task.run_status !== 'queued' ||
-          task.cancel_requested ||
+          (task.cancel_requested && !plan) ||
           task.execution_stage === 'outcome_unknown' ||
           flight.abort.signal.aborted
         ) {
           refuse('REVISION_CONFLICT')
         }
-        const refs = HiveWorkflowCaseRunReadSchema.parse({
+        const refs = (plan ? HiveWorkflowPlanRunReadSchema : HiveWorkflowCaseRunReadSchema).parse({
           projectId: task.run_scope.projectId,
           caseId: task.run_scope.caseId,
           taskId: task.id,
-          runId: task.run_id
+          runId: task.run_id,
+          ...(plan ? { applicationRef: task.run_scope.applicationRef } : {})
         })
-        await bridge.prepareCaseRun(refs)
+        await (plan ? bridge.preparePlanRun(refs) : bridge.prepareCaseRun(refs))
         const current = await bridge.owner()
         if (
           current.accountId !== owner.accountId ||
@@ -141,7 +144,7 @@ export function createTaskDispatch(repository, options = {}) {
       } else if (owner.ownershipEpoch !== task.binding.command.ownershipEpoch) {
         refuse('FORBIDDEN')
       }
-      if (!recovering && task.run_scope.kind === 'workbenchCase') {
+      if (!recovering && ['workbenchCase', 'workbenchPlan'].includes(task.run_scope.kind)) {
         requireTaskDispatchBinding(
           task,
           await bridge.binding(task.company_id, task.run_id, 'execute')

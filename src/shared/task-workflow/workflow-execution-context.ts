@@ -7,6 +7,7 @@ import {
 import { WorkflowRoleSchema, WorkflowRunBindingSchema } from './workflow-bindings'
 import { WorkflowCodeVersionSchema, WorkflowRoleExecutionSchema } from './workflow-evidence'
 import { WorkflowPlanIntentSchema } from './workflow-plan-intent'
+import { WorkflowPlanExecutionSchema } from './workflow-plan-execution'
 import { structuredAgentSessionDigest as digest } from '../structured-agent-session-mutation'
 
 // Immutable business references; only the authenticated host grant supplies execution authority.
@@ -20,6 +21,7 @@ export const WorkflowExecutionContextSchema = z
     role: WorkflowRoleSchema,
     handoffRefs: boundedTaskCollection(TaskOpaqueRef, 32),
     planIntent: WorkflowPlanIntentSchema.optional(),
+    planExecution: WorkflowPlanExecutionSchema.optional(),
     codeInput: z
       .strictObject({
         producer: WorkflowRoleExecutionSchema,
@@ -30,6 +32,15 @@ export const WorkflowExecutionContextSchema = z
   .superRefine((context, issue) => {
     const source = context.codeInput
     const intent = context.planIntent
+    const plan = context.planExecution
+    if (
+      plan &&
+      (intent ||
+        plan.proposalTaskRef !== context.stageRef ||
+        plan.sourceTask.spaceId !== context.binding.scope.companyRef)
+    ) {
+      issue.addIssue({ code: 'custom', message: 'workflow_execution_plan_mismatch' })
+    }
     if (
       intent &&
       (context.role !== 'product' ||

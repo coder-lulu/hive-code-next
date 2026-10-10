@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createTaskDispatch } from '../../integration/paperclip/service/task-dispatch.mjs'
 import { createTaskDispatchRecovery } from '../../integration/paperclip/service/task-dispatch-recovery.mjs'
 import { workflowPrepareFixture } from '../../src/main/tasks/local-task-workflow-prepare.test-fixture.ts'
+import { planPrepareFixture } from '../../src/main/tasks/local-task-plan-prepare.test-fixture.ts'
 import { LocalTaskClient } from '../../src/main/tasks/local-task-client.ts'
 
 const fixtures = [],
@@ -10,8 +11,8 @@ afterEach(async () => {
   await Promise.all(dispatchers.splice(0).map((dispatch) => dispatch.close()))
   await Promise.all(fixtures.splice(0).map((f) => f.close()))
 })
-async function fixture() {
-  const f = await workflowPrepareFixture()
+async function fixture(kind = 'case') {
+  const f = await (kind === 'plan' ? planPrepareFixture() : workflowPrepareFixture())
   fixtures.push(f)
   const accountId = f.owner.accountId,
     order = [],
@@ -74,9 +75,10 @@ async function fixture() {
       secret: f.credential.secret,
       headers
     })
-    const original = client.prepareCaseRun.bind(client)
+    const method = kind === 'plan' ? 'preparePlanRun' : 'prepareCaseRun'
+    const original = client[method].bind(client)
     prepares.push(
-      vi.spyOn(client, 'prepareCaseRun').mockImplementation(async (refs) => {
+      vi.spyOn(client, method).mockImplementation(async (refs) => {
         order.push('prepare')
         const result = await original(refs)
         order.push('bound')
@@ -108,6 +110,45 @@ async function fixture() {
 }
 
 describe('original per-run dispatch flight after private Main preparation', () => {
+  it('prepares adopted plan runs through actual Main HTTP and the same dispatch flight', async () => {
+    const f = await fixture('plan')
+    await Promise.all([
+      f.dispatch.start(f.accountId, f.refs.taskId, f.refs.runId),
+      f.dispatch.start(f.accountId, f.refs.taskId, f.refs.runId)
+    ])
+    await vi.waitFor(() => expect(f.execute).toHaveBeenCalledOnce())
+    expect(f.issue).toHaveBeenCalledOnce()
+    expect(f.bindingCommit).toHaveBeenCalledOnce()
+    expect(f.prepares[0]).toHaveBeenCalledWith(f.refs)
+    await vi.waitFor(() =>
+      expect(f.order).toEqual(['prepare', 'bound', 'claim', 'dispatch', 'execute'])
+    )
+  })
+  it('recovers queued unbound adopted plan runs via the private plan preparation hook', async () => {
+    const f = await fixture('plan')
+    await f.dispatch.recover()
+    await vi.waitFor(() => expect(f.execute).toHaveBeenCalledOnce())
+    expect(f.repository.claimDispatch).toHaveBeenCalledOnce()
+    expect(f.repository.claimRecoveryDelivery).not.toHaveBeenCalled()
+  })
+  it('prepares expired cancelled unbound plan runs only for native recovery, never execute', async () => {
+    const f = await fixture('plan')
+    f.task.cancel_requested = true
+    f.admission.run.status = 'cancelRequested'
+    f.graph.runs[0].status = 'cancelRequested'
+    f.graph.graph.status = 'cancel_requested'
+    f.graph.graph.startedAt = new Date(Date.now() - 120000).toISOString()
+    f.graph.graph.deadlineAt = new Date(
+      Date.parse(f.graph.graph.startedAt) + f.graph.graph.maxDurationMs
+    ).toISOString()
+    f.admission.executionDeadlineAt = f.graph.graph.deadlineAt
+    await f.dispatch.recover()
+    await vi.waitFor(() => expect(f.recover).toHaveBeenCalledOnce())
+    expect(f.execute).not.toHaveBeenCalled()
+    expect(f.repository.claimDispatch).not.toHaveBeenCalled()
+    expect(f.repository.claimRecoveryDelivery).toHaveBeenCalledOnce()
+    expect(f.task.binding.command.executionDeadlineAt).toBe(f.admission.executionDeadlineAt)
+  })
   it('coalesces concurrent null-binding starts through actual Main HTTP and issuer, then dispatches once without recursion', async () => {
     const f = await fixture()
     await Promise.all([

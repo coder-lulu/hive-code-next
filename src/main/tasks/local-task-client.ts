@@ -16,6 +16,7 @@ import { createLocalTaskRequest, type LocalTaskClientOptions } from './local-tas
 import { TaskExecutionError } from './task-execution-error'
 import { LocalTaskRuntimeOwnerSchema } from '../../shared/task-execution/task-command-delivery'
 import {
+  HiveRuntimeAdapterBinding,
   HiveRuntimeBindingPurposeSchema,
   type HiveRuntimeBindingPurpose
 } from './paperclip-adapter-contract'
@@ -30,7 +31,13 @@ import {
 } from '../../shared/task-workflow/workflow-native-outcome'
 import { WorkflowCommandEvidenceSchema } from '../../shared/task-workflow/workflow-command-evidence'
 import { WorkflowNativeArtifactSchema } from '../../shared/task-workflow/workflow-native-artifact'
+import { HiveWorkflowPlanRunReadSchema } from '../../shared/hive-workflow-plan-runs'
 import { HiveWorkflowCaseRunReadSchema } from '../../shared/hive-workflow-case-runs'
+import {
+  TASK_NATIVE_DEFAULT_MAX_BYTES,
+  TASK_WORKFLOW_NATIVE_MAX_BYTES,
+  TASK_WORKFLOW_NATIVE_MAX_STRUCTURAL_TOKENS
+} from '../../shared/task-execution/task-native-transport-limits'
 
 type Identity = Pick<
   TaskExecutionStart,
@@ -59,12 +66,13 @@ export class LocalTaskClient {
       },
       maximumResponseBytesByPath: {
         ...options.maximumResponseBytesByPath,
-        '/execution/workflow-outcome': 64 * 1024,
+        '/execution/workflow-outcome': TASK_WORKFLOW_NATIVE_MAX_BYTES,
         '/execution/workflow-commands': WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES,
         '/execution/workflow-artifact': WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES
       },
       maximumResponseStructuralTokensByPath: {
         ...options.maximumResponseStructuralTokensByPath,
+        '/execution/workflow-outcome': TASK_WORKFLOW_NATIVE_MAX_STRUCTURAL_TOKENS,
         '/execution/workflow-commands': 16_384,
         '/execution/workflow-artifact': 16_384
       }
@@ -99,6 +107,27 @@ export class LocalTaskClient {
     return reply.data
   }
 
+  async preparePlanRun(value: unknown) {
+    const query = HiveWorkflowPlanRunReadSchema.safeParse(value)
+    if (!query.success) {
+      throw new TaskExecutionError('INVALID_REQUEST')
+    }
+    const reply = HiveWorkflowPlanRunReadSchema.safeParse(
+      await this.request('/execution/workflow-plan-prepare', query.data)
+    )
+    if (
+      !reply.success ||
+      query.data.projectId !== reply.data.projectId ||
+      query.data.caseId !== reply.data.caseId ||
+      query.data.applicationRef !== reply.data.applicationRef ||
+      query.data.taskId !== reply.data.taskId ||
+      query.data.runId !== reply.data.runId
+    ) {
+      throw new TaskExecutionError('OUTCOME_UNKNOWN')
+    }
+    return reply.data
+  }
+
   async owner() {
     const parsed = LocalTaskRuntimeOwnerSchema.safeParse(await this.request('/execution/owner'))
     if (!parsed.success) {
@@ -119,9 +148,21 @@ export class LocalTaskClient {
     ) {
       throw new TaskExecutionError('INVALID_REQUEST')
     }
-    return this.request(
-      `/execution/binding/${encodeURIComponent(companyId)}/${encodeURIComponent(runId)}?purpose=${purpose}`
+    const binding = await this.request(
+      `/execution/binding/${encodeURIComponent(companyId)}/${encodeURIComponent(runId)}?purpose=${purpose}`,
+      undefined,
+      {
+        maximumBytes: TASK_WORKFLOW_NATIVE_MAX_BYTES,
+        structuralTokens: TASK_WORKFLOW_NATIVE_MAX_STRUCTURAL_TOKENS
+      }
     )
+    if (Buffer.byteLength(JSON.stringify(binding)) > TASK_NATIVE_DEFAULT_MAX_BYTES) {
+      const parsed = HiveRuntimeAdapterBinding.safeParse(binding)
+      if (!parsed.success || !parsed.data.command.workflowContext) {
+        throw new TaskExecutionError('CAPACITY_EXCEEDED')
+      }
+    }
+    return binding
   }
 
   async start(commandValue: unknown, fingerprint: string) {

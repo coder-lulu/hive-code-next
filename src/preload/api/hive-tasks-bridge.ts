@@ -17,6 +17,13 @@ export const hiveTasksApi: HiveTasksApi = {
   getWorkflowPlanApplication: (query) =>
     ipcRenderer.invoke('hiveTasks:getWorkflowPlanApplication', query),
   applyWorkflowPlan: (input) => ipcRenderer.invoke('hiveTasks:applyWorkflowPlan', input),
+  getWorkflowPlanGraph: (query) => ipcRenderer.invoke('hiveTasks:getWorkflowPlanGraph', query),
+  startWorkflowPlanGraph: (input) => ipcRenderer.invoke('hiveTasks:startWorkflowPlanGraph', input),
+  cancelWorkflowPlanGraph: (input) =>
+    ipcRenderer.invoke('hiveTasks:cancelWorkflowPlanGraph', input),
+  retryWorkflowPlanTask: (input) => ipcRenderer.invoke('hiveTasks:retryWorkflowPlanTask', input),
+  resumeWorkflowPlanGraph: (input) =>
+    ipcRenderer.invoke('hiveTasks:resumeWorkflowPlanGraph', input),
   startWorkflowCase: (input) => ipcRenderer.invoke('hiveTasks:startWorkflowCase', input),
   getWorkflowCaseRuns: (query) => ipcRenderer.invoke('hiveTasks:getWorkflowCaseRuns', query),
   getWorkflowCaseSessionPage: (query) =>

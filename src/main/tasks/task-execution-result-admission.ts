@@ -33,8 +33,10 @@ export function admitTaskExecutionResult(
     (result.status === 'cancelled' || (result.status === 'failed' && fatal)) &&
     result.stopProof.evidenceKind === 'stopped' &&
     (fatal ||
-      (record.dispatch === 'dispatching' && record.structuredBinding) ||
-      (stopping?.dispatch === 'dispatching' && stopping.structuredBinding))
+      (['bound', 'dispatching'].includes(record.dispatch) && record.structuredBinding) ||
+      (stopping &&
+        ['bound', 'dispatching'].includes(stopping.dispatch) &&
+        stopping.structuredBinding))
   ) {
     if (!stopping) {
       return refuseTaskExecution('OUTCOME_UNKNOWN')

@@ -3,6 +3,12 @@ import { getLocalTasks } from '../startup/main-process-tasks'
 import { isTrustedUIRenderer } from './ui'
 import type { HiveTaskCreate, HiveTasksApi } from '../../shared/hive-tasks'
 import type { HiveWorkflowCaseStart } from '../../shared/hive-workflow-case-runs'
+import type {
+  HiveWorkflowPlanGraphQuery,
+  HiveWorkflowPlanGraphStart,
+  HiveWorkflowPlanGraphMutation,
+  HiveWorkflowPlanGraphRetry
+} from '../../shared/hive-workflow-plan-runs'
 import type { HiveWorkflowCaseSessionRead } from '../../shared/hive-workflow-case-session'
 import type {
   HiveWorkflowPlanApply,
@@ -85,6 +91,21 @@ export function registerHiveTaskHandlers() {
   )
   bind('applyWorkflowPlan', (facade, input: HiveWorkflowPlanApply) =>
     facade.applyWorkflowPlan(input)
+  )
+  bind('getWorkflowPlanGraph', (facade, query: HiveWorkflowPlanGraphQuery) =>
+    facade.getWorkflowPlanGraph(query)
+  )
+  bind('startWorkflowPlanGraph', (facade, input: HiveWorkflowPlanGraphStart) =>
+    facade.startWorkflowPlanGraph(input)
+  )
+  bind('cancelWorkflowPlanGraph', (facade, input: HiveWorkflowPlanGraphMutation) =>
+    facade.cancelWorkflowPlanGraph(input)
+  )
+  bind('retryWorkflowPlanTask', (facade, input: HiveWorkflowPlanGraphRetry) =>
+    facade.retryWorkflowPlanTask(input)
+  )
+  bind('resumeWorkflowPlanGraph', (facade, input: HiveWorkflowPlanGraphMutation) =>
+    facade.resumeWorkflowPlanGraph(input)
   )
   bind('getWorkflowCaseRuns', (facade, query: HiveWorkflowCaseReadQuery) =>
     facade.getWorkflowCaseRuns(query)

@@ -19,6 +19,10 @@ import { TaskExecutionResultSchema } from '../../../src/shared/task-execution/ta
 import { HiveRuntimeAdapterBinding } from '../../../src/main/tasks/paperclip-adapter-contract.ts'
 import { WorkflowRunInputSchema } from './workflow-case-run-records.mjs'
 import { refuseWorkbench as refuse } from './team-workbench-repository-records.mjs'
+import {
+  selectWorkflowRoleArtifact,
+  workflowRoleReportNames
+} from '../../../src/shared/task-workflow/workflow-role-artifacts.ts'
 
 export const WorkflowCaseOutcomeConsumedPayloadSchema = z.strictObject({
   kind: z.literal('hive.workflow.outcome_consumed'),
@@ -47,12 +51,15 @@ export function validateWorkflowCaseEvidenceEvent(row, accountId, view) {
       producer.status === 'failed' &&
       review &&
       review.decision !== 'approved')
-  const outputName = {
-    product: 'requirements.md',
-    developer: 'implementation.md',
-    tester: 'test-report.md',
-    ops: 'release-plan.md'
-  }[context.role]
+  let report
+  try {
+    report = selectWorkflowRoleArtifact(artifacts, workflowRoleReportNames[context.role])
+    if (context.role === 'tester') {
+      selectWorkflowRoleArtifact(artifacts, 'review.json')
+    }
+  } catch {
+    refuse('REVISION_CONFLICT')
+  }
   const versionDigest = createHash('sha256').update(JSON.stringify(asset.outcome)).digest('hex')
   if (
     row.company_id !== view.binding.scope.companyRef ||
@@ -106,9 +113,8 @@ export function validateWorkflowCaseEvidenceEvent(row, accountId, view) {
         handoff.stageRef !== context.stageRef ||
         digest(handoff.producer) !== digest(expected) ||
         !acceptedBusiness ||
-        !artifacts.some(
-          (item) => item.name === outputName && digest(item.version) === digest(handoff.artifact)
-        ) ||
+        !report ||
+        digest(report.version) !== digest(handoff.artifact) ||
         digest({ value: handoff.codeVersion }) !== digest({ value: asset.outcome.codeVersion }))) ||
     (review &&
       (digest(review.binding) !== digest(view.binding) ||
@@ -118,10 +124,8 @@ export function validateWorkflowCaseEvidenceEvent(row, accountId, view) {
         (review.decision === 'approved' && asset.outcome.commands.kind !== 'available') ||
         digest(review.reviewer) !== digest(expected) ||
         digest({ value: review.codeVersion }) !== digest({ value: context.codeInput?.version }) ||
-        !artifacts.some(
-          (item) =>
-            item.name === 'test-report.md' && digest(item.version) === digest(review.testReport)
-        )))
+        !report ||
+        digest(report.version) !== digest(review.testReport)))
   ) {
     refuse('REVISION_CONFLICT')
   }

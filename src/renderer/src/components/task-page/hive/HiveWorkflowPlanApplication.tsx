@@ -6,6 +6,7 @@ import type { HiveWorkflowCaseView } from '../../../../../shared/hive-workflow-c
 import type { WorkflowPlanDraft } from '../../../../../shared/task-workflow/workflow-plan-draft'
 import type { HiveWorkflowPlanApplicationView } from '../../../../../shared/hive-workflow-plan-application'
 import { useHiveWorkflowPlanApplication } from './use-hive-workflow-plan-application'
+import { HiveWorkflowPlanGraph } from './HiveWorkflowPlanGraph'
 
 function PlanDifference({ page }: { page: HiveWorkflowPlanApplicationView }) {
   const { t } = useTranslation()
@@ -77,9 +78,6 @@ function AppliedTasks({
           revision: receipt.planRevision
         })}
       </p>
-      <p className="text-sm text-muted-foreground">
-        {t('hiveWorkflowCases.planApply.dispatchUnavailable')}
-      </p>
       <ol className="divide-y divide-border">
         {receipt.createdTaskRefs.map((task) => {
           const proposed =
@@ -128,6 +126,7 @@ function AppliedTasks({
           ))}
         </dl>
       </details>
+      <HiveWorkflowPlanGraph key={receipt.applicationRef} original={view} application={receipt} />
     </div>
   )
 }

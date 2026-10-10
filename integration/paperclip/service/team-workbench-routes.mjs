@@ -1,5 +1,12 @@
 import { z } from 'zod'
 import {
+  HiveWorkflowPlanGraphQuerySchema,
+  HiveWorkflowPlanGraphStartSchema,
+  HiveWorkflowPlanGraphMutationSchema,
+  HiveWorkflowPlanGraphRetrySchema,
+  HiveWorkflowPlanRunReadSchema
+} from '../../../src/shared/hive-workflow-plan-runs.ts'
+import {
   HiveWorkflowPlanQuerySchema,
   HiveWorkflowPlanApplySchema
 } from '../../../src/shared/hive-workflow-plan-application.ts'
@@ -28,6 +35,12 @@ import {
 } from '../../../src/shared/hive-workflow-cases.ts'
 
 export const WORKBENCH_PATHS = Object.freeze([
+  '/hive/workbench/plans/graph-read',
+  '/hive/workbench/plans/graph-start',
+  '/hive/workbench/plans/graph-cancel',
+  '/hive/workbench/plans/graph-retry',
+  '/hive/workbench/plans/graph-resume',
+  '/hive/workbench/plans/run-read',
   '/hive/workbench/plans/read',
   '/hive/workbench/plans/apply',
   '/hive/workbench/companies/list',
@@ -51,6 +64,36 @@ const TeamRead = z.strictObject({ projectId: HiveWorkbenchObjectIdInputSchema })
 /** The authenticated Hive facade supplies account identity and the validated workspace binding. */
 export function handleTeamWorkbenchRequest(repository, accountId, path, body) {
   switch (path) {
+    case '/hive/workbench/plans/graph-resume':
+      return repository.resumeWorkflowPlanGraph(
+        accountId,
+        HiveWorkflowPlanGraphMutationSchema.parse(body)
+      )
+    case '/hive/workbench/plans/graph-read':
+      return repository.getWorkflowPlanGraph(
+        accountId,
+        HiveWorkflowPlanGraphQuerySchema.parse(body)
+      )
+    case '/hive/workbench/plans/graph-start':
+      return repository.startWorkflowPlanGraph(
+        accountId,
+        HiveWorkflowPlanGraphStartSchema.parse(body)
+      )
+    case '/hive/workbench/plans/graph-cancel':
+      return repository.cancelWorkflowPlanGraph(
+        accountId,
+        HiveWorkflowPlanGraphMutationSchema.parse(body)
+      )
+    case '/hive/workbench/plans/graph-retry':
+      return repository.retryWorkflowPlanTask(
+        accountId,
+        HiveWorkflowPlanGraphRetrySchema.parse(body)
+      )
+    case '/hive/workbench/plans/run-read':
+      return repository.getWorkflowPlanRunAdmission(
+        accountId,
+        HiveWorkflowPlanRunReadSchema.parse(body)
+      )
     case '/hive/workbench/plans/read':
       return repository.getWorkflowPlanApplication(
         accountId,

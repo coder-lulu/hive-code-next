@@ -1,3 +1,4 @@
+import { setWorkflowPlanningIntent } from './hive-workflow-planning-intent.test-fixture'
 import { createHash, randomUUID } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import { workflowCaseFixture } from '../../shared/hive-workflow-cases.test-fixture'
@@ -26,6 +27,7 @@ function fixture() {
     attempt: 1,
     taskRevision: '1'
   }
+  setWorkflowPlanningIntent(f.view, task)
   const input = hiveWorkflowStagePrompt(f.view, fixed.stageRef)
   const admission = {
     requestId: startRequest.requestId,

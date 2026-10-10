@@ -18,6 +18,13 @@ import {
   requireWorkflowCaseRunDispatch
 } from './workflow-case-run-records.mjs'
 import { consumeWorkflowCaseOutcome } from './workflow-case-outcome-consumer.mjs'
+import { consumePlanGraphOutcome } from './workflow-plan-graph-outcome-consumer.mjs'
+import { requirePlanRunDispatch } from './task-run-plan-scope.mjs'
+import {
+  readPlanGraphSource,
+  readPlanGraphRows,
+  planRunAdmission
+} from './workflow-plan-graph-records.mjs'
 import {
   createTaskControlRepository,
   requireExternalTaskScope
@@ -89,6 +96,7 @@ export function createTaskRepository(sql) {
       refuse('REVISION_CONFLICT')
     }
     await consumeWorkflowCaseOutcome(db, accountId, task, receipt, nativeDelivery)
+    await consumePlanGraphOutcome(db, accountId, task, receipt, nativeDelivery)
     const settled = await read(db, accountId, taskId, runId)
     if (token !== undefined) {
       await requireCurrentTaskDelivery(db, accountId, settled, token)
@@ -162,9 +170,7 @@ export function createTaskRepository(sql) {
         const task = await read(db, accountId, taskId, runId, true)
         if (
           binding.command.executionPolicy.trustMode !==
-          (task.run_scope.kind === 'workbenchCase'
-            ? 'enforced_autonomous'
-            : 'trusted_personal_preview')
+          (task.run_scope.kind !== 'personal' ? 'enforced_autonomous' : 'trusted_personal_preview')
         ) {
           refuse('FORBIDDEN')
         }
@@ -190,8 +196,22 @@ export function createTaskRepository(sql) {
         ) {
           refuse('REVISION_CONFLICT')
         }
-        if (task.run_scope.kind === 'workbenchCase') {
-          const record = await readWorkflowCaseRun(db, accountId, taskId, runId)
+        if (task.run_scope.kind !== 'personal') {
+          const source =
+            task.run_scope.kind === 'workbenchPlan'
+              ? await readPlanGraphSource(db, accountId, task.run_scope)
+              : null
+          const admission = source
+            ? planRunAdmission(
+                source,
+                await readPlanGraphRows(db, accountId, source),
+                taskId,
+                runId
+              )
+            : null
+          const record = admission
+            ? { run: admission.run, input: admission }
+            : await readWorkflowCaseRun(db, accountId, taskId, runId)
           if (
             digest(record.run.task) !== digest(binding.command.task) ||
             binding.command.executionDeadlineAt !== record.input.executionDeadlineAt ||
@@ -202,12 +222,16 @@ export function createTaskRepository(sql) {
             refuse('REVISION_CONFLICT')
           }
           if (!task.cancel_requested) {
-            const active =
-              await db`SELECT c.id FROM pipeline_cases c JOIN pipeline_stages s ON s.id=c.stage_id
+            if (task.run_scope.kind === 'workbenchPlan') {
+              await requirePlanRunDispatch(db, accountId, task)
+            } else {
+              const active =
+                await db`SELECT c.id FROM pipeline_cases c JOIN pipeline_stages s ON s.id=c.stage_id
               WHERE c.id=${task.run_scope.caseId} AND c.company_id=${task.company_id} AND c.terminal_kind IS NULL
                 AND c.retired_at IS NULL AND s.config->'hiveWorkflow'->'stage'->>'stageRef'=${task.run_scope.stageRef} FOR SHARE OF c,s`
-            if (active.length !== 1) {
-              refuse('REVISION_CONFLICT')
+              if (active.length !== 1) {
+                refuse('REVISION_CONFLICT')
+              }
             }
             await requireWorkflowIssueCheckout(db, task, runId)
           }
@@ -228,6 +252,7 @@ export function createTaskRepository(sql) {
         }
         await requireTaskDeliveryWriter(db, accountId, task, token)
         await requireWorkflowCaseRunDispatch(db, accountId, task)
+        await requirePlanRunDispatch(db, accountId, task)
         if (
           task.checkout_run_id !== runId ||
           task.execution_run_id !== runId ||

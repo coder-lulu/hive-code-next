@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { TASK_WORKFLOW_NATIVE_MAX_BYTES } from '../../shared/task-execution/task-native-transport-limits'
 import { canonicalAgentSessionDigest as digest } from '../../shared/agent-session-mutation-envelope'
 import {
   WorkflowCommandEvidenceSchema,
@@ -75,7 +76,11 @@ export class TaskWorkflowOutcomeStore {
       context = record.command.workflowContext!
     let bytes: Buffer | null = null
     try {
-      bytes = await readTaskArtifactFile(this.options.directory, filename, 64 * 1024)
+      bytes = await readTaskArtifactFile(
+        this.options.directory,
+        filename,
+        TASK_WORKFLOW_NATIVE_MAX_BYTES
+      )
     } catch (error) {
       if (!absent(error)) {
         throw error
@@ -134,7 +139,12 @@ export class TaskWorkflowOutcomeStore {
       outcome,
       version: versionFor(Buffer.from(JSON.stringify(outcome)))
     })
-    await this.write(filename, Buffer.from(JSON.stringify(asset)), 64 * 1024, guard)
+    await this.write(
+      filename,
+      Buffer.from(JSON.stringify(asset)),
+      TASK_WORKFLOW_NATIVE_MAX_BYTES,
+      guard
+    )
     return this.validate(record, asset, guard)
   }
 

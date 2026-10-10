@@ -1,3 +1,4 @@
+import { setWorkflowPlanningIntent } from './hive-workflow-planning-intent.test-fixture'
 import { randomUUID, createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
 import { canonicalAgentSessionDigest as digest } from '../../shared/agent-session-mutation-envelope'
@@ -37,6 +38,7 @@ function fixture() {
     status: 'pending',
     artifactRefs: []
   }
+  setWorkflowPlanningIntent(f.view, run.task)
   const prompt = hiveWorkflowStagePrompt(f.view, task.stageRef)
   let admission = {
     requestId: input.requestId,
@@ -227,12 +229,17 @@ describe('authenticated workflow run dispatch through the original Task binding'
     }
     if (boundary === 'context-role') {
       admission.workflowContext.role = 'developer'
+      delete admission.workflowContext.planIntent
     }
     if (boundary === 'context-workflow') {
       admission.workflowContext.binding.workflowRunRef = randomUUID()
+      admission.workflowContext.planIntent!.facts.binding = structuredClone(
+        admission.workflowContext.binding
+      )
     }
     if (boundary === 'context-employee') {
       admission.workflowContext.employeeRef = randomUUID()
+      admission.workflowContext.planIntent!.employeeRef = admission.workflowContext.employeeRef
     }
     if (boundary === 'prompt') {
       admission.input = 'Changed instruction'

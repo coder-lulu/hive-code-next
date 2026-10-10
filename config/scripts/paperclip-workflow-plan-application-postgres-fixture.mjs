@@ -3,8 +3,15 @@ import { workflowStageAdmissionFixture } from './paperclip-workflow-stage-admiss
 import { workflowConsumerDelivery } from './paperclip-workflow-consumer-postgres-fixture.mjs'
 import { workflowPlanProposalFixture } from '../../src/shared/task-workflow/workflow-plan-proposal.test-fixture.ts'
 import { canonicalAgentSessionDigest as digest } from '../../src/shared/agent-session-mutation-envelope.ts'
-export async function createPlanApplicationPostgresFixture(h, complete = true, failed = false) {
-  const f = await workflowStageAdmissionFixture(h)
+export async function createPlanApplicationPostgresFixture(
+  h,
+  complete = true,
+  failed = false,
+  transformProposal,
+  maxParallelism = 1,
+  requirement
+) {
+  const f = await workflowStageAdmissionFixture(h, 600_000, maxParallelism, requirement)
   const facts = f.first.workflowContext.planIntent.facts
   const proposal = {
     ...workflowPlanProposalFixture(),
@@ -28,6 +35,7 @@ export async function createPlanApplicationPostgresFixture(h, complete = true, f
     outputKind: 'code',
     dependsOn: [proposal.tasks[0].taskRef]
   })
+  transformProposal?.(proposal)
   let delivery = await workflowConsumerDelivery(h, f, f.first, {
     planText: JSON.stringify(proposal),
     ...(failed ? { status: 'failed' } : {})

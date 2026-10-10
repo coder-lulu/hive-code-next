@@ -64,40 +64,76 @@ describe('original fatal model lifecycle without user cancellation', () => {
     expect(f.acquire).not.toHaveBeenCalled()
     expect(f.launchAgain).not.toHaveBeenCalled()
   })
-  it('reconciles unknown until exact host stop, then settles failed without a completed turn', async () => {
-    const f = await fixture()
-    await f.fatal()
-    const failureEvent = f.store.tasks.get(f.command)!.events.at(-1)
-    expect((await f.reconcile()).result).toBeNull()
-    expect(f.store.tasks.get(f.command)?.status).toBe('outcome_unknown')
-    expect(f.record().lease.deathEvidence).toBeNull()
-    f.allowStop()
-    const observation = await f.reconcile()
-    expect(observation.result).toMatchObject({
-      status: 'failed',
-      artifactRefs: [],
-      usageFactRefs: [],
-      stopProof: { evidenceKind: 'stopped', managedToolsSettled: true, writersFenced: true }
-    })
-    const task = f.store.tasks.get(f.command)!
-    expect(task.cancellationKey).toBeNull()
-    expect(task.structuredBinding).toEqual(f.original.structuredBinding)
-    expect(task.command).toEqual(f.original.command)
-    expect(task.workspace).toEqual(f.original.workspace)
-    expect(task.events).toContainEqual(failureEvent)
-    expect(task.modelDispatchAttempts).toBe(1)
-    expect(f.record().lease.deathEvidence?.kind).toBe('execution-host-exit-observed')
-    expect(f.host.hasSession(f.binding.sessionId)).toBe(false)
-    expect(
-      (await readPersistedTestAgentSessionStore(f.directory)).taskExecutions[
-        taskExecutionRecordKey(f.command)
-      ]
-    ).toEqual(task)
-    expect(f.request).toHaveBeenCalledOnce()
-    expect(f.acquire).not.toHaveBeenCalled()
-    expect(f.launchAgain).not.toHaveBeenCalled()
-    expect(readTaskModelFatalFailure(f.store.tasks, task)).toBeUndefined()
-  })
+  it.each(['stream', 'fetch'] as const)(
+    'settles an original %s failure only after exact host stop',
+    async (phase) => {
+      const f = await fixture()
+      if (phase === 'fetch') {
+        f.request.mockRejectedValueOnce(
+          new Error('fetch failed', {
+            cause: Object.assign(new Error('socket closed'), { code: 'UND_ERR_SOCKET' })
+          })
+        )
+        await expect(f.channel.start(f.params)).rejects.toMatchObject({
+          diagnostic: {
+            phase: 'fetch',
+            category: 'network',
+            code: 'TASK_MODEL_UPSTREAM_UNAVAILABLE',
+            networkCode: 'UND_ERR_SOCKET'
+          }
+        })
+        await vi.waitFor(() => expect(f.raw.close).toHaveBeenCalled())
+      } else {
+        await f.fatal()
+      }
+      const failureEvent = f.store.tasks.get(f.command)!.events.at(-1)
+      expect((await f.reconcile()).result).toBeNull()
+      expect(f.store.tasks.get(f.command)?.status).toBe('outcome_unknown')
+      expect(f.record().lease.deathEvidence).toBeNull()
+      f.allowStop()
+      const observation = await f.reconcile()
+      expect(observation.result).toMatchObject({
+        status: 'failed',
+        artifactRefs: [],
+        usageFactRefs: [],
+        stopProof: { evidenceKind: 'stopped', managedToolsSettled: true, writersFenced: true }
+      })
+      const task = f.store.tasks.get(f.command)!
+      expect(task.cancellationKey).toBeNull()
+      expect(task.structuredBinding).toEqual(f.original.structuredBinding)
+      expect(task.command).toEqual(f.original.command)
+      expect(task.workspace).toEqual(f.original.workspace)
+      expect(task.events).toContainEqual(failureEvent)
+      expect(task.modelDispatchAttempts).toBe(1)
+      expect(f.record().lease.deathEvidence?.kind).toBe('execution-host-exit-observed')
+      expect(f.host.hasSession(f.binding.sessionId)).toBe(false)
+      expect(
+        (await readPersistedTestAgentSessionStore(f.directory)).taskExecutions[
+          taskExecutionRecordKey(f.command)
+        ]
+      ).toEqual(task)
+      expect(f.request).toHaveBeenCalledOnce()
+      expect(f.acquire).not.toHaveBeenCalled()
+      expect(f.launchAgain).not.toHaveBeenCalled()
+      expect(readTaskModelFatalFailure(f.store.tasks, task)).toBeUndefined()
+    }
+  )
+
+  it.each([undefined, 'ECONNREFUSED', 'TASK_MODEL_AUTH_UNAVAILABLE'])(
+    'does not admit a fetch failure outside the observed socket class: %s',
+    async (code) => {
+      const f = await fixture()
+      f.request.mockRejectedValueOnce(Object.assign(new Error(code ?? 'fetch failed'), { code }))
+      await expect(f.channel.start(f.params)).rejects.toThrow()
+      await vi.waitFor(() => expect(f.raw.close).toHaveBeenCalled())
+      expect(
+        readTaskModelFatalFailure(f.store.tasks, f.store.tasks.get(f.command)!)
+      ).toBeUndefined()
+      f.allowStop()
+      expect((await f.reconcile()).result).toBeNull()
+      expect(f.record().lease.deathEvidence).toBeNull()
+    }
+  )
 
   it('keeps first private failure, clears a proved retry timer and never revives a terminal fact', async () => {
     const f = await fixture()

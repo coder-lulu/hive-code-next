@@ -166,6 +166,12 @@ export function runScopeFixture(personal = false) {
   const sql = vi.fn(async (strings, ...values) => {
     const text = strings.join('?').replaceAll(/\s+/g, ' ').trim()
     calls.push({ text, values })
+    if (
+      text ===
+      'SELECT a.application_id,a.case_id,i.project_id FROM hive_task_bindings b JOIN issues i ON i.id=b.task_id JOIN hive_workflow_plan_application_tasks m ON m.issue_id=i.id JOIN hive_workflow_plan_applications a ON a.application_id=m.application_id WHERE b.account_id=? AND b.run_id=? AND i.id=?'
+    ) {
+      return []
+    }
     if (text.startsWith('SELECT r.case_id,cb.project_id')) {
       return task.account_id === values[0] && task.id === values[1] && task.run_id === values[2]
         ? [

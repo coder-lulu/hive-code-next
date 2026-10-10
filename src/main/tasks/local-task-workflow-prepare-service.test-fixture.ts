@@ -47,6 +47,8 @@ export async function startWorkflowPrepareUnitService(options: {
   accountId(): string | undefined
   team: unknown
   view: unknown
+  cancelTask?(): unknown
+  graph?: unknown
   admission: unknown
   task: unknown
   runId: string
@@ -75,17 +77,23 @@ export async function startWorkflowPrepareUnitService(options: {
       if (path.endsWith(`/runs/${options.runId}`)) {
         await options.beforeTaskRead?.()
       }
-      const value = path.endsWith('/team/read')
-        ? options.team
-        : path.endsWith('/cases/read')
-          ? options.view
-          : path.endsWith('/cases/run-read')
-            ? options.admission
-            : path.endsWith('/binding')
-              ? await options.bindingCommit(HiveRuntimeAdapterBinding.parse(body))
-              : path.endsWith(`/runs/${options.runId}`)
-                ? options.task
-                : undefined
+      const value = path.endsWith('/cancel')
+        ? options.cancelTask?.()
+        : path.endsWith('/team/read')
+          ? options.team
+          : path.endsWith('/cases/read')
+            ? options.view
+            : path.endsWith('/plans/graph-read')
+              ? options.graph
+              : path.endsWith('/plans/run-read')
+                ? options.admission
+                : path.endsWith('/cases/run-read')
+                  ? options.admission
+                  : path.endsWith('/binding')
+                    ? await options.bindingCommit(HiveRuntimeAdapterBinding.parse(body))
+                    : path.endsWith(`/runs/${options.runId}`)
+                      ? options.task
+                      : undefined
       if (value === undefined) {
         throw new Error('No dispatch callback is permitted during preparation')
       }

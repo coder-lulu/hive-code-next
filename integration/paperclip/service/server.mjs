@@ -6,6 +6,8 @@ import { dirname } from 'node:path'
 import { z } from 'zod'
 import postgres from '@hive-paperclip-postgres'
 import { HIVE_WORKFLOW_CASE_MAX_REQUEST_BYTES } from '../../../src/shared/hive-workflow-cases.ts'
+import { HIVE_WORKFLOW_PLAN_RESPONSE_BYTES_BY_PATH } from '../../../src/shared/hive-workflow-plan-response-budget.ts'
+import { TASK_WORKFLOW_NATIVE_MAX_BYTES } from '../../../src/shared/task-execution/task-native-transport-limits.ts'
 import { applyPendingMigrations } from '@hive-paperclip-db'
 import { createTaskRepository } from './task-repository.mjs'
 import { createTaskDispatch } from './task-dispatch.mjs'
@@ -15,6 +17,7 @@ import { createWorkflowDefinitionRepository } from './workflow-definition-reposi
 import { createWorkflowCaseRepository } from './workflow-case-repository.mjs'
 import { createWorkflowCaseRunRepository } from './workflow-case-run-repository.mjs'
 import { createWorkflowPlanApplicationRepository } from './workflow-plan-application-repository.mjs'
+import { createWorkflowPlanGraphRepository } from './workflow-plan-graph-repository.mjs'
 import { WORKBENCH_PATHS, handleTeamWorkbenchRequest } from './team-workbench-routes.mjs'
 import {
   EXTERNAL_EXECUTION_PATH,
@@ -29,9 +32,15 @@ const Input = z.strictObject({
   workspaceSelector: z.string().min(1).max(512)
 })
 const Empty = z.strictObject({})
-const send = (response, status, value) => {
+const send = (response, status, value, maximumBytes) => {
+  const body = JSON.stringify(value)
+  if (maximumBytes !== undefined && Buffer.byteLength(body, 'utf8') > maximumBytes) {
+    response.writeHead(503, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+    response.end(JSON.stringify({ error: { code: 'CAPABILITY_UNAVAILABLE' } }))
+    return
+  }
   response.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
-  response.end(JSON.stringify(value))
+  response.end(body)
 }
 const descriptor = process.env.HIVE_PAPERCLIP_SERVICE_DESCRIPTOR
 const databaseUrl = process.env.HIVE_PAPERCLIP_DATABASE_URL
@@ -55,6 +64,9 @@ await sql.unsafe(
 await sql.unsafe(
   await readFile(new URL('./workflow-plan-application-tables.sql', import.meta.url), 'utf8')
 )
+await sql.unsafe(
+  await readFile(new URL('./workflow-plan-graph-tables.sql', import.meta.url), 'utf8')
+)
 const repository = createTaskRepository(sql),
   dispatch = createTaskDispatch(repository)
 const workbenchRepository = {
@@ -62,7 +74,8 @@ const workbenchRepository = {
   ...createWorkflowDefinitionRepository(sql),
   ...createWorkflowCaseRepository(sql),
   ...createWorkflowCaseRunRepository(sql),
-  ...createWorkflowPlanApplicationRepository(sql)
+  ...createWorkflowPlanApplicationRepository(sql),
+  ...createWorkflowPlanGraphRepository(sql)
 }
 const secret = randomBytes(32).toString('base64url'),
   expected = Buffer.from(secret)
@@ -149,7 +162,9 @@ const server = createServer(async (request, response) => {
     const maximumBodyBytes =
       request.url === '/hive/workbench/cases/create'
         ? HIVE_WORKFLOW_CASE_MAX_REQUEST_BYTES
-        : 64 * 1024
+        : action === 'binding'
+          ? TASK_WORKFLOW_NATIVE_MAX_BYTES
+          : 64 * 1024
     let length = 0
     for await (const chunk of request.iterator({ destroyOnReturn: false })) {
       length += chunk.length
@@ -177,7 +192,12 @@ const server = createServer(async (request, response) => {
         body
       )
       const createsObject = request.url.endsWith('/create')
-      send(response, createsObject ? 201 : 200, result)
+      send(
+        response,
+        createsObject ? 201 : 200,
+        result,
+        HIVE_WORKFLOW_PLAN_RESPONSE_BYTES_BY_PATH[request.url]
+      )
       return
     }
     if (!taskId && !action) {

@@ -187,8 +187,9 @@ export function createStructuredAgentSessionConversationLifetime(host: {
           if (closed !== true) {
             throw new Error('Task provider acquisition close was not proven')
           }
-          await deps().store.tasks.assertFailedBootStopCurrent(expected)
+          const current = await deps().store.tasks.assertFailedBootStopCurrent(expected)
           if (
+            current.lease.claimStatus !== 'released' &&
             (await host
               .context()
               .runtimeState.commitExecutionOwnerStop(

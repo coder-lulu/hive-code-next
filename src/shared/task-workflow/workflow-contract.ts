@@ -10,6 +10,8 @@ import { WorkflowPlanProposalSchema } from './workflow-plan-proposal'
 import { WorkflowPlanIntentSchema } from './workflow-plan-intent'
 import { WorkflowPlanDraftSchema } from './workflow-plan-draft'
 import { WorkflowPlanDiffSchema } from './workflow-plan-diff'
+import { WorkflowPlanExecutionSchema } from './workflow-plan-execution'
+import * as Graph from '../hive-workflow-plan-runs'
 import {
   HiveWorkflowPlanQuerySchema,
   HiveWorkflowPlanApplySchema,
@@ -34,6 +36,20 @@ export const WorkflowSchemas = {
   PlanIntent: WorkflowPlanIntentSchema,
   PlanDraft: WorkflowPlanDraftSchema,
   PlanDiff: WorkflowPlanDiffSchema,
+  PlanExecution: WorkflowPlanExecutionSchema,
+  PlanGraphQuery: Graph.HiveWorkflowPlanGraphQuerySchema,
+  PlanGraphStart: Graph.HiveWorkflowPlanGraphStartSchema,
+  PlanGraphMutation: Graph.HiveWorkflowPlanGraphMutationSchema,
+  PlanGraphRetry: Graph.HiveWorkflowPlanGraphRetrySchema,
+  PlanGraphControl: Graph.HiveWorkflowPlanGraphControlSchema,
+  PlanGraphTask: Graph.HiveWorkflowPlanGraphTaskSchema,
+  PlanGraphRun: Graph.HiveWorkflowPlanGraphRunSchema,
+  PlanGraphOutcome: Graph.HiveWorkflowPlanGraphOutcomeSchema,
+  PlanGraphView: Graph.HiveWorkflowPlanGraphViewSchema,
+  PlanGraphReply: Graph.HiveWorkflowPlanGraphReplySchema,
+  PlanRunRead: Graph.HiveWorkflowPlanRunReadSchema,
+  PlanRunAdmission: Graph.HiveWorkflowPlanRunAdmissionSchema,
+  PlanRunStartRequest: Graph.HiveWorkflowPlanRunStartRequestSchema,
   PlanApplicationQuery: HiveWorkflowPlanQuerySchema,
   PlanApplyRequest: HiveWorkflowPlanApplySchema,
   PlanApplyReceipt: HiveWorkflowPlanApplicationReceiptSchema,
@@ -51,7 +67,17 @@ export function taskWorkflowJsonSchema() {
       name,
       z.toJSONSchema(schema, {
         target: 'draft-2020-12',
-        io: name === 'PlanApplicationQuery' || name === 'PlanApplyRequest' ? 'input' : 'output'
+        io: [
+          'PlanApplicationQuery',
+          'PlanApplyRequest',
+          'PlanGraphQuery',
+          'PlanGraphStart',
+          'PlanGraphMutation',
+          'PlanGraphRetry',
+          'PlanRunRead'
+        ].includes(name)
+          ? 'input'
+          : 'output'
       })
     ])
   )

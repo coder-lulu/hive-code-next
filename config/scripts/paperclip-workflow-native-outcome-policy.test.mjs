@@ -62,6 +62,37 @@ function fixture() {
 }
 
 describe('private native data hashes match the original bound task and result', () => {
+  it('accepts the original uniquely named nested report with unchanged provenance checks', () => {
+    const f = fixture()
+    f.report.name = 'deliverables/product-v1/requirements.md'
+    f.report.version.artifactRef = `artifact:${sha(JSON.stringify([f.outcome.producer.commandFingerprint, f.report.name, sha(f.report.text)]))}`
+    f.outcome.artifacts[0].name = f.report.name
+    f.receipt.artifactRefs = [f.report.version.artifactRef]
+    f.outcome.producer.resultDigest = digest(f.receipt)
+    f.seal()
+    expect(validateWorkflowNativeOutcome(f.task, f.receipt, f.delivery).report).toEqual(f.report)
+  })
+  it('rejects a supplied subset that hides a second manifest report', () => {
+    const f = fixture()
+    const member = { name: 'v2/requirements.md', version: version('other report') }
+    f.outcome.artifacts.push(member)
+    f.receipt.artifactRefs.push(member.version.artifactRef)
+    f.outcome.producer.resultDigest = digest(f.receipt)
+    f.seal()
+    expect(() => validateWorkflowNativeOutcome(f.task, f.receipt, f.delivery)).toThrow(
+      'IDEMPOTENCY_CONFLICT'
+    )
+  })
+  it('preserves a failed outcome without a report as missing evidence', () => {
+    const f = fixture()
+    f.outcome.artifacts = []
+    f.delivery.artifacts = []
+    f.receipt.artifactRefs = []
+    f.receipt.status = f.outcome.producer.status = 'failed'
+    f.outcome.producer.resultDigest = digest(f.receipt)
+    f.seal()
+    expect(validateWorkflowNativeOutcome(f.task, f.receipt, f.delivery).report).toBeUndefined()
+  })
   it('accepts complete synthetic content without creating execution or approval authority', () => {
     const f = fixture()
     expect(validateWorkflowNativeOutcome(f.task, f.receipt, f.delivery).report).toEqual(f.report)

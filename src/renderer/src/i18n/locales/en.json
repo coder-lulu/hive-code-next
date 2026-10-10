@@ -21216,7 +21216,7 @@
     },
     "plans": {
       "title": "Product plan drafts",
-      "readonly": "Draft preview only. Data checks do not adopt a plan. General task-graph execution is unavailable.",
+      "readonly": "This preview preserves the original draft and inspection. Data validation does not adopt or execute a plan; check current execution prerequisites below after adoption.",
       "empty": "No Product plan draft has been recorded for this Case.",
       "revision": "Plan revision {{revision}}",
       "states": {
@@ -21239,7 +21239,7 @@
       "artifactRef": "Plan artifact reference",
       "artifactRevision": "Plan artifact revision",
       "artifactDigest": "Plan artifact digest",
-      "gaps": "Unavailable capabilities",
+      "gaps": "Capability gaps recorded during draft inspection",
       "blocking": "Blocking",
       "optional": "Optional",
       "required": "Required",
@@ -21283,7 +21283,7 @@
     },
     "planApply": {
       "title": "Adopt a plan",
-      "help": "Adoption creates business tasks and dependencies. These tasks remain blocked until task graph dispatch is available. The source workflow history stays attached to its original runs.",
+      "help": "Adoption creates business tasks and dependencies. Run the adopted plan after checking execution prerequisites; source workflow history keeps its original runs.",
       "inspect": "Compare and inspect",
       "refresh": "Refresh",
       "apply": "Adopt as business tasks",
@@ -21293,7 +21293,6 @@
       "added": "Added",
       "removed": "Removed",
       "created": "Plan {{revision}} adopted: {{count}} tasks created",
-      "dispatchUnavailable": "Task graph dispatch is unavailable. No execution has been queued.",
       "receipt": "Original adoption receipt",
       "applicationRef": "Adoption reference",
       "requestId": "Request reference",
@@ -21332,6 +21331,78 @@
         "changed": "The plan or project version changed. Refresh before retrying.",
         "conflict": "This request is already bound to different content. Refresh the original plan before retrying.",
         "unavailable": "The task service or its response is unavailable. Refresh to check the current result before retrying."
+      }
+    },
+    "planGraph": {
+      "title": "Plan task execution",
+      "help": "Advance tasks through the adopted dependencies. Code requires independent testing; release preparation produces a plan.",
+      "report": "View original report",
+      "reportTruncated": "This report is long; its beginning is displayed.",
+      "start": "Run adopted plan",
+      "cancel": "Cancel plan execution",
+      "retry": "Retry this task",
+      "resume": "Resume dependency advancement",
+      "identity": "Task and run references",
+      "limits": "Up to {{parallel}} concurrent tasks · {{seconds}} seconds for this execution",
+      "attempts": "Attempt {{current}} / {{max}}",
+      "deadline": "Execution deadline: {{at}}",
+      "runState": "Original run: {{state}}",
+      "errors": {
+        "forbidden": "This account cannot execute the plan. Check login and project authorization.",
+        "unsupported": "This environment cannot execute this plan.",
+        "changed": "Plan or project state changed. Refresh before retrying.",
+        "conflict": "The request is bound to other content. Refresh the original plan.",
+        "unavailable": "Plan execution service or results are unavailable. Refresh to check the current state."
+      },
+      "states": {
+        "running": "Running",
+        "paused": "Paused",
+        "cancel_requested": "Awaiting stop proof",
+        "done": "Completed",
+        "cancelled": "Cancelled"
+      },
+      "pending": {
+        "read": "Checking plan execution…",
+        "start": "Admitting plan execution…",
+        "cancel": "Requesting cancellation…",
+        "retry": "Admitting retry…",
+        "resume": "Checking resume prerequisites…",
+        "report": "Reading the original report…"
+      },
+      "reasons": {
+        "graph_not_started": "Plan tasks have not started.",
+        "source_case_cancelled": "The source workflow was cancelled.",
+        "source_busy": "The source workflow has unsettled execution.",
+        "project_binding_changed": "The project binding has changed.",
+        "role_unavailable": "A required team role is unavailable.",
+        "resource_loading_unavailable": "Required resources cannot be loaded yet.",
+        "knowledge_access_unavailable": "Required knowledge cannot be accessed yet.",
+        "hard_budget_unavailable": "The required hard budget cannot be enforced yet.",
+        "unsupported_graph": "This graph includes unsupported handoffs.",
+        "independent_review_required": "A code task has no independent testing handoff.",
+        "deadline_exceeded": "The execution deadline has passed; new tasks cannot start.",
+        "graph_paused": "The plan is paused. Review task reasons before retrying or cancelling.",
+        "graph_cancelled": "The plan was cancelled.",
+        "authorization_unavailable": "A successor task cannot be authorized.",
+        "capability_unavailable": "A successor task cannot be executed in this environment.",
+        "revision_conflict": "Task state changed. Check prerequisites before resuming dependency advancement."
+      },
+      "blocked": {
+        "waiting_dependency": "Waiting for dependencies.",
+        "capability_unavailable": "Execution capability is unavailable.",
+        "authorization_unavailable": "Execution authorization is unavailable.",
+        "unknown": "The outcome is unknown; occupancy is retained.",
+        "cancel_requested": "Cancellation requested; awaiting stop proof from the original Runtime.",
+        "failed": "The task failed. Retry within the attempt and duration limits.",
+        "review_rejected": "Independent testing did not approve the work; the plan is paused.",
+        "attempts_exhausted": "The attempt limit has been reached.",
+        "deadline_exceeded": "The execution deadline has passed.",
+        "retry_backoff": "Waiting for the retry interval. Refresh shortly."
+      },
+      "reviews": {
+        "approved": "Independent testing approved the work.",
+        "changes_requested": "Independent testing requested changes.",
+        "rejected": "Independent testing rejected the work."
       }
     }
   },

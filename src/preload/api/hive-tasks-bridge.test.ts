@@ -46,6 +46,18 @@ describe('Hive task run bridge', () => {
     ])
   })
 
+  it('exposes graph control without exposing private run inputs', async () => {
+    const query = {
+      projectId: '11111111-1111-4111-8111-111111111111',
+      caseId: '22222222-2222-4222-8222-222222222222',
+      applicationRef: '33333333-3333-4333-8333-333333333333'
+    }
+    await hiveTasksApi.getWorkflowPlanGraph(query)
+    expect(invoke).toHaveBeenCalledWith('hiveTasks:getWorkflowPlanGraph', query)
+    expect(hiveTasksApi).not.toHaveProperty('getWorkflowPlanRunAdmission')
+    expect(hiveTasksApi).not.toHaveProperty('preparePlanRun')
+  })
+
   it('keeps immutable artifact authorization scoped to its original run', async () => {
     await hiveTasksApi.artifact('task:test', 'run:first', 'artifact:first')
     expect(invoke).toHaveBeenCalledWith(

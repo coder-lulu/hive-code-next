@@ -116,7 +116,8 @@ export function assertTaskCodexFailedBootBinding(
           cancellationKey: task.cancellationKey
         })
       )) ||
-    (!fatalModelFailure && (task.dispatch !== 'dispatching' || !task.cancellationKey)) ||
+    (!fatalModelFailure &&
+      (!['bound', 'dispatching'].includes(task.dispatch) || !task.cancellationKey)) ||
     (fatalModelFailure && !['bound', 'dispatching'].includes(task.dispatch)) ||
     task.result !== null ||
     !task.structuredBinding ||

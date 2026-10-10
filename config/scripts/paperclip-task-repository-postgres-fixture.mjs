@@ -102,7 +102,8 @@ export async function createPostgresTaskHarness(configPath) {
       'workflow-definition-tables.sql',
       'workflow-case-tables.sql',
       'workflow-plan-intent-tables.sql',
-      'workflow-plan-application-tables.sql'
+      'workflow-plan-application-tables.sql',
+      'workflow-plan-graph-tables.sql'
     ]) {
       await sql.unsafe(
         await readFile(

@@ -18,6 +18,15 @@ export const HiveTaskServiceRowSchema = z.object({
     .discriminatedUnion('kind', [
       z.object({ kind: z.literal('personal') }),
       z.object({
+        kind: z.literal('workbenchPlan'),
+        projectId: z.string().uuid(),
+        caseId: z.string().uuid(),
+        applicationRef: z.string().uuid(),
+        graphRef: z.string().uuid(),
+        proposalTaskRef: z.string().min(1).max(160),
+        workspaceRef: z.string().min(1).max(160)
+      }),
+      z.object({
         kind: z.literal('workbenchCase'),
         projectId: z.string().uuid(),
         caseId: z.string().uuid(),

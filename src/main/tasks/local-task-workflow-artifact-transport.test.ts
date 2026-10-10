@@ -1,3 +1,4 @@
+import { TASK_WORKFLOW_NATIVE_MAX_BYTES } from '../../shared/task-execution/task-native-transport-limits'
 import { request as httpRequest } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { artifactReadFixture } from './task-workflow-artifact-read.test-fixture'
@@ -129,7 +130,7 @@ describe('private artifact route authentication and request/response bounds', ()
         ...value.outcome,
         artifacts: [
           {
-            name: 'x'.repeat(TASK_TRANSPORT_MAX_BYTES),
+            name: 'x'.repeat(TASK_WORKFLOW_NATIVE_MAX_BYTES),
             version: value.outcome.artifacts[0].version
           }
         ]

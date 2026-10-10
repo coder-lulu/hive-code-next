@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { readPlanTaskScope } from './task-run-plan-scope.mjs'
 import { validateWorkflowTaskCase } from './task-run-case-scope.mjs'
 import { readWorkflowDefinitionRevision } from './workflow-definition-repository.mjs'
 import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent-session-mutation-envelope.ts'
@@ -48,6 +49,13 @@ function validateBinding(task, scope, team) {
 export function createTaskRunScopeReader(sql) {
   const readInTransaction = async (db, accountId, taskId, runId, lock) => {
     requireTaskRepositoryScope(accountId, taskId, runId)
+    const [plan] = await db`SELECT a.application_id,a.case_id,i.project_id FROM hive_task_bindings b
+      JOIN issues i ON i.id=b.task_id JOIN hive_workflow_plan_application_tasks m ON m.issue_id=i.id
+      JOIN hive_workflow_plan_applications a ON a.application_id=m.application_id
+      WHERE b.account_id=${accountId} AND b.run_id=${runId} AND i.id=${taskId}`
+    if (plan) {
+      return readPlanTaskScope(db, accountId, taskId, runId, lock, plan)
+    }
     const [candidate] =
       await db`SELECT r.case_id,cb.project_id,cb.company_id,cb.account_id AS case_account_id,
       cb.workflow_id,cb.workflow_revision,cb.project_binding_revision

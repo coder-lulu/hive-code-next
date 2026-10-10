@@ -44,7 +44,9 @@ describe('persistent Paperclip run authority for personal tasks and Workbench Ca
       companyId: f.companyId,
       employeeRef: f.task.agent_id
     })
-    expect(f.calls).toHaveLength(2)
+    expect(f.calls).toHaveLength(3)
+    expect(f.calls[0].text).toContain('hive_workflow_plan_application_tasks')
+    expect(f.calls[0].text).not.toContain('FOR ')
     f.task.personal_agent_id = randomUUID()
     await expect(f.read()).rejects.toThrow('FORBIDDEN')
   })
@@ -313,12 +315,14 @@ describe('persistent Paperclip run authority for personal tasks and Workbench Ca
   it('locks the exact Issue/run binding before returning writer authority', async () => {
     const f = fixture()
     await f.read(true)
+    expect(f.calls[0].text).toContain('hive_workflow_plan_application_tasks')
     expect(f.calls[0].text).not.toContain('FOR ')
-    expect(f.calls[1].text).toContain('FOR SHARE OF c,cb,p,pb')
+    expect(f.calls[1].text).not.toContain('FOR ')
+    expect(f.calls[2].text).toContain('FOR SHARE OF c,cb,p,pb')
     const issueLock = f.calls.find(({ text }) => text.includes('FOR UPDATE OF i,b'))
     expect(issueLock).toBeDefined()
     expect(issueLock.values).toEqual([f.accountId, f.taskId, f.runId])
-    expect(f.calls.indexOf(issueLock)).toBeGreaterThan(1)
+    expect(f.calls.indexOf(issueLock)).toBeGreaterThan(2)
   })
 
   it('locks the persisted project before Issue/run or Agent locks for ordinary polling', async () => {

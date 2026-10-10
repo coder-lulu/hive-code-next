@@ -19,6 +19,10 @@ import { assertTaskDirectoryIdentity } from './task-managed-copy'
 import { isTaskDockerEnforcementPolicy } from './task-docker-enforcement'
 import { WorkflowExecutionContextSchema } from '../../shared/task-workflow/workflow-execution-context'
 import { assertTaskOutputWorkspace } from './task-output-workspace'
+import {
+  HIVE_WORKFLOW_PLAN_RUN_INPUT_CHARACTERS,
+  HIVE_WORKFLOW_PLAN_RUN_RESPONSE_BYTES
+} from '../../shared/hive-workflow-plan-response-budget'
 
 export const LocalTaskBindingInputSchema = z
   .strictObject({
@@ -26,11 +30,15 @@ export const LocalTaskBindingInputSchema = z
     paperclipAgentId: TaskOpaqueRef,
     task: TaskRefSchema,
     workspaceSelector: z.string().min(1).max(512),
-    input: z.string().min(1).max(128_000),
+    input: z.string().min(1).max(HIVE_WORKFLOW_PLAN_RUN_INPUT_CHARACTERS),
     executionMode: z.literal('enforced_autonomous').optional(),
     executionDeadlineAt: TaskTimestamp.optional(),
     workflowContext: WorkflowExecutionContextSchema.optional()
   })
+  .refine(
+    (input) => input.workflowContext?.planExecution !== undefined || input.input.length <= 128_000,
+    'Only an adopted workflow plan may supply an expanded prompt.'
+  )
   .refine(
     (input) =>
       input.executionDeadlineAt === undefined || input.executionMode === 'enforced_autonomous',
@@ -82,7 +90,7 @@ function sameFile(before: Stats, after: Stats) {
     before.ctimeMs === after.ctimeMs
   )
 }
-async function readBindingFile(path: string) {
+async function readBindingFile(path: string, maximumBytes = 1024 * 1024) {
   const before = await lstat(path)
   if (
     !before.isFile() ||
@@ -93,7 +101,7 @@ async function readBindingFile(path: string) {
   }
   const file = await open(path, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0))
   try {
-    const read = await readNodeFileHandleWithinLimit(file, 1024 * 1024)
+    const read = await readNodeFileHandleWithinLimit(file, maximumBytes)
     if (!sameFile(before, read.stats) || !sameFile(before, await lstat(path))) {
       return refuseTaskExecution('REVISION_CONFLICT')
     }
@@ -132,7 +140,10 @@ export async function readLocalTaskBinding(options: {
   assertDirectory()
   const [bindingFile, intentFile] = await Promise.all([
     readBindingFile(join(canonical, `${options.key}.json`)),
-    readBindingFile(join(canonical, `${options.key}.intent.json`))
+    readBindingFile(
+      join(canonical, `${options.key}.intent.json`),
+      HIVE_WORKFLOW_PLAN_RUN_RESPONSE_BYTES
+    )
   ])
   const stored = StoredBinding.parse(bindingFile.value)
   const intent = Intent.parse(intentFile.value)

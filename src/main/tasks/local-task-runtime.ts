@@ -224,6 +224,7 @@ export async function startLocalTaskRuntime(options: {
     capabilities,
     currentOwner: currentRuntime,
     prepareCaseRun: facadeService.prepareCaseRun,
+    preparePlanRun: facadeService.preparePlanRun,
     authenticate: credential.authenticate,
     resolveBinding: (companyId, runId, purpose, caller) =>
       issuer.resolveBinding(companyId, runId, caller.operationCallerKey, purpose)

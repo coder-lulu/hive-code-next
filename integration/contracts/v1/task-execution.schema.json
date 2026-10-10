@@ -612,6 +612,255 @@
                   ],
                   "additionalProperties": false
                 },
+                "planExecution": {
+                  "type": "object",
+                  "properties": {
+                    "graphRef": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "applicationRef": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "planRevision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "draftDigest": {
+                      "type": "string",
+                      "minLength": 64,
+                      "maxLength": 64,
+                      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                    },
+                    "proposalDigest": {
+                      "type": "string",
+                      "minLength": 64,
+                      "maxLength": 64,
+                      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                    },
+                    "proposalTaskRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "sourceTask": {
+                      "type": "object",
+                      "properties": {
+                        "spaceId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "taskId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "runId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "attempt": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "taskRevision": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        }
+                      },
+                      "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+                      "additionalProperties": false
+                    },
+                    "dependencyOutcomes": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "proposalTaskRef": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                          },
+                          "producer": {
+                            "type": "object",
+                            "properties": {
+                              "employeeRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": ["product", "developer", "tester", "ops"]
+                              },
+                              "task": {
+                                "type": "object",
+                                "properties": {
+                                  "spaceId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160,
+                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                  },
+                                  "taskId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160,
+                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                  },
+                                  "runId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160,
+                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                  },
+                                  "attempt": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "taskRevision": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160,
+                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                  }
+                                },
+                                "required": [
+                                  "spaceId",
+                                  "taskId",
+                                  "runId",
+                                  "attempt",
+                                  "taskRevision"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "runtimeRecordId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "ownershipEpoch": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "executionId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "executionEpoch": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "commandFingerprint": {
+                                "type": "string",
+                                "minLength": 64,
+                                "maxLength": 64,
+                                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                              },
+                              "sessionRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "executionWorkspaceRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "workspaceExecutionClaimRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              }
+                            },
+                            "required": [
+                              "employeeRef",
+                              "role",
+                              "task",
+                              "runtimeRecordId",
+                              "ownershipEpoch",
+                              "executionId",
+                              "executionEpoch",
+                              "commandFingerprint",
+                              "sessionRef",
+                              "executionWorkspaceRef",
+                              "workspaceExecutionClaimRef"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "outcomeRef": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                          },
+                          "outcomeVersion": {
+                            "type": "object",
+                            "properties": {
+                              "artifactRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "artifactRevision": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "digest": {
+                                "type": "string",
+                                "minLength": 64,
+                                "maxLength": 64,
+                                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                              }
+                            },
+                            "required": ["artifactRef", "artifactRevision", "digest"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["proposalTaskRef", "producer", "outcomeRef", "outcomeVersion"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "graphRef",
+                    "applicationRef",
+                    "planRevision",
+                    "draftDigest",
+                    "proposalDigest",
+                    "proposalTaskRef",
+                    "sourceTask",
+                    "dependencyOutcomes"
+                  ],
+                  "additionalProperties": false
+                },
                 "codeInput": {
                   "type": "object",
                   "properties": {
@@ -1440,6 +1689,255 @@
                     "policyRef",
                     "policyRevision",
                     "facts"
+                  ],
+                  "additionalProperties": false
+                },
+                "planExecution": {
+                  "type": "object",
+                  "properties": {
+                    "graphRef": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "applicationRef": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "planRevision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "draftDigest": {
+                      "type": "string",
+                      "minLength": 64,
+                      "maxLength": 64,
+                      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                    },
+                    "proposalDigest": {
+                      "type": "string",
+                      "minLength": 64,
+                      "maxLength": 64,
+                      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                    },
+                    "proposalTaskRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "sourceTask": {
+                      "type": "object",
+                      "properties": {
+                        "spaceId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "taskId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "runId": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "attempt": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "taskRevision": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        }
+                      },
+                      "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+                      "additionalProperties": false
+                    },
+                    "dependencyOutcomes": {
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "proposalTaskRef": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                          },
+                          "producer": {
+                            "type": "object",
+                            "properties": {
+                              "employeeRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "role": {
+                                "type": "string",
+                                "enum": ["product", "developer", "tester", "ops"]
+                              },
+                              "task": {
+                                "type": "object",
+                                "properties": {
+                                  "spaceId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160,
+                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                  },
+                                  "taskId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160,
+                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                  },
+                                  "runId": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160,
+                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                  },
+                                  "attempt": {
+                                    "type": "integer",
+                                    "minimum": 1,
+                                    "maximum": 9007199254740991
+                                  },
+                                  "taskRevision": {
+                                    "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 160,
+                                    "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                                  }
+                                },
+                                "required": [
+                                  "spaceId",
+                                  "taskId",
+                                  "runId",
+                                  "attempt",
+                                  "taskRevision"
+                                ],
+                                "additionalProperties": false
+                              },
+                              "runtimeRecordId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "ownershipEpoch": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "executionId": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "executionEpoch": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "commandFingerprint": {
+                                "type": "string",
+                                "minLength": 64,
+                                "maxLength": 64,
+                                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                              },
+                              "sessionRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "executionWorkspaceRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "workspaceExecutionClaimRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              }
+                            },
+                            "required": [
+                              "employeeRef",
+                              "role",
+                              "task",
+                              "runtimeRecordId",
+                              "ownershipEpoch",
+                              "executionId",
+                              "executionEpoch",
+                              "commandFingerprint",
+                              "sessionRef",
+                              "executionWorkspaceRef",
+                              "workspaceExecutionClaimRef"
+                            ],
+                            "additionalProperties": false
+                          },
+                          "outcomeRef": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                          },
+                          "outcomeVersion": {
+                            "type": "object",
+                            "properties": {
+                              "artifactRef": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 160,
+                                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                              },
+                              "artifactRevision": {
+                                "type": "integer",
+                                "minimum": 1,
+                                "maximum": 9007199254740991
+                              },
+                              "digest": {
+                                "type": "string",
+                                "minLength": 64,
+                                "maxLength": 64,
+                                "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                              }
+                            },
+                            "required": ["artifactRef", "artifactRevision", "digest"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["proposalTaskRef", "producer", "outcomeRef", "outcomeVersion"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "graphRef",
+                    "applicationRef",
+                    "planRevision",
+                    "draftDigest",
+                    "proposalDigest",
+                    "proposalTaskRef",
+                    "sourceTask",
+                    "dependencyOutcomes"
                   ],
                   "additionalProperties": false
                 },

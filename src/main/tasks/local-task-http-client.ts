@@ -14,6 +14,7 @@ export type LocalTaskClientOptions = {
   maximumResponseBytesByPath?: Readonly<Record<string, number>>
   maximumResponseStructuralTokensByPath?: Readonly<Record<string, number>>
 }
+type ResponseLimits = { maximumBytes: number; structuralTokens: number }
 const MAX_BYTES = 64 * 1024
 
 /** The credential's only audience is the exact local task service; redirects are never followed. */
@@ -38,7 +39,7 @@ export function createLocalTaskRequest(options: LocalTaskClientOptions) {
     throw new TaskExecutionError('INVALID_REQUEST')
   }
   const fetchImpl = options.fetch ?? fetch
-  return async (path: string, body?: unknown): Promise<unknown> => {
+  return async (path: string, body?: unknown, limits?: ResponseLimits): Promise<unknown> => {
     if (!path.startsWith('/') || path.startsWith('//')) {
       throw new TaskExecutionError('INVALID_REQUEST')
     }
@@ -62,14 +63,18 @@ export function createLocalTaskRequest(options: LocalTaskClientOptions) {
       })
       const bytes = await readFetchResponseBytesWithinLimit(
         response,
-        options.maximumResponseBytesByPath?.[target.pathname] ??
+        limits?.maximumBytes ??
+          options.maximumResponseBytesByPath?.[target.pathname] ??
           options.maximumResponseBytes ??
           MAX_BYTES
       )
       const content = new TextDecoder('utf-8', { fatal: true }).decode(bytes)
       assertJsonTextStructureWithinLimits(content, {
         nestingDepth: 16,
-        structuralTokens: options.maximumResponseStructuralTokensByPath?.[target.pathname] ?? 16_384
+        structuralTokens:
+          limits?.structuralTokens ??
+          options.maximumResponseStructuralTokensByPath?.[target.pathname] ??
+          16_384
       })
       const value: unknown = JSON.parse(content)
       if (!response.ok) {

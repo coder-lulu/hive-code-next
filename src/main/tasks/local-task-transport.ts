@@ -1,17 +1,26 @@
-import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { createServer, type ServerResponse } from 'node:http'
 import { once } from 'node:events'
 import type { TaskExecutionCaller, TaskExecutionHost } from './task-execution-host'
 import { TaskExecutionError } from './task-execution-error'
 import { TaskOpaqueRef } from '../../shared/task-execution/task-execution-primitives'
-import type { HiveRuntimeBindingPurpose } from './paperclip-adapter-contract'
+import {
+  HiveRuntimeAdapterBinding,
+  type HiveRuntimeBindingPurpose
+} from './paperclip-adapter-contract'
 import {
   LocalTaskRuntimeOwnerSchema,
   TaskDeliveryTokenSchema
 } from '../../shared/task-execution/task-command-delivery'
 import { WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES } from '../../shared/task-workflow/workflow-native-outcome'
+import { HiveWorkflowPlanRunReadSchema } from '../../shared/hive-workflow-plan-runs'
 import { HiveWorkflowCaseRunReadSchema } from '../../shared/hive-workflow-case-runs'
 
-export const TASK_TRANSPORT_MAX_BYTES = 64 * 1024
+import { readTaskCommand } from './local-task-command-body'
+import {
+  TASK_NATIVE_DEFAULT_MAX_BYTES as TASK_TRANSPORT_MAX_BYTES,
+  TASK_WORKFLOW_NATIVE_MAX_BYTES
+} from '../../shared/task-execution/task-native-transport-limits'
+export { TASK_TRANSPORT_MAX_BYTES }
 const errorStatus = (code: TaskExecutionError['code']) =>
   ({
     INVALID_REQUEST: 400,
@@ -26,29 +35,6 @@ const errorStatus = (code: TaskExecutionError['code']) =>
     CAPACITY_EXCEEDED: 429,
     SERVICE_UNAVAILABLE: 503
   })[code]
-
-async function readTaskCommand(request: IncomingMessage) {
-  const declaredSize = Number(request.headers['content-length'])
-  if (declaredSize > TASK_TRANSPORT_MAX_BYTES) {
-    throw Object.assign(new TaskExecutionError('INVALID_REQUEST'), { status: 413 })
-  }
-  const chunks: Buffer[] = []
-  let size = 0
-  for await (const chunk of request.iterator({ destroyOnReturn: false })) {
-    const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)
-    size += bytes.length
-    if (size > TASK_TRANSPORT_MAX_BYTES) {
-      request.resume()
-      throw Object.assign(new TaskExecutionError('INVALID_REQUEST'), { status: 413 })
-    }
-    chunks.push(bytes)
-  }
-  try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks, size)))
-  } catch {
-    throw new TaskExecutionError('INVALID_REQUEST')
-  }
-}
 
 /** Loopback is a network restriction; a separate restricted service credential authenticates every call. */
 export async function startLocalTaskTransport(options: {
@@ -65,6 +51,7 @@ export async function startLocalTaskTransport(options: {
   authenticate: (bearer: string) => TaskExecutionCaller | null
   capabilities: (caller: TaskExecutionCaller) => unknown
   currentOwner?: (caller: TaskExecutionCaller) => unknown
+  preparePlanRun?: (refs: unknown, caller: TaskExecutionCaller) => Promise<unknown>
   prepareCaseRun?: (refs: unknown, caller: TaskExecutionCaller) => Promise<unknown>
   resolveBinding?: (
     companyId: string,
@@ -177,34 +164,40 @@ export async function startLocalTaskTransport(options: {
         const purpose = bindingPath[3] === 'execute' ? 'execute' : 'recover'
         const binding = await options.resolveBinding(companyId.data, runId.data, purpose, caller)
         caller.assertCurrent?.()
-        send(response, 200, binding)
+        const parsedBinding = HiveRuntimeAdapterBinding.safeParse(binding)
+        send(
+          response,
+          200,
+          binding,
+          parsedBinding.success && parsedBinding.data.command.workflowContext
+            ? TASK_WORKFLOW_NATIVE_MAX_BYTES
+            : TASK_TRANSPORT_MAX_BYTES
+        )
         return
       }
-      if (request.url === '/execution/workflow-prepare' && request.method === 'POST') {
+      const preparation =
+        request.url === '/execution/workflow-prepare'
+          ? { schema: HiveWorkflowCaseRunReadSchema, prepare: options.prepareCaseRun }
+          : request.url === '/execution/workflow-plan-prepare'
+            ? { schema: HiveWorkflowPlanRunReadSchema, prepare: options.preparePlanRun }
+            : null
+      if (preparation && request.method === 'POST') {
         if (
           !/^application\/json(?:;\s*charset=utf-8)?$/i.test(request.headers['content-type'] ?? '')
         ) {
           throw new TaskExecutionError('INVALID_REQUEST')
         }
-        const refs = HiveWorkflowCaseRunReadSchema.safeParse(await readTaskCommand(request))
+        const refs = preparation.schema.safeParse(await readTaskCommand(request))
         if (!refs.success) {
           throw new TaskExecutionError('INVALID_REQUEST')
         }
         caller.assertCurrent?.()
-        if (!options.prepareCaseRun) {
+        if (!preparation.prepare) {
           throw new TaskExecutionError('CAPABILITY_UNAVAILABLE')
         }
-        const result = HiveWorkflowCaseRunReadSchema.safeParse(
-          await options.prepareCaseRun(refs.data, caller)
-        )
+        const result = preparation.schema.safeParse(await preparation.prepare(refs.data, caller))
         caller.assertCurrent?.()
-        if (
-          !result.success ||
-          refs.data.projectId !== result.data.projectId ||
-          refs.data.caseId !== result.data.caseId ||
-          refs.data.taskId !== result.data.taskId ||
-          refs.data.runId !== result.data.runId
-        ) {
+        if (!result.success || JSON.stringify(refs.data) !== JSON.stringify(result.data)) {
           throw new TaskExecutionError('OUTCOME_UNKNOWN')
         }
         send(response, 200, result.data)
@@ -227,7 +220,7 @@ export async function startLocalTaskTransport(options: {
       ) {
         throw new TaskExecutionError('INVALID_REQUEST')
       }
-      const command = await readTaskCommand(request)
+      const command = await readTaskCommand(request, route === 'start')
       caller.assertCurrent?.()
       const operation: (value: unknown, caller: TaskExecutionCaller) => Promise<unknown> =
         options.host[route]
@@ -239,7 +232,9 @@ export async function startLocalTaskTransport(options: {
         result,
         route === 'workflowCommands' || route === 'workflowArtifact'
           ? WORKFLOW_NATIVE_EVIDENCE_MAX_BYTES
-          : TASK_TRANSPORT_MAX_BYTES
+          : route === 'workflowOutcome'
+            ? TASK_WORKFLOW_NATIVE_MAX_BYTES
+            : TASK_TRANSPORT_MAX_BYTES
       )
     } catch (error) {
       const code = error instanceof TaskExecutionError ? error.code : 'SERVICE_UNAVAILABLE'

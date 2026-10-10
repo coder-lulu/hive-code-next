@@ -3,14 +3,12 @@ import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent
 import { WorkflowNativeDeliverySchema } from '../../../src/shared/task-workflow/workflow-native-delivery.ts'
 import { WorkflowReviewProposalSchema } from '../../../src/shared/task-workflow/workflow-review-proposal.ts'
 import { refuseTaskRepository as refuse } from './task-delivery-repository.mjs'
+import {
+  selectWorkflowRoleArtifact,
+  workflowRoleReportNames
+} from '../../../src/shared/task-workflow/workflow-role-artifacts.ts'
 
 const sha = (value) => createHash('sha256').update(value).digest('hex')
-const reports = {
-  product: 'requirements.md',
-  developer: 'implementation.md',
-  tester: 'test-report.md',
-  ops: 'release-plan.md'
-}
 const identityKeys = [
   'protocolVersion',
   'runtimeRecordId',
@@ -70,10 +68,24 @@ export function validateWorkflowNativeOutcome(task, receipt, rawDelivery) {
       refuse('IDEMPOTENCY_CONFLICT')
     }
   }
-  const report = delivery.artifacts.find(
-    (artifact) => artifact.name === reports[outcome.context.role]
-  )
-  const reviewArtifact = delivery.artifacts.find((artifact) => artifact.name === 'review.json')
+  const selectDelivered = (name) => {
+    let member
+    try {
+      member = selectWorkflowRoleArtifact(outcome.artifacts, name)
+    } catch {
+      refuse('IDEMPOTENCY_CONFLICT')
+    }
+    return (
+      member &&
+      delivery.artifacts.find(
+        (artifact) =>
+          artifact.name === member.name && digest(artifact.version) === digest(member.version)
+      )
+    )
+  }
+  const report = selectDelivered(workflowRoleReportNames[outcome.context.role])
+  const reviewArtifact =
+    outcome.context.role === 'tester' ? selectDelivered('review.json') : undefined
   let proposal
   if (outcome.context.role === 'tester' && reviewArtifact) {
     try {

@@ -45,6 +45,29 @@ function fixture() {
 }
 
 describe('original native assets read under the existing delivery lease', () => {
+  it('reads the unique original nested role report without changing its identity', async () => {
+    const f = fixture()
+    f.value.artifacts[0].name = 'deliverables/product-v1/requirements.md'
+    f.value.asset.outcome.artifacts[0].name = f.value.artifacts[0].name
+    expect((await readWorkflowNativeDelivery(f.options)).artifacts).toEqual(f.value.artifacts)
+  })
+  it('reads adopted Product native evidence without requesting another planning proposal', async () => {
+    const f = fixture()
+    f.options.task.run_scope.kind = 'workbenchPlan'
+    f.value.asset.outcome.context.planExecution = {
+      graphRef: '11111111-1111-4111-8111-111111111111',
+      applicationRef: '22222222-2222-4222-8222-222222222222',
+      planRevision: 1,
+      draftDigest: 'a'.repeat(64),
+      proposalDigest: 'b'.repeat(64),
+      proposalTaskRef: f.value.asset.outcome.context.stageRef,
+      sourceTask: f.value.asset.outcome.producer.task,
+      dependencyOutcomes: []
+    }
+    delete f.value.asset.outcome.context.planIntent
+    expect((await readWorkflowNativeDelivery(f.options)).artifacts).toEqual(f.value.artifacts)
+    expect(f.client.workflowArtifact).toHaveBeenCalledTimes(1)
+  })
   it('reads the exact Product plan member with a fresh binding for the second file', async () => {
     const f = fixture()
     const plan = {
@@ -137,6 +160,27 @@ describe('original native assets read under the existing delivery lease', () => 
     const f = fixture()
     f.value.asset.outcome.artifacts.push(f.value.asset.outcome.artifacts[0])
     await expect(readWorkflowNativeDelivery(f.options)).rejects.toThrow('IDEMPOTENCY_CONFLICT')
+  })
+  it('rejects ambiguity across root and nested reports before reading either', async () => {
+    const f = fixture()
+    f.value.asset.outcome.artifacts.push({
+      ...f.value.asset.outcome.artifacts[0],
+      name: 'v2/requirements.md'
+    })
+    await expect(readWorkflowNativeDelivery(f.options)).rejects.toThrow('IDEMPOTENCY_CONFLICT')
+    expect(f.client.workflowArtifact).not.toHaveBeenCalled()
+  })
+  it('does not broaden the exact plan proposal path', async () => {
+    const f = fixture()
+    f.value.asset.outcome.artifacts.push({
+      name: 'v1/plan-proposal.json',
+      version: {
+        ...f.value.asset.outcome.artifacts[0].version,
+        artifactRef: `artifact:${'9'.repeat(64)}`
+      }
+    })
+    expect((await readWorkflowNativeDelivery(f.options)).artifacts).toEqual(f.value.artifacts)
+    expect(f.client.workflowArtifact).toHaveBeenCalledTimes(1)
   })
   it('stops reading as soon as the real delivery lease guard is revoked', async () => {
     const f = fixture()

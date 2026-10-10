@@ -1,12 +1,9 @@
 import { WorkflowNativeDeliverySchema } from '../../../src/shared/task-workflow/workflow-native-delivery.ts'
 import { refuseTaskRepository as refuse } from './task-delivery-repository.mjs'
-
-const reports = {
-  product: 'requirements.md',
-  developer: 'implementation.md',
-  tester: 'test-report.md',
-  ops: 'release-plan.md'
-}
+import {
+  selectWorkflowRoleArtifact,
+  workflowRoleReportNames
+} from '../../../src/shared/task-workflow/workflow-role-artifacts.ts'
 
 /** Read original immutable assets under this delivery lease; never create execution authority. */
 export async function readWorkflowNativeDelivery({
@@ -17,7 +14,7 @@ export async function readWorkflowNativeDelivery({
   assertCurrent
 }) {
   if (
-    task.run_scope.kind !== 'workbenchCase' ||
+    !['workbenchCase', 'workbenchPlan'].includes(task.run_scope.kind) ||
     !observation.result ||
     observation.result.status === 'cancelled' ||
     observation.result.stopProof.evidenceKind === 'not_started' ||
@@ -56,13 +53,29 @@ export async function readWorkflowNativeDelivery({
     refuse('IDEMPOTENCY_CONFLICT')
   }
   const names = [
-    reports[outcome.context.role],
-    ...(outcome.context.role === 'product' ? ['plan-proposal.json'] : []),
+    workflowRoleReportNames[outcome.context.role],
+    ...(outcome.context.role === 'product' && !outcome.context.planExecution
+      ? ['plan-proposal.json']
+      : []),
     ...(outcome.context.role === 'tester' ? ['review.json'] : [])
   ]
   const artifacts = []
   for (const name of names) {
-    const matches = outcome.artifacts.filter((artifact) => artifact.name === name)
+    let matches
+    try {
+      const selected =
+        name === 'plan-proposal.json'
+          ? undefined
+          : selectWorkflowRoleArtifact(outcome.artifacts, name)
+      matches =
+        name === 'plan-proposal.json'
+          ? outcome.artifacts.filter((artifact) => artifact.name === name)
+          : selected
+            ? [selected]
+            : []
+    } catch {
+      refuse('IDEMPOTENCY_CONFLICT')
+    }
     if (matches.length > 1) {
       refuse('IDEMPOTENCY_CONFLICT')
     }

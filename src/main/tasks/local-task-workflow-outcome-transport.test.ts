@@ -1,3 +1,4 @@
+import { TASK_WORKFLOW_NATIVE_MAX_BYTES } from '../../shared/task-execution/task-native-transport-limits'
 import { request as httpRequest } from 'node:http'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { startLocalTaskTransport, TASK_TRANSPORT_MAX_BYTES } from './local-task-transport'
@@ -109,13 +110,13 @@ describe('authenticated and bounded workflow outcome loopback transport', () => 
       expect(f.deps.authorize).not.toHaveBeenCalled()
     }
   )
-  it('keeps outcome and other routes at 64 KiB while bounding commands at 8 MiB', async () => {
+  it('bounds workflow outcomes at 1 MiB, ordinary routes at 64 KiB and commands at 8 MiB', async () => {
     const f = await fixture(1)
     vi.mocked(f.deps.workflowOutcomes!.read).mockResolvedValueOnce({
       ...f.asset,
       outcome: {
         ...f.asset.outcome,
-        artifacts: [{ name: 'x'.repeat(TASK_TRANSPORT_MAX_BYTES), version: f.asset.version }]
+        artifacts: [{ name: 'x'.repeat(TASK_WORKFLOW_NATIVE_MAX_BYTES), version: f.asset.version }]
       }
     })
     const outcome = await fetch(`${f.baseUrl}/execution/workflow-outcome`, {
