@@ -7,6 +7,7 @@ import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent
 import { readWorkflowDefinitionRevision } from './workflow-definition-repository.mjs'
 import { refuseWorkbench, workbenchOwnerReferences } from './team-workbench-repository-records.mjs'
 import { readWorkflowCaseEvidence } from './workflow-case-evidence-projection.mjs'
+import { readCurrentWorkflowPlanIntent } from './workflow-plan-intent-repository.mjs'
 
 function stored(schema, value) {
   const parsed = schema.safeParse(value)
@@ -192,6 +193,7 @@ export async function readWorkflowCaseView(db, accountId, project, caseId, expec
   }
   return stored(HiveWorkflowCaseViewSchema, {
     ...view,
+    planningIntent: await readCurrentWorkflowPlanIntent(db, accountId, view),
     ...(await readWorkflowCaseEvidence(db, accountId, view))
   })
 }

@@ -4,6 +4,35 @@ import { workflowTestVectors } from '../../shared/task-workflow/workflow.test-fi
 import { TaskExecutionStartSchema } from '../../shared/task-execution/task-execution-command'
 import { computeTaskExecutionFingerprint } from '../../shared/task-execution/task-execution-fingerprint'
 import { taskCommand } from './task-execution.test-fixture'
+import { workflowPlanIntentFixture } from '../../shared/task-workflow/workflow-plan-draft.test-fixture'
+
+function productContext() {
+  const { codeInput: _codeInput, ...value } = context()
+  const planIntent = workflowPlanIntentFixture()
+  planIntent.facts.binding = value.binding
+  planIntent.facts.definitionDigest = value.definitionDigest
+  planIntent.sourceTask.spaceId = value.binding.scope.companyRef
+  planIntent.stageRef = value.stageRef
+  planIntent.employeeRef = value.employeeRef
+  return WorkflowExecutionContextSchema.parse({ ...value, role: 'product', planIntent })
+}
+
+function plannedCommand() {
+  const workflowContext = productContext()
+  const command = taskCommand()
+  return TaskExecutionStartSchema.parse({
+    ...command,
+    executionDeadlineAt: command.expiresAt,
+    task: { ...workflowContext.planIntent!.sourceTask },
+    executionPolicy: {
+      trustMode: 'enforced_autonomous',
+      executionPolicyRef: 'docker-local-linux',
+      executionPolicyRevision: '1',
+      enforcementEvidenceRef: `docker-enforcement:${'c'.repeat(64)}`
+    },
+    workflowContext
+  })
+}
 
 function context() {
   const handoff = workflowTestVectors.examples.handoff
@@ -65,6 +94,63 @@ describe('host-bound workflow execution metadata', () => {
       true
     )
   })
+  it('keeps historical absent planning intent absent and preserves actual Product intent', () => {
+    expect(WorkflowExecutionContextSchema.parse(context())).not.toHaveProperty('planIntent')
+    const product = productContext()
+    expect(WorkflowExecutionContextSchema.parse(product)).toEqual(product)
+  })
+  it.each(['binding', 'definitionDigest', 'stageRef', 'employeeRef'] as const)(
+    'rejects Product planning intent whose %s differs from its frozen context',
+    (field) => {
+      const product = productContext()
+      const intent = product.planIntent!
+      if (field === 'binding') {
+        intent.facts.binding = { ...intent.facts.binding, workflowRunRef: 'case-foreign' }
+      } else if (field === 'definitionDigest') {
+        intent.facts.definitionDigest = '0'.repeat(64)
+      } else {
+        intent[field] = 'foreign-test'
+      }
+      expect(WorkflowExecutionContextSchema.safeParse(product).success).toBe(false)
+    }
+  )
+  it.each(['developer', 'tester', 'ops'] as const)(
+    'rejects planning intent on a %s context',
+    (role) => {
+      const value = context()
+      const intent = productContext().planIntent
+      expect(
+        WorkflowExecutionContextSchema.safeParse({ ...value, role, planIntent: intent }).success
+      ).toBe(false)
+    }
+  )
+  it('includes the independently allocated plan revision in the command fingerprint', () => {
+    const controlled = plannedCommand()
+    expect(TaskExecutionStartSchema.safeParse(controlled).success).toBe(true)
+    expect(controlled.task).toEqual(controlled.workflowContext!.planIntent!.sourceTask)
+    const changed = structuredClone(controlled)
+    changed.workflowContext!.planIntent!.facts.planRevision++
+    expect(computeTaskExecutionFingerprint(changed, 'trusted-local:runtime')).not.toBe(
+      computeTaskExecutionFingerprint(controlled, 'trusted-local:runtime')
+    )
+  })
+  it.each(['spaceId', 'taskId', 'runId', 'attempt', 'taskRevision'] as const)(
+    'rejects a command whose %s differs from the actual planning source task',
+    (field) => {
+      const command = plannedCommand()
+      const changed = {
+        ...command,
+        task: { ...command.task, [field]: field === 'attempt' ? 2 : 'foreign-test' }
+      }
+      const parsed = TaskExecutionStartSchema.safeParse(changed)
+      expect(parsed.success).toBe(false)
+      if (!parsed.success) {
+        expect(parsed.error.issues.map((issue) => issue.message)).toContain(
+          'workflow_plan_task_mismatch'
+        )
+      }
+    }
+  )
   it('requires enforced policy and exact command company at the execution boundary', () => {
     const workflowContext = context()
     const command = taskCommand()

@@ -1,12 +1,19 @@
 import { createHash } from 'node:crypto'
+import { workflowRoleExecutionForAsset } from './workflow-native-role-execution.mjs'
+export { workflowRoleExecutionForAsset } from './workflow-native-role-execution.mjs'
+import { WorkflowPlanDraftSchema } from '../../../src/shared/task-workflow/workflow-plan-draft.ts'
+import {
+  validateWorkflowPlanIntentRow,
+  readWorkflowPlanIntentRows
+} from './workflow-plan-intent-repository.mjs'
+import { validateWorkflowPlanDraft } from './workflow-plan-draft-projection.mjs'
 import { z } from 'zod'
 import { readWorkflowCaseExecutionNotices } from './workflow-case-execution-notice-projection.mjs'
 import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import { WorkflowNativeOutcomeAssetSchema } from '../../../src/shared/task-workflow/workflow-native-outcome.ts'
 import {
   WorkflowHandoffSchema,
-  WorkflowReviewSchema,
-  WorkflowRoleExecutionSchema
+  WorkflowReviewSchema
 } from '../../../src/shared/task-workflow/workflow-evidence.ts'
 import { TaskExecutionResultSchema } from '../../../src/shared/task-execution/task-execution-receipts.ts'
 import { HiveRuntimeAdapterBinding } from '../../../src/main/tasks/paperclip-adapter-contract.ts'
@@ -17,25 +24,9 @@ export const WorkflowCaseOutcomeConsumedPayloadSchema = z.strictObject({
   kind: z.literal('hive.workflow.outcome_consumed'),
   asset: WorkflowNativeOutcomeAssetSchema,
   handoff: WorkflowHandoffSchema.optional(),
-  review: WorkflowReviewSchema.optional()
+  review: WorkflowReviewSchema.optional(),
+  planDraft: WorkflowPlanDraftSchema.optional()
 })
-
-export function workflowRoleExecutionForAsset(rawAsset) {
-  const { context, producer } = WorkflowNativeOutcomeAssetSchema.parse(rawAsset).outcome
-  return WorkflowRoleExecutionSchema.parse({
-    employeeRef: context.employeeRef,
-    role: context.role,
-    task: producer.task,
-    runtimeRecordId: producer.runtimeRecordId,
-    ownershipEpoch: producer.ownershipEpoch,
-    executionId: producer.executionId,
-    executionEpoch: producer.executionEpoch,
-    commandFingerprint: producer.commandFingerprint,
-    sessionRef: producer.sessionRef,
-    executionWorkspaceRef: producer.executionWorkspaceId,
-    workspaceExecutionClaimRef: producer.workspaceExecutionClaimRef
-  })
-}
 
 export function validateWorkflowCaseEvidenceEvent(row, accountId, view) {
   const payload = WorkflowCaseOutcomeConsumedPayloadSchema.safeParse(row.payload)
@@ -92,6 +83,8 @@ export function validateWorkflowCaseEvidenceEvent(row, accountId, view) {
     context.definitionDigest !== view.definitionDigest ||
     digest(context) !== digest(input.data.workflowContext) ||
     input.data.caseId !== view.id ||
+    command.inputRef !== `input:${input.data.inputDigest}` ||
+    input.data.inputDigest !== digest(input.data.input) ||
     digest(producer.task) !== digest(input.data.task) ||
     digest(producer.task) !== digest(command.task) ||
     producer.commandFingerprint !== binding.data.commandFingerprint ||
@@ -132,6 +125,8 @@ export function validateWorkflowCaseEvidenceEvent(row, accountId, view) {
   ) {
     refuse('REVISION_CONFLICT')
   }
+  const planIntent = validateWorkflowPlanIntentRow(row.plan_intent, accountId, input.data, view)
+  validateWorkflowPlanDraft(payload.data.planDraft, asset, input.data, planIntent)
   return { eventId: row.id, ...payload.data }
 }
 
@@ -146,6 +141,9 @@ export async function readWorkflowCaseConsumedEvidence(db, accountId, view) {
     refuse('REVISION_CONFLICT')
   }
   const evidence = []
+  const plans = new Map(
+    (await readWorkflowPlanIntentRows(db, accountId, view)).map((row) => [row.run_id, row])
+  )
   for (const row of rows) {
     const [producer] =
       await db`SELECT b.task_id,b.account_id,b.binding,b.workflow_input,b.result_receipt,
@@ -155,7 +153,14 @@ export async function readWorkflowCaseConsumedEvidence(db, accountId, view) {
     if (!producer) {
       refuse('REVISION_CONFLICT')
     }
-    evidence.push(validateWorkflowCaseEvidenceEvent({ ...row, ...producer }, accountId, view))
+    const planIntent = plans.get(row.run_id)
+    evidence.push(
+      validateWorkflowCaseEvidenceEvent(
+        { ...row, ...producer, plan_intent: planIntent },
+        accountId,
+        view
+      )
+    )
   }
   return evidence
 }
@@ -163,6 +168,7 @@ export async function readWorkflowCaseConsumedEvidence(db, accountId, view) {
 export async function readWorkflowCaseEvidence(db, accountId, view) {
   const evidence = await readWorkflowCaseConsumedEvidence(db, accountId, view)
   return {
+    planDrafts: evidence.flatMap((item) => (item.planDraft ? [item.planDraft] : [])),
     handoffs: evidence.flatMap((item) => (item.handoff ? [item.handoff] : [])),
     reviews: evidence.flatMap((item) => (item.review ? [item.review] : [])),
     executionNotices: await readWorkflowCaseExecutionNotices(db, accountId, view, evidence)

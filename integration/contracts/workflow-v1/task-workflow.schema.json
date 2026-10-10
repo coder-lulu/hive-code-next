@@ -809,6 +809,927 @@
       ],
       "additionalProperties": false
     },
+    "PlanIntent": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "workflow.plan-intent"
+        },
+        "intentRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "sourceTask": {
+          "type": "object",
+          "properties": {
+            "spaceId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "taskId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "runId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "attempt": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "taskRevision": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            }
+          },
+          "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+          "additionalProperties": false
+        },
+        "stageRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "employeeRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "policyRef": {
+          "type": "string",
+          "const": "workflow.plan-inspection"
+        },
+        "policyRevision": {
+          "type": "number",
+          "const": 1
+        },
+        "facts": {
+          "type": "object",
+          "properties": {
+            "binding": {
+              "type": "object",
+              "properties": {
+                "scope": {
+                  "type": "object",
+                  "properties": {
+                    "companyRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "projectRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["companyRef", "projectRef"],
+                  "additionalProperties": false
+                },
+                "workflowRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "workflowRevision": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "workflowRunRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                }
+              },
+              "required": ["scope", "workflowRef", "workflowRevision", "workflowRunRef"],
+              "additionalProperties": false
+            },
+            "definitionDigest": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "goalRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "planRevision": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "authorizedRoles": {
+              "minItems": 1,
+              "maxItems": 4,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["product", "developer", "tester", "ops"]
+              }
+            },
+            "limits": {
+              "type": "object",
+              "properties": {
+                "maxTasks": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 32
+                },
+                "maxParallelism": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 4
+                },
+                "maxDurationMs": {
+                  "type": "integer",
+                  "minimum": 1000,
+                  "maximum": 86400000
+                },
+                "maxAttempts": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3
+                }
+              },
+              "required": ["maxTasks", "maxParallelism", "maxDurationMs", "maxAttempts"],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "binding",
+            "definitionDigest",
+            "goalRef",
+            "planRevision",
+            "authorizedRoles",
+            "limits"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "contractVersion",
+        "kind",
+        "intentRef",
+        "sourceTask",
+        "stageRef",
+        "employeeRef",
+        "policyRef",
+        "policyRevision",
+        "facts"
+      ],
+      "additionalProperties": false
+    },
+    "PlanDraft": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "contractVersion": {
+          "type": "number",
+          "const": 1
+        },
+        "kind": {
+          "type": "string",
+          "const": "workflow.plan-draft"
+        },
+        "draftRef": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+        },
+        "intent": {
+          "type": "object",
+          "properties": {
+            "contractVersion": {
+              "type": "number",
+              "const": 1
+            },
+            "kind": {
+              "type": "string",
+              "const": "workflow.plan-intent"
+            },
+            "intentRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "sourceTask": {
+              "type": "object",
+              "properties": {
+                "spaceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "taskId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "runId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "taskRevision": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                }
+              },
+              "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+              "additionalProperties": false
+            },
+            "stageRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "employeeRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "policyRef": {
+              "type": "string",
+              "const": "workflow.plan-inspection"
+            },
+            "policyRevision": {
+              "type": "number",
+              "const": 1
+            },
+            "facts": {
+              "type": "object",
+              "properties": {
+                "binding": {
+                  "type": "object",
+                  "properties": {
+                    "scope": {
+                      "type": "object",
+                      "properties": {
+                        "companyRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "projectRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        }
+                      },
+                      "required": ["companyRef", "projectRef"],
+                      "additionalProperties": false
+                    },
+                    "workflowRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "workflowRevision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "workflowRunRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    }
+                  },
+                  "required": ["scope", "workflowRef", "workflowRevision", "workflowRunRef"],
+                  "additionalProperties": false
+                },
+                "definitionDigest": {
+                  "type": "string",
+                  "minLength": 64,
+                  "maxLength": 64,
+                  "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                },
+                "goalRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "planRevision": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "authorizedRoles": {
+                  "minItems": 1,
+                  "maxItems": 4,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "enum": ["product", "developer", "tester", "ops"]
+                  }
+                },
+                "limits": {
+                  "type": "object",
+                  "properties": {
+                    "maxTasks": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 32
+                    },
+                    "maxParallelism": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 4
+                    },
+                    "maxDurationMs": {
+                      "type": "integer",
+                      "minimum": 1000,
+                      "maximum": 86400000
+                    },
+                    "maxAttempts": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 3
+                    }
+                  },
+                  "required": ["maxTasks", "maxParallelism", "maxDurationMs", "maxAttempts"],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "binding",
+                "definitionDigest",
+                "goalRef",
+                "planRevision",
+                "authorizedRoles",
+                "limits"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "contractVersion",
+            "kind",
+            "intentRef",
+            "sourceTask",
+            "stageRef",
+            "employeeRef",
+            "policyRef",
+            "policyRevision",
+            "facts"
+          ],
+          "additionalProperties": false
+        },
+        "producer": {
+          "type": "object",
+          "properties": {
+            "employeeRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "role": {
+              "type": "string",
+              "enum": ["product", "developer", "tester", "ops"]
+            },
+            "task": {
+              "type": "object",
+              "properties": {
+                "spaceId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "taskId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "runId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                },
+                "attempt": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 9007199254740991
+                },
+                "taskRevision": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                }
+              },
+              "required": ["spaceId", "taskId", "runId", "attempt", "taskRevision"],
+              "additionalProperties": false
+            },
+            "runtimeRecordId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "ownershipEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "executionId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionEpoch": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "commandFingerprint": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            },
+            "sessionRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "executionWorkspaceRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            },
+            "workspaceExecutionClaimRef": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 160,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+            }
+          },
+          "required": [
+            "employeeRef",
+            "role",
+            "task",
+            "runtimeRecordId",
+            "ownershipEpoch",
+            "executionId",
+            "executionEpoch",
+            "commandFingerprint",
+            "sessionRef",
+            "executionWorkspaceRef",
+            "workspaceExecutionClaimRef"
+          ],
+          "additionalProperties": false
+        },
+        "outcomeVersion": {
+          "type": "object",
+          "properties": {
+            "artifactRef": {
+              "type": "string",
+              "minLength": 73,
+              "maxLength": 73,
+              "pattern": "^artifact:[a-f0-9]{64}$"
+            },
+            "artifactRevision": {
+              "type": "number",
+              "const": 1
+            },
+            "digest": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            }
+          },
+          "required": ["artifactRef", "artifactRevision", "digest"],
+          "additionalProperties": false
+        },
+        "sourceInputDigest": {
+          "type": "string",
+          "minLength": 64,
+          "maxLength": 64,
+          "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+        },
+        "artifact": {
+          "type": "object",
+          "properties": {
+            "artifactRef": {
+              "type": "string",
+              "minLength": 73,
+              "maxLength": 73,
+              "pattern": "^artifact:[a-f0-9]{64}$"
+            },
+            "artifactRevision": {
+              "type": "number",
+              "const": 1
+            },
+            "digest": {
+              "type": "string",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+            }
+          },
+          "required": ["artifactRef", "artifactRevision", "digest"],
+          "additionalProperties": false
+        },
+        "inspection": {
+          "oneOf": [
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "validated"
+                },
+                "proposal": {
+                  "type": "object",
+                  "properties": {
+                    "contractVersion": {
+                      "type": "number",
+                      "const": 1
+                    },
+                    "kind": {
+                      "type": "string",
+                      "const": "workflow.plan-proposal"
+                    },
+                    "binding": {
+                      "type": "object",
+                      "properties": {
+                        "scope": {
+                          "type": "object",
+                          "properties": {
+                            "companyRef": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            },
+                            "projectRef": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            }
+                          },
+                          "required": ["companyRef", "projectRef"],
+                          "additionalProperties": false
+                        },
+                        "workflowRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        },
+                        "workflowRevision": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 9007199254740991
+                        },
+                        "workflowRunRef": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 160,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                        }
+                      },
+                      "required": ["scope", "workflowRef", "workflowRevision", "workflowRunRef"],
+                      "additionalProperties": false
+                    },
+                    "definitionDigest": {
+                      "type": "string",
+                      "minLength": 64,
+                      "maxLength": 64,
+                      "pattern": "^[0-9a-f]{64}(?![\\s\\S])"
+                    },
+                    "goalRef": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                    },
+                    "planRevision": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    },
+                    "tasks": {
+                      "minItems": 1,
+                      "maxItems": 32,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "taskRef": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                          },
+                          "title": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 4096,
+                            "allOf": [
+                              {
+                                "pattern": "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[^\\uD800-\\uDFFF]){0,2048}(?![\\s\\S])"
+                              },
+                              {
+                                "pattern": "\\S"
+                              }
+                            ]
+                          },
+                          "requestedRole": {
+                            "type": "string",
+                            "enum": ["product", "developer", "tester", "ops"]
+                          },
+                          "outputKind": {
+                            "type": "string",
+                            "enum": ["requirements", "code", "test_report", "release_plan"]
+                          },
+                          "dependsOn": {
+                            "maxItems": 32,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 160,
+                              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                            }
+                          },
+                          "acceptance": {
+                            "minItems": 1,
+                            "maxItems": 16,
+                            "type": "array",
+                            "items": {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 4096,
+                              "allOf": [
+                                {
+                                  "pattern": "^(?:[\\uD800-\\uDBFF][\\uDC00-\\uDFFF]|[^\\uD800-\\uDFFF]){0,2048}(?![\\s\\S])"
+                                },
+                                {
+                                  "pattern": "\\S"
+                                }
+                              ]
+                            }
+                          },
+                          "maxAttempts": {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 3
+                          }
+                        },
+                        "required": [
+                          "taskRef",
+                          "title",
+                          "requestedRole",
+                          "outputKind",
+                          "dependsOn",
+                          "acceptance",
+                          "maxAttempts"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "requestedLimits": {
+                      "type": "object",
+                      "properties": {
+                        "maxParallelism": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 4
+                        },
+                        "maxDurationMs": {
+                          "type": "integer",
+                          "minimum": 1000,
+                          "maximum": 86400000
+                        },
+                        "budget": {
+                          "type": "object",
+                          "properties": {
+                            "costMicros": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 9007199254740991
+                            },
+                            "currency": {
+                              "type": "string",
+                              "minLength": 3,
+                              "maxLength": 3,
+                              "pattern": "^[A-Z]{3}(?![\\s\\S])"
+                            }
+                          },
+                          "required": ["costMicros", "currency"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["maxParallelism", "maxDurationMs"],
+                      "additionalProperties": false
+                    },
+                    "resourceSelectionRefs": {
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                      }
+                    },
+                    "requiredCoverage": {
+                      "type": "string",
+                      "enum": ["managed_only", "effective_set_verified"]
+                    },
+                    "knowledgeRequirements": {
+                      "minItems": 1,
+                      "maxItems": 16,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "sourceRef": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 160,
+                            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                          },
+                          "required": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": ["sourceRef", "required"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "contractVersion",
+                    "kind",
+                    "binding",
+                    "definitionDigest",
+                    "goalRef",
+                    "planRevision",
+                    "tasks",
+                    "requestedLimits"
+                  ],
+                  "additionalProperties": false
+                },
+                "capabilityGaps": {
+                  "maxItems": 19,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "capability": {
+                        "type": "string",
+                        "enum": [
+                          "task_graph_dispatch",
+                          "resource_loading",
+                          "hard_budget_enforcement",
+                          "knowledge_access"
+                        ]
+                      },
+                      "blocking": {
+                        "type": "boolean"
+                      },
+                      "sourceRef": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160,
+                        "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                      }
+                    },
+                    "required": ["capability", "blocking"],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": ["kind", "proposal", "capabilityGaps"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "rejected"
+                },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "plan_invalid",
+                    "plan_duplicate_task",
+                    "plan_unknown_dependency",
+                    "plan_duplicate_dependency",
+                    "plan_dependency_cycle",
+                    "plan_depth_exceeded",
+                    "plan_output_mismatch",
+                    "plan_resource_coverage_required",
+                    "plan_duplicate_resource",
+                    "plan_duplicate_knowledge",
+                    "plan_policy_invalid",
+                    "plan_target_mismatch",
+                    "plan_limits_exceeded",
+                    "plan_role_unavailable",
+                    "plan_json_invalid",
+                    "plan_request_too_large"
+                  ]
+                },
+                "taskRef": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,159}(?![\\s\\S])"
+                }
+              },
+              "required": ["kind", "reason"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "kind": {
+                  "type": "string",
+                  "const": "unavailable"
+                },
+                "reason": {
+                  "type": "string",
+                  "const": "plan_artifact_missing"
+                }
+              },
+              "required": ["kind", "reason"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": [
+        "contractVersion",
+        "kind",
+        "draftRef",
+        "intent",
+        "producer",
+        "outcomeVersion",
+        "sourceInputDigest",
+        "inspection"
+      ],
+      "additionalProperties": false
+    },
     "Handoff": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -1974,6 +2895,12 @@
     },
     {
       "$ref": "#/$defs/PlanProposal"
+    },
+    {
+      "$ref": "#/$defs/PlanIntent"
+    },
+    {
+      "$ref": "#/$defs/PlanDraft"
     },
     {
       "$ref": "#/$defs/Handoff"

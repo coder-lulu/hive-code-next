@@ -1,6 +1,6 @@
 # 工程团队与成果交接契约 v1
 
-状态：2026-10-08。首条四角色工程链已接入存储、Facade、本机隔离执行、独立审核及原生页面；下述 PlanProposal 仅交付数据与校验基础，一般业务任务图、计划采纳和任务工具消费者仍待接入。契约测试不替代真实执行、部署或多人权限验收。
+状态：2026-10-10。首条四角色工程链已接入存储、Facade、本机隔离执行、独立审核及原生页面；PlanProposal 已接入原 Product 规划请求、草稿保存与默认可见的原生只读预览，本切片真实执行和客户端验收已通过。一般业务任务图、计划采纳和任务工具消费者仍待接入。契约测试不替代真实执行、部署或多人权限验收。
 
 TypeScript 唯一来源为 [src/shared/task-workflow](../../../src/shared/task-workflow/)。[task-workflow.schema.json](task-workflow.schema.json) 由该来源生成；[test-vectors.json](test-vectors.json) 给出固定示例和成果/批准失效向量。它是业务对象与证据绑定合同，不替代 [P0 execution v1](../v1/README.md)，不新增启动器、运行账本或业务调度器。
 
@@ -43,7 +43,11 @@ requestedLimits 限制最多 4 并发、最长 24 小时；可选预算只接受
 
 `inspectWorkflowPlanProposalJson` 在 JSON.parse 前检查 128 KiB UTF-8 上限，保留 Unicode 字节语义。`inspectWorkflowPlanProposal` 对照调用方从认证存储取得的固定目标、允许角色与更窄策略上限，返回具体拒绝原因或保留原提案的 validated 投影。validated 仅表示这些数据检查通过，不是授权或采纳；当前总是明确报告一般业务 DAG 派发缺口。资源加载和硬预算需求有阻断缺口；必需知识有阻断缺口，可选知识缺失明确披露。
 
-本基础没有提案存储、差异页、proposePlan/plan-apply API、TaskToolFacade、模型规划请求或新派发路径。后续消费者必须复用原认证执行与成果/结算链，事务性保存草稿与采纳版本，并在具体动作前重新授权；不得把模型字段或此校验结果当作能力凭证。[plan-proposal-test-vectors.json](plan-proposal-test-vectors.json) 使用纯合成数据固定有效示例与拒绝向量。JSON Schema 只表达字段约束，图语义与策略检查必须运行同源 TypeScript。
+`WorkflowPlanIntent` 由服务端在新 Product 受理事务中封存，包含原 TaskRef、员工、固定目标与校验策略；planRevision 按原 Case 的实际意图记录独立分配。启动命令要求意图中的 spaceId、taskId、runId、attempt、taskRevision 与原命令一致。规划提示词沿用原 Product 运行，要求在原成果清单中提交 requirements.md 和 plan-proposal.json。
+
+`WorkflowPlanDraft` 复用认证后的原成果与终态结算链，在 outcome_consumed 事务中保存 validated、rejected 或 unavailable/plan_artifact_missing 投影，以及原意图、生产者、输入摘要和成果版本。来源校验先于内容解析；内容拒绝保留原成果身份，来源不匹配拒绝业务变更。原生 Case 详情提供只读版本、来源及缺口预览。历史运行没有规划意图时不补造草稿；重复结算与取消仍遵循原执行边界。
+
+草稿检查通过不表示计划已采纳，也不触发一般业务任务图派发。计划差异页、proposePlan/plan-apply API、TaskToolFacade、资源/知识加载及硬预算消费者仍待接入；后续动作须重新授权，不得把模型字段或检查结果当作能力凭证。本次自动化验证、真实客户端验收和三轮独立复核已通过，发布提交以仓库 Git 历史为准。[plan-proposal-test-vectors.json](plan-proposal-test-vectors.json) 使用纯合成数据固定有效示例与拒绝向量。JSON Schema 只表达字段约束，图语义与策略检查必须运行同源 TypeScript。
 
 从项目根生成和核对：
 

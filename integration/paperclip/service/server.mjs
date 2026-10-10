@@ -48,6 +48,9 @@ await sql.unsafe(
   await readFile(new URL('./workflow-definition-tables.sql', import.meta.url), 'utf8')
 )
 await sql.unsafe(await readFile(new URL('./workflow-case-tables.sql', import.meta.url), 'utf8'))
+await sql.unsafe(
+  await readFile(new URL('./workflow-plan-intent-tables.sql', import.meta.url), 'utf8')
+)
 const repository = createTaskRepository(sql),
   dispatch = createTaskDispatch(repository)
 const workbenchRepository = {

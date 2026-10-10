@@ -100,7 +100,8 @@ export async function createPostgresTaskHarness(configPath) {
     for (const file of [
       'team-workbench-tables.sql',
       'workflow-definition-tables.sql',
-      'workflow-case-tables.sql'
+      'workflow-case-tables.sql',
+      'workflow-plan-intent-tables.sql'
     ]) {
       await sql.unsafe(
         await readFile(

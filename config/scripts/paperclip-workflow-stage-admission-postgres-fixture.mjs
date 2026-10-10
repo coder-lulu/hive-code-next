@@ -8,6 +8,7 @@ import {
   admitWorkflowCaseStageInTransaction
 } from '../../integration/paperclip/service/workflow-case-run-repository.mjs'
 import { workflowRoleExecutionForAsset } from '../../integration/paperclip/service/workflow-case-evidence-projection.mjs'
+import { createWorkflowPlanDraft } from '../../integration/paperclip/service/workflow-plan-draft-projection.mjs'
 import { taskCommand } from '../../src/main/tasks/task-execution.test-fixture.ts'
 import { computeTaskExecutionFingerprint } from '../../src/shared/task-execution/task-execution-fingerprint.ts'
 import { canonicalAgentSessionDigest as digest } from '../../src/shared/agent-session-mutation-envelope.ts'
@@ -176,6 +177,14 @@ export async function closeWorkflowNativeFixture(h, f, admission, options = {}) 
     version: version(JSON.stringify(outcome))
   })
   const payload = { kind: 'hive.workflow.outcome_consumed', asset }
+  const planDraft = createWorkflowPlanDraft(
+    { asset, artifacts: [] },
+    admission,
+    admission.workflowContext.planIntent
+  )
+  if (planDraft) {
+    payload.planDraft = planDraft
+  }
   const target =
     options.targetRole && current.stageTasks.find((item) => item.role === options.targetRole)
   if (target && !options.assetOnly) {

@@ -22,6 +22,10 @@ import {
   workflowCaseRunAdmission
 } from './workflow-case-run-records.mjs'
 import { requireWorkflowIssueCheckout } from './workflow-issue-checkout.mjs'
+import {
+  prepareWorkflowPlanIntent,
+  insertWorkflowPlanIntent
+} from './workflow-plan-intent-repository.mjs'
 
 function unavailable(reason) {
   throw Object.assign(new Error('CAPABILITY_UNAVAILABLE'), {
@@ -180,10 +184,21 @@ export async function admitWorkflowCaseStageInTransaction(db, accountId, supplie
   if (clock.admitted_at.getTime() >= Date.parse(first.executionDeadlineAt)) {
     unavailable('deadline_exceeded')
   }
+  const runId = randomUUID(),
+    revision = Number(task.status_version)
+  const taskRef = {
+    spaceId: project.companyId,
+    taskId: task.id,
+    runId,
+    attempt: prior.length + 1,
+    taskRevision: String(revision + 1)
+  }
+  const planningIntent = await prepareWorkflowPlanIntent(db, view, taskRef, stage.stageRef)
+  const promptView = { ...view, planningIntent }
   let workflowContext, prompt
   try {
-    workflowContext = hiveWorkflowStageContext(view, stage.stageRef)
-    prompt = hiveWorkflowStagePrompt(view, stage.stageRef, first.input)
+    workflowContext = hiveWorkflowStageContext(promptView, stage.stageRef)
+    prompt = hiveWorkflowStagePrompt(promptView, stage.stageRef, first.input)
   } catch (error) {
     if (error.message === 'CAPABILITY_UNAVAILABLE') {
       unavailable('context_unavailable')
@@ -193,8 +208,6 @@ export async function admitWorkflowCaseStageInTransaction(db, accountId, supplie
   if (prompt.length > 128_000) {
     unavailable('input_limit')
   }
-  const runId = randomUUID(),
-    revision = Number(task.status_version)
   const startRequest = {
     requestId: cause.causeRunId,
     projectId: project.id,
@@ -208,13 +221,7 @@ export async function admitWorkflowCaseStageInTransaction(db, accountId, supplie
     caseId: view.id,
     stageRef: stage.stageRef,
     causeRunId: cause.causeRunId,
-    task: {
-      spaceId: project.companyId,
-      taskId: task.id,
-      runId,
-      attempt: prior.length + 1,
-      taskRevision: String(revision + 1)
-    },
+    task: taskRef,
     startRequest,
     definitionDigest: view.definitionDigest,
     projectBindingRevision: view.projectBindingRevision,
@@ -227,6 +234,7 @@ export async function admitWorkflowCaseStageInTransaction(db, accountId, supplie
   await requireWorkflowIssueCheckout(db, task, runId)
   await db`INSERT INTO heartbeat_runs(id,company_id,agent_id,status,invocation_source,driver_kind)
     VALUES(${runId},${project.companyId},${fixed.employeeRef},'queued','on_demand','hive_runtime')`
+  await insertWorkflowPlanIntent(db, accountId, view, planningIntent)
   const changed =
     await db`UPDATE issues SET status='todo',status_version=status_version+1,execution_run_id=${runId},updated_at=now()
     WHERE id=${task.id} AND company_id=${project.companyId} AND status_version=${revision} AND status=${task.status}

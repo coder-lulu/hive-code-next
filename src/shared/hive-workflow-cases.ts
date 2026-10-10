@@ -17,6 +17,9 @@ import {
 } from './task-workflow/workflow-bindings'
 import { WORKFLOW_STAGE_LIMITS } from './task-workflow/workflow-definition'
 import { WorkflowHandoffSchema, WorkflowReviewSchema } from './task-workflow/workflow-evidence'
+import { WorkflowPlanIntentSchema } from './task-workflow/workflow-plan-intent'
+import { WorkflowPlanDraftSchema } from './task-workflow/workflow-plan-draft'
+import { HIVE_WORKFLOW_PLAN_DRAFT_LIMIT, workflowCasePlansMatch } from './hive-workflow-case-plans'
 import { structuredAgentSessionDigest as digest } from './structured-agent-session-mutation'
 
 const ObjectId = z.string().uuid()
@@ -89,6 +92,8 @@ export const HiveWorkflowStageTaskSchema = z.strictObject({
 export const HiveWorkflowCaseViewSchema = CaseSummary.extend({
   requirement: Requirement,
   originTaskId: ObjectId,
+  planningIntent: WorkflowPlanIntentSchema.nullable(),
+  planDrafts: boundedTaskCollection(WorkflowPlanDraftSchema, HIVE_WORKFLOW_PLAN_DRAFT_LIMIT),
   workflow: HiveWorkflowSnapshotSchema,
   team: WorkflowTeamBindingSchema,
   handoffs: boundedTaskCollection(WorkflowHandoffSchema, 96),
@@ -104,6 +109,9 @@ export const HiveWorkflowCaseViewSchema = CaseSummary.extend({
   ])
 }).superRefine((view, context) => {
   const { binding, workflow, team } = view
+  if (!workflowCasePlansMatch(view)) {
+    context.addIssue({ code: 'custom', message: 'workflow_case_plan_mismatch' })
+  }
   const scope = binding.scope
   const definition = workflow.definition
   if (

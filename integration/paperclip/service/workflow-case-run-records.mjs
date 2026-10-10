@@ -12,6 +12,7 @@ import {
 } from './team-workbench-repository-records.mjs'
 import { readWorkflowCaseView } from './workflow-case-records.mjs'
 import { createTaskRunScopeReader } from './task-run-scope.mjs'
+import { readWorkflowPlanIntent } from './workflow-plan-intent-repository.mjs'
 
 export const WorkflowRunInputSchema = HiveWorkflowCaseRunAdmissionSchema.pick({
   input: true,
@@ -68,11 +69,13 @@ export async function readWorkflowCaseRun(db, accountId, taskId, runId) {
     binding.input_fingerprint !== digest({ operation: 'cases.start', input: input.startRequest }) ||
     (task.binding &&
       (digest(task.binding.command.task) !== digest(input.task) ||
+        task.binding.command.inputRef !== `input:${input.inputDigest}` ||
         task.binding.command.executionDeadlineAt !== input.executionDeadlineAt ||
         digest(task.binding.command.workflowContext ?? {}) !== digest(input.workflowContext ?? {})))
   ) {
     refuse('REVISION_CONFLICT')
   }
+  await readWorkflowPlanIntent(db, accountId, input)
   const status =
     task.result_receipt?.status ??
     (task.execution_stage === 'outcome_unknown'

@@ -87,6 +87,8 @@ export function workflowCaseFixture(accountId = 'workflow-case-owner') {
     handoffs: [],
     reviews: [],
     executionNotices: [],
+    planningIntent: null,
+    planDrafts: [],
     stageTasks: definition.stages.map((stage) => ({
       stageRef: stage.stageRef,
       taskId: randomUUID(),
@@ -106,6 +108,8 @@ export function workflowCaseFixture(accountId = 'workflow-case-owner') {
     handoffs: _handoffs,
     reviews: _reviews,
     executionNotices: _executionNotices,
+    planningIntent: _planningIntent,
+    planDrafts: _planDrafts,
     executionAvailability: _availability,
     ...summary
   } = view

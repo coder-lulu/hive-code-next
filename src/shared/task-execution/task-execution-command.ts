@@ -59,6 +59,15 @@ export const TaskExecutionStartSchema = z
     ) {
       issue.addIssue({ code: 'custom', message: 'workflow_controlled_admission_required' })
     }
+    const plannedTask = context.planIntent?.sourceTask
+    if (
+      plannedTask &&
+      (['spaceId', 'taskId', 'runId', 'attempt', 'taskRevision'] as const).some(
+        (key) => plannedTask[key] !== command.task[key]
+      )
+    ) {
+      issue.addIssue({ code: 'custom', message: 'workflow_plan_task_mismatch' })
+    }
     const producer = context.codeInput?.producer
     if (
       context.role === 'tester' &&

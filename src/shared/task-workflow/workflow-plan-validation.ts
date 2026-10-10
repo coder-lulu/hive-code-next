@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { canonicalAgentSessionDigest as digest } from '../agent-session-mutation-envelope'
+import { structuredAgentSessionDigest as digest } from '../structured-agent-session-mutation'
 import {
   boundedTaskCollection,
   TaskDigest,
@@ -9,10 +9,10 @@ import {
 import { WorkflowRoleSchema, WorkflowRunBindingSchema } from './workflow-bindings'
 import {
   WORKFLOW_PLAN_LIMITS,
+  WorkflowPlanProposalRefusalSchema,
   WorkflowPlanProposalSchema,
   workflowPlanProposalRefusal,
-  type WorkflowPlanProposal,
-  type WorkflowPlanProposalRefusal
+  type WorkflowPlanProposal
 } from './workflow-plan-proposal'
 
 // Callers must derive these facts from authenticated storage, never the model or a request body.
@@ -32,14 +32,16 @@ export const WorkflowPlanValidationFactsSchema = z.strictObject({
   })
 })
 export type WorkflowPlanValidationFacts = z.infer<typeof WorkflowPlanValidationFactsSchema>
-export type WorkflowPlanValidationRefusal =
-  | WorkflowPlanProposalRefusal
-  | 'plan_policy_invalid'
-  | 'plan_target_mismatch'
-  | 'plan_limits_exceeded'
-  | 'plan_role_unavailable'
-  | 'plan_json_invalid'
-  | 'plan_request_too_large'
+export const WorkflowPlanValidationRefusalSchema = z.enum([
+  ...WorkflowPlanProposalRefusalSchema.options,
+  'plan_policy_invalid',
+  'plan_target_mismatch',
+  'plan_limits_exceeded',
+  'plan_role_unavailable',
+  'plan_json_invalid',
+  'plan_request_too_large'
+])
+export type WorkflowPlanValidationRefusal = z.infer<typeof WorkflowPlanValidationRefusalSchema>
 export type WorkflowPlanCapabilityGap = {
   capability:
     | 'task_graph_dispatch'

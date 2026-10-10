@@ -5,6 +5,7 @@ import { HiveWorkflowCaseRuns } from './HiveWorkflowCaseRuns'
 import { HiveWorkflowCaseEvidence } from './HiveWorkflowCaseEvidence'
 import { HiveWorkflowCaseCode } from './HiveWorkflowCaseCode'
 import { HiveWorkflowCaseGraph } from './HiveWorkflowCaseGraph'
+import { HiveWorkflowCasePlans } from './HiveWorkflowCasePlans'
 import type { HiveWorkflowCaseRunsModel } from './use-hive-workflow-case-runs'
 
 export function HiveWorkflowCaseDetail({
@@ -58,6 +59,7 @@ export function HiveWorkflowCaseDetail({
         <p className="break-words whitespace-pre-wrap text-sm">{view.requirement}</p>
       </div>
       <HiveWorkflowCaseGraph key={`${view.id}:${view.binding.workflowRevision}`} view={view} />
+      <HiveWorkflowCasePlans view={view} />
       <HiveWorkflowCaseEvidence view={view} model={runs} />
       <HiveWorkflowCaseCode view={view} />
       <HiveWorkflowCaseRuns view={view} model={runs} scopeLabel={scopeLabel} />

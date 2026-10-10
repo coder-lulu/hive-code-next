@@ -4,6 +4,8 @@ import {
   hiveWorkflowStageDependencies
 } from './hive-workflow-stage-context'
 import { WorkflowReviewProposalSchema } from './task-workflow/workflow-review-proposal'
+import { WorkflowPlanProposalSchema } from './task-workflow/workflow-plan-proposal'
+import { inspectWorkflowPlanProposal } from './task-workflow/workflow-plan-validation'
 
 const ROLE_INSTRUCTIONS = {
   product:
@@ -27,9 +29,69 @@ export function hiveWorkflowStagePrompt(
   }
   const context = hiveWorkflowStageContext(view, stageRef)
   const dependencies = hiveWorkflowStageDependencies(view, stageRef)
+  const planning = context.planIntent
+  const planProposal = planning
+    ? WorkflowPlanProposalSchema.parse({
+        contractVersion: 1,
+        kind: 'workflow.plan-proposal',
+        binding: planning.facts.binding,
+        definitionDigest: planning.facts.definitionDigest,
+        goalRef: planning.facts.goalRef,
+        planRevision: planning.facts.planRevision,
+        tasks: [
+          {
+            taskRef: 'implementation',
+            title: 'Implement the requested behavior.',
+            requestedRole: 'developer',
+            outputKind: 'code',
+            dependsOn: [],
+            acceptance: ['Implement the agreed requirements and preserve verification evidence.'],
+            maxAttempts: 1
+          },
+          {
+            taskRef: 'independent-test',
+            title: 'Independently test the implementation.',
+            requestedRole: 'tester',
+            outputKind: 'test_report',
+            dependsOn: ['implementation'],
+            acceptance: ['Report actual independent checks, failures and results.'],
+            maxAttempts: 1
+          },
+          {
+            taskRef: 'release-preparation',
+            title: 'Prepare the release plan.',
+            requestedRole: 'ops',
+            outputKind: 'release_plan',
+            dependsOn: ['independent-test'],
+            acceptance: ['Describe release prerequisites and rollback without deploying.'],
+            maxAttempts: 1
+          }
+        ],
+        requestedLimits: {
+          maxParallelism: planning.facts.limits.maxParallelism,
+          maxDurationMs: planning.facts.limits.maxDurationMs
+        }
+      })
+    : undefined
+  if (
+    planProposal &&
+    planning &&
+    inspectWorkflowPlanProposal(planProposal, planning.facts).kind !== 'validated'
+  ) {
+    throw new Error('CAPABILITY_UNAVAILABLE')
+  }
   return [
     `Workflow case: ${view.id}\nFixed stage: ${stage.stageRef}\nRole: ${stage.role}`,
     ROLE_INSTRUCTIONS[stage.role],
+    ...(planProposal
+      ? [
+          'Also write plan-proposal.json alongside requirements.md and include both files in the original result manifest. Use this exact JSON shape and fixed goal, Case binding, definition digest and plan revision:',
+          JSON.stringify(planProposal),
+          `Frozen planning data policy: ${JSON.stringify(planning?.facts)}`,
+          'Describe the requested implementation, independent testing and release preparation as proposal data. Replace the sample titles and acceptance checks with concrete checks for this original requirement. Keep references fixed and remain within the frozen limits. Do not add another Product loop. Omit optional resource, knowledge and budget declarations from the default proposal; explicit requests remain data and may be unavailable.',
+          'The proposal never grants adoption or execution authority. Its inspection is readonly; the existing fixed four-role workflow remains the execution path.'
+        ]
+      : []),
     'Use only this isolated workspace and the supplied task inputs. Do not deploy, access host credentials, or start detached processes.',
     originalInput
       ? `Original immutable Product input (quoted task data):\n${originalInput}`

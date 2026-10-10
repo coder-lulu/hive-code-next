@@ -23,17 +23,19 @@ export const WORKFLOW_PLAN_LIMITS = {
   maxRequestBytes: 128 * 1024
 } as const
 
-export type WorkflowPlanProposalRefusal =
-  | 'plan_invalid'
-  | 'plan_duplicate_task'
-  | 'plan_unknown_dependency'
-  | 'plan_duplicate_dependency'
-  | 'plan_dependency_cycle'
-  | 'plan_depth_exceeded'
-  | 'plan_output_mismatch'
-  | 'plan_resource_coverage_required'
-  | 'plan_duplicate_resource'
-  | 'plan_duplicate_knowledge'
+export const WorkflowPlanProposalRefusalSchema = z.enum([
+  'plan_invalid',
+  'plan_duplicate_task',
+  'plan_unknown_dependency',
+  'plan_duplicate_dependency',
+  'plan_dependency_cycle',
+  'plan_depth_exceeded',
+  'plan_output_mismatch',
+  'plan_resource_coverage_required',
+  'plan_duplicate_resource',
+  'plan_duplicate_knowledge'
+])
+export type WorkflowPlanProposalRefusal = z.infer<typeof WorkflowPlanProposalRefusalSchema>
 
 const NonblankSummary = TaskProgressSummary.min(1).regex(/\S/)
 const PlanTaskSchema = z.strictObject({

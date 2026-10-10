@@ -40,6 +40,22 @@ export function hiveWorkflowStageContext(view: HiveWorkflowCaseView, stageRef: s
     throw new Error('REVISION_CONFLICT')
   }
   const dependencies = hiveWorkflowStageDependencies(view, stageRef)
+  const planIntent = stage.role === 'product' ? view.planningIntent : undefined
+  if (stage.role === 'product') {
+    if (!planIntent) {
+      throw new Error('CAPABILITY_UNAVAILABLE')
+    }
+    if (
+      planIntent.facts.goalRef !== view.originTaskId ||
+      planIntent.sourceTask.taskId !== task.taskId ||
+      planIntent.stageRef !== stageRef ||
+      planIntent.employeeRef !== task.employeeRef ||
+      digest(planIntent.facts.binding) !== digest(view.binding) ||
+      planIntent.facts.definitionDigest !== view.definitionDigest
+    ) {
+      throw new Error('REVISION_CONFLICT')
+    }
+  }
   let code = dependencies.find((item) => item.producer.role === 'developer')
   if (
     stage.role === 'ops' ||
@@ -72,6 +88,7 @@ export function hiveWorkflowStageContext(view: HiveWorkflowCaseView, stageRef: s
     employeeRef: task.employeeRef,
     role: stage.role,
     handoffRefs: dependencies.map((item) => item.handoffRef),
+    ...(planIntent ? { planIntent } : {}),
     ...(code ? { codeInput: { producer: code.producer, version: code.codeVersion } } : {})
   })
 }

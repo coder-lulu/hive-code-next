@@ -1,4 +1,6 @@
 import { createHash } from 'node:crypto'
+import { readWorkflowPlanIntent } from './workflow-plan-intent-repository.mjs'
+import { createWorkflowPlanDraft } from './workflow-plan-draft-projection.mjs'
 import { canonicalAgentSessionDigest as digest } from '../../../src/shared/agent-session-mutation-envelope.ts'
 import {
   WorkflowHandoffSchema,
@@ -124,6 +126,8 @@ export async function consumeWorkflowCaseOutcome(db, accountId, task, receipt, n
     nativeDelivery
   )
   const { asset } = delivery
+  const planIntent = await readWorkflowPlanIntent(db, accountId, record.input, view)
+  const planDraft = createWorkflowPlanDraft(delivery, record.input, planIntent)
   const actor = { type: 'agent', agentId: task.agent_id, runId: task.run_id }
   let acceptedHandoff, review, target
   const reportAvailable = report !== undefined && report.text.trim().length > 0
@@ -214,7 +218,8 @@ export async function consumeWorkflowCaseOutcome(db, accountId, task, receipt, n
       kind: 'hive.workflow.outcome_consumed',
       asset,
       ...(acceptedHandoff ? { handoff: acceptedHandoff } : {}),
-      ...(review ? { review } : {})
+      ...(review ? { review } : {}),
+      ...(planDraft ? { planDraft } : {})
     })
   )
   const { view: after } = await requireWorkflowCase(db, accountId, {

@@ -33,6 +33,7 @@ describe.skipIf(!configPath)('real original next-stage Case admission transactio
       await h.sql`SELECT
       (SELECT count(*)::int FROM heartbeat_runs WHERE company_id=${f.company.id}) AS runs,
       (SELECT count(*)::int FROM hive_task_bindings WHERE account_id=${f.accountId}) AS bindings,
+      (SELECT count(*)::int FROM hive_workflow_plan_intents WHERE case_id=${f.view.id}) AS intents,
       (SELECT count(*)::int FROM pipeline_case_events WHERE case_id=${f.view.id}) AS events`
     )[0]
   }
@@ -85,6 +86,7 @@ describe.skipIf(!configPath)('real original next-stage Case admission transactio
     expect(await counts(f)).toEqual({
       runs: before.runs + 1,
       bindings: before.bindings + 1,
+      intents: before.intents,
       events: before.events + 1
     })
     expect(await business(f)).toEqual(original)

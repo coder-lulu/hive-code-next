@@ -86,6 +86,9 @@ export async function workflowConsumerDelivery(h, f, admission, options = {}) {
       })
     )
   }
+  if (role === 'product' && options.planText !== undefined) {
+    artifact('plan-proposal.json', options.planText)
+  }
   const identity = Object.fromEntries(
     ['protocolVersion', 'runtimeRecordId', 'ownershipEpoch', 'executionId', 'executionEpoch'].map(
       (key) => [key, command[key]]

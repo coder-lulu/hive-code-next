@@ -50,7 +50,8 @@ describe.skipIf(!configPath)('real requirement case admission in Paperclip Postg
     for (const file of [
       'team-workbench-tables.sql',
       'workflow-definition-tables.sql',
-      'workflow-case-tables.sql'
+      'workflow-case-tables.sql',
+      'workflow-plan-intent-tables.sql'
     ]) {
       await h.sql.unsafe(
         await readFile(

@@ -57,6 +57,7 @@ export async function readWorkflowNativeDelivery({
   }
   const names = [
     reports[outcome.context.role],
+    ...(outcome.context.role === 'product' ? ['plan-proposal.json'] : []),
     ...(outcome.context.role === 'tester' ? ['review.json'] : [])
   ]
   const artifacts = []

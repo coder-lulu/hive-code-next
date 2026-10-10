@@ -16,10 +16,15 @@ import {
 import { WORKFLOW_STAGE_LIMITS } from '../../src/shared/task-workflow/workflow-definition.ts'
 import { createLocalTaskRequest } from '../../src/main/tasks/local-task-http-client.ts'
 import { assertJsonTextStructureWithinLimits } from '../../src/shared/json-text-structure-limit.ts'
+import {
+  HIVE_WORKFLOW_CASE_RESPONSE_BYTES,
+  HIVE_WORKFLOW_CASE_RESPONSE_BYTES_BY_PATH,
+  HIVE_WORKFLOW_CASE_RESPONSE_TOKENS_BY_PATH
+} from '../../src/shared/hive-workflow-case-response-budget.ts'
 
 const configPath = process.env.HIVE_PAPERCLIP_P2_POSTGRES_CONFIG
 const workflowBytes = 64 * 1024
-const clientBytes = 512 * 1024
+const clientBytes = HIVE_WORKFLOW_CASE_RESPONSE_BYTES
 const definitionStorageBytes = 98_304
 const teamStorageBytes = 24_576
 const evidenceDirectory = resolve('logs/paperclip-development/p3/replay-ack-backend')
@@ -184,7 +189,8 @@ describe.skipIf(!configPath)('real requirement case capacity in Paperclip Postgr
     for (const file of [
       'team-workbench-tables.sql',
       'workflow-definition-tables.sql',
-      'workflow-case-tables.sql'
+      'workflow-case-tables.sql',
+      'workflow-plan-intent-tables.sql'
     ]) {
       await h.sql.unsafe(
         await readFile(
@@ -314,7 +320,9 @@ describe.skipIf(!configPath)('real requirement case capacity in Paperclip Postgr
       const request = createLocalTaskRequest({
         baseUrl: 'http://127.0.0.1:63555/',
         secret: 'a'.repeat(43),
-        maximumResponseBytes: clientBytes,
+        maximumResponseBytes: 512 * 1024,
+        maximumResponseBytesByPath: HIVE_WORKFLOW_CASE_RESPONSE_BYTES_BY_PATH,
+        maximumResponseStructuralTokensByPath: HIVE_WORKFLOW_CASE_RESPONSE_TOKENS_BY_PATH,
         fetch: async (url) =>
           new Response(
             new URL(url).pathname.endsWith('/create') ? response : JSON.stringify(view),

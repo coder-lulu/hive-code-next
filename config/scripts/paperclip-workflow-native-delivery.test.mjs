@@ -45,6 +45,44 @@ function fixture() {
 }
 
 describe('original native assets read under the existing delivery lease', () => {
+  it('reads the exact Product plan member with a fresh binding for the second file', async () => {
+    const f = fixture()
+    const plan = {
+      name: 'plan-proposal.json',
+      text: '{',
+      version: {
+        artifactRef: `artifact:${'9'.repeat(64)}`,
+        artifactRevision: 1,
+        digest: '8'.repeat(64)
+      }
+    }
+    f.value.artifacts.push(plan)
+    f.value.asset.outcome.artifacts.push({ name: plan.name, version: plan.version })
+    f.client.workflowArtifact.mockImplementation(async (query) =>
+      f.value.artifacts.find((item) => item.version.artifactRef === query.artifactRef)
+    )
+    expect((await readWorkflowNativeDelivery(f.options)).artifacts).toEqual(f.value.artifacts)
+    expect(f.options.resolveBinding).toHaveBeenCalledTimes(3)
+    expect(f.client.workflowArtifact.mock.calls[1][0].artifactRef).toBe(plan.version.artifactRef)
+  })
+  it('stops before the plan read when its per-file binding can no longer be renewed', async () => {
+    const f = fixture()
+    f.value.asset.outcome.artifacts.push({
+      name: 'plan-proposal.json',
+      version: {
+        artifactRef: `artifact:${'9'.repeat(64)}`,
+        artifactRevision: 1,
+        digest: '8'.repeat(64)
+      }
+    })
+    const original = f.options.resolveBinding.getMockImplementation()
+    f.options.resolveBinding
+      .mockImplementationOnce(original)
+      .mockImplementationOnce(original)
+      .mockRejectedValueOnce(new Error('Expired original lease'))
+    await expect(readWorkflowNativeDelivery(f.options)).rejects.toThrow('Expired original lease')
+    expect(f.client.workflowArtifact).toHaveBeenCalledTimes(1)
+  })
   it('renews original binding before each asset read and preserves its membership', async () => {
     const f = fixture()
     expect(await readWorkflowNativeDelivery(f.options)).toEqual({ ...f.value, commands: undefined })

@@ -16,6 +16,10 @@ import {
 } from './team-workbench-repository-records.mjs'
 import { requireWorkflowIssueCheckout } from './workflow-issue-checkout.mjs'
 import {
+  prepareWorkflowPlanIntent,
+  insertWorkflowPlanIntent
+} from './workflow-plan-intent-repository.mjs'
+import {
   assertCurrentWorkflowEmployees,
   requireLinearWorkflowDefinition
 } from './workflow-pipeline-policy.mjs'
@@ -143,7 +147,6 @@ export function createWorkflowCaseRunRepository(sql) {
         }
         const runId = randomUUID()
         await requireWorkflowIssueCheckout(db, task, runId)
-        const prompt = hiveWorkflowStagePrompt(view, stage.stageRef)
         const [clock] = await db`SELECT clock_timestamp() AS admitted_at`
         const executionDeadlineAt = new Date(
           clock.admitted_at.getTime() + view.workflow.definition.maxDurationMs
@@ -155,6 +158,12 @@ export function createWorkflowCaseRunRepository(sql) {
           attempt: 1,
           taskRevision: String(fixed.taskRevision + 1)
         }
+        await db`INSERT INTO heartbeat_runs(id,company_id,agent_id,status,invocation_source,driver_kind)
+          VALUES(${runId},${project.companyId},${fixed.employeeRef},'queued','on_demand','hive_runtime')`
+        const planningIntent = await prepareWorkflowPlanIntent(db, view, taskRef, stage.stageRef)
+        await insertWorkflowPlanIntent(db, accountId, view, planningIntent)
+        const promptView = { ...view, planningIntent }
+        const prompt = hiveWorkflowStagePrompt(promptView, stage.stageRef)
         const intent = WorkflowRunInputSchema.parse({
           caseId: view.id,
           stageRef: stage.stageRef,
@@ -166,10 +175,8 @@ export function createWorkflowCaseRunRepository(sql) {
           inputDigest: digest(prompt),
           workspaceSelector: project.workspaceSelector,
           executionDeadlineAt,
-          workflowContext: hiveWorkflowStageContext(view, stage.stageRef)
+          workflowContext: hiveWorkflowStageContext(promptView, stage.stageRef)
         })
-        await db`INSERT INTO heartbeat_runs(id,company_id,agent_id,status,invocation_source,driver_kind)
-          VALUES(${runId},${project.companyId},${fixed.employeeRef},'queued','on_demand','hive_runtime')`
         const updated = await db`UPDATE issues SET status='todo',status_version=status_version+1,
           execution_run_id=${runId},updated_at=now() WHERE id=${task.id} AND company_id=${project.companyId}
           AND status_version=${fixed.taskRevision} AND status='backlog' AND assignee_agent_id=${fixed.employeeRef}

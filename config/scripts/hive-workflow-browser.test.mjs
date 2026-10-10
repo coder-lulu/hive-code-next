@@ -7,6 +7,8 @@ import { canonicalAgentSessionDigest } from '../../src/shared/agent-session-muta
 import { workflowCaseFixture } from '../../src/shared/hive-workflow-cases.test-fixture.ts'
 import { workflowCaseEvidenceFixture } from '../../src/renderer/src/components/task-page/hive/hive-workflow-case-evidence.test-fixtures.ts'
 import { workflowTestVectors } from '../../src/shared/task-workflow/workflow.test-fixture.ts'
+import { workflowPlanDraftFixture } from '../../src/shared/task-workflow/workflow-plan-draft.test-fixture.ts'
+import { inspectWorkflowPlanProposal } from '../../src/shared/task-workflow/workflow-plan-validation.ts'
 
 let contract
 let caseContract
@@ -48,6 +50,58 @@ function snapshot() {
 }
 
 describe('browser workflow contract', () => {
+  it.each(['validated', 'rejected', 'unavailable'])(
+    'validates a Case with an original %s draft without Node globals',
+    (kind) => {
+      const { view } = workflowCaseFixture()
+      const draft = workflowPlanDraftFixture()
+      const task = view.stageTasks.find((item) => item.role === 'product')
+      const facts = {
+        ...draft.intent.facts,
+        binding: view.binding,
+        definitionDigest: view.definitionDigest,
+        goalRef: view.originTaskId
+      }
+      draft.intent = {
+        ...draft.intent,
+        facts,
+        stageRef: task.stageRef,
+        employeeRef: task.employeeRef,
+        sourceTask: {
+          ...draft.intent.sourceTask,
+          spaceId: facts.binding.scope.companyRef,
+          taskId: task.taskId,
+          runId: randomUUID()
+        }
+      }
+      draft.producer.employeeRef = task.employeeRef
+      draft.producer.task = { ...draft.intent.sourceTask }
+      draft.inspection = inspectWorkflowPlanProposal(
+        {
+          ...draft.inspection.proposal,
+          binding: facts.binding,
+          definitionDigest: facts.definitionDigest,
+          goalRef: facts.goalRef
+        },
+        facts
+      )
+      if (kind === 'rejected') {
+        draft.inspection = { kind, reason: 'plan_json_invalid' }
+      }
+      if (kind === 'unavailable') {
+        delete draft.artifact
+        draft.inspection = { kind, reason: 'plan_artifact_missing' }
+      }
+      view.planningIntent = draft.intent
+      view.planDrafts = [draft]
+      expect(caseContract.HiveWorkflowCaseViewSchema.parse(view)).toEqual(view)
+      if (kind === 'validated') {
+        draft.inspection.proposal.goalRef = randomUUID()
+        expect(caseContract.HiveWorkflowCaseViewSchema.safeParse(view).success).toBe(false)
+      }
+    }
+  )
+
   it('validates original session history and UTF-8 bounds without Node globals', () => {
     const cursor = { epoch: 'original-epoch', sequence: 3 }
     const identity = {

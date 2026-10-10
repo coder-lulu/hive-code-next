@@ -6,6 +6,31 @@ import { hiveWorkflowStageContext } from './hive-workflow-stage-context'
 import { hiveWorkflowStagePrompt } from './hive-workflow-stage-prompt'
 import { WorkflowHandoffSchema, WorkflowReviewSchema } from './task-workflow/workflow-evidence'
 import { workflowTestVectors } from './task-workflow/workflow.test-fixture'
+import { workflowPlanIntentFixture } from './task-workflow/workflow-plan-draft.test-fixture'
+import { WorkflowPlanProposalSchema } from './task-workflow/workflow-plan-proposal'
+import { inspectWorkflowPlanProposal } from './task-workflow/workflow-plan-validation'
+
+function plannedProduct() {
+  const f = workflowCaseFixture()
+  const task = f.view.stageTasks.find((item) => item.role === 'product')!
+  const planningIntent = workflowPlanIntentFixture()
+  planningIntent.sourceTask = {
+    spaceId: f.view.binding.scope.companyRef,
+    taskId: task.taskId,
+    runId: randomUUID(),
+    attempt: 1,
+    taskRevision: String(task.taskRevision + 1)
+  }
+  planningIntent.stageRef = task.stageRef
+  planningIntent.employeeRef = task.employeeRef
+  planningIntent.facts.binding = f.view.binding
+  planningIntent.facts.definitionDigest = f.view.definitionDigest
+  planningIntent.facts.goalRef = f.view.originTaskId
+  planningIntent.facts.planRevision = 7
+  planningIntent.facts.limits.maxParallelism = f.workflow.definition.maxParallelism
+  planningIntent.facts.limits.maxDurationMs = f.workflow.definition.maxDurationMs
+  return { ...f, task, planningIntent, view: { ...f.view, planningIntent } }
+}
 
 function handoff(role: 'product' | 'developer', attempt = 1, f = workflowCaseFixture()) {
   const task = f.view.stageTasks.find((stage) => stage.role === role)!
@@ -93,6 +118,99 @@ function testedCase(decision: 'approved' | 'changes_requested') {
 }
 
 describe('accepted workflow business inputs', () => {
+  it('requires real planning intent for a new Product context and prompt', () => {
+    const f = workflowCaseFixture()
+    const product = f.view.stageTasks.find((item) => item.role === 'product')!
+    expect(() => hiveWorkflowStageContext(f.view, product.stageRef)).toThrow(
+      'CAPABILITY_UNAVAILABLE'
+    )
+    expect(() => hiveWorkflowStagePrompt(f.view, product.stageRef)).toThrow(
+      'CAPABILITY_UNAVAILABLE'
+    )
+    const planned = plannedProduct()
+    expect(hiveWorkflowStageContext(planned.view, planned.task.stageRef).planIntent).toEqual(
+      planned.planningIntent
+    )
+  })
+  it.each(['goal', 'task', 'stage', 'employee', 'binding', 'definition'] as const)(
+    'rejects replaced Product planning %s',
+    (field) => {
+      const f = plannedProduct()
+      if (field === 'goal') {
+        f.planningIntent.facts.goalRef = randomUUID()
+      } else if (field === 'task') {
+        f.planningIntent.sourceTask.taskId = randomUUID()
+      } else if (field === 'stage') {
+        f.planningIntent.stageRef = 'stage-foreign'
+      } else if (field === 'employee') {
+        f.planningIntent.employeeRef = randomUUID()
+      } else if (field === 'binding') {
+        f.planningIntent.facts.binding = {
+          ...f.planningIntent.facts.binding,
+          workflowRunRef: randomUUID()
+        }
+      } else {
+        f.planningIntent.facts.definitionDigest = '0'.repeat(64)
+      }
+      expect(() => hiveWorkflowStageContext(f.view, f.task.stageRef)).toThrow()
+    }
+  )
+  it('uses only frozen intent facts for the three-role proposal sample while preserving original requirement', () => {
+    const f = plannedProduct()
+    f.planningIntent.facts.limits.maxAttempts = 1
+    const original = JSON.stringify(f.view)
+    const immutableInput =
+      'Original synthetic Product input, retained before any later description edit.'
+    const prompt = hiveWorkflowStagePrompt(
+      { ...f.view, requirement: 'Changed synthetic requirement.' },
+      f.task.stageRef,
+      immutableInput
+    )
+    const line = prompt
+      .split('\n')
+      .find((item) => item.startsWith('{"contractVersion":1,"kind":"workflow.plan-proposal"'))
+    expect(line).toBeDefined()
+    const proposal = WorkflowPlanProposalSchema.parse(JSON.parse(line!))
+    expect(inspectWorkflowPlanProposal(proposal, f.planningIntent.facts).kind).toBe('validated')
+    expect(proposal.binding).toEqual(f.planningIntent.facts.binding)
+    expect(proposal.definitionDigest).toBe(f.planningIntent.facts.definitionDigest)
+    expect(proposal.goalRef).toBe(f.view.originTaskId)
+    expect(proposal.planRevision).toBe(7)
+    expect(proposal.tasks.map((item) => item.requestedRole)).toEqual(['developer', 'tester', 'ops'])
+    expect(proposal.tasks.map((item) => item.dependsOn)).toEqual([
+      [],
+      ['implementation'],
+      ['independent-test']
+    ])
+    expect(proposal.requestedLimits).toEqual({
+      maxParallelism: f.planningIntent.facts.limits.maxParallelism,
+      maxDurationMs: f.planningIntent.facts.limits.maxDurationMs
+    })
+    expect(proposal).not.toHaveProperty('resourceSelectionRefs')
+    expect(proposal).not.toHaveProperty('knowledgeRequirements')
+    expect(proposal.requestedLimits).not.toHaveProperty('budget')
+    expect(prompt).toContain('plan-proposal.json')
+    expect(prompt).toContain('include both files in the original result manifest')
+    expect(prompt).toContain(immutableInput)
+    expect(prompt).not.toContain('Changed synthetic requirement.')
+    expect(prompt).toContain(f.workflow.definition.stages[0].acceptanceCriteria.join('\n'))
+    expect(prompt).toContain('existing fixed four-role workflow remains the execution path')
+    expect(JSON.stringify(f.view)).toBe(original)
+  })
+  it.each(['task-count', 'role'] as const)(
+    'refuses a sample incompatible with the actual frozen %s policy',
+    (boundary) => {
+      const f = plannedProduct()
+      if (boundary === 'task-count') {
+        f.planningIntent.facts.limits.maxTasks = 2
+      } else {
+        f.planningIntent.facts.authorizedRoles = ['product', 'developer', 'tester']
+      }
+      expect(() => hiveWorkflowStagePrompt(f.view, f.task.stageRef)).toThrow(
+        'CAPABILITY_UNAVAILABLE'
+      )
+    }
+  )
   it('requires explicit bounded handoff/review arrays in every Case view', () => {
     const f = workflowCaseFixture()
     const absent = { ...f.view }

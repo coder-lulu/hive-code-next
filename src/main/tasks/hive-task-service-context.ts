@@ -7,6 +7,10 @@ import { readTaskArtifactFile } from './task-artifact-index'
 import { refuseTaskExecution } from './task-execution-error'
 import { assertTaskAuthorizationCurrent } from './task-structured-launch-origin'
 import { HIVE_WORKFLOW_PAGE_STRUCTURAL_TOKENS } from '../../shared/hive-task-workflows'
+import {
+  HIVE_WORKFLOW_CASE_RESPONSE_BYTES_BY_PATH,
+  HIVE_WORKFLOW_CASE_RESPONSE_TOKENS_BY_PATH
+} from '../../shared/hive-workflow-case-response-budget'
 
 export function createHiveTaskServiceContext(options: {
   descriptorPath: string
@@ -52,10 +56,12 @@ export function createHiveTaskServiceContext(options: {
       headers: { 'X-Hive-Account-Id': account.accountId },
       maximumResponseBytes: 512 * 1024,
       maximumResponseBytesByPath: {
+        ...HIVE_WORKFLOW_CASE_RESPONSE_BYTES_BY_PATH,
         '/hive/workbench/cases/start': 1024 * 1024,
         '/hive/workbench/cases/run-read': 1024 * 1024
       },
       maximumResponseStructuralTokensByPath: {
+        ...HIVE_WORKFLOW_CASE_RESPONSE_TOKENS_BY_PATH,
         '/hive/workbench/workflows/list': HIVE_WORKFLOW_PAGE_STRUCTURAL_TOKENS
       }
     })
