@@ -27,6 +27,7 @@ import { createTaskCodexEvidence } from './task-codex-evidence'
 import { createTaskCancelledDispatchSettlement } from './task-cancelled-dispatch'
 import { refuseTaskExecution } from './task-execution-error'
 import { createLocalTaskFacadeAssembly } from './local-task-facade-assembly'
+import { createHiveTeamTaskToolFactory } from './hive-team-task-tools'
 import { TaskArtifactIndex } from './task-artifact-index'
 import { TaskWorkflowOutcomeStore } from './task-workflow-outcome-store'
 import { installTaskAuthorizationMonitor } from './task-authorization-monitor'
@@ -266,6 +267,14 @@ export async function startLocalTaskRuntime(options: {
     issuer,
     host,
     facade: facadeService.facade,
+    teamTaskTools: createHiveTeamTaskToolFactory({
+      directory: join(directory, 'team-tool-receipts'),
+      facade: facadeService.facade,
+      currentAccount: () => options.account.getRuntimeCloudAuthorization(),
+      currentRuntime,
+      resolveWorkspaceSource,
+      assertCurrent
+    }),
     close() {
       closed = true
       return (closing ??= (async () => {

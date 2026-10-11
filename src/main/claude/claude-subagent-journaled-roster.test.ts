@@ -55,10 +55,12 @@ function linkageJournal(
   rows: () => Row[]
 ): {
   epoch: string
+  itemBody: StructuredAgentSessionLinkageJournal['itemBody']
   visitItemsWithLinkage: StructuredAgentSessionLinkageJournal['visitItemsWithLinkage']
 } {
   return {
     epoch,
+    itemBody: (itemId) => rows().find((row) => row.itemId === itemId)?.body ?? null,
     visitItemsWithLinkage: (visit) => {
       for (const row of rows()) {
         visit(row.itemId, row.sequence, row.body, row.linkage)

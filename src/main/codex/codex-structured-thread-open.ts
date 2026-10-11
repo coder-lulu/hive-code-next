@@ -10,6 +10,7 @@ import {
   type CodexAppServerConnection
 } from './codex-app-server-connection'
 import type { CodexStructuredPermissionPolicy } from './codex-structured-permission-policy'
+import type { NativeTeamTaskToolSession } from '../../shared/hive-team-task-tools'
 import { readCodexThreadId } from './codex-structured-thread-facts'
 
 export type CodexOpenedThread = {
@@ -92,14 +93,27 @@ export async function openCodexThread(
      *  another model reads as a mid-conversation switch and injects a second full prompt. */
     model?: string
   },
-  timeoutMs: number | undefined
+  timeoutMs: number | undefined,
+  dynamicTools?: NativeTeamTaskToolSession['definitions']
 ): Promise<CodexOpenedThread> {
   const resumeThreadId = launch.resumeThreadId
   const threadSettings = { cwd: launch.cwd, ...launch.permissionPolicy }
   const startThread = (): Promise<unknown> =>
     connection.request(
       'thread/start',
-      { ...threadSettings, ...(launch.model ? { model: launch.model } : {}) },
+      {
+        ...threadSettings,
+        ...(launch.model ? { model: launch.model } : {}),
+        ...(dynamicTools?.length
+          ? {
+              dynamicTools: dynamicTools.map((tool) => ({
+                ...tool,
+                type: 'function',
+                deferLoading: false
+              }))
+            }
+          : {})
+      },
       { timeoutMs }
     )
   let supersededThreadId: string | undefined

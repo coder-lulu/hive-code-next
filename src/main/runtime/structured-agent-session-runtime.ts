@@ -46,6 +46,7 @@ import type { AgentSessionRecordStore } from './agent-session-record-store'
 import { journalDatabaseHoldsAgentSessions } from '../native-chat/agent-session-journal/journal-database'
 import { createStructuredTaskCodexRuntime } from './structured-task-codex-runtime'
 import type { TaskCodexRuntimeAccountPorts } from '../tasks/task-codex-runtime-account-ports'
+import type { RuntimeTeamTaskToolProvider } from './structured-team-task-tools'
 import type { TaskCodexStructuredLaunchDependencies } from '../tasks/task-codex-structured-launch'
 import type { NativeChatShellEnvironmentPolicy } from '../../shared/native-chat-shell-environment'
 import { createStructuredAgentEnvironmentResolvers } from './structured-agent-shell-environment'
@@ -145,6 +146,7 @@ export type StructuredAgentSessionRuntimeDeps = {
    *  reads with no session record. Absent disables the catalog surface. */
   resolveAgentAccountHome?: RuntimeAgentAccountHomeResolver
   taskCodexAccounts?: TaskCodexRuntimeAccountPorts
+  prepareTeamTaskTools?: RuntimeTeamTaskToolProvider
   taskDocker?: Partial<
     Pick<
       TaskCodexStructuredLaunchDependencies,

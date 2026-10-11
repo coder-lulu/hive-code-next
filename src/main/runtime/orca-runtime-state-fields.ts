@@ -19,6 +19,7 @@ import type {
 import type { RuntimeDesktopWindowStatus } from '../../shared/runtime-types'
 import type { AgentSessionClaimSigner } from './agent-session-claim-identity'
 import type { TaskCodexRuntimeAccountPorts } from '../tasks/task-codex-runtime-account-ports'
+import type { RuntimeTeamTaskToolProvider } from './structured-team-task-tools'
 import type { OrchestrationEnvironmentTransport } from './orchestration/environment-transport'
 import type { RuntimeCommandSurfaceHost } from './orca-runtime-core'
 import { installRuntimeFileCommandSurface } from './runtime-file-command-surface'
@@ -122,6 +123,7 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
       getRuntimeRecordId?: () => string | null
       agentSessionClaimSigner?: AgentSessionClaimSigner
       taskCodexAccounts?: TaskCodexRuntimeAccountPorts
+      prepareTeamTaskTools?: RuntimeTeamTaskToolProvider
       skillTransactionRecovery?: Promise<unknown>
       // Why a host hook and not a direct call: the process that owns this runtime's index
       // differs per host (scanner child on the desktop, in-process on orcad), and on orcad
@@ -135,6 +137,7 @@ export class OrcaRuntimeWithStateFields extends OrcaRuntimeWithLinearCommands {
     this.machineName.start()
     this.prepareClaudeAuth = deps?.prepareClaudeAuth
     this.taskCodexAccounts = deps?.taskCodexAccounts ?? null
+    this.prepareTeamTaskTools = deps?.prepareTeamTaskTools ?? null
     const runtime = this as RuntimeCommandSurfaceHost<this>
     installRuntimeFileCommandSurface(runtime, this.fileCommands)
     installRuntimeGitCommandSurface(runtime, this.gitCommands)

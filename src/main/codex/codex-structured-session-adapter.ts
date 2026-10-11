@@ -1,4 +1,5 @@
 import * as codexRewind from './codex-structured-rewind'
+import { cancelCodexTurnWithTeamToolRevocation } from './codex-team-task-tool-host'
 import type { AgentJournalMessageItem } from '../../shared/agent-session-journal-types'
 import type { AgentSessionBackgroundTaskState } from '../../shared/agent-session-wire'
 import { isCodexAppServerRequestError } from './codex-app-server-connection'
@@ -40,10 +41,7 @@ import {
 import { createCodexStructuredNotificationRetry } from './codex-structured-notification-retry'
 import { acquireCodexStructuredSession } from './codex-structured-session-acquire'
 import { changeCodexThreadGoal } from './codex-structured-thread-goal'
-import {
-  answerCodexStructuredPrompt,
-  cancelCodexStructuredTurn
-} from './codex-structured-prompt-ownership'
+import { answerCodexStructuredPrompt } from './codex-structured-prompt-ownership'
 
 export type {
   CodexStructuredLaunch,
@@ -126,6 +124,9 @@ export class CodexStructuredSessionAdapter implements StructuredAgentSessionAdap
       return { accepted: false, reason: 'failed' }
     }
     if (event.type === 'notification') {
+      if (session.teamTaskTools?.observe(event, false, session) === false) {
+        return { accepted: true }
+      }
       noteCodexTurnOpened(session, event.method, event.params)
     }
     const admission = session.translator?.handle(event) ?? { accepted: true }
@@ -133,6 +134,7 @@ export class CodexStructuredSessionAdapter implements StructuredAgentSessionAdap
       return admission
     }
     if (event.type === 'notification') {
+      session.teamTaskTools?.observe(event, true, session)
       // Only an admitted turn end settles; a refused one settles on the retry that lands.
       settleCodexSendsInEndedTurn(session, event, (settlement) =>
         this.deps.onDispatchSettledLate?.({ sessionId: event.sessionId, ...settlement })
@@ -151,6 +153,10 @@ export class CodexStructuredSessionAdapter implements StructuredAgentSessionAdap
     sessionId: string,
     request: Parameters<typeof deliverCodexServerRequest>[2]
   ): void {
+    const current = this.sessions.get(sessionId)
+    if (current?.teamTaskTools?.handle(current, request, () => this.sessions.get(sessionId))) {
+      return
+    }
     deliverCodexServerRequest(sessionId, this.sessions.get(sessionId), request, (session, event) =>
       this.emit(session, event)
     )
@@ -166,8 +172,7 @@ export class CodexStructuredSessionAdapter implements StructuredAgentSessionAdap
     )
   }
 
-  /** The tracker's own roster. No host decision reads it: the host's child records are the one
-   *  owner of "what runs", and this stays only so tests can hold the two rule sets side by side. */
+  /** Test comparison only; host decisions read the host's authoritative child records. */
   backgroundTaskState = (sessionId: string): AgentSessionBackgroundTaskState | null | undefined =>
     this.sessions.get(sessionId)?.backgroundTasks.state
 
@@ -223,7 +228,7 @@ export class CodexStructuredSessionAdapter implements StructuredAgentSessionAdap
   }
 
   cancelTurn: StructuredAgentSessionAdapter['cancelTurn'] = (request) =>
-    cancelCodexStructuredTurn({
+    cancelCodexTurnWithTeamToolRevocation({
       request,
       sessions: this.sessions,
       requestTimeoutMs: this.deps.requestTimeoutMs

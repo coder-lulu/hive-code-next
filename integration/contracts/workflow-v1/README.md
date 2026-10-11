@@ -1,6 +1,8 @@
 # 工程团队与成果交接契约 v1
 
-状态：2026-10-11。首条四角色工程链、Product 草稿及幂等采纳已验收。有限已采纳任务图已通过受控 Docker 真实执行、独立审核、原运行取消恢复、原生报告/界面及服务重启留存验证，相关自动化和构建通过；三轮源码复核通过，提交前实现与验收验证完成；文档交付复核和实际 Git 发布回执待补齐。计划替换、任务工具、资源/知识加载及硬预算仍待接入；本切片不代表部署、远程或完整持续自治验收。
+状态：2026-10-11。首条四角色工程链、Product 草稿、幂等采纳和有限已采纳任务图已验收并发布：公开 `a7bccef5cd4bf6392358a663e41b9eb3af0d0dfd`、私有文档 `759152ff20d6edcdc0bf962a12f527801d5be72b`，实际远程回执已核实。普通本机 Native Codex 会话的团队启动/查询子集已完成自动化、源码复核及真实四角色验收；本次发布以实际 Git 回执为准。完整业务任务工具、计划替换、资源/知识加载及硬预算仍待接入；本切片不代表部署、远程或完整持续自治验收。
+
+普通新会话默认提供 `hive_team_task_start({title, requirement})` 和 `hive_team_task_status({caseRef?})`。Main 按当前会话真实工作区确定唯一已拥有项目及流程，沿原 Facade 创建/开始和读取 Case；模型不能指定公司、工作区、执行器、命令或凭据。工具不自动采纳或启动计划图，task-origin 业务会话不继承。结果未确认时保留原请求并查询，不创建替代 Case；会话 Stop 撤销本轮工具权限，已受理 Case 的取消仍走原业务入口。通过 Codex 原生 dynamicTools 接入，不新增 MCP 服务或运行账本；已有未带该目录的第三方线程须新建会话。
 
 TypeScript 的流程与提案来源为 [src/shared/task-workflow](../../../src/shared/task-workflow/)，采纳 API 来源为 [hive-workflow-plan-application.ts](../../../src/shared/hive-workflow-plan-application.ts)，图控制与运行视图来源为 [hive-workflow-plan-runs.ts](../../../src/shared/hive-workflow-plan-runs.ts)。[task-workflow.schema.json](task-workflow.schema.json) 由同源生成；[test-vectors.json](test-vectors.json) 给出固定示例和成果/批准失效向量。它是业务对象与证据绑定合同，不替代 [P0 execution v1](../v1/README.md)，不新增启动器、运行账本或独立业务调度平面。
 

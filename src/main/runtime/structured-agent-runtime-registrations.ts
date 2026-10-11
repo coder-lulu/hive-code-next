@@ -37,6 +37,7 @@ import { acpStructuredAgentDefinition } from '../acp/acp-structured-agent-defini
 import { createAcpAgentConnection } from '../acp/acp-agent-connection'
 import { createAcpStructuredLaunchResolver } from '../acp/acp-structured-launch-resolution'
 import { AcpStructuredSessionAdapter } from '../acp/acp-structured-session-adapter'
+import { prepareRuntimeTeamTaskTools } from './structured-team-task-tools'
 
 /** What an agent's adapter is built from: the open store and the runtime around it. */
 export type StructuredAgentAdapterContext = {
@@ -93,6 +94,12 @@ export type StructuredAgentRuntimeRegistration = {
 function createCodexAdapter(context: StructuredAgentAdapterContext): StructuredAgentRuntimeAdapter {
   const { deps, store, followUps, host } = context
   return new CodexStructuredSessionAdapter({
+    ...(deps.prepareTeamTaskTools
+      ? {
+          prepareTeamTaskTools: (input) =>
+            prepareRuntimeTeamTaskTools({ input, store, provider: deps.prepareTeamTaskTools })
+        }
+      : {}),
     resolveLaunch: createCodexStructuredLaunchResolver({
       store,
       resolveWorkspacePath: deps.resolveWorkspacePath,

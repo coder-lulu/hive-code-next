@@ -1,4 +1,6 @@
 import type { StructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
+import type { NativeTeamTaskToolSession } from '../../shared/hive-team-task-tools'
+import type { CodexTeamTaskToolHost } from './codex-team-task-tool-host'
 import type {
   AgentJournalAnsweredTurnIdentity,
   AgentJournalItemIdentity
@@ -93,6 +95,9 @@ export type CodexStructuredSessionEvent =
   | { type: 'ended'; sessionId: string; reason: string; observedAt?: number }
 
 export type CodexStructuredSessionAdapterDeps = {
+  prepareTeamTaskTools?: (
+    input: StructuredAgentSessionAcquireInput
+  ) => Promise<NativeTeamTaskToolSession | null>
   resolveLaunch: (input: CodexStructuredLaunchInput) => Promise<CodexStructuredLaunch>
   /** Host capability seam; production uses the native Windows process table. */
   isWindowsProcessStartTimeAvailable?: () => boolean
@@ -126,6 +131,7 @@ export type CodexStructuredSessionAdapterDeps = {
 }
 
 export type CodexSession = {
+  teamTaskTools?: CodexTeamTaskToolHost
   connection: CodexAppServerConnection
   ended: boolean
   /** First observed child exit survives rejected settlement admission. */
