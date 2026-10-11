@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  stageNodePtySources,
   assertNodePtyPatchApplied,
   bindingGypForLibc,
   ptySourceForLibc,
@@ -170,4 +171,19 @@ describe('readManifest', () => {
     dirs.push(dir)
     expect(readManifest(dir)).toBeNull()
   })
+})
+
+it('stages nested winpty build inputs without modifying the Electron tree', () => {
+  const source = stage(PATCHED_BINDING_GYP, PATCHED_PTY_CC)
+  writeFileSync(join(source, 'package.json'), '{}')
+  mkdirSync(join(source, 'deps/winpty/src'), { recursive: true })
+  writeFileSync(join(source, 'deps/winpty/src/winpty.gyp'), 'nested gyp')
+  mkdirSync(join(source, 'build/Release'), { recursive: true })
+  writeFileSync(join(source, 'build/Release/conpty.node'), 'electron binary')
+  const destination = join(source, 'scratch')
+  stageNodePtySources(source, destination)
+  expect(readFileSync(join(destination, 'deps/winpty/src/winpty.gyp'), 'utf8')).toBe('nested gyp')
+  writeFileSync(join(destination, 'deps/winpty/src/winpty.gyp'), 'changed scratch')
+  expect(readFileSync(join(source, 'deps/winpty/src/winpty.gyp'), 'utf8')).toBe('nested gyp')
+  expect(readFileSync(join(source, 'build/Release/conpty.node'), 'utf8')).toBe('electron binary')
 })

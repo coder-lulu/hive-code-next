@@ -9,12 +9,11 @@ import {
   sha256,
   hasPreparedResources
 } from './client-build-contract.mjs'
-import { acquireBuildLock, capture, pnpmStep, pnpmCommand } from './client-build-execution.mjs'
+import { acquireBuildLock, capture, pnpmCommand } from './client-build-execution.mjs'
 import { androidPreflight, buildAndroid } from './client-build-android.mjs'
 import { iosPreflight, buildIOS } from './client-build-ios.mjs'
-import { buildDesktop } from './client-build-desktop.mjs'
 import { deliverArtifacts, verifyArtifacts } from './client-build-artifacts.mjs'
-import { canReuseInstalledDependencies } from './client-build-install.mjs'
+import { prepareTargetDependencies, requireTargetDependencies } from './client-build-install.mjs'
 
 const root = resolve(import.meta.dirname, '../..')
 const { values, positionals } = parseArgs({
@@ -49,10 +48,13 @@ async function preflight() {
     await iosPreflight(context)
   }
   if (names.includes('windows-x64')) {
-    const vswhere = join(
-      context.env['ProgramFiles(x86)'],
-      'Microsoft Visual Studio/Installer/vswhere.exe'
-    )
+    const programFiles = Object.entries(context.env).find(
+      ([key]) => key.toLowerCase() === 'programfiles(x86)'
+    )?.[1]
+    if (!programFiles) {
+      throw new Error('Windows build requires ProgramFiles(x86) to locate Visual Studio')
+    }
+    const vswhere = join(programFiles, 'Microsoft Visual Studio/Installer/vswhere.exe')
     const installation = await capture(context, vswhere, [
       '-latest',
       '-products',
@@ -132,6 +134,7 @@ async function main() {
       const preload = join(root, 'config/scripts/client-build-offline.cjs')
       context.env.NODE_OPTIONS += ` --require=${JSON.stringify(process.platform === 'win32' ? preload.replaceAll('\\', '/') : preload)}`
       for (const name of names) {
+        requireTargetDependencies(context, name)
         if (!hasPreparedResources(context, name)) {
           throw new Error(
             `${name} resources are missing or stale; run clients:prepare -- --target ${name}`
@@ -143,24 +146,13 @@ async function main() {
       context.logs = join(root, 'logs', 'client-build', context.attempt, name)
       const receipt = join(context.work, name, 'prepared.json')
       if (command === 'prepare') {
-        const mobileTarget = ['android', 'ios'].includes(name)
-        const cwd = mobileTarget ? join(root, 'mobile') : root
         mkdirSync(join(context.work, name), { recursive: true })
-        if (!canReuseInstalledDependencies(context, name)) {
-          await pnpmStep(
-            context,
-            `${name}-install`,
-            [
-              'install',
-              '--frozen-lockfile',
-              '--store-dir',
-              context.store,
-              ...(mobileTarget ? ['--node-linker=hoisted'] : ['--ignore-scripts'])
-            ],
-            cwd
-          )
-        }
+        await prepareTargetDependencies(context, name)
       }
+      // Desktop modules need installed bundler dependencies; doctor must work without them.
+      const buildDesktop = ['android', 'ios'].includes(name)
+        ? undefined
+        : (await import('./client-build-desktop.mjs')).buildDesktop
       const source =
         name === 'android'
           ? await buildAndroid(context, command === 'prepare')

@@ -68,7 +68,13 @@ describe('N-API pinning', () => {
     expect(JSON.parse(prebuildCompileGypi()).target_defaults.conditions).toEqual([
       [
         'OS=="mac"',
-        { xcode_settings: { CLANG_CXX_LANGUAGE_STANDARD: 'gnu++20', CLANG_CXX_LIBRARY: 'libc++' } }
+        {
+          xcode_settings: {
+            CLANG_CXX_LANGUAGE_STANDARD: 'gnu++20',
+            CLANG_CXX_LIBRARY: 'libc++',
+            GCC_ENABLE_CPP_EXCEPTIONS: 'YES'
+          }
+        }
       ]
     ])
   })

@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { renderPublication } from './upstream-sync-publication.mjs'
@@ -56,6 +56,9 @@ function fixture() {
     write(suite, {
       suite,
       status: 'success',
+      phase: 'final',
+      formalAcceptance: true,
+      omittedChecks: [],
       upstreamSha: options.upstream,
       targetSha: options.target,
       candidateSha: options.candidate,
@@ -74,6 +77,21 @@ function fixture() {
 }
 
 describe('upstream sync publication evidence', () => {
+  it.each([
+    { phase: 'repair' },
+    { phase: undefined },
+    { formalAcceptance: false },
+    { omittedChecks: ['pty-wsl-ssh'] },
+    { omittedChecks: undefined }
+  ])('rejects diagnostic or incomplete verification even with matching SHAs: %j', (change) => {
+    const { options, write } = fixture()
+    const report = JSON.parse(
+      readFileSync(path.join(options.evidence, 'common-gates.json'), 'utf8')
+    )
+    write('common-gates', { ...report, ...change })
+    expect(() => renderPublication(options)).toThrow(/final verification/)
+  })
+
   it('makes first-history review, every path ownership, and proposed checkpoint status explicit', () => {
     const { options } = fixture()
     const body = renderPublication(options)

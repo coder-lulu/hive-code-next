@@ -5,7 +5,11 @@ import { sha256 } from './client-build-contract.mjs'
 
 const execution = vi.hoisted(() => ({ capture: vi.fn(), step: vi.fn(), nodeStep: vi.fn() }))
 vi.mock('./client-build-execution.mjs', () => execution)
-import { androidBundletoolPath, buildAndroid } from './client-build-android.mjs'
+import {
+  androidBundletoolPath,
+  buildAndroid,
+  assertAndroidSdkResources
+} from './client-build-android.mjs'
 
 // Expo 55.0.30's bundled template.tgz, package/android/gradle/wrapper/gradle-wrapper.properties.
 const expoWrapper = [
@@ -145,4 +149,19 @@ it.each([
     'Gradle wrapper differs from pinned version'
   )
   expect(execution.step).not.toHaveBeenCalled()
+})
+
+it('rejects SDKs lacking the library AGP build-tools even when app tools exist', () => {
+  const pin = context.release.android
+  for (const resource of [
+    `platforms/android-${pin.compileSdk}/android.jar`,
+    `build-tools/${pin.buildTools}/source.properties`,
+    `ndk/${pin.ndk}/source.properties`,
+    `cmake/${pin.cmake}/source.properties`
+  ]) {
+    write(join(context.env.ANDROID_HOME, resource), 'fixture')
+  }
+  expect(() => assertAndroidSdkResources(context)).toThrow('build-tools/35.0.0/source.properties')
+  write(join(context.env.ANDROID_HOME, 'build-tools/35.0.0/source.properties'), 'fixture')
+  expect(() => assertAndroidSdkResources(context)).not.toThrow()
 })

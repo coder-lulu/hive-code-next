@@ -12,6 +12,7 @@
     "gradle": "9.0.0",
     "gradleSha256": "8fad3d78296ca518113f3d29016617c7f9367dc005f932bd9d93bf45ba46072b",
     "buildTools": "36.0.0",
+    "additionalBuildTools": ["35.0.0"],
     "compileSdk": 36,
     "targetSdk": 36,
     "minSdk": 24,

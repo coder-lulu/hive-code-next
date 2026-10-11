@@ -307,7 +307,10 @@ describe(
 
     it.each([
       'config/private-document-fingerprints.json',
-      'config/scripts/verify-documentation-governance.mjs'
+      'config/scripts/verify-documentation-governance.mjs',
+      'config/scripts/upstream-sync-repair-plan.mjs',
+      'config/scripts/upstream-sync-preflight.mjs',
+      'config/scripts/pnpm-cli-invocation.mjs'
     ])('cannot replace frozen privacy controls through a reviewed result: %s', (file) => {
       const f = fixture()
       const row = resolution(f, file, 'candidate attempts to disable privacy checks\n')

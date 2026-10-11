@@ -151,13 +151,20 @@ export async function androidPreflight(context) {
   if (expected && certificate !== expected) {
     throw new Error('Android keystore does not match the expected release certificate')
   }
+  assertAndroidSdkResources(context)
+}
+
+export function assertAndroidSdkResources(context) {
+  const pin = context.release.android
   const sdk = context.env.ANDROID_HOME
   if (!sdk) {
     throw new Error('Set androidSdk / ANDROID_HOME')
   }
   for (const relative of [
     `platforms/android-${pin.compileSdk}/android.jar`,
-    `build-tools/${pin.buildTools}/source.properties`,
+    ...[pin.buildTools, ...(pin.additionalBuildTools || [])].map(
+      (version) => `build-tools/${version}/source.properties`
+    ),
     `ndk/${pin.ndk}/source.properties`,
     `cmake/${pin.cmake}/source.properties`
   ]) {
