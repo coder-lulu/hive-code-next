@@ -18,9 +18,6 @@ import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { HiveRuntimeSessionsSettings } from './HiveRuntimeSessionsSettings'
 import { HiveAccountDetailRow } from './HiveAccountDetailRow'
-import { HiveAiAccountSection } from './HiveAiAccountSection'
-import { HiveAiModelsSection } from './HiveAiModelsSection'
-import { HiveAiModelSelectionSection } from './HiveAiModelSelectionSection'
 import { HiveAccountSecuritySection } from './HiveAccountSecuritySection'
 import {
   HiveAccountLoading,
@@ -306,19 +303,6 @@ export function HiveAccountSettingsContent(
         onOpenConnectionHelp={props.onOpenDeviceConnections ?? props.onOpenRuntimeDetails}
       />
 
-      {accountAuthorized && state.account?.accountId && (
-        <>
-          <HiveAiAccountSection key={state.account.accountId} accountId={state.account.accountId} />
-          <HiveAiModelSelectionSection
-            key={`available-models-${state.account.accountId}`}
-            accountId={state.account.accountId}
-          />
-          <HiveAiModelsSection
-            key={`models-${state.account.accountId}`}
-            accountId={state.account.accountId}
-          />
-        </>
-      )}
       <HiveAccountSecuritySection
         credentialProtection={credentialProtection}
         busy={busy !== null}

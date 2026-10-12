@@ -76,10 +76,10 @@ describe("a Codex child agent's shell on an older client's flat roster", () => {
   })
 })
 
-it('preserves Managed Pi child IDs instead of applying Codex legacy rewriting', () => {
-  const { tasks } = structuredChildWorkLegacyTasks([reviewer, shell], 'managed-pi')
+it('preserves external provider child IDs instead of applying Codex legacy rewriting', () => {
+  const { tasks } = structuredChildWorkLegacyTasks([reviewer, shell], 'custom-agent')
   expect(tasks?.map((task) => task.id)).toEqual(['thread-A', 'cmd-1'])
-  expect(structuredChildWorkLegacySubagents([reviewer], 'managed-pi')).toEqual(
+  expect(structuredChildWorkLegacySubagents([reviewer], 'custom-agent')).toEqual(
     structuredChildWorkLegacySubagents([reviewer], 'claude')
   )
 })

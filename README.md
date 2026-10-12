@@ -12,7 +12,6 @@ HiveCode 提供 macOS、Windows 和 Linux 桌面客户端，以及 Android、iOS
 | ----------------- | ---------------------------------------------------------------------------------------------------- |
 | 项目与 Git 工作树 | 导入本地目录或克隆仓库，创建、切换和管理独立工作树，为并行任务隔离工作目录。                         |
 | 智能体会话        | 接入 Codex、Claude Code、OpenCode、Gemini、Pi 等工具，在工作树中运行多个会话，查看输出、状态和历史。 |
-| HiveCode AI       | 基于随应用提供的 Pi，通过 Hive 账户接入已授权模型，支持模型选择和对话。                              |
 | 终端与文件        | 使用集成终端、文件浏览与编辑、Markdown 预览和文件搜索。                                              |
 | 代码审阅          | 查看 Git 改动和差异，执行提交操作，处理已连接代码托管平台上的 PR。                                   |
 | 浏览器工具        | 使用浏览器视图，以及页面操作、截图、控制台和网络检查工具。                                           |
@@ -27,7 +26,7 @@ HiveCode 提供 macOS、Windows 和 Linux 桌面客户端，以及 Android、iOS
 
 桌面与无界面模式共享同一套运行服务（runtime）。运行主机可以在没有桌面窗口的模式下工作，适用于服务器与远程开发。客户端需要能够访问主机端点；SSH 转发、局域网或其他已配置网络可以提供连接通道。浏览器与终端相关功能仍需要目标系统的原生运行依赖。
 
-Hive 账户登录、模型服务和账户中继需要可用的 Hive 后端及有效授权。登录渠道以服务实际返回的能力为准；通知还需要系统权限与对应平台的推送配置。
+Hive 账户登录和账户中继需要可用的 Hive 后端及有效授权。HiveCode 不提供内置智能体、模型 API 或 API 额度。登录渠道以服务实际返回的能力为准；通知还需要系统权限与对应平台的推送配置。
 
 ## 从源码开发
 
@@ -41,7 +40,7 @@ pnpm --dir mobile install --frozen-lockfile --ignore-scripts
 pnpm dev
 ```
 
-`pnpm dev` 会准备内置 Pi 依赖与 Electron 原生运行环境，再启动桌面开发模式。移动端使用独立的依赖目录和锁文件。
+`pnpm dev` 会准备 Electron 原生运行环境，再启动桌面开发模式。移动端使用独立的依赖目录和锁文件。
 
 首次运行完整 `pnpm test` 前，执行 `node config/scripts/prepare-cross-version-baselines.mjs` 获取跨版本测试所需的固定上游快照，并在同一终端设置 `ORCA_CROSS_VERSION_BASELINE_REF=v1.4.186`。Bash 使用 `export ORCA_CROSS_VERSION_BASELINE_REF=v1.4.186`，PowerShell 使用 `$env:ORCA_CROSS_VERSION_BASELINE_REF='v1.4.186'`。这些快照用于历史回归验证，不会写入公开分支或创建发布标签；涉及真实 shell 的测试还需要本机安装相应工具。
 

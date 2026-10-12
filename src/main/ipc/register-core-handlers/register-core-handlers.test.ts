@@ -69,8 +69,7 @@ const {
   registerNativeChatHandlersMock,
   registerEmulatorFrameStreamHandlersMock,
   registerEmulatorVideoStreamHandlersMock,
-  registerHiveAccountHandlersMock,
-  registerHiveTaskHandlersMock
+  registerHiveAccountHandlersMock
 } = vi.hoisted(() => ({
   getPathMock: vi.fn(() => '/test/user-data'),
   listEnvironmentsMock: vi.fn(() => []),
@@ -140,8 +139,7 @@ const {
   registerNativeChatHandlersMock: vi.fn(),
   registerEmulatorFrameStreamHandlersMock: vi.fn(),
   registerEmulatorVideoStreamHandlersMock: vi.fn(),
-  registerHiveAccountHandlersMock: vi.fn(),
-  registerHiveTaskHandlersMock: vi.fn()
+  registerHiveAccountHandlersMock: vi.fn()
 }))
 
 vi.mock('electron', () => ({
@@ -153,10 +151,6 @@ vi.mock('electron', () => ({
 
 vi.mock('../hive-account', () => ({
   registerHiveAccountHandlers: registerHiveAccountHandlersMock
-}))
-
-vi.mock('../hive-tasks', () => ({
-  registerHiveTaskHandlers: registerHiveTaskHandlersMock
 }))
 
 vi.mock('../../shared/runtime-environment-store', () => ({
@@ -494,7 +488,6 @@ describe('registerCoreHandlers', () => {
     registerEmulatorFrameStreamHandlersMock.mockReset()
     registerEmulatorVideoStreamHandlersMock.mockReset()
     registerHiveAccountHandlersMock.mockReset()
-    registerHiveTaskHandlersMock.mockReset()
   })
 
   it('passes the store through to handler registrars that need it', async () => {
@@ -596,8 +589,6 @@ describe('registerCoreHandlers', () => {
     expect(registerLocalhostWorktreeLabelHandlersMock).toHaveBeenCalledWith(store)
     expect(registerTelemetryHandlersMock).toHaveBeenCalledWith(store)
     expect(registerHiveAccountHandlersMock).toHaveBeenCalledWith(undefined)
-    expect(registerHiveTaskHandlersMock).toHaveBeenCalledTimes(1)
-    expect(registerHiveTaskHandlersMock).toHaveBeenCalledWith()
     expect(registerOrcaProfileHandlersMock).toHaveBeenCalledWith(store, { onBeforeRelaunch })
     expect(registerSessionHandlersMock).toHaveBeenCalledWith(store, runtime)
     expect(registerUIHandlersMock).toHaveBeenCalledWith(store, {
@@ -751,6 +742,5 @@ describe('registerCoreHandlers', () => {
     // Why: ipcMain.handle throws on duplicate channel registration, so the
     // memory handler must not be wired up a second time on reactivation.
     expect(registerMemoryHandlersMock).not.toHaveBeenCalled()
-    expect(registerHiveTaskHandlersMock).not.toHaveBeenCalled()
   })
 })

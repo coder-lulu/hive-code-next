@@ -8,17 +8,6 @@ import {
 } from './quick-workspace-agent-selection'
 
 describe('filterQuickWorkspaceAgents', () => {
-  it('does not advertise the local built-in agent before target detection establishes support', () => {
-    expect(filterQuickWorkspaceAgents([{ id: 'hivecode', label: 'HiveCode AI' }], null)).toEqual([])
-    expect(pickQuickWorkspaceAgent('hivecode', null)).toBe('claude')
-  })
-  it('includes the built-in HiveCode AI without an external CLI installation', () => {
-    expect(
-      filterQuickWorkspaceAgents([{ id: 'hivecode', label: 'HiveCode AI' }], ['hivecode'])
-    ).toEqual([{ id: 'hivecode', label: 'HiveCode AI' }])
-    expect(pickQuickWorkspaceAgent('hivecode', ['hivecode'])).toBe('hivecode')
-  })
-
   const catalog = [
     { id: 'claude' as const, label: 'Claude' },
     { id: 'codex' as const, label: 'Codex' },

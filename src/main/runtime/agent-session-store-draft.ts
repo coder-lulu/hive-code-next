@@ -1,6 +1,5 @@
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
-import { hiveRuntimeStateChanged, serializeHiveRuntimeState } from './agent-session-hive-state-rows'
 /**
  * A transaction applies to a draft of the published store state, and the store publishes the draft
  * only once its rows have committed, so no reader ever sees a change that might still roll back.
@@ -24,8 +23,6 @@ export function draftAgentSessionStoreState(state: AgentSessionStoreState): Agen
   return {
     ...state,
     records: new Map(state.records),
-    hiveSessions: new Map(state.hiveSessions),
-    taskExecutions: new Map(state.taskExecutions),
     operations: new Map(state.operations),
     retiredClaimKeys: [...state.retiredClaimKeys],
     sessionTabs: state.sessionTabs?.clone() ?? null
@@ -37,7 +34,6 @@ type KeyedRowWrites = { upsert: [key: string, json: string][]; remove: string[] 
 /** Exactly the rows a draft changed, each serialized as it will be stored. */
 export type AgentSessionStoreRowWrites = {
   records: KeyedRowWrites
-  hiveRuntimeState: string | null
   operations: KeyedRowWrites
   /** The whole list when it changed, else null. */
   retiredClaimKeys: RetiredAgentSessionClaimKey[] | null
@@ -127,11 +123,7 @@ export function agentSessionStoreDraftRowWrites(
   if (!tabs.every(isReadableAgentSessionStoreTab)) {
     throw new Error('agent_session_store_write_invalid')
   }
-  const hiveRuntimeState = hiveRuntimeStateChanged(published, draft)
-    ? serializeHiveRuntimeState(draft)
-    : null
   const changed =
-    hiveRuntimeState !== null ||
     records.upsert.length > 0 ||
     records.remove.length > 0 ||
     operations.upsert.length > 0 ||
@@ -142,7 +134,6 @@ export function agentSessionStoreDraftRowWrites(
     return null
   }
   return {
-    hiveRuntimeState,
     records,
     operations,
     retiredClaimKeys,

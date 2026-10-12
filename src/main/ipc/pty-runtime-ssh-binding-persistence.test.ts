@@ -131,7 +131,7 @@ describe('registerPtyHandlers', () => {
           leafId?: string
           sessionId?: string
           persistHostSessionBinding?: boolean
-          launchAgent?: 'hivecode'
+          launchAgent?: 'pi'
         }): Promise<{ id: string; isReattach?: boolean }>
       }
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: this fixture implements only provider operations exercised by the real spawn handler.
@@ -197,7 +197,7 @@ describe('registerPtyHandlers', () => {
           tabId: 'tab-remote',
           leafId,
           ...(isReattach ? { sessionId: 'ssh:ssh-reattach-ok@@relay-pty' } : {}),
-          launchAgent: 'hivecode',
+          launchAgent: 'pi',
           persistHostSessionBinding: true
         })
 
@@ -209,7 +209,7 @@ describe('registerPtyHandlers', () => {
             ptyId: 'ssh:ssh-reattach-ok@@relay-pty',
             hostAdmittedMembership: true,
             origin: isReattach ? 'reattach' : 'spawn',
-            ...(!isReattach ? { launchAgent: 'hivecode' } : {})
+            ...(!isReattach ? { launchAgent: 'pi' } : {})
           },
           'ssh:ssh-reattach-ok'
         )

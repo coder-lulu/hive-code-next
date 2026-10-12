@@ -172,8 +172,6 @@ describe('settings screen behavior', () => {
   })
 
   it.each([
-    ['AI 额度与用量', '/ai-account'],
-    ['AI 模型与价格', '/ai-models'],
     ['终端', '/terminal-settings'],
     ['聊天界面', '/native-chat-settings'],
     ['浏览器', '/browser-settings'],

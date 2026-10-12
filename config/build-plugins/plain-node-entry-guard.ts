@@ -40,7 +40,6 @@ export const CLI_MAIN_ENTRY_NAMES = [
 // Plain-Node processes and CLI modules cannot load Electron's API.
 const PLAIN_NODE_ENTRY_NAMES = [
   'daemon-entry',
-  'managed-pi-pack-product',
   'parcel-watcher-process-entry',
   'computer-sidecar',
   'wsl-transcript-fs-process-entry',

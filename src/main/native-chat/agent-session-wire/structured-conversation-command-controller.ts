@@ -78,9 +78,6 @@ export class StructuredConversationCommandController {
       return target
     }
     return records.flatMap((record) => {
-      if (record.provider === 'managed-pi') {
-        return []
-      }
       const target = destination(record.sessionId)
       const sessionId = target !== record.sessionId ? target : null
       // Explicit history reveals remain readable; closed replacements stay closed.

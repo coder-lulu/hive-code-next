@@ -26,31 +26,31 @@ describe('runtime launch identity persistence', () => {
   })
 
   it.each(['new', 'existing'] as const)(
-    'restores authored Hive identity from a %s binding',
+    'restores authored Pi identity from a %s binding',
     async (kind) => {
       const store = createStore()
       if (kind === 'existing') {
         await store.persistPtyBinding(binding)
       }
-      expect(await store.persistPtyBinding({ ...binding, launchAgent: 'hivecode' })).toBe(true)
+      expect(await store.persistPtyBinding({ ...binding, launchAgent: 'pi' })).toBe(true)
       const restored = createStore().getWorkspaceSession()
       const tabs = restored.tabsByWorktree[binding.worktreeId]
       expect(tabs[0]).toMatchObject({
         id: binding.tabId,
         ptyId: binding.ptyId,
-        launchAgent: 'hivecode'
+        launchAgent: 'pi'
       })
       expect(buildHeadlessMobileSessionTerminalTabs(binding.worktreeId, tabs, restored)).toEqual([
         expect.objectContaining({
           parentTabId: binding.tabId,
           leafId: binding.leafId,
-          launchAgent: 'hivecode'
+          launchAgent: 'pi'
         })
       ])
       expect(await store.persistPtyBinding(binding)).toBe(true)
       expect(
         createStore().getWorkspaceSession().tabsByWorktree[binding.worktreeId][0].launchAgent
-      ).toBe('hivecode')
+      ).toBe('pi')
     }
   )
 
@@ -60,7 +60,7 @@ describe('runtime launch identity persistence', () => {
     expect(
       await store.persistPtyBinding({
         ...binding,
-        launchAgent: 'hivecode',
+        launchAgent: 'pi',
         expectedBinding: { ptyId: 'other-pty' }
       })
     ).toBe(false)

@@ -40,34 +40,8 @@ export async function discoverModelsLocal(input: {
   backslash: CommandTemplateBackslash
   spawnAgent: SpawnSourceControlAgent
 }): Promise<DiscoverCommitMessageModelsResult> {
-  let resolvedSpec = getAgentModelProbeSpec(input.agentId)
+  const spec = getAgentModelProbeSpec(input.agentId)
   let env = input.env
-  if (input.agentId === 'hivecode' && resolvedSpec?.modelDiscovery) {
-    if (input.options.wslDistro) {
-      return {
-        success: false,
-        error: 'HiveCode AI model discovery requires the local authenticated app.'
-      }
-    }
-    const [{ CliInstaller }, { getAppEnvironment }] = await Promise.all([
-      import('../cli/cli-installer'),
-      import('../../shared/app-environment')
-    ])
-    const { launcherPath } = await new CliInstaller().getStatus()
-    if (!launcherPath) {
-      return { success: false, error: 'The HiveCode CLI launcher is unavailable.' }
-    }
-    resolvedSpec = {
-      ...resolvedSpec,
-      modelDiscovery: { ...resolvedSpec.modelDiscovery, binary: launcherPath }
-    }
-    env = {
-      ...process.env,
-      ...input.env,
-      ORCA_USER_DATA_PATH: getAppEnvironment().getPath('userData')
-    }
-  }
-  const spec = resolvedSpec
   if (!spec) {
     return { success: false, error: `Agent "${input.agentId}" does not support model discovery.` }
   }
@@ -75,7 +49,7 @@ export async function discoverModelsLocal(input: {
     return staticModelDiscoveryResult(spec)
   }
 
-  const planned = planModelDiscovery(spec, input.agentId === 'hivecode' ? undefined : input.agentCommandOverride, input.backslash)
+  const planned = planModelDiscovery(spec, input.agentCommandOverride, input.backslash)
   if (!planned.ok) {
     return { success: false, error: planned.error }
   }

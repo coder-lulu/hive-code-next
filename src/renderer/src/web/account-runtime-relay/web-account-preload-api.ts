@@ -19,27 +19,6 @@ export function createWebAccountPreloadApi(
       }
       return account.session.loginCapabilities()
     },
-    readAiAccount: async () => {
-      throw new Error('Use the HiveCloud AI account page.')
-    },
-    activateAiAccount: async () => {
-      throw new Error('Use the HiveCloud AI account page.')
-    },
-    readAiBenefits: async () => {
-      throw new Error('Use the HiveCloud AI account page.')
-    },
-    readAiConsumption: async () => {
-      throw new Error('Use the HiveCloud AI account page.')
-    },
-    readAiModelCandidates: async () => {
-      throw new Error('Use the HiveCloud AI models page.')
-    },
-    readAiModels: async () => {
-      throw new Error('Use the HiveCloud AI models page.')
-    },
-    selectAiModel: async () => {
-      throw new Error('Select an AI model in the desktop client.')
-    },
     getState: async () => state(),
     signIn: async () => {
       window.location.assign('https://console.hivekernel.com/login?redirect=%2Fruntime%2F')

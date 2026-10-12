@@ -15,7 +15,7 @@ import type { AgentSessionRecord } from '../../../shared/agent-session-record'
 export type StructuredAgentSessionLeaseStore = Pick<
   AgentSessionRecordStore,
   'getRecord' | 'transitionHandoff'
-> & { tasks: Pick<AgentSessionRecordStore['tasks'], 'hasSessionBinding'> }
+>
 
 /** Releases the lease of the child whose exit this host observed, with that exit's evidence.
  *  Throws `agent_session_checkpoint_stale` when the record no longer names that child. */

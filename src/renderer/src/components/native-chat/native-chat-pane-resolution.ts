@@ -47,11 +47,7 @@ export function resolveNativeChatSession(
   input: NativeChatPaneResolutionInput
 ): NativeChatPaneResolution | null {
   const hookAgent = input.agentStatusEntry?.agentType
-  // Hive owns this launch; Pi reports the underlying native runtime identity.
-  const agent =
-    input.launchAgent === 'hivecode' && hookAgent === 'pi'
-      ? 'hivecode'
-      : (hookAgent ?? input.launchAgent ?? input.resolvedAgent)
+  const agent = hookAgent ?? input.launchAgent ?? input.resolvedAgent
   if (!agent || !isNativeChatSupportedAgent(agent)) {
     return null
   }

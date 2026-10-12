@@ -47,7 +47,6 @@ export const TUI_AGENT_AUTO_PICK_ORDER = [
   'hermes',
   'devin',
   'openclaw',
-  'hivecode',
   'codebuddy',
   'jcode'
 ] as const satisfies readonly TuiAgent[]
@@ -65,7 +64,7 @@ export function pickTuiAgent(
     return null
   }
   const disabledSet = new Set(normalizeDisabledTuiAgents(disabled))
-  const detectedSet = new Set(detected)
+  const detectedSet = new Set([...detected].filter(isTuiAgent))
   if (preferred && detectedSet.has(preferred) && !disabledSet.has(preferred)) {
     return preferred
   }
@@ -97,7 +96,7 @@ export function haveSameDisabledTuiAgents(left: unknown, right: unknown): boolea
 }
 
 export function isTuiAgentEnabled(agent: TuiAgent, disabled?: Iterable<unknown> | null): boolean {
-  return !normalizeDisabledTuiAgents(disabled).includes(agent)
+  return isTuiAgent(agent) && !normalizeDisabledTuiAgents(disabled).includes(agent)
 }
 
 export function filterEnabledTuiAgents<T extends TuiAgent>(

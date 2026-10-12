@@ -9,19 +9,6 @@ export type AgentModelProbeSpec = Omit<CommitMessageAgentSpec, 'promptDelivery' 
 
 /** Agents that support model discovery but are not commit-message agents. */
 const MODEL_DISCOVERY_ONLY_SPECS: Partial<Record<TuiAgent, AgentModelProbeSpec>> = {
-  hivecode: {
-    id: 'hivecode',
-    label: 'HiveCode AI',
-    binary: 'hive',
-    modelSource: 'dynamic',
-    modelDiscovery: {
-      binary: 'hive',
-      args: ['hive-ai', '--list-models'],
-      parse: parseOmpModelList
-    },
-    models: [],
-    defaultModelId: ''
-  },
   grok: {
     id: 'grok',
     label: 'Grok',

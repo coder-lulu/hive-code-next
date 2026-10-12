@@ -50,7 +50,7 @@ export function createTabsCloseActions(
       const dedupedGroupOrder = dedupeTabOrder(group.tabOrder)
       const remainingOrder = dedupeTabOrder(dedupedGroupOrder.filter((id) => id !== tabId))
       const wasLastTab = remainingOrder.length === 0
-      if (tab.contentType === 'agent-session' && tab.agentSessionAgent !== 'hivecode') {
+      if (tab.contentType === 'agent-session') {
         const provisional =
           shouldRetainStructuredAgentSessionLaunchTab(worktreeId, tab.entityId) ||
           hasStructuredAgentSessionLaunchCancellationTombstone(worktreeId, tab.entityId)

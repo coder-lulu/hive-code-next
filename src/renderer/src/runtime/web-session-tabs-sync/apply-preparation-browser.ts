@@ -20,10 +20,7 @@ import {
   webSessionOpenFilesForWorktree
 } from './state-equality-files'
 import { shouldRetainStructuredAgentSessionLaunchTab } from '@/lib/structured-agent-session-launch-registry'
-import {
-  LOCAL_STRUCTURED_SESSION_OWNER,
-  executionHostIdForSessionTabsOwner
-} from '../local-structured-session-owner'
+import { executionHostIdForSessionTabsOwner } from '../local-structured-session-owner'
 
 export function prepareWebSessionTabsSnapshotBrowser(
   base: ReturnType<typeof prepareWebSessionTabsSnapshotBase>
@@ -184,15 +181,6 @@ export function prepareWebSessionTabsSnapshotBrowser(
   advanceWebSessionOpenFilesIndex(batchContext, nextOpenFiles, worktreeId)
   const retainedUnifiedTabs = currentUnifiedTabs.filter((tab) => {
     if (tab.contentType === 'agent-session') {
-      // The local CLI inventory never publishes Hive sessions. Its absence (including
-      // publisher retraction) cannot close a tab owned by the Hive conversation runtime.
-      if (
-        environmentId === LOCAL_STRUCTURED_SESSION_OWNER &&
-        !reconcilesNonAgentTabs &&
-        tab.agentSessionAgent === 'hivecode'
-      ) {
-        return true
-      }
       // A matching host row is authoritative; retaining the provisional tab beside its mirror
       // would briefly render two panes before lifecycle publication is recorded.
       // A host that cannot list its chats is no evidence this one closed.

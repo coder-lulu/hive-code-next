@@ -18,7 +18,7 @@ import { createStructuredAgentSessionLogger } from './structured-agent-session-l
 const NOW = 1_800_000_000_000
 
 // The runtime state never reads the journal database; it only fills the deps' shape.
-const logs = resolve('logs/paperclip-development/p3/controlled-runtime/host-runtime-state/tmp')
+const logs = resolve('logs/native-session/host-runtime-state/tmp')
 mkdirSync(logs, { recursive: true })
 const stateDirectory = mkdtempSync(join(logs, 'orca-host-runtime-state-'))
 afterAll(() => {

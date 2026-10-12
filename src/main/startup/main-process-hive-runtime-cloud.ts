@@ -1,13 +1,5 @@
 import { app } from 'electron'
-import { join } from 'node:path'
-import { HiveAgentLocalRuntime } from '../native-chat/hive-agent-local-runtime'
 import { HiveAccountService } from '../hive-account/hive-account-service'
-import { startHiveNativePiBridge } from '../hive-account/hive-native-pi-bridge'
-import { getMainHttpClient } from '../network/http-client'
-import { piTitlebarExtensionService } from '../pi/titlebar-extension-service'
-import { getHiveAccountConfig } from '../hive-account/hive-account-config'
-import { HiveAgentLocalPrincipal } from '../native-chat/hive-agent-local-principal'
-import { resolveHiveAgentLocalProject } from '../native-chat/hive-agent-local-project'
 import { getHiveRuntimeCloudConfig } from '../hive-runtime-cloud/hive-runtime-cloud-config'
 import { HiveRuntimeCloudPresenceService } from '../hive-runtime-cloud/hive-runtime-cloud-presence-service'
 import { defaultPresenceDependencies } from '../hive-runtime-cloud/hive-runtime-cloud-presence-support'
@@ -39,15 +31,11 @@ import {
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
 import { mainProcessState as state } from './main-process-state'
-import { initializeLocalTasks, stopLocalTasks } from './main-process-tasks'
 import {
   getHiveRuntimeRelayStatus,
   installHiveRuntimeRelay,
   stopHiveRuntimeRelay
 } from './main-process-hive-runtime-relay'
-
-let nativePiBridge: Promise<Awaited<ReturnType<typeof startHiveNativePiBridge>> | null> | null =
-  null
 
 export function initializeHiveAccount(): void {
   const account = new HiveAccountService(app.getPath('userData'))
@@ -58,29 +46,6 @@ export function initializeHiveAccount(): void {
       state.isQuitting ? account.getState() : account.refresh().then((result) => result.state)
     )
     .catch(() => account.getState())
-  nativePiBridge = state.hiveAccountStartupState
-    .then(() => {
-      if (state.isQuitting) {
-        return null
-      }
-      return startHiveNativePiBridge({
-        account,
-        userDataPath: app.getPath('userData'),
-        resourcesDirectory: app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'out'),
-        cloudOrigin: () => {
-          const config = getHiveAccountConfig()
-          return config.configured ? config.config.apiBaseUrl : null
-        },
-        fetch: (input, init) => getMainHttpClient().fetch(String(input), init),
-        prepareAgentDirectory: (directory) => {
-          piTitlebarExtensionService.buildPtyEnv('hive-native', directory, 'pi')
-        }
-      })
-    })
-    .catch((error) => {
-      console.error('HiveCode AI native bridge could not start', error)
-      return null
-    })
 }
 
 export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): void {
@@ -149,23 +114,6 @@ export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): 
         })
       : null
   )
-  if (state.hiveAccountService && state.store && !state.isServeMode) {
-    const projectStore = state.store
-    state.hiveAgentLocalPrincipal = new HiveAgentLocalPrincipal(
-      state.hiveAccountService,
-      processLocalRuntimeOwnership,
-      getHiveAccountConfig,
-      (selector) => resolveHiveAgentLocalProject(runtimeService, projectStore, selector)
-    )
-    state.hiveAgentLocalRuntime = new HiveAgentLocalRuntime({
-      account: state.hiveAccountService,
-      presence: processRuntimeCloudPresence,
-      principal: state.hiveAgentLocalPrincipal,
-      runtime: runtimeService,
-      getConfig: getHiveAccountConfig,
-      resourcesDirectory: app.isPackaged ? process.resourcesPath : join(app.getAppPath(), 'out')
-    })
-  }
   state.uninstallRuntimeCloudAccess = installHiveAccountRuntimeAccess({
     directory: processRuntimeCloudDirectory,
     transport: processRuntimeCloudTransport,
@@ -195,7 +143,6 @@ export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): 
       consumer.setAuthorization(authorization)
     }
   }
-  initializeLocalTasks()
 }
 
 export function installHiveRuntimeCloudWebLaunch(runtimeRpc: OrcaRuntimeRpcServer): void {
@@ -233,15 +180,7 @@ export function installHiveRuntimeCloudWebLaunch(runtimeRpc: OrcaRuntimeRpcServe
 }
 
 export function stopHiveRuntimeCloud(): { name: string; promise: Promise<void> }[] {
-  const localRuntime = state.hiveAgentLocalRuntime
-  const hiveAgentShutdown = (localRuntime?.close() ?? Promise.resolve()).then(() => {
-    if (state.hiveAgentLocalRuntime === localRuntime) {
-      state.hiveAgentLocalRuntime = null
-    }
-  })
   const runtimeRelayShutdown = stopHiveRuntimeRelay()
-  state.hiveAgentLocalPrincipal?.stop()
-  state.hiveAgentLocalPrincipal = null
   state.unsubscribeRuntimeCloudAuthorization?.()
   state.unsubscribeRuntimeCloudAuthorization = null
   state.unsubscribeRuntimeCloudPresenceState?.()
@@ -266,12 +205,6 @@ export function stopHiveRuntimeCloud(): { name: string; promise: Promise<void> }
   state.hiveAccountService = null
   state.hiveAccountStartupState = null
   return [
-    { name: 'hive-tasks', promise: stopLocalTasks() },
-    {
-      name: 'hive-native-pi',
-      promise: (nativePiBridge ?? Promise.resolve(null)).then((bridge) => bridge?.close())
-    },
-    { name: 'hive-agent', promise: hiveAgentShutdown },
     { name: 'runtime-relay', promise: runtimeRelayShutdown },
     { name: 'runtime-cloud-presence', promise: runtimeCloudPresenceShutdown },
     { name: 'runtime-cloud-web-session-control', promise: runtimeCloudWebSessionControlShutdown }

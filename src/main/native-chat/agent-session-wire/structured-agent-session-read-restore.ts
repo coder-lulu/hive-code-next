@@ -15,7 +15,7 @@ export async function restoreStructuredAgentSessionRead(
   sessionId: string
 ): Promise<OpenedStructuredAgentSessionConversation | null> {
   const record = deps.store.getRecord(sessionId)
-  if (!record || record.provider === 'managed-pi') {
+  if (!record) {
     return null
   }
   if (readJournalSessionEpoch(deps.journalDatabase.db, sessionId) === null) {

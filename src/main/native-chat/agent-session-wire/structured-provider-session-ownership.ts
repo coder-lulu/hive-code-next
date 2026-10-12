@@ -14,9 +14,6 @@ export function listStructuredProviderSessionOwnership(
   records: readonly AgentSessionRecord[]
 ): StructuredProviderSessionOwnership[] {
   return records.flatMap((record) => {
-    if (record.provider === 'managed-pi') {
-      return []
-    }
     return record.providerHandleChain.map((link) => ({
       sessionId: record.sessionId,
       workspaceId: record.location.workspaceId,

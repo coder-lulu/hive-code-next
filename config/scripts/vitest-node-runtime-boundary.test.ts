@@ -19,7 +19,6 @@ it('keeps loader hooks and real Windows credential/pipe owners in the Node proje
     'src/main/cursor/hook-service.test.ts',
     'src/main/startup/run-electron-vite-dev-web.test.ts',
     'src/main/providers/agent-foreground-process-git-bash.win32.test.ts',
-    'src/main/providers/hive-native-foreground.win32.test.ts',
     'tests/e2e/cross-version-wire/agent-session-death-evidence-downgrade.unit.test.ts',
     'tests/e2e/cross-version-wire/kept-card-downgrade.unit.test.ts',
     'tests/e2e/cross-version-wire/session-search-agent-set-downgrade.unit.test.ts',
@@ -117,90 +116,6 @@ it('keeps the real Hive Web Launch HTTP listener in Node without moving its mock
   for (const operation of ['createServer', 'listen', 'closeAllConnections', 'close']) {
     expect(calls.has(operation), operation).toBe(true)
   }
-})
-
-function importsWorkflowPrepareFixture(source: ts.SourceFile): boolean {
-  return source.statements.some(
-    (node) =>
-      ts.isImportDeclaration(node) &&
-      hasValueImport(node) &&
-      ts.isStringLiteral(node.moduleSpecifier) &&
-      node.moduleSpecifier.text.endsWith('/local-task-workflow-prepare.test-fixture.ts')
-  )
-}
-
-it.each([
-  ['import { workflowPrepareFixture } from "./local-task-workflow-prepare.test-fixture.ts"', true],
-  ['import type { Rig } from "./local-task-workflow-prepare.test-fixture.ts"', false],
-  ['import { type Rig } from "./local-task-workflow-prepare.test-fixture.ts"', false]
-])('distinguishes the HTTP fixture value dependency in %s', (source, value) => {
-  expect(
-    importsWorkflowPrepareFixture(
-      ts.createSourceFile('example.mjs', source, ts.ScriptTarget.Latest)
-    )
-  ).toBe(value)
-})
-
-it('keeps the real Paperclip preparation HTTP lifecycle in Node without moving mock-only controls', () => {
-  const actual = 'config/scripts/paperclip-workflow-prepare-dispatch.test.mjs'
-  const nodeFiles = new Set(
-    globSync(NODE_RUNTIME_INCLUDE).map((file) => file.replaceAll('\\', '/'))
-  )
-  for (const owner of [
-    actual,
-    'config/scripts/paperclip-workflow-prepare-recovery-repository.test.mjs',
-    'config/scripts/paperclip-external-execution-control.test.mjs'
-  ]) {
-    const source = ts.createSourceFile(owner, readFileSync(owner, 'utf8'), ts.ScriptTarget.Latest)
-    expect(importsWorkflowPrepareFixture(source), owner).toBe(owner === actual)
-    expect(nodeFiles.has(owner), owner).toBe(owner === actual)
-  }
-  const fixture = 'src/main/tasks/local-task-workflow-prepare.test-fixture.ts'
-  const source = ts.createSourceFile(fixture, readFileSync(fixture, 'utf8'), ts.ScriptTarget.Latest)
-  expect(
-    source.statements.some(
-      (node) =>
-        ts.isImportDeclaration(node) &&
-        hasValueImport(node) &&
-        ts.isStringLiteral(node.moduleSpecifier) &&
-        node.moduleSpecifier.text === './local-task-workflow-prepare-service.test-fixture'
-    )
-  ).toBe(true)
-  const serviceFile = 'src/main/tasks/local-task-workflow-prepare-service.test-fixture.ts'
-  const service = ts.createSourceFile(
-    serviceFile,
-    readFileSync(serviceFile, 'utf8'),
-    ts.ScriptTarget.Latest
-  )
-  expect(
-    service.statements.some(
-      (node) =>
-        ts.isImportDeclaration(node) &&
-        hasValueImport(node) &&
-        ts.isStringLiteral(node.moduleSpecifier) &&
-        node.moduleSpecifier.text === 'node:http'
-    )
-  ).toBe(true)
-  const calls = new Set<string>()
-  const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node)) {
-      if (ts.isIdentifier(node.expression)) {
-        calls.add(node.expression.text)
-      } else if (
-        ts.isPropertyAccessExpression(node.expression) &&
-        ts.isIdentifier(node.expression.expression) &&
-        node.expression.expression.text === 'service'
-      ) {
-        calls.add(`service.${node.expression.name.text}`)
-      }
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(service)
-  for (const call of ['createServer', 'service.closeAllConnections', 'service.close']) {
-    expect(calls.has(call), call).toBe(true)
-  }
-  expect(NODE_RUNTIME_INCLUDE).toContain(actual)
 })
 
 function importsNodePtyRuntime(source: ts.SourceFile): boolean {
@@ -801,26 +716,4 @@ it('runs the real daemon exec PTY in Node while preserving mocked spawn consumer
       ts.createSourceFile(native, readFileSync(native, 'utf8'), ts.ScriptTarget.Latest)
     )
   ).toBe(true)
-})
-
-it('runs actual pinned Node Pack builders in Node while retaining notice-only controls in Bun', () => {
-  const consumers = [
-    'config/scripts/managed-pi-cloud-host.test.ts',
-    'config/scripts/managed-pi-execution-host.test.ts',
-    'config/scripts/managed-pi-pack-build.test.ts',
-    'config/scripts/managed-pi-process.test.ts',
-    'config/scripts/managed-pi-text-runtime.test.ts'
-  ]
-  const nodeFiles = new Set(
-    globSync(NODE_RUNTIME_INCLUDE).map((file) => file.replaceAll('\\', '/'))
-  )
-  for (const owner of [...consumers, 'config/scripts/managed-pi-pack-notices.test.ts']) {
-    const source = ts.createSourceFile(owner, readFileSync(owner, 'utf8'), ts.ScriptTarget.Latest)
-    expect(
-      callsImportedRuntime(source, '/managed-pi-pack-producer', 'produceManagedPiTextPack'),
-      owner
-    ).toBe(consumers.includes(owner))
-    expect(nodeFiles.has(owner), owner).toBe(consumers.includes(owner))
-    expect(NODE_RUNTIME_INCLUDE.includes(owner), owner).toBe(consumers.includes(owner))
-  }
 })

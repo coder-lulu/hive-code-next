@@ -12,7 +12,6 @@ import type { JournalHostDatabase } from '../native-chat/agent-session-journal/j
 import type { JournalOperationReceipt } from '../native-chat/agent-session-journal/journal-row-writer'
 import { journalOpenRefusalError } from '../native-chat/agent-session-journal/journal-open-failure'
 import { AgentSessionJournalError } from '../native-chat/agent-session-journal/journal-write-guards'
-import { takeJournalTransactionFailureOutcome } from '../native-chat/agent-session-journal/journal-database'
 import type { AgentSessionStoreState } from './agent-session-store-state'
 import { writeAgentSessionStoreRows } from './agent-session-record-rows'
 import { AgentSessionStoreCommittedRefresh } from './agent-session-store-committed-refresh'
@@ -52,10 +51,6 @@ function freezeRows(
   for (const key of operations) {
     deepFreeze(state.operations.get(key))
   }
-  if (!writes || writes.hiveRuntimeState !== null) {
-    state.hiveSessions?.forEach(deepFreeze)
-    state.taskExecutions?.forEach(deepFreeze)
-  }
   if (!writes || writes.retiredClaimKeys) {
     state.retiredClaimKeys.forEach(deepFreeze)
   }
@@ -74,7 +69,6 @@ function readOnlyStoreRefusal(): Error {
 type StagedStoreTransaction<T> = {
   result: T
   writes: AgentSessionStoreRowWrites | null
-  draft: AgentSessionStoreState
   /** Publishes the draft. Only once its rows have committed. */
   adopt: () => void
 }
@@ -96,8 +90,7 @@ export class AgentSessionStoreTransactions {
       (state) => {
         freezeRows(state, null)
         this.published = state
-      },
-      readOnlyStoreRefusal
+      }
     )
     journalDatabase.onBeforeTransaction(() => this.refreshCommittedState())
     journalDatabase.onStoreUnchangedCommit(() => this.refresh.committed())
@@ -167,26 +160,15 @@ export class AgentSessionStoreTransactions {
     const writes = staged.writes
     if (writes && !readOnly) {
       const published = this.published
-      const database = this.journalDatabase.db
-      let writing = false
-      try {
-        this.journalDatabase.transaction((db) => {
-          this.refresh.assertTransactionCurrent(db)
-          if (this.published !== published) {
-            throw agentSessionRefusalError('agent_session_ownership_unknown', {
-              reason: 'replaySuperseded'
-            })
-          }
-          writing = true
-          writeAgentSessionStoreRows(db, writes)
-        })
-      } catch (error) {
-        const outcome = takeJournalTransactionFailureOutcome(error, database)
-        if (writing && outcome !== 'rolled_back') {
-          this.refresh.recordFailedTaskWrite(published, staged.draft)
+      this.journalDatabase.transaction((db) => {
+        this.refresh.assertTransactionCurrent(db)
+        if (this.published !== published) {
+          throw agentSessionRefusalError('agent_session_ownership_unknown', {
+            reason: 'replaySuperseded'
+          })
         }
-        throw error
-      }
+        writeAgentSessionStoreRows(db, writes)
+      })
     }
     staged.adopt()
     this.refresh.committed()
@@ -201,7 +183,6 @@ export class AgentSessionStoreTransactions {
     return {
       result,
       writes,
-      draft,
       adopt: () => {
         if (writes) {
           freezeRows(draft, writes)

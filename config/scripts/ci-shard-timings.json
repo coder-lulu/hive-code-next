@@ -2551,7 +2551,6 @@
       "src/main/native-chat/agent-session-wire/structured-agent-session-restart-offer-after-reattach.test.ts": 829,
       "src/main/native-chat/agent-session-wire/structured-agent-session-restart-offer-endings.test.ts": 711,
       "src/main/native-chat/agent-session-wire/structured-agent-session-restart-ownership.test.ts": 3393,
-      "src/main/native-chat/agent-session-wire/structured-agent-session-restart-reconcile.test.ts": 320,
       "src/main/native-chat/agent-session-wire/structured-agent-session-restart-restore-gate.test.ts": 48,
       "src/main/native-chat/agent-session-wire/structured-agent-session-restart-restore.test.ts": 131,
       "src/main/native-chat/agent-session-wire/structured-agent-session-restart-resume.test.ts": 354,

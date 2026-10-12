@@ -249,8 +249,7 @@ export function normalizeHookPayload(
       ? normalizeAgentStatusPayload({
           state: 'done',
           prompt: '',
-          agentType:
-            source === 'pi' && hookPayloadRecord.hivecode_native === true ? 'hivecode' : source
+          agentType: source
         })
       : null)
   const restoredUnconfirmed =

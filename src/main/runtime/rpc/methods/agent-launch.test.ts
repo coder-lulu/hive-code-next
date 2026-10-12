@@ -91,14 +91,14 @@ describe('background task launch presentation', () => {
     }
     await launch(
       {
-        agent: 'hivecode',
+        agent: 'pi',
         target: { kind: 'existing', worktree: 'id:wt-7' },
         presentation: 'background'
       },
       runtime
     )
     expect(runtime.createTerminal.mock.calls[0]?.[1]).toMatchObject({
-      startupAgent: 'hivecode',
+      startupAgent: 'pi',
       presentation: 'background'
     })
     expect(runtime.selectCreatedMobileSessionTabForClient).not.toHaveBeenCalled()

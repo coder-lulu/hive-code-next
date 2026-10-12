@@ -43,10 +43,6 @@ const productManifest = require('./product/hivecode.product.json')
 const { writePackagedUpdaterConfig } = require('./packaged-updater-config.cjs')
 const packageJson = require('../package.json')
 const { verifyStaticAppImagePackage } = require('./scripts/static-appimage-package-contract.cjs')
-const { createNativePiResources, verifyPackagedNativePi } = require('./native-pi-resources.cjs')
-const managedPiPackResources = require('./managed-pi-pack-resources.cjs')
-const { createManagedPiPackResource, managedPiWindowsSignExts, managedPiMacSignIgnore } =
-  managedPiPackResources
 
 // Why: dev-channel builds must carry the *release* identity — same bundle id,
 // Developer ID signature, and notarization ticket — or Squirrel.Mac refuses to
@@ -237,6 +233,19 @@ module.exports = {
     // extraResources. Shipping them in app.asar bloats the desktop bundle.
     '!src{,/**/*}',
     '!out/orcad{,/**/*}',
+    '!integration{,/**/*}',
+    // Retired runtime output must never enter app.asar.
+    // Case aliases name the same directory on Windows; keep other file matching case-sensitive.
+    ...[
+      'paperclip-service',
+      'paperclip-adapter',
+      'paperclip-runtime',
+      'managed-pi',
+      'native-pi'
+    ].map(
+      (name) =>
+        `!out/${name.replace(/[a-z]/g, (letter) => `[${letter}${letter.toUpperCase()}]`)}{,/**/*}`
+    ),
     // Never in app.asar: the template ships via orcadTemplateExtraResource; prebuilds are build inputs.
     '!out/orcad-*{,/**/*}',
     '!out/.orcad-*{,/**/*}',
@@ -278,6 +287,9 @@ module.exports = {
     // Why: local agent configuration can contain credentials and session state;
     // it is never a runtime input and must not cross the packaging boundary.
     '!{.claude,.grok,.agents,.codex}{,/**/*}',
+    '!.aoci{,/**/*}',
+    '!aoci{,.code,.meta}.txt',
+    '!AGENTS.md.backup.*',
     // Local sessions, credentials and mutable build evidence must never ship.
     '!{.tmp,.omx,.local-dev,output,test-results,playwright-report}{,/**/*}',
     '!.tmp-*',
@@ -287,9 +299,6 @@ module.exports = {
     '!Casks{,/**/*}',
     '!{AGENTS.md,CLAUDE.md,DEVELOPING.md,bundle-size-progress.md,ORCHESTRATION_IMPLEMENTATION_CHECKLIST.md,ORCHESTRATION_STRUCTURED_OUTPUT_DESIGN.md}',
     '!out/**/*.test.js',
-    // Packs ship through platform resources; exclude every build slice from app.asar.
-    '!out/managed-pi{,/**/*}',
-    '!out/native-pi{,/**/*}',
     // Why: main builds with sourcemap:'hidden' so release CI can publish maps
     // for decoding minified crash traces. The app never loads them (no
     // sourceMappingURL is emitted), and packing them would add ~34MB to app.asar.
@@ -407,8 +416,6 @@ module.exports = {
     if (!existsSync(resourcesDir)) {
       throw new Error(`Missing packaged resources directory: ${resourcesDir}`)
     }
-    verifyPackagedNativePi(context)
-    await managedPiPackResources.verifyPackagedManagedPiTextPack(context, resolve(__dirname, '..'))
     writePackagedUpdaterConfig(resourcesDir)
     // Desktop format copies are stamped independently; the runtime build targets only deb.
     if (context.electronPlatformName === 'linux') {
@@ -516,12 +523,7 @@ module.exports = {
       )
     }
   },
-  afterSign: async (context) => {
-    verifyPackagedNativePi(context)
-    await managedPiPackResources.verifyPackagedManagedPiTextPack(context, resolve(__dirname, '..'))
-  },
   win: {
-    signExts: managedPiWindowsSignExts,
     verifyUpdateCodeSignature: false,
     executableName: productManifest.desktop.executableName,
     ...(isHardwareWindowsSigning
@@ -535,8 +537,6 @@ module.exports = {
     extraResources: [
       ...commonExtraResources,
       ...windowsRuntimeResources,
-      createManagedPiPackResource('win32'),
-      ...createNativePiResources('win32'),
       winSpeechNativeResource,
       {
         from: 'resources/win32/bin/hive.cmd',
@@ -634,11 +634,7 @@ module.exports = {
         schemes: [productManifest.schemes.primary, ...productManifest.schemes.aliases]
       }
     ],
-    signIgnore: [
-      ...managedPiMacSignIgnore,
-      ...bundledRipgrepMacSignIgnore,
-      ...orcadTemplateMacSignIgnore
-    ],
+    signIgnore: [...bundledRipgrepMacSignIgnore, ...orcadTemplateMacSignIgnore],
     extendInfo: {
       NSAppleEventsUsageDescription:
         'HiveCode allows terminal-launched developer tools to automate local apps when you request it.',
@@ -676,8 +672,6 @@ module.exports = {
     extraResources: [
       ...commonExtraResources,
       ...createPackagedRuntimeNodeModuleResources('darwin'),
-      createManagedPiPackResource('darwin'),
-      ...createNativePiResources('darwin'),
       macSpeechNativeResource,
       {
         from: 'resources/darwin/bin/hive',
@@ -756,8 +750,6 @@ module.exports = {
     extraResources: [
       ...commonExtraResources,
       ...createPackagedRuntimeNodeModuleResources('linux'),
-      createManagedPiPackResource('linux'),
-      ...createNativePiResources('linux'),
       linuxSpeechNativeResource,
       ...(isHeadlessRuntimeDeb
         ? [

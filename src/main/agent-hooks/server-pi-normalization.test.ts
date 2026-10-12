@@ -28,19 +28,18 @@ afterEach(() => {
 })
 
 describe('Pi hook normalization', () => {
-  it('accepts Hive native resume-only identity across host persistence', () => {
+  it('accepts Pi resume-only identity across host persistence', () => {
     const started = _internals.normalizeHookPayload(
       'pi',
       buildBody({
         hook_event_name: 'session_start',
-        hivecode_native: true,
-        session_id: 'hive-session',
-        session_file: '/account/sessions/hive-session.jsonl'
+        session_id: 'pi-session',
+        session_file: '/account/sessions/pi-session.jsonl'
       }),
       'production'
     )!
     expect(started.providerSessionOnly).toBe(true)
-    expect(started.payload.agentType).toBe('hivecode')
+    expect(started.payload.agentType).toBe('pi')
     expect(isValidPiProviderSessionOnly(started.providerSession, started.payload.agentType)).toBe(
       true
     )

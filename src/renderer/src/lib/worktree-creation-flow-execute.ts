@@ -273,7 +273,7 @@ export async function executeWorktreeCreation(
   const structuredAgent = preparedRequest.agent
   if (
     agentLaunchRoute === 'structured-native-chat' &&
-    (structuredAgent === 'hivecode' || isAgentSessionHandleProvider(structuredAgent))
+    isAgentSessionHandleProvider(structuredAgent)
   ) {
     let structuredSession: WorktreeCreationStructuredSessionResult | null = null
     try {

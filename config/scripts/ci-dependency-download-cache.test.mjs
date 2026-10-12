@@ -10,9 +10,7 @@ const action = read('.github/actions/install-node-dependencies/action.yml')
 describe('CI dependency download caches', () => {
   it('scopes desktop stores to the root lockfile and lets mixed installs opt in', () => {
     expect(action.inputs['cache-dependency-path'].default.trim().split('\n')).toEqual([
-      'pnpm-lock.yaml',
-      'runtime/managed-pi/pnpm-lock.yaml',
-      'runtime/native-pi/pnpm-lock.yaml'
+      'pnpm-lock.yaml'
     ])
     for (const step of action.runs.steps.filter((step) => step.uses === 'actions/setup-node@v6')) {
       expect(step.with.cache).toBe(

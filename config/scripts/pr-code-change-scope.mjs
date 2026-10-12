@@ -382,7 +382,6 @@ const WINDOWS_PACKAGE_TESTS = [
   'src/main/windows/windows-pty-job.win32.test.ts',
   'src/main/windows/windows-msys-job.win32.test.ts',
   'src/main/providers/agent-foreground-process-git-bash.win32.test.ts',
-  'src/main/providers/hive-native-foreground.win32.test.ts',
   'src/main/windows/windows-host-job.win32.test.ts',
   'src/main/windows/windows-process-tree-command-line-patch.test.ts',
   'src/main/windows/windows-process-table-native-addon.win32.test.ts',

@@ -64,8 +64,7 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
       store.paneForegroundAgentByPaneKey
     )
   )
-  const effectiveChatViewMode =
-    (nativeChatEnabled || terminalTab?.launchAgent === 'hivecode') && isChatViewMode
+  const effectiveChatViewMode = nativeChatEnabled && isChatViewMode
   const restoredLayout = useMemo(
     () => (terminalTab ? sanitizeTerminalLayoutPaneTitles(savedLayout, terminalTab) : savedLayout),
     [savedLayout, terminalTab]
@@ -124,16 +123,13 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
   )
   const isChatEligibleForLeaf = useCallback(
     (leafId: string | null): boolean => {
-      let detectedAgent = leafId ? (tabAgentTypeByLeaf[leafId] ?? null) : null
+      const detectedAgent = leafId ? (tabAgentTypeByLeaf[leafId] ?? null) : null
       const launchAgent = nativeChatLaunchAgentForLeaf({
         launchAgent: terminalTab?.launchAgent,
         launchAgentLeafId: getTabWideAgentHintLeafId(),
         leafId,
         leafIds: getNativeChatLeafIds()
       })
-      if (launchAgent === 'hivecode' && detectedAgent === 'pi') {
-        detectedAgent = 'hivecode'
-      }
       return canToggleNativeChat({
         experimentalNativeChatEnabled: nativeChatEnabled,
         contentType: 'terminal',

@@ -27,13 +27,6 @@ const ARCHIVE_PATHS = [
   'src/types',
   'mobile/src/worktree/agent-row-display.ts'
 ]
-// Product-owned policy inputs exist only in newer trees; released Orca trees need none of them.
-const OPTIONAL_ARCHIVE_PATHS = [
-  'integration/paperclip/runtime/codex-package.json',
-  'integration/paperclip/runtime/catalog-provenance.json',
-  'integration/paperclip/runtime/model-tools.json',
-  'integration/paperclip/runtime/hive-models.json'
-]
 // The tree preparation removes these too; avoid archiving and extracting discarded tests.
 const TEST_SOURCE_SUFFIXES = ['test', 'bench', 'spec'].flatMap((kind) =>
   ['ts', 'tsx'].map((extension) => `.${kind}.${extension}`)
@@ -228,22 +221,6 @@ export async function extractReleaseCheckoutTree(
   const archive = join(staging, '.release-checkout.tar')
   const deadline = Date.now() + CHECKOUT_PROCESS_TIMEOUT_MS
   try {
-    const tracked =
-      archivePaths === ARCHIVE_PATHS
-        ? new Set(
-            (
-              await runCheckoutProcess(
-                repoRoot,
-                'git',
-                ['ls-tree', '--name-only', commit, '--', ...OPTIONAL_ARCHIVE_PATHS],
-                deadline
-              )
-            )
-              .trim()
-              .split('\n')
-          )
-        : new Set<string>()
-    const paths = [...archivePaths, ...OPTIONAL_ARCHIVE_PATHS.filter((path) => tracked.has(path))]
     await runCheckoutProcess(
       repoRoot,
       'git',
@@ -253,7 +230,7 @@ export async function extractReleaseCheckoutTree(
         `--output=${archive}`,
         commit,
         '--',
-        ...paths,
+        ...archivePaths,
         ...ARCHIVE_TEST_EXCLUDES
       ],
       deadline

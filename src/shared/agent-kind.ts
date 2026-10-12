@@ -14,7 +14,6 @@ import type { TuiAgent } from './tui-agent'
 type ConcreteAgentKind = Exclude<AgentKind, 'other'>
 
 const TUI_AGENT_KIND_BY_AGENT = {
-  hivecode: 'hivecode',
   claude: 'claude-code',
   'claude-agent-teams': 'claude-agent-teams',
   codebuddy: 'codebuddy',

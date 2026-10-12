@@ -14,7 +14,6 @@ import type { StructuredAgentSessionLifetimeContext } from './structured-agent-s
 import type { StructuredAgentSessionProviderChild } from './structured-agent-session-host-types'
 import { stopAgentSessionProviderRoot } from './structured-agent-session-provider-exit-proof'
 import { releaseStoredStructuredAgentSessionOwnerAfterExit } from './structured-agent-session-lease-release'
-import { agentSessionExecutionHostWitnessMatchesRecord } from '../../../shared/agent-session-execution-host-proof'
 import { isSurfaceReleasableAgentSessionRecord } from '../../runtime/agent-session-surface-release-transition'
 
 /** What a caller learned about the child's exit: proven, or not. A root still there after the
@@ -29,40 +28,8 @@ export async function joinStructuredAgentSessionChildClose(
 ): Promise<StructuredAgentSessionChildCloseVerdict> {
   // Read before the close: once the child is gone the provider can no longer say.
   const unanswered = context.deps.adapter.startAnswered?.(sessionId) === false
-  const record = context.deps.store.getRecord(sessionId)
-  const isTaskExecution = () => {
-    const current = context.deps.store.getRecord(sessionId)
-    return (
-      Boolean(record && Object.hasOwn(record, 'taskSource')) ||
-      Boolean(current && Object.hasOwn(current, 'taskSource')) ||
-      context.deps.store.tasks.hasSessionBinding(sessionId)
-    )
-  }
-  const taskExecution = isTaskExecution()
-  if (!(await closeProviderRoot(context, sessionId, taskExecution))) {
+  if (!(await closeProviderRoot(context, sessionId))) {
     return 'unverifiable'
-  }
-  if (isTaskExecution()) {
-    // A Task binding can become visible while the provider's close is awaited.
-    if (!taskExecution && !(await closeProviderRoot(context, sessionId, true))) {
-      return 'unverifiable'
-    }
-    if (
-      (await context.runtimeState.commitExecutionOwnerStop(sessionId, child.fence)) !== 'resolved'
-    ) {
-      return 'unverifiable'
-    }
-    const committed = context.deps.store.getRecord(sessionId)
-    const death = committed?.lease.deathEvidence
-    if (
-      !committed ||
-      death?.kind !== 'execution-host-exit-observed' ||
-      death.ownerFence !== child.fence ||
-      committed.lease.unreconciled ||
-      !agentSessionExecutionHostWitnessMatchesRecord(death.witness, committed)
-    ) {
-      return 'unverifiable'
-    }
   }
   await context.endExitedChild(sessionId, child, {
     expected: true,
@@ -106,27 +73,13 @@ export async function joinClosingStructuredAgentSessionChild(
 
 function closeProviderRoot(
   context: StructuredAgentSessionLifetimeContext,
-  sessionId: string,
-  taskExecution: boolean
+  sessionId: string
 ): Promise<boolean> {
   const { adapter, logger } = context.deps
   // An adapter with no close has nothing to stop; anything else must PROVE the exit.
   const stop = adapter.disposeSession ?? adapter.closeSession
   if (!stop) {
-    return Promise.resolve(!taskExecution)
-  }
-  if (taskExecution) {
-    return Promise.resolve()
-      .then(() => stop.call(adapter, sessionId))
-      .then((proof) => proof === true)
-      .catch((error: unknown) => {
-        logger.warn('Task provider cleanup did not prove complete execution exit', {
-          scope: 'provider-close',
-          sessionId,
-          error
-        })
-        return false
-      })
+    return Promise.resolve(true)
   }
   return stopAgentSessionProviderRoot(
     () => stop.call(adapter, sessionId),

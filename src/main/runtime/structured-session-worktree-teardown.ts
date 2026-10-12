@@ -132,11 +132,7 @@ export function listStructuredSessionsForWorktree(
       (record) =>
         record.location.workspaceId === worktreeId && record.location.executionHostId === hostId
     )
-    .flatMap((record) =>
-      record.provider === 'managed-pi'
-        ? []
-        : [{ sessionId: record.sessionId, agent: record.provider }]
-    )
+    .map((record) => ({ sessionId: record.sessionId, agent: record.provider }))
   return {
     members,
     live: members.filter((session) => observeStructuredSession(session.sessionId).status === 'live')

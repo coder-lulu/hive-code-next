@@ -45,7 +45,6 @@ import { HiveAccountSignInConfirmDialog } from '../settings/HiveAccountSignInCon
 import { HiveAccountSignOutConfirmDialog } from '../settings/HiveAccountSignOutConfirmDialog'
 import { preloadHiveAccountSettings } from '../settings/settings-page-loader'
 import { SidebarFeedbackDialog } from './SidebarFeedbackDialog'
-import { SidebarApiQuota } from './SidebarApiQuota'
 import accountMascot from '../../../../../resources/desktop-home-mascot.png'
 
 const NO_UPDATE_CHECK_MODIFIERS = {
@@ -783,11 +782,6 @@ const SidebarFooter = React.memo(function SidebarFooter() {
               ) : null}
 
               <div className="hive-account-menu-group">
-                <SidebarApiQuota
-                  accountId={connected ? (accountState?.account?.accountId ?? null) : null}
-                  onOpenDetails={openAccountCenter}
-                  onSignIn={requestSignIn}
-                />
                 <DropdownMenuItem
                   className="hive-account-menu-item"
                   onSelect={() => {

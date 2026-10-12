@@ -5,11 +5,6 @@ import type { TuiAgent } from './tui-agent'
 describe('TUI_AGENT_CONFIG', () => {
   it('resolves launchCmd and expectedProcess for every agent', () => {
     for (const [agent, config] of Object.entries(TUI_AGENT_CONFIG)) {
-      if (config.builtIn && agent !== 'hivecode') {
-        expect(config.launchCmd).toBe('')
-        expect(config.detectCmd).toBe('')
-        continue
-      }
       expect(config.launchCmd, agent).toBeTruthy()
       expect(config.expectedProcess, agent).toBeTruthy()
     }

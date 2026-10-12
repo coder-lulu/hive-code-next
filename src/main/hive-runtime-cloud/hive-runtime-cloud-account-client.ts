@@ -8,7 +8,6 @@ import {
   normalizeRuntimeDirectoryPage
 } from './hive-runtime-cloud-directory-response'
 import { HiveRuntimeCloudHttpClient } from './hive-runtime-cloud-http-client'
-import { hiveAgentLocalIdentitySchema } from './hive-agent-local-identity'
 import {
   normalizeRuntimeDisplayNamePatchResponse,
   type HiveRuntimeDisplayNamePatchResponse
@@ -24,14 +23,6 @@ import {
 } from './hive-runtime-cloud-session-response'
 
 export class HiveRuntimeCloudAccountClient extends HiveRuntimeCloudHttpClient {
-  async getCurrentIdentity(accessToken: string, signal?: AbortSignal) {
-    if (signal?.aborted || !accessToken || accessToken.length > 8192 || /\s/.test(accessToken)) {
-      throw new Error('hive_agent_identity_unavailable')
-    }
-    const response = await this.get('/hive/v1/ai/identity', accessToken, signal)
-    return Object.freeze(hiveAgentLocalIdentitySchema.parse(response.value))
-  }
-
   async listOwnedRuntimes(
     accessToken: string,
     cursor: string | null,

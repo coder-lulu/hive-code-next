@@ -2,7 +2,6 @@ import type { AgentSessionOwnerProbe } from '../../shared/agent-session-lease-ad
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import { renewAgentSessionLease } from './agent-session-lease-transitions'
 import type { AgentSessionStoreState } from './agent-session-store-state'
-import { taskDockerSessionProbeForRecord } from '../tasks/task-docker-session-owner'
 
 export type AgentSessionLeaseRenewal = {
   sessionId: string
@@ -31,7 +30,7 @@ export function renewAgentSessionLeases(
     const renewed = renewAgentSessionLease({
       record,
       fence: args.fence,
-      childProbe: taskDockerSessionProbeForRecord(record, args.childProbe, state.taskExecutions),
+      childProbe: args.childProbe,
       now: args.now,
       leaseTtlMs: args.leaseTtlMs ?? defaultLeaseTtlMs
     })

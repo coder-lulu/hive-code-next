@@ -157,15 +157,6 @@ export class AgentSessionJournal implements AgentSessionJournalReader {
     )
   }
 
-  /** Explicit retention deletion, serialized with this chat's writer. */
-  purgeContent(fence: number): Promise<void> {
-    return this.epochController.purge(fence, (loaded) => {
-      this.adoptLoadedJournal(loaded)
-      this.queuedMessages.invalidate()
-      this.onCommitted?.()
-    })
-  }
-
   async open(): Promise<void> {
     await this.restore()
     this.openedThrough = this.cursor()

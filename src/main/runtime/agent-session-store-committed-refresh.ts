@@ -2,15 +2,8 @@ import { isDeepStrictEqual as same } from 'node:util'
 import type Database from '../sqlite/sync-database'
 import type { JournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database'
 import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
-import { taskExecutionEvidenceRegressed } from '../tasks/task-execution-evidence-regression'
-import { refuseTaskExecution } from '../tasks/task-execution-error'
-import type { TaskExecutionRecord } from '../tasks/task-execution-record'
 import type { AgentSessionStoreState } from './agent-session-store-contract'
-import { loadAgentSessionStoreRows, writeAgentSessionStoreRows } from './agent-session-record-rows'
-import {
-  agentSessionStoreDraftRowWrites,
-  draftAgentSessionStoreState
-} from './agent-session-store-draft'
+import { loadAgentSessionStoreRows } from './agent-session-record-rows'
 
 type Version = { changes: number; external: number }
 
@@ -38,8 +31,6 @@ function reuseState(previous: AgentSessionStoreState, loaded: AgentSessionStoreS
   loaded.records = reuseRows(previous.records, loaded.records)!
   loaded.operations = reuseRows(previous.operations, loaded.operations)!
   loaded.unreadableRecords = reuseRows(previous.unreadableRecords, loaded.unreadableRecords)!
-  loaded.hiveSessions = reuseRows(previous.hiveSessions, loaded.hiveSessions)
-  loaded.taskExecutions = reuseRows(previous.taskExecutions, loaded.taskExecutions)
   if (same(previous.retiredClaimKeys, loaded.retiredClaimKeys)) {
     loaded.retiredClaimKeys = previous.retiredClaimKeys
   }
@@ -56,35 +47,16 @@ function reuseState(previous: AgentSessionStoreState, loaded: AgentSessionStoreS
   return same(previous, loaded) ? previous : loaded
 }
 
-/** Committed SQL invalidation and lost-effect fencing for the one host store. */
+/** Committed SQL invalidation for the one host store. */
 export class AgentSessionStoreCommittedRefresh {
   private seen: Version | undefined
   private refreshing = false
-  private fencePending = false
-  private failedTaskWrites: Map<string, TaskExecutionRecord | undefined> | undefined
-  private unacknowledgedCommit = false
 
   constructor(
     private readonly database: JournalHostDatabase,
     private readonly read: () => AgentSessionStoreState,
-    private readonly publish: (state: AgentSessionStoreState) => void,
-    private readonly refuseReadOnly: () => Error
+    private readonly publish: (state: AgentSessionStoreState) => void
   ) {}
-
-  recordFailedTaskWrite(previous: AgentSessionStoreState, draft: AgentSessionStoreState): void {
-    const changed = new Map<string, TaskExecutionRecord | undefined>()
-    for (const key of new Set([
-      ...(previous.taskExecutions?.keys() ?? []),
-      ...(draft.taskExecutions?.keys() ?? [])
-    ])) {
-      const before = previous.taskExecutions?.get(key)
-      const after = draft.taskExecutions?.get(key)
-      if (!same(before, after)) {
-        changed.set(key, structuredClone(after))
-      }
-    }
-    this.failedTaskWrites = changed.size ? changed : undefined
-  }
 
   refresh(): void {
     const db = this.database.db
@@ -92,13 +64,10 @@ export class AgentSessionStoreCommittedRefresh {
       return
     }
     if (db.isTransaction) {
-      if (this.failedTaskWrites || this.fencePending) {
-        throw this.stale()
-      }
       return
     }
     const observed = version(db)
-    if (!this.failedTaskWrites && !this.fencePending && same(this.seen, observed)) {
+    if (same(this.seen, observed)) {
       return
     }
     this.refreshing = true
@@ -108,50 +77,18 @@ export class AgentSessionStoreCommittedRefresh {
       if (!same(version(db), observed)) {
         throw this.stale()
       }
-      this.unacknowledgedCommit ||= [...(this.failedTaskWrites ?? [])].some(([key, expected]) =>
-        same(loaded.taskExecutions?.get(key), expected)
-      )
-      const lost = taskExecutionEvidenceRegressed(previous.taskExecutions, loaded.taskExecutions)
-      const retained = previous.taskRecoveryBlocked === true && !loaded.taskRecoveryBlocked
-      this.fencePending ||= lost || retained || this.unacknowledgedCommit
-      if (this.fencePending) {
-        if (this.database.readOnly) {
-          throw this.refuseReadOnly()
-        }
-        const fenced = { ...draftAgentSessionStoreState(loaded), taskRecoveryBlocked: true }
-        const writes = agentSessionStoreDraftRowWrites(loaded, fenced)
-        if (writes) {
-          this.database.transaction((transaction) => {
-            if (version(transaction).external !== observed.external) {
-              throw this.stale()
-            }
-            writeAgentSessionStoreRows(transaction, writes)
-          })
-        }
-        this.publish(fenced)
-        this.fencePending = false
-      } else if (loaded !== previous) {
+      if (loaded !== previous) {
         this.publish(loaded)
       }
       // Own writes change total_changes; an external commit must still be noticed on the next guard.
       this.seen = { changes: version(db).changes, external: observed.external }
-      this.failedTaskWrites = undefined
-      if (this.unacknowledgedCommit) {
-        this.unacknowledgedCommit = false
-        refuseTaskExecution('OUTCOME_UNKNOWN')
-      }
     } finally {
       this.refreshing = false
     }
   }
 
   assertTransactionCurrent(db: Database.Database): void {
-    if (
-      this.failedTaskWrites ||
-      this.fencePending ||
-      !this.seen ||
-      version(db).external !== this.seen.external
-    ) {
+    if (!this.seen || version(db).external !== this.seen.external) {
       throw this.stale()
     }
   }

@@ -10,7 +10,6 @@ export const NATIVE_CHAT_SUPPORTED_AGENT_LIST: readonly TuiAgent[] = [
   'codex',
   'grok',
   'omp',
-  'hivecode',
   'opencode',
   'opencode2'
 ]
@@ -26,10 +25,6 @@ export function isNativeChatSupportedAgent(agent: string | null | undefined): bo
 /** Agents whose Model-A SSH transcript reader is not supported. A hook path alone
  *  does not establish owning-host reads, so OMP remains gated even with metadata. */
 export function nativeChatRequiresLocalTranscript(agent: string | null | undefined): boolean {
-  // HiveCode sessions are read by their owning Host through nativeChat RPC.
-  if (agent === 'hivecode') {
-    return false
-  }
   const transcriptAgent = resolveNativeChatTranscriptAgent(agent)
   return transcriptAgent === 'grok' || transcriptAgent === 'omp' || transcriptAgent === 'opencode'
 }
@@ -49,9 +44,6 @@ export function resolveNativeChatTranscriptAgent(
   // Orca preserves its distinct agent identity for launch and UI behavior.
   if (agent === 'claude' || agent === 'openclaude') {
     return 'claude'
-  }
-  if (agent === 'hivecode') {
-    return 'omp'
   }
   if (agent === 'opencode' || agent === 'opencode2') {
     return 'opencode'

@@ -21,7 +21,6 @@ export function applyAgentSessionRestartAdjudication(args: {
 }): AgentSessionRecord {
   const { record } = args
   const adjudication = adjudicateAgentSessionRestart({
-    record,
     lease: record.lease,
     probe: args.probe,
     observedAt: args.now
@@ -58,10 +57,7 @@ export function applyAgentSessionRestartAdjudication(args: {
     ...withLease(record, {
       ...record.lease,
       handoffStage: adjudication.stage,
-      unreconciled:
-        Object.hasOwn(record, 'taskSource') || args.probe.outcome.startsWith('execution-host-')
-          ? record.lease.unreconciled
-          : false
+      unreconciled: false
     }),
     updatedAt: args.now
   }

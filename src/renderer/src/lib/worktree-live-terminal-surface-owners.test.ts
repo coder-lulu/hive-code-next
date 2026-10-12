@@ -52,14 +52,11 @@ describe('live terminal surface owners', () => {
 
   it('preserves explicit launch ownership without promoting process recognition', () => {
     const declared = indexLiveTerminalSurfaceOwners(
-      [summary({ launchAgent: 'hivecode', agentIdentity: 'pi' })],
+      [summary({ launchAgent: 'pi', agentIdentity: 'pi' })],
       WORKTREE_ID
     )
-    expect(declared.get(`${WORKTREE_ID}@@live-agent`)).toMatchObject({ launchAgent: 'hivecode' })
-    const observed = indexLiveTerminalSurfaceOwners(
-      [summary({ agentIdentity: 'hivecode' })],
-      WORKTREE_ID
-    )
+    expect(declared.get(`${WORKTREE_ID}@@live-agent`)).toMatchObject({ launchAgent: 'pi' })
+    const observed = indexLiveTerminalSurfaceOwners([summary({ agentIdentity: 'pi' })], WORKTREE_ID)
     expect(observed.get(`${WORKTREE_ID}@@live-agent`)).not.toHaveProperty('launchAgent')
   })
 
@@ -113,14 +110,12 @@ describe('live terminal surface owners', () => {
 
   it('preserves explicit launch identity on the recorded orphan surface', () => {
     const owners = indexLiveTerminalSurfaceOwners(
-      [
-        summary({ orphaned: true, recordedPaneKey: `tab-live:${LEAF_ID}`, launchAgent: 'hivecode' })
-      ],
+      [summary({ orphaned: true, recordedPaneKey: `tab-live:${LEAF_ID}`, launchAgent: 'pi' })],
       WORKTREE_ID
     )
     expect(owners.get(`${WORKTREE_ID}@@live-agent`)).toMatchObject({
       unowned: true,
-      recorded: { launchAgent: 'hivecode' }
+      recorded: { launchAgent: 'pi' }
     })
   })
 

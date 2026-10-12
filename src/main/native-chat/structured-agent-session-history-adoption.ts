@@ -59,8 +59,7 @@ export function findCommittedStructuredAgentSessionAdoptionReplay(input: {
     !record ||
     record.sessionId !== input.selfSessionId ||
     record.provider !== input.agent ||
-    adopted?.origin !== 'adopted' ||
-    adopted.handle.agent === 'managed-pi'
+    adopted?.origin !== 'adopted'
   ) {
     return null
   }

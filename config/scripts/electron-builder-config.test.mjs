@@ -2,7 +2,7 @@ import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } fro
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createAfterPackFixture, seedBundledRipgrep } from './electron-builder-test-fixtures.mjs'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
@@ -582,9 +582,6 @@ describe('electron-builder config', () => {
     'marks packaged Unix CLI launchers executable',
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-config-'))
-      const packGate = vi
-        .spyOn(require('../managed-pi-pack-resources.cjs'), 'verifyPackagedManagedPiTextPack')
-        .mockResolvedValue(undefined)
       const fixtureConfig = createAfterPackFixture()
       try {
         const resourcesDir = join(root, 'linux-unpacked', 'resources')
@@ -635,7 +632,6 @@ describe('electron-builder config', () => {
 
         expect((await stat(launcherPath)).mode & 0o111).not.toBe(0)
       } finally {
-        packGate.mockRestore()
         await rm(root, { recursive: true, force: true })
       }
     }

@@ -8,9 +8,7 @@ import {
   AGENT_SESSION_RECORD_SCHEMA_VERSION,
   isPersistedAgentSessionRecord
 } from '../../shared/agent-session-record'
-import { hiveAgentSessionEntrySchema } from '../../shared/hive-agent-session-entry'
 import { parseAgentSessionTabTable } from './agent-session-tab-table'
-import { TaskExecutionRecordSchema, taskExecutionRecordKey } from '../tasks/task-execution-record'
 import {
   AGENT_SESSION_STORE_SCHEMA_VERSION,
   type AgentSessionStoreState,
@@ -25,9 +23,7 @@ export function emptyState(hostId: string): AgentSessionStoreState {
     operations: new Map(),
     retiredClaimKeys: [],
     unreadableRecords: new Map(),
-    sessionTabs: null,
-    hiveSessions: new Map(),
-    taskExecutions: new Map()
+    sessionTabs: null
   }
 }
 
@@ -82,67 +78,8 @@ export function parseState(
   const state = emptyState(hostId)
   state.schemaVersion = schemaVersion
   state.hostId = file.hostId
-  if (
-    schemaVersion <= AGENT_SESSION_STORE_SCHEMA_VERSION &&
-    file.taskRecoveryBlocked !== undefined
-  ) {
-    if (typeof file.taskRecoveryBlocked !== 'boolean') {
-      return null
-    }
-    state.taskRecoveryBlocked = file.taskRecoveryBlocked
-  }
-  if (
-    schemaVersion <= AGENT_SESSION_STORE_SCHEMA_VERSION &&
-    (schemaVersion === AGENT_SESSION_STORE_SCHEMA_VERSION || file.taskExecutions !== undefined)
-  ) {
-    if (
-      !file.taskExecutions ||
-      typeof file.taskExecutions !== 'object' ||
-      Array.isArray(file.taskExecutions)
-    ) {
-      return null
-    }
-    for (const [key, value] of Object.entries(file.taskExecutions)) {
-      const record = TaskExecutionRecordSchema.safeParse(value)
-      if (!record.success || taskExecutionRecordKey(record.data.command) !== key) {
-        return null
-      }
-      state.taskExecutions!.set(key, record.data)
-    }
-  }
   let legacyHandoffLeasesNormalized = false
   let needsRewrite = schemaVersion < AGENT_SESSION_STORE_SCHEMA_VERSION
-  if (
-    schemaVersion <= AGENT_SESSION_STORE_SCHEMA_VERSION &&
-    file.hiveRecoveryFenceAt !== undefined
-  ) {
-    if (
-      !Number.isSafeInteger(file.hiveRecoveryFenceAt) ||
-      (file.hiveRecoveryFenceAt as number) < 0
-    ) {
-      return null
-    }
-    state.hiveRecoveryFenceAt = file.hiveRecoveryFenceAt as number
-  }
-  if (
-    (schemaVersion >= 3 && schemaVersion <= AGENT_SESSION_STORE_SCHEMA_VERSION) ||
-    (schemaVersion < AGENT_SESSION_STORE_SCHEMA_VERSION && file.hiveSessions !== undefined)
-  ) {
-    if (
-      !file.hiveSessions ||
-      typeof file.hiveSessions !== 'object' ||
-      Array.isArray(file.hiveSessions)
-    ) {
-      return null
-    }
-    for (const [id, rawEntry] of Object.entries(file.hiveSessions)) {
-      const entry = hiveAgentSessionEntrySchema.safeParse(rawEntry)
-      if (!entry.success || entry.data.aggregate.session.sessionId !== id) {
-        return null
-      }
-      state.hiveSessions!.set(id, entry.data)
-    }
-  }
   if (typeof file.records === 'object' && file.records !== null) {
     for (const [sessionId, value] of Object.entries(file.records)) {
       const decoded = isPersistedAgentSessionRecord(value)

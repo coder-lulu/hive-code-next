@@ -45,7 +45,7 @@ describe('web native chat preload API', () => {
     installWebPreloadApi()
     const frames = vi.fn()
     const stop = await globals.window.api.nativeChat.subscribe(
-      { subscriptionId: 'p5', agent: 'hivecode', sessionId: 'session-p5' },
+      { subscriptionId: 'external-retry', agent: 'codex', sessionId: 'session-retry' },
       frames
     )
     await Promise.resolve()

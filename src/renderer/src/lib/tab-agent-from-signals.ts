@@ -53,9 +53,7 @@ export function resolveLaunchedAgentExitEvidence(args: {
   if (!args.isRemote && args.processShellForeground && args.hasObservedAgentSignal) {
     return true
   }
-  if (
-    !titleShowsNoAgent(args.title, args.launchAgent === 'hivecode' ? undefined : args.defaultTitle)
-  ) {
+  if (!titleShowsNoAgent(args.title, args.defaultTitle)) {
     return false
   }
   return args.hasCompletedHook || (!args.isRemote && args.hasObservedAgentSignal)
@@ -101,10 +99,7 @@ export function resolveTabAgentFromSignals(args: {
   const processProvesShell = !args.isRemote && args.processShellForeground === true
   const hasCompletedHook = (args.focusedCompletedHookAgent ?? null) !== null
   // Native Hive keeps its session title after a turn and restores it as the default title.
-  const noAgentTitle = titleShowsNoAgent(
-    args.title,
-    launchAgent === 'hivecode' ? undefined : args.defaultTitle
-  )
+  const noAgentTitle = titleShowsNoAgent(args.title, args.defaultTitle)
   const idleIdentitySuppressed =
     !args.isRemote && (noAgentTitle || processProvesShell) && hasCompletedHook
   const idleFocusedIdentity = idleIdentitySuppressed

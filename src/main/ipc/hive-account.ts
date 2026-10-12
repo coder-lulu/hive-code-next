@@ -1,4 +1,3 @@
-import { registerHiveAiAccountHandler } from './hive-ai-account'
 import { app, BrowserWindow, ipcMain } from 'electron'
 import {
   HIVE_ACCOUNT_STATE_CHANGED_CHANNEL,
@@ -20,7 +19,6 @@ type HiveAccountHandlerService = Pick<
   | 'refresh'
   | 'signOut'
 > &
-  Parameters<typeof registerHiveAiAccountHandler>[0] &
   Partial<
     Pick<
       HiveAccountService,
@@ -268,7 +266,6 @@ export function registerHiveAccountHandlers(
   )
   ipcMain.handle('hiveAccount:refresh', () => service.refresh())
   ipcMain.handle('hiveAccount:signOut', () => service.signOut())
-  registerHiveAiAccountHandler(service)
   ipcMain.handle('hiveAccount:accountSecurity', () => {
     if (!service.accountSecurity) {
       throw new Error('HiveCloud account security is unavailable')

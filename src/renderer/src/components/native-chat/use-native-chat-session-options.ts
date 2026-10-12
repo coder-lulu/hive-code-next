@@ -214,7 +214,7 @@ export function useNativeChatSessionOptions(args: {
       catalog.models
     // OMP reports exact selectors, including models absent from cached discovery.
     const matched =
-      agent === 'omp' || agent === 'hivecode'
+      agent === 'omp'
         ? reportedModel.trim()
         : matchNativeChatCatalogModelId({ ...catalog, models }, reportedModel)
     if (!matched || appliedReportedModelRef.current === matched) {

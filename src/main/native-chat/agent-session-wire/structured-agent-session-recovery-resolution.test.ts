@@ -41,7 +41,7 @@ async function openStore(directory?: string): Promise<AgentSessionRecordStore> {
   return openTestAgentSessionRecordStore(directory ?? (await newStoreDirectory()))
 }
 
-async function reserve(store: AgentSessionRecordStore, managedPi = false) {
+async function reserve(store: AgentSessionRecordStore) {
   operations += 1
   return store.reserveOwner({
     sessionId: SESSION,
@@ -51,9 +51,9 @@ async function reserve(store: AgentSessionRecordStore, managedPi = false) {
       workspaceId: 'workspace-1',
       workspaceKind: 'folder'
     },
-    provider: managedPi ? 'managed-pi' : 'codex',
+    provider: 'codex',
     accountHome: {
-      variable: managedPi ? 'PI_CODING_AGENT_DIR' : 'CODEX_HOME',
+      variable: 'CODEX_HOME',
       path: '/tmp/agent-home'
     },
     expectedFence: null,
@@ -125,23 +125,6 @@ function deps(
 }
 
 describe('structured session recovery resolution', () => {
-  it('leaves managed Pi recovery to its separate owner without probing or stopping it', async () => {
-    const store = await openStore()
-    await reserve(store, true)
-    await latch(store)
-    const before = store.getRecord(SESSION)
-    const probeRecord = vi.fn(async () => MATCHED)
-    const stopOwnerProcess = vi.fn()
-    expect(
-      await resolveStructuredSessionRecovery(
-        { store, probeRecord, stopOwnerProcess, now: () => NOW },
-        SESSION
-      )
-    ).toBe('not-applicable')
-    expect(probeRecord).not.toHaveBeenCalled()
-    expect(stopOwnerProcess).not.toHaveBeenCalled()
-    expect(store.getRecord(SESSION)).toEqual(before)
-  })
   it('keeps an ownerless reservation when no scan proves it unused', async () => {
     const store = await openStore()
     await reserve(store)

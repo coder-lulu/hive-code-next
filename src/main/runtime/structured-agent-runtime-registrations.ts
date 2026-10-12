@@ -1,7 +1,6 @@
 // Each runtime registration owns its adapter, location support and account resolution at start.
 
 import { createCodexStructuredLaunchResolver } from '../codex/codex-structured-launch-resolution'
-import type { createStructuredTaskCodexRuntime } from './structured-task-codex-runtime'
 import { supportsCodexStructuredLocation } from '../codex/codex-structured-location-support'
 import { supportsClaudeStructuredLocation } from '../claude/claude-structured-location-support'
 import { supportsSupervisedProviderChildLocation } from '../provider-process/supervised-provider-child-location'
@@ -37,7 +36,6 @@ import { acpStructuredAgentDefinition } from '../acp/acp-structured-agent-defini
 import { createAcpAgentConnection } from '../acp/acp-agent-connection'
 import { createAcpStructuredLaunchResolver } from '../acp/acp-structured-launch-resolution'
 import { AcpStructuredSessionAdapter } from '../acp/acp-structured-session-adapter'
-import { prepareRuntimeTeamTaskTools } from './structured-team-task-tools'
 
 /** What an agent's adapter is built from: the open store and the runtime around it. */
 export type StructuredAgentAdapterContext = {
@@ -45,7 +43,6 @@ export type StructuredAgentAdapterContext = {
   store: AgentSessionRecordStore
   journalDatabase: JournalHostDatabase
   environment: ReturnType<typeof createStructuredAgentEnvironmentResolvers>
-  taskRuntime: ReturnType<typeof createStructuredTaskCodexRuntime>
   /** Hands the host an exit or other lifecycle event the agent observed. */
   deliverLifecycle: (event: StructuredAgentSessionLifecycleEvent) => void
   followUps: ReturnType<typeof createStructuredAgentSessionDispatchFollowUps>
@@ -94,18 +91,11 @@ export type StructuredAgentRuntimeRegistration = {
 function createCodexAdapter(context: StructuredAgentAdapterContext): StructuredAgentRuntimeAdapter {
   const { deps, store, followUps, host } = context
   return new CodexStructuredSessionAdapter({
-    ...(deps.prepareTeamTaskTools
-      ? {
-          prepareTeamTaskTools: (input) =>
-            prepareRuntimeTeamTaskTools({ input, store, provider: deps.prepareTeamTaskTools })
-        }
-      : {}),
     resolveLaunch: createCodexStructuredLaunchResolver({
       store,
       resolveWorkspacePath: deps.resolveWorkspacePath,
       resolveEnvironment: context.environment.resolveCodexEnvironment,
       resolveLaunchArgs: () => deps.resolveLaunchArgs('codex'),
-      resolveTaskLaunch: context.taskRuntime.resolveLaunch,
       ...(deps.resolveCodexPermissionPolicy
         ? { resolvePermissionPolicy: deps.resolveCodexPermissionPolicy }
         : {}),

@@ -29,32 +29,7 @@ it('keeps private documentation site builds out of public workflows', () => {
   expect(privateSiteConsumers).toEqual([])
 })
 
-it('triggers headless qualification when imported task model catalogs change', () => {
-  const workflow = readWorkflow('node-server-tests.yml')
-  const escape = (value) => value.replace(/[.+?^${}()|[\]\\]/g, '\\$&')
-  const matches = (pattern, path) =>
-    new RegExp(
-      `^${pattern
-        .split('**')
-        .map((part) => part.split('*').map(escape).join('[^/]*'))
-        .join('.*')}$`
-    ).test(path)
-  for (const event of ['push', 'pull_request']) {
-    for (const input of [
-      'integration/paperclip/runtime/hive-models.json',
-      'integration/paperclip/runtime/catalog-provenance.json',
-      'integration/paperclip/runtime/model-tools.json',
-      'integration/paperclip/runtime/codex-package.json'
-    ]) {
-      expect(
-        workflow.on[event].paths.some((pattern) => matches(pattern, input)),
-        `${event} must qualify the headless runtime for ${input}`
-      ).toBe(true)
-    }
-  }
-})
-
-it('keeps the Windows SSH checkout closure for Pi installs, task catalogs and renderer assets', () => {
+it('keeps the Windows SSH checkout closure for root dependencies and renderer assets', () => {
   const workflow = readWorkflow('ssh-windows-hosts.yml')
   const checkout = workflow.jobs.hosts.steps.find((step) =>
     step.uses?.startsWith('actions/checkout@')
@@ -71,24 +46,8 @@ it('keeps the Windows SSH checkout closure for Pi installs, task catalogs and re
   const installCommands = install.runs.steps.find(
     (step) => step.name === 'Install dependencies'
   ).run
-  const pkg = JSON.parse(readFileSync('package.json', 'utf8'))
-  const preparations = [...installCommands.matchAll(/pnpm run (prepare:(?:managed|native)-pi)/g)]
-  expect(preparations.map(([, script]) => script)).toEqual([
-    'prepare:managed-pi',
-    'prepare:native-pi'
-  ])
-  for (const [, script] of preparations) {
-    const directory = /--dir ([^ ]+)/.exec(pkg.scripts[script])?.[1]
-    expect(directory, `${script} must resolve its actual product source directory`).toBeDefined()
-    for (const file of ['package.json', 'pnpm-lock.yaml', 'pnpm-workspace.yaml']) {
-      const input = `${directory}/${file}`
-      expect(existsSync(input), `${script} input must actually exist: ${input}`).toBe(true)
-      expect(covered(input), `SSH sparse checkout omits ${script} input: ${input}`).toBe(true)
-    }
-  }
+  expect(installCommands).not.toMatch(/prepare:(?:managed|native)-pi/)
   for (const source of [
-    'src/main/tasks/task-docker-model-profile.ts',
-    'src/main/tasks/task-model-response-configuration.ts',
     'src/renderer/src/components/settings/HiveAccountSignInConfirmDialog.tsx'
   ]) {
     let requiredImports = 0
@@ -102,7 +61,7 @@ it('keeps the Windows SSH checkout closure for Pi installs, task catalogs and re
         '\\',
         '/'
       )
-      if (!input.startsWith('integration/') && !input.startsWith('mobile/')) {
+      if (!input.startsWith('mobile/')) {
         continue
       }
       requiredImports += 1

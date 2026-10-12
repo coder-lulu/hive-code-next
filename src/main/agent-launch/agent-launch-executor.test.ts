@@ -87,9 +87,8 @@ function harness(options: {
     createTerminalAgent,
     deliverStructuredPrompt,
     deliverTerminalPrompt,
-    run: (intent: AgentLaunchIntent, requiredMode?: 'structured') =>
+    run: (intent: AgentLaunchIntent) =>
       executeAgentLaunch({
-        requiredMode,
         // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the stub implements only the two runtime methods the executor reaches, and each test asserts the calls made, so an omitted method throws rather than reading a wrong value.
         runtime: runtime as unknown as AgentLaunchExecution['runtime'],
         intent,
@@ -111,28 +110,6 @@ const CREATE_INTENT: AgentLaunchIntent = {
 }
 
 describe('a structured launch that creates its own worktree', () => {
-  it('keeps a task structured regardless of the ordinary tab preference', async () => {
-    const h = harness({ settings: {} })
-    expect((await h.run(CREATE_INTENT, 'structured')).outcome.kind).toBe('structured')
-    expect(h.createTerminalAgent).not.toHaveBeenCalled()
-  })
-  it('refuses an unsupported task surface before creating a terminal', async () => {
-    const h = harness({ createSupport: { supported: false } })
-    await expect(h.run(CREATE_INTENT, 'structured')).rejects.toThrow(
-      'agent_launch_required_mode_unavailable'
-    )
-    expect(h.createTerminalAgent).not.toHaveBeenCalled()
-  })
-  it('does not turn a task attach refusal into a terminal launch', async () => {
-    const h = harness({
-      structuredCreateError: new AgentLaunchStructuredSessionRefusedError(
-        'structured_agent_session_unsupported',
-        'Unavailable'
-      )
-    })
-    await expect(h.run(CREATE_INTENT, 'structured')).rejects.toThrow('Unavailable')
-    expect(h.createTerminalAgent).not.toHaveBeenCalled()
-  })
   it('creates the worktree with no startup agent, then asks the host, then opens a session', async () => {
     const h = harness({})
     const result = await h.run(CREATE_INTENT)

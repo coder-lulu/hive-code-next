@@ -23,7 +23,7 @@ export function isTuiAgent(value: unknown): value is TuiAgent {
 }
 
 export function getTuiAgentDetectCommands(config: TuiAgentConfig): string[] {
-  return config.builtIn ? [] : [config.detectCmd, ...(config.detectCmdAliases ?? [])]
+  return [config.detectCmd, ...(config.detectCmdAliases ?? [])]
 }
 
 export function getTuiAgentLaunchCommand(

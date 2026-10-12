@@ -1,13 +1,11 @@
 // The one handler that ends a provider child's record, whether its exit was expected (a close this
 // host asked for) or not (the child died on its own). The exit was seen or proven first-hand, so
-// bookkeeping always ends the child record. A Task also needs exact execution-host death
-// proof to release its lease. `expected` changes what the chat is told.
+// bookkeeping always ends the child record. `expected` changes what the chat is told.
 
 import {
   agentSessionFailureFact,
   type SubmissionRejectionFact
 } from '../../../shared/agent-session-failure'
-import { agentSessionExecutionHostWitnessMatchesRecord } from '../../../shared/agent-session-execution-host-proof'
 import { PROVIDER_EXIT_ROW_PREFIX } from '../../../shared/agent-session-stop-row-identity'
 import { structuredAgentSessionFailureWordsContext } from './structured-agent-session-send-preparation'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
@@ -114,24 +112,6 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
   }
   const { expected } = exit
   const record = context.store.getRecord(sessionId)
-  let taskExecution = Boolean(record && Object.hasOwn(record, 'taskSource'))
-  const isTaskExecution = () => {
-    const current = context.store.getRecord(sessionId)
-    return (taskExecution ||=
-      Boolean(current && Object.hasOwn(current, 'taskSource')) ||
-      context.store.tasks.hasSessionBinding(sessionId))
-  }
-  const executionExitProven = () => {
-    const current = context.store.getRecord(sessionId)
-    const death = current?.lease.deathEvidence
-    return Boolean(
-      current &&
-      death?.kind === 'execution-host-exit-observed' &&
-      death.ownerFence === child.fence &&
-      !current.lease.unreconciled &&
-      agentSessionExecutionHostWitnessMatchesRecord(death.witness, current)
-    )
-  }
   const close = child.close
   // Receipt of the exit is the one end time the host may record for a running turn.
   const observedAt = exit.observedAt ?? context.now()
@@ -170,7 +150,7 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
       ...(!expected && exit.failure ? { failure: exit.failure } : {}),
       duringStartup: exitedDuringStartup,
       // The adapter publishes an exit only once it saw the root go, first-hand or proven.
-      rootGone: !isTaskExecution() || executionExitProven(),
+      rootGone: true,
       ...(expected && close ? { endedAt: close.requestedAt } : {})
     })
     context.publishStatus?.(sessionId)
@@ -204,7 +184,6 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
     // Folded before the fallback's end is built, so the end reads it (`turnEndAfterStop`).
     await close?.recorded
     const generation = child.generation ?? 'unknown'
-    // Exact execution-host proof is also required for a Task child's terminal verdict.
     const watched = { ownerFence: child.fence, observedAt }
     const settled = await settleStructuredAgentSessionDeadGeneration({
       journal: session.journal,
@@ -216,10 +195,7 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
         : 'provider_exited_before_acknowledgement',
       // Only a turn no adapter settled. Whether a close ended a person's turn is the Stop event's to
       // say (`turnEndAfterStop`); a death of its own interrupted it.
-      verdict:
-        isTaskExecution() && !executionExitProven()
-          ? { state: 'unverifiable' }
-          : { state: 'interrupted', completedAt: expected ? context.now() : observedAt },
+      verdict: { state: 'interrupted', completedAt: expected ? context.now() : observedAt },
       failureTextContext: structuredAgentSessionFailureWordsContext(record, session.journal),
       // A failed start always says why: no response was running to carry the reason.
       showUnexpectedExitOutcome:
@@ -235,45 +211,25 @@ export async function endExitedStructuredAgentSessionChildUnderSerialize<
       ...(startFailed && child.generation
         ? { exitedDuringStartup: { generation: child.generation } }
         : {}),
-      ...(!isTaskExecution() || executionExitProven() ? { exit: watched } : {}),
+      exit: watched,
       ...(unrunRejection ? { unrunRejection } : {})
     })
     if (!settled.ok) {
       logExitFailure(context, sessionId, 'exit-settlement', settled.error)
     }
   } finally {
-    // Task execution owns its lease until exact execution-host death is durable.
     // A generic provider root's observed exit permits release even if settlement failed.
     let released = false
     try {
-      if (isTaskExecution()) {
-        if (executionExitProven()) {
-          released = true
-        } else {
-          await context.store.transitionHandoff(sessionId, (current) => {
-            if (
-              current.lease.runtimeFence !== child.fence ||
-              JSON.stringify(current.taskSource) !== JSON.stringify(record.taskSource)
-            ) {
-              throw new Error('agent_session_checkpoint_stale')
-            }
-            return {
-              ...current,
-              lease: { ...current.lease, handoffStage: 'recovering', handoffOperationId: null }
-            }
-          })
-        }
-      } else {
-        await releaseStoredStructuredAgentSessionOwnerAfterExit({
-          store: context.store,
-          sessionId,
-          expectedFence: child.fence,
-          now: context.now(),
-          exitObservedAt: observedAt,
-          exitReason: exit.reason
-        })
-        released = true
-      }
+      await releaseStoredStructuredAgentSessionOwnerAfterExit({
+        store: context.store,
+        sessionId,
+        expectedFence: child.fence,
+        now: context.now(),
+        exitObservedAt: observedAt,
+        exitReason: exit.reason
+      })
+      released = true
     } catch (error) {
       logExitFailure(context, sessionId, 'exit-owner-release', error)
     }

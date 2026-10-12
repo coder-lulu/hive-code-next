@@ -10,8 +10,7 @@ export function pickQuickWorkspaceAgent(
   detectedAgentIds: Iterable<TuiAgent> | null,
   disabledTuiAgents?: Iterable<unknown> | null
 ): TuiAgent | null {
-  const candidates =
-    detectedAgentIds ?? TUI_AGENT_AUTO_PICK_ORDER.filter((agent) => agent !== 'hivecode')
+  const candidates = detectedAgentIds ?? TUI_AGENT_AUTO_PICK_ORDER
   return pickTuiAgent(preferred, candidates, disabledTuiAgents)
 }
 
@@ -33,9 +32,6 @@ function isQuickWorkspaceAgentAvailable(
   disabledTuiAgents?: Iterable<unknown> | null
 ): boolean {
   if (!isTuiAgentEnabled(agent, disabledTuiAgents)) {
-    return false
-  }
-  if (agent === 'hivecode' && detectedAgentIds === null) {
     return false
   }
   return detectedAgentIds === null || hasDetectedAgent(detectedAgentIds, agent)

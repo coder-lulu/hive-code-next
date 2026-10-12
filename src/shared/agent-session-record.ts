@@ -2,17 +2,10 @@ import { isAgentSessionAccountHome } from './agent-session-account-home'
 import { isAgentSessionRewindRecord, type AgentSessionRewindRecord } from './agent-session-rewind'
 import { isAgentSessionLaunchArgs } from './agent-session-launch-args'
 import { isAgentSessionConversationName } from './agent-session-conversation-name'
-import {
-  isAgentSessionDeathEvidence,
-  agentSessionExecutionHostWitnessMatchesRecord
-} from './agent-session-execution-host-proof'
-import type { AgentSessionDeathEvidence } from './agent-session-execution-host-proof'
-export type { AgentSessionDeathEvidence } from './agent-session-execution-host-proof'
+import { isAgentSessionDeathEvidence } from './agent-session-death-evidence'
+import type { AgentSessionDeathEvidence } from './agent-session-death-evidence'
+export type { AgentSessionDeathEvidence } from './agent-session-death-evidence'
 import type { AgentSessionAccountHome } from './agent-session-account-home'
-import {
-  TaskSessionSourceReferenceSchema,
-  type TaskSessionSourceReference
-} from './task-execution/task-structured-binding'
 export type { AgentSessionAccountHome } from './agent-session-account-home'
 import {
   isPersistedAgentSessionHandoffStage,
@@ -138,7 +131,6 @@ export type AgentSessionRecord = {
   provider: string
   providerHandleChain: AgentSessionProviderHandleLink[]
   accountHome: AgentSessionAccountHome
-  taskSource?: TaskSessionSourceReference
   /** The directory the provider first launched in, in the execution host's path syntax. Floating
    *  sessions resume here; worktree and folder ids still resolve by id to their durable place. */
   launchDirectory?: string
@@ -326,8 +318,7 @@ export function isPersistedAgentSessionRecord(
     isAgentSessionId(record.sessionId) &&
     isAgentSessionExecutionLocation(record.location) &&
     isStructuredAgentId(record.provider) &&
-    (!Object.hasOwn(record, 'taskSource') ||
-      TaskSessionSourceReferenceSchema.safeParse(record.taskSource).success) &&
+    !Object.hasOwn(record, 'taskSource') &&
     isAgentSessionAccountHome(record.accountHome) &&
     (record.launchDirectory === undefined ||
       isBoundedString(record.launchDirectory, MAX_PATH_LENGTH)) &&
@@ -347,22 +338,6 @@ export function isPersistedAgentSessionRecord(
     return false
   }
   const validated = record as AgentSessionRecord
-  if (
-    validated.lease.deathEvidence?.kind === 'execution-host-exit-observed' &&
-    !agentSessionExecutionHostWitnessMatchesRecord(validated.lease.deathEvidence.witness, validated)
-  ) {
-    return false
-  }
-  if (
-    validated.provider === 'managed-pi' &&
-    (validated.accountHome.variable !== 'PI_CODING_AGENT_DIR' ||
-      validated.location.executionHostId !== 'local' ||
-      validated.location.wslDistro !== null ||
-      validated.lease.runtimeKind !== 'native' ||
-      (validated.lease.ownerProcess?.hostId ?? 'local') !== 'local')
-  ) {
-    return false
-  }
   // The row holds stored handles; validate the chain they decode to.
   const chain = decodePersistedAgentSessionProviderHandleChain(validated.providerHandleChain)
   const head = chain?.at(-1)
@@ -381,5 +356,3 @@ export function isPersistedAgentSessionRecord(
         head.mintedAtFence === validated.lease.runtimeFence))
   )
 }
-
-export const isAgentSessionRecord = isPersistedAgentSessionRecord

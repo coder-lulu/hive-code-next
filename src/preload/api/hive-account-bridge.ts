@@ -7,13 +7,6 @@ import type { HiveAccountApi } from './hive-account-api'
 
 export const hiveAccountApi = {
   getLoginCapabilities: () => ipcRenderer.invoke('hiveAccount:getLoginCapabilities'),
-  readAiAccount: () => ipcRenderer.invoke('hiveAccount:readAiAccount'),
-  activateAiAccount: () => ipcRenderer.invoke('hiveAccount:activateAiAccount'),
-  readAiBenefits: () => ipcRenderer.invoke('hiveAccount:readAiBenefits'),
-  readAiConsumption: (query) => ipcRenderer.invoke('hiveAccount:readAiConsumption', query),
-  readAiModelCandidates: () => ipcRenderer.invoke('hiveAccount:readAiModelCandidates'),
-  readAiModels: () => ipcRenderer.invoke('hiveAccount:readAiModels'),
-  selectAiModel: (command) => ipcRenderer.invoke('hiveAccount:selectAiModel', command),
   getState: () => ipcRenderer.invoke('hiveAccount:getState'),
   signIn: (options) => ipcRenderer.invoke('hiveAccount:signIn', options),
   startSmsSignIn: (options) => ipcRenderer.invoke('hiveAccount:startSmsSignIn', options),

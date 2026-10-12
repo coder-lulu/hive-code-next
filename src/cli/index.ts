@@ -69,15 +69,6 @@ export async function main(
   cwd = resolveInvocationCwd()
 ): Promise<void> {
   warnForCompatibilityInvocation()
-  if (argv[0] === 'hive-ai') {
-    try {
-      await (await import('./hive-ai.js')).runHiveAi(argv.slice(1), cwd)
-    } catch (error) {
-      reportCliError(error, false, { commandPath: ['hive-ai'] })
-      process.exitCode = 1
-    }
-    return
-  }
   // Why: version audits use the bundled launcher; Electron intercepts direct binary version flags.
   if (argv.length === 1 && (argv[0] === '--version' || argv[0] === '-v')) {
     const version = readOrcaCliVersion()

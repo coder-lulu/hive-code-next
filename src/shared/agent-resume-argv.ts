@@ -1,4 +1,3 @@
-import { PRODUCT_CONFIG } from './brand'
 import type { AgentProviderSessionMetadata, ResumableTuiAgent } from './agent-session-resume'
 
 /** The argv that re-enters an existing session, per agent. Split from
@@ -34,10 +33,6 @@ export function getAgentResumeArgv(
     case 'opencode2':
       return providerSession.key === 'session_id'
         ? ['opencode2', '--standalone', '--session', id]
-        : null
-    case PRODUCT_CONFIG.slug:
-      return providerSession.key === 'session_id' && providerSession.transcriptPath
-        ? [PRODUCT_CONFIG.slug, '--session', providerSession.transcriptPath]
         : null
     case 'pi':
       return providerSession.key === 'session_id' && providerSession.transcriptPath

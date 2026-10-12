@@ -3,7 +3,7 @@ import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journa
 // Per-chat close drains admitted writes and refuses new work. The shared host
 // database remains open for other chats and closes only at host teardown.
 
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -19,7 +19,6 @@ import {
   createTrackedJournalOpener,
   openTestJournalHostDatabase
 } from './journal-host-database-test-support'
-import { journalDatabasePath } from './journal-host-database'
 
 const IDENTITY: AgentSessionJournalIdentity = {
   sessionId: 'session-1',
@@ -132,7 +131,6 @@ describe('closed-state admission happens at enqueue', () => {
       ),
       settle(journal.rollEpoch('handle_forked', 1)),
       settle(journal.replaceEpochItems('handle_forked', 1, [])),
-      settle(journal.purgeContent(1)),
       settle(
         journal.queuedMessages.insert({
           messageId: 'closed-draft',
@@ -184,49 +182,6 @@ describe('closed-state admission happens at enqueue', () => {
         turnScope: AGENT_JOURNAL_THREAD_SCOPE
       })
     ).resolves.toBeDefined()
-  })
-
-  it('purges only the owned chat including durable draft bodies and cached pause facts', async () => {
-    const journal = await openJournal()
-    const other = await journals.open({
-      identity: { ...IDENTITY, sessionId: 'other-chat' },
-      stateDirectory: root
-    })
-    await journal.appendItem(item(1), body('owned-purge-secret'), {
-      fence: 1,
-      turnScope: { kind: 'thread' }
-    })
-    await journal.queuedMessages.insert({
-      messageId: 'own-draft',
-      body: {
-        kind: 'message',
-        role: 'user',
-        blocks: [{ type: 'text', text: 'owned-queued-secret' }]
-      },
-      fingerprint: 'own-fp',
-      hostInstance: 'host-1'
-    })
-    await other.queuedMessages.insert({
-      messageId: 'other-draft',
-      body: { kind: 'message', role: 'user', blocks: [{ type: 'text', text: 'other-secret' }] },
-      fingerprint: 'other-fp',
-      hostInstance: 'host-1'
-    })
-    await journal.appendStopEvent({ reason: 'user-stop', caller: 'client-1' }, 1)
-    expect(journal.queuedMessages.pauses('host-1')).toHaveLength(1)
-    expect(journal.queuedMessages.list()).toHaveLength(1)
-    const oldEpoch = journal.epoch
-    await journal.purgeContent(1)
-    expect(journal.epoch).not.toBe(oldEpoch)
-    expect(journal.snapshot().items).toEqual([])
-    expect(journal.queuedMessages.list()).toEqual([])
-    expect(other.queuedMessages.list()).toHaveLength(1)
-    // Stop/Resume are now folded journal facts; the replacement must retain no owned pause.
-    expect(journal.queuedMessages.pauses('host-1')).toEqual([])
-    const persisted = await readFile(journalDatabasePath(root))
-    expect(persisted.includes(Buffer.from('owned-purge-secret'))).toBe(false)
-    expect(persisted.includes(Buffer.from('owned-queued-secret'))).toBe(false)
-    expect(persisted.includes(Buffer.from('other-secret'))).toBe(true)
   })
 
   it('retains the host connection after a failed close and releases it on retry', async () => {

@@ -14,7 +14,6 @@ import { OrcaLogo } from '../components/OrcaLogo'
 import { useMobileAuthSession } from '../auth/mobile-auth-session'
 import { productNameText } from '../product-brand'
 import type { MobileTheme } from '../theme/mobile-theme'
-import { MobileDrawerApiQuota } from './MobileDrawerApiQuota'
 
 interface MobileHomeDrawerProps {
   readonly theme: MobileTheme
@@ -23,7 +22,6 @@ interface MobileHomeDrawerProps {
   readonly canOpenHostActions: boolean
   readonly onClose: () => void
   readonly onAccount: () => void
-  readonly onApiQuota: () => void
   readonly onManageDevices: () => void
   readonly onTasks: () => void
   readonly onRecentWork: () => void
@@ -47,7 +45,6 @@ export function MobileHomeDrawer({
   canOpenHostActions,
   onClose,
   onAccount,
-  onApiQuota,
   onManageDevices,
   onTasks,
   onRecentWork,
@@ -143,7 +140,6 @@ export function MobileHomeDrawer({
 
           <View style={styles.rule} />
           <ScrollView contentContainerStyle={styles.body} showsVerticalScrollIndicator={false}>
-            {visible && <MobileDrawerApiQuota theme={theme} onOpen={onApiQuota} />}
             <View style={styles.rule} />
             <View style={styles.navList}>
               {rows.map((row) => (

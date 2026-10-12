@@ -403,10 +403,6 @@ describe('packaged runtime resources', () => {
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'orca-after-pack-prune-order-'))
       const previousPath = process.env.PATH
-      // The real Pack gate is covered independently with built/corrupted artifacts.
-      const packGate = vi
-        .spyOn(require('../managed-pi-pack-resources.cjs'), 'verifyPackagedManagedPiTextPack')
-        .mockResolvedValue(undefined)
       const fixtureConfig = createAfterPackFixture()
       try {
         const appOutDir = join(root, 'linux-unpacked')
@@ -465,7 +461,6 @@ describe('packaged runtime resources', () => {
         await expect(stat(wrongArchPackage)).rejects.toMatchObject({ code: 'ENOENT' })
       } finally {
         process.env.PATH = previousPath
-        packGate.mockRestore()
         await removeTree(root)
       }
     }
@@ -476,9 +471,6 @@ describe('packaged runtime resources', () => {
     async (headlessDeb) => {
       vi.stubEnv('HIVECODE_HEADLESS_RUNTIME_DEB', headlessDeb ? '1' : undefined)
       const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-config-'))
-      const packGate = vi
-        .spyOn(require('../managed-pi-pack-resources.cjs'), 'verifyPackagedManagedPiTextPack')
-        .mockResolvedValue(undefined)
       const fixtureConfig = createAfterPackFixture()
       try {
         const resourcesDir = join(root, 'linux-unpacked', 'resources')
@@ -535,7 +527,6 @@ describe('packaged runtime resources', () => {
           headlessDeb ? 'deb' : 'AppImage'
         )
       } finally {
-        packGate.mockRestore()
         vi.unstubAllEnvs()
         await removeTree(root)
       }

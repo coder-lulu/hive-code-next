@@ -161,8 +161,8 @@ describe('Floating Workspace authority', () => {
       }
     )
 
-    expect(activeResult.current?.detectedIds).toEqual(['claude', 'hivecode'])
-    expect(floatingResult.current?.detectedIds).toEqual(['codex', 'hivecode'])
+    expect(activeResult.current?.detectedIds).toEqual(['claude'])
+    expect(floatingResult.current?.detectedIds).toEqual(['codex'])
     expect(useAppStore.getState().detectedAgentIds).toEqual(['claude'])
     const detectedContexts = detectLocalAgents.mock.calls.map(([context]) => context)
     expect(detectedContexts).toEqual([
@@ -186,8 +186,8 @@ describe('Floating Workspace authority', () => {
     })
     await flushEffects()
 
-    expect(activeResult.current?.detectedIds).toEqual(['claude', 'hivecode'])
-    expect(floatingResult.current?.detectedIds).toEqual(['codex', 'hivecode'])
+    expect(activeResult.current?.detectedIds).toEqual(['claude'])
+    expect(floatingResult.current?.detectedIds).toEqual(['codex'])
     expect(useAppStore.getState().detectedAgentIds).toEqual(['claude'])
     expect(refreshLocalAgents).toHaveBeenLastCalledWith(undefined)
 
@@ -195,9 +195,9 @@ describe('Floating Workspace authority', () => {
     await act(async () => {
       await activeResult.current?.refresh()
     })
-    expect(activeResult.current?.detectedIds).toEqual(['claude', 'hivecode'])
+    expect(activeResult.current?.detectedIds).toEqual(['claude'])
     expect(activeResult.current?.detectionFailed).toBe(true)
-    expect(floatingResult.current?.detectedIds).toEqual(['codex', 'hivecode'])
+    expect(floatingResult.current?.detectedIds).toEqual(['codex'])
     expect(floatingResult.current?.detectionFailed).toBe(false)
   })
 })
@@ -487,7 +487,7 @@ describe('useDetectedAgents failure presentation', () => {
     const target: AgentDetectionTarget = { kind: 'local', contextKey: 'host' }
     const root = await renderProbe(target)
 
-    expect(latestHookResult?.detectedIds).toEqual(['hivecode'])
+    expect(latestHookResult?.detectedIds).toBeNull()
     expect(latestHookResult?.detectionFailed).toBe(true)
     expect(latestHookResult?.isLoading).toBe(false)
     await act(async () => root.render(createElement(HookProbe, { target })))
@@ -500,7 +500,7 @@ describe('useDetectedAgents failure presentation', () => {
 
     await renderProbe({ kind: 'local', contextKey: 'host' })
 
-    expect(latestHookResult?.detectedIds).toEqual(['hivecode'])
+    expect(latestHookResult?.detectedIds).toEqual([])
     expect(latestHookResult?.detectionFailed).toBe(false)
   })
 
@@ -511,7 +511,7 @@ describe('useDetectedAgents failure presentation', () => {
       await latestHookResult?.refresh()
     })
 
-    expect(latestHookResult?.detectedIds).toEqual(['codex', 'hivecode'])
+    expect(latestHookResult?.detectedIds).toEqual(['codex'])
     expect(latestHookResult?.detectionFailed).toBe(true)
     expect(latestHookResult?.isRefreshing).toBe(false)
 
@@ -524,7 +524,7 @@ describe('useDetectedAgents failure presentation', () => {
       await latestHookResult?.refresh()
     })
 
-    expect(latestHookResult?.detectedIds).toEqual(['claude', 'hivecode'])
+    expect(latestHookResult?.detectedIds).toEqual(['claude'])
     expect(latestHookResult?.detectionFailed).toBe(false)
   })
 

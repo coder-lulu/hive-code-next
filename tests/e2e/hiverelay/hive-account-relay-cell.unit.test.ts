@@ -26,8 +26,6 @@ import { defineMethod, defineStreamingMethod } from '../../../src/main/runtime/r
 import type { OrcaRuntimeService } from '../../../src/main/runtime/orca-runtime'
 import { startAccountRelayCell } from './hive-account-relay-cell-fixture'
 import { startAccountRelayBrowser } from './hive-account-relay-browser-fixture'
-import { createRelayNativePiTranscript } from './hive-relay-native-pi-fixture'
-import { NATIVE_CHAT_METHODS } from '../../../src/main/runtime/rpc/methods/native-chat'
 const origin = process.env.HIVE_RUNTIME_HOST_HTTP_FIXTURE
 const pauseCloud = process.env.HIVE_RELAY_CLOUD_PAUSE_TEST === '1'
 it.skipIf(!origin)(
@@ -53,7 +51,6 @@ it.skipIf(!origin)(
     } as CurrentHiveRuntimeCloudLeaseContext
     mkdirSync(resolve('logs/hiveagent-p5'), { recursive: true })
     const storage = mkdtempSync(join(resolve('logs/hiveagent-p5'), 'cell-integration-'))
-    const nativeSession = await createRelayNativePiTranscript(storage)
     createHiveRuntimeRelayBindingStore(join(storage, 'bindings')).write(
       context.tuple.runtimeRecordId,
       fixture.binding
@@ -68,10 +65,8 @@ it.skipIf(!origin)(
       fixture.cell.cellId,
       fixture.relaySigningPublicKey,
       async () => {
-        browser.current = await startAccountRelayBrowser(
-          storage,
-          (body) => fixtureFetch('/fixture/intent', body),
-          nativeSession
+        browser.current = await startAccountRelayBrowser(storage, (body) =>
+          fixtureFetch('/fixture/intent', body)
         )
         return browser.current.origin
       }
@@ -180,7 +175,6 @@ it.skipIf(!origin)(
       runtime,
       userDataPath: storage,
       methods: [
-        ...NATIVE_CHAT_METHODS,
         defineMethod({
           name: 'fixture.read',
           params: null,
@@ -269,15 +263,6 @@ it.skipIf(!origin)(
       if (!response.ok) {
         throw new Error('Initial Relay RPC failed')
       }
-      const nativeRead = await client.request({
-        id: 'native-read',
-        method: 'nativeChat.readSession',
-        params: nativeSession
-      })
-      expect(nativeRead.ok).toBe(true)
-      expect(JSON.stringify(nativeRead)).toContain('p5-host-owned-native-read-proof-20260926')
-      expect(JSON.stringify(nativeRead)).toContain('P5 native tool completed')
-      expect(observedWire.join('')).not.toContain('p5-host-owned-native-read-proof-20260926')
       const rpcLatencies = await Promise.all(
         Array.from({ length: 20 }, async (_, index) => {
           const id = `concurrent-read-${index}`
@@ -415,15 +400,6 @@ it.skipIf(!origin)(
           ok: true,
           result: { principal: expect.stringMatching(/^account-runtime:/) }
         })
-        const recoveredNative = await client.request({
-          id: 'native-recovered',
-          method: 'nativeChat.readSession',
-          params: nativeSession
-        })
-        expect(recoveredNative.ok).toBe(true)
-        expect(JSON.stringify(recoveredNative)).toContain(
-          'p5-host-owned-native-read-proof-20260926'
-        )
         writeFileSync(
           join(storage, 'cloud-recovery.json'),
           JSON.stringify({
@@ -441,9 +417,8 @@ it.skipIf(!origin)(
       await vi.waitFor(() => expect(client!.isClosed).toBe(true), { timeout: 8000 })
       await expect(
         client.request({
-          id: 'revoked-native',
-          method: 'nativeChat.readSession',
-          params: nativeSession
+          id: 'revoked-read',
+          method: 'fixture.read'
         })
       ).rejects.toThrow()
       await heartbeatTail

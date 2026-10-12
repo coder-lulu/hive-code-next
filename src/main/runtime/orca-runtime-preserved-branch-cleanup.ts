@@ -22,8 +22,6 @@ import type {
   AiVaultPrepareSessionResumeResult
 } from '../../shared/ai-vault-resume-preparation'
 import type { AgentSessionClaimSigner } from './agent-session-claim-identity'
-import type { TaskCodexRuntimeAccountPorts } from '../tasks/task-codex-runtime-account-ports'
-import type { RuntimeTeamTaskToolProvider } from './structured-team-task-tools'
 import type { AgentStatus } from '../../shared/agent-detection'
 import { RuntimeLegacyWorkerTerminalRecoveryPersistence } from './runtime-legacy-worker-terminal-recovery-persistence'
 import { RuntimeLegacyWorkerTerminalRecoveryController } from './runtime-legacy-worker-terminal-recovery-controller'
@@ -153,9 +151,6 @@ export class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeWithTermin
     | null
 
   protected readonly agentSessionClaimSigner: AgentSessionClaimSigner
-
-  protected readonly taskCodexAccounts: TaskCodexRuntimeAccountPorts | null
-  protected readonly prepareTeamTaskTools: RuntimeTeamTaskToolProvider | null
 
   protected readonly agentSessionCreateOperations = new Map<string, AgentSessionCreateOperation>()
 

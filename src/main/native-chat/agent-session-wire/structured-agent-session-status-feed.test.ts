@@ -3,7 +3,6 @@ import {
   createTrackedJournalOpener
 } from '../agent-session-journal/journal-host-database-test-support'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
-import { APP_DISPLAY_NAME, PRODUCT_CONFIG } from '../../../shared/brand'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -111,36 +110,6 @@ function feedFor(
 }
 
 describe('StructuredAgentSessionStatusFeed', () => {
-  it(`publishes ${APP_DISPLAY_NAME} Managed Pi child views through the current host feed without Codex ID rewriting`, async () => {
-    const journal = await journals.open({
-      identity: {
-        sessionId: SESSION,
-        workspaceId: 'workspace-1',
-        hostId: 'local',
-        agent: PRODUCT_CONFIG.slug,
-        providerHandle: { transport: 'hive-native', agent: PRODUCT_CONFIG.slug, nativeId: SESSION }
-      },
-      stateDirectory: join(root, SESSION)
-    })
-    const child = statusFeedChildView({ providerId: 'pi-child' })
-    const { feed, events, dispose } = feedFor(
-      new Map([[SESSION, { journal, provider: 'managed-pi' }]]),
-      null,
-      undefined,
-      () => [child]
-    )
-    feed.publish(SESSION, journal)
-    expect(events.at(-1)).toMatchObject({
-      type: 'status',
-      session: {
-        agent: 'managed-pi',
-        children: [expect.objectContaining({ providerId: 'pi-child' })],
-        backgroundTasks: [expect.objectContaining({ id: 'pi-child' })]
-      }
-    })
-    dispose()
-  })
-
   it('publishes provider ownership transitions without changing journal time', async () => {
     const journal = await openJournal()
     const sessions = new Map<string, Indexed>([

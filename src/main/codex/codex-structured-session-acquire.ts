@@ -21,7 +21,7 @@ import {
   codexSpawnedProcessIdentity
 } from './codex-structured-owner-identity'
 import { openCodexStructuredConnection } from './codex-structured-connection-open'
-import { openCodexTeamTaskThread } from './codex-team-task-tool-host'
+import { openCodexThread } from './codex-structured-thread-open'
 import {
   closeCodexPublishedSession,
   handleCodexSessionExit
@@ -189,13 +189,7 @@ export async function acquireCodexStructuredSession(input: {
       })
     }
     acquisitions.assertCurrent(sessionId, attempt)
-    const { opened, teamTaskTools } = await openCodexTeamTaskThread(
-      connection,
-      launch,
-      deps,
-      acquireInput,
-      () => acquisitions.assertCurrent(sessionId, attempt)
-    )
+    const opened = await openCodexThread(connection, launch, deps.requestTimeoutMs)
     acquisitions.assertCurrent(sessionId, attempt)
     primaryThreadId = opened.threadId
     const restoreAdmission = translator?.restoreThread(opened.threadId, opened.thread ?? {})
@@ -234,7 +228,6 @@ export async function acquireCodexStructuredSession(input: {
     // Where this session's child work goes: the host's records, after each frame is journaled.
     const sink = codexChildWorkSink(sessionId, deps)
     const session: CodexSession = {
-      ...(teamTaskTools ? { teamTaskTools } : {}),
       connection,
       ...codexSessionLifecycle(acquireInput.fence, acquired.acquisitionGeneration as string),
       threadId: opened.threadId,

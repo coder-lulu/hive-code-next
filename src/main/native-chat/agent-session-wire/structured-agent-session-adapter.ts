@@ -21,7 +21,6 @@ import type {
   AgentSessionJournalIdentity
 } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionProviderHandleLink } from '../../../shared/agent-session-provider-handle'
-import type { TaskStructuredLaunchOrigin } from '../../tasks/task-structured-launch-origin'
 import type {
   AgentSessionAccountHome,
   AgentSessionExecutionLocation,
@@ -260,9 +259,6 @@ export type StructuredAgentSessionAcquireInput = {
   /** Durably records the child's identity the moment it exists, before any handshake, so a crash
    *  mid-start leaves an owner recovery can stop. The acquisition's `process` must match it. */
   onSpawned?: (process: AgentSessionProcessIdentity) => Promise<void>
-  /** Host-only source guard after launch preparation and again in the synchronous spawn frame. */
-  spawnGuard?: { prepare: () => Promise<void>; assertCurrent: () => void }
-  taskOrigin?: TaskStructuredLaunchOrigin
   /** Aborted by a close, or by a Stop admitted now, that must not wait behind this acquire: the
    *  adapter stops what it started and the acquire fails. An adapter whose acquire never waits on
    *  the provider's handshake may ignore it. */

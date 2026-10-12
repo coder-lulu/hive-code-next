@@ -22,8 +22,6 @@ import {
   isFloatingWorkspaceSelector
 } from '../../shared/floating-workspace-worktree'
 import { parseWorkspaceKey } from '../../shared/workspace-scope'
-import { resolveTaskCodexCreateIntent } from '../tasks/task-codex-create-intent'
-import type { TaskStructuredLaunchOrigin } from '../tasks/task-structured-launch-origin'
 import {
   agentSessionAccountHome,
   type AgentSessionAccountHome
@@ -158,15 +156,7 @@ export class OrcaRuntimeWithGetStructuredAgentSessionCreateSupport extends OrcaR
     agent: StructuredAgentId
     callerKey?: string
     resumeFrom?: { providerSessionId: string }
-    taskOrigin?: TaskStructuredLaunchOrigin
   }): Promise<AgentSessionAttachParams & { hostLaunchDirectory?: string }> {
-    if (Object.hasOwn(input, 'taskOrigin')) {
-      return resolveTaskCodexCreateIntent({
-        input,
-        resolveLocation: (selector) => this.resolveStructuredAgentSessionLocation(selector),
-        resolveSelectedAccount: this.taskCodexAccounts?.resolveSelected
-      })
-    }
     const hostLaunchDirectory = isFloatingWorkspaceSelector(input.worktree)
       ? (await this.resolveRuntimeFileTarget(input.worktree)).worktree.path
       : undefined

@@ -45,11 +45,7 @@ export function isValidPiProviderSessionOnly(
   providerSession: AgentProviderSessionMetadata | undefined,
   agentType: AgentType | undefined
 ): boolean {
-  return Boolean(
-    providerSession &&
-    (agentType === 'pi' || agentType === 'hivecode') &&
-    getAgentResumeArgv(agentType === 'hivecode' ? 'hivecode' : 'pi', providerSession)
-  )
+  return Boolean(providerSession && agentType === 'pi' && getAgentResumeArgv('pi', providerSession))
 }
 
 export function toAgentStatusIpcPayload(

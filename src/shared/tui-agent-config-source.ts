@@ -1,24 +1,8 @@
 import type { TuiAgent } from './tui-agent'
 import type { TuiAgentConfigSource } from './resolve-tui-agent-config'
-import {
-  getHiveCodeCliCommandNameForPlatform,
-  getOrcaCliCommandNameForPlatform
-} from './orca-cli-command-name'
+import { getOrcaCliCommandNameForPlatform } from './orca-cli-command-name'
 
 export const TUI_AGENT_CONFIG_SOURCE: Record<TuiAgent, TuiAgentConfigSource> = {
-  hivecode: {
-    builtIn: true,
-    detectCmd: 'hive',
-    launchCmd: 'hive hive-ai',
-    launchCmdByPlatform: {
-      linux: `${getHiveCodeCliCommandNameForPlatform('linux')} hive-ai`,
-      win32: `${getHiveCodeCliCommandNameForPlatform('win32')} hive-ai`
-    },
-    expectedProcess: 'pi',
-    promptInjectionMode: 'argv',
-    draftPromptEnvVar: 'ORCA_PI_PREFILL',
-    windowsShiftEnterEncoding: 'csi-u'
-  },
   claude: {
     detectCmd: 'claude',
     promptInjectionMode: 'argv',

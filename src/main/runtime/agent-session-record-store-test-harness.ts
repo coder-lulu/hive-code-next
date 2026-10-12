@@ -2,12 +2,6 @@ import {
   readLegacyAgentSessionRecords,
   legacyAgentSessionRecordImport
 } from './agent-session-legacy-record-import'
-import { emptyState } from './agent-session-store-parsing'
-import {
-  loadHiveRuntimeState,
-  serializeHiveRuntimeState,
-  writeHiveRuntimeState
-} from './agent-session-hive-state-rows'
 /**
  * The one way tests open, seed and read back the durable agent-session record store, so a change
  * to where or how the store persists is made here rather than in every test that uses it. Every
@@ -17,8 +11,6 @@ import {
 
 import type { AgentSessionOperationRow } from '../../shared/agent-session-operation-ledger'
 import type { PersistedAgentSessionRecord } from '../../shared/agent-session-legacy-handoff-lease'
-import type { HiveAgentSessionEntry } from '../../shared/hive-agent-session-entry'
-import type { TaskExecutionRecord } from '../tasks/task-execution-record'
 import {
   encodePersistedAgentSessionProviderHandle,
   isAgentSessionProviderHandle
@@ -46,10 +38,6 @@ export type PersistedTestAgentSessionStore = {
   retiredClaimKeys: RetiredAgentSessionClaimKey[]
   /** Written as raw record rows; always empty on a read, where `records` holds every row. */
   unusableRecords: Record<string, { reason: string; raw: unknown }>
-  hiveSessions: Record<string, HiveAgentSessionEntry>
-  taskExecutions: Record<string, TaskExecutionRecord>
-  hiveRecoveryFenceAt?: number
-  taskRecoveryBlocked?: boolean
   /** Absent until the store first records a chat tab. */
   sessionTabs?: { tabId: string; sessionId: string }[]
 }
@@ -124,16 +112,6 @@ function writePersisted(db: Database.Database, persisted: PersistedTestAgentSess
         "INSERT INTO agent_session_store_meta (key, value) VALUES ('session_tabs_recorded', '1')"
       ).run()
     }
-    writeHiveRuntimeState(
-      db,
-      serializeHiveRuntimeState({
-        ...emptyState(persisted.hostId ?? TEST_HOST_ID),
-        hiveSessions: new Map(Object.entries(persisted.hiveSessions)),
-        taskExecutions: new Map(Object.entries(persisted.taskExecutions)),
-        hiveRecoveryFenceAt: persisted.hiveRecoveryFenceAt,
-        taskRecoveryBlocked: persisted.taskRecoveryBlocked
-      })
-    )
     db.exec('COMMIT')
   } catch (error) {
     db.exec('ROLLBACK')
@@ -172,8 +150,6 @@ export async function seedTestAgentSessionRecordStore(
     operations: {},
     retiredClaimKeys: [],
     unusableRecords: {},
-    hiveSessions: {},
-    taskExecutions: {},
     ...(seed.sessionTabs ? { sessionTabs: seed.sessionTabs } : {})
   })
 }
@@ -203,9 +179,7 @@ export async function readPersistedTestAgentSessionStore(
     records: {},
     operations: {},
     retiredClaimKeys: [],
-    unusableRecords: {},
-    hiveSessions: {},
-    taskExecutions: {}
+    unusableRecords: {}
   }
   for (const row of db
     .prepare('SELECT session_id, record_json FROM agent_session_records ORDER BY rowid')
@@ -243,12 +217,6 @@ export async function readPersistedTestAgentSessionStore(
       .all()
       .map((row) => ({ tabId: String(row.tab_id), sessionId: String(row.session_id) }))
   }
-  const hiveState = emptyState(persisted.hostId ?? TEST_HOST_ID)
-  loadHiveRuntimeState(db, hiveState)
-  persisted.hiveSessions = Object.fromEntries(hiveState.hiveSessions ?? [])
-  persisted.taskExecutions = Object.fromEntries(hiveState.taskExecutions ?? [])
-  persisted.hiveRecoveryFenceAt = hiveState.hiveRecoveryFenceAt
-  persisted.taskRecoveryBlocked = hiveState.taskRecoveryBlocked
   return persisted
 }
 

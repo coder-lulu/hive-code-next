@@ -15,9 +15,9 @@ const tab: RuntimeMobileSessionTerminalTab = {
   id: `${TAB}::${LEAF}`,
   parentTabId: TAB,
   leafId: LEAF,
-  title: 'HiveCode AI',
+  title: 'Pi',
   isActive: true,
-  launchAgent: 'hivecode'
+  launchAgent: 'pi'
 }
 
 function publish(row: AgentStatusIpcPayload, retained: boolean) {
@@ -50,7 +50,7 @@ function hook(state: 'working' | 'done'): AgentStatusIpcPayload {
     connectionId: null,
     state,
     prompt: '',
-    agentType: 'hivecode',
+    agentType: 'pi',
     receivedAt: now,
     stateStartedAt: now,
     providerSession: { key: 'session_id', id: 'session-1' }

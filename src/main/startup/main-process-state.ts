@@ -1,6 +1,4 @@
 import type { HiveAccountService } from '../hive-account/hive-account-service'
-import type { HiveAgentLocalPrincipal } from '../native-chat/hive-agent-local-principal'
-import type { HiveAgentLocalRuntime } from '../native-chat/hive-agent-local-runtime'
 import type { HiveRuntimeCloudPresenceService } from '../hive-runtime-cloud/hive-runtime-cloud-presence-service'
 import type { HiveRuntimeCloudWebLaunchService } from '../hive-runtime-cloud/hive-runtime-cloud-web-launch-service'
 import type { HiveRuntimeCloudWebSessionControlService } from '../hive-runtime-cloud/hive-runtime-cloud-web-session-control-service'
@@ -91,8 +89,6 @@ export const mainProcessState = {
   claudeAccounts: null as ClaudeAccountService | null,
   claudeRuntimeAuth: null as ClaudeRuntimeAuthService | null,
   hiveAccountService: null as HiveAccountService | null,
-  hiveAgentLocalPrincipal: null as HiveAgentLocalPrincipal | null,
-  hiveAgentLocalRuntime: null as HiveAgentLocalRuntime | null,
   hiveAccountStartupState: null as Promise<HiveAccountState> | null,
   runtimeCloudPresence: null as HiveRuntimeCloudPresenceService | null,
   runtimeCloudDirectory: null as HiveAccountRuntimeDirectoryService | null,

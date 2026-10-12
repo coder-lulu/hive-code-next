@@ -8,7 +8,6 @@ import type { GlobalSettings } from './global-settings-types'
 
 // Mirrors `TuiAgent` launch surface; `claude`↔`claude-code` (product, not CLI string). `other` is the escape hatch; see `tuiAgentToAgentKind`.
 export const AGENT_KIND_VALUES = [
-  'hivecode',
   'claude-code',
   'claude-agent-teams',
   'codebuddy',

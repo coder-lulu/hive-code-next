@@ -15,7 +15,6 @@ export const SYNTHETIC_AGENT_TITLE_AGENTS = [
   'cursor',
   'opencode',
   'pi',
-  'hivecode',
   'omp',
   'droid',
   'hermes',
@@ -53,14 +52,6 @@ export const SYNTHETIC_AGENT_TITLE_PROFILES: Record<string, SyntheticAgentTitleP
     // over it replaced the session label and fought its frames at 80ms. Terminal states still
     // synthesize: they carry the pane's agent identity downstream, and Pi is quiet at rest.
     synthesizeWorkingTitle: false
-  },
-  hivecode: {
-    workingLabel: 'HiveCode AI',
-    permissionLabel: 'HiveCode AI - action required',
-    idleLabel: 'HiveCode AI ready',
-    titleIdentityGroup: 'pi-compatible',
-    // Hive owns the bundled Pi session; preserve its native title and status events.
-    synthesizeTerminalTitle: false
   },
   omp: {
     workingLabel: 'OMP',

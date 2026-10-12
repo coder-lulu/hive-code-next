@@ -87,35 +87,6 @@ describe('DesktopHomeComposerFooter', () => {
     expect(screen.queryByRole('option', { name: 'Claude' })).toBeNull()
   })
 
-  it('offers a workspace selection instead of a temporary session on Web', () => {
-    render(
-      <DesktopHomeComposerFooter
-        allowTemporarySession={false}
-        model={EMPTY_HOME_MODEL}
-        selectedWorkspaceId=""
-        onWorkspaceChange={vi.fn()}
-        agent="hivecode"
-        agents={AGENT_CATALOG.filter((entry) => entry.id === 'hivecode')}
-        onAgentChange={vi.fn()}
-        defaultAgent="hivecode"
-        onSetDefaultAgent={vi.fn()}
-        onOpenAgentSettings={vi.fn()}
-        permissionMode="default"
-        onPermissionChange={vi.fn()}
-        hasDraft={false}
-        onSubmit={vi.fn()}
-      />
-    )
-    const trigger = screen.getByRole('button', { name: /project or workspace/i })
-    expect(trigger.textContent).toContain('Select Host workspace')
-    expect(screen.getByRole('button', { name: 'Send task' }).hasAttribute('disabled')).toBe(true)
-    fireEvent.pointerDown(trigger, new PointerEvent('pointerdown', { bubbles: true, button: 0 }))
-    expect(screen.queryByRole('menuitem', { name: /Temporary session/ })).toBeNull()
-    expect(
-      screen.getByRole('menuitem', { name: /Select Host workspace/ }).getAttribute('aria-disabled')
-    ).toBe('true')
-  })
-
   it('bounds the project selector while preserving full labels on hover', () => {
     render(
       <DesktopHomeComposerFooter

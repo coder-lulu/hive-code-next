@@ -189,7 +189,7 @@ describe('createUISlice settings navigation', () => {
   })
 
   it.each(['github', 'linear'] as const)(
-    'does not prefetch %s providers when opening the native workbench',
+    'prefetches the default %s provider on an ordinary Tasks visit',
     (source) => {
       const store = createUIStore()
       const prefetchWorkItems = vi.fn()
@@ -215,8 +215,16 @@ describe('createUISlice settings navigation', () => {
       store.getState().openTaskPage()
       expect(store.getState().activeView).toBe('tasks')
       expect(store.getState().taskPageData).toEqual({})
-      expect(prefetchWorkItems).not.toHaveBeenCalled()
-      expect(prefetchLinearIssues).not.toHaveBeenCalled()
+      if (source === 'github') {
+        expect(prefetchWorkItems).toHaveBeenCalledTimes(2)
+        expect(prefetchLinearIssues).not.toHaveBeenCalled()
+      } else {
+        expect(prefetchWorkItems).not.toHaveBeenCalled()
+        expect(prefetchLinearIssues).toHaveBeenCalledWith(
+          { kind: 'list', filter: 'all', limit: 36 },
+          { sourceContext: null }
+        )
+      }
     }
   )
 

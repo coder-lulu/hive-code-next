@@ -37,10 +37,7 @@ export const PREFLIGHT_METHODS = [
   defineMethod({
     name: 'preflight.detectAgents',
     params: null,
-    // HiveCode AI is bundled with this Host; it has no external CLI to probe.
-    handler: async () => [
-      ...new Set([...(await detectInstalledAgentsWithShellPathHydration()), 'hivecode'])
-    ]
+    handler: async () => detectInstalledAgentsWithShellPathHydration()
   }),
   defineMethod({
     name: 'preflight.detectRemoteAgents',
@@ -55,10 +52,7 @@ export const PREFLIGHT_METHODS = [
   defineMethod({
     name: 'preflight.refreshAgents',
     params: null,
-    handler: async () => {
-      const result = await refreshShellPathAndDetectAgents()
-      return { ...result, agents: [...new Set([...result.agents, 'hivecode'])] }
-    }
+    handler: async () => refreshShellPathAndDetectAgents()
   }),
   defineMethod({
     name: 'preflight.readAgentVersion',

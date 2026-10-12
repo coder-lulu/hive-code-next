@@ -7,7 +7,6 @@ import {
   NATIVE_CHAT_SUPPORTED_AGENT_LIST
 } from '../../../../shared/native-chat-agent-support'
 import type { TuiAgent } from '../../../../shared/tui-agent'
-import { PRODUCT_CONFIG } from '../../../../shared/brand'
 import en from '@/i18n/locales/en.json'
 import { i18n } from '@/i18n/i18n'
 import { getAgentCatalog } from '@/lib/agent-catalog'
@@ -19,7 +18,6 @@ const EXPECTED_SUPPORTED_AGENTS = [
   'codex',
   'grok',
   'omp',
-  PRODUCT_CONFIG.slug,
   'opencode',
   'opencode2'
 ] as const satisfies readonly TuiAgent[]

@@ -1,4 +1,3 @@
-import { evictStructuredAgentSession } from './structured-agent-session-eviction'
 // How a conversation is reached, closed and swept — the host's lifetime rules in one place.
 //
 // A conversation is reached only through `conversation`, which opens it at rest and starts no
@@ -26,10 +25,6 @@ import type { StructuredAgentSessionHostSession } from './structured-agent-sessi
 import { StructuredAgentSessionIdleSweep } from './structured-agent-session-idle-sweep'
 import { AGENT_SESSION_NOT_ATTACHED } from './structured-agent-session-mutation-admission'
 import { deferredStructuredAgentSessionLogger } from './structured-agent-session-logger'
-import type { TaskExecutionRecord } from '../../tasks/task-execution-record'
-import { settleStaleStructuredAgentSessionState } from './structured-agent-session-dead-generation-settlement'
-import { captureUnfinishedStructuredAgentSessionWork } from './structured-agent-session-unfinished-work'
-import { abandonQueuedStructuredAgentSessionMessages } from './structured-agent-session-queued-abandon'
 
 export type StructuredAgentSessionConversationLifetime = ReturnType<
   typeof createStructuredAgentSessionConversationLifetime
@@ -158,78 +153,6 @@ export function createStructuredAgentSessionConversationLifetime(host: {
         }
         await stopStructuredAgentSessionAgentUnderSerialize(host.context(), sessionId, { cause })
         await closeConversation(sessionId)
-      })
-    },
-    /** A failed Task acquisition may retain an owner without ever opening its conversation. */
-    closeTaskExecution: async (expected: TaskExecutionRecord): Promise<true> => {
-      const original = await deps().store.tasks.assertFailedBootStopCurrent(expected)
-      return serialize(original.sessionId, async (): Promise<true> => {
-        await deps().store.tasks.assertFailedBootStopCurrent(expected)
-        if (disposed) {
-          throw new AgentSessionRefusalError(AGENT_SESSION_NOT_ATTACHED)
-        }
-        const session = sessions.get(original.sessionId) ?? (await host.open(original.sessionId))
-        await deps().store.tasks.assertFailedBootStopCurrent(expected)
-        if (!session) {
-          throw new AgentSessionRefusalError(AGENT_SESSION_NOT_ATTACHED)
-        }
-        // Opening schedules delivery behind this serialize; reject it before releasing the lock.
-        await abandonQueuedStructuredAgentSessionMessages(
-          deps(),
-          original.sessionId,
-          session.journal
-        )
-        if (!session.child) {
-          const closed = await deps().adapter.releaseAcquisition?.({
-            sessionId: original.sessionId,
-            agent: original.provider
-          })
-          if (closed !== true) {
-            throw new Error('Task provider acquisition close was not proven')
-          }
-          const current = await deps().store.tasks.assertFailedBootStopCurrent(expected)
-          if (
-            current.lease.claimStatus !== 'released' &&
-            (await host
-              .context()
-              .runtimeState.commitExecutionOwnerStop(
-                original.sessionId,
-                original.lease.runtimeFence
-              )) !== 'resolved'
-          ) {
-            throw new Error('Task execution host exit was not proven')
-          }
-          await deps().store.tasks.assertFailedBootStopCurrent(expected, true)
-          const { runtimeState } = host.context()
-          await evictStructuredAgentSession({
-            sessionId: original.sessionId,
-            logger: deps().logger,
-            eventSink: runtimeState.eventSinkFor(original.sessionId),
-            discardSink: () => runtimeState.discardEventSink(original.sessionId),
-            acknowledgeRelease: () => deps().adapter.acknowledgeSessionRelease?.(original.sessionId)
-          })
-        }
-        await stopStructuredAgentSessionAgentUnderSerialize(host.context(), original.sessionId, {
-          cause: 'evict'
-        })
-        const stopped = await deps().store.tasks.assertFailedBootStopCurrent(expected, true)
-        await settleStaleStructuredAgentSessionState({
-          journal: session.journal,
-          sessionId: original.sessionId,
-          fence: stopped.lease.runtimeFence,
-          acquisitionGeneration: null,
-          deathEvidence: stopped.lease.deathEvidence
-        })
-        const remaining = captureUnfinishedStructuredAgentSessionWork(session.journal)
-        if (
-          remaining.hadUnsettledSubmissions ||
-          remaining.items.length > 0 ||
-          !(await closeConversation(original.sessionId))
-        ) {
-          throw new Error('Task session close was not settled')
-        }
-        await deps().store.tasks.assertFailedBootStopCurrent(expected, true)
-        return true
       })
     }
   }

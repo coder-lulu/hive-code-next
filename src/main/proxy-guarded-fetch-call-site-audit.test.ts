@@ -23,11 +23,8 @@ const AUDITED_NON_NET_FETCH_CALLS = new Map<string, number>([
   ['main/jira/authenticated-request.ts', 1],
   // MainHttpClient delegates to guarded net.fetch on desktop or the audited Node host port.
   ['main/hive-runtime-cloud/hive-runtime-cloud-http-client.ts', 1],
-  ['main/hive-runtime-cloud/hive-ai-text-stream-client.ts', 1],
   ['main/hive-runtime-cloud/relay-host/hive-runtime-relay-region-measurement.ts', 1],
   // Startup injects MainHttpClient.fetch into the local Pi capability broker.
-  ['main/startup/main-process-hive-runtime-cloud.ts', 1],
-  ['main/hive-account/hive-native-pi-bridge.ts', 1],
   ['main/preflight/agent-installer-download.ts', 1],
   ['main/preflight/agent-version-service.ts', 1],
   // The existing electron-updater partition gap described above also applies to Hive metadata.

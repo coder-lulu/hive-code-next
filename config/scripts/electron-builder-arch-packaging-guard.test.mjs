@@ -34,6 +34,24 @@ describe('arch-aware packaging guard', () => {
   const packHost = (arch) =>
     electronBuilderConfig.beforePack({ electronPlatformName: process.platform, arch }, bundleDir)
 
+  it('packages without reading a Paperclip service directory', () => {
+    const forbiddenResources = new Proxy(
+      {},
+      {
+        get() {
+          throw new Error('Paperclip resources must not be read')
+        }
+      }
+    )
+    expect(() =>
+      electronBuilderConfig.beforePack(
+        { electronPlatformName: process.platform, arch: HOST_ARCH },
+        bundleDir,
+        forbiddenResources
+      )
+    ).not.toThrow()
+  })
+
   it('allows packaging the host platform and architecture', () => {
     expect(() => packHost(HOST_ARCH)).not.toThrow()
   })

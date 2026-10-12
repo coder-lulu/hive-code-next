@@ -363,24 +363,24 @@ describe('codex structured launch resolution', () => {
   })
 
   it.each([undefined, null, { kind: 'task_execution' }])(
-    'refuses a present Task source before any personal workspace launch (%j)',
+    'refuses retired task ownership before any personal workspace launch (%j)',
     async (taskSource) => {
       const session = record()
       Object.defineProperty(session, 'taskSource', { value: taskSource, enumerable: true })
       const resolveWorkspacePath = vi.fn(async () => '/must-not-open-personal')
       await expect(
         resolverFor(session, resolveWorkspacePath)({ identity: IDENTITY })
-      ).rejects.toThrow('TASK_DOCKER_RUNTIME_UNAVAILABLE')
+      ).rejects.toThrow('structured_agent_session_unsupported')
       expect(resolveWorkspacePath).not.toHaveBeenCalled()
     }
   )
 
-  it('refuses present Task context on a personal record before resolving launch data', async () => {
+  it('refuses retired task context on a personal record before resolving launch data', async () => {
     const input = { identity: IDENTITY }
     Object.defineProperty(input, 'taskOrigin', { value: undefined, enumerable: true })
     const resolveWorkspacePath = vi.fn(async () => '/must-not-open-personal')
     await expect(resolverFor(record(), resolveWorkspacePath)(input)).rejects.toThrow(
-      'TASK_DOCKER_RUNTIME_UNAVAILABLE'
+      'structured_agent_session_unsupported'
     )
     expect(resolveWorkspacePath).not.toHaveBeenCalled()
   })

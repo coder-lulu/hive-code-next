@@ -13,7 +13,6 @@ const mocks = vi.hoisted(() => ({
   guardPinnedTabClose: vi.fn(),
   resolvePinnedTabLabel: vi.fn(),
   closeStructuredAgentSession: vi.fn(),
-  retireHiveAgentSession: vi.fn(),
   callRuntimeRpc: vi.fn()
 }))
 
@@ -45,39 +44,6 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
 }))
 
 import { deleteTemporarySession } from './temporary-session-actions'
-vi.mock('@/runtime/hive-agent-session-retirement', () => ({
-  retireHiveAgentSession: mocks.retireHiveAgentSession
-}))
-
-it('routes Hive retirement to its owned API, not generic provider shutdown', async () => {
-  const bucket = FLOATING_TERMINAL_WORKTREE_ID
-  mocks.state.tabsByWorktree = {}
-  mocks.state.unifiedTabsByWorktree = {
-    [bucket]: [
-      {
-        id: 'hive-tab',
-        entityId: 'ha-session:owned',
-        worktreeId: bucket,
-        contentType: 'agent-session',
-        agentSessionAgent: 'hivecode',
-        executionHostId: 'local'
-      }
-    ]
-  }
-  mocks.retireHiveAgentSession.mockResolvedValue(undefined)
-  mocks.closeStructuredAgentSession.mockClear()
-  mocks.callRuntimeRpc.mockClear()
-  expect(
-    await deleteTemporarySession({
-      ownerBucketKey: bucket,
-      unifiedTabId: 'hive-tab',
-      executionHostId: 'local'
-    })
-  ).toBe(true)
-  expect(mocks.retireHiveAgentSession).toHaveBeenCalledWith(bucket, 'ha-session:owned')
-  expect(mocks.closeStructuredAgentSession).not.toHaveBeenCalled()
-  expect(mocks.callRuntimeRpc).not.toHaveBeenCalled()
-})
 
 describe('temporary session deletion', () => {
   beforeEach(() => {

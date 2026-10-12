@@ -1,6 +1,6 @@
-import { readFileSync, type Dirent } from 'node:fs'
+import type { Dirent } from 'node:fs'
 import { readFile, rm, writeFile } from 'node:fs/promises'
-import { dirname, join, relative, resolve, sep } from 'node:path'
+import { join } from 'node:path'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { runProcess } from '../../../src/shared/child-process/run-process'
 import { extractReleaseCheckoutTree } from './release-checkout-tree'
@@ -76,59 +76,6 @@ it('excludes discarded test sources before they consume the shared extraction de
   )
   expect(extraction.timeoutMs).toBeLessThanOrEqual(45_000)
   expect(extraction.terminationBarrier).toBe(true)
-})
-
-it('archives the real policy data imported by the current task producers', async () => {
-  const policyPaths = new Set<string>()
-  for (const producer of [
-    'src/main/tasks/task-docker-model-profile.ts',
-    'src/main/tasks/task-model-response-configuration.ts'
-  ]) {
-    const file = resolve(producer)
-    for (const match of readFileSync(file, 'utf8').matchAll(
-      /\bfrom\s+['"]([^'"]+\/integration\/[^'"]+\.json)['"]/g
-    )) {
-      policyPaths.add(
-        relative(process.cwd(), resolve(dirname(file), match[1]))
-          .split(sep)
-          .join('/')
-      )
-    }
-  }
-  expect(policyPaths.size).toBe(4)
-  vi.mocked(runProcess).mockResolvedValueOnce({
-    code: 0,
-    signal: null,
-    timedOut: false,
-    stdout: [...policyPaths].join('\n'),
-    stderr: ''
-  })
-  await extractReleaseCheckoutTree('/repository', '/staging', 'a'.repeat(40), undefined, 'linux')
-  const query = vi.mocked(runProcess).mock.calls[0][0]
-  expect(query.args?.slice(0, 4)).toEqual(['ls-tree', '--name-only', 'a'.repeat(40), '--'])
-  expect(query.args?.slice(4)).toEqual(expect.arrayContaining([...policyPaths]))
-  const archive = vi
-    .mocked(runProcess)
-    .mock.calls.find(([spec]) => spec.args?.[0] === 'archive')![0]
-  expect(archive.args).toEqual(expect.arrayContaining([...policyPaths]))
-  expect(query.timeoutMs).toBeLessThanOrEqual(45_000)
-  expect(archive.timeoutMs).toBeLessThanOrEqual(query.timeoutMs!)
-  expect(query.terminationBarrier).toBe(true)
-})
-
-it('does not archive a guessed policy path when the tracked-path query fails', async () => {
-  vi.mocked(runProcess).mockResolvedValueOnce({
-    code: 1,
-    signal: null,
-    timedOut: false,
-    stdout: '',
-    stderr: 'not an object'
-  })
-  await expect(
-    extractReleaseCheckoutTree('/repository', '/staging', 'a'.repeat(40), undefined, 'linux')
-  ).rejects.toThrow('git ls-tree not an object')
-  expect(runProcess).toHaveBeenCalledOnce()
-  expect(rm).toHaveBeenCalledWith(join('/staging', '.release-checkout.tar'), { force: true })
 })
 
 function treeEntry(name: string, kind: 'file' | 'directory' | 'symlink' = 'file'): Dirent {
@@ -327,10 +274,7 @@ it('settles every manifest write before cleaning a failed Windows preparation', 
     await vi.waitFor(() => expect(issued).toBe(8))
     expect(
       vi.mocked(runProcess).mock.calls.map(([spec]) => [spec.program, spec.args?.[0]])
-    ).toEqual([
-      ['git', 'ls-tree'],
-      ['git', 'archive']
-    ])
+    ).toEqual([['git', 'archive']])
     expect(rm).not.toHaveBeenCalled()
   } finally {
     release()

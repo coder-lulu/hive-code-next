@@ -178,22 +178,6 @@ export default function SettingsScreen() {
           />
         </SettingsGroup>
 
-        <SettingsGroup title="AI 服务">
-          <SettingsRow
-            icon={KeyRound}
-            label="AI 额度与用量"
-            detail="余额和累计用量，无需连接电脑"
-            onPress={() => router.push('/ai-account')}
-          />
-          <SettingsRow
-            icon={Database}
-            label="AI 模型与价格"
-            detail="模型候选和参考费率"
-            last
-            onPress={() => router.push('/ai-models')}
-          />
-        </SettingsGroup>
-
         <SettingsGroup title="显示与语言">
           <View style={styles.appearanceRow}>
             <Palette size={20} strokeWidth={1.8} color={theme.color.text.secondary} />

@@ -5,7 +5,6 @@ import { buildTerminalTabRetirementPlan } from '@/store/slices/terminal-tab-reti
 import { guardPinnedTabClose, resolvePinnedTabLabel } from '@/store/pinned-tab-close-guard'
 import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
 import { closeStructuredAgentSession } from '@/runtime/structured-agent-session-close'
-import { retireHiveAgentSession } from '@/runtime/hive-agent-session-retirement'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 import { parseExecutionHostId } from '../../../shared/execution-host'
 import {
@@ -110,14 +109,6 @@ export async function deleteTemporarySession(
   }
 
   const closeStructuredSession = async (): Promise<boolean> => {
-    if (unifiedTab.agentSessionAgent === 'hivecode') {
-      if (owner.executionHostId !== 'local') {
-        throw new Error('hive_agent_capability_unavailable')
-      }
-      await retireHiveAgentSession(owner.bucketKey, unifiedTab.entityId)
-      state.closeUnifiedTab(unifiedTabId)
-      return true
-    }
     const runtimeTarget = runtimeTargetForHost(owner.executionHostId)
     await closeStructuredAgentSession(runtimeTarget, unifiedTab.entityId)
     await callRuntimeRpc(runtimeTarget, 'session.tabs.close', {

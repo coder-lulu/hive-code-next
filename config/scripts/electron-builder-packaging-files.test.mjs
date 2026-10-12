@@ -4,53 +4,101 @@ import { describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
-const { FileMatcher } = require('app-builder-lib/out/fileMatcher')
-const { createManagedPiPackResource } = require('../managed-pi-pack-resources.cjs')
+const { FileMatcher, getMainFileMatchers } = require('app-builder-lib/out/fileMatcher')
 
 describe('electron-builder config', () => {
-  it.each(['win32', 'darwin', 'linux'])(
-    'excludes all Pack build slices from app.asar while copying only the %s target',
+  it.each(['win', 'mac', 'linux'])(
+    'excludes local AOCI state and retired service output with the %s production matcher',
     (platform) => {
       const root = process.cwd()
-      const mapping = createManagedPiPackResource(platform)
-      const expand = (value) => value.replaceAll('${arch}', 'x64')
-      const extra = new FileMatcher(
-        join(root, expand(mapping.from)),
-        '/resources',
-        expand,
-        mapping.filter
-      )
-      const excludes = []
-      extra.computeParsedPatterns(excludes, root)
-      const app = new FileMatcher(root, '/dest', expand, electronBuilderConfig.files)
-      app.prependPattern('**/*')
-      app.excludePatterns = excludes
-      const isFile = { isDirectory: () => false }
-      const packRoot = `out/managed-pi/${platform}-x64`
-      expect(
-        extra.createFilter()(
-          join(root, packRoot, platform === 'win32' ? 'node.exe' : 'node'),
-          isFile
-        )
-      ).toBe(true)
-      for (const os of ['win32', 'darwin', 'linux']) {
-        for (const arch of ['x64', 'arm64']) {
-          for (const file of [
-            'pack-index.json',
-            os === 'win32' ? 'node.exe' : 'node',
-            'agent.cjs',
-            'sbom.json'
-          ]) {
-            expect(
-              app.createFilter()(join(root, `out/managed-pi/${os}-${arch}`, file), isFile)
-            ).toBe(false)
+      const [matcher] = getMainFileMatchers(
+        root,
+        join(root, 'logs/packaging-matcher/destination'),
+        (value) => value.replaceAll('${arch}', 'x64'),
+        electronBuilderConfig[platform],
+        {
+          info: {
+            projectDir: root,
+            buildResourcesDir: 'resources/build',
+            config: electronBuilderConfig,
+            isPrepackedAppAsar: false,
+            debugLogger: { isEnabled: false }
           }
+        },
+        join(root, '.build/packaging-output'),
+        false
+      )
+      const isPacked = matcher.createFilter()
+      for (const directory of [
+        '.aoci',
+        'out/paperclip-service',
+        'out/paperclip-adapter',
+        'out/paperclip-runtime',
+        'out/managed-pi',
+        'out/native-pi'
+      ]) {
+        expect
+          .soft(isPacked(join(root, directory), { isDirectory: () => true }), directory)
+          .toBe(false)
+      }
+      for (const file of [
+        '.aoci/baseline.json',
+        '.aoci/config.json',
+        '.aoci/ledger.jsonl',
+        '.aoci/verify_history/result.json',
+        'aoci.txt',
+        'aoci.code.txt',
+        'aoci.meta.txt',
+        'AGENTS.md.backup.20261005_205649.f8f60302cb8ed360c247dbc56a894f9a81760a0612aa34ae61c83ab9df463a27',
+        'out/paperclip-service/service.mjs',
+        'out/paperclip-service/resource-manifest.json',
+        'out/native-pi/win32-x64/node.exe',
+        'out/managed-pi/linux-x64/agent.cjs'
+      ]) {
+        expect.soft(isPacked(join(root, file), { isDirectory: () => false }), file).toBe(false)
+      }
+      for (const file of ['out/main/index.js', 'out/preload/index.js', 'out/renderer/index.html']) {
+        expect(isPacked(join(root, file), { isDirectory: () => false }), file).toBe(true)
+      }
+      for (const retired of [
+        'paperclip-service',
+        'paperclip-adapter',
+        'paperclip-runtime',
+        'native-pi',
+        'managed-pi'
+      ].flatMap((name) => [
+        name,
+        name.toUpperCase(),
+        name.replace(/(^|-)[a-z]/g, (letter) => letter.toUpperCase())
+      ])) {
+        expect
+          .soft(isPacked(join(root, 'out', retired), { isDirectory: () => true }), retired)
+          .toBe(false)
+        for (const name of [
+          'index.js',
+          'server.mjs',
+          'agent.cjs',
+          'index.js.map',
+          'server.d.ts',
+          'package.json',
+          'LICENSE',
+          'nested/extensionless'
+        ]) {
+          const file = `out/${retired}/${name}`
+          expect.soft(isPacked(join(root, file), { isDirectory: () => false }), file).toBe(false)
         }
       }
-      expect(app.createFilter()(join(root, 'out/main/managed-pi-pack-product.js'), isFile)).toBe(
-        true
-      )
-      expect(app.createFilter()(join(root, 'out/renderer/index.html'), isFile)).toBe(true)
+    }
+  )
+
+  it.each(['win', 'mac', 'linux'])(
+    'does not copy retired service or HiveAI resources on %s',
+    (platform) => {
+      expect(
+        electronBuilderConfig[platform].extraResources.filter((resource) =>
+          /paperclip|native-pi|managed-pi/i.test(JSON.stringify(resource))
+        )
+      ).toEqual([])
     }
   )
 

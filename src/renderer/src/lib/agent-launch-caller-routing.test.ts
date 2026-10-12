@@ -196,7 +196,7 @@ describe('agent launch caller routing', () => {
     expect(() =>
       launchAgentInNewTab({
         requestId: 'unowned-browser-launch',
-        agent: 'hivecode',
+        agent: 'pi',
         worktreeId: 'global-floating-terminal'
       })
     ).toThrow('Select a connected Host workspace')

@@ -27,23 +27,6 @@ function restoreEnv(key: string, previous: string | undefined): void {
 }
 
 describe('resolveSessionFilePath', () => {
-  it('requires the Hive hook file and never falls back to an OMP account', async () => {
-    const root = await makeRoot('orca-native-chat-hive-')
-    const transcript = join(root, 'hive-session.jsonl')
-    await writeFile(transcript, '{}\n')
-    expect(
-      await resolveSessionFilePath('hivecode', 'hive-session', { transcriptPath: transcript })
-    ).toBe(transcript)
-    expect(
-      await resolveSessionFilePath('hivecode', 'hive-session', { ompSessionsDir: root })
-    ).toBeNull()
-    expect(
-      await resolveSessionFilePath('hivecode', 'hive-session', {
-        transcriptPath: join(root, 'missing.jsonl'),
-        ompSessionsDir: root
-      })
-    ).toBeNull()
-  })
   it('globs Claude project subdirs for <sessionId>.jsonl', async () => {
     const root = await makeRoot('orca-native-chat-resolve-claude-')
     const claudeProjectsDir = join(root, 'claude-projects')

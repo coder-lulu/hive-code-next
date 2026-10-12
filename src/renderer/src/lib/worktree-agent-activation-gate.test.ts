@@ -620,7 +620,7 @@ describe('worktree agent activation gate', () => {
     )
   })
 
-  it.each([undefined, 'hivecode'] as const)(
+  it.each([undefined, 'pi'] as const)(
     'materializes an unmounted host surface with launchAgent=%s',
     async (launchAgent) => {
       const livePtyId = `${WORKTREE_ID}@@live-agent`

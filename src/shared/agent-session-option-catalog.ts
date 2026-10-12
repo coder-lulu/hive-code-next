@@ -40,14 +40,6 @@ const CATALOGS: AgentSessionOptionCatalogMap = {
   gemini: GEMINI_SESSION_OPTION_CATALOG,
   cursor: CURSOR_SESSION_OPTION_CATALOG,
   grok: GROK_SESSION_OPTION_CATALOG,
-  hivecode: {
-    ...OMP_SESSION_OPTION_CATALOG,
-    modelApply: {
-      ...OMP_SESSION_OPTION_CATALOG.modelApply,
-      midSession: { kind: 'command', build: (value) => `/model ${String(value)}` }
-    },
-    listModels: { ...OMP_SESSION_OPTION_CATALOG.listModels!, command: 'hive hive-ai --list-models' }
-  },
   muse: MUSE_SESSION_OPTION_CATALOG,
   omp: OMP_SESSION_OPTION_CATALOG
 }

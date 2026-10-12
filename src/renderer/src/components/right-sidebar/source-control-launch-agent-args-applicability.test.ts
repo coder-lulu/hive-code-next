@@ -13,18 +13,6 @@ vi.mock('@/store', () => ({ useAppStore: { getState: mocks.getState } }))
 import { sourceControlLaunchAppliesAgentArgs } from './source-control-launch-agent-args-applicability'
 
 describe('sourceControlLaunchAppliesAgentArgs', () => {
-  it('applies arguments to the HiveCode native terminal command', () => {
-    expect(
-      sourceControlLaunchAppliesAgentArgs({ agent: 'hivecode', executionHostId: 'local' })
-    ).toBe(true)
-    expect(mocks.resolveAgentSessionLaunchRoute).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        agent: 'hivecode',
-        workspace: expect.objectContaining({ executionHostId: 'local' })
-      })
-    )
-  })
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.resolveAgentSessionLaunchRoute.mockReturnValue('terminal-tui')

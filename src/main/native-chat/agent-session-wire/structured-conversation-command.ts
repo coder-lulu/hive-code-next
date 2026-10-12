@@ -133,9 +133,6 @@ export function runStructuredConversationCommand(
         rerunWhenReplayMissing: () => true,
         run: async (ctx) => {
           const record = store.getRecord(sessionId)!
-          if (record.provider === 'managed-pi') {
-            throw new Error('structured_agent_session_unsupported')
-          }
           const blocked = conversationCommandBlocked(
             ctx,
             record,

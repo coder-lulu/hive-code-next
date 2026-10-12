@@ -2,8 +2,6 @@ import { SQLITE_DATABASE_RUNTIME_INCLUDE } from './vitest-sqlite-database-runtim
 
 // Real SQLite fixtures keep Node publication and close semantics.
 export const SQLITE_RUNTIME_INCLUDE = [
-  'src/main/tasks/**/*.test.ts',
-  'src/main/companies/**/*.test.ts',
   'src/main/ipc/runtime-environments-subscription-lifecycle.test.ts',
   'src/main/ipc/runtime-environments-subscription-routing.test.ts',
   ...SQLITE_DATABASE_RUNTIME_INCLUDE,

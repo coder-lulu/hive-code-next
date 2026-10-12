@@ -16,28 +16,6 @@ import type { PersistedNativeChatSessionOptions } from '../../../../shared/nativ
 describe('native chat PTY session options', () => {
   beforeEach(() => clearNativeChatSessionOptionCacheForTests())
 
-  it('switches a Hive Pi model without the OMP extension capability and accepts the native report', async () => {
-    const dispatch = vi.fn().mockResolvedValue({ outcome: 'applied' })
-    const surface = createNativeChatPtySessionOptions({
-      agent: 'hivecode',
-      scopeKey: 'hive-pi-model',
-      mode: 'live',
-      canSwitchOmpModel: false,
-      initialModels: [
-        { id: 'hivecode/first', label: 'First', options: [] },
-        { id: 'hivecode/second', label: 'Second', options: [] }
-      ],
-      reportedValues: { model: 'hivecode/first' },
-      dispatchCommand: dispatch
-    })!
-    await surface.setOption('model', 'hivecode/second')
-    expect(dispatch).toHaveBeenCalledWith('/model hivecode/second')
-    surface.reportSessionOptions({ model: 'hivecode/second' })
-    expect(surface.getSnapshot()).toMatchObject([
-      { id: 'model', valueSource: 'reported', kind: { currentValue: 'hivecode/second' } }
-    ])
-  })
-
   it('renders nothing when no model list exists at all', () => {
     const surface = createNativeChatPtySessionOptions({
       agent: 'claude',

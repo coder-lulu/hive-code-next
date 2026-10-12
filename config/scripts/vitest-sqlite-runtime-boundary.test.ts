@@ -10,7 +10,6 @@ const sqliteHarnesses = new Set([
   'acknowledged-terminal-tab-retirement-fixture',
   'session-search-indexer-test-fixture',
   'agent-session-record-store-test-harness',
-  'task-adapter.test-fixture',
   'journal-host-database-test-support',
   'orchestration-legacy-compatibility-dispatcher-test-fixture',
   'orchestration-mailbox-notification-test-harness',
@@ -97,24 +96,6 @@ it.each([...sqliteHarnesses])(
     ).toBe(false)
   }
 )
-
-it('classifies the real Paperclip task database fixture without classifying HTTP preparation or mocked storage', () => {
-  const owner = 'config/scripts/paperclip-task-dispatch.test.mjs'
-  expect(importsSqliteRuntime(owner, readFileSync(owner, 'utf8'))).toBe(true)
-  for (const control of [
-    'config/scripts/paperclip-workflow-prepare-dispatch.test.mjs',
-    'config/scripts/paperclip-workflow-prepare-recovery-repository.test.mjs'
-  ]) {
-    expect(importsSqliteRuntime(control, readFileSync(control, 'utf8')), control).toBe(false)
-  }
-  const fixture = 'src/main/tasks/task-adapter.test-fixture.ts'
-  expect(importsSqliteRuntime(fixture, readFileSync(fixture, 'utf8'))).toBe(true)
-  expect(readFileSync(fixture, 'utf8')).toContain(
-    'await openTestAgentSessionRecordStore(directory)'
-  )
-  expect(readFileSync(fixture, 'utf8')).toContain('closeTestJournalHostDatabase(directory)')
-  expect(NODE_RUNTIME_INCLUDE).toContain(owner)
-})
 
 it('classifies the real profile authority value without admitting type-only or mock module imports', () => {
   const owner = 'src/main/runtime/example.test.ts'

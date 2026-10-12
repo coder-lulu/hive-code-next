@@ -9,8 +9,7 @@ import { expect, vi } from 'vitest'
 
 export async function startAccountRelayBrowser(
   directory: string,
-  createIntent: (body: Record<string, unknown>) => Promise<unknown>,
-  nativeSession?: { agent: 'hivecode'; sessionId: string; transcriptPath: string }
+  createIntent: (body: Record<string, unknown>) => Promise<unknown>
 ) {
   const built = await build({
     stdin: {
@@ -40,12 +39,6 @@ export async function startAccountRelayBrowser(
       const response = await channel.request({ id: 'browser-read', method: 'fixture.read' })
       if (!response.ok || !response.result.principal.startsWith('account-runtime:')) throw new Error('Wrong principal')
       document.querySelector('#rpc').textContent = 'account RPC ready'
-      const nativeSession = ${JSON.stringify(nativeSession ?? null)}
-      if (nativeSession) {
-        const native = await channel.request({ id: 'browser-native', method: 'nativeChat.readSession', params: nativeSession })
-        if (!native.ok || !JSON.stringify(native.result).includes('p5-host-owned-native-read-proof-20260926')) throw new Error('Native transcript missing')
-        document.querySelector('#native').textContent = 'native tool transcript ready'
-      }
       channel.subscribe({ id: 'browser-stream', method: 'fixture.stream' }, {
         onResponse: (response) => { if (response.ok && response.result.value === 'stream-ready') document.querySelector('#stream').textContent = 'stream ready' },
         onBinary: (bytes) => { if (Array.from(bytes).join(',') === '1,2,3') document.querySelector('#binary').textContent = 'binary ready' }
@@ -90,7 +83,7 @@ export async function startAccountRelayBrowser(
         } else {
           response.setHeader('content-type', 'text/html')
           response.end(
-            '<!doctype html><title>Relay integration</title><p id="state">starting</p><p id="rpc"></p><p id="stream"></p><p id="binary"></p><p id="native"></p><script src="/client.js"></script>'
+            '<!doctype html><title>Relay integration</title><p id="state">starting</p><p id="rpc"></p><p id="stream"></p><p id="binary"></p><script src="/client.js"></script>'
           )
         }
       } catch {
@@ -114,9 +107,6 @@ export async function startAccountRelayBrowser(
         expect(await page!.locator('#rpc').textContent()).toBe('account RPC ready')
         expect(await page!.locator('#stream').textContent()).toBe('stream ready')
         expect(await page!.locator('#binary').textContent()).toBe('binary ready')
-        if (nativeSession) {
-          expect(await page!.locator('#native').textContent()).toBe('native tool transcript ready')
-        }
       },
       { timeout: 15000 }
     )
@@ -154,7 +144,7 @@ export async function startAccountRelayBrowser(
       await ready()
       await page.reload()
       await ready()
-      await page.screenshot({ path: join(directory, 'browser-native-reconnected.png') })
+      await page.screenshot({ path: join(directory, 'browser-reconnected.png') })
       expect(keys).toHaveLength(2)
       expect(new Set(keys).size).toBe(2)
       expect(offers.some((offer) => offer.includes('permessage-deflate'))).toBe(true)

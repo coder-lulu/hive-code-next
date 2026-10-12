@@ -149,14 +149,6 @@ export async function resolveSessionFilePath(
     return null
   }
 
-  // Hive sessions live in the authenticated account directory, never the OMP user root.
-  if (agent === 'hivecode') {
-    if (unavailable) {
-      throw unavailable
-    }
-    return null
-  }
-
   const resolved = await resolveSessionFileById(transcriptAgent, sessionId, options, signal)
   if (!resolved && unavailable) {
     throw unavailable

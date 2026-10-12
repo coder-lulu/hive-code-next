@@ -99,7 +99,6 @@ export { formatAgentTypeLabel } from '../../../shared/agent-type-label'
 
 // Why: the record requires every recognized terminal agent to have an icon.
 const ICONABLE_AGENT_TYPES: Record<TerminalAgent, true> = {
-  hivecode: true,
   claude: true,
   'claude-agent-teams': true,
   codebuddy: true,

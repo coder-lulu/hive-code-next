@@ -122,7 +122,7 @@ describe('ptyHoldsPublishedRuntimeSurface', () => {
     leafId: LEAF,
     ptyId: 'pty-1',
     incarnationId: 'inc-1',
-    title: 'HiveCode AI',
+    title: 'Pi',
     isActive: false
   }
   const snapshot = {

@@ -16,7 +16,6 @@ export const RESUMABLE_TUI_AGENTS = [
   'opencode',
   'opencode2',
   'pi',
-  'hivecode',
   'mimo-code',
   'droid',
   'grok',
@@ -194,8 +193,7 @@ export function agentProviderSessionsEqual(
   return (
     left.key === right.key &&
     left.id === right.id &&
-    ((agent !== 'pi' && agent !== 'hivecode' && agent !== 'prime-agent') ||
-      left.transcriptPath === right.transcriptPath)
+    ((agent !== 'pi' && agent !== 'prime-agent') || left.transcriptPath === right.transcriptPath)
   )
 }
 

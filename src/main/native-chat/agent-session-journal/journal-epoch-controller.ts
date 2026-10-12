@@ -5,7 +5,7 @@ import type {
 import type { JournalHostDatabase } from './journal-host-database'
 import { replaceJournalEpoch, type JournalReplacementItem } from './journal-epoch-replacement'
 import type { JournalQueuePauseRestatement } from './queued-message-pause'
-import { publishNewEpoch, purgeJournalContent } from './journal-epoch-rollover'
+import { publishNewEpoch } from './journal-epoch-rollover'
 import type { JournalLoad } from './journal-open'
 import type { AgentJournalEpochReason } from './journal-row-schema'
 import { assertJournalFence, assertJournalWritable } from './journal-write-guards'
@@ -37,21 +37,6 @@ export class JournalEpochController {
       fence,
       now: this.deps.now(),
       onPublished: this.deps.adopt
-    })
-  }
-
-  purge(fence: number, onPublished: (loaded: JournalLoad) => void): Promise<void> {
-    return this.deps.serialize(() => {
-      purgeJournalContent({
-        database: this.deps.database(),
-        identity: this.deps.identity,
-        readOnly: this.deps.readOnly(),
-        highestFence: this.deps.highestFence(),
-        mintEpoch: this.deps.mintEpoch,
-        fence,
-        now: this.deps.now,
-        onPublished
-      })
     })
   }
 

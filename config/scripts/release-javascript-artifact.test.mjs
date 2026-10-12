@@ -1,5 +1,6 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
+import { createHash } from 'node:crypto'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   javascriptInventory,
@@ -10,6 +11,7 @@ import {
 } from './release-javascript-artifact.mjs'
 import { releaseJavascriptSupport } from './release-javascript-support.mjs'
 import { runProcessSync, describeProcessFailure } from './script-child-process.mjs'
+import { getTarProgram } from './zip-extractor-command.mjs'
 
 const directories = []
 const configuration = {
@@ -262,46 +264,82 @@ describe('HiveCode JavaScript release service configuration', () => {
   })
 })
 
-it('excludes host native Pi slots and their extensionless or executable runtimes from portable transfer', () => {
+const retiredOutputVariants = [
+  'native-pi',
+  'managed-pi',
+  'paperclip-service',
+  'paperclip-adapter',
+  'paperclip-runtime'
+].flatMap((name) => [
+  name,
+  name.toUpperCase(),
+  name.replace(/(^|-)[a-z]/g, (letter) => letter.toUpperCase())
+])
+
+it.each(retiredOutputVariants)('excludes retired %s outputs from portable transfer', (runtime) => {
   const options = fixture()
-  for (const file of [
-    'linux-x64/node',
-    'win32-x64/node.exe',
-    'darwin-arm64/node_modules/addon.node'
-  ]) {
-    const destination = join(options.root, 'out', 'native-pi', file)
+  const files = runtime.toLowerCase().startsWith('paperclip-')
+    ? ['index.cjs', 'package.json', 'LICENSE', 'dist/server.d.ts', 'nested/extensionless']
+    : [
+        'linux-x64/node',
+        'win32-x64/node.exe',
+        'darwin-arm64/node_modules/addon.node',
+        'linux-x64/agent.cjs',
+        'linux-x64/pack-index.json'
+      ]
+  for (const file of files) {
+    const destination = join(options.root, 'out', runtime, file)
     mkdirSync(dirname(destination), { recursive: true })
     writeFileSync(destination, 'host-specific runtime')
   }
   const manifest = packReleaseJavascript(options)
-  expect(manifest.files.some((file) => file.path.startsWith('native-pi/'))).toBe(false)
+  expect(manifest.files.some((file) => file.path.startsWith(`${runtime}/`))).toBe(false)
+  const listing = runProcessSync({
+    program: getTarProgram(),
+    args: ['-tzf', join(options.artifactDir, 'release-javascript.tar.gz')],
+    cwd: options.root
+  })
+  expect(listing.code, describeProcessFailure(listing)).toBe(0)
+  expect(listing.stdout.toLowerCase()).not.toContain(`out/${runtime.toLowerCase()}/`)
   restoreReleaseJavascript(options)
   expect(javascriptInventory(join(options.root, 'out'))).toEqual(manifest.files)
 })
 
-it('refuses a foreign host native Pi slot in a purported portable archive inventory', () => {
+it.each(retiredOutputVariants)('refuses a retired %s slot in a portable inventory', (runtime) => {
   const options = fixture()
-  const directory = join(options.root, 'out', 'native-pi', 'linux-x64')
+  const directory = join(options.root, 'out', runtime, 'linux-x64')
   mkdirSync(directory, { recursive: true })
   writeFileSync(join(directory, 'node'), 'extensionless foreign executable')
   expect(() => javascriptInventory(join(options.root, 'out'))).toThrow('host output')
 })
 
-it('allows a genuinely portable source while refusing host-bound Pack trust even with forced artifact configuration', () => {
+it.each(retiredOutputVariants)(
+  'rejects an archive carrying retired %s before replacing output',
+  (runtime) => {
+    const options = fixture()
+    const manifest = packReleaseJavascript(options)
+    const directory = join(options.root, 'out', runtime, 'linux-x64')
+    mkdirSync(directory, { recursive: true })
+    writeFileSync(join(directory, 'agent.cjs'), 'retired runtime')
+    writeFileSync(join(directory, 'extensionless'), 'retired runtime')
+    const archive = join(options.artifactDir, 'release-javascript.tar.gz')
+    const result = runProcessSync({
+      program: getTarProgram(),
+      args: ['-czf', archive, '-C', options.root, 'out'],
+      cwd: options.root
+    })
+    expect(result.code, describeProcessFailure(result)).toBe(0)
+    manifest.archiveSha256 = createHash('sha256').update(readFileSync(archive)).digest('hex')
+    writeFileSync(join(options.artifactDir, 'manifest.json'), JSON.stringify(manifest))
+    expect(() => restoreReleaseJavascript(options)).toThrow(/retired runtime/)
+    expect(readFileSync(join(options.root, 'out', 'main', 'index.js'), 'utf8')).toBe(
+      'main/index.js'
+    )
+  }
+)
+
+it('allows portable release JavaScript builds', () => {
   const options = fixture()
   expect(releaseJavascriptSupport(options.root)).toEqual({ supported: true, reason: '' })
   packReleaseJavascript(options)
-  writeFileSync(
-    join(options.root, 'electron.vite.config.ts'),
-    'const plugins = [createManagedPiPackBuildPlugin(resolve("."))];'
-  )
-  mkdirSync(join(options.root, 'config', 'build-plugins'), { recursive: true })
-  writeFileSync(
-    join(options.root, 'config', 'build-plugins', 'managed-pi-pack-build.ts'),
-    'const define = { HIVECODE_MANAGED_PI_PACK_TRUST: JSON.stringify({ [pack.directoryKey]: pack.indexSha256 }) };'
-  )
-  expect(releaseJavascriptSupport(options.root)).toMatchObject({ supported: false })
-  expect(() => packReleaseJavascript(options)).toThrow('Full per-platform builds are required')
-  expect(() => restoreReleaseJavascript(options)).toThrow('Full per-platform builds are required')
-  expect(readFileSync(join(options.root, 'out', 'main', 'index.js'), 'utf8')).toBe('main/index.js')
 })

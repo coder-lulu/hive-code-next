@@ -51,7 +51,6 @@ function contextFor(session: StructuredAgentSessionChildExitSession) {
   const context: StructuredAgentSessionChildExitContext<typeof session> = {
     logger: recordingStructuredAgentSessionLogger().logger,
     store: {
-      tasks: { hasSessionBinding: () => false },
       getRecord: () => record,
       transitionHandoff: async (
         _sessionId: string,

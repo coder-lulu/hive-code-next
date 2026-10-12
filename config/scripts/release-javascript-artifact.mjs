@@ -30,6 +30,13 @@ const REQUIRED_FILES = [
 ]
 const NATIVE_FILE = /\.(?:node|exe|dll|dylib|so(?:\.\d+)*|a)$/i
 const ARCHIVE_NAME = 'release-javascript.tar.gz'
+const RETIRED_RUNTIME_OUTPUTS = [
+  'native-pi',
+  'managed-pi',
+  'paperclip-service',
+  'paperclip-adapter',
+  'paperclip-runtime'
+]
 
 function sha256(bytes) {
   return createHash('sha256').update(bytes).digest('hex')
@@ -96,15 +103,17 @@ export function releaseJavascriptConfiguration(root, env = process.env) {
 export function javascriptInventory(
   directory,
   prefix = '',
-  { excludeHostOutput = false, excludeNativePi = false } = {}
+  { excludeHostOutput = false, excludeRetiredRuntimeOutput = false } = {}
 ) {
   return readdirSync(directory, { withFileTypes: true })
     .sort((left, right) => (left.name < right.name ? -1 : left.name > right.name ? 1 : 0))
     .flatMap((entry) => {
       const name = prefix ? `${prefix}/${entry.name}` : entry.name
       const root = name.split('/')[0]
-      const hostOutput = ['relay', 'orcad-template', 'orcad-prebuilds', 'native-pi'].includes(root)
-      if ((excludeHostOutput && hostOutput) || (excludeNativePi && root === 'native-pi')) {
+      const retiredRuntime = RETIRED_RUNTIME_OUTPUTS.includes(root.toLowerCase())
+      const hostOutput =
+        retiredRuntime || ['relay', 'orcad-template', 'orcad-prebuilds'].includes(root)
+      if ((excludeHostOutput && hostOutput) || (excludeRetiredRuntimeOutput && retiredRuntime)) {
         return []
       }
       assert(!entry.isSymbolicLink(), `JavaScript artifact contains a symlink: ${name}`)
@@ -112,7 +121,7 @@ export function javascriptInventory(
       assert(!hostOutput, `JavaScript artifact contains host output: ${name}`)
       const file = join(directory, entry.name)
       if (entry.isDirectory()) {
-        return javascriptInventory(file, name, { excludeHostOutput, excludeNativePi })
+        return javascriptInventory(file, name, { excludeHostOutput, excludeRetiredRuntimeOutput })
       }
       assert(entry.isFile(), `JavaScript artifact contains a special file: ${name}`)
       const bytes = readFileSync(file)
@@ -132,11 +141,25 @@ export function packReleaseJavascript({ root = process.cwd(), artifactDir, confi
   assert(support.supported, support.reason)
   configuration ??= releaseJavascriptConfiguration(root)
   const out = join(root, 'out')
-  const files = javascriptInventory(out, '', { excludeNativePi: true })
+  const files = javascriptInventory(out, '', { excludeRetiredRuntimeOutput: true })
   verifyRequiredFiles(files)
   mkdirSync(artifactDir, { recursive: true })
   const archive = join(artifactDir, ARCHIVE_NAME)
-  command(getTarProgram(), ['--exclude=out/native-pi', '-czf', archive, '-C', root, 'out'], root)
+  const retiredOutputNames = readdirSync(out).filter((name) =>
+    RETIRED_RUNTIME_OUTPUTS.includes(name.toLowerCase())
+  )
+  command(
+    getTarProgram(),
+    [
+      ...retiredOutputNames.map((name) => `--exclude=out/${name}`),
+      '-czf',
+      archive,
+      '-C',
+      root,
+      'out'
+    ],
+    root
+  )
   const manifest = {
     schema: 1,
     configuration,
@@ -160,6 +183,10 @@ export function restoreReleaseJavascript({ root = process.cwd(), artifactDir, co
   const entries = command(getTarProgram(), ['-tzf', archive], root).split(/\r?\n/)
   for (const entry of entries) {
     assert(entry === 'out/' || entry.startsWith('out/'), `Unexpected archive entry: ${entry}`)
+    assert(
+      !RETIRED_RUNTIME_OUTPUTS.includes(entry.split('/')[1]?.toLowerCase()),
+      `JavaScript archive contains retired runtime output: ${entry}`
+    )
     assert(
       !entry.includes('\\') && !entry.split('/').includes('..'),
       `Unsafe archive entry: ${entry}`

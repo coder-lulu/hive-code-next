@@ -817,18 +817,7 @@ it('parses the minted pane key the window was given', async () => {
   expect(parsePaneKey(`${request.tabId}:${request.leafId}`)).not.toBeNull()
 })
 
-describe('task launch view admission', () => {
-  it('shows no early terminal tab for a required structured task', async () => {
-    const runtime = hostWithWindow()
-    const { publishAgentLaunchTabEarly } = await import('./agent-launch-tab-publication')
-    const result = await publishAgentLaunchTabEarly(
-      AGENT_LAUNCH.params.parse({ ...LAUNCH, operationId: nextOperationId() }),
-      rpcContext(runtime, { ...CLI, requiredAgentLaunchMode: 'structured' })
-    )
-    expect(result).toBeNull()
-    expect(runtime.published).toEqual([])
-  })
-
+describe('account client launch view admission', () => {
   it('shows no early terminal tab to an account client that cannot read it', async () => {
     const runtime = hostWithWindow()
     const { publishAgentLaunchTabEarly } = await import('./agent-launch-tab-publication')

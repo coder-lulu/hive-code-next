@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useAppStore } from '@/store'
 import type { TuiAgent } from '../../../shared/tui-agent'
 
@@ -205,12 +205,5 @@ export function useDetectedAgents(
     localContextKey
   ])
 
-  const availableIds = useMemo(
-    () =>
-      targetKind === 'local'
-        ? [...new Set<TuiAgent>([...(detectedIds ?? []), 'hivecode'])]
-        : detectedIds,
-    [detectedIds, targetKind]
-  )
-  return { detectedIds: availableIds, isLoading, detectionFailed, isRefreshing, refresh }
+  return { detectedIds, isLoading, detectionFailed, isRefreshing, refresh }
 }

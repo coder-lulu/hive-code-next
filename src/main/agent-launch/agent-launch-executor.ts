@@ -67,7 +67,6 @@ import {
 } from './agent-launch-surface-factories'
 
 export type AgentLaunchExecution = {
-  requiredMode?: 'structured'
   runtime: Pick<OrcaRuntimeService, 'getStructuredAgentSessionCreateSupport' | 'getClientSettings'>
   intent: AgentLaunchIntent
   surfaces: AgentLaunchSurfaceFactory
@@ -77,8 +76,6 @@ export type AgentLaunchExecution = {
   callerRendersStructured?: boolean
   /** Attributes a throw to the step that was running, the way a dispatch's own stages do. */
   onStage?: (stage: 'worktree_create' | 'mode_settle' | 'surface_create') => void
-  /** Called only at the original guards before any surface creation. */
-  onPrelaunchRefused?: (error: Error) => never
   /** The surface exists and its tab is published; runs before any prompt delivery. Must not throw. */
   onSurfacePublished?: (surface: AgentLaunchPublishedSurface) => void
 }
@@ -111,22 +108,9 @@ export async function executeAgentLaunch(
         : {}),
       ...(execution.callerRendersStructured === false ? { callerRendersStructured: false } : {})
     },
-    settings: execution.requiredMode
-      ? {
-          ...settings,
-          experimentalNativeChat: true,
-          experimentalStructuredNativeChat: true,
-          openAgentTabsInChatByDefault: true
-        }
-      : settings,
+    settings,
     vocabulary
   })
-
-  if (execution.requiredMode && preflight.mode !== execution.requiredMode) {
-    const error = new Error('agent_launch_required_mode_unavailable')
-    execution.onPrelaunchRefused?.(error)
-    throw error
-  }
 
   // A reused terminal already downgraded in the pre-flight; there is nothing to create. Its agent
   // was running before this launch existed, so argv is unreachable and the PTY is the only way in.
@@ -185,11 +169,6 @@ export async function executeAgentLaunch(
   )
 
   execution.onStage?.('surface_create')
-  if (execution.requiredMode && settled.mode !== execution.requiredMode) {
-    const error = new Error('agent_launch_required_mode_unavailable')
-    execution.onPrelaunchRefused?.(error)
-    throw error
-  }
   let created: CreatedSurface
   try {
     created = await createSurface(execution, placed, settled)
@@ -198,7 +177,6 @@ export async function executeAgentLaunch(
     // outcome. Only the former is safe to replace with a terminal in the same workspace; retrying
     // after an unknown attach outcome could create two agents.
     if (
-      execution.requiredMode !== undefined ||
       settled.mode !== 'structured' ||
       !(error instanceof AgentLaunchStructuredSessionRefusedError) ||
       !isDefinitiveAgentSessionCreateRefusal(error.code)

@@ -13,11 +13,7 @@ import { TERMINAL_FIT_RESTORE_DEADLINE_MS } from '../../shared/terminal-fit-rest
 import { DESKTOP_RENDERER_RUNTIME_CLIENT_CAPABILITIES } from './desktop-renderer-runtime-capabilities'
 import { RpcDispatcher } from '../runtime/rpc/dispatcher'
 import { DESKTOP_RPC_CALLER } from '../runtime/rpc/rpc-caller-identity'
-import { ALL_RPC_METHODS } from '../runtime/rpc/methods'
 import { DesktopRuntimeSenderLifecycle } from './desktop-runtime-sender-lifecycle'
-import { hiveAgentDesktopMethods } from './hive-agent-desktop-methods'
-import { isTrustedUIRenderer } from './ui'
-import type { HiveAgentLocalRuntime } from '../native-chat/hive-agent-local-runtime'
 
 function boundTerminalFitRestore(pending: Promise<boolean>): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -28,21 +24,7 @@ function boundTerminalFitRestore(pending: Promise<boolean>): Promise<boolean> {
   return Promise.race([pending, deadline]).finally(() => clearTimeout(timer))
 }
 
-export function registerRuntimeHandlers(
-  runtime: OrcaRuntimeService,
-  getHiveAgentRuntime: () => HiveAgentLocalRuntime | null = () => null
-): void {
-  const methodsFor = (event: Electron.IpcMainInvokeEvent) => [
-    ...ALL_RPC_METHODS,
-    ...hiveAgentDesktopMethods({
-      getRuntime: getHiveAgentRuntime,
-      assertSender: () => {
-        if (!isTrustedUIRenderer(event.sender) || event.senderFrame !== event.sender.mainFrame) {
-          throw new Error('hive_agent_forbidden')
-        }
-      }
-    })
-  ]
+export function registerRuntimeHandlers(runtime: OrcaRuntimeService): void {
   const pendingTerminalFitRestores = new Map<string, Promise<boolean>>()
   const desktopSenders = new DesktopRuntimeSenderLifecycle(runtime)
   ipcMain.removeHandler('runtime:syncWindowGraph')
@@ -87,7 +69,7 @@ export function registerRuntimeHandlers(
         throw new Error('Runtime RPC call must originate from the current main frame')
       }
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the dispatcher's RpcSuccess/RpcFailure union is the same envelope RuntimeRpcResponse describes; only the `result` generic differs, and this call site declares it as unknown.
-      return (await new RpcDispatcher({ runtime, methods: methodsFor(event) }).dispatch(
+      return (await new RpcDispatcher({ runtime }).dispatch(
         {
           id: 'desktop-ipc',
           authToken: 'desktop-ipc',
@@ -124,7 +106,7 @@ export function registerRuntimeHandlers(
       // The controller outlives the dispatch: most streaming handlers return once set up and
       // keep streaming until their signal aborts, so `runtime:unsubscribe` or sender retirement
       // is what ends it, never the handler settling.
-      void new RpcDispatcher({ runtime, methods: methodsFor(event) }).dispatchStreaming(
+      void new RpcDispatcher({ runtime }).dispatchStreaming(
         {
           id: args.subscriptionId,
           authToken: 'desktop-ipc',

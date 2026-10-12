@@ -1,5 +1,3 @@
-import { serializeHiveRuntimeState } from './agent-session-hive-state-rows'
-import { AGENT_SESSION_OPERATION_FUTURE_SKEW_MS } from '../../shared/agent-session-host-authority'
 // The one-time copy of `agent-sessions.json` into the chat journal database, inside the version-4
 // migration (journal-database.ts). The file and its `.bak` are only ever read: an older build that
 // still uses them finds them as it left them.
@@ -20,6 +18,7 @@ import { raiseAgentSessionFencesAfterBackupRecovery } from './agent-session-back
 import {
   legacyAgentSessionStorePath,
   loadAgentSessionStore,
+  hasRetiredTaskSessionProvenance,
   type AgentSessionStoreState
 } from './agent-session-record-store-file'
 import {
@@ -98,19 +97,18 @@ function withFloorAboveSetAsideCopy(record: AgentSessionRecord, raw: unknown): A
 
 function importRows(
   state: AgentSessionStoreState,
-  fromBackup: boolean,
-  hostId: string
+  fromBackup: boolean
 ): AgentSessionStoreImportRows {
   const records = new Map(state.records)
+  for (const [sessionId, { raw }] of state.unreadableRecords) {
+    if (hasRetiredTaskSessionProvenance(raw)) {
+      records.delete(sessionId)
+    }
+  }
   const imported = { ...state, records }
   if (fromBackup) {
     // The commit the backup lost may have granted a fence it cannot show: main's rule for this state.
     raiseAgentSessionFencesAfterBackupRecovery(imported)
-    imported.taskRecoveryBlocked = true
-    imported.hiveRecoveryFenceAt = Math.max(
-      imported.hiveRecoveryFenceAt ?? 0,
-      Date.now() + AGENT_SESSION_OPERATION_FUTURE_SKEW_MS
-    )
   }
   const rows: AgentSessionStoreImportRows['records'] = []
   for (const [sessionId, loaded] of records) {
@@ -132,9 +130,6 @@ function importRows(
     }
   }
   return {
-    // A different host's business state grants no Hive or task authority on this host. Native
-    // records still import below as unresolved; the original file remains its audit evidence.
-    hiveRuntimeState: state.hostId === hostId ? serializeHiveRuntimeState(imported) : undefined,
     records: rows,
     operations: [...state.operations].map(([key, row]) => [key, JSON.stringify(row)]),
     retiredClaimKeys: state.retiredClaimKeys,
@@ -163,7 +158,7 @@ export function legacyAgentSessionRecordImport(
   }
   let rows: AgentSessionStoreImportRows
   try {
-    rows = importRows(legacy.state, legacy.fromBackup, hostId)
+    rows = importRows(legacy.state, legacy.fromBackup)
   } catch (error) {
     report({ kind: 'unusable', error })
     return NO_LEGACY_JOURNAL_RECORDS

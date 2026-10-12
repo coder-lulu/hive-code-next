@@ -8,10 +8,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Database from '../sqlite/sync-database'
 import { journalDatabasePath } from '../native-chat/agent-session-journal/journal-host-database'
 import * as recordRows from './agent-session-record-rows'
-import {
-  createUnconfirmedTaskSqlFixture,
-  writeExternalTaskCounter
-} from './agent-session-store-ack-loss.test-fixture'
 import { JournalRowWriter } from '../native-chat/agent-session-journal/journal-row-writer'
 import { JournalWriteQueue } from '../native-chat/agent-session-journal/journal-write-queue'
 import type { JournalRow } from '../native-chat/agent-session-journal/journal-row-schema'
@@ -268,57 +264,6 @@ describe('after the database closes', () => {
 })
 
 describe('one published store per live host database', () => {
-  it.each([
-    'commit',
-    'commit-reused-error',
-    'commit-quarantine-retry',
-    'rollback',
-    'rollback-external',
-    'rollback-external-task'
-  ])('verifies failed Task SQL before the next business callback (%s)', async (kind) => {
-    const { fixture, database, persisted } = await createUnconfirmedTaskSqlFixture(
-      root,
-      kind.startsWith('commit'),
-      kind === 'commit-reused-error'
-    )
-    const owner = fixture.store.getRecord(fixture.binding.sessionId)
-    await expect(fixture.reserve()).rejects.toThrow('task-sql-unconfirmed')
-    expect(fixture.store.tasks.get(fixture.command)).toEqual(fixture.task)
-    expect((await persisted()).taskExecutions[fixture.key].modelDispatchAttempts).toBe(
-      kind.startsWith('commit') ? 1 : undefined
-    )
-    const callback = vi.fn()
-    if (kind.startsWith('commit')) {
-      if (kind === 'commit-quarantine-retry') {
-        const transaction = database.transaction.bind(database)
-        vi.spyOn(database, 'transaction').mockImplementationOnce((run) =>
-          transaction((db) => {
-            run(db)
-            throw new Error('quarantine-write-failed')
-          })
-        )
-        await expect(fixture.reserve(callback)).rejects.toThrow('quarantine-write-failed')
-        expect(callback).not.toHaveBeenCalled()
-        expect((await persisted()).taskExecutions[fixture.key].modelDispatchAttempts).toBe(1)
-      }
-      await expect(fixture.reserve(callback)).rejects.toThrow('OUTCOME_UNKNOWN')
-      expect(callback).not.toHaveBeenCalled()
-      expect(await persisted()).toMatchObject({ taskRecoveryBlocked: true })
-      expect((await persisted()).taskExecutions[fixture.key].modelDispatchAttempts).toBe(1)
-    } else {
-      if (kind.startsWith('rollback-external')) {
-        await writeExternalTaskCounter(root, kind === 'rollback-external-task')
-      }
-      expect((await fixture.reserve(callback)).record.modelDispatchAttempts).toBe(
-        kind === 'rollback-external-task' ? 2 : 1
-      )
-      expect(callback).toHaveBeenCalledOnce()
-      expect((await persisted()).taskRecoveryBlocked).not.toBe(true)
-      expect(fixture.store.getRecord(fixture.binding.sessionId)).toBe(owner)
-      expect(owner?.lease.unreconciled).toBe(false)
-    }
-  })
-
   it('appends 32 real journal rows without full store reloads, but detects external and unknown-hook writes', async () => {
     const store = await openTestAgentSessionRecordStore(root)
     const original = await liveChat(store, 'chat-a-0001')
@@ -413,8 +358,6 @@ describe('one published store per live host database', () => {
     await liveChat(store, 'chat-a-0001')
     const other = await openTestAgentSessionRecordStore(root)
     expect(other).toBe(store)
-    expect(other.tasks).toBe(store.tasks)
-    expect(other.hive).toBe(store.hive)
     await Promise.all([
       store.setConversationName('chat-a-0001', 'first'),
       other.setConversationName('chat-a-0001', 'second')
@@ -423,7 +366,6 @@ describe('one published store per live host database', () => {
     closeTestJournalHostDatabases()
     const restarted = await openTestAgentSessionRecordStore(root)
     expect(restarted).not.toBe(store)
-    expect(restarted.tasks).not.toBe(store.tasks)
   })
 
   it('skips row reloads while SQL is unchanged and preserves identity after an unrelated write', async () => {

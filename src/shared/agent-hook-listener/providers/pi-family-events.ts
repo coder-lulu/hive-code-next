@@ -20,8 +20,6 @@ export function normalizePiCompatibleEvent(
   paneKey: string,
   hookPayload: Record<string, unknown>
 ): ParsedAgentStatusPayload | null {
-  // Preserve the bundled runtime's owner in the canonical status and resume record.
-  const owner = agentType === 'pi' && hookPayload.hivecode_native === true ? 'hivecode' : agentType
   if (agentType !== 'omp' && eventName === 'session_start') {
     // Why: Pi's session_start fires on TUI open/resume; discard stale turn details, no working row before user activity.
     clearPaneTurnCacheState(state, paneKey)
@@ -45,7 +43,7 @@ export function normalizePiCompatibleEvent(
     if (
       !previous ||
       previous.providerSessionOnly === true ||
-      previous.payload.agentType !== owner ||
+      previous.payload.agentType !== agentType ||
       (eventName === 'model_select' && !model)
     ) {
       return null
@@ -114,7 +112,7 @@ export function normalizePiCompatibleEvent(
     prompt: resolvePrompt(state, paneKey, promptText, {
       resetOnNewTurn: isNewTurnEvent(agentType, eventName)
     }),
-    agentType: owner,
+    agentType,
     model,
     modelSwitchCommand,
     toolName: snapshot.toolName,

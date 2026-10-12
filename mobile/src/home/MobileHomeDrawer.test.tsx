@@ -25,7 +25,6 @@ vi.mock('lucide-react-native', () => ({
   MessageCircleQuestion: 'Icon'
 }))
 vi.mock('../components/OrcaLogo', () => ({ OrcaLogo: 'Logo' }))
-vi.mock('./MobileDrawerApiQuota', () => ({ MobileDrawerApiQuota: 'ApiQuota' }))
 vi.mock('../auth/mobile-auth-session', () => ({
   useMobileAuthSession: () => ({ hydrated: true, session: null })
 }))
@@ -42,7 +41,6 @@ describe('MobileHomeDrawer', () => {
       onManageDevices: vi.fn(),
       onClose: vi.fn(),
       onAccount: vi.fn(),
-      onApiQuota: vi.fn(),
       onTasks: vi.fn(),
       onRecentWork: vi.fn(),
       onSettings: vi.fn(),
@@ -75,21 +73,8 @@ describe('MobileHomeDrawer', () => {
     expect(actions.onManageDevices).toHaveBeenCalledOnce()
   })
 
-  it('opens quota details from the drawer and unmounts its reader when closed', () => {
-    const actions = renderDrawer()
-    act(() => renderer!.root.findByType('ApiQuota' as never).props.onOpen())
-    expect(actions.onApiQuota).toHaveBeenCalledOnce()
-    act(() =>
-      renderer!.update(
-        createElement(MobileHomeDrawer, {
-          ...actions,
-          theme: lightTheme,
-          visible: false,
-          pairedComputerCount: 0,
-          canOpenHostActions: false
-        })
-      )
-    )
+  it('does not offer the retired official API quota entry', () => {
+    renderDrawer()
     expect(renderer!.root.findAllByType('ApiQuota' as never)).toHaveLength(0)
   })
 

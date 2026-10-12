@@ -1,18 +1,5 @@
 /* eslint-disable max-lines -- HiveCloud account lifecycle and SMS authentication share one secure-store and PKCE boundary. */
 
-import { HiveAiAccountReader } from '../hive-runtime-cloud/hive-ai-account-reader'
-import { HiveAiConsumptionReader } from '../hive-runtime-cloud/hive-ai-consumption-reader'
-import type { ConsumptionQuery } from '../../shared/hive-ai-consumption'
-import {
-  HiveAiModelReader,
-  type HiveAiModelResolution
-} from '../hive-runtime-cloud/hive-ai-model-reader'
-import type {
-  HiveAiModelCatalogSnapshot,
-  HiveAiModelSelection
-} from '../../shared/hive-ai-model-catalog'
-import type { HiveAiModelCandidatesSnapshot } from '../../shared/hive-ai-model-candidates'
-import type { HiveAiAccountSnapshot, HiveAiBenefitsSnapshot } from '../../shared/hive-ai-account'
 import { createHash, randomBytes } from 'node:crypto'
 import type {
   HiveAccountLoginCapabilities,
@@ -115,9 +102,6 @@ export class HiveAccountService extends HiveAccountPublication {
   private refreshFlight: Promise<HiveAccountRefreshResult> | null = null
   private temporarySession: HiveAccountSession | null = null
   private refreshTimer: NodeJS.Timeout | undefined
-  private readonly aiAccountReader: HiveAiAccountReader
-  private readonly aiConsumptionReader: HiveAiConsumptionReader
-  private readonly aiModelReader: HiveAiModelReader
   private mutationEpoch = 0
   constructor(
     private readonly userDataPath: string,
@@ -125,9 +109,6 @@ export class HiveAccountService extends HiveAccountPublication {
     onStateChanged: (state: HiveAccountState) => void = () => undefined
   ) {
     super(onStateChanged)
-    this.aiAccountReader = new HiveAiAccountReader(this, dependencies.getConfig)
-    this.aiConsumptionReader = new HiveAiConsumptionReader(this, dependencies.getConfig)
-    this.aiModelReader = new HiveAiModelReader(this, dependencies.getConfig)
     migrateLegacyOrcaCloudIdentity(userDataPath)
   }
 
@@ -606,41 +587,6 @@ export class HiveAccountService extends HiveAccountPublication {
       return { ...result, state: await this.getState() }
     }
     return result
-  }
-
-  readAiModelCandidates(): Promise<HiveAiModelCandidatesSnapshot> {
-    return this.aiAccountReader.readModelCandidates()
-  }
-
-  readAiModels(): Promise<HiveAiModelCatalogSnapshot> {
-    return this.aiModelReader.read()
-  }
-
-  selectAiModel(command: HiveAiModelSelection): Promise<HiveAiModelCatalogSnapshot> {
-    return this.aiModelReader.select(command)
-  }
-
-  resolveAiModelForGeneration(
-    command: HiveAiModelSelection,
-    accountId: string
-  ): Promise<HiveAiModelResolution> {
-    return this.aiModelReader.resolveForGeneration(command, accountId)
-  }
-
-  readAiAccount(): Promise<HiveAiAccountSnapshot> {
-    return this.aiAccountReader.read()
-  }
-
-  activateAiAccount(): Promise<Pick<HiveAiAccountSnapshot, 'accountId' | 'account'>> {
-    return this.aiAccountReader.activate()
-  }
-
-  readAiBenefits(): Promise<HiveAiBenefitsSnapshot> {
-    return this.aiAccountReader.readBenefits()
-  }
-
-  readAiConsumption(query: ConsumptionQuery) {
-    return this.aiConsumptionReader.read(query)
   }
 
   async accountSecurity(): Promise<HiveAccountSecurity> {

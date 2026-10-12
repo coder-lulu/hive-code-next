@@ -18,9 +18,6 @@ export const FAKE_APP_SERVER = String.raw`
     if (message.method === 'test/env') {
       return send({ id: message.id, result: { codexHome: process.env.CODEX_HOME ?? null } })
     }
-    if (message.method === 'test/env-presence') {
-      return send({ id: message.id, result: { secretInherited: process.env.HIVE_DOCKER_TEST_PARENT_SECRET !== undefined, codexHome: process.env.CODEX_HOME ?? null } })
-    }
     if (message.method === 'test/cwd') {
       return send({ id: message.id, result: { cwd: process.cwd() } })
     }

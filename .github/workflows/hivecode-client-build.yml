@@ -104,8 +104,6 @@ jobs:
           cache-electron-package: 'true'
           cache-dependency-path: |
             pnpm-lock.yaml
-            runtime/managed-pi/pnpm-lock.yaml
-            runtime/native-pi/pnpm-lock.yaml
             mobile/pnpm-lock.yaml
       - uses: ./.github/actions/install-mobile-dependencies
         with:

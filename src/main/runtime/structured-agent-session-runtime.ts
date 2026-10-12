@@ -42,12 +42,11 @@ import {
   journalDatabasePath,
   type JournalHostDatabase
 } from '../native-chat/agent-session-journal/journal-host-database'
-import type { AgentSessionRecordStore } from './agent-session-record-store'
 import { journalDatabaseHoldsAgentSessions } from '../native-chat/agent-session-journal/journal-database'
-import { createStructuredTaskCodexRuntime } from './structured-task-codex-runtime'
-import type { TaskCodexRuntimeAccountPorts } from '../tasks/task-codex-runtime-account-ports'
-import type { RuntimeTeamTaskToolProvider } from './structured-team-task-tools'
-import type { TaskCodexStructuredLaunchDependencies } from '../tasks/task-codex-structured-launch'
+import {
+  createStructuredAgentSessionOwnerProbe,
+  createStructuredAgentSessionOwnerProbes
+} from './structured-agent-session-owner-probe'
 import type { NativeChatShellEnvironmentPolicy } from '../../shared/native-chat-shell-environment'
 import { createStructuredAgentEnvironmentResolvers } from './structured-agent-shell-environment'
 import type { ClaudeStructuredAuthPolicy } from '../claude-accounts/claude-structured-auth-policy'
@@ -145,39 +144,12 @@ export type StructuredAgentSessionRuntimeDeps = {
   /** The account home a structured launch would pin right now, for catalog
    *  reads with no session record. Absent disables the catalog surface. */
   resolveAgentAccountHome?: RuntimeAgentAccountHomeResolver
-  taskCodexAccounts?: TaskCodexRuntimeAccountPorts
-  prepareTeamTaskTools?: RuntimeTeamTaskToolProvider
-  taskDocker?: Partial<
-    Pick<
-      TaskCodexStructuredLaunchDependencies,
-      'resolveDockerConfiguration' | 'runDocker' | 'openDocker' | 'readAuth' | 'request'
-    >
-  >
 }
 
 type InstalledRuntime = RuntimeTeardownHandle & {
-  store: AgentSessionRecordStore
-  stateDirectory: string
-  claimKeyId: string
   journalDatabase: JournalHostDatabase
 }
 let installing: Promise<InstalledRuntime> | null = null
-
-/** Share the existing store; a detached or replaced runtime never grants a new host access. */
-export async function getStructuredAgentSessionResources() {
-  const pending = installing
-  if (!pending) {
-    throw new Error('hive_agent_capability_unavailable')
-  }
-  const { store, stateDirectory, claimKeyId, journalDatabase } = await pending
-  const assertCurrent = () => {
-    if (installing !== pending) {
-      throw new Error('hive_agent_capability_unavailable')
-    }
-  }
-  assertCurrent()
-  return Object.freeze({ store, stateDirectory, claimKeyId, journalDatabase, assertCurrent })
-}
 
 /** Thrown when the host is installed without a Claude auth policy resolver. */
 export const CLAUDE_STRUCTURED_AUTH_POLICY_REQUIRED =
@@ -295,7 +267,6 @@ async function installOnJournal(
   { journalDatabase, store }: OpenedAgentSessionRecordStore
 ): Promise<InstalledRuntime> {
   const envResolvers = createStructuredAgentEnvironmentResolvers(deps)
-  const taskRuntime = createStructuredTaskCodexRuntime(deps, store)
   let host: StructuredAgentSessionHost | null = null
   const lifecycle = createStructuredAgentSessionLifecycleDelivery({
     handle: (event) => host?.handleAdapterEvent(event),
@@ -312,7 +283,6 @@ async function installOnJournal(
     store,
     journalDatabase,
     environment: envResolvers,
-    taskRuntime,
     deliverLifecycle: lifecycle.deliver,
     followUps: createStructuredAgentSessionDispatchFollowUps({
       host: () => host,
@@ -334,9 +304,8 @@ async function installOnJournal(
     recoveryCapsule: new AgentSessionRecoveryCapsule(deps.stateDirectory),
     journalDatabase,
     claimKeyId: deps.claimKeyId,
-    probeOwner: taskRuntime.probeOwner,
-    probeOwners: taskRuntime.probeOwners,
-    stopExecutionOwner: taskRuntime.stopExecutionOwner,
+    probeOwner: createStructuredAgentSessionOwnerProbe(deps.hostId),
+    probeOwners: createStructuredAgentSessionOwnerProbes(deps.hostId),
     ...(deps.resolveLaunchArgs
       ? {
           resolveLaunchArgs: async (provider: AgentSessionRecord['provider']) =>
@@ -373,9 +342,6 @@ async function installOnJournal(
   return {
     host,
     adapter,
-    store,
-    stateDirectory: deps.stateDirectory,
-    claimKeyId: deps.claimKeyId,
     journalDatabase,
     waitForRecovery: lifecycle.drain
   }

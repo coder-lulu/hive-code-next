@@ -36,7 +36,7 @@ async function readStructuredAgentSessionOptionsAtRest(
   sessionId: string
 ): Promise<RestingOptions> {
   const record = deps.store.getRecord(sessionId)
-  if (!record || record.provider === 'managed-pi') {
+  if (!record) {
     throw new Error('agent_session_identity_required')
   }
   const rules = restingOptionRules(deps.agents, record)

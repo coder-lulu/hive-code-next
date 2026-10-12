@@ -181,8 +181,6 @@ function ThemedRootLayout() {
               options={{ headerShown: false, presentation: 'modal', gestureEnabled: false }}
             />
             <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="ai-account" options={{ headerShown: false }} />
-            <Stack.Screen name="ai-models" options={{ headerShown: false }} />
             <Stack.Screen name="account" options={{ headerShown: false }} />
             <Stack.Screen name="account/delete" options={{ headerShown: false }} />
             <Stack.Screen name="runtime-sessions" options={{ headerShown: false }} />

@@ -1,4 +1,3 @@
-import { HiveAgentTaskPane } from '../hive-agent/HiveAgentTaskPane'
 import { memo, useCallback, useMemo, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useShallow } from 'zustand/react/shallow'
@@ -65,20 +64,16 @@ const StructuredAgentSessionOverlaySlot = memo(function StructuredAgentSessionOv
       onFocusOwningGroup={isSessionDetail ? undefined : onFocusOwningGroup}
     >
       <div className="native-chat-pane-shell relative z-10 flex min-h-0 min-w-0 flex-1">
-        {tab.agentSessionAgent === 'hivecode' ? (
-          <HiveAgentTaskPane tabId={tab.id} sessionId={tab.entityId} worktreeId={tab.worktreeId} />
-        ) : (
-          <NativeChatView
-            mode="structured"
-            tabId={tab.id}
-            groupId={isSessionDetail ? undefined : groupId}
-            sessionId={tab.entityId}
-            agent={tab.agentSessionAgent}
-            isVisible={isActive}
-            isFocusedGroup={isFocusedGroup}
-            target={stableTarget}
-          />
-        )}
+        <NativeChatView
+          mode="structured"
+          tabId={tab.id}
+          groupId={isSessionDetail ? undefined : groupId}
+          sessionId={tab.entityId}
+          agent={tab.agentSessionAgent}
+          isVisible={isActive}
+          isFocusedGroup={isFocusedGroup}
+          target={stableTarget}
+        />
       </div>
     </RetainedPaneHost>,
     document.body

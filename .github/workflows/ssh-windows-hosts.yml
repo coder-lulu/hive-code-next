@@ -105,7 +105,6 @@ jobs:
             tests
             src
             runtime
-            integration
             mobile/assets
       - name: Self-test the provisioning scripts before touching the machine
         shell: pwsh

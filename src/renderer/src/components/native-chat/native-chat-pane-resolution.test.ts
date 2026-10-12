@@ -17,38 +17,6 @@ function entry(
 }
 
 describe('resolveNativeChatSession', () => {
-  it('retains Hive ownership and the native Pi transcript from its hook', () => {
-    const paneKey = 'tab:leaf'
-    expect(
-      resolveNativeChatSession({
-        paneKey,
-        launchAgent: 'hivecode',
-        ptyId: 'pty',
-        agentStatusEntry: entry({
-          paneKey,
-          agentType: 'pi',
-          providerSession: {
-            key: 'session_id',
-            id: 'native',
-            transcriptPath: '/account/native.jsonl'
-          }
-        })
-      })
-    ).toEqual({
-      paneKey,
-      agent: 'hivecode',
-      ptyId: 'pty',
-      sessionId: 'native',
-      transcriptPath: '/account/native.jsonl'
-    })
-    expect(
-      resolveNativeChatSession({
-        paneKey,
-        ptyId: 'pty',
-        agentStatusEntry: entry({ paneKey, agentType: 'pi' })
-      })
-    ).toBeNull()
-  })
   it('resolves a pane with a captured Claude session', () => {
     const paneKey = 'tab-1:11111111-1111-4111-8111-111111111111'
     expect(

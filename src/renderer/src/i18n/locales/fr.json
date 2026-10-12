@@ -918,6 +918,8 @@
         "fa90f739a5": "Choisissez le projet, le nom de l'espace de travail et l'agent avant de créer l'espace de travail."
       },
       "PullRequestPage": {
+        "2560588245": "Échec de la demande de reviewer",
+        "3450247584": "Commentaire",
         "000f90afcf": "Terminé",
         "00b7b82329": "branche source",
         "00d3be6bcd": "Relecteurs",
@@ -943,7 +945,6 @@
         "1e6d089420": "Reviewers retirés",
         "1ff5d979df": "Personne n'est assigné",
         "246b2c6456": "Échec de l'actualisation des vérifications",
-        "2560588245": "Échec de la demande de reviewer",
         "25690a3855": "Démarrer un espace de travail à partir de la PR",
         "2760fa29a4": "Tous les autres",
         "2b4fdb880c": "Ne plus marquer comme consulté",
@@ -952,7 +953,6 @@
         "2f5195c6a0": "Rouvrir",
         "319cf2d54b": "Afficher l'arborescence des fichiers",
         "31a7b202f2": "Répondre à @{{value0}}",
-        "3450247584": "Commentaire",
         "345b68254c": "fil de discussion",
         "3463d10a63": "Commentaires",
         "347034903a": "Copier le lien GitHub",
@@ -2055,6 +2055,7 @@
           "aa593eb5e2": "Heure"
         },
         "AutomationsPage": {
+          "2695883141": "supprimer",
           "02a33e3204": "de",
           "0329f9bef1": "Fermer · Esc",
           "080dcb5fbb": "Supprimer l'automatisation",
@@ -2071,7 +2072,6 @@
           "2430fecf53": "Choisissez un lieu d'exécution et saisissez un prompt avant d'enregistrer.",
           "244727e655": "Automatisation mise à jour.",
           "25060635c6": "Ajouter",
-          "2695883141": "supprimer",
           "295698292f": "Relancer",
           "2a20596d6b": "Automatisation enregistrée.",
           "2faecab10b": "Exécuter maintenant",
@@ -5880,9 +5880,9 @@
             "4a8d9e0c1f": "Masquer les fichiers du commit {{value0}} : {{value1}}"
           },
           "GitHubPRStackMap": {
+            "3511405914": "fermé",
             "0c1645ebd0": "Développer la stack #{{value0}}",
             "316039b5db": "vérifications en attente",
-            "3511405914": "fermé",
             "4b1e5ee9d3": "modifications demandées",
             "525259fa17": "Les détails de la stack sont temporairement indisponibles.",
             "568c647ccd": "brouillon",
@@ -6030,6 +6030,7 @@
             "cc06595a3b": "Copier le chemin de la ligne"
           },
           "SourceControl": {
+            "1406954883": "Effacer toutes les notes...",
             "011f9713fc": "Commit bloqué",
             "02d8c04339": "Générer les détails de {{value0}} avec l'IA",
             "03194cfff4": "État de session local issu d'un conflit que vous avez ouvert ici.",
@@ -6046,7 +6047,6 @@
             "0fad573938": "Non committé",
             "11463f7a98": "Supprimer le fichier non suivi",
             "11b5dd8e41": "Comparaison avec",
-            "1406954883": "Effacer toutes les notes...",
             "15b6e834ac": "Échec de l'ouverture du commit dans le navigateur",
             "15b7f210d7": "Vérifiez le prompt avant de démarrer un agent.",
             "1623bf4e19": "Copier la note",
@@ -6332,6 +6332,7 @@
           "checks": {
             "panel": {
               "content": {
+                "3916814392": "en retard (commit de base :",
                 "00e1c1658a": "Terminé",
                 "02ca4f9074": "en succès",
                 "03ca88f623": "Édition",
@@ -6349,7 +6350,6 @@
                 "2ba0a32bdd": "bot",
                 "2dd5ddabc4": "workflow n° ",
                 "365254cc1b": "Marquer comme non résolu",
-                "3916814392": "en retard (commit de base :",
                 "3a71a6ed0b": "Résolvez les conflits pour que les vérifications et le merge puissent aboutir.",
                 "3fff651d32": "Ajouter un commentaire de PR",
                 "49731703ea": "Tâches",
@@ -6430,10 +6430,10 @@
               },
               "empty": {
                 "state": {
+                  "3322603418": "Statut de la pull request indisponible",
                   "05e4aec17b": "Les vérifications {{value0}} seront disponibles une fois l'opération terminée",
                   "13e1c7d5ed": "Aucune {{value0}} trouvée",
                   "2bdd7aaf2d": "Le statut GitHub n'a pas pu être actualisé. Les données en cache ont été conservées.",
-                  "3322603418": "Statut de la pull request indisponible",
                   "3d4af82ff4": "Actualisation du statut GitHub pour cette branche",
                   "41252bc53f": "Branche non publiée",
                   "5b0cfae9a5": "Créez une {{value0}} pour lancer les vérifications et la revue.",
@@ -7423,13 +7423,13 @@
           "advanced": "Avancé"
         },
         "AppearancePane": {
+          "3057983501": "Non assigné",
           "0cd9b8228f": "Choisissez l'icône d'app affichée dans le Dock et le sélecteur de fenêtres.",
           "0f28e7b30c": "Choisissez l'apparence d'HiveCode dans la fenêtre de l'app.",
           "0fafabcf35": "Afficher les fichiers ignorés par Git",
           "102d6b5f9b": "Police de l'IDE",
           "2df8f79aa5": "Afficher HiveCode dans la barre de titre.",
           "2edf606c46": "Réduire dans la zone de notification à la fermeture",
-          "3057983501": "Non assigné",
           "3e4175e5c6": "Barre d'état",
           "42554f615f": "Choisissez la police utilisée par l'interface d'HiveCode.",
           "4de76f6902": "Contrôler ce qui apparaît dans la barre de titre de l'application.",
@@ -7489,9 +7489,9 @@
           "usagePercentageDisplayUsed": "Utilisé"
         },
         "AutoRenameBranchFromWorkSetting": {
+          "1626524572": "Nautilus",
           "0de9fda203": "Abandonner",
           "12ea4a408d": "Quand un agent commence à travailler dans un nouveau espace de travail, HiveCode renomme sa branche générée automatiquement (par ex.",
-          "1626524572": "Nautilus",
           "2ee2779c05": "{firstPrompt}",
           "40e7be7850": "Enregistré",
           "56580dcf60": ". Vous pouvez aussi référencer",
@@ -7787,10 +7787,10 @@
           "fdee745b87": "demande de fusion"
         },
         "ComputerUsePane": {
+          "1735461723": "Permet aux agents d'inspecter et de piloter des applications de bureau locales.",
           "07bbe4c4cb": "Captures d'écran",
           "0c29da5805": "Prêt",
           "0c9a33f468": "Capture les fenêtres des applications pour que les agents puissent inspecter leur état visuel.",
-          "1735461723": "Permet aux agents d'inspecter et de piloter des applications de bureau locales.",
           "2168fa5ab0": "Impossible de charger les autorisations Computer Use",
           "3383ea1aab": "Impossible de réinitialiser les autorisations Computer Use",
           "45f8e22c2e": "Ouvrir",
@@ -9915,10 +9915,10 @@
           "tooltipTitle": "Substitutions au niveau dépôt"
         },
         "SourceControlAiActionRecipeDefaults": {
+          "2576299196": "arguments",
           "06a9dab64d": "vérifications",
           "0740d30915": "Commande personnalisée",
           "2037c78a6f": "modèle",
-          "2576299196": "arguments",
           "2cb4bb7e5d": "Arguments CLI",
           "4f549a5fa8": "Enregistrement...",
           "673369fe0c": "cli",
@@ -10387,6 +10387,7 @@
           "target_title": "Mode de thème"
         },
         "TerminalWindowSection": {
+          "1705318506": "Couleur ANSI magenta",
           "00eaa6b881": "Réglages d'apparence et d'arrière-plan de la fenêtre.",
           "026a0b8013": "Couleur du texte principal",
           "03acb60aa0": "Contrôle la transparence de l'arrière-plan du terminal.",
@@ -10396,7 +10397,6 @@
           "0ffb02f921": "Couleur ANSI vert vif",
           "1601140f03": "Couleur ANSI cyan vif",
           "16948119cb": "Blanc vif",
-          "1705318506": "Couleur ANSI magenta",
           "1846f6ee6a": "Marge verticale autour de la grille du terminal, en pixels.",
           "1afcc1d973": "Marge verticale",
           "1be593d3e8": "ANSI vif",
@@ -10763,13 +10763,13 @@
         },
         "agents": {
           "search": {
+            "2814401339": "installé",
             "01926b9d8c": "Configurer les agents de codage IA, l'agent par défaut et les remplacements de commandes.",
             "042c551bc5": "configuration",
             "0d1c334987": "couvercle",
             "0d752916f8": "points d’extension",
             "13b20636a6": "en attente",
             "167daeb5e9": "commande",
-            "2814401339": "installé",
             "2afd3b5858": "activer",
             "2e188c771c": "masquer",
             "32836788b0": "titre généré",
@@ -11323,6 +11323,7 @@
           "message": {
             "ai": {
               "search": {
+                "3766941527": "agent",
                 "001ca3f2af": "Valeurs par défaut appliquées à l'ouverture du composeur de création de PR.",
                 "0b946b2abe": "Ajoute des recettes d'actions pour les actions commit, pull request, nom de branche et correction de Source Control.",
                 "0f29331fed": "arguments",
@@ -11331,7 +11332,6 @@
                 "181cdb0637": "ouvrir",
                 "18b6d38835": "Agent, arguments CLI et modèle de commande utilisés par chaque bouton IA de contrôle de code source.",
                 "24dbdfca78": "Afficher les actions Source Control AI",
-                "3766941527": "agent",
                 "37c65bbb44": "corriger",
                 "3c4e5e5938": "Recettes d'action",
                 "402f101af8": "instruction",
@@ -11403,6 +11403,7 @@
         "developer": {
           "permissions": {
             "search": {
+              "3363889768": "LAN, USB et Bluetooth",
               "00e954319e": "whisper",
               "05ab708ee5": "Ouvrir le volet de confidentialité de macOS pour l'accès aux fichiers protégés des projets et worktrees.",
               "08f8039ca9": "accessibilité",
@@ -11414,7 +11415,6 @@
               "259b829b84": "caméra",
               "2e5d98ab56": "Autoriser les captures d'écran, l'inspection de l'écran, la saisie clavier et l'automatisation des fenêtres.",
               "302c0c42f9": "Micro et caméra",
-              "3363889768": "LAN, USB et Bluetooth",
               "39bb49e662": "Enregistrement d'écran et accessibilité",
               "3cd51d18a1": "enregistrement d'écran",
               "3e0131e45d": "icloud",
@@ -11965,11 +11965,11 @@
         "mobile": {
           "emulator": {
             "search": {
+              "2348045036": "Choisissez l'appareil émulateur qu'HiveCode ouvre par défaut.",
               "04c5f5d901": "appareil",
               "0b95dfd5b3": "Disponibilité de l'émulateur",
               "1ad6fb6230": "appareil par défaut",
               "1dc8c52ffa": "iPhone par défaut",
-              "2348045036": "Choisissez l'appareil émulateur qu'HiveCode ouvre par défaut.",
               "25159de808": "émulateur mobile",
               "25d7bfbcd4": "udid",
               "27397fe8e9": "outils de ligne de commande Xcode",
@@ -12304,12 +12304,12 @@
         },
         "privacy": {
           "search": {
+            "3922051573": "données",
             "058550f6bc": "do_not_track",
             "10124159f1": "confidentialité",
             "1686c07fee": "assistance",
             "27a27b2f63": "refuser",
             "2b5a5c312f": "posthog",
-            "3922051573": "données",
             "4104f6f0f3": "analytique",
             "4d4bb76bf4": "accepter",
             "57b283461a": "Partager les données d'utilisation anonymes",
@@ -13685,8 +13685,8 @@
           "e8c1f4a2b9": "dans les options de l'espace de travail."
         },
         "RemoteFileBrowser": {
-          "00c4235c10": "Aucun résultat pour « {{value0}} »",
           "2300612806": "Tapez pour filtrer ou saisissez un chemin…",
+          "00c4235c10": "Aucun résultat pour « {{value0}} »",
           "51001182e3": "Répertoire vide",
           "971d85cc84": "S'ouvre comme projet sur cet hôte · {{value0}}",
           "9e060f5815": "Sélectionner un dossier",
@@ -15618,12 +15618,12 @@
             "tooltip": "Ouvrir les discussions interrompues disponibles pour reprendre"
           },
           "PetStatusSegment": {
+            "3668339495": "Supprimer {{value0}}",
             "0608ad02a2": "Choisir un compagnon",
             "1fbc51cc77": "Masquer le compagnon",
             "2021d4f6db": "L'importation d'un bundle de compagnon nécessite un redémarrage complet de l'app (pas seulement un rechargement).",
             "2f7bbaa457": "Taille",
             "34c25dfe9c": "Compagnon",
-            "3668339495": "Supprimer {{value0}}",
             "59b5955621": "Téléverser le vôtre…",
             "6d0a8cd179": "Afficher le compagnon",
             "aec479308a": "Menu du compagnon",
@@ -15899,6 +15899,7 @@
             "f5e1a84d79": "Actualiser"
           },
           "WorkspaceSpaceManagerPanel": {
+            "2965415393": "Échec de la suppression forcée",
             "02b27c2230": "espace de travail",
             "0990a63160": "Aucune taille de espace de travail analysée pour le moment.",
             "09960d86bd": "Analysé",
@@ -15915,7 +15916,6 @@
             "20a4204dce": "Les derniers résultats valides restent visibles.",
             "243287ac60": "Nom",
             "265d956765": "{{value0}}. Vous pouvez quitter cette page.",
-            "2965415393": "Échec de la suppression forcée",
             "2b501ee391": "Conserver : principal",
             "33653dbac2": "Suppression en cours",
             "33aef3e9cc": "Taille",
@@ -16663,8 +16663,8 @@
             "agent": {
               "session": {
                 "fork": {
-                  "046e8d853c": "Aucun contexte de terminal à forker",
                   "2317900211": "Échec de la copie du contexte du fork.",
+                  "046e8d853c": "Aucun contexte de terminal à forker",
                   "373a3103e7": "Contexte copié",
                   "38e41edc6e": "Cet espace de travail ne peut pas être forké en worktree Git.",
                   "3fc568a49d": "Échec de la copie du contexte.",
@@ -16831,6 +16831,7 @@
       "workspace": {
         "cleanup": {
           "WorkspaceCleanupDialog": {
+            "3828408538": "Supprimer {{value0}}",
             "06cf78521e": "Tout sélectionner dans {{value0}}",
             "0a2e3c7cba": "À examiner",
             "0b1766738a": "Dépôt",
@@ -16845,7 +16846,6 @@
             "2ddbd6fe8a": "coché",
             "352f15d6fc": "Dernière activité",
             "37ab28277e": "non suggéré",
-            "3828408538": "Supprimer {{value0}}",
             "38ca0b1400": "Cette opération supprime définitivement leurs fichiers locaux. Vous ne pourrez pas annuler.",
             "3d957ff117": "Aucun espace de travail ne correspond à ces filtres.",
             "41d594d01e": "Impossible de supprimer {{value0}} espace de travail{{value1}}",
@@ -17770,8 +17770,8 @@
           }
         },
         "repos": {
-          "15cf5319ec": "{{path}} a été vérifié sur {{hostName}}, mais cet hôte n'a pas signalé de dossier exploitable.",
           "2975400634": "Mettez à jour le serveur HiveCode pour ouvrir des dossiers non Git sur ce runtime.",
+          "15cf5319ec": "{{path}} a été vérifié sur {{hostName}}, mais cet hôte n'a pas signalé de dossier exploitable.",
           "2dcd706774": "Le projet existe aussi dans un autre profil",
           "3be0f7df04": "Impossible d'ouvrir le dossier sur le runtime sélectionné",
           "6d3318e813": "Échec de l'import des dépôts",
@@ -19079,9 +19079,7 @@
         "reconnect": "Reconnecter"
       }
     },
-    "nativeChat": {
-      "hiveSendUnavailable": "Le message n’a pas été envoyé. Reconnectez ou reprenez la session Hive, puis réessayez."
-    },
+    "nativeChat": {},
     "onboarding": {
       "flow": {
         "actions": {
@@ -19394,17 +19392,6 @@
       "viewDetails": "Voir les détails",
       "workAccount": "Compte professionnel",
       "working": "En activité"
-    },
-    "sidebarApiQuota": {
-      "disabled": "Désactivé",
-      "loading": "Chargement…",
-      "notActivated": "Non activé",
-      "pending": "Préparation…",
-      "points": "{{value}} points",
-      "refresh": "Actualiser le solde API",
-      "signIn": "Connectez-vous pour consulter le solde",
-      "title": "Solde API",
-      "unavailable": "Indisponible"
     },
     "status": {
       "bar": {
@@ -19955,131 +19942,6 @@
   "githubChecks": {
     "retrying": "Nouvelle tentative…"
   },
-  "hiveAgentChat": {
-    "legacyHistory": "Cette conversation est un historique en lecture seule. Démarrez une nouvelle session HiveCode AI pour utiliser Pi natif.",
-    "signIn": "Connectez-vous à votre compte Hive pour utiliser les conversations IA.",
-    "unavailable": "Conversation indisponible. Vérifiez votre connexion, la propriété de l’appareil et votre compte IA."
-  },
-  "hiveAiAccount": {
-    "activate": "Activer le compte IA",
-    "activating": "Traitement de l’activation IA…",
-    "activationFailed": "Le résultat de la demande d’activation n’a pas pu être confirmé. Actualisez ou contactez l’assistance.",
-    "activationReady": "Activez votre compte IA pour le créer et le lier.",
-    "available": "Points IA disponibles",
-    "dataUnavailable": "Indisponible",
-    "disabled": "Votre compte IA est désactivé. Contactez l’assistance.",
-    "group": "Groupe d’utilisateurs",
-    "groupAndPlans": "Groupe et forfaits",
-    "insufficient": "Les points de votre portefeuille sont insuffisants. Les points des forfaits sont comptabilisés séparément.",
-    "loading": "Chargement du compte IA…",
-    "loadingBenefits": "Chargement du groupe et des forfaits…",
-    "noPlans": "Aucun forfait",
-    "notProvisioned": "Votre compte IA n’est pas activé. L’activation est actuellement indisponible.",
-    "pending": "Votre compte IA est en cours de préparation. Actualisez plus tard.",
-    "planExpires": "Expiration · UTC+08:00",
-    "planRemaining": "Points restants",
-    "planResets": "Prochaine réinitialisation · UTC+08:00",
-    "planStatus_active": "Actif",
-    "planStatus_cancelled": "Annulé",
-    "planStatus_expired": "Expiré",
-    "planTotal": "Total des points",
-    "planUsed": "Points utilisés",
-    "plansUnavailable": "Les informations des forfaits sont indisponibles. Actualisez plus tard.",
-    "refresh": "Actualiser",
-    "refreshBalance": "Actualiser le solde IA",
-    "requests": "Total des requêtes",
-    "separatePoints": "Les points du portefeuille et des forfaits sont comptabilisés séparément. 1 point = 1 unité de quota New API.",
-    "timeZone": "· UTC+08:00",
-    "title": "Solde et utilisation IA",
-    "unavailable": "Le solde IA est indisponible. Actualisez plus tard.",
-    "units": "1 point = 1 unité de quota New API. Les points ne sont pas une monnaie. Les totaux d’utilisation couvrent toute la durée de vie de ce compte IA.",
-    "unknown": "Votre compte IA nécessite une vérification. Actualisez plus tard ou contactez l’assistance.",
-    "unlimited": "Illimité",
-    "updated": "Mis à jour",
-    "used": "Total des points utilisés",
-    "verifyActivation": "Vérifier l’activation"
-  },
-  "hiveAiConsumption": {
-    "empty": "Aucune entrée pour cette période.",
-    "from": "Date de début",
-    "input": "Tokens d’entrée",
-    "invalid": "Sélectionnez une période de 31 jours maximum et vérifiez le nom du modèle.",
-    "last30": "30 derniers jours",
-    "last7": "7 derniers jours",
-    "loading": "Chargement de l’historique de consommation…",
-    "modelFilter": "Modèle (nom exact)",
-    "next": "Suivant",
-    "notice": "UTC+08:00, jusqu’à 31 jours. Journaux de la passerelle en direct ; les points enregistrés ne constituent pas un décompte définitif. De nouvelles entrées peuvent apparaître entre les pages.",
-    "output": "Tokens de sortie",
-    "page": "Page",
-    "points": "Points enregistrés",
-    "previous": "Précédent",
-    "request": "ID de requête de la passerelle",
-    "search": "Rechercher dans l’historique",
-    "title": "Historique de consommation",
-    "to": "Date de fin",
-    "today": "Aujourd’hui",
-    "unavailable": "L’historique de consommation est indisponible. Réessayez plus tard."
-  },
-  "hiveAiModelSelection": {
-    "choose": "Choisir",
-    "description": "Modèles disponibles pour votre compte IA actuel. Votre choix est conservé pour cette connexion ; les conversations textuelles sont encore en développement.",
-    "empty": "Aucun modèle textuel disponible pour ce compte.",
-    "loading": "Chargement des modèles disponibles…",
-    "noMatches": "Aucun modèle correspondant.",
-    "noSelection": "Aucun modèle sélectionné.",
-    "refresh": "Actualiser les modèles",
-    "search": "Rechercher des modèles",
-    "selected": "Sélectionné",
-    "selectionFailed": "La sélection n’a pas été confirmée. Actualisez la liste des modèles et choisissez à nouveau.",
-    "title": "Modèles IA disponibles",
-    "unavailable": "Impossible de charger les modèles disponibles. Vérifiez les identifiants de votre compte IA ou actualisez."
-  },
-  "hiveAiModels": {
-    "cacheRead": "Lecture du cache",
-    "cacheWrite": "Écriture en cache",
-    "candidate": "Référence",
-    "description": "Catalogue de référence et tarifs de base New API. La disponibilité des modèles est vérifiée séparément pour votre compte.",
-    "empty": "Aucun modèle de référence disponible.",
-    "input": "Entrée",
-    "loading": "Chargement des tarifs des modèles…",
-    "noRates": "Aucun tarif par jeton disponible.",
-    "output": "Sortie",
-    "refresh": "Actualiser",
-    "refreshPrices": "Actualiser les tarifs des modèles IA",
-    "tiered": "Facturation par paliers. Les détails tarifaires sont en attente.",
-    "title": "Modèles et tarifs IA",
-    "unavailable": "Les tarifs des modèles sont indisponibles. Actualisez plus tard.",
-    "units": "Tarifs de référence par groupe en points IA par million de jetons. Ce ne sont ni des montants monétaires ni les frais définitifs.",
-    "updated": "Mis à jour"
-  },
-  "hiveTasks": {
-    "artifact": "Artefact {{number}}",
-    "cancel": "Annuler la tâche",
-    "chooseWorkspace": "Choisir un espace de travail local",
-    "closeArtifact": "Fermer l’artefact",
-    "create": "Exécuter la tâche",
-    "description": "Utilise vos autorisations Codex locales pour exécuter des tâches et collecter des artefacts dans un espace de travail indépendant. Nécessite une connexion à HiveCloud, un Runtime local connecté et une connexion à Codex.",
-    "empty": "Aucune tâche Codex pour le moment.",
-    "input": "Instructions de la tâche",
-    "open": "Tâches Codex",
-    "refresh": "Actualiser",
-    "signIn": "Connectez-vous à HiveCloud et connectez cet ordinateur avant d’exécuter des tâches.",
-    "status": {
-      "cancelRequested": "Annulation demandée",
-      "cancelled": "Annulée",
-      "failed": "Échec",
-      "pending": "En attente",
-      "running": "En cours",
-      "succeeded": "Prêt pour vérification",
-      "unknown": "Résultat non confirmé"
-    },
-    "title": "Titre de la tâche",
-    "unavailable": "Le service de tâches est indisponible. Vérifiez le service Paperclip local et la configuration de Codex, puis actualisez.",
-    "unknownHelp": "Le résultat de l’exécution n’a pas pu être confirmé. L’espace de travail reste réservé ; actualisez ou annulez la tâche.",
-    "working": "Traitement en cours…",
-    "workspace": "Espace de travail"
-  },
   "menu": {
     "appearance": "Apparence",
     "checkForUpdates": "Rechercher les mises à jour...",
@@ -20570,7 +20432,7 @@
       "clearDay": "Effacer le jour sélectionné",
       "collection": "Paramètres de collecte et détails des sources",
       "collectionOff": "Collecte désactivée",
-      "costNotice": "Les estimations locales ne sont ni des frais facturés ni des points New API. L’utilisation sans tarif est indisponible, pas gratuite.",
+      "costNotice": "Les estimations locales ne sont pas des frais facturés. L’utilisation sans tarif est indisponible, pas gratuite.",
       "cumulative": "Cumulée",
       "dailyOnly": "L’historique disponible contient des totaux quotidiens. L’utilisation horaire, le nombre de requêtes et les coûts quotidiens ne sont pas enregistrés ; les jours absents ne signifient pas une utilisation nulle.",
       "empty": "Aucune utilisation pendant cette période. Vérifiez les paramètres de collecte ci-dessous.",
@@ -20664,31 +20526,7 @@
       "loadingHint": "Chargement de {{value0}}…"
     }
   },
-  "agents": {
-    "hivecode": {
-      "name": "HiveCode AI"
-    }
-  },
-  "hiveWorkflowCases": {
-    "description": "Soumettez des exigences avec un processus enregistré, consultez les tâches affectées et exécutez l’étape initiale des exigences produit. Le passage automatique entre les quatre rôles n’est pas encore pris en charge.",
-    "executionUnavailable": "L’exécution des étapes est indisponible tant qu’un environnement d’exécution Docker Linux n’a pas été vérifié.",
-    "execution": {
-      "title": "Exécution des étapes",
-      "scope": "Exécutez l’étape initiale des exigences produit avec l’employé affecté. Le passage automatique entre les quatre rôles n’est pas encore pris en charge.",
-      "start": "Démarrer l’étape actuelle",
-      "resume": "Reprendre l’étape actuelle",
-      "uncertain": "Le résultat du démarrage n’a pas été confirmé. Réessayer réutilise la même requête ; actualisez pour consulter l’état de l’exécution.",
-      "empty": "Cette demande n’a encore aucune exécution d’étape.",
-      "artifactTruncated": "L’aperçu affiche uniquement les 262 144 premiers caractères."
-    }
-  },
-  "hiveWorkflow": {
-    "description": "Configurez les étapes de livraison et les critères d’acceptation. L’enregistrement crée une version du processus. Les demandes peuvent exécuter l’étape initiale des exigences produit dans un environnement Docker Linux vérifié ; le passage automatique entre les quatre rôles n’est pas encore pris en charge."
-  },
-  "hiveWorkbench": {
-    "teamNotConfigured": "Enregistrez les quatre employés pour terminer la configuration de l’équipe, puis soumettez une demande pour exécuter l’étape initiale des exigences produit. Le passage automatique entre les quatre rôles n’est pas encore pris en charge.",
-    "executionUnavailable": "L’exécution des étapes nécessite un environnement Docker Linux vérifié. Les demandes prennent uniquement en charge l’étape initiale des exigences produit ; le passage automatique entre les quatre rôles n’est pas encore pris en charge."
-  },
+  "agents": {},
   "csv": {
     "detectingDelimiter": "Détection du délimiteur…",
     "indexProgress": "Indexation du CSV… {{percent}} %",

@@ -1,6 +1,4 @@
 import { resolve } from 'node:path'
-import { existsSync } from 'node:fs'
-import { paperclipCaseKernelAliases } from './scripts/paperclip-case-kernel-source.mjs'
 import { defaultExclude, defineConfig } from 'vitest/config'
 import { UNIT_INCLUDE, UNIT_EXCLUDE } from './scripts/ci-unit-files.mjs'
 import TimingSequencer from './scripts/ci-unit-sequencer.mjs'
@@ -8,25 +6,14 @@ import RuntimeSequencer from './scripts/vitest-runtime-sequencer.mjs'
 import { NODE_RUNTIME_INCLUDE } from './scripts/vitest-node-runtime-files.mjs'
 import { nodeRuntimePool } from './scripts/vitest-node-runtime-pool'
 
-const paperclipSource = resolve('logs/paperclip-p1/paperclip')
-const checkoutAliases = existsSync(resolve(paperclipSource, 'packages/db/node_modules/drizzle-orm'))
-  ? paperclipCaseKernelAliases(paperclipSource)
-  : {}
-
 const balancedShards = process.env.ORCA_BALANCE_UNIT_SHARDS === '1'
 const measurementFile = 'src/main/foreign-sqlite-readers/foreign-sqlite-reader-event-loop.test.ts'
 const transforms = {
   define: { ORCA_FEATURE_WALL_ENABLED: 'true' },
   resolve: {
     alias: {
-      ...checkoutAliases,
       '@renderer': resolve('src/renderer/src'),
       '@': resolve('src/renderer/src'),
-      '@hive-paperclip-external-execution': resolve(
-        process.env.HIVE_PAPERCLIP_SOURCE
-          ? resolve(process.env.HIVE_PAPERCLIP_SOURCE, 'server/src/services/external-execution.ts')
-          : 'integration/paperclip/core/external-execution.ts'
-      ),
       'fs/promises': 'node:fs/promises',
       fs: 'node:fs',
       os: 'node:os'

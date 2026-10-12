@@ -6,8 +6,6 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { createBootstrapFatalExitBanner } from './config/build-plugins/bootstrap-fatal-exit-banner'
 import { createPdfjsViewerAssetsPlugin } from './config/build-plugins/pdfjs-viewer-assets'
-import { createNativePiBuildPlugin } from './config/build-plugins/native-pi-build'
-import { createManagedPiPackBuildPlugin } from './config/build-plugins/managed-pi-pack-build'
 import {
   CLI_MAIN_ENTRY_NAMES,
   createPlainNodeEntryGuardPlugin
@@ -211,10 +209,7 @@ const MAIN_MINIFY: 'oxc' | false = process.env.ORCA_UNMINIFIED_MAIN === '1' ? fa
 
 export const electronViteConfig: UserConfig = {
   main: {
-    plugins: [
-      createManagedPiPackBuildPlugin(resolve('.')),
-      createNativePiBuildPlugin(resolve('.'))
-    ],
+    plugins: [],
     build: {
       // Why: 'esbuild' makes rolldown disable its own minifier and re-print every
       // chunk through esbuild, which is undeclared here and only resolves via
@@ -241,7 +236,6 @@ export const electronViteConfig: UserConfig = {
           'browser-window-close-preload': resolve('src/preload/browser-window-close.ts'),
           'doc-preview-link-preload': resolve('src/preload/doc-preview-link.ts'),
           'daemon-entry': resolve('src/main/daemon/daemon-entry.ts'),
-          'managed-pi-pack-product': resolve('src/main/runtime/managed-pi-pack-product.ts'),
           'plugin-host-entry': resolve('src/main/plugins/plugin-host-entry.ts'),
           'computer-sidecar': resolve('src/main/computer/sidecar-entry.ts'),
           'stt-worker': resolve('src/main/speech/stt-worker.ts'),

@@ -14,8 +14,6 @@
  */
 
 import { randomUUID } from 'node:crypto'
-import { assertSynchronousAuthorization } from '../../../../shared/synchronous-authorization-guard'
-import { agentSessionRefusalError } from '../../../../shared/agent-session-wire-refusals'
 import { narrowStructuredLaunchSeedOptions } from '../../../../shared/native-chat-session-option-defaults'
 import { createStructuredAgentSessionOperationId } from '../../../../shared/structured-agent-session-mutation'
 import { structuredAgentSessionTabId } from '../../../../shared/structured-agent-session-projection'
@@ -34,7 +32,6 @@ import { AgentLaunchSessionAlreadyExistsError } from '../../../../shared/agent-l
 import { createStructuredAgentSessionId } from '../../../../shared/structured-agent-session-create'
 import { toAgentLaunchPreferences } from '../../../../shared/agent-launch-preferences'
 import { paneIdentity } from '../../runtime-terminal-pane-identity'
-import type { TerminalSpawnScope } from '../../runtime-terminal-contracts'
 import {
   trackTerminalSpawnDispatch,
   type TerminalSpawnDispatch
@@ -56,24 +53,9 @@ export function agentLaunchSurfaceFactory(
   // The tab shown before the launch ran; asked at spawn, since the window's answer and the user's
   // close can both land after admission.
   earlyTab: Pick<EarlyAgentLaunchTab, 'windowShowsTab' | 'closedByUser'> | null = null,
-  presentation?: 'focused' | 'background',
-  assertCurrent?: (spawnScope?: TerminalSpawnScope) => void
+  presentation?: 'focused' | 'background'
 ): AgentLaunchSurfaceFactory {
   const movesHostWindow = agentLaunchMovesHostWindow(context)
-  const malformedGuard = (): never => {
-    throw agentSessionRefusalError('agent_session_operation_invalid', {
-      reason: 'requestMalformed'
-    })
-  }
-  const checkCurrent = (spawnScope?: TerminalSpawnScope) =>
-    assertSynchronousAuthorization(() => assertCurrent?.(spawnScope), malformedGuard)
-  const assertBeforeCreate = () => {
-    try {
-      checkCurrent()
-    } catch (error) {
-      terminalSpawn.rethrow(error)
-    }
-  }
   return {
     createStructuredSession: async ({
       worktreeId,
@@ -82,8 +64,6 @@ export function agentLaunchSurfaceFactory(
       sessionId: requested,
       tabId
     }) => {
-      assertBeforeCreate()
-      const taskOrigin = context.taskLaunchOrigin
       const sessionId = requested ?? createStructuredAgentSessionId(agent, randomUUID)
       const seeded = narrowStructuredLaunchSeedOptions(options)
       const created = await createStructuredAgentSessionForWorktree({
@@ -109,17 +89,6 @@ export function agentLaunchSurfaceFactory(
         agent,
         ...(seeded ? { options: seeded } : {}),
         ...(tabId ? { tabId } : {}),
-        ...(taskOrigin
-          ? {
-              taskOrigin: {
-                ...taskOrigin,
-                validate: () => {
-                  assertSynchronousAuthorization(() => taskOrigin.validate(), malformedGuard)
-                  checkCurrent()
-                }
-              }
-            }
-          : {}),
         // The user asked for this chat, so it takes the surface — unlike a dispatched worker.
         activate: !callerPresentsSurface && presentation !== 'background',
         onPrepareRefused: (refusal, cause) =>
@@ -146,7 +115,6 @@ export function agentLaunchSurfaceFactory(
       }
     },
     deliverStructuredPrompt: async ({ sessionId, fence, prompt }) => {
-      checkCurrent()
       return commitStructuredAgentSessionLaunchPrompt({
         host: getStructuredAgentSessionHost(),
         caller: operationCallerKey
@@ -168,7 +136,6 @@ export function agentLaunchSurfaceFactory(
       options,
       viewMode
     }) => {
-      assertBeforeCreate()
       const launchPreferences = toAgentLaunchPreferences(options)
       let promptRodeLaunchCommand = false
       if (earlyTab?.closedByUser()) {
@@ -199,8 +166,7 @@ export function agentLaunchSurfaceFactory(
         ...(launchSource ? { launchSource } : {}),
         ...(viewMode ? { viewMode } : {}),
         ...(earlyTab?.windowShowsTab() || !movesHostWindow ? { surfaceOwner: false as const } : {}),
-        onPtySpawnDispatched: (scope) => {
-          checkCurrent(scope)
+        onPtySpawnDispatched: () => {
           terminalSpawn.onPtySpawnDispatched()
         }
       })
@@ -222,7 +188,6 @@ export function agentLaunchSurfaceFactory(
       }
     },
     deliverTerminalPrompt: async ({ handle, agent, freshLaunch, prompt }) => {
-      checkCurrent()
       return deliverTerminalAgentLaunchPrompt({
         runtime: context.runtime,
         handle,

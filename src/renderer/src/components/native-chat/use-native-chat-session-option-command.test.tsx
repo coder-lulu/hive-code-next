@@ -18,10 +18,7 @@ vi.mock('@/lib/native-chat-telemetry', () => ({ emitNativeChatMessageSent: vi.fn
 
 import { useNativeChatSessionOptionCommand } from './use-native-chat-session-option-command'
 
-function renderDispatch(
-  agent: 'codex' | 'claude' | 'openclaude' | 'hivecode',
-  onSubmitted = vi.fn()
-) {
+function renderDispatch(agent: 'codex' | 'claude' | 'openclaude', onSubmitted = vi.fn()) {
   return renderHook(() =>
     useNativeChatSessionOptionCommand({
       agent,
@@ -63,22 +60,7 @@ describe('useNativeChatSessionOptionCommand', () => {
       {},
       'pty-1',
       '/model sonnet',
-      expect.any(AbortSignal),
-      { bracketedPaste: false }
-    )
-    expect(typeNativeChatCommand).not.toHaveBeenCalled()
-  })
-
-  it('frames Hive model commands so Pi submits instead of accepting autocomplete', async () => {
-    const hook = renderDispatch('hivecode')
-    await act(() => hook.result.current.dispatch('/model hivecode/gpt-6-sol'))
-
-    expect(sendNativeChatMessageVerified).toHaveBeenCalledWith(
-      {},
-      'pty-1',
-      '/model hivecode/gpt-6-sol',
-      expect.any(AbortSignal),
-      { bracketedPaste: true, requireAgentStatus: 'sendable' }
+      expect.any(AbortSignal)
     )
     expect(typeNativeChatCommand).not.toHaveBeenCalled()
   })

@@ -82,12 +82,6 @@ export function codexProviderHandle(threadId: string): AgentSessionProviderHandl
   return { ...CODEX_STRUCTURED_HANDLE_NAMESPACE, nativeId: threadId }
 }
 
-export const MANAGED_PI_HANDLE_NAMESPACE = { transport: 'managed-pi', agent: 'managed-pi' } as const
-
-export function managedPiProviderHandle(sessionId: string): AgentSessionProviderHandle {
-  return { ...MANAGED_PI_HANDLE_NAMESPACE, nativeId: sessionId }
-}
-
 // ─── Validation ─────────────────────────────────────────────────────────────
 
 const MAX_HANDLE_FIELD_LENGTH = 512
@@ -112,7 +106,7 @@ function isNamespacePart(value: unknown): value is string {
 /** An agent id a host may register: the same bounded slug a handle's agent is. Whether a host runs
  *  it is that host's registry's answer, not this check's. */
 export function isStructuredAgentId(value: unknown): value is string {
-  return isNamespacePart(value)
+  return isNamespacePart(value) && value !== 'managed-pi' && value !== 'hivecode'
 }
 
 function isLegacyNamespace(handle: AgentSessionProviderHandleNamespace): boolean {
@@ -143,19 +137,13 @@ export function isAgentSessionProviderHandle(value: unknown): value is AgentSess
   const resumeCursor = 'resumeCursor' in value ? value.resumeCursor : undefined
   if (
     !isNamespacePart(transport) ||
-    !isNamespacePart(agent) ||
+    transport === 'managed-pi' ||
+    !isStructuredAgentId(agent) ||
     !isAgentSessionProviderHandleField(nativeId)
   ) {
     return false
   }
   const namespace = { transport, agent }
-  if (isAgentSessionProviderHandleInNamespace(namespace, MANAGED_PI_HANDLE_NAMESPACE)) {
-    return (
-      /^ha-session:[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
-        nativeId
-      ) && resumeCursor === undefined
-    )
-  }
   if (isAgentSessionProviderHandleInNamespace(namespace, CODEX_STRUCTURED_HANDLE_NAMESPACE)) {
     return resumeCursor === undefined
   }
@@ -189,15 +177,11 @@ type StoredCodexProviderHandle = { provider: 'codex'; threadId: string }
 export type PersistedAgentSessionProviderHandle =
   | StoredClaudeProviderHandle
   | StoredCodexProviderHandle
-  | { provider: 'managed-pi'; sessionId: string }
   | AgentSessionProviderHandle
 
 export function encodePersistedAgentSessionProviderHandle(
   handle: AgentSessionProviderHandle
 ): PersistedAgentSessionProviderHandle {
-  if (isAgentSessionProviderHandleInNamespace(handle, MANAGED_PI_HANDLE_NAMESPACE)) {
-    return { provider: 'managed-pi', sessionId: handle.nativeId }
-  }
   if (isAgentSessionProviderHandleInNamespace(handle, CLAUDE_STRUCTURED_HANDLE_NAMESPACE)) {
     return { provider: 'claude', sessionId: handle.nativeId, leafUuid: handle.resumeCursor ?? null }
   }
@@ -230,14 +214,6 @@ export function decodePersistedAgentSessionProviderHandle(
     return null
   }
   const provider = 'provider' in value ? value.provider : undefined
-  if (provider === 'managed-pi') {
-    const sessionId = 'sessionId' in value ? value.sessionId : undefined
-    if (typeof sessionId !== 'string') {
-      return null
-    }
-    const handle = managedPiProviderHandle(sessionId)
-    return Object.keys(value).length === 2 && isAgentSessionProviderHandle(handle) ? handle : null
-  }
   if (provider === 'claude') {
     const sessionId = 'sessionId' in value ? value.sessionId : undefined
     // Why: a null leaf and a missing one were never the same stored value; keep refusing the second.
@@ -267,11 +243,8 @@ export function decodePersistedAgentSessionProviderHandle(
 
 /** Stable string identity for one handle. Two handles with the same key name the same writer target. */
 export function agentSessionProviderHandleKey(handle: AgentSessionProviderHandle): string {
-  if (isAgentSessionProviderHandleInNamespace(handle, MANAGED_PI_HANDLE_NAMESPACE)) {
-    return `managed-pi:${JSON.stringify(handle.nativeId)}`
-  }
   const stored = encodePersistedAgentSessionProviderHandle(handle)
-  if ('provider' in stored && stored.provider !== 'managed-pi') {
+  if ('provider' in stored) {
     return stored.provider === 'claude'
       ? `claude:${JSON.stringify([stored.sessionId, stored.leafUuid])}`
       : `codex:${JSON.stringify(stored.threadId)}`
@@ -286,11 +259,8 @@ export function agentSessionProviderHandleKey(handle: AgentSessionProviderHandle
  * whatever the provider called it.
  */
 export function agentSessionProviderHandleRoot(handle: AgentSessionProviderHandle): string {
-  if (isAgentSessionProviderHandleInNamespace(handle, MANAGED_PI_HANDLE_NAMESPACE)) {
-    return `managed-pi:${JSON.stringify(handle.nativeId)}`
-  }
   const stored = encodePersistedAgentSessionProviderHandle(handle)
-  if ('provider' in stored && stored.provider !== 'managed-pi') {
+  if ('provider' in stored) {
     return stored.provider === 'claude'
       ? `claude:${JSON.stringify(stored.sessionId)}`
       : `codex:${JSON.stringify(stored.threadId)}`
@@ -320,7 +290,7 @@ export function agentSessionWireProviderHandle(
   handle: AgentSessionProviderHandle
 ): AgentSessionWireProviderHandle | null {
   const stored = encodePersistedAgentSessionProviderHandle(handle)
-  if (!('provider' in stored) || stored.provider === 'managed-pi') {
+  if (!('provider' in stored)) {
     return null
   }
   return stored.provider === 'claude'

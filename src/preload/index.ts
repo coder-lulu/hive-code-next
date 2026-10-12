@@ -7,7 +7,6 @@ import {
 import { appApi } from './api/app-bridge'
 import { orcaProfilesApi } from './api/orca-profiles-bridge'
 import { hiveAccountApi } from './api/hive-account-bridge'
-import { hiveTasksApi } from './api/hive-tasks-bridge'
 import { hiveRuntimeCloudApi } from './api/hive-runtime-cloud-bridge'
 import { platformApi } from './api/platform-bridge'
 import { wslApi } from './api/wsl-bridge'
@@ -106,7 +105,6 @@ const api = {
   app: appApi,
   orcaProfiles: orcaProfilesApi,
   hiveAccount: hiveAccountApi,
-  hiveTasks: hiveTasksApi,
   hiveRuntimeCloud: hiveRuntimeCloudApi,
   platform: platformApi,
   wsl: wslApi,

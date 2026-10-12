@@ -18,11 +18,6 @@ export type NativeChatAgentProfile = {
 }
 
 const NATIVE_CHAT_AGENT_PROFILES: Partial<Record<AgentType, NativeChatAgentProfile>> = {
-  hivecode: {
-    skillPrefix: '/',
-    skillSourceOwner: 'pi',
-    expandsSlashCommandsFromText: true
-  },
   codex: {
     skillPrefix: '$',
     skillSourceOwner: 'codex',

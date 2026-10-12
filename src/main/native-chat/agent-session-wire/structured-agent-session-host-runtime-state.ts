@@ -1,6 +1,5 @@
 import type { AgentSessionOwnerProbe } from '../../../shared/agent-session-lease-adjudication'
 import type { AgentSessionRecord } from '../../../shared/agent-session-record'
-import { agentSessionExecutionHostProbeMatchesRecord } from '../../../shared/agent-session-execution-host-proof'
 import {
   createDeferredStructuredAgentSessionEventSink,
   type DeferredStructuredAgentSessionEventSink,
@@ -13,10 +12,7 @@ import {
   heldProviderChildReader,
   type ProviderChildSessions
 } from './structured-agent-session-provider-child'
-import {
-  resolveStructuredSessionRecovery,
-  commitStructuredSessionExecutionHostExit
-} from './structured-agent-session-recovery-resolution'
+import { resolveStructuredSessionRecovery } from './structured-agent-session-recovery-resolution'
 
 export class StructuredAgentSessionHostRuntimeState {
   private readonly eventSinks = new Map<string, DeferredStructuredAgentSessionEventSink>()
@@ -33,7 +29,6 @@ export class StructuredAgentSessionHostRuntimeState {
     this.onEventSinkFailure = onEventSinkFailure
     this.leaseRenewer = new StructuredAgentSessionLeaseRenewer({
       store: deps.store,
-      owns: (record) => record.provider !== 'managed-pi',
       probe: (record) => this.probeRecord(record),
       ...(deps.probeOwners ? { probeMany: deps.probeOwners } : {}),
       holdsLiveChild: heldProviderChildReader(sessions, deps.adapter),
@@ -141,10 +136,7 @@ export class StructuredAgentSessionHostRuntimeState {
         probeRecord: (record) => this.probeRecord(record),
         platform: this.deps.platform ?? process.platform,
         now: () => this.deps.now?.() ?? Date.now(),
-        ...(this.deps.stopOwnerProcess ? { stopOwnerProcess: this.deps.stopOwnerProcess } : {}),
-        ...(this.deps.stopExecutionOwner
-          ? { stopExecutionOwner: this.deps.stopExecutionOwner }
-          : {})
+        ...(this.deps.stopOwnerProcess ? { stopOwnerProcess: this.deps.stopOwnerProcess } : {})
       },
       sessionId
     )
@@ -152,12 +144,6 @@ export class StructuredAgentSessionHostRuntimeState {
 
   probeOwner(sessionId: string): Promise<AgentSessionOwnerProbe> {
     const record = this.deps.store.getRecord(sessionId)
-    if (
-      record &&
-      (Object.hasOwn(record, 'taskSource') || this.deps.store.tasks.hasSessionBinding(sessionId))
-    ) {
-      return this.probeRecord(record)
-    }
     if (
       !record ||
       (record.lease.ownerProcess === null && record.lease.claimStatus !== 'reserved')
@@ -170,44 +156,13 @@ export class StructuredAgentSessionHostRuntimeState {
     return this.probeRecord(record)
   }
 
-  async commitExecutionOwnerStop(
-    sessionId: string,
-    expectedFence: number
-  ): Promise<'resolved' | 'unresolved'> {
-    const record = this.deps.store.getRecord(sessionId)
-    if (!record || !this.deps.stopExecutionOwner) {
-      return 'unresolved'
-    }
-    const probe = await this.deps.stopExecutionOwner(record)
-    if (
-      !probe ||
-      probe.outcome !== 'execution-host-exited' ||
-      probe.witness.ownerFence !== expectedFence ||
-      !agentSessionExecutionHostProbeMatchesRecord(probe, record)
-    ) {
-      return 'unresolved'
-    }
-    const barrier = await this.lifecycleBarrier(sessionId)
-    if (!barrier.ok) {
-      throw barrier.error
-    }
-    return commitStructuredSessionExecutionHostExit(
-      { store: this.deps.store, now: () => this.deps.now?.() ?? Date.now() },
-      record,
-      probe
-    )
-  }
-
   probeRecord(record: AgentSessionRecord): Promise<AgentSessionOwnerProbe> {
     return (
       this.deps.probeOwner?.(record) ??
-      (Object.hasOwn(record, 'taskSource') ||
-      this.deps.store.tasks.hasSessionBinding(record.sessionId)
-        ? Promise.resolve({ outcome: 'execution-host-unverifiable' })
-        : Promise.resolve({
-            outcome: 'indeterminate',
-            reason: 'This host cannot probe structured session owners.'
-          }))
+      Promise.resolve({
+        outcome: 'indeterminate',
+        reason: 'This host cannot probe structured session owners.'
+      })
     )
   }
 }

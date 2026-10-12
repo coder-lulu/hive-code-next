@@ -35,7 +35,6 @@ const RESUME_HOST_AUTHORITY_CAPABILITY_BY_AGENT = {
   opencode: undefined,
   opencode2: AGENT_SESSION_OPENCODE2_RESUME_RUNTIME_CAPABILITY,
   pi: undefined,
-  hivecode: undefined,
   'mimo-code': undefined,
   droid: undefined,
   grok: undefined,

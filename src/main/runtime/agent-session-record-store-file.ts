@@ -6,6 +6,7 @@
 
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { isRecord } from '../../shared/agent-status-child-work-value-guards'
 import { emptyState, parseState } from './agent-session-store-parsing'
 import {
   AGENT_SESSION_STORE_SCHEMA_VERSION,
@@ -42,6 +43,77 @@ export function legacyAgentSessionStorePath(stateDirectory: string): string {
 
 const backupPath = (filePath: string): string => `${filePath}.bak`
 
+/** A native backup cannot replace evidence that this session belonged to a retired executor. */
+export function hasRetiredTaskSessionProvenance(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    (value.provider === 'managed-pi' ||
+      value.provider === 'hivecode' ||
+      (Array.isArray(value.providerHandleChain) &&
+        value.providerHandleChain.some(
+          (link: unknown) =>
+            isRecord(link) &&
+            isRecord(link.handle) &&
+            (link.handle.provider === 'managed-pi' ||
+              link.handle.provider === 'hivecode' ||
+              link.handle.transport === 'managed-pi' ||
+              link.handle.agent === 'managed-pi' ||
+              link.handle.agent === 'hivecode')
+        )) ||
+      Object.hasOwn(value, 'taskSource') ||
+      (isRecord(value.lease) &&
+        isRecord(value.lease.deathEvidence) &&
+        value.lease.deathEvidence.kind === 'execution-host-exit-observed'))
+  )
+}
+
+/** Keep source evidence even when unrelated metadata makes the primary require a backup. */
+function collectRetiredTaskSessionRecords(raw: string, records: Map<string, unknown>): void {
+  let value: unknown
+  try {
+    value = JSON.parse(raw)
+  } catch {
+    return
+  }
+  if (!isRecord(value)) {
+    return
+  }
+  const retain = (sessionId: string, record: unknown) => {
+    if (!records.has(sessionId) && hasRetiredTaskSessionProvenance(record)) {
+      records.set(sessionId, record)
+    }
+  }
+  if (isRecord(value.records)) {
+    for (const [sessionId, record] of Object.entries(value.records)) {
+      retain(sessionId, record)
+    }
+  }
+  if (isRecord(value.unusableRecords)) {
+    for (const [sessionId, entry] of Object.entries(value.unusableRecords)) {
+      if (isRecord(entry)) {
+        retain(sessionId, entry.raw)
+      }
+    }
+  }
+}
+
+/** Both whole-file fallback and per-record salvage retain the same source evidence. */
+function parseStateRetainingRetiredRecords(
+  raw: string,
+  hostId: string,
+  retiredRecords: Map<string, unknown>
+): ReturnType<typeof parseState> {
+  collectRetiredTaskSessionRecords(raw, retiredRecords)
+  const parsed = parseState(raw, hostId)
+  if (parsed) {
+    for (const [sessionId, raw] of retiredRecords) {
+      parsed.state.records.delete(sessionId)
+      parsed.state.unreadableRecords.set(sessionId, { reason: 'current_shape_invalid', raw })
+    }
+  }
+  return parsed
+}
+
 /** A record the primary retained as unreadable may still have a valid copy in the previous
  *  committed state. Adopting it keeps the session reachable — the lease is re-adjudicated
  *  like any other — while the unreadable bytes stay quarantined verbatim. */
@@ -51,7 +123,9 @@ async function salvageUnreadableRecordsFromBackup(
   hostId: string
 ): Promise<void> {
   const missing = [...state.unreadableRecords.keys()].filter(
-    (sessionId) => !state.records.has(sessionId)
+    (sessionId) =>
+      !state.records.has(sessionId) &&
+      !hasRetiredTaskSessionProvenance(state.unreadableRecords.get(sessionId)?.raw)
   )
   if (missing.length === 0) {
     return
@@ -62,12 +136,17 @@ async function salvageUnreadableRecordsFromBackup(
   } catch {
     return
   }
-  const backup = parseState(raw, hostId)
-  if (!backup) {
-    return
-  }
+  const retiredRecords = new Map<string, unknown>()
+  const backup = parseStateRetainingRetiredRecords(raw, hostId, retiredRecords)
   for (const sessionId of missing) {
-    const record = backup.state.records.get(sessionId)
+    if (retiredRecords.has(sessionId)) {
+      state.unreadableRecords.set(sessionId, {
+        reason: 'current_shape_invalid',
+        raw: retiredRecords.get(sessionId)
+      })
+      continue
+    }
+    const record = backup?.state.records.get(sessionId)
     if (record) {
       state.records.set(sessionId, record)
     }
@@ -79,6 +158,7 @@ export async function loadAgentSessionStore(
   hostId: string
 ): Promise<LoadedAgentSessionStore> {
   let unusableStoreFound = false
+  const retiredRecords = new Map<string, unknown>()
   for (const [candidate, recoveredFromBackup] of [
     [filePath, false],
     [backupPath(filePath), true]
@@ -95,7 +175,7 @@ export async function loadAgentSessionStore(
       }
       continue
     }
-    const parsed = parseState(raw, hostId)
+    const parsed = parseStateRetainingRetiredRecords(raw, hostId, retiredRecords)
     if (!parsed) {
       unusableStoreFound = true
       continue

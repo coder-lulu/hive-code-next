@@ -304,9 +304,6 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
       <MobileHomeDrawer
         canOpenHostActions={activeConnectedHost != null}
         onAccount={() => closeDrawerAfter(() => data.router.push(session ? '/account' : '/login'))}
-        onApiQuota={() =>
-          closeDrawerAfter(() => data.router.push(session ? '/ai-account' : '/login'))
-        }
         onClose={closeDrawer}
         onManageDevices={() => closeDrawerAfter(() => data.router.push('/devices'))}
         onFeedback={() => closeDrawerAfter(() => data.router.push('/feedback'))}

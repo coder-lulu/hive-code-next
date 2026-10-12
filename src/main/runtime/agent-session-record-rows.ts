@@ -1,4 +1,3 @@
-import { loadHiveRuntimeState, writeHiveRuntimeState } from './agent-session-hive-state-rows'
 import { isDeepStrictEqual as same } from 'node:util'
 // The agent-session store's rows in the host journal: snapshots of committed rows, exactly the
 // changed rows written back, and the one-time copy of the records file.
@@ -177,7 +176,6 @@ export function loadAgentSessionStoreRows(
   } else if (table.sessionIds().length > 0) {
     state.unrecordedSessionTabs = table
   }
-  loadHiveRuntimeState(db, state)
   return state
 }
 
@@ -232,9 +230,6 @@ export function writeAgentSessionStoreRows(
       insert.run(keyId, retiredAt)
     }
   }
-  if (writes.hiveRuntimeState !== null) {
-    writeHiveRuntimeState(db, writes.hiveRuntimeState)
-  }
   if (writes.sessionTabs) {
     writeTabIndex(db, writes.sessionTabs)
   }
@@ -242,7 +237,6 @@ export function writeAgentSessionStoreRows(
 
 /** What the one-time import copies in, each row already serialized. */
 export type AgentSessionStoreImportRows = {
-  hiveRuntimeState?: string
   records: [sessionId: string, json: string][]
   operations: [key: string, json: string][]
   retiredClaimKeys: { keyId: string; retiredAt: number }[]
@@ -256,9 +250,6 @@ export function insertAgentSessionStoreRowsIfAbsent(
   db: Database.Database,
   rows: AgentSessionStoreImportRows
 ): void {
-  if (rows.hiveRuntimeState !== undefined) {
-    writeHiveRuntimeState(db, rows.hiveRuntimeState, true)
-  }
   const insertRecord = db.prepare(
     'INSERT OR IGNORE INTO agent_session_records (session_id, record_json) VALUES (?, ?)'
   )

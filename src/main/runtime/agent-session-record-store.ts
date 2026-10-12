@@ -2,9 +2,6 @@ import { mutateAgentSessionDraftRecord } from './agent-session-store-draft'
 /** Durable single-writer session records and their operation ledger, as rows in the host's chat
  *  journal database. */
 
-import { HiveAgentSessionPersistence } from './hive-agent-session-transactions'
-import { TaskExecutionPersistence } from '../tasks/task-execution-store'
-import { assertTaskStructuredAcquisition } from '../tasks/task-structured-reservation'
 import {
   commitConversationClearRecord,
   commitConversationCommandRecord,
@@ -98,10 +95,7 @@ export class AgentSessionRecordStore {
   private constructor(
     private readonly transactions: AgentSessionStoreTransactions,
     readonly hostId: string
-  ) {
-    this.hive = new HiveAgentSessionPersistence(transactions)
-    this.tasks = new TaskExecutionPersistence(transactions)
-  }
+  ) {}
 
   /** One live store per host database; committed SQL drift is revalidated before guarded writes. */
   static open(args: {
@@ -128,8 +122,6 @@ export class AgentSessionRecordStore {
 
   listRecords = (): AgentSessionRecord[] => [...this.state.records.values()]
 
-  readonly hive: HiveAgentSessionPersistence
-  readonly tasks: TaskExecutionPersistence
   /** Whether this host has recorded a chat, readable or not. Nothing removes a record row. */
   holdsRecords = (): boolean => this.state.records.size > 0 || this.state.unreadableRecords.size > 0
 
@@ -208,12 +200,6 @@ export class AgentSessionRecordStore {
     )
   }
 
-  assertTaskAcquisition = (
-    request: AgentSessionReserveRequest,
-    record: AgentSessionRecord
-  ): Promise<void> =>
-    this.transact((draft) => assertTaskStructuredAcquisition(draft, request, record))
-
   commitProcessIdentity = (args: AgentSessionProcessIdentityCommit): Promise<AgentSessionRecord> =>
     this.mutate(args.sessionId, (record) => commitAgentSessionProcessIdentity({ ...args, record }))
 
@@ -257,16 +243,14 @@ export class AgentSessionRecordStore {
   }
 
   async evictProvenDeadOwner(args: AgentSessionOwnerEviction): Promise<AgentSessionRecord> {
-    return this.mutate(args.sessionId, (record, draft) =>
-      evictAgentSessionOwner({ ...args, record }, draft.taskExecutions)
-    )
+    return this.mutate(args.sessionId, (record) => evictAgentSessionOwner({ ...args, record }))
   }
 
   async transitionHandoff(
     sessionId: string,
     transition: AgentSessionRecordTransition
   ): Promise<AgentSessionRecord> {
-    return this.mutate(sessionId, (record, draft) => transition(record, draft.taskExecutions))
+    return this.mutate(sessionId, (record) => transition(record))
   }
 
   /**
@@ -277,9 +261,7 @@ export class AgentSessionRecordStore {
   async reconcileOnRestart(
     args: AgentSessionRestartProbeArgs
   ): Promise<Map<string, AgentSessionRecord>> {
-    const pending = this.listRecords().filter(
-      (record) => record.lease.unreconciled && (args.owns?.(record) ?? true)
-    )
+    const pending = this.listRecords().filter((record) => record.lease.unreconciled)
     const probes = await collectAgentSessionRestartProbes(pending, args)
     return this.transact((draft) => applyAgentSessionRestartProbes(draft, probes, args.now), {
       inMemoryWhenReadOnly: true

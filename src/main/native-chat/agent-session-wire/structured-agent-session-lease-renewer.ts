@@ -23,7 +23,6 @@ export class StructuredAgentSessionLeaseRenewer {
   constructor(
     private readonly input: {
       store: AgentSessionRecordStore
-      owns?: (record: AgentSessionRecord) => boolean
       validate?: (record: AgentSessionRecord) => void
       probe: (record: AgentSessionRecord) => Promise<AgentSessionOwnerProbe>
       probeMany?: (
@@ -74,7 +73,6 @@ export class StructuredAgentSessionLeaseRenewer {
   private async renewOnce(): Promise<void> {
     const records = this.input.store.listRecords().filter(
       (record) =>
-        (this.input.owns?.(record) ?? true) &&
         !record.lease.unreconciled &&
         record.lease.claimStatus === 'live' &&
         record.lease.ownerProcess !== null &&

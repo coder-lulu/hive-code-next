@@ -17,38 +17,6 @@ import {
   readJournalSessionEpoch
 } from './journal-row-table'
 import type { AgentJournalEpochReason, JournalRow } from './journal-row-schema'
-import { assertJournalFence, assertJournalWritable } from './journal-write-guards'
-
-/** Serialized by the store's write queue, with the same epoch publication boundary as rollover. */
-export function purgeJournalContent(input: {
-  database: JournalHostDatabase
-  identity: AgentSessionJournalIdentity
-  readOnly: boolean
-  highestFence: number
-  mintEpoch: () => string
-  fence: number
-  now: () => number
-  onPublished: (loaded: JournalLoad) => void
-}): void {
-  assertJournalWritable(input.readOnly, input.identity.sessionId)
-  assertJournalFence(input.fence, input.highestFence)
-  const db = input.database.db
-  db.pragma('secure_delete = ON')
-  publishNewEpoch({
-    database: input.database,
-    identity: input.identity,
-    purgeQueuedContent: true,
-    epoch: input.mintEpoch(),
-    reason: 'session_created',
-    fence: input.fence,
-    now: input.now(),
-    onPublished: input.onPublished
-  })
-  const checkpoint = db.pragma('wal_checkpoint(TRUNCATE)') as { busy: number }[]
-  if (checkpoint.some((entry) => entry.busy !== 0)) {
-    throw new Error('hive_agent_outcome_unknown')
-  }
-}
 
 export function publishNewEpoch(input: {
   database: JournalHostDatabase
@@ -57,8 +25,6 @@ export function publishNewEpoch(input: {
   reason: AgentJournalEpochReason
   fence: number
   now: number
-  /** Explicit Hive retirement erases drafts that are outside the live epoch. */
-  purgeQueuedContent?: boolean
   /** Called the instant the transaction commits, before any fallible follow-up. */
   onPublished: (loaded: JournalLoad) => void
 }): void {
@@ -76,9 +42,6 @@ export function publishNewEpoch(input: {
 
   const { sessionId } = input.identity
   input.database.transaction((db) => {
-    if (input.purgeQueuedContent) {
-      db.prepare('DELETE FROM queued_messages WHERE session_id = ?').run(sessionId)
-    }
     const retired = readJournalSessionEpoch(db, sessionId)
     if (retired !== null) {
       deleteJournalEpochRows(db, sessionId, retired)

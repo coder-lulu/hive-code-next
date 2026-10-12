@@ -1,5 +1,3 @@
-import { PRODUCT_CONFIG } from '../../../shared/brand'
-import { TUI_AGENT_CONFIG } from '../../../shared/tui-agent-config'
 import { translate } from '@/i18n/i18n'
 import type { AgentCatalogEntry } from './agent-catalog'
 
@@ -172,12 +170,6 @@ export function secondaryAgentCatalogEntries(): AgentCatalogEntry[] {
       cmd: 'openclaw',
       faviconDomain: 'openclaw.ai',
       homepageUrl: 'https://github.com/openclaw/openclaw'
-    },
-    {
-      id: PRODUCT_CONFIG.slug,
-      label: translate(`agents.${PRODUCT_CONFIG.slug}.name`, 'Orca AI'),
-      cmd: TUI_AGENT_CONFIG[PRODUCT_CONFIG.slug].launchCmd,
-      homepageUrl: 'https://hivekernel.com'
     },
     {
       id: 'codebuddy',

@@ -11,7 +11,7 @@ import {
 export type NativeChatLaunchPromptDelivery = 'auto-submit' | 'draft' | 'submit-after-ready'
 
 /**
- * HiveCode AI opens in chat; external agents use `openAgentTabsInChatByDefault`.
+ * Agents use `openAgentTabsInChatByDefault`.
  *
  * A draft launch opens in chat only when its
  * unsent context can be mirrored into the composer — gated on the same
@@ -26,7 +26,7 @@ export function decideInitialAgentTabViewMode(args: {
   launchDraftText?: string
   nativeChatTranscriptIsLocalReadable?: boolean
 }): Tab['viewMode'] {
-  if (args.agent !== 'hivecode' && !agentTabsDefaultToNativeChat(args)) {
+  if (!agentTabsDefaultToNativeChat(args)) {
     return undefined
   }
   if (!isNativeChatSupportedAgent(args.agent)) {

@@ -200,22 +200,3 @@ describe('explicit structured chat requests', () => {
     }
   )
 })
-
-it('opens built-in HiveCode chat by default on local and remote Hosts', () => {
-  expect(route({ agent: 'hivecode', settings: null })).toBe('legacy-native-chat')
-  expect(route({ agent: 'hivecode' })).toBe('legacy-native-chat')
-  expect(
-    route({ agent: 'hivecode', settings: { ...settings, openAgentTabsInChatByDefault: false } })
-  ).toBe('legacy-native-chat')
-  expect(
-    structuredAgentLaunchSupported({
-      agent: 'hivecode',
-      settings,
-      executionHostId: 'local',
-      hostCapabilities: null
-    })
-  ).toBe(false)
-  expect(route({ agent: 'hivecode', nativeChatTranscriptIsLocalReadable: false })).toBe(
-    'legacy-native-chat'
-  )
-})

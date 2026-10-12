@@ -3,7 +3,6 @@
 # an unchecked test is one whose type-level pins prove nothing.
 # Regenerate/prune: node scripts/check-tests-typecheck-ratchet.mjs --prune
 src/accounts-route-reset-credit.test.ts
-src/ai-account/mobile-ai-models-screen.test.tsx
 src/auth/MobileLoginBottomSheet.test.tsx
 src/auth/mobile-provider-auth.test.ts
 src/auth/mobile-sms-auth.test.ts

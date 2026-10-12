@@ -100,12 +100,7 @@ export function useNativeChatSessionOptionCommand(args: {
                 target.settings,
                 target.ptyId,
                 command,
-                sendController.signal,
-                // Pi model autocomplete consumes Enter unless the command is pasted atomically.
-                {
-                  bracketedPaste: agent === 'hivecode',
-                  ...(agent === 'hivecode' ? { requireAgentStatus: 'sendable' as const } : {})
-                }
+                sendController.signal
               )
         if (!accepted) {
           throw new Error('The terminal did not accept the command.')

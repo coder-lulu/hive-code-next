@@ -156,8 +156,6 @@ export async function publishAgentLaunchTabEarly(
 ): Promise<EarlyAgentLaunchTab | null> {
   const runtime = context.runtime
   if (
-    context.requiredAgentLaunchMode !== undefined ||
-    context.taskLaunchOrigin !== undefined ||
     params.target.kind !== 'existing' ||
     params.reuseTerminal ||
     !readsEarlyLaunchTab(context) ||

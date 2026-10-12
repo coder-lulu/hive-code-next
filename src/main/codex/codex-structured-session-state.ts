@@ -1,6 +1,4 @@
 import type { StructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
-import type { NativeTeamTaskToolSession } from '../../shared/hive-team-task-tools'
-import type { CodexTeamTaskToolHost } from './codex-team-task-tool-host'
 import type {
   AgentJournalAnsweredTurnIdentity,
   AgentJournalItemIdentity
@@ -10,7 +8,6 @@ import type { AgentJournalDispatchRejection } from '../../shared/agent-session-f
 import { cancelProcessAcquisition } from '../../shared/child-process/cancel-process-acquisition'
 import type {
   CodexAppServerConnection,
-  CodexAppServerConnectionHandlers,
   openCodexAppServerConnection
 } from './codex-app-server-connection'
 import { CodexAcquisitionWindow } from './codex-structured-acquisition-window'
@@ -48,15 +45,10 @@ export type CodexStructuredLaunch = {
   /** The model the session chose; the thread opens on it so its first turn is not a switch. */
   model?: string
   env?: Record<string, string>
-  openTaskConnection?: (
-    handlers: CodexAppServerConnectionHandlers
-  ) => Promise<CodexAppServerConnection>
 }
 
 export type CodexStructuredLaunchInput = Pick<StructuredAgentSessionAcquireInput, 'identity'> &
-  Partial<
-    Pick<StructuredAgentSessionAcquireInput, 'fence' | 'spawnToken' | 'spawnGuard' | 'taskOrigin'>
-  >
+  Partial<Pick<StructuredAgentSessionAcquireInput, 'fence' | 'spawnToken'>>
 /** Turn and item boundaries, timed by when the host received them, never by when a buffered or
  *  retried delivery got round to them. */
 export const CODEX_RECEIPT_TIMED_METHODS: ReadonlySet<string> = new Set([
@@ -95,9 +87,6 @@ export type CodexStructuredSessionEvent =
   | { type: 'ended'; sessionId: string; reason: string; observedAt?: number }
 
 export type CodexStructuredSessionAdapterDeps = {
-  prepareTeamTaskTools?: (
-    input: StructuredAgentSessionAcquireInput
-  ) => Promise<NativeTeamTaskToolSession | null>
   resolveLaunch: (input: CodexStructuredLaunchInput) => Promise<CodexStructuredLaunch>
   /** Host capability seam; production uses the native Windows process table. */
   isWindowsProcessStartTimeAvailable?: () => boolean
@@ -131,7 +120,6 @@ export type CodexStructuredSessionAdapterDeps = {
 }
 
 export type CodexSession = {
-  teamTaskTools?: CodexTeamTaskToolHost
   connection: CodexAppServerConnection
   ended: boolean
   /** First observed child exit survives rejected settlement admission. */

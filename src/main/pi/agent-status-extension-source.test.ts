@@ -6,15 +6,6 @@ import {
 } from './agent-status-extension-test-harness'
 
 describe('getPiAgentStatusExtensionSource', () => {
-  it('stamps Hive ownership only for the bundled process, not an inheriting child', async () => {
-    for (const pid of [SELF_PID, SELF_PID - 1]) {
-      const harness = createHarness({ kind: 'pi', env: { HIVECODE_AI_NATIVE_PID: String(pid) } })
-      await harness.callHook('before_agent_start', { prompt: 'hello' })
-      const payload = JSON.parse(String(harness.fetchMock.mock.calls[0]?.[1]?.body)).payload
-      expect(payload.hivecode_native).toBe(pid === SELF_PID ? true : undefined)
-    }
-  })
-
   it('registers Prime hooks only in the event-emitting daemon worker', () => {
     const frontend = createHarness({
       kind: 'prime-agent',

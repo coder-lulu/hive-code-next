@@ -42,7 +42,6 @@ import type { NativeChatApi } from './api/native-chat-api'
 import type { OnboardingApi, StarNagApi } from './api/onboarding-api'
 import type { OrcaProfileApi } from './api/orca-profile-api'
 import type { HiveAccountApi } from './api/hive-account-api'
-import type { HiveTasksApi } from '../shared/hive-tasks'
 import type { HiveRuntimeCloudApi } from './api/hive-runtime-cloud-api'
 import type {
   ComputerUsePermissionsApi,
@@ -76,7 +75,6 @@ export type PreloadApi = {
   app: AppApi
   orcaProfiles: OrcaProfileApi
   hiveAccount: HiveAccountApi
-  hiveTasks: HiveTasksApi
   hiveRuntimeCloud: HiveRuntimeCloudApi
   platform: PlatformApi
   e2e: E2EApi

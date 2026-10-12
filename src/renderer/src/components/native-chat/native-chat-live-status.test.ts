@@ -22,27 +22,24 @@ function user(id: string, text: string): NativeChatMessage {
 }
 
 describe('mergeNativeChatLiveSession', () => {
-  it.each(['pi', 'hivecode'] as const)(
-    'keeps %s running while an assistant tool call executes',
-    (agent) => {
-      const message: NativeChatMessage = {
-        ...assistant('tool-turn', 'Running the test'),
-        blocks: [
-          { type: 'text', text: 'Running the test' },
-          { type: 'tool-call', name: 'bash', input: { command: 'node slow-once.mjs' } }
-        ]
-      }
-      expect(
-        mergeNativeChatLiveSession({
-          messages: [user('u-1', 'run the test'), message],
-          sessionId: 'sess',
-          agent,
-          hookState: 'working',
-          stateStartedAt: 1
-        }).status
-      ).toBe('working')
+  it.each(['pi'] as const)('keeps %s running while an assistant tool call executes', (agent) => {
+    const message: NativeChatMessage = {
+      ...assistant('tool-turn', 'Running the test'),
+      blocks: [
+        { type: 'text', text: 'Running the test' },
+        { type: 'tool-call', name: 'bash', input: { command: 'node slow-once.mjs' } }
+      ]
     }
-  )
+    expect(
+      mergeNativeChatLiveSession({
+        messages: [user('u-1', 'run the test'), message],
+        sessionId: 'sess',
+        agent,
+        hookState: 'working',
+        stateStartedAt: 1
+      }).status
+    ).toBe('working')
+  })
 
   it("surfaces live 'working' before the assistant turn lands in the transcript", () => {
     const session = mergeNativeChatLiveSession({

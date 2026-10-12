@@ -21,7 +21,6 @@ export type DraftPasteReadySignal = DraftPasteMarkerSignal | 'opencode-agent-row
 export type TuiAgentDetectionRuntime = NodeJS.Platform | 'wsl'
 
 export type TuiAgentConfig = {
-  builtIn?: boolean
   detectCmd: string
   /** Additional executable names that identify the same agent on PATH. */
   detectCmdAliases?: readonly string[]

@@ -171,9 +171,6 @@ export function attachParamsForRecord(
     expectedRuntimeFence: number
   }
 ): AgentSessionAttachParams {
-  if (record.provider === 'managed-pi') {
-    throw new Error('structured_agent_session_unsupported')
-  }
   const params: AgentSessionAttachParams = {
     envelope: {
       sessionId: record.sessionId,

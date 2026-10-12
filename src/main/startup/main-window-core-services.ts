@@ -77,7 +77,6 @@ export function attachMainWindowCoreServices(
     keybindings,
     {
       ...(state.hiveAccountService ? { hiveAccountService: state.hiveAccountService } : {}),
-      getHiveAgentRuntime: () => state.hiveAgentLocalRuntime,
       ...(state.hiveAccountStartupState
         ? { hiveAccountStartupState: state.hiveAccountStartupState }
         : {}),

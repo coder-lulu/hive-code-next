@@ -13,7 +13,7 @@ export { isNativeChatSupportedAgent }
  *  unit-testable; call sites resolve `launchAgent`/`detectedAgent` from the
  *  terminal tab + agent-status before calling. */
 export type NativeChatAvailabilityInput = {
-  /** Experimental gate for external agents; built-in HiveCode chat is always available. */
+  /** Experimental native chat availability. */
   experimentalNativeChatEnabled?: boolean
   contentType: Tab['contentType']
   /** The coding-agent Orca launched in this terminal, if any (from TerminalTab). */
@@ -40,11 +40,8 @@ export type NativeChatAvailabilityInput = {
  *  launch metadata is next, and title resolution only fills the pre-hook gap for
  *  manually-started Claude/Codex/Grok sessions. */
 export function canToggleNativeChat(input: NativeChatAvailabilityInput): boolean {
-  const agent =
-    input.launchAgent === 'hivecode' && input.detectedAgent === 'pi'
-      ? 'hivecode'
-      : (input.detectedAgent ?? input.launchAgent ?? input.resolvedAgent)
-  if (agent !== 'hivecode' && input.experimentalNativeChatEnabled !== true) {
+  const agent = input.detectedAgent ?? input.launchAgent ?? input.resolvedAgent
+  if (input.experimentalNativeChatEnabled !== true) {
     return false
   }
   if (input.contentType !== 'terminal') {

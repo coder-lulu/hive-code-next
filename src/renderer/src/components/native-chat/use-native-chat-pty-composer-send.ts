@@ -18,7 +18,6 @@ import { isSlashCommandDraft } from '../../../../shared/native-chat-slash-comman
 import type { NativeChatPickerState } from './use-native-chat-picker-state'
 import type { NativeChatSendLifecycle } from './use-native-chat-send-lifecycle'
 import type { NativeChatPtySessionOptionsSurface } from './native-chat-pty-session-options'
-import { translate } from '@/i18n/i18n'
 import type { NativeChatOptimisticSendOutcome } from './native-chat-composer-types'
 import {
   answerNativeChatCommandInComposer,
@@ -77,33 +76,21 @@ export function useNativeChatPtyComposerSend(args: {
     })
     let pendingId: string | undefined
     const sendOptions =
-      args.agent === 'hivecode'
+      args.agent === 'claude' && classification === 'chat'
         ? {
             ...launchSendOptions,
-            requireAgentStatus: 'sendable' as const,
-            onRejected: () =>
-              args.setNotice(
-                translate(
-                  'components.nativeChat.hiveSendUnavailable',
-                  'Message was not sent. Reconnect or resume the Hive session, then retry.'
-                )
-              )
-          }
-        : args.agent === 'claude' && classification === 'chat'
-          ? {
-              ...launchSendOptions,
-              onWriteRejected: () => {
-                if (pendingId) {
-                  args.optimisticSendOutcome?.reject(pendingId)
-                }
-              },
-              onWriteUnconfirmed: () => {
-                if (pendingId) {
-                  args.optimisticSendOutcome?.holdUnconfirmed(pendingId)
-                }
+            onWriteRejected: () => {
+              if (pendingId) {
+                args.optimisticSendOutcome?.reject(pendingId)
+              }
+            },
+            onWriteUnconfirmed: () => {
+              if (pendingId) {
+                args.optimisticSendOutcome?.holdUnconfirmed(pendingId)
               }
             }
-          : launchSendOptions
+          }
+        : launchSendOptions
     let pendingHandle: NativeChatSendHandle | null = null
     // Why: slash-like text must not silently drop its attached images.
     if (classification !== 'chat' && imagePaths.length === 0) {

@@ -220,7 +220,7 @@ export function UsageOverviewPane({ isActive = true }: { isActive?: boolean }): 
             <p className="text-xs text-muted-foreground">
               {translate(
                 'usage.redesign.costNotice',
-                'Local estimates are not billed charges or New API points. Unpriced usage is unavailable, not free.'
+                'Local estimates are not billed charges. Unpriced usage is unavailable, not free.'
               )}
               {overview.hasPartialCost
                 ? ` ${translate('usage.redesign.partialCost', 'Some usage has no price.')}`

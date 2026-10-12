@@ -67,8 +67,8 @@ export function AccountsOfficialService(): React.JSX.Element {
                 <ChevronRight className="size-4" />
               </Button>
             </div>
-            <div className="accounts-official-status grid border-t border-border/60 px-5 py-3.5">
-              <div className="accounts-official-identity flex min-w-0 items-center gap-3">
+            <div className="border-t border-border/60 px-5 py-3.5">
+              <div className="flex min-w-0 items-center gap-3">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold">
                   {state ? (
                     initial
@@ -107,20 +107,6 @@ export function AccountsOfficialService(): React.JSX.Element {
                           : translate('auto.components.settings.AccountsPane.loading', 'Loading…')}
                   </p>
                 </div>
-              </div>
-              <div className="accounts-official-model flex min-w-0 flex-wrap items-center gap-3">
-                <span className="text-sm font-medium">
-                  {translate('auto.components.settings.AccountsPane.modelService', 'Model service')}
-                </span>
-                <Badge
-                  variant="secondary"
-                  className="max-w-full whitespace-normal rounded-md font-normal text-muted-foreground"
-                >
-                  {translate(
-                    'auto.components.settings.AccountsPane.modelServiceUnavailable',
-                    'Not available in this version'
-                  )}
-                </Badge>
               </div>
             </div>
           </section>

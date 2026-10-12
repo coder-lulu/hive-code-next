@@ -231,7 +231,7 @@ describe('a fresh launch writes the ledger once before its effect', () => {
 })
 
 describe('stable replay identity', () => {
-  it('replays a HiveCode native launch across account relay reconnection and host-store reopen', async () => {
+  it('replays a external Pi launch across account relay reconnection and host-store reopen', async () => {
     const accountContext: Partial<RpcContext> = {
       clientKind: 'runtime',
       clientCapabilities: [AGENT_LAUNCH_RUNTIME_CAPABILITY],
@@ -239,7 +239,7 @@ describe('stable replay identity', () => {
       authenticatedAccountOperationCallerKey: `account-runtime:${'a'.repeat(64)}`
     }
     const params = createLaunch({
-      agent: 'hivecode',
+      agent: 'pi',
       operationId: OPERATION_ID,
       target: { kind: 'existing', worktree: 'id:wt-7' }
     })

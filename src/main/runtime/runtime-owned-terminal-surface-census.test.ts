@@ -23,7 +23,7 @@ describe('runtime-owned terminal surface census', () => {
             id: 'hive-background-tab',
             ptyId: null,
             worktreeId: TEST_WORKTREE_ID,
-            title: 'HiveCode AI',
+            title: 'Pi',
             customTitle: null,
             color: null,
             sortOrder: 0,
@@ -61,7 +61,7 @@ describe('runtime-owned terminal surface census', () => {
                 incarnationId: 'hive-incarnation',
                 cwd: TEST_WORKTREE_PATH,
                 worktreeId: TEST_WORKTREE_ID,
-                title: 'HiveCode AI'
+                title: 'Pi'
               }
             ]
           : []
@@ -89,12 +89,12 @@ describe('runtime-owned terminal surface census', () => {
       presentation: 'background',
       tabId: 'hive-background-tab',
       leafId: HEADLESS_LEAF_ID,
-      launchAgent: 'hivecode'
+      launchAgent: 'pi'
     })
     omit(2)
     omit(3)
     expect((await runtime.listMobileSessionTabs(`id:${TEST_WORKTREE_ID}`)).tabs).toEqual([
-      expect.objectContaining({ parentTabId: created.tabId, launchAgent: 'hivecode' })
+      expect.objectContaining({ parentTabId: created.tabId, launchAgent: 'pi' })
     ])
     const listed = await runtime.listTerminals(`id:${TEST_WORKTREE_ID}`, undefined, {
       includeVisualLayouts: false
@@ -104,7 +104,7 @@ describe('runtime-owned terminal surface census', () => {
         ptyId,
         tabId: created.tabId,
         leafId: HEADLESS_LEAF_ID,
-        launchAgent: 'hivecode',
+        launchAgent: 'pi',
         orphaned: false
       })
     ])

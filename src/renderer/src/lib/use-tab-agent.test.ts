@@ -676,30 +676,6 @@ describe('useTabAgent', () => {
     expect(getForegroundProcess).not.toHaveBeenCalled()
   })
 
-  it.each(['pty-1', 'remote:web-env-1@@terminal-1'])(
-    'preserves completed Hive launch metadata after remount on %s',
-    async (remotePtyId) => {
-      const paneKey = makePaneKey('tab-1', LEAF_ID)
-      useAppStore.setState({
-        ptyIdsByTabId: { 'tab-1': [remotePtyId] },
-        agentStatusByPaneKey: {
-          [paneKey]: { ...completedAgentStatus(paneKey), agentType: 'hivecode' }
-        }
-      })
-
-      await renderHookProbe({
-        ...baseTab,
-        ptyId: remotePtyId,
-        title: 'P5 read verification',
-        defaultTitle: 'P5 read verification',
-        launchAgent: 'hivecode'
-      })
-
-      expect(clearTabLaunchAgent).not.toHaveBeenCalled()
-      expect(latestHookAgent).toBe('hivecode')
-    }
-  )
-
   it('treats paired runtime PTYs as remote-like for completed hook fallback', async () => {
     const paneKey = makePaneKey('tab-1', LEAF_ID)
     useAppStore.setState({

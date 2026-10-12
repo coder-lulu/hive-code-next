@@ -24,11 +24,7 @@ export function createRestartReconciler(deps: {
 }): (sessionId: string) => Promise<AgentSessionWireRefusal | null> {
   let pending: Promise<void> | null = null
   return async (sessionId) => {
-    if (
-      !deps.store
-        .listRecords()
-        .some((record) => record.provider !== 'managed-pi' && record.lease.unreconciled)
-    ) {
+    if (!deps.store.listRecords().some((record) => record.lease.unreconciled)) {
       return null
     }
     if (!pending) {
@@ -130,16 +126,11 @@ async function reconcileCurrentLeases(deps: {
 }): Promise<void> {
   for (let pass = 0; pass < MAX_RECONCILIATION_PASSES; pass += 1) {
     await deps.store.reconcileOnRestart({
-      owns: (record) => record.provider !== 'managed-pi',
       probe: deps.probe,
       ...(deps.probeMany ? { probeMany: deps.probeMany } : {}),
       now: deps.now()
     })
-    if (
-      !deps.store
-        .listRecords()
-        .some((record) => record.provider !== 'managed-pi' && record.lease.unreconciled)
-    ) {
+    if (!deps.store.listRecords().some((record) => record.lease.unreconciled)) {
       return
     }
   }

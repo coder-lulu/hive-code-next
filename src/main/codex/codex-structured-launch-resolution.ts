@@ -6,7 +6,6 @@
 // must name the thread this session actually proved — never one a caller asks
 // for, which is how a resume becomes a fork wearing a resume's name.
 
-import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import { agentSessionProviderHandleChainHead } from '../../shared/agent-session-provider-handle'
 import { LOCAL_EXECUTION_HOST_ID } from '../../shared/execution-host'
 import { resolveCodexCommand } from '../codex-cli/command'
@@ -20,8 +19,7 @@ import { codexStructuredLaunchArgs } from './codex-structured-launch-args'
 import { CODEX_STRUCTURED_AGENT } from './codex-structured-agent-definition'
 
 export type CodexStructuredLaunchResolverDeps = {
-  store: Pick<AgentSessionRecordStore, 'getRecord' | 'pinLaunchDirectory'> &
-    Partial<Pick<AgentSessionRecordStore, 'tasks'>>
+  store: Pick<AgentSessionRecordStore, 'getRecord' | 'pinLaunchDirectory'>
   resolveLaunchArgs: () => Promise<string[]> | string[]
   /** Absolute path of a workspace on this host. Rejects when the workspace no
    *  longer resolves, which is the case a stale mobile client hits. */
@@ -34,10 +32,6 @@ export type CodexStructuredLaunchResolverDeps = {
   /** The user's Agent Permissions setting as thread policy, re-read per acquisition.
    *  States both postures outright — a resume inherits the last one for any field left absent. */
   resolvePermissionPolicy?: () => CodexStructuredPermissionPolicy
-  resolveTaskLaunch?: (
-    input: CodexStructuredLaunchInput,
-    record: AgentSessionRecord
-  ) => Promise<CodexStructuredLaunch>
 }
 
 export type CodexStructuredInvocation = {
@@ -74,19 +68,8 @@ export function createCodexStructuredLaunchResolver(
     if (!record) {
       throw new Error(`no durable agent-session record for ${identity.sessionId}`)
     }
-    if (
-      Object.hasOwn(record, 'taskSource') ||
-      Object.hasOwn(input, 'taskOrigin') ||
-      deps.store.tasks?.hasSessionBinding(identity.sessionId)
-    ) {
-      if (!deps.resolveTaskLaunch) {
-        throw new Error('TASK_DOCKER_RUNTIME_UNAVAILABLE')
-      }
-      const launch = await deps.resolveTaskLaunch(input, record)
-      if (typeof launch.openTaskConnection !== 'function') {
-        throw new Error('TASK_DOCKER_RUNTIME_UNAVAILABLE')
-      }
-      return launch
+    if (Object.hasOwn(record, 'taskSource') || Object.hasOwn(input, 'taskOrigin')) {
+      throw new Error('structured_agent_session_unsupported')
     }
     const { location, accountHome } = record
     if (record.provider !== 'codex') {

@@ -8,35 +8,17 @@ const state = {
   records: {},
   operations: {},
   retiredClaimKeys: [],
-  unusableRecords: {},
-  hiveSessions: {},
-  taskExecutions: {}
+  unusableRecords: {}
 }
 describe('product metadata schema upgrade boundary', () => {
-  it('migrates earlier records and requires both product collections in the current schema', () => {
-    const { hiveSessions: _hive, ...old } = state
-    expect(parseState(JSON.stringify({ ...old, schemaVersion: 2 }), 'host-1')?.needsRewrite).toBe(
+  it('migrates earlier records and reads current native session metadata', () => {
+    expect(parseState(JSON.stringify({ ...state, schemaVersion: 2 }), 'host-1')?.needsRewrite).toBe(
       true
     )
-    expect(parseState(JSON.stringify(old), 'host-1')).toBeNull()
     expect(parseState(JSON.stringify(state), 'host-1')?.needsRewrite).toBe(false)
-    const { taskExecutions: _tasks, ...previous } = state
-    expect(
-      parseState(JSON.stringify({ ...previous, schemaVersion: 3 }), 'host-1')?.needsRewrite
-    ).toBe(true)
-    expect(parseState(JSON.stringify(previous), 'host-1')).toBeNull()
   })
   it('rejects corrupt current metadata without dropping it into an empty writable store', () => {
-    for (const patch of [
-      { hiveSessions: [] },
-      { hiveSessions: { wrong: {} } },
-      { taskExecutions: [] },
-      { taskExecutions: { wrong: {} } },
-      { taskRecoveryBlocked: 'false' },
-      { hiveRecoveryFenceAt: -1 },
-      { operations: { wrong: {} } },
-      { visibleSessionIds: [123] }
-    ]) {
+    for (const patch of [{ operations: { wrong: {} } }, { visibleSessionIds: [123] }]) {
       expect(parseState(JSON.stringify({ ...state, ...patch }), 'host-1')).toBeNull()
     }
   })
@@ -45,8 +27,7 @@ describe('product metadata schema upgrade boundary', () => {
       JSON.stringify({
         ...state,
         schemaVersion: 99,
-        hiveSessions: { future: { schemaVersion: 99 } },
-        hiveRecoveryFenceAt: 'future'
+        futureMetadata: { schemaVersion: 99 }
       }),
       'host-1'
     )

@@ -13,7 +13,6 @@ import {
   tokenizeCommandLine
 } from './agent-command-line-entrypoint'
 import { isFreshOmpLaunchCommand } from './omp-fresh-launch'
-import { PRODUCT_CONFIG } from './brand'
 
 export type RecognizedAgentProcess = { agent: TerminalAgent; processName: string }
 
@@ -68,8 +67,7 @@ for (const [agent, config] of Object.entries(TUI_AGENT_CONFIG)) {
   }
 }
 
-// Explicit CLI names own their identity before wrappers contribute weaker child-process
-// hints: Hive launches Pi, but a bare `pi` command still belongs to the Pi agent.
+// Explicit CLI names own their identity before wrappers contribute weaker child-process hints.
 for (const [agent, config] of Object.entries(TUI_AGENT_CONFIG) as [
   TuiAgent,
   (typeof TUI_AGENT_CONFIG)[TuiAgent]
@@ -219,10 +217,7 @@ export function recognizeAgentProcessFromCommandLine(
     return null
   }
   // Why: the generic Orca CLI is not an agent; only this subcommand launches its TUI mode.
-  if (
-    (direct?.agent === 'claude-agent-teams' && tokens[1]?.toLowerCase() !== 'claude-teams') ||
-    (direct?.agent === PRODUCT_CONFIG.slug && tokens[1]?.toLowerCase() !== 'hive-ai')
-  ) {
+  if (direct?.agent === 'claude-agent-teams' && tokens[1]?.toLowerCase() !== 'claude-teams') {
     direct = null
   }
   const directRecognition = keep ? direct : filterHeadlessOneShotAgentCommand(direct, tokens)
@@ -237,10 +232,8 @@ export function recognizeAgentProcessFromCommandLine(
     ? recognizePythonEntrypoint(tokens, entrypoint)
     : (recognizeAgentProcess(entrypoint) ?? recognizeNodeScriptEntrypoint(entrypoint))
   if (
-    (viaEntrypoint?.agent === 'claude-agent-teams' &&
-      tokens[tokens.indexOf(entrypoint, 1) + 1]?.toLowerCase() !== 'claude-teams') ||
-    (viaEntrypoint?.agent === PRODUCT_CONFIG.slug &&
-      tokens[tokens.indexOf(entrypoint, 1) + 1]?.toLowerCase() !== 'hive-ai')
+    viaEntrypoint?.agent === 'claude-agent-teams' &&
+    tokens[tokens.indexOf(entrypoint, 1) + 1]?.toLowerCase() !== 'claude-teams'
   ) {
     return null
   }

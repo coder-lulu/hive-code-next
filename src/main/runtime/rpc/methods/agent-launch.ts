@@ -117,8 +117,6 @@ async function runAgentLaunch(
   const result = await executeAgentLaunch({
     runtime: context.runtime,
     intent,
-    requiredMode: context.requiredAgentLaunchMode,
-    onPrelaunchRefused: replaySafe?.terminalSpawn.rethrow,
     surfaces: agentLaunchSurfaceFactory(
       context,
       replaySafe?.attachOperationId,
@@ -126,8 +124,7 @@ async function runAgentLaunch(
       callerNavigationId !== null,
       replaySafe?.terminalSpawn,
       view.early,
-      intent.presentation,
-      (scope) => context.assertAgentLaunchCurrent?.(intent, scope)
+      intent.presentation
     ),
     workspaces: agentLaunchWorkspaceFactory(context, intent.agent),
     ...(callerRendersLaunchedChat(context, intent.agent) ? {} : { callerRendersStructured: false }),

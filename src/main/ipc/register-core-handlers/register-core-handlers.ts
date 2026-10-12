@@ -22,7 +22,6 @@ import { registerStatsHandlers } from '../stats'
 import { registerMemoryHandlers } from '../memory'
 import { registerRateLimitHandlers } from '../rate-limits'
 import { registerRuntimeHandlers } from '../runtime'
-import type { HiveAgentLocalRuntime } from '../../native-chat/hive-agent-local-runtime'
 import { registerRuntimeEnvironmentHandlers } from '../runtime-environments'
 import { registerEphemeralVmHandlers } from '../ephemeral-vm'
 import { registerAiVaultHandlers } from '../ai-vault'
@@ -58,7 +57,6 @@ import { registerSpeechHandlers } from '../speech'
 import { registerTerminalRenderDesyncEvidenceHandler } from '../terminal-render-desync-evidence'
 import { registerOrcaProfileHandlers } from '../orca-profiles'
 import { registerHiveAccountHandlers } from '../hive-account'
-import { registerHiveTaskHandlers } from '../hive-tasks'
 import {
   registerHiveRuntimeCloudHandlers,
   type HiveRuntimeCloudHandlerServices
@@ -110,7 +108,6 @@ import type { HiveAccountState } from '../../../shared/hive-account'
 let registered = false
 
 type CoreHandlerLifecycleOptions = {
-  getHiveAgentRuntime?: () => HiveAgentLocalRuntime | null
   onBeforeRelaunch?: () => void | Promise<void>
   onOrcaProfileAuthMutation?: () => void
   onBeforeOrcaProfileSignOut?: () => void
@@ -212,7 +209,6 @@ export function registerCoreHandlers(
     registerPluginHandlers(store, pluginService, runtime, marketplaceServices)
   }
   registerTelemetryHandlers(store)
-  registerHiveTaskHandlers()
   registerHiveAccountHandlers(
     lifecycleOptions.hiveAccountService
       ? {
@@ -247,7 +243,7 @@ export function registerCoreHandlers(
     registerFilesystemHandlers(store)
   }
   registerFilesystemWatcherHandlers()
-  registerRuntimeHandlers(runtime, lifecycleOptions.getHiveAgentRuntime)
+  registerRuntimeHandlers(runtime)
   registerRuntimeEnvironmentHandlers(store)
   registerEphemeralVmHandlers(store, pluginService)
   // Session history and terminal resume are not chats; a refused host leaves nothing to check.

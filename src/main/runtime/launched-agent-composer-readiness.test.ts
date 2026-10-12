@@ -6,7 +6,6 @@ import {
   resolvePasteReadySignal
 } from '../../shared/draft-paste-ready-scanner'
 import type { TuiAgent } from '../../shared/tui-agent'
-import { PRODUCT_CONFIG } from '../../shared/brand'
 import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import type { RuntimeTerminalWait } from '../../shared/runtime-terminal-contracts'
 import { GROK_STARTUP_PTY_TRACE } from '../../shared/__fixtures__/grok-startup-pty-trace'
@@ -30,7 +29,6 @@ import { waitForWorktreeStartupDraft } from './runtime-worktree-startup-readines
 // worker start waits for a captured input-box marker, and a row that gains or loses evidence
 // shows up in review.
 const EXPECTED_LANES: Record<TuiAgent, LaunchedAgentReadinessLane> = {
-  [PRODUCT_CONFIG.slug]: 'tui-idle',
   zcode: 'composer-marker',
   opencode: 'composer-marker',
   opencode2: 'composer-marker',
