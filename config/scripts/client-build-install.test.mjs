@@ -1,10 +1,17 @@
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync } from 'node:fs'
+import { pathToFileURL } from 'node:url'
+import { spawnSync } from 'node:child_process'
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, cpSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { it, expect } from 'vitest'
+import { it, expect, vi } from 'vitest'
 import { stringify } from 'yaml'
 import { sha256 } from './client-build-contract.mjs'
-import { canReuseInstalledDependencies, hasBuildToolEntrypoints } from './client-build-install.mjs'
+import {
+  canReuseInstalledDependencies,
+  hasBuildToolEntrypoints,
+  requireTargetDependencies,
+  prepareTargetDependencies
+} from './client-build-install.mjs'
 
 function withInstalledDependencies(run, target = 'windows-x64') {
   const fixtures = resolve(
@@ -200,3 +207,147 @@ it('rejects a mobile build tool with a missing entrypoint', () => {
     expect(reusable()).toBe(false)
   }, 'ios')
 })
+
+const execution = vi.hoisted(() => ({ pnpmStep: vi.fn() }))
+vi.mock('./client-build-execution.mjs', () => execution)
+
+it('prepares every desktop dependency graph before returning to the builder', async () => {
+  execution.pnpmStep.mockReset()
+  const root = resolve('logs/sync-efficiency/build-preflight/missing-graphs')
+  const context = { root, store: join(root, 'store'), toolchain: { pnpm: '12.8.1' } }
+  await prepareTargetDependencies(context, 'windows-x64')
+  expect(execution.pnpmStep.mock.calls.map((call) => call[3])).toEqual([
+    root,
+    join(root, 'runtime/native-pi'),
+    join(root, 'runtime/managed-pi'),
+    join(root, 'mobile')
+  ])
+  for (const call of execution.pnpmStep.mock.calls) {
+    expect(call[2]).toEqual(
+      expect.arrayContaining(['install', '--frozen-lockfile', '--store-dir', context.store])
+    )
+  }
+  expect(execution.pnpmStep.mock.calls[1][2]).toContain('--node-linker=hoisted')
+  expect(execution.pnpmStep.mock.calls[2][2]).toContain('--node-linker=isolated')
+  expect(execution.pnpmStep.mock.calls[3][2]).toContain('--node-linker=hoisted')
+})
+it('stops preparation when a dependency graph fails', async () => {
+  execution.pnpmStep.mockReset().mockRejectedValueOnce(new Error('frozen graph mismatch'))
+  await expect(
+    prepareTargetDependencies(
+      { root: resolve('logs/missing-graphs'), store: 'store' },
+      'windows-x64'
+    )
+  ).rejects.toThrow('frozen graph mismatch')
+  expect(execution.pnpmStep).toHaveBeenCalledTimes(1)
+})
+
+it('doctor reaches toolchain preflight without loading any installed package', () => {
+  const directory = resolve('logs/sync-efficiency/build-preflight/doctor-fixture')
+  mkdirSync(directory, { recursive: true })
+  const guard = join(directory, 'no-dependencies.mjs')
+  writeFileSync(
+    guard,
+    `import { registerHooks } from 'node:module'
+registerHooks({ resolve(specifier, context, next) {
+  if (!specifier.startsWith('node:') && !specifier.startsWith('.') && !specifier.startsWith('/') && !specifier.startsWith('file:') && !/^[A-Za-z]:/.test(specifier)) throw new Error('Fresh checkout cannot resolve package: ' + specifier)
+  return next(specifier, context)
+} })`
+  )
+  const pnpm = join(directory, 'pnpm-fixture.cjs')
+  writeFileSync(pnpm, 'console.log("invalid-fixture-version")')
+  const result = spawnSync(
+    process.execPath,
+    [
+      '--import',
+      pathToFileURL(guard).href,
+      resolve('config/scripts/client-build.mjs'),
+      'doctor',
+      '--target',
+      'desktop'
+    ],
+    {
+      encoding: 'utf8',
+      windowsHide: true,
+      env: {
+        ...Object.fromEntries(
+          Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'npm_execpath')
+        ),
+        npm_execpath: pnpm,
+        HIVECODE_BUILD_HOME: directory
+      }
+    }
+  )
+  expect(result.status).toBe(1)
+  expect(result.stderr).toMatch(/pnpm .* required/)
+  expect(result.stderr).not.toContain('Fresh checkout cannot resolve package')
+})
+
+it.each(['runtime/native-pi', 'runtime/managed-pi', 'mobile'])(
+  'offline readiness rejects missing or stale %s without installing',
+  (graph) => {
+    withInstalledDependencies(({ cwd: root }) => {
+      for (const directory of ['runtime/native-pi', 'runtime/managed-pi', 'mobile']) {
+        withInstalledDependencies(
+          ({ cwd }) => {
+            cpSync(cwd, join(root, directory), { recursive: true })
+          },
+          directory === 'mobile' ? 'android' : 'windows-x64'
+        )
+      }
+      writeFileSync(
+        join(root, 'runtime/native-pi/node_modules/.modules.yaml'),
+        stringify({ nodeLinker: 'hoisted', packageManager: 'pnpm@12.0.0' })
+      )
+      const context = { root, toolchain: { pnpm: '12.0.0' } }
+      execution.pnpmStep.mockReset()
+      expect(() => requireTargetDependencies(context, 'windows-x64')).not.toThrow()
+      const entry = join(root, graph, 'node_modules/.modules.yaml')
+      rmSync(entry)
+      expect(() => requireTargetDependencies(context, 'windows-x64')).toThrow(
+        'run clients:prepare -- --target windows-x64'
+      )
+      writeFileSync(
+        join(root, graph, 'node_modules/.modules.yaml'),
+        stringify({ nodeLinker: 'invalid', packageManager: 'pnpm@12.0.0' })
+      )
+      expect(() => requireTargetDependencies(context, 'windows-x64')).toThrow(
+        'dependencies are missing or stale'
+      )
+      expect(execution.pnpmStep).not.toHaveBeenCalled()
+    })
+  }
+)
+
+it.skipIf(process.platform !== 'win32')(
+  'doctor resolves case-insensitive Windows ProgramFiles environment names',
+  () => {
+    const directory = resolve('logs/sync-efficiency/build-preflight/windows-environment-fixture')
+    mkdirSync(directory, { recursive: true })
+    const pnpm = join(directory, 'pnpm-fixture.cjs')
+    const toolchain = JSON.parse(readFileSync(resolve('config/toolchain.json'), 'utf8'))
+    writeFileSync(pnpm, `console.log(${JSON.stringify(toolchain.pnpm)})`)
+    const environment = Object.fromEntries(
+      Object.entries(process.env).filter(
+        ([key]) => !['npm_execpath', 'programfiles(x86)'].includes(key.toLowerCase())
+      )
+    )
+    const result = spawnSync(
+      process.execPath,
+      [resolve('config/scripts/client-build.mjs'), 'doctor', '--target', 'windows-x64'],
+      {
+        encoding: 'utf8',
+        windowsHide: true,
+        env: {
+          ...environment,
+          npm_execpath: pnpm,
+          'PROGRAMFILES(X86)': directory,
+          HIVECODE_BUILD_HOME: directory
+        }
+      }
+    )
+    expect(result.status).toBe(1)
+    expect(result.stderr).toContain('vswhere.exe')
+    expect(result.stderr).not.toContain('Received undefined')
+  }
+)

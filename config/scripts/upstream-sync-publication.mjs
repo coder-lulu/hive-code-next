@@ -89,6 +89,13 @@ export function renderPublication(options) {
       )
       requireValue(report.suite === name, `Unexpected gate suite: ${name}`)
       requireValue(
+        report.phase === 'final' &&
+          report.formalAcceptance === true &&
+          Array.isArray(report.omittedChecks) &&
+          report.omittedChecks.length === 0,
+        `Missing complete final verification: ${name}`
+      )
+      requireValue(
         Array.isArray(report.commands) && report.commands.length > 0,
         `Missing commands: ${name}`
       )

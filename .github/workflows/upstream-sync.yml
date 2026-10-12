@@ -4,7 +4,7 @@ name: Upstream Sync
 # Existing repository-level Actions enablement remains an operator setting.
 on:
   schedule:
-    - cron: '17 2 * * 1,4'
+    - cron: '17 2 * * *'
   workflow_dispatch:
     inputs:
       target_branch:
@@ -239,17 +239,26 @@ jobs:
             --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
             --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/evidence/tree-sync-verify.json"
 
+      - name: Check frozen product tip before expensive verification
+        shell: bash
+        run: |
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-sync-preflight.mjs" \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --target-branch "$TARGET_BRANCH"
+
       - uses: ./.github/actions/install-node-dependencies
 
       - name: Install separate mobile workspace dependencies
         run: pnpm --dir mobile install --frozen-lockfile --ignore-scripts
+
+      - name: Prepare maintained AI runtimes before typecheck
+        run: pnpm run prepare:native-pi && pnpm run prepare:managed-pi
 
       - name: Run common product verification once
         shell: bash
         run: |
           set -euo pipefail
           {
-            node "$RUNNER_TEMP/upstream-sync-control/config/scripts/run-upstream-sync-gates.mjs" --suite=common --cwd "$GITHUB_WORKSPACE"
+            node "$RUNNER_TEMP/upstream-sync-control/config/scripts/run-upstream-sync-gates.mjs" --suite=common --phase=final --cwd "$GITHUB_WORKSPACE"
             pnpm run typecheck
             pnpm run lint
             pnpm run test
@@ -311,6 +320,7 @@ jobs:
           mkdirSync(directory, { recursive: true })
           writeFileSync(`${directory}/common-gates.json`, JSON.stringify({
             suite: 'common-gates', status: process.env.GATE_STATUS,
+            phase: 'final', formalAcceptance: true, omittedChecks: [],
             upstreamSha: process.env.UPSTREAM_SHA, targetSha: process.env.TARGET_SHA, candidateSha: process.env.CANDIDATE_SHA,
             commands: [
               'node config/scripts/run-upstream-sync-gates.mjs --suite=common',
@@ -399,13 +409,19 @@ jobs:
             --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
             --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/tree-sync-$PLATFORM.json"
 
+      - name: Check frozen product tip before expensive verification
+        shell: bash
+        run: |
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-sync-preflight.mjs" \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --target-branch "$TARGET_BRANCH"
+
       - uses: ./.github/actions/install-node-dependencies
 
       - name: Execute the focused platform regression matrix
         shell: bash
         run: |
           set -euo pipefail
-          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/run-upstream-sync-gates.mjs" --suite=regression --platform="$PLATFORM" --cwd "$GITHUB_WORKSPACE" \
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/run-upstream-sync-gates.mjs" --suite=regression --phase=final --platform="$PLATFORM" --cwd "$GITHUB_WORKSPACE" \
             2>&1 | tee "$GITHUB_WORKSPACE/logs/upstream-sync/regression-$PLATFORM.log"
 
       - name: Record platform verification outcome
@@ -419,6 +435,7 @@ jobs:
           const suite = `regression-${process.env.PLATFORM}`
           writeFileSync(`${process.env.GITHUB_WORKSPACE}/logs/upstream-sync/${suite}.json`, JSON.stringify({
             suite, status: process.env.GATE_STATUS,
+            phase: 'final', formalAcceptance: true, omittedChecks: [],
             upstreamSha: process.env.UPSTREAM_SHA, targetSha: process.env.TARGET_SHA, candidateSha: process.env.CANDIDATE_SHA,
             commands: [`node config/scripts/run-upstream-sync-gates.mjs --suite=regression --platform=${process.env.PLATFORM}`],
           }, null, 2))

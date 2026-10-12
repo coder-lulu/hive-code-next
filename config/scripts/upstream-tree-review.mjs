@@ -21,6 +21,9 @@ const protectedPaths = new Set([
   'config/scripts/audit-fork-delta.mjs',
   'config/scripts/track-upstream-changes.mjs',
   'config/scripts/run-upstream-sync-gates.mjs',
+  'config/scripts/upstream-sync-repair-plan.mjs',
+  'config/scripts/upstream-sync-preflight.mjs',
+  'config/scripts/pnpm-cli-invocation.mjs',
   '.github/workflows/upstream-sync.yml'
 ])
 

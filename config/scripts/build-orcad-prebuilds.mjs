@@ -190,14 +190,19 @@ function nodePtyDir() {
  * Compile in a scratch copy, never in node_modules/node-pty: that tree holds the Electron
  * build the desktop loads, and a Node-headers rebuild there would break the app.
  */
+export function stageNodePtySources(sourceDir, stagedDir) {
+  mkdirSync(stagedDir, { recursive: true })
+  // binding.gyp references the nested winpty gyp and its vendored source tree.
+  for (const entry of ['package.json', 'src', 'deps']) {
+    cpSync(join(sourceDir, entry), join(stagedDir, entry), { recursive: true, dereference: true })
+  }
+}
+
 async function compileNodePty(sourceDir, slot) {
   const workDir = join(WORK_DIR, slot)
   const stagedDir = join(workDir, 'node-pty')
   rmSync(workDir, { recursive: true, force: true })
-  mkdirSync(stagedDir, { recursive: true })
-  for (const entry of ['package.json', 'src']) {
-    cpSync(join(sourceDir, entry), join(stagedDir, entry), { recursive: true })
-  }
+  stageNodePtySources(sourceDir, stagedDir)
   const libc = detectLibc()
   writeFileSync(
     join(stagedDir, 'binding.gyp'),

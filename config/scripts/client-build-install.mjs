@@ -1,3 +1,4 @@
+import { pnpmStep } from './client-build-execution.mjs'
 import { createRequire } from 'node:module'
 import { existsSync, readFileSync } from 'node:fs'
 import { join, resolve, relative } from 'node:path'
@@ -44,9 +45,9 @@ function matchesInstalledLockfile(source, installed) {
 }
 
 // Adopt a previously installed tree only when its graph, layout and patches agree.
-export function canReuseInstalledDependencies(context, name) {
+export function canReuseInstalledDependencies(context, name, directory) {
   const mobile = name === 'android' || name === 'ios'
-  const cwd = mobile ? join(context.root, 'mobile') : context.root
+  const cwd = directory || (mobile ? join(context.root, 'mobile') : context.root)
   const modules = join(cwd, 'node_modules/.modules.yaml')
   const virtualLock = join(cwd, 'node_modules/.pnpm/lock.yaml')
   if (!existsSync(modules) || !existsSync(virtualLock)) {
@@ -71,7 +72,7 @@ export function canReuseInstalledDependencies(context, name) {
     }
     const metadata = parse(readFileSync(modules, 'utf8'))
     if (
-      metadata.nodeLinker !== (mobile ? 'hoisted' : 'isolated') ||
+      metadata.nodeLinker !== (mobile || name === 'native-pi' ? 'hoisted' : 'isolated') ||
       metadata.packageManager !== `pnpm@${context.toolchain.pnpm}`
     ) {
       return false
@@ -112,5 +113,50 @@ export function canReuseInstalledDependencies(context, name) {
     return true
   } catch {
     return false
+  }
+}
+
+// All graphs consumed by desktop typechecking and packaging must exist before either starts.
+function targetDependencyGraphs(context, target) {
+  const mobile = target === 'android' || target === 'ios'
+  return mobile
+    ? [[target, join(context.root, 'mobile')]]
+    : [
+        [target, context.root],
+        ['native-pi', join(context.root, 'runtime/native-pi')],
+        ['managed-pi', join(context.root, 'runtime/managed-pi')],
+        ['android', join(context.root, 'mobile')]
+      ]
+}
+
+export function requireTargetDependencies(context, target) {
+  for (const [name, cwd] of targetDependencyGraphs(context, target)) {
+    if (!canReuseInstalledDependencies(context, name, cwd)) {
+      throw new Error(
+        `${name} dependencies are missing or stale; run clients:prepare -- --target ${target}`
+      )
+    }
+  }
+}
+
+export async function prepareTargetDependencies(context, target) {
+  for (const [name, cwd] of targetDependencyGraphs(context, target)) {
+    if (canReuseInstalledDependencies(context, name, cwd)) {
+      continue
+    }
+    const hoisted = ['android', 'ios', 'native-pi'].includes(name)
+    await pnpmStep(
+      context,
+      `${target}-install-${name}`,
+      [
+        'install',
+        '--frozen-lockfile',
+        '--store-dir',
+        context.store,
+        `--node-linker=${hoisted ? 'hoisted' : 'isolated'}`,
+        ...(['android', 'ios'].includes(name) ? [] : ['--ignore-scripts'])
+      ],
+      cwd
+    )
   }
 }
