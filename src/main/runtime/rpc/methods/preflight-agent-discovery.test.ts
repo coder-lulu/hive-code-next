@@ -25,7 +25,11 @@ function invoke(name: string, params?: unknown) {
   if (!method) {
     throw new Error(`Missing method ${name}`)
   }
-  return method.handler(params, {} as never)
+  return method.handler(params, {
+    get runtime(): never {
+      throw new Error('Agent discovery must not read Runtime state')
+    }
+  })
 }
 
 describe('Host external agent discovery for remote workspaces', () => {
