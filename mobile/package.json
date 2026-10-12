@@ -1,6 +1,6 @@
 {
   "name": "hivecode-mobile",
-  "version": "1.5.0-beta.24",
+  "version": "1.5.0-beta.25",
   "private": true,
   "main": "index.js",
   "scripts": {
