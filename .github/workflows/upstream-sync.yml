@@ -250,9 +250,6 @@ jobs:
       - name: Install separate mobile workspace dependencies
         run: pnpm --dir mobile install --frozen-lockfile --ignore-scripts
 
-      - name: Prepare maintained AI runtimes before typecheck
-        run: pnpm run prepare:native-pi && pnpm run prepare:managed-pi
-
       - name: Run common product verification once
         shell: bash
         run: |

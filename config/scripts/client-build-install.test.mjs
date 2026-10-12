@@ -216,20 +216,14 @@ it('prepares every desktop dependency graph before returning to the builder', as
   const root = resolve('logs/sync-efficiency/build-preflight/missing-graphs')
   const context = { root, store: join(root, 'store'), toolchain: { pnpm: '12.8.1' } }
   await prepareTargetDependencies(context, 'windows-x64')
-  expect(execution.pnpmStep.mock.calls.map((call) => call[3])).toEqual([
-    root,
-    join(root, 'runtime/native-pi'),
-    join(root, 'runtime/managed-pi'),
-    join(root, 'mobile')
-  ])
+  expect(execution.pnpmStep.mock.calls.map((call) => call[3])).toEqual([root, join(root, 'mobile')])
   for (const call of execution.pnpmStep.mock.calls) {
     expect(call[2]).toEqual(
       expect.arrayContaining(['install', '--frozen-lockfile', '--store-dir', context.store])
     )
   }
   expect(execution.pnpmStep.mock.calls[1][2]).toContain('--node-linker=hoisted')
-  expect(execution.pnpmStep.mock.calls[2][2]).toContain('--node-linker=isolated')
-  expect(execution.pnpmStep.mock.calls[3][2]).toContain('--node-linker=hoisted')
+  expect(execution.pnpmStep.mock.calls[0][2]).toContain('--node-linker=isolated')
 })
 it('stops preparation when a dependency graph fails', async () => {
   execution.pnpmStep.mockReset().mockRejectedValueOnce(new Error('frozen graph mismatch'))
@@ -283,22 +277,13 @@ registerHooks({ resolve(specifier, context, next) {
   expect(result.stderr).not.toContain('Fresh checkout cannot resolve package')
 })
 
-it.each(['runtime/native-pi', 'runtime/managed-pi', 'mobile'])(
+it.each(['.', 'mobile'])(
   'offline readiness rejects missing or stale %s without installing',
   (graph) => {
     withInstalledDependencies(({ cwd: root }) => {
-      for (const directory of ['runtime/native-pi', 'runtime/managed-pi', 'mobile']) {
-        withInstalledDependencies(
-          ({ cwd }) => {
-            cpSync(cwd, join(root, directory), { recursive: true })
-          },
-          directory === 'mobile' ? 'android' : 'windows-x64'
-        )
-      }
-      writeFileSync(
-        join(root, 'runtime/native-pi/node_modules/.modules.yaml'),
-        stringify({ nodeLinker: 'hoisted', packageManager: 'pnpm@12.0.0' })
-      )
+      withInstalledDependencies(({ cwd }) => {
+        cpSync(cwd, join(root, 'mobile'), { recursive: true })
+      }, 'android')
       const context = { root, toolchain: { pnpm: '12.0.0' } }
       execution.pnpmStep.mockReset()
       expect(() => requireTargetDependencies(context, 'windows-x64')).not.toThrow()
@@ -351,3 +336,13 @@ it.skipIf(process.platform !== 'win32')(
     expect(result.stderr).not.toContain('Received undefined')
   }
 )
+
+it('upstream verification invokes only scripts provided by the current product manifest', () => {
+  const scripts = JSON.parse(readFileSync(resolve('package.json'), 'utf8')).scripts
+  const workflow = readFileSync(resolve('.github/workflows/upstream-sync.yml'), 'utf8')
+  const invoked = [...workflow.matchAll(/\bpnpm run ([a-zA-Z0-9:_-]+)/g)].map((match) => match[1])
+  expect(invoked).toContain('typecheck')
+  for (const name of invoked) {
+    expect(scripts, `Workflow invokes missing script ${name}`).toHaveProperty(name)
+  }
+})

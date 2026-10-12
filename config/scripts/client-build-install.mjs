@@ -72,7 +72,7 @@ export function canReuseInstalledDependencies(context, name, directory) {
     }
     const metadata = parse(readFileSync(modules, 'utf8'))
     if (
-      metadata.nodeLinker !== (mobile || name === 'native-pi' ? 'hoisted' : 'isolated') ||
+      metadata.nodeLinker !== (mobile ? 'hoisted' : 'isolated') ||
       metadata.packageManager !== `pnpm@${context.toolchain.pnpm}`
     ) {
       return false
@@ -123,8 +123,6 @@ function targetDependencyGraphs(context, target) {
     ? [[target, join(context.root, 'mobile')]]
     : [
         [target, context.root],
-        ['native-pi', join(context.root, 'runtime/native-pi')],
-        ['managed-pi', join(context.root, 'runtime/managed-pi')],
         ['android', join(context.root, 'mobile')]
       ]
 }
@@ -144,7 +142,7 @@ export async function prepareTargetDependencies(context, target) {
     if (canReuseInstalledDependencies(context, name, cwd)) {
       continue
     }
-    const hoisted = ['android', 'ios', 'native-pi'].includes(name)
+    const hoisted = ['android', 'ios'].includes(name)
     await pnpmStep(
       context,
       `${target}-install-${name}`,
