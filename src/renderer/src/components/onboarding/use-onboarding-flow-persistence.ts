@@ -9,6 +9,7 @@ import type { EventProps } from '../../../../shared/telemetry-events'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OnboardingState } from '../../../../shared/onboarding-state-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { applyAgentPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { StepId, StepNumber } from './use-onboarding-flow-types'
 
@@ -24,7 +25,7 @@ export async function persistStep(
 }
 
 function selectedAgentOrBlank(agent: TuiAgent | null): TuiAgent | 'blank' {
-  return agent ?? 'blank'
+  return isTuiAgent(agent) ? agent : 'blank'
 }
 
 export function buildCompletedOnboardingNotificationSettings(

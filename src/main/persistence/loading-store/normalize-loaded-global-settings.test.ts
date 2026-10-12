@@ -20,6 +20,19 @@ function normalizeLegacyProfile(overrides: Record<string, unknown>): PersistedSt
   return normalizeLoadedGlobalSettings(parsed, terminal, profile)
 }
 
+describe('persisted default agent', () => {
+  it.each(['hivecode', 'managed-pi', 'unknown-agent', 42, undefined])(
+    'restores %s as automatic selection',
+    (defaultTuiAgent) => {
+      expect(normalizeLegacyProfile({ defaultTuiAgent }).defaultTuiAgent).toBeNull()
+    }
+  )
+
+  it.each(['codex', 'pi', 'blank', null])('preserves %s', (defaultTuiAgent) => {
+    expect(normalizeLegacyProfile({ defaultTuiAgent }).defaultTuiAgent).toBe(defaultTuiAgent)
+  })
+})
+
 describe('retired Agents sidebar setting', () => {
   it('does not mark new profiles as migrated', () => {
     expect(normalizeLegacyProfile({}).agentsSidebarMigratedFromExperimental).toBe(false)

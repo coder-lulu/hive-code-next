@@ -11,6 +11,26 @@ vi.mock('sonner', () => ({
 }))
 
 describe('prepareSkippedOnboardingPreferences', () => {
+  it.each(['hivecode', 'managed-pi', 'unknown-agent', null])(
+    'does not persist invalid skipped selection %s',
+    async (selectedAgent) => {
+      const updateSettings = vi.fn()
+      const input: Parameters<typeof prepareSkippedOnboardingPreferences>[0] = {
+        currentStepId: 'agent',
+        themeBeforePreview: null,
+        settingsTheme: 'light',
+        selectedAgent: null,
+        setTheme: vi.fn(),
+        applyTheme: vi.fn(),
+        updateSettings,
+        setError: vi.fn()
+      }
+      Reflect.set(input, 'selectedAgent', selectedAgent)
+      expect(await prepareSkippedOnboardingPreferences(input)).toBe(true)
+      expect(updateSettings).not.toHaveBeenCalled()
+    }
+  )
+
   beforeEach(() => {
     vi.clearAllMocks()
   })

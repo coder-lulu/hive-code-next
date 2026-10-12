@@ -1,13 +1,46 @@
 import { describe, expect, it } from 'vitest'
 import { resolveOnboardingSettingsHydration } from './onboarding-settings-hydration'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import { getDefaultSettings } from '../../../../shared/constants'
 
-const settings = {
+const settings: GlobalSettings = {
+  ...getDefaultSettings('/tmp'),
   theme: 'light',
   defaultTuiAgent: 'codex'
-} as GlobalSettings
+}
 
 describe('resolveOnboardingSettingsHydration', () => {
+  it.each(['hivecode', 'managed-pi', 'unknown-agent', 'blank', null, undefined])(
+    'does not select invalid or empty preference %s',
+    (defaultTuiAgent) => {
+      const persistedSettings = { ...settings }
+      Reflect.set(persistedSettings, 'defaultTuiAgent', defaultTuiAgent)
+      expect(
+        resolveOnboardingSettingsHydration({
+          settings: persistedSettings,
+          settingsHydrated: false,
+          themeInteracted: false,
+          agentInteracted: false,
+          currentTheme: 'light',
+          currentAgent: null
+        })
+      ).toEqual({ settingsHydrated: true })
+    }
+  )
+
+  it.each(['codex', 'pi'] as const)('hydrates current external agent %s', (defaultTuiAgent) => {
+    expect(
+      resolveOnboardingSettingsHydration({
+        settings: { ...settings, defaultTuiAgent },
+        settingsHydrated: false,
+        themeInteracted: false,
+        agentInteracted: false,
+        currentTheme: 'light',
+        currentAgent: null
+      })
+    ).toEqual({ settingsHydrated: true, selectedAgent: defaultTuiAgent })
+  })
+
   it('does nothing before settings hydrate', () => {
     expect(
       resolveOnboardingSettingsHydration({

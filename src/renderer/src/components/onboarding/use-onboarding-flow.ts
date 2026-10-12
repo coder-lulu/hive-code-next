@@ -8,6 +8,7 @@ import { buildAgentPickedPayload } from './agent-picked-payload'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OnboardingState } from '../../../../shared/onboarding-state-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { STEPS } from './use-onboarding-flow-types'
 import { persistStep, useCloseWith, usePersistCurrentStep } from './use-onboarding-flow-persistence'
 import { resolveOnboardingSettingsHydration } from './onboarding-settings-hydration'
@@ -62,9 +63,7 @@ export function useOnboardingFlow(
   )
   const [stepIndex, setStepIndex] = useState(initialStep)
   const [selectedAgent, setSelectedAgent] = useState<TuiAgent | null>(
-    settings?.defaultTuiAgent && settings.defaultTuiAgent !== 'blank'
-      ? settings.defaultTuiAgent
-      : null
+    isTuiAgent(settings?.defaultTuiAgent) ? settings.defaultTuiAgent : null
   )
   const [yoloPermissions, setYoloPermissions] = useState(
     resolveAgentPermissionModeSummary({

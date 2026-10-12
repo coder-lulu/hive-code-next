@@ -9,6 +9,7 @@ import type { EventProps } from '../../../../shared/telemetry-events'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { OnboardingState } from '../../../../shared/onboarding-state-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { STEPS } from './use-onboarding-flow-types'
 
 type TaskSourcesSnapshotProps = EventProps<'onboarding_task_sources_snapshot'>
@@ -153,7 +154,7 @@ export async function prepareSkippedOnboardingPreferences({
       }
     }
     // Why: skipping bypasses step persistence, so save the visible agent choice before closing.
-    if (currentStepId === 'agent' && selectedAgent) {
+    if (currentStepId === 'agent' && isTuiAgent(selectedAgent)) {
       await updateSettings({ defaultTuiAgent: selectedAgent })
     }
     return true

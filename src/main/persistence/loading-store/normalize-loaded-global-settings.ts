@@ -12,6 +12,7 @@ import { normalizeNativeChatShellEnvironmentVariables } from '../../../shared/na
 import { stripRetiredGlobalSettings } from '../applying-settings/terminal-settings-migrations'
 import { readLegacySidekickFlag } from '../applying-settings/onboarding-normalization'
 import { normalizeMachineName } from '../../../shared/machine-name'
+import { isTuiAgent } from '../../../shared/tui-agent-config'
 import type { PersistedState } from '../../../shared/persisted-state-types'
 import type { PreparedLoadedTerminalSettings } from './prepare-loaded-terminal-settings'
 import type { PreparedLoadedProfileSettings } from './prepare-loaded-profile-settings'
@@ -61,6 +62,10 @@ export function normalizeLoadedGlobalSettings(
     // old default indistinguishable from a real opt-in. Preserve stored `true`; only
     // the default changed.
     ...stripRetiredGlobalSettings(parsed.settings),
+    defaultTuiAgent:
+      parsed.settings?.defaultTuiAgent === 'blank' || isTuiAgent(parsed.settings?.defaultTuiAgent)
+        ? parsed.settings.defaultTuiAgent
+        : null,
     nativeChatAppearance: normalizeNativeChatAppearanceSettings(
       parsed.settings?.nativeChatAppearance
     ),

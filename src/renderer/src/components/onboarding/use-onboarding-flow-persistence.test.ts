@@ -4,6 +4,8 @@ import { createElement, useEffect, act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultOnboardingState } from '../../../../shared/onboarding-defaults'
+import { renderHook, cleanup } from '@testing-library/react'
+import { getDefaultSettings } from '../../../../shared/constants'
 import type { OnboardingState } from '../../../../shared/onboarding-state-types'
 
 const trackMock = vi.hoisted(() => vi.fn())
@@ -16,6 +18,7 @@ import {
   buildCompletedOnboardingNotificationSettings,
   buildOnboardingDismissedPayload,
   useCloseWith,
+  usePersistCurrentStep,
   type DismissedExtras,
   trackOnboardingDismissed
 } from './use-onboarding-flow-persistence'
@@ -81,6 +84,7 @@ describe('onboarding flow persistence', () => {
   })
 
   afterEach(() => {
+    cleanup()
     if (root) {
       act(() => root?.unmount())
     }
@@ -89,6 +93,42 @@ describe('onboarding flow persistence', () => {
     container = null
     vi.useRealTimers()
   })
+
+  it.each([
+    ['hivecode', 'blank', false],
+    ['managed-pi', 'blank', false],
+    ['unknown-agent', 'blank', false],
+    [null, 'blank', false],
+    ['codex', 'codex', true],
+    ['pi', 'pi', true]
+  ] as const)(
+    'persists selection %s without claiming an invalid choice',
+    async (selectedAgent, expected, choseAgent) => {
+      const updateSettings = vi.fn().mockResolvedValue(undefined)
+      const input: Parameters<typeof usePersistCurrentStep>[0] = {
+        currentStepId: 'agent',
+        selectedAgent: null,
+        yoloPermissions: false,
+        theme: 'dark',
+        settings: getDefaultSettings('/tmp'),
+        updateSettings,
+        onboardingChecklist: getDefaultOnboardingState().checklist,
+        onOnboardingChange: vi.fn(),
+        setError: vi.fn()
+      }
+      Reflect.set(input, 'selectedAgent', selectedAgent)
+      const { result } = renderHook(() => usePersistCurrentStep(input))
+      await expect(result.current()).resolves.toEqual({ ok: true })
+      expect(updateSettings).toHaveBeenCalledWith(
+        expect.objectContaining({ defaultTuiAgent: expected })
+      )
+      expect(window.api.onboarding.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          checklist: expect.objectContaining({ choseAgent })
+        })
+      )
+    }
+  )
 
   it('builds dismissed telemetry with the triggering advance path', () => {
     expect(
