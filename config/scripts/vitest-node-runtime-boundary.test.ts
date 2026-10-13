@@ -4,6 +4,7 @@ import ts from 'typescript-api'
 import { expect, it } from 'vitest'
 import { discoverUnitFiles } from './ci-unit-files.mjs'
 import { NODE_RUNTIME_INCLUDE } from './vitest-node-runtime-files.mjs'
+import { callsImportedRuntime, hasValueImport } from './vitest-runtime-owner-source'
 
 it('keeps loader hooks and real Windows credential/pipe owners in the Node project', () => {
   const nodeFiles = new Set(
@@ -49,23 +50,6 @@ it('keeps real native ACL writes in Node while leaving mock-only notification an
     expect(readFileSync(owner, 'utf8')).not.toContain('writeSecureFile')
   }
 })
-
-function hasValueImport(node: ts.ImportDeclaration): boolean {
-  const clause = node.importClause
-  if (!clause) {
-    return true
-  }
-  if (clause.isTypeOnly) {
-    return false
-  }
-  return (
-    !!clause.name ||
-    !clause.namedBindings ||
-    ts.isNamespaceImport(clause.namedBindings) ||
-    clause.namedBindings.elements.length === 0 ||
-    clause.namedBindings.elements.some((binding) => !binding.isTypeOnly)
-  )
-}
 
 function importsNodeHttpRuntime(source: ts.SourceFile): boolean {
   return source.statements.some(
@@ -367,7 +351,7 @@ it('keeps real SQLite fixtures and publication durability in Node without moving
     'src/main/ipc/pty/pane/pane-owner-replacement.test.ts',
     'src/main/startup/profile-state-recovery-preflight.test.ts',
     'src/main/runtime/structured-worker-cleared-session.test.ts',
-    'src/main/window/history-gc-profile-worktree-ids.test.ts',
+    'src/main/orca-profiles/other-profile-workspace-catalog.test.ts',
     'src/main/runtime/orchestration/structured-session-mail-target.test.ts'
   ]) {
     expect(NODE_RUNTIME_INCLUDE, owner).toContain(owner)
@@ -613,7 +597,7 @@ it('runs real native setup and hook child-process contracts in Node while keepin
   ]
   for (const owner of [
     ...consumers,
-    'src/shared/child-process/windows-command-line.test.ts',
+    'src/packages/process-host/src/windows-command-line.test.ts',
     'src/shared/windows-command-line-budget.test.ts'
   ]) {
     const module = ts.createSourceFile(owner, readFileSync(owner, 'utf8'), ts.ScriptTarget.Latest)
@@ -634,41 +618,6 @@ it('runs real native setup and hook child-process contracts in Node while keepin
     expect(NODE_RUNTIME_INCLUDE.includes(owner), owner).toBe(consumers.includes(owner))
   }
 })
-
-function callsImportedRuntime(
-  source: ts.SourceFile,
-  moduleSuffix: string,
-  importedName: string
-): boolean {
-  const bindings = new Set<string>()
-  for (const node of source.statements) {
-    if (
-      !ts.isImportDeclaration(node) ||
-      !hasValueImport(node) ||
-      !ts.isStringLiteral(node.moduleSpecifier) ||
-      !node.moduleSpecifier.text.endsWith(moduleSuffix)
-    ) {
-      continue
-    }
-    const named = node.importClause?.namedBindings
-    if (named && ts.isNamedImports(named)) {
-      for (const binding of named.elements) {
-        if (!binding.isTypeOnly && (binding.propertyName ?? binding.name).text === importedName) {
-          bindings.add(binding.name.text)
-        }
-      }
-    }
-  }
-  let called = false
-  const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && ts.isIdentifier(node.expression)) {
-      called ||= bindings.has(node.expression.text)
-    }
-    ts.forEachChild(node, visit)
-  }
-  visit(source)
-  return called
-}
 
 it.each([
   ['import { run } from "./runtime"; run({})', true],

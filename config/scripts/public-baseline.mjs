@@ -1,6 +1,5 @@
 import {
   PRODUCT_TARGET_BRANCHES,
-  readCommitJson,
   resolveCommit,
   SHA_PATTERN,
   STATE_PATH,
@@ -11,11 +10,42 @@ const RECEIPT_PATH = 'config/open-source-baseline.json'
 const LEDGER_PATH = 'config/upstream-change-ledger.json'
 const ARCHIVE = 'https://github.com/coder-lulu/hive-code-next-history'
 
-export function readPublicBaseline({ git, head }) {
+export function readPublicBaseline({ git: raw, head }) {
+  const git = (args, input) => raw(['--no-replace-objects', ...args], input)
+  const metadata = new Map()
+  const readMetadata = (sha, file, optional = false) => {
+    if (!SHA_PATTERN.test(sha)) {
+      throw new Error('Public baseline metadata requires an immutable commit')
+    }
+    if (!metadata.has(sha)) {
+      const entries = new Map(
+        git(['ls-tree', '-z', sha, '--', RECEIPT_PATH, LEDGER_PATH, STATE_PATH])
+          .split('\0')
+          .filter(Boolean)
+          .map((record) => {
+            const tab = record.indexOf('\t')
+            return [record.slice(tab + 1), record.slice(0, tab).split(' ')[2]]
+          })
+      )
+      metadata.set(sha, { entries, contents: new Map() })
+    }
+    const { entries, contents } = metadata.get(sha)
+    if (!entries.has(file)) {
+      if (optional) {
+        return null
+      }
+      throw new Error(`Missing ${file} in ${sha}`)
+    }
+    if (!contents.has(file)) {
+      contents.set(file, git(['show', `${sha}:${file}`]))
+    }
+    // Parse afresh so equal root/head reads retain independent result objects.
+    return JSON.parse(contents.get(file))
+  }
   const headSha = resolveCommit(git, head)
-  const current = readCommitJson(git, headSha, RECEIPT_PATH, true)
+  const current = readMetadata(headSha, RECEIPT_PATH, true)
   const roots = git(['rev-list', '--max-parents=0', headSha, '--']).trim().split(/\s+/)
-  const receipts = roots.map((root) => readCommitJson(git, root, RECEIPT_PATH, true))
+  const receipts = roots.map((root) => readMetadata(root, RECEIPT_PATH, true))
   // The receipt is introduced only by the new root, never by an old-history preparation commit.
   if (!receipts.some(Boolean)) {
     return null
@@ -48,11 +78,11 @@ export function readPublicBaseline({ git, head }) {
     throw new Error('Invalid public baseline provenance')
   }
   for (const root of roots) {
-    const ledgerBlob = git(['rev-parse', `${root}:${LEDGER_PATH}`]).trim()
+    const ledgerBlob = metadata.get(root).entries.get(LEDGER_PATH)
     if (ledgerBlob !== receipt.ledgerBlob) {
       throw new Error('Public baseline ledger blob is invalid')
     }
-    const state = readCommitJson(git, root, STATE_PATH)
+    const state = readMetadata(root, STATE_PATH)
     if (
       state.schemaVersion !== 1 ||
       state.upstream !== UPSTREAM_REPOSITORY ||
@@ -64,8 +94,8 @@ export function readPublicBaseline({ git, head }) {
       throw new Error('Public baseline must preserve the reviewed cursor and pending decisions')
     }
   }
-  const initialLedger = readCommitJson(git, roots[0], LEDGER_PATH)
-  const currentLedger = readCommitJson(git, headSha, LEDGER_PATH)
+  const initialLedger = readMetadata(roots[0], LEDGER_PATH)
+  const currentLedger = readMetadata(headSha, LEDGER_PATH)
   if (
     initialLedger.schemaVersion !== 1 ||
     !Array.isArray(initialLedger.entries) ||

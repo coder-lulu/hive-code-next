@@ -66,6 +66,9 @@ describe('checkpoint Git execution boundary', () => {
       return args.at(-1).replace(/\^\{commit\}$/, '')
     })
     expect(prepareCrossVersionBaselines({ cwd: 'fixture-root' }).commits).toEqual([
+      '6e4f817101daa18d82824b69243d9079baa9c416',
+      '2bb20586ebc39d605e16d95f57420e20a16e7485',
+      '4bb6f2072b07c1f0664b809551f77754700570e4',
       'd802fdc7429f5f9d959b99a73656545bd760eace',
       '2307f2ebbe1c1e737c0b12d920bb0a208332db2c',
       '11aba8bdc5e492d3ba01fc7fe333495ace74128f',
@@ -82,13 +85,12 @@ describe('checkpoint Git execution boundary', () => {
       'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c',
       'f97ca2a49d9c711dab54a656a7f8a47ae6c6749c',
       '28957d6004dd191b6f0baff493a9fd3d37405d9d',
-      '6e4f817101daa18d82824b69243d9079baa9c416',
       'd937d22f498505c017634be9bf0540c9fa42e665',
       '4cb013c0a9251275fa3d20ea33b45429e07aa6be',
       '4bb337741c335cfcc428d3b4271023566e2dadb8',
       'fd9125ea8c7b347cd8b675a4095e31cd3c865d25'
     ])
-    expect(execution.run).toHaveBeenCalledTimes(42)
+    expect(execution.run).toHaveBeenCalledTimes(46)
     for (const [, , options] of execution.run.mock.calls) {
       expect(options.env.GIT_DIR).toBeUndefined()
       expect(options.env.GIT_WORK_TREE).toBeUndefined()

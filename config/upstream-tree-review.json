@@ -629,7 +629,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "5163cd6d56c929978792f636c5d659384f96f8ed"
+        "sha": "419995976d20ae81a0a9bd53054c7dbe35f0108a"
       },
       "upstream": {
         "mode": "100644",
@@ -637,12 +637,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "12d715c48b0adaee679f2896295b2c102454b140"
+        "sha": "419995976d20ae81a0a9bd53054c7dbe35f0108a"
       },
-      "reason": "Preserve both native process tests and restore owned exact-compiler TypeScript incremental cache before the new background compiler gate; existing runner/read-only credentials boundaries retained.",
+      "reason": "Preserve both native process tests and restore owned exact-compiler TypeScript incremental cache before the new background compiler gate; existing runner/read-only credentials boundaries retained. Join process-host-imports and main-sync-spawn ratchet before starting Typecheck group to respect existing concurrency budget; all checks retained.",
       "regressionTests": [
         "config/scripts/pr-workflow-parallelism.test.mjs",
-        "config/scripts/pr-code-change-scope.test.mjs"
+        "config/scripts/pr-code-change-scope.test.mjs",
+        "config/scripts/ci-background-step-barriers.test.mjs"
       ]
     },
     {
@@ -9964,11 +9965,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "a55e56dcdea5bef3f770687f982d195ec2246b58"
+        "sha": "e2323b5c32f37dc4c3c827923d0d74f7a59472b6"
       },
-      "reason": "Final source unchanged: existing real bundled byte marker test proves platform sibling selection. Inventory now separate focused test to avoid exceeding source lint line budget.",
+      "reason": "Final source unchanged: existing real bundled byte marker test proves platform sibling selection. Inventory now separate focused test to avoid exceeding source lint line budget. Existing measured route sweep stale against reviewed Hive source; exact MAIN E5 plus one approved C6 source overlay independently measured16prefixes. Actual79scripts vs historic74; derive new envelope using same margin4 and worst observed11. This is required remeasurement per existing policy, not arbitrary budget increase.",
       "regressionTests": [
-        "ui-gap-web-inventory.log: actual .web.tsx sibling selection test passed, no headful browser"
+        "ui-gap-web-inventory.log: actual .web.tsx sibling selection test passed, no headful browser",
+        "config/scripts/build-mobile-web-app-bundle.test.mjs"
       ]
     },
     {
@@ -10306,9 +10308,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "02792e27924974f5869c4e04b8271bf388df2abf"
+        "sha": "3bc619aa5e00d8f9a6ae51c6c813a826dbe81c4f"
       },
-      "reason": "config/scripts/generate-skill-bundle-manifest.test.mjs: retain the independently maintained product installer boundary; upstream installer algorithms, provider registry, fixtures and comments are reference-only and are not authorized for absorption. Exact original owned blob retained for subsequent current-host seam review.",
+      "reason": "config/scripts/generate-skill-bundle-manifest.test.mjs: retain the independently maintained product installer boundary; upstream installer algorithms, provider registry, fixtures and comments are reference-only and are not authorized for absorption. Exact original owned blob retained for subsequent current-host seam review. Current reviewed release workflow allows only package.json, stricter than original/base two-path release-mapping allowance. Upstream already has same one-path guard. Test stale two-path expectation corrected; no workflow changes. Regex also pins immediate || true) to reject additional allowlist entries; skill-resource tripwire now expects no matching step.",
       "regressionTests": [
         "src/main/skills/skill-runtime-capability.test.ts",
         "src/main/skills/skill-install-management-service.test.ts",
@@ -11102,13 +11104,18 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "63167005b5e4c768033a6157586dffb961d90306"
+        "sha": "65dbd9c22031e20d200a22fe200922ccd5fe9ffd"
       },
-      "reason": "Execute runner body in isolated VM with fake child process/filesystem/process; prove preflight fail-closed, failure propagation, exact managed spec/worker/env forwarding and no actual child execution.",
+      "reason": "Execute runner body in isolated VM with fake child process/filesystem/process; prove preflight fail-closed, failure propagation, exact managed spec/worker/env forwarding and no actual child execution. {\"boundary\":\"Retired SSH facade and5 nonexistent tests migrated to current runtime target/dispatch/local Git authority; real3owner suites passed, SSH explicitly unavailable, no execution restored.\",\"checkpoint\":\"23 actual immutable release pins require46 sanitized Git calls; no ref/pin/permissions changes.\",\"prune\":\"Keep cleanup before tsc after required process-host package build.\",\"docker\":\"Await actual managed process events; preserve unavailable-template, preparation failure, lane/environment/argv and null exit denial; add spawn error denial. No Docker run or availability bypass.\",\"routes\":\"Reviewed files+preview clipboard grant requires4new handoffs; removes6nowcovered ones;17 exact entries, explicit missing clipboard negative preserved.\"}",
       "regressionTests": [
         "ci-routing-third.log: 145 passed; 2 integration failures correctly detect Root-owned retired E2E files pending removal",
         "ci-routing-lint-complete.log: exit 0",
-        "Docker E2E not executed; layout-oracle traversal Windows path issue handed to Root"
+        "Docker E2E not executed; layout-oracle traversal Windows path issue handed to Root",
+        "config/scripts/upstream-sync-boundary-contract.test.mjs",
+        "config/scripts/upstream-sync-checkpoint-execution.test.mjs",
+        "config/scripts/prune-stale-cli-emits.test.mjs",
+        "config/scripts/run-ssh-docker-e2e.test.mjs",
+        "config/scripts/mobile-web-page-route-hop-coverage.test.mjs"
       ]
     },
     {
@@ -11280,7 +11287,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "9232ac9e686f89e6ca46797b89321fff42b3a6f2"
+        "sha": "f5b4b9d8770ad063ebf6a1e6c5babe8234dc8f41"
       },
       "upstream": {
         "mode": "100644",
@@ -11288,16 +11295,18 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "3dc98cb431d7e9b0cd4518882e47f1a58ac0a245"
+        "sha": "f5b4b9d8770ad063ebf6a1e6c5babe8234dc8f41"
       },
-      "reason": "Route exactly 12 real SQLite runtime consumers to Node for Bun orchestration; current AST import-contract test proves classification, no mocked DB replacement or pool weakening. Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime.",
+      "reason": "Route exactly 12 real SQLite runtime consumers to Node for Bun orchestration; current AST import-contract test proves classification, no mocked DB replacement or pool weakening. Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime. Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes.",
       "regressionTests": [
         "cli-tooling-final-tests.log: 22 suites, 479 passed, 33 explicit platform skips",
         "cli-tooling-lint.log: 22 changed source/test files passed",
         "cli-guided-create-green.log: 3 suites33 passed; cli-guided-create-red.log proves original failure",
         "cli-guided-create-lint.log: two changed create files passed",
         "config/scripts/vitest-node-runtime-boundary.test.ts",
-        "src/main/orca-profiles/other-profile-workspace-catalog.test.ts"
+        "src/main/orca-profiles/other-profile-workspace-catalog.test.ts",
+        "config/scripts/vitest-node-native-runtime-boundary.test.ts",
+        "config/scripts/vitest-node-runtime-pool.test.ts"
       ]
     },
     {
@@ -11661,11 +11670,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "852c0552a048145da64228b68b7c292402e99fd3"
+        "sha": "5b693977a6e61c9548b0d26223fcf182de7503ec"
       },
-      "reason": "Adapt new shared failure/retry component to Graphite live theme and accessible 44dp targets, preserving upstream retry grouping.",
+      "reason": "Adapt new shared failure/retry component to Graphite live theme and accessible 44dp targets, preserving upstream retry grouping. Fix unlocalized shared Retry label to existing fixed Chinese convention; no i18n layer, layout/token or callback changes.",
       "regressionTests": [
-        "mobile/src/files/mobile-file-preview-retry.test.tsx"
+        "mobile/src/files/mobile-file-preview-retry.test.tsx",
+        "mobile/src/files/MobileFileExplorerPanel.test.ts",
+        "mobile/src/session/mobile-session-graphite.test.ts"
       ]
     },
     {
@@ -13257,11 +13268,17 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "90b9445be997f0aca11200b3d0284f56f7a0705c"
+        "sha": "e129559772f179873d85f67b89f351c23ec71b05"
       },
-      "reason": "Keep owned zod and @ alias source mount; upstream lazy native dependency creation and single relative resolution retain shared WeakSet identity without duplicate pathFor call.",
+      "reason": "Keep owned zod and @ alias source mount; upstream lazy native dependency creation and single relative resolution retain shared WeakSet identity without duplicate pathFor call. Enumerate actual exports on relative and alias module references so CommonJS star re-exports retain split runtime capabilities and live bindings. Keep refusing native boundaries, per-run caches, delivery ambiguity identity and exact-one mutation counting. Two new cases reproduced undefined exports before the repair.",
       "regressionTests": [
-        "mobile/scripts/rpc-recording.mts"
+        "mobile/scripts/rpc-recording.mts",
+        "mobile/src/test-support/rpc-recording/operation-module-loader.test.ts",
+        "mobile/src/test-support/rpc-recording/operation-module-loader-work-budget.test.ts",
+        "mobile/src/test-support/rpc-recording/compiled-operation-module.test.ts",
+        "mobile/src/test-support/rpc-recording/pilot-recordings.test.ts",
+        "mobile/src/test-support/rpc-recording/family-recordings.test.ts",
+        "mobile/src/test-support/rpc-recording/mutants/probe-hole-witness.test.ts"
       ]
     },
     {
@@ -13884,9 +13901,9 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "fd9245511815f3fbae0175b3c6499a858e4594f9"
+        "sha": "d9a3ad955c5a54580db00276184e698152383557"
       },
-      "reason": "Add actual app/pair.tsx mounted lifecycle regression: route precedence, supported URL extraction, invalid/rejected URL, unmount and changed-params cancellation. No production route/auth changes. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
+      "reason": "Add actual app/pair.tsx mounted lifecycle regression: route precedence, supported URL extraction, invalid/rejected URL, unmount and changed-params cancellation. No production route/auth changes. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent. Find actual imported mocked component binding rather than unsupported host-element string, preserving redirect lifecycle assertions.",
       "regressionTests": [
         "mobile/src/transport/pair-redirect-screen.test.tsx",
         "pnpm --dir mobile run format:check"
@@ -14936,14 +14953,15 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "f29cee9d55ff0911e2eb4113c7ca3deea78179ba"
+        "sha": "3ae3039a16b9a7eac4be2cf15b6eaab3b282bda9"
       },
-      "reason": "Construct real local fixture PATH with host delimiter; mocked service manager OS is not the filesystem host OS. Preserve refusal of version-scoped launchers and server-only credentials.",
+      "reason": "Construct real local fixture PATH with host delimiter; mocked service manager OS is not the filesystem host OS. Preserve refusal of version-scoped launchers and server-only credentials. Update only affected user-visible message assertion to HiveCode; retain refusal, runtime ABI and source-fence assertions. Service-unit test additionally pins existing durable Orca log path.",
       "regressionTests": [
         "cli-tooling-final-tests.log: 22 suites, 479 passed, 33 explicit platform skips",
         "cli-tooling-lint.log: 22 changed source/test files passed",
         "cli-guided-create-green.log: 3 suites33 passed; cli-guided-create-red.log proves original failure",
-        "cli-guided-create-lint.log: two changed create files passed"
+        "cli-guided-create-lint.log: two changed create files passed",
+        "src/cli/handlers/serve-service.test.ts"
       ]
     },
     {
@@ -14982,14 +15000,15 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "8eb64a33d81e80875b1a2ee57e4ab00598cca988"
+        "sha": "a0f819a83533d9ee6ac61395e957b962b277513a"
       },
-      "reason": "Fix real default create --agent rejection: new-worktree preparation uses current guided focused presentation while create.activate stays unchanged. Existing-workspace background remains supported and schema guard unchanged.",
+      "reason": "Fix real default create --agent rejection: new-worktree preparation uses current guided focused presentation while create.activate stays unchanged. Existing-workspace background remains supported and schema guard unchanged. Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
       "regressionTests": [
         "cli-tooling-final-tests.log: 22 suites, 479 passed, 33 explicit platform skips",
         "cli-tooling-lint.log: 22 changed source/test files passed",
         "cli-guided-create-green.log: 3 suites33 passed; cli-guided-create-red.log proves original failure",
-        "cli-guided-create-lint.log: two changed create files passed"
+        "cli-guided-create-lint.log: two changed create files passed",
+        "config/scripts/user-visible-brand-boundary.test.mjs"
       ]
     },
     {
@@ -15276,13 +15295,14 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "797a0d31a7a94b95a53964833ee72e714dc9cc6b"
+        "sha": "afab78a2e8ded5b07fcc03e75a9960976c9cab28"
       },
-      "reason": "Preserve the selected physical profile, isolated serve options and supervised update handoff; launch through process-host and retain the bounded Linux AppImage user-namespace probe. Fix custom profile-name inference and extract the unchanged sandbox predicate to respect the existing module budget.",
+      "reason": "Preserve the selected physical profile, isolated serve options and supervised update handoff; launch through process-host and retain the bounded Linux AppImage user-namespace probe. Fix custom profile-name inference and extract the unchanged sandbox predicate to respect the existing module budget. Consume already branded refusal message directly instead of applying dynamic branding over user data/path contents; no launch or updater admission behavior changed.",
       "regressionTests": [
         "src/cli/runtime/launch.test.ts",
         "src/cli/runtime/metadata-path.test.ts",
-        "src/cli/runtime/serve-signal-exit-diagnostic.test.ts"
+        "src/cli/runtime/serve-signal-exit-diagnostic.test.ts",
+        "config/scripts/user-visible-brand-boundary.test.mjs"
       ]
     },
     {
@@ -15444,14 +15464,15 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "acab10f3e1c865a7171436d2856b9248ae1f0115"
+        "sha": "3c690d4291434f75c68e6995fa2946af0dedcd90"
       },
-      "reason": "Compare host-native joined fixture paths while retaining launchd/systemd service payload, supervision, no-pairing and timeout assertions.",
+      "reason": "Compare host-native joined fixture paths while retaining launchd/systemd service payload, supervision, no-pairing and timeout assertions. Update only affected user-visible message assertion to HiveCode; retain refusal, runtime ABI and source-fence assertions. Service-unit test additionally pins existing durable Orca log path.",
       "regressionTests": [
         "cli-tooling-final-tests.log: 22 suites, 479 passed, 33 explicit platform skips",
         "cli-tooling-lint.log: 22 changed source/test files passed",
         "cli-guided-create-green.log: 3 suites33 passed; cli-guided-create-red.log proves original failure",
-        "cli-guided-create-lint.log: two changed create files passed"
+        "cli-guided-create-lint.log: two changed create files passed",
+        "src/cli/runtime/serve-service-unit.test.ts"
       ]
     },
     {
@@ -15569,11 +15590,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "19cc77f14450d0ed237291117df82ef4e7b52c4b"
+        "sha": "7e4004ec9cc79658c9497e42f1d6e264c79818ad"
       },
-      "reason": "Retain host-aware current selectors and parent worktree validation; add actual current CLI arguments without choosing a client-local owner for a remote workspace.",
+      "reason": "Retain host-aware current selectors and parent worktree validation; add actual current CLI arguments without choosing a client-local owner for a remote workspace. Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
       "regressionTests": [
-        "src/cli/index.test.ts"
+        "src/cli/index.test.ts",
+        "config/scripts/user-visible-brand-boundary.test.mjs"
       ]
     },
     {
@@ -15666,12 +15688,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "a2bf07f4272eecbc9dde3e22b626252fc1aa8779"
+        "sha": "02b793472726ca2c146fa76a4c1cabdd320dd459"
       },
-      "reason": "Preserve current executable names and owned help branding while documenting/validating accepted managed server, launch, automation and supervised serve flags.",
+      "reason": "Preserve current executable names and owned help branding while documenting/validating accepted managed server, launch, automation and supervised serve flags. Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
       "regressionTests": [
         "src/cli/index.test.ts",
-        "src/cli/index-serve-command.test.ts"
+        "src/cli/index-serve-command.test.ts",
+        "config/scripts/user-visible-brand-boundary.test.mjs"
       ]
     },
     {
@@ -17614,13 +17637,16 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "64d26c69bb5e2f7c6db4f12fd05a5ad454b83f6c"
+        "sha": "4c2b88b3b37e4833a5d317a1b568dd985a00c3a6"
       },
-      "reason": "Adapt fixture to actual current Host/process/session/account contract; maintain security assertions and real lifecycle checks without broad casts or disabled diagnostics",
+      "reason": "Adapt fixture to actual current Host/process/session/account contract; maintain security assertions and real lifecycle checks without broad casts or disabled diagnostics Two deleted execution-wrapper imports now use public process-host runProcessSync and existing pure process-failure-message owner. Windows root reaper pure mock uses EventEmitter with explicit PipedChildProcess shape rather than writing Bun native readonly pid; all10 original safety assertions unchanged, no runner/production edits.",
       "regressionTests": [
         "node-fixtures-focused.log: 8 suites69 tests passed; ACP 1 failure fixed next",
         "node-fixtures-acp-focused.log: 4 suites87 passed including ACP8, queued host and transfer safety",
-        "node-fixtures-lint.log: 10 files pass"
+        "node-fixtures-lint.log: 10 files pass",
+        "config/scripts/release-javascript-artifact.test.mjs",
+        "config/scripts/verify-telemetry-constants.test.mjs",
+        "src/main/claude/claude-windows-root-exit-reaper.test.ts"
       ]
     },
     {
@@ -29539,13 +29565,14 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "aaf1052eab058a98c8378a2c910e95a22ce9238d"
+        "sha": "7971cdf172d33555388da74ab25de365d124b9af"
       },
-      "reason": "Current Hive updater stages through native checkForUpdates, gates native-ready by accepted candidate/generation, then commits install; error/reset poison late readiness. Preparation must explicitly succeed. Preserve signed source and supervised handoff fences.",
+      "reason": "Current Hive updater stages through native checkForUpdates, gates native-ready by accepted candidate/generation, then commits install; error/reset poison late readiness. Preparation must explicitly succeed. Preserve signed source and supervised handoff fences. Consume already branded refusal message directly instead of applying dynamic branding over user data/path contents; no launch or updater admission behavior changed.",
       "regressionTests": [
         "src/main/updater.headless-serve-install.test.ts",
         "src/main/updater.mac-install.test.ts",
-        "src/main/updater-events.test.ts"
+        "src/main/updater-events.test.ts",
+        "config/scripts/user-visible-brand-boundary.test.mjs"
       ]
     },
     {
@@ -33551,11 +33578,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "ecdd6d19a2bb8d2d6cf873a3a367cce60ebae5a1"
+        "sha": "1ef7fcf2d8b84594a0fc47c626775ca0d65d8a93"
       },
-      "reason": "Test actual preserved product community skill command, without new upstream pinned installer algorithm; retain interaction/owner assertions.",
+      "reason": "Test actual preserved product community skill command, without new upstream pinned installer algorithm; retain interaction/owner assertions. Correct only installedCommand expectation to update; preserve first-install add and prerequisite/UI cases.",
       "regressionTests": [
-        "focused skill UI tests"
+        "focused skill UI tests",
+        "src/renderer/src/components/sidebar/LinearAgentSkillSetupPrompt.test.tsx"
       ]
     },
     {
@@ -35183,11 +35211,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "00990f17ac9e2d060a8cd6fa61f32fc9ff11e6f5"
+        "sha": "01ed6579575e77f9c7e7ee59a7341a95216c70b4"
       },
-      "reason": "Current Runtime/Orcad SSH only. Remove legacy relay bridge transport, reject persisted old SSH PTY binding explicitly without spawning, killing or changing data.",
+      "reason": "Current Runtime/Orcad SSH only. Remove legacy relay bridge transport, reject persisted old SSH PTY binding explicitly without spawning, killing or changing data. Preserve resolved Runtime authority for SSH-shaped wake hints. Only mark ownerless saved SSH obsolete; unresolved/hydrating guards retained. Real connectPanePty tests require exact HUB transport and reject ownerless/ambiguous routing with no IPC/direct SSH.",
       "regressionTests": [
-        "src/renderer/src/components/terminal-pane/direct-ssh-hidden-output-restore-unavailable-banner.test.ts"
+        "src/renderer/src/components/terminal-pane/direct-ssh-hidden-output-restore-unavailable-banner.test.ts",
+        "src/renderer/src/components/terminal-pane/pty-connection-remote-runtime-attach.test.ts",
+        "src/renderer/src/components/terminal-pane/pty-connection/deferred-session-attach-current-owner.test.ts"
       ]
     },
     {
@@ -38743,12 +38773,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "46be9a2ac011cbe4ced78c3dda13b01a22433483"
+        "sha": "a93ea8b634a81450fa63d183525901431a2ff42e"
       },
-      "reason": "A real Windows junction fixture reproduced Git refusing an explicitly excluded ignored path. Preserve tracked staging, enumerate visible untracked entries and send literal NUL pathspecs while excluding only verified shared links; no receipt until staging succeeds.",
+      "reason": "A real Windows junction fixture reproduced Git refusing an explicitly excluded ignored path. Preserve tracked staging, enumerate visible untracked entries and send literal NUL pathspecs while excluding only verified shared links; no receipt until staging succeeds. Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
       "regressionTests": [
         "src/main/runtime/runtime-git-stage-worktree-scope.test.ts",
-        "src/main/git/source-control/stage-worktree-changes.test.ts"
+        "src/main/git/source-control/stage-worktree-changes.test.ts",
+        "config/scripts/user-visible-brand-boundary.test.mjs"
       ]
     },
     {
@@ -41492,15 +41523,23 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "ffe30377e888b2e52f75256cbd7dac632abc10e7"
+        "sha": "4fd1131ff2955ab90117c9e65a26bb436a9ef649"
       },
-      "reason": "Isolated scratch directory lives in required logs under a Git parent. Set GIT_CEILING_DIRECTORIES to its parent (Git does not honor a ceiling equal to cwd) so this test genuinely exercises a non-repository root; all real release-sharing/read-only/fallback assertions retained.",
+      "reason": "Isolated scratch directory lives in required logs under a Git parent. Set GIT_CEILING_DIRECTORIES to its parent (Git does not honor a ceiling equal to cwd) so this test genuinely exercises a non-repository root; all real release-sharing/read-only/fallback assertions retained. Windows independentcopy fallback uses bounded8 directorypreparation, bounded8 regularfile copyFile/verbatim nonderef cp forlinks, bounded8 final modewrites. Phases do notoverlap. Everyissuedoperation settles before failure/lease release. NonWindows fallback unchanged. Nohardlinks/lease/ref/publication/timeout changes. ActualWindows nativecp refuseslinkcreationEPERM; test asserts same refusal plus sourceuntouched, and always proves nestedreadonly/inode independently.",
       "regressionTests": [
         "cli-cross-version-isolation-pin.log: 2 suites28 passed",
         "cli-cross-version-qoder-setup.log: 9 passed",
         "cli-cross-version-cache-second.log: kept-card and old-tab mirror suites passed (other then-failing suites separately repaired)",
         "cli-cross-version-diagnostic-snapshot.log: 43 passed with real f4c70d7dfd08d16e1a4c2787fe21156b8b0829ec producer, diagnostic only",
-        "cli-cross-version-lint.log: all6 changed files passed"
+        "cli-cross-version-lint.log: all6 changed files passed",
+        "tests/e2e/cross-version-wire/release-source-cache.unit.test.ts",
+        "tests/e2e/cross-version-wire/release-source-retention.unit.test.ts",
+        "tests/e2e/cross-version-wire/release-checkout-tree.unit.test.ts",
+        "tests/e2e/cross-version-wire/release-checkout-tree-bounded.unit.test.ts",
+        "tests/e2e/cross-version-wire/agent-session-death-evidence-downgrade.unit.test.ts",
+        "tests/e2e/cross-version-wire/agent-session-resume-marker-downgrade.unit.test.ts",
+        "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts",
+        "tests/e2e/cross-version-wire/orchestration-delivery-downgrade.unit.test.ts"
       ]
     },
     {
@@ -43340,15 +43379,16 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "cf25e3910e6460f4c6fe40209b27c2a24d17cc81"
+        "sha": "d2143cdc05ebdfe0151705e667e1adc8f0b3ff36"
       },
-      "reason": "Replace live imports of removed shared child-process helpers with the sole public @orca/process-host API; remove the obsolete TypeScript loader without changing process or build ownership.",
+      "reason": "Replace live imports of removed shared child-process helpers with the sole public @orca/process-host API; remove the obsolete TypeScript loader without changing process or build ownership. Restore source-independent client doctor/preparation using the owned public @orca/process-host manifest source export and Node builtins. The temporary synchronous loader is scoped to this importer and package source, rejects relative escapes, transforms current TypeScript and deregisters in finally. Keep existing Windows-hidden process execution and literal argv behavior; no raw subprocess wrapper, installed compiler, swallowed failure or fabricated toolchain readiness. The unchanged fresh-checkout doctor assertion first failed, then passed; real capture failure, closed stdin logging and metacharacter literal argv regressions pass.",
       "regressionTests": [
         "config/scripts/client-build-execution.test.mjs",
         "config/scripts/check-hivecode-brand-boundary.test.mjs",
         "config/scripts/headless-serve-shutdown-registration.test.mjs",
         "config/scripts/hourly-preflight-workflow.test.mjs",
-        "config/scripts/linux-cli-launch-contract-version.test.ts"
+        "config/scripts/linux-cli-launch-contract-version.test.ts",
+        "config/scripts/client-build-install.test.mjs"
       ]
     },
     {
@@ -43401,7 +43441,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "a90eff02aedd063eee774a9bd03444cbe465573a"
+        "sha": "54dad60ca4ac5ee49738fd7c891623ca1ee2f404"
       },
       "upstream": {
         "mode": "100644",
@@ -43409,12 +43449,14 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "435a789c55e10fa1a7a6205d00477e5177605530"
+        "sha": "54dad60ca4ac5ee49738fd7c891623ca1ee2f404"
       },
-      "reason": "Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime.",
+      "reason": "Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime. Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes.",
       "regressionTests": [
         "config/scripts/vitest-node-runtime-boundary.test.ts",
-        "src/main/orca-profiles/other-profile-workspace-catalog.test.ts"
+        "src/main/orca-profiles/other-profile-workspace-catalog.test.ts",
+        "config/scripts/vitest-node-native-runtime-boundary.test.ts",
+        "config/scripts/vitest-node-runtime-pool.test.ts"
       ]
     },
     {
@@ -43448,6 +43490,2044 @@
       "regressionTests": [
         "src/renderer/src/components/settings/AgentDetectionRefreshButton.test.tsx",
         "src/renderer/src/components/settings/HostAgentLaunchSettings.test.tsx"
+      ]
+    },
+    {
+      "path": "mobile/src/test-support/rpc-recording/operation-module-loader.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "d4aea1cf8bd8eeaa30e5184cff68fb702c89d31b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "d4aea1cf8bd8eeaa30e5184cff68fb702c89d31b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "d4aea1cf8bd8eeaa30e5184cff68fb702c89d31b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6010b3a0ab4e8cf2d6caef8dc1dc29e2473aa2ec"
+      },
+      "reason": "Enumerate actual exports on relative and alias module references so CommonJS star re-exports retain split runtime capabilities and live bindings. Keep refusing native boundaries, per-run caches, delivery ambiguity identity and exact-one mutation counting. Two new cases reproduced undefined exports before the repair.",
+      "regressionTests": [
+        "mobile/src/test-support/rpc-recording/operation-module-loader.test.ts",
+        "mobile/src/test-support/rpc-recording/operation-module-loader-work-budget.test.ts",
+        "mobile/src/test-support/rpc-recording/compiled-operation-module.test.ts",
+        "mobile/src/test-support/rpc-recording/pilot-recordings.test.ts",
+        "mobile/src/test-support/rpc-recording/family-recordings.test.ts",
+        "mobile/src/test-support/rpc-recording/mutants/probe-hole-witness.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/install-electron-package-binary-test-fixtures.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "43af71328ff56f038961141583fad58ca97133e3"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "5b98116a1b3558fdc6f07d287b30e14bfbf251aa"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "43af71328ff56f038961141583fad58ca97133e3"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "aba5bac5b6c6273695b8e8e05d196e8c75b5ab14"
+      },
+      "reason": "Isolate standalone installer fixtures from ancestor Git cache discovery with a fixture-local ceiling while retaining their own repository/worktree cache contracts. A real logs-local probe adopted the parent distribution and bypassed fake download/extraction, causing fourteen existing cases to fail. Add an explicit ancestor-cache isolation regression; retain all download, retry, rollback, partial extraction and unsettled-download assertions.",
+      "regressionTests": [
+        "config/scripts/install-electron-package-binary.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/install-electron-package-binary.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "155668b534a165461712632d3303de0120810be6"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "f3c2f8c7ae5d665b225a0cd46e0e84968beda4b8"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "155668b534a165461712632d3303de0120810be6"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6b08ecf8520a696063390ae319667e8046714ce5"
+      },
+      "reason": "Isolate standalone installer fixtures from ancestor Git cache discovery with a fixture-local ceiling while retaining their own repository/worktree cache contracts. A real logs-local probe adopted the parent distribution and bypassed fake download/extraction, causing fourteen existing cases to fail. Add an explicit ancestor-cache isolation regression; retain all download, retry, rollback, partial extraction and unsettled-download assertions.",
+      "regressionTests": [
+        "config/scripts/install-electron-package-binary.test.mjs"
+      ]
+    },
+    {
+      "path": "mobile/rpc-foundation/hive/manifest.json",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "0af0470330622ded957d8d2fb1dba77a6c7e176d"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "0af0470330622ded957d8d2fb1dba77a6c7e176d"
+      },
+      "reason": "Bind the independently proven 794-file three-way corpus digest, preserving historical recorder/source/baseline metadata and the 755 supported/39 unsupported domain. Update only the separately approved PR triage overlay dependency hash/reason for its real workspace scope. No corpus re-recording or retired graph restoration.",
+      "regressionTests": [
+        "mobile/src/test-support/hive-recording-reference.test.ts",
+        "mobile/src/test-support/hive-golden-domain.test.ts",
+        "mobile/src/test-support/rpc-recording/family-recordings.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/src/transport/rpc-client-direct-v2.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "345480a36959d562bbd24eab6b87060c50d4b0e0"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "a249e108bab0277bf90add2be21d05abeb6678bd"
+      },
+      "reason": "Use current base64 pin option, assert pin rejection via authentication callback with no authentication/no send; real authenticated send failure must force reconnect rather than reject credentials.",
+      "regressionTests": [
+        "mobile/src/transport/rpc-client-direct-v2.test.ts",
+        "mobile/src/transport/mobile-e2ee-v2-physical-channel.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/src/platform/text-input-font-size.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "c3399f225a2bba9b7ec91287b20a396e93f311fd"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "936dd1adb807a0577deef50bc7a5c86a61f2980e"
+      },
+      "reason": "Follow actual Ask stylesheet extraction; retain exact fontSize seam invariant.",
+      "regressionTests": [
+        "mobile/src/platform/text-input-font-size.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/src/transport/unvalidated-rpc-request-port-inventory.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "5cafcab3b7a7035eb40ac7fd2d8ef89fe29ba558"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "23291ac79ee82aa43815673d2789d64f9728e701"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "5cafcab3b7a7035eb40ac7fd2d8ef89fe29ba558"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "700fd42d4a9502286ea73ac65e2ca0fe880a76f4"
+      },
+      "reason": "Move same two raw port references to extracted type contract owner; no allowance increase.",
+      "regressionTests": [
+        "mobile/src/transport/unvalidated-rpc-request-port-boundary.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/src/session/mobile-session-graphite.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "0187445d146ba43e56368a6f3dfa37352881de49"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "c62bc60b4a190cdfb0a913c2ffbdf716b6180500"
+      },
+      "reason": "Include shared load-error component actually rendered by MobileMarkdownReader in localized source closure; preserve all label/forbidden English assertions.",
+      "regressionTests": [
+        "mobile/src/session/mobile-session-graphite.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/rpc-foundation/hive/goldens/matrix-session.pr-triage-agent.launchreplay-1.json",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "6c778daeb4cab5ba20af92da5ad5f9c37f17165c"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "370bc0423dbcbcd3db1bf714a0e5373ae2535889"
+      },
+      "reason": "Port only current workspace-scoped preflight.detectAgents request into reviewed PR triage overlay; preserve Hive update-required/no-start refusal and all other observation nodes. Reviewed-deltas top-level digest belongs to concurrent Root repair; this slice changes only one delta row, remaining38 unchanged.",
+      "regressionTests": [
+        "mobile/src/test-support/rpc-recording/family-recordings.test.ts",
+        "mobile/src/session/pr-ai-triage-launch.test.ts",
+        "mobile/src/session/mobile-new-tab-agent-loader.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/rpc-foundation/hive/reviewed-deltas.json",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "224427fbede198794441bf3679f22a2899177b78"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "224427fbede198794441bf3679f22a2899177b78"
+      },
+      "reason": "Port only current workspace-scoped preflight.detectAgents request into reviewed PR triage overlay; preserve Hive update-required/no-start refusal and all other observation nodes. Reviewed-deltas top-level digest belongs to concurrent Root repair; this slice changes only one delta row, remaining38 unchanged.",
+      "regressionTests": [
+        "mobile/src/test-support/rpc-recording/family-recordings.test.ts",
+        "mobile/src/session/pr-ai-triage-launch.test.ts",
+        "mobile/src/session/mobile-new-tab-agent-loader.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/src/test-support/rpc-recording/adapters/session-terminal-create-mount-adapters.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "4adb1b67872f7cb823a25b0252af4b47d66fba95"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "4adb1b67872f7cb823a25b0252af4b47d66fba95"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "7daf2f86c1cdc7055890dd5686389ddc63b48a65"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "78cba055e65e8b6fa71d49a32c25d2743e110187"
+      },
+      "reason": "Supply current sessionTabsRef backed by the same sessionTabs state and updated by the setter; coherent fixture follows current production scope without golden recording changes.",
+      "regressionTests": [
+        "mobile/src/test-support/rpc-recording/pilot-recordings.test.ts",
+        "mobile/src/test-support/rpc-recording/family-recordings.test.ts",
+        "mobile/src/test-support/rpc-recording/mutants/probe-hole-witness.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/terminal-pane/pty-connection-remote-runtime-attach.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "cbd4464e65d63de699b0d2a80995cf556dccfa01"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "cbd4464e65d63de699b0d2a80995cf556dccfa01"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "cbd4464e65d63de699b0d2a80995cf556dccfa01"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3b8960d38ac58e86efd574fce3c6b9a644265353"
+      },
+      "reason": "Preserve resolved Runtime authority for SSH-shaped wake hints. Only mark ownerless saved SSH obsolete; unresolved/hydrating guards retained. Real connectPanePty tests require exact HUB transport and reject ownerless/ambiguous routing with no IPC/direct SSH.",
+      "regressionTests": [
+        "src/renderer/src/components/terminal-pane/pty-connection-remote-runtime-attach.test.ts",
+        "src/renderer/src/components/terminal-pane/pty-connection/deferred-session-attach-current-owner.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/settings.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "464591144aee2bfee64abdd437290016e67dc037"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "464591144aee2bfee64abdd437290016e67dc037"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "464591144aee2bfee64abdd437290016e67dc037"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e4f59a2e69254534ad4187aac05de90c96edb4d5"
+      },
+      "reason": "Positive remote catalog fixture advertises actual project-host setup capability and supplies empty authoritative project/setup lists; selected host preservation assertions and unsupported capability production guard unchanged.",
+      "regressionTests": [
+        "src/renderer/src/store/slices/settings.test.ts",
+        "src/renderer/src/store/slices/repos-project-host-capability.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/repos-nested-ssh-projection.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "9ced00f07fcc084eee14f409876409a94ff852b9"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "9ced00f07fcc084eee14f409876409a94ff852b9"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "8016f35464819ded222e0476b3942d9fcd142607"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "aed4b3161d001d1aabbc8f7411876c6f540dc68f"
+      },
+      "reason": "Override transport seam only in this spec to forward catalog RPC to its authoritative per-case fixture; shared harness otherwise consumed requests with empty lists. Preserve distinct SSH setup and paired-runtime authority assertions.",
+      "regressionTests": [
+        "src/renderer/src/store/slices/repos-nested-ssh-projection.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/tests-typecheck-baseline.txt",
+      "base": {
+        "mode": "100644",
+        "sha": "c2eadf35e2ad4d7921ee9928f59d2b3148c08279"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "0ad482b260dd2531b13949c082513ebd5541d202"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "b8dda1e45a74fa16c2bd05c52f204e145cc0d79e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "0ad482b260dd2531b13949c082513ebd5541d202"
+      },
+      "reason": "Remove exactly two resolved test entries; add no allowances and preserve compiler settings. Fresh original checker passes with 150 grandfathered files.",
+      "regressionTests": [
+        "mobile/scripts/check-tests-typecheck-ratchet.test.ts",
+        "pnpm --dir mobile check:tests-typecheck"
+      ]
+    },
+    {
+      "path": "mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "cfd1157ab273f65c2ebf8c981e1c3324614919e2"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "9f43dae625c02ccf632280eb880488a6203e7685"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "cfd1157ab273f65c2ebf8c981e1c3324614919e2"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "47517cf540402338f496e3b0f66abb8a7db76a3a"
+      },
+      "reason": "Preserve toggle/hold runtime table with const literal inference matching actual voice policy union; no casts or weakened assertions.",
+      "regressionTests": [
+        "mobile/src/session/MobileNativeChatView.prompt-presentation.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/ensure-native-runtime.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "68a10b5bb20671932bfd75413e00ede70ad8ee1b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "78ab170973deeb0b8fb17ec221d14f4b56273953"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "c65706638c9c40b250063877477a7cdee46b7d88"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "34dddccab73e20ac1e47bb837d28506d912b0339"
+      },
+      "reason": "Remove inherited case variants of npm_config_node_gyp before setting synthetic fixture tool. Windows case-insensitive environment otherwise keeps inherited uppercase real pnpm node-gyp and compiles missing binding.gyp. Both Node/Bun probes reproduce alias conflict; no production, ABI, timeout, runtime selector, or assertion change.",
+      "regressionTests": [
+        "config/scripts/ensure-native-runtime.test.mjs"
+      ]
+    },
+    {
+      "path": "src/renderer/src/store/slices/detected-agents.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "a343fe2c59c92872fe2ff2514245f660736c9453"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "cee0f6404a8e08ef0dcbca4c0240df60396b018e"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "a343fe2c59c92872fe2ff2514245f660736c9453"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a0c8c7032fd3e2dcec91537f47404b5230022712"
+      },
+      "reason": "Replace retired method-not-found fallback expectation per frozen current-only policy. Assert retained prior cache, visible failure, settled loading, and exactly one refresh RPC on selected environment, no legacy detect call. Workspace capability and owner fences unchanged.",
+      "regressionTests": [
+        "src/renderer/src/store/slices/detected-agents.test.ts",
+        "src/renderer/src/store/slices/runtime-detected-agents.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/agent-state-rules-bundle.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "1413cc34368abc48d4607ab05d02fc18af7f8130"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "38be07f323fa63b5c42e673c71e3de5ca87bfa36"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "1413cc34368abc48d4607ab05d02fc18af7f8130"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "11564885f6deaf1ace7e683072441c907291c074"
+      },
+      "reason": "Fresh RED actual bundled-only IDs include dsh in addition to gemini/opencode2/pi. Add dsh to exact inventory expectation, retaining every per-agent live-update refusal and any-agent acceptance. Pi here is external terminal detection rule, not retired native agent SDK; no production revival.",
+      "regressionTests": [
+        "config/scripts/agent-state-rules-bundle.test.mjs"
+      ]
+    },
+    {
+      "path": "src/main/ipc/registered-worktree-root-probes.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "a1ba05441b99f603570d3552914a153db0bba5f9"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a1ba05441b99f603570d3552914a153db0bba5f9"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "a1ba05441b99f603570d3552914a153db0bba5f9"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "14c0a4ce9f0d1dc93a46b1fb11188a308b596be5"
+      },
+      "reason": "Prevent ancestor Git discovery from widening authorization after nested metadata loss: require registered root membership before graph expansion. Exact resolved match fast path; differing aliases require actual realpath equality, fail closed on unavailable entries. Preserve repo-only grant and listingFailed. Cache repo.path to retain original access-count budget.",
+      "regressionTests": [
+        "src/main/ipc/registered-worktree-root-graph-authority.test.ts",
+        "src/main/ipc/filesystem-path-containment-unicode-normalization.test.ts",
+        "src/main/ipc/filesystem-auth.test.ts",
+        "src/main/ipc/registered-worktree-root-ownership.test.ts",
+        "src/main/ipc/registered-worktree-root-refresh.test.ts",
+        "src/main/ipc/registered-worktree-root-wsl-runtime.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/registered-worktree-root-graph-authority.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "1c562ec1affbf83b452ab12decd56e9ba263b85f"
+      },
+      "reason": "Real Git negative for deleted nested .git; real main, linked, junction and Windows case alias positive graph membership. No mocked Git or filesystem identity.",
+      "regressionTests": [
+        "src/main/ipc/registered-worktree-root-graph-authority.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/filesystem-path-containment-unicode-normalization.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "54922246cd92999adf84cc07b70b3fe308835e07"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "cc2e657a434e6e25fd633c59ab2af8e987f678ec"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "54922246cd92999adf84cc07b70b3fe308835e07"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "1a5b386dcfae97269ee2431387506a3abad5469e"
+      },
+      "reason": "Initialize actual isolated Git repositories for fixtures advertised as kind git; retain all ten Unicode and unauthorized-read assertions. Separate real nested-metadata-loss regression locks production repair.",
+      "regressionTests": [
+        "src/main/ipc/filesystem-path-containment-unicode-normalization.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/filesystem-auth.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "12a9995eecf54838732987d5df2c6426abc6df47"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "12a9995eecf54838732987d5df2c6426abc6df47"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "12a9995eecf54838732987d5df2c6426abc6df47"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2d6ab6557127b15d9f4194b38d81b6758427419c"
+      },
+      "reason": "Preserve existing security/cache assertions with a faithful graph fixture including the actual registered root; empty/mismatched graphs are unavailable, not authoritative absence.",
+      "regressionTests": [
+        "src/main/ipc/filesystem-auth.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/registered-worktree-root-ownership.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "c03f923d7ec485f08830160fd21d3f76e66da6c6"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "c03f923d7ec485f08830160fd21d3f76e66da6c6"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "c03f923d7ec485f08830160fd21d3f76e66da6c6"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "22574e0623810bdf812e249588207d2eea62cdb4"
+      },
+      "reason": "Preserve existing security/cache assertions with a faithful graph fixture including the actual registered root; empty/mismatched graphs are unavailable, not authoritative absence.",
+      "regressionTests": [
+        "src/main/ipc/registered-worktree-root-ownership.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/registered-worktree-root-refresh.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "f33221adb05a893e31770beb7e6dd8b7a63dadd5"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "f33221adb05a893e31770beb7e6dd8b7a63dadd5"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "f33221adb05a893e31770beb7e6dd8b7a63dadd5"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4f64202c18212db2d09606049210c6f83dec1a46"
+      },
+      "reason": "Preserve existing security/cache assertions with a faithful graph fixture including the actual registered root; empty/mismatched graphs are unavailable, not authoritative absence.",
+      "regressionTests": [
+        "src/main/ipc/registered-worktree-root-refresh.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/registered-worktree-root-wsl-runtime.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "6d516a3574ab3d285bf4f55ce87f0298f6a9eacb"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "6d516a3574ab3d285bf4f55ce87f0298f6a9eacb"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "6d516a3574ab3d285bf4f55ce87f0298f6a9eacb"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "59b95bdc9a53b6c90937e47e4840b921c6c86beb"
+      },
+      "reason": "Preserve existing security/cache assertions with a faithful graph fixture including the actual registered root; empty/mismatched graphs are unavailable, not authoritative absence.",
+      "regressionTests": [
+        "src/main/ipc/registered-worktree-root-wsl-runtime.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/verify-mobile-web-app-bundle.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "48917d294ce2150291a349aa48327f168f50b2d4"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "c976ebe53375a493a7b5ba18aee8af9edd8484ec"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "48917d294ce2150291a349aa48327f168f50b2d4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "c976ebe53375a493a7b5ba18aee8af9edd8484ec"
+      },
+      "reason": "Existing measured route sweep stale against reviewed Hive source; exact MAIN E5 plus one approved C6 source overlay independently measured16prefixes. Actual79scripts vs historic74; derive new envelope using same margin4 and worst observed11. This is required remeasurement per existing policy, not arbitrary budget increase.",
+      "regressionTests": [
+        "config/scripts/build-mobile-web-app-bundle.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/vitest-runtime-owner-source.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "fa70f2594ceaea4854c65d91be07100c446934e2"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "fa70f2594ceaea4854c65d91be07100c446934e2"
+      },
+      "reason": "Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes.",
+      "regressionTests": [
+        "config/scripts/vitest-node-runtime-boundary.test.ts",
+        "config/scripts/vitest-node-native-runtime-boundary.test.ts",
+        "config/scripts/vitest-node-runtime-pool.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/vitest-node-native-runtime-boundary.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "52127bf37188b9c8c9dd6f99751193b77210ee3a"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "52127bf37188b9c8c9dd6f99751193b77210ee3a"
+      },
+      "reason": "Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes.",
+      "regressionTests": [
+        "config/scripts/vitest-node-runtime-boundary.test.ts",
+        "config/scripts/vitest-node-native-runtime-boundary.test.ts",
+        "config/scripts/vitest-node-runtime-pool.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/orca-cli-skill-guidance.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "d6a5c33c72258369fa5062ed15029162ea1736ff"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "df5010d12d569b683010b0ef8f576ef3a4bdf044"
+      },
+      "reason": "Assert current managed create-agent launch receipt and single outcome handle guidance; preserve authority and no duplicate fresh launch rules.",
+      "regressionTests": [
+        "config/scripts/orca-cli-skill-guidance.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/orchestration-skill-guidance.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "466a6a8abb7cbe28a960a79bf92fac5bf2405a3a"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "3065f59ed9baee00d4de564582a05949de6e70bd"
+      },
+      "reason": "Count semantic document lines without trailing file newline; existing 202-line maximum and guidance checks unchanged.",
+      "regressionTests": [
+        "config/scripts/orchestration-skill-guidance.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/pr-checks-skip-wiring.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "bda176fee2291e643a079b3a87a4d3417133d075"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "a064415c8c44d84d04e39506197bc85a672c949a"
+      },
+      "reason": "Assert actual browser-contract classifier input on reusable test job; preserve all remaining expensive-job skip gates.",
+      "regressionTests": [
+        "config/scripts/pr-checks-skip-wiring.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/ci-background-step-barriers.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "4844c635d0784356734e8652a5b390cbc83ee383"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "8b2c71aef315f5d049964b529a7ba839f1b7d552"
+      },
+      "reason": "Assert both background mobile type tasks joined before allocating Test workers and unchanged concurrency ceiling; ratchet reflects actual background job.",
+      "regressionTests": [
+        "config/scripts/ci-background-step-barriers.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/release-e2e-dispatch-contract.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "3908afad2617eb8e4754010e44cf91c6125fba89"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "686eae5ea0cd71b26b503489540d3771b275ccbe"
+      },
+      "reason": "Align packaging contract to current Electron/web owner and artifact suffix; retired Relay build absent; publication and permissions guards retained.",
+      "regressionTests": [
+        "config/scripts/release-e2e-dispatch-contract.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/toolchain-contract.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "7496555bfcbfeb7badf6a1bcf2a643e981e65283"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "2a4920b1f87d73430a6f897d5b4a79fbefffbb1b"
+      },
+      "reason": "Use current docker-ssh-host fixture while retaining immutable Node toolchain digest assertion.",
+      "regressionTests": [
+        "config/scripts/toolchain-contract.test.mjs"
+      ]
+    },
+    {
+      "path": ".github/workflows/mobile.yml",
+      "base": {
+        "mode": "100644",
+        "sha": "78047f09d2e56118dfb3b3c495db431c7d2d6f49"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "e23527a8a9ecda48cc9be5f004902d1496d0323b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "57ac9819d916d6904456eff7619175b3a244063f"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e23527a8a9ecda48cc9be5f004902d1496d0323b"
+      },
+      "reason": "Join both background type processes before Test; all checks and failure exits retained, no permission or publishing changes.",
+      "regressionTests": [
+        "config/scripts/ci-background-step-barriers.test.mjs"
+      ]
+    },
+    {
+      "path": "mobile/src/mobile-web-shell/bridge/bridge-client-errors.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "db4e6ee02eb0b5a4886b2475fc24dbbd4926658e"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "c7779584679a313c62a4e0dde1acb0c0d104bb27"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "9ea8d5c22c61f5e5a9844cd9c9ec9b813d1f0f88"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "87e14c9a1b56eaf20c84283082c1390c4368e4a3"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "mobile/src/session/mobile-new-tab-agent-loader.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "5cc02b5442148331f65c9a0370da520f5427c15a"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "cd227e4ffb44a9796a2159d54dc6ce0c35028a20"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "6b2bef916d6a7b1b58eb4da99681beb8b5569664"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "9ee3335f51cd37a85d898d6957a6f9144c6ac3d4"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "mobile/src/session/mobile-new-tab-agent-loader.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/ephemeral-vm-workspace-target.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "67bd053a082e6ba20725a631479c444bbf5301e7"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "dba1c0c2d5e23b39e43882db26f5438c444d2eb7"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "05c7d813a40f37a6c6ec43294000d9b16f8988cb"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "1c649c728d64f9188a2f6e7319eda6da901a5ec7"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/renderer/src/lib/ephemeral-vm-workspace-target.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/execution-host-facts.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "d663593116162524802191ba6de0e925b1b4da7c"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "66a6bb0c5a850e77fcc8cb1bb13b7a51899f0c9c"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-ssh-target-management.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "39fb3df97a77e507471ab656ba72b67895e2bf4b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "dae1644c5026028f3965a1d3cbc7686eebfa3891"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/renderer/src/runtime/runtime-ssh-target-management.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-agent-session-attachment-upload.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "b32c0bc6340541b2088d933bd01a0eb8c426303a"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "77787b82c53b3bb90bc8acc2b187b93640f44314"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/renderer/src/web/preload-api/web-agent-session-attachment-upload.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/agent-launch-recovery.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "b5545ffdc2d4daa745772ec9a2d142fa4607584a"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "00fb2b8eab604bd7d8ffa2c657717f2bdc0c78ef"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/agent-launch-request.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "a2d9024bbd6e7a9525c2b497d51445f2d1843d40"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "0a1d5996727abd4aa2e4f78c30889694da8b0e17"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/account-list-format.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "66da6d4b1b71731c395854f8f13129b260cce392"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "66da6d4b1b71731c395854f8f13129b260cce392"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "59df0c6b3a48cf722b1e3f41f4c2d39c3a819e1b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "9253092f274a721bb3dc8cd535a600bc2243abd9"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/agent-launch.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "04aa441d374300204b1fbf3135b159661e0d5266"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a1887ef49cb6bedd6d48d501b66ffe14ca18bbd5"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/reference.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "c2f94a839795f3f16a9621d57f21983a76abb7c1"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "f2634de88f686bcc7489e17ed89f8e9f9f33e0e2"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/serve-restore.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "ed1193b991f3d5e25e2a1bb729dd4ee669618aab"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "5ad9556824bf6d290a1052668167747a6214fc6e"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/cli/handlers/serve-restore.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/serve-service-format.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "fd0a530a6cfc1c94299bfee3dbf245618ea8b884"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "0ec20738a7ec4555cfb8a4dffd6c5c230d41980a"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/serve-service.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "74f26d0c9e9067878f61aab7310de1850735cab2"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e8a851fdb14e97c64513528d3f445b06a3eb1777"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/cli/handlers/serve-service.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/terminal-daemon.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "99a277eab9715956f59385a8b9a4b86cd244d5e4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2bd90411cbe3036193c70afe0e00e338742e5ae4"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/cli/handlers/terminal-daemon.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/worktree-setup-decision-recovery.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "27acc186b395fc3e75280cdc25917a2f120311f8"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "27acc186b395fc3e75280cdc25917a2f120311f8"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "dbf292fc57be82b9e9301c0bb92528450d2e0539"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "9dcf726b9896e7cfd07e750e57921041a182269a"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/reference-input.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "e2a9054633dbe111ee286b6c5a40f2f8f2e1350a"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "7d04ef08bb7be8f39dcde04b3fa27b0866bdaed3"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/runtime-source-fence.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "0210da945d7c8215f39eb3d04d1c6f20a1695897"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4b8a604aca320b536fc46f0e950a4acc1d30d8a6"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/cli/runtime/runtime-source-fence.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/serve-app-launcher.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "753851ec7aeb51201cc2b43f95291fc9b2120a54"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "5d90772b41172b6175880d8eecbadbd272b8bcb3"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/serve-electron-preflight.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "f973f71b48679734da99b6b3114d7e17de57d833"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "ead8fc70c652c0a08c87472ab8d902817b65a68e"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/cli/runtime/serve-electron-preflight.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/serve-install-hold.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "c9cfc378487e62c30afec1087141ad9c019a2fc9"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "dd2f0ff4eec68d2f71ebfdb0a1a190809f8845d9"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/cli/runtime/serve-install-hold.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/serve-pairing-redaction.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "ae7c68c80b49e848760d49e4a586d2965b840931"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "b54a3403819ac5db4cb5944e148ed78260b4c5a0"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/cli/runtime/serve-pairing-redaction.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/serve-service-unit.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "232d5f17c9fe214164e5e07753c390895c20ccc4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "68641317b14e713f4ecc6c9dd5376f3c3e485e25"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json. Preserve historical Library/Logs/Orca directory through explicit LEGACY_SERVE_LOG_DIRECTORY constant; new unit regression pins that durable path.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/cli/runtime/serve-service-unit.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/serve-supervised-service.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "a3fd4bba13dc9be855e561c9dc14f1cfeef5ee8f"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2552b34468ed7b28761a3d98e2ff44060fa6f568"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/cli/runtime/serve-supervised-service.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/serve-supervisor-brake.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "c5d6f5bc8179ee8039a0cba078bdf75be3552c82"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3983f0f2ce0ecde630c550d4c3421d488a75d31c"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/specs/agent-launch.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "3db5d4a641a900ea5d2313f765995fd9753df72d"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "9c112b000dd21d6e4b5e6273e775817607a4c7f5"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/specs/terminal-daemon.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "0ab468ecbba8a4ecdaadfab817bfb2007bd2a6c9"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e139e0f5c576291bd11010092e15445d5f528af2"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/main/codex/codex-background-terminals.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "d32b91ef096a554609447605e55a609ff333e9fa"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "15a25b40bda3ff0993c4f7a3bbab2dbae3f05486"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/main/codex/codex-background-terminals.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/orcad/launcher.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "747f30cc7847d692d5a631081f202e319ea58975"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "11f38962dfc28de496b77d787d694e15d7d1157c"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/main/orcad/orcad-bundled-runtime.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "497e8a1120f9a17d364938f5753cff629bfd3f46"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "2f61f33d0f2de113a8e31091d3c26a8091bacca0"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "297b8f7c48edbbf0f88bb4f8fe24e1ba655476c9"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "8d04b667fe21c778112c2921042b5400ee211a3b"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/main/orcad/orcad-bundled-runtime.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/provisioned-root-checkout.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "07b7a56e21e4637874fba7ab7b70f250d979923d"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "cf016ad332d05c70dc6b13542d84231ad050e804"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/main/provisioned-root-checkout.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ssh/orcad-interrupted-candidate-resume.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "8e26437d9acc939e35928e8f8b9391ad1b971032"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "41a72ad711ba736c9f98ddcc496472859157f200"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/main/ssh/orcad-managed-serving.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "02891479d4e99b1adf3bf940c5c4fea38230b1ca"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "02891479d4e99b1adf3bf940c5c4fea38230b1ca"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "19580399d176984f1927e1a0ab9c513639cd3e88"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a2bb757575afc23dfa1754ed3184e0d07e2d316c"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/main/ssh/orcad-managed-serving.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/updater/serve-supervisor-install-park.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "5008426e1fbca1d92c7ccfc75369ff76f56b7027"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6405635ea426e47964e5a532e119a40b6fefc6e9"
+      },
+      "reason": "Replace reviewed user-facing brand copy only; technical identifiers, ORCA environment variables, CLI binary names and paths are preserved. Exact before/after literals in c6-brand-copy-edit-plan.json. Independent reviewer found three refusal branches formerly covered by dynamic wrapper; statically brand all unresponsive/busy/unregistered branches and retain original PID interpolation. c6-brand-refusal-red-valid locked 3 failures, green 18 PASS.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs",
+        "src/main/updater/serve-supervisor-install-park.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/user-visible-brand-boundary.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "8badf7a26fcb076ea7e4bfd7335fe0c0533cad4b"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "617162a652dacdaf430044bf9ee28bbd0b9c497d"
+      },
+      "reason": "Exclude only explicit .test-support test fixture suffix from production scan; add negative test fixture and positive production-looking names regression. No brand allowlist expansion.",
+      "regressionTests": [
+        "config/scripts/user-visible-brand-boundary.test.mjs"
+      ]
+    },
+    {
+      "path": "src/cli/handlers/serve-restore.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "24158e0ee59cd682f6d55e40f34dbd94d2b75f21"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "211fedd0f93196b71fae44b477c0286c0e7462e1"
+      },
+      "reason": "Update only affected user-visible message assertion to HiveCode; retain refusal, runtime ABI and source-fence assertions. Service-unit test additionally pins existing durable Orca log path.",
+      "regressionTests": [
+        "src/cli/handlers/serve-restore.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/serve-electron-preflight.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "48eba25456e3aaeeba13adc64ee62ed31faa4a14"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "eb31e527d7ffe8f2656da1e4cfde8349c96e2659"
+      },
+      "reason": "Update only affected user-visible message assertion to HiveCode; retain refusal, runtime ABI and source-fence assertions. Service-unit test additionally pins existing durable Orca log path.",
+      "regressionTests": [
+        "src/cli/runtime/serve-electron-preflight.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/orcad/orcad-bundled-runtime.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "9fe9b96afb782446725fd83d63554680642376dd"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "17d174a35c830be64776774759c948b107de39dc"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "357d0efd1c677a08b573158597a45fbe28200ebb"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "f61fb79132f8a82a8fb6aa3a701cb86487fb9c84"
+      },
+      "reason": "Update only affected user-visible message assertion to HiveCode; retain refusal, runtime ABI and source-fence assertions. Service-unit test additionally pins existing durable Orca log path.",
+      "regressionTests": [
+        "src/main/orcad/orcad-bundled-runtime.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/preload-api/web-agent-session-attachment-upload.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "4b1e6b56af93d8cac77a12876181b9fd26a4ab10"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6f032ecfbcc174df0b65b8e475e7abee97f0e5bc"
+      },
+      "reason": "Update only affected user-visible message assertion to HiveCode; retain refusal, runtime ABI and source-fence assertions. Service-unit test additionally pins existing durable Orca log path.",
+      "regressionTests": [
+        "src/renderer/src/web/preload-api/web-agent-session-attachment-upload.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/updater/serve-supervisor-install-park.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "cb2c2b07f825399a06fce379f7c07f45c3328f17"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3f627b750dcc6efe332fcd26dc29402eaa5a28f7"
+      },
+      "reason": "Add exact three refusal reason outputs with original process IDs; retain all eight existing park/timeout/bundle/coordination tests. Locks missing static branding after removing unsafe dynamic replacement.",
+      "regressionTests": [
+        "src/main/updater/serve-supervisor-install-park.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/web-preload-upstream-adaptations.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "12d8848a1f4234ef072ba4dc6bfef313171349b8"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "4e0fc2341020b150a40c2800bd1cf9851a1b014d"
+      },
+      "reason": "Add actual supported external Kiro history provider; preserve exact selected-client call, other-host refusal and host-local data redaction.",
+      "regressionTests": [
+        "src/renderer/src/web/web-preload-upstream-adaptations.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/new-workspace-prompt-delivery.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "8665896819624dee703df1278e49b9d606131469"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "b0c55ff66c37a4e195f644e684ead57590800f0c"
+      },
+      "reason": "Use actual PTY-keyed input/paste signatures; preserve exact activation-selected/delayed PTY, content, forcePaste and no telemetry assertions.",
+      "regressionTests": [
+        "src/renderer/src/lib/new-workspace-prompt-delivery.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/startup/hive-runtime-cloud-presence-wiring.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "e8ed38a585e939e036c16265d611ac377f3b574a"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "31df3d44637ff071d6b426d205ef64ed12e16371"
+      },
+      "reason": "Bound restart fencing at current relaunch-auth versus update-state preservation helpers; retain revocation and committed shutdown barrier assertions.",
+      "regressionTests": [
+        "src/main/startup/hive-runtime-cloud-presence-wiring.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/startup/headless-pty-hydration-ordering.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "c2dd0ef4a7e676a9d743a678b610659021065104"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "ae63df55908430a7ed585d94eba430abd15b6e40"
+      },
+      "reason": "Follow extracted agentHookRuntimeDeps and startOrcadManagedAgentHooks owners; retain order, environment setting gate, captured pane identity, settings listener and recovery-before-replay assertions.",
+      "regressionTests": [
+        "src/main/startup/headless-pty-hydration-ordering.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/startup/desktop-startup-ordering.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "b0e7433ca3a056c9db21081cb601835d039cd0ea"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "9bda97b3462a710f3053337379fdbe0705265e16"
+      },
+      "reason": "Bound readiness at actual output argument and follow serve-quit wrapper; assert its repeatable signal registration before publication.",
+      "regressionTests": [
+        "src/main/startup/desktop-startup-ordering.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/accounts-host-owned-sections.test.tsx",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "7fe2b1173f2114606bad2761c5b40fa26e4f76bf"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "db7f21142e57b1329e361cd1a159b311b36273db"
+      },
+      "reason": "Provide explicit authoritative accountOwner; unavailable case missing owner stays unavailable. Preserve remount, WSL and no local credential fallback.",
+      "regressionTests": [
+        "src/renderer/src/components/settings/accounts-host-owned-sections.test.tsx"
+      ]
+    },
+    {
+      "path": "src/main/runtime/runtime-owned-terminal-surface-census.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "21fe7d6d65c475b64c09cc44c1d4282822ef78cc"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "fc95ffda78b65de311f906189304e4d910395166"
+      },
+      "reason": "Mock spawn honors actual persistHostSessionBinding through real fixture store.persistPtyBinding, matching production IPC commit. Retain single-tab omission survival and close release assertions; add exact persisted pane binding assertion.",
+      "regressionTests": [
+        "src/main/runtime/runtime-owned-terminal-surface-census.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/linear-agent-skill-update-command.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "4dc3661d506486b6af1fce178f6168c6b389092f"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "4dc3661d506486b6af1fce178f6168c6b389092f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e608e158e6e415629453de22862048ff8d010b9e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "9d7665667a0aaa5399884fa45d9ede9befb11228"
+      },
+      "reason": "Restore product update semantics using existing owned buildAgentFeatureSkillUpdateCommand; keep separate first-install add command and canonical/legacy selection; no upstream installer algorithm introduced.",
+      "regressionTests": [
+        "src/renderer/src/lib/linear-agent-skill-update-command.test.ts",
+        "src/renderer/src/components/sidebar/LinearAgentSkillSetupPrompt.update-command.test.tsx",
+        "src/renderer/src/components/sidebar/LinearAgentSkillSetupPrompt.test.tsx"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/linear-agent-skill-update-command.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "a831c081a48d733444a5c7e41f11e3fc6399d68f"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a831c081a48d733444a5c7e41f11e3fc6399d68f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "9329b151bb6c4f5a0b940fa6539154053c932e33"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "f027c016991a58d0827b25f86a66d454108553c6"
+      },
+      "reason": "Pin update target to existing update helper; preserve missing/canonical/dual/legacy scenarios.",
+      "regressionTests": [
+        "src/renderer/src/lib/linear-agent-skill-update-command.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/prune-stale-cli-emits.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "ee6b74bc28af8ad2444acb52552f8254e101d81e"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "561aa5b107aad0f169c3e16619ffd6f19509b5c4"
+      },
+      "reason": "{\"boundary\":\"Retired SSH facade and5 nonexistent tests migrated to current runtime target/dispatch/local Git authority; real3owner suites passed, SSH explicitly unavailable, no execution restored.\",\"checkpoint\":\"23 actual immutable release pins require46 sanitized Git calls; no ref/pin/permissions changes.\",\"prune\":\"Keep cleanup before tsc after required process-host package build.\",\"docker\":\"Await actual managed process events; preserve unavailable-template, preparation failure, lane/environment/argv and null exit denial; add spawn error denial. No Docker run or availability bypass.\",\"routes\":\"Reviewed files+preview clipboard grant requires4new handoffs; removes6nowcovered ones;17 exact entries, explicit missing clipboard negative preserved.\"}",
+      "regressionTests": [
+        "config/scripts/upstream-sync-boundary-contract.test.mjs",
+        "config/scripts/upstream-sync-checkpoint-execution.test.mjs",
+        "config/scripts/prune-stale-cli-emits.test.mjs",
+        "config/scripts/run-ssh-docker-e2e.test.mjs",
+        "config/scripts/mobile-web-page-route-hop-coverage.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/mobile-web-page-route-hop-coverage.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "c718a0bd02ed3c676d18395ac52400573e274f68"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "77068cbee6ad5fe50afeaebf13764454ec4c9829"
+      },
+      "reason": "{\"boundary\":\"Retired SSH facade and5 nonexistent tests migrated to current runtime target/dispatch/local Git authority; real3owner suites passed, SSH explicitly unavailable, no execution restored.\",\"checkpoint\":\"23 actual immutable release pins require46 sanitized Git calls; no ref/pin/permissions changes.\",\"prune\":\"Keep cleanup before tsc after required process-host package build.\",\"docker\":\"Await actual managed process events; preserve unavailable-template, preparation failure, lane/environment/argv and null exit denial; add spawn error denial. No Docker run or availability bypass.\",\"routes\":\"Reviewed files+preview clipboard grant requires4new handoffs; removes6nowcovered ones;17 exact entries, explicit missing clipboard negative preserved.\"}",
+      "regressionTests": [
+        "config/scripts/upstream-sync-boundary-contract.test.mjs",
+        "config/scripts/upstream-sync-checkpoint-execution.test.mjs",
+        "config/scripts/prune-stale-cli-emits.test.mjs",
+        "config/scripts/run-ssh-docker-e2e.test.mjs",
+        "config/scripts/mobile-web-page-route-hop-coverage.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/verify-telemetry-constants.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "94d248e245af3f4708d5487aaad4bc1dfa18f9c7"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "dd0ea2c9f239630fb3def7fac7e6570b1df3451e"
+      },
+      "reason": "Two deleted execution-wrapper imports now use public process-host runProcessSync and existing pure process-failure-message owner. Windows root reaper pure mock uses EventEmitter with explicit PipedChildProcess shape rather than writing Bun native readonly pid; all10 original safety assertions unchanged, no runner/production edits.",
+      "regressionTests": [
+        "config/scripts/release-javascript-artifact.test.mjs",
+        "config/scripts/verify-telemetry-constants.test.mjs",
+        "src/main/claude/claude-windows-root-exit-reaper.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/release-javascript-artifact.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "420311b90f891a83b1a14349c3ff702b9db4e284"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "853a4265277b5922459e2e065d9c67457341f2f3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "420311b90f891a83b1a14349c3ff702b9db4e284"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "f17e71a58c75893e91693080ba366b3bd6c25126"
+      },
+      "reason": "Two deleted execution-wrapper imports now use public process-host runProcessSync and existing pure process-failure-message owner. Windows root reaper pure mock uses EventEmitter with explicit PipedChildProcess shape rather than writing Bun native readonly pid; all10 original safety assertions unchanged, no runner/production edits.",
+      "regressionTests": [
+        "config/scripts/release-javascript-artifact.test.mjs",
+        "config/scripts/verify-telemetry-constants.test.mjs",
+        "src/main/claude/claude-windows-root-exit-reaper.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/release-javascript-support.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "5a77df80429cd45b31c56137074e1c6e08083072"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "c654b7920eaaccb4e957f6c6a222169064fd4aaf"
+      },
+      "reason": "Original product support/test already contradicted. Current owned portable JavaScript capability and unchanged artifact invariants allow true onlywith2scripts. Missing each script realfixture derives unavailable; mockonlysupplies its realcapability to benchmarkfixedroot; spawnthrowsnegative proves0builds. Workflowfallbackguards unchanged. No realcrossplatformbuild performed.",
+      "regressionTests": [
+        "config/scripts/release-javascript-support.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/client-build-process-host.mjs",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "dd7d4272cba5eb0f5b3e9ed24fc55143a874f3a0"
+      },
+      "reason": "Restore source-independent client doctor/preparation using the owned public @orca/process-host manifest source export and Node builtins. The temporary synchronous loader is scoped to this importer and package source, rejects relative escapes, transforms current TypeScript and deregisters in finally. Keep existing Windows-hidden process execution and literal argv behavior; no raw subprocess wrapper, installed compiler, swallowed failure or fabricated toolchain readiness. The unchanged fresh-checkout doctor assertion first failed, then passed; real capture failure, closed stdin logging and metacharacter literal argv regressions pass.",
+      "regressionTests": [
+        "config/scripts/client-build-install.test.mjs",
+        "config/scripts/client-build-execution.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/client-build-execution.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "15f70f35051f3c3542c44623e4494b1bc77f5607"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "a21e9041f130f34ea9956960286591bd888e92c5"
+      },
+      "reason": "Restore source-independent client doctor/preparation using the owned public @orca/process-host manifest source export and Node builtins. The temporary synchronous loader is scoped to this importer and package source, rejects relative escapes, transforms current TypeScript and deregisters in finally. Keep existing Windows-hidden process execution and literal argv behavior; no raw subprocess wrapper, installed compiler, swallowed failure or fabricated toolchain readiness. The unchanged fresh-checkout doctor assertion first failed, then passed; real capture failure, closed stdin logging and metacharacter literal argv regressions pass.",
+      "regressionTests": [
+        "config/scripts/client-build-install.test.mjs",
+        "config/scripts/client-build-execution.test.mjs"
+      ]
+    },
+    {
+      "path": "src/main/window/native-chat-paste-files.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "05599675c7c394e4702015492d01cb8bf0c04ad7"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "05599675c7c394e4702015492d01cb8bf0c04ad7"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "05599675c7c394e4702015492d01cb8bf0c04ad7"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "77ef707291a6e2f51bc3e175e8cbcb3f55709a60"
+      },
+      "reason": "Keep real filesystem containment assertions while making directory links real Windows junctions and verifying lstat link identity. Separate mixed ordinary restoration/expiry assertions from file-symlink assertions. Two crafted paths depend on POSIX symlink/.. resolution and are explicitly unavailable on Windows; two real file-symlink tests run only when a measured Windows privilege probe succeeds. On this host EPERM leaves those four tests not-tested; no production guard change, fake link substitution or full platform-coverage claim.",
+      "regressionTests": [
+        "src/main/window/native-chat-paste-files.test.ts"
+      ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/release-checkout-cache.unit.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "9f32b852928c08cc6ee1d8cf69a8fae0722f1157"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "7c409f5e5c86b65b5ce9fdd5293768952bfbda51"
+      },
+      "reason": "Align thirteen cache boundary tests with the already frozen current-only format-eight materializer. Keep the exact requested immutable SHA identity, verified current cache reuse, explicit cache isolation, and every old-root/stamp/tamper preservation assertion; obsolete historical location and release-label aliases are neither read nor reused and new writes stay under logs. Do not restore removed cache aliases or change the materializer.",
+      "regressionTests": [
+        "tests/e2e/cross-version-wire/release-checkout-cache.unit.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/global-fetch-call-site-audit.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "4279ce97d69e37ebd5630941f13e86da00d5b4fe"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "911dbcf24c59b0d774b7f378f8aa7938fef26669"
+      },
+      "reason": "Delete exactly three stale global-fetch census entries whose calls moved or disappeared. Audit the current injected MainHttpClient OAuth/Codex calls. Permit exactly one session-scoped request in the proxy-login adapter, with a unique default-session caller and readiness fence contract; retain rejection of every other explicit session/partition request. Dynamic tests prove pending readiness sends nothing and failed readiness remains on guarded default-session fetch. No new unaudited egress or general session-option exemption.",
+      "regressionTests": [
+        "src/main/global-fetch-call-site-audit.test.ts",
+        "src/main/proxy-guarded-fetch-call-site-audit.test.ts",
+        "src/main/host/electron-http-client.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/proxy-guarded-fetch-call-site-audit.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "71a8e69422a6a16ce0fcb22b74797a44436b6f0b"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "a7bd036e2d11e872d36d78ccd39bc1377bd055a5"
+      },
+      "reason": "Delete exactly three stale global-fetch census entries whose calls moved or disappeared. Audit the current injected MainHttpClient OAuth/Codex calls. Permit exactly one session-scoped request in the proxy-login adapter, with a unique default-session caller and readiness fence contract; retain rejection of every other explicit session/partition request. Dynamic tests prove pending readiness sends nothing and failed readiness remains on guarded default-session fetch. No new unaudited egress or general session-option exemption.",
+      "regressionTests": [
+        "src/main/global-fetch-call-site-audit.test.ts",
+        "src/main/proxy-guarded-fetch-call-site-audit.test.ts",
+        "src/main/host/electron-http-client.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/host/electron-http-client.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "8bd405bbd66e7cdec949d39feea35f60a19536a4"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "d920f4f2252cf2bc0fc6869de609435882d5a732"
+      },
+      "reason": "Delete exactly three stale global-fetch census entries whose calls moved or disappeared. Audit the current injected MainHttpClient OAuth/Codex calls. Permit exactly one session-scoped request in the proxy-login adapter, with a unique default-session caller and readiness fence contract; retain rejection of every other explicit session/partition request. Dynamic tests prove pending readiness sends nothing and failed readiness remains on guarded default-session fetch. No new unaudited egress or general session-option exemption.",
+      "regressionTests": [
+        "src/main/global-fetch-call-site-audit.test.ts",
+        "src/main/proxy-guarded-fetch-call-site-audit.test.ts",
+        "src/main/host/electron-http-client.test.ts"
+      ]
+    },
+    {
+      "path": "src/shared/agent-hook-listener-relay-dependency.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "c9d83e89eb6816c9c72210a68b686d3af4a70b07"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "38d1993cc3ab8609449777673471e33b4a653d08"
+      },
+      "reason": "Follow current main agent-hook server consumers after the retired relay entrypoints were deleted. Census all active server modules, preserving all eleven original listener seeds and adding four actual provider-routing/state seeds. Retain the complete transitive Node-builtins/shared-only dependency rejection and provider-dispatch reachability guard, plus every syntax/type-only parser assertion. No deleted relay or builtin agent graph restoration.",
+      "regressionTests": [
+        "src/shared/agent-hook-listener-relay-dependency.test.ts"
+      ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/release-source-cache.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "3c99fdaa585f71460a3bf36c9f616c598bc85dd6"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "71f13640b25800edb40350ebacd85e66fbae8355"
+      },
+      "reason": "Windows independentcopy fallback uses bounded8 directorypreparation, bounded8 regularfile copyFile/verbatim nonderef cp forlinks, bounded8 final modewrites. Phases do notoverlap. Everyissuedoperation settles before failure/lease release. NonWindows fallback unchanged. Nohardlinks/lease/ref/publication/timeout changes. ActualWindows nativecp refuseslinkcreationEPERM; test asserts same refusal plus sourceuntouched, and always proves nestedreadonly/inode independently.",
+      "regressionTests": [
+        "tests/e2e/cross-version-wire/release-source-cache.unit.test.ts",
+        "tests/e2e/cross-version-wire/release-source-retention.unit.test.ts",
+        "tests/e2e/cross-version-wire/release-checkout-tree.unit.test.ts",
+        "tests/e2e/cross-version-wire/release-checkout-tree-bounded.unit.test.ts",
+        "tests/e2e/cross-version-wire/agent-session-death-evidence-downgrade.unit.test.ts",
+        "tests/e2e/cross-version-wire/agent-session-resume-marker-downgrade.unit.test.ts",
+        "tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts",
+        "tests/e2e/cross-version-wire/orchestration-delivery-downgrade.unit.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/mobile-web-app-stack-transition-render.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "55ab979455b5da0d93e07122418b9e4f99607597"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "027acdfe859767eec4186289114181751a701dda"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "55ab979455b5da0d93e07122418b9e4f99607597"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "cfe54adbfa3f771c51663819ca1a65ee2f35c0f4"
+      },
+      "reason": "Only attach options, page errors and sampled frame diagnostics to existing reduced-motion terminal-state equality assertion. No action, timing, budget, predicate or expected state changed. Browser instability remains under investigation; this is not a production fix.",
+      "regressionTests": [
+        "config/scripts/mobile-web-app-stack-transition-render.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/public-baseline.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "155f8b06c02ad7cc94d789b5df276a4fb90a8028"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "d1f1d8c2a83b9edf7e29094a0fea056427d7a4bd"
+      },
+      "reason": "Invocation-local successful full-SHA object read reuse, three fixed public metadata paths batched per immutable commit, three frozen tree identities in one validated rev-parse. Public reads always disable replacement objects; mutable refs and failed reads remain fresh. Receipt, ledger, parent and private-document proofs remain recomputed. Original tamper deadline remains 60 seconds. Ledger identity now uses the same already-read immutable ls-tree entry instead of a redundant rev-parse per root; exact receipt equality remains required. No private text, fixture timeout, assertion, production lifecycle or authorization policy was relaxed.",
+      "regressionTests": [
+        "config/scripts/public-baseline.test.mjs",
+        "config/scripts/upstream-tree-sync-cache.test.mjs",
+        "config/scripts/upstream-tree-sync.test.mjs"
+      ]
+    },
+    {
+      "path": "src/main/runtime/agent-terminal-startup-prompt.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "cdf6cd16dbb5ce7e0af020a74647cf1f991dd493"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "cdf6cd16dbb5ce7e0af020a74647cf1f991dd493"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "cdf6cd16dbb5ce7e0af020a74647cf1f991dd493"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "69bf0ee303a29f102f3613fa4710a2bd82f3c582"
+      },
+      "reason": "POSIX bash/zsh fixture did not freeze either execution host or launch platform. On Windows the real implementation correctly carries the prompt with PowerShell escaping because a safe later paste cannot be proved. This is a fixture mismatch, not a production cancellation/quoting defect. Freeze process.platform linux with afterEach restoration and explicit launch-platform resolver linux; preserve all seven original cases and add win32 host+launch test asserting escaped newline, no literal newline, carry=true.",
+      "regressionTests": [
+        "src/main/runtime/agent-terminal-startup-prompt.test.ts",
+        "src/main/runtime/agent-launch-typed-line-shell.test.ts",
+        "src/main/runtime/runtime-worktree-agent-startup.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/src/terminal/terminal-webview-payload-hash.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "18212d2656853326aba5f53b1583292be6768d04"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "660e38139f90520ae1867420860ec5238b53bacd"
+      },
+      "reason": "Already accepted dependency update in mobile/package.json and pnpm-lock.yaml: xterm 6.1.0-beta.303 -> beta.304; unicode11 0.10.0-beta.300 -> beta.301; webgl 0.20.0-beta.299 -> beta.300. Snapshot remained at previous engine. Engine changes are real emitted dependency code, not path comments or CRLF. Exact old-engine substitution reproduces the prior entire payload and SHA; retain execution and dependency provenance.",
+      "regressionTests": [
+        "mobile/src/terminal/terminal-webview-payload-hash.test.ts",
+        "mobile/src/terminal/terminal-webview-engine.test.ts",
+        "mobile/src/terminal/terminal-webview-theme.test.ts",
+        "mobile/src/terminal/terminal-webview-html/document-style.test.ts",
+        "mobile/src/terminal/document/native-document-bundle.test.ts",
+        "mobile/src/terminal/terminal-web-document-mount.test.ts"
       ]
     }
   ],

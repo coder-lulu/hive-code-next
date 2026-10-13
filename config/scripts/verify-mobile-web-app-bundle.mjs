@@ -38,7 +38,7 @@ export function mobileWebAppBundleMaxAssets(routeCount, imageCount) {
  * refused asset on a phone. Splitting barely moves it — the same code is emitted in more files —
  * so shrinking this still means cutting code.
  *
- * This head reads 7,686,714 bytes of the 9,437,184 here, 81.5%, leaving 1,750,470. A reading and
+ * The prior measurement read 7,686,714 bytes of the 9,437,184 here, 81.5%, leaving 1,750,470. A reading and
  * not a pin: nothing asserts it, because the number moves with every build. It is here so the
  * generation that spends the rest can see it was already this close.
  */
@@ -50,9 +50,10 @@ export const MOBILE_WEB_APP_BUNDLE_MAX_TOTAL_BYTES = 9 * 1024 * 1024
  * A chunk is emitted per distinct set of importers, not per route, so a route's marginal cost is
  * what it fails to share rather than what it weighs. Re-measured on this head by building
  * `routes.slice(0, n)` for every n, which is what the fence below is derived from rather than
- * fitted to. The spread is 1 to 10: `pr` and `web` add one script each and `session` adds ten.
+ * fitted to. The spread is 1 to 11: `pr` and `web` add one script each and `review` adds eleven.
  * The root `./_layout.tsx` (the page's web sibling of the native root) sorts first; with it the
- * swept tree reads 74 scripts at 16 routes; the 15-route prefix reads 72 on this head.
+ * swept tree reads 79 scripts at 16 routes; the 15-route prefix reads 76.
+ * Measured with esbuild 0.28.2 on the reviewed Hive mobile source graph.
  *
  * This table is the fence's only input, so a route added to the tree stales it and the pins beside
  * the fence fail until it is re-measured. That is the point: the bound is re-derived, never bumped.
@@ -60,20 +61,20 @@ export const MOBILE_WEB_APP_BUNDLE_MAX_TOTAL_BYTES = 9 * 1024 * 1024
 export const MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP = [
   ['./_layout.tsx', 3],
   ['./h/[hostId]/[...page].tsx', 6],
-  ['./h/[hostId]/accounts.tsx', 8],
-  ['./h/[hostId]/agent-history/[worktreeId].tsx', 13],
-  ['./h/[hostId]/edit.tsx', 18],
-  ['./h/[hostId]/files/[worktreeId].tsx', 23],
-  ['./h/[hostId]/files/preview/[worktreeId].tsx', 31],
-  ['./h/[hostId]/history/[worktreeId].tsx', 33],
-  ['./h/[hostId]/index.tsx', 37],
-  ['./h/[hostId]/pr/[worktreeId].tsx', 38],
-  ['./h/[hostId]/review/[worktreeId].tsx', 47],
-  ['./h/[hostId]/session/[worktreeId].tsx', 57],
-  ['./h/[hostId]/source-control/[worktreeId].tsx', 62],
-  ['./h/[hostId]/tasks.tsx', 71],
-  ['./h/[hostId]/web.tsx', 72],
-  ['./h/_layout.tsx', 74]
+  ['./h/[hostId]/accounts.tsx', 9],
+  ['./h/[hostId]/agent-history/[worktreeId].tsx', 14],
+  ['./h/[hostId]/edit.tsx', 19],
+  ['./h/[hostId]/files/[worktreeId].tsx', 24],
+  ['./h/[hostId]/files/preview/[worktreeId].tsx', 32],
+  ['./h/[hostId]/history/[worktreeId].tsx', 34],
+  ['./h/[hostId]/index.tsx', 39],
+  ['./h/[hostId]/pr/[worktreeId].tsx', 40],
+  ['./h/[hostId]/review/[worktreeId].tsx', 51],
+  ['./h/[hostId]/session/[worktreeId].tsx', 61],
+  ['./h/[hostId]/source-control/[worktreeId].tsx', 66],
+  ['./h/[hostId]/tasks.tsx', 75],
+  ['./h/[hostId]/web.tsx', 76],
+  ['./h/_layout.tsx', 79]
 ]
 
 const sweptScripts = MOBILE_WEB_APP_BUNDLE_SCRIPT_SWEEP.map(([, scripts]) => scripts)
@@ -134,7 +135,7 @@ export function mobileWebAppBundleMaxChunks(routeCount) {
 /**
  * What the browser must parse before the first route can paint: the entry plus every chunk it
  * reaches by static import. This is the budget splitting exists to hold — it was 8.16 MB as one
- * chunk and measures 1,244,312 bytes split on this head, 1.19 of the 3 MiB — so a route
+ * chunk and previously measured 1,244,312 bytes split, 1.19 of the 3 MiB — so a route
  * re-imported statically, or `splitting` dropped, fails the build here instead of arriving as a
  * slow first open on a phone.
  *

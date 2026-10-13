@@ -18,10 +18,35 @@ import {
 export const TREE_SYNC_RECEIPT_PATH = 'config/upstream-tree-sync-receipt.json'
 const receiptName = TREE_SYNC_RECEIPT_PATH.split('/').at(-1)
 
+// One recomputation only: immutable object reads may repeat during normalization.
+// Keep mutable refs, validation commands and writes observable on every call.
+export function frozenTreeGit(raw) {
+  const reads = new Map()
+  return (args, input) => {
+    const treeRef = args[1] === '-z' ? args[2] : args[1]
+    const immutable =
+      input === undefined &&
+      ((args[0] === 'ls-tree' && SHA_PATTERN.test(treeRef ?? '')) ||
+        (args[0] === 'show' &&
+          args.length === 2 &&
+          SHA_PATTERN.test(args[1].split(':')[0]) &&
+          args[1].includes(':')))
+    const key = immutable ? JSON.stringify(args) : null
+    if (key !== null && reads.has(key)) {
+      return reads.get(key)
+    }
+    const result = raw(['--no-replace-objects', ...args], input)
+    if (key !== null) {
+      reads.set(key, result)
+    }
+    return result
+  }
+}
+
 function context(options) {
   const cwd = options.cwd ?? process.cwd()
   const raw = createGit(cwd)
-  const git = (args, input) => raw(['--no-replace-objects', ...args], input)
+  const git = frozenTreeGit(raw)
   for (const sha of [options.target, options.upstream]) {
     if (!SHA_PATTERN.test(sha)) {
       throw new Error('Tree sync requires exact frozen target and upstream SHAs')
@@ -177,9 +202,18 @@ export function computeUpstreamTreeSync(options) {
     .trim()
     .split(/\s+/)
     .filter(Boolean)
-  const baseTreeSha = git(['rev-parse', `${base}^{tree}`]).trim()
-  const targetTreeSha = git(['rev-parse', `${target}^{tree}`]).trim()
-  const upstreamTreeSha = git(['rev-parse', `${upstream}^{tree}`]).trim()
+  const treeShas = git([
+    'rev-parse',
+    '--revs-only',
+    '--end-of-options',
+    ...[base, target, upstream].map((sha) => `${sha}^{tree}`)
+  ])
+    .trim()
+    .split(/\r?\n/)
+  if (treeShas.length !== 3 || treeShas.some((sha) => !SHA_PATTERN.test(sha))) {
+    throw new Error('Invalid frozen tree identities')
+  }
+  const [baseTreeSha, targetTreeSha, upstreamTreeSha] = treeShas
   const normalizedBase = normalize(git, base, docs, null, gitmodules)
   const normalizedTarget = normalize(git, target, docs, null, gitmodules)
   const normalizedUpstream = normalize(git, upstream, docs, null, gitmodules)

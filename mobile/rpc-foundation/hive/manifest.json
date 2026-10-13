@@ -152,7 +152,7 @@
     "tasks.worktree-capabilities": "52a76b7a830b32287bce14abbe1b9d9ac70e71eafe5b4c6801c2eb14a4150125",
     "tasks.setup-hook-trust": "52a76b7a830b32287bce14abbe1b9d9ac70e71eafe5b4c6801c2eb14a4150125"
   },
-  "upstreamGoldensSha256": "77f10254ffc9d7c912311b9fafcbd9f85fde90685e0a4eb64b75e6dccaa58033",
+  "upstreamGoldensSha256": "9d27c3df9c9b46abb3bdaae557ae2dc6c15312f2608a5cd3fb906c3b43e30221",
   "overlays": {
     "aivault-history-screen-listed": {
       "sha256": "c49e0f4e5694878f8cc4142e90961dcbd409b5371d130525d96c7053eb29eb25",
@@ -239,8 +239,8 @@
       "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
     },
     "matrix-session.pr-triage-agent.launchreplay-1": {
-      "sha256": "ceac66e29f10cacdf95f29fdda70b06263a152f6cad17ec93fabe3008827fdcb",
-      "reason": "Hive preserves the agent.launch update-required refusal and its RPC/state transitions while replacing the visible Orca product name with HiveCode."
+      "sha256": "3d3f8c1ea432eb39697aba7fe2c79c0590b29edae40b6660a66688abe40a8dc0",
+      "reason": "Hive preserves the current workspace-scoped preflight.detectAgents request and agent.launch update-required refusal with its RPC/state transitions, replacing only the visible Orca product name with HiveCode."
     },
     "matrix-session.startup-worktree.activate-1": {
       "sha256": "fff4abaa5b08bcac8e2e3e4501260f0451d9328126c2e4013729307eef2ea9b3",
