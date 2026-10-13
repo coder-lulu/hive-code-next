@@ -118,3 +118,10 @@ config/scripts/reclaim-dev-electron-bundles.mjs text eol=lf
 /resources/skills/*.json linguist-generated=true text eol=lf
 # Vitest writes snapshots with LF, so checkout bytes must match on every host.
 **/__snapshots__/*.snap text eol=lf
+
+# Keep mobile formatter inputs LF on every checkout host.
+/mobile/**/*.json text eol=lf
+/mobile/**/*.js text eol=lf
+/mobile/**/*.md text eol=lf
+/mobile/**/*.yaml text eol=lf
+/mobile/**/*.mts text eol=lf

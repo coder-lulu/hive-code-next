@@ -13,7 +13,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "625bbe133ecb1674f5e1f665bda937fb4cc1bc2a"
+        "sha": "9257e63ca72bb64adfb98da1891f84beb827a226"
       },
       "upstream": {
         "mode": "100644",
@@ -21,12 +21,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "625bbe133ecb1674f5e1f665bda937fb4cc1bc2a"
+        "sha": "9257e63ca72bb64adfb98da1891f84beb827a226"
       },
-      "reason": "Explicit product-boundary policy maintenance: preserve private Gitlink isolation and current patch normalization, remove only retired Relay asset scope, and update exact reviewed literal paths/hashes without weakening the global scan. Authorized policy maintenance is frozen in the product parent before source absorption; the product entry therefore binds that parent policy blob.",
+      "reason": "Explicit product-boundary policy maintenance: preserve private Gitlink isolation and current patch normalization, remove only retired Relay asset scope, and update exact reviewed literal paths/hashes without weakening the global scan. Authorized policy maintenance is frozen in the product parent before source absorption; the product entry therefore binds that parent policy blob. Freeze five mobile text-extension LF rules in the control parent to match the existing formatter; preserve all prior attributes, binary exemptions and patch bytes.",
       "regressionTests": [
         "config/scripts/check-hivecode-brand-boundary.test.mjs",
-        "config/scripts/verify-documentation-governance.test.mjs"
+        "config/scripts/verify-documentation-governance.test.mjs",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -11751,11 +11752,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "815dfe926ee3a1dc4cf18b3fbed6c0135ee87e91"
+        "sha": "a954c371903945092371907505e4643c7b925028"
       },
-      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions.",
+      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/components/WorktreeAgentRow.visual-line.test.tsx"
+        "mobile/src/components/WorktreeAgentRow.visual-line.test.tsx",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -12324,11 +12326,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "b404d7430f09ea4b227a52a32c9ae7f73d80c226"
+        "sha": "c2e3d296ce923bad5bba8e9d7df2ee90ffd29098"
       },
-      "reason": "Use explicit theme/44px hit target/16px icon tokens and assert absence of Copy message button specifically, allowing valid image-preview button; retain all late/overlapping clipboard response and failure checks.",
+      "reason": "Use explicit theme/44px hit target/16px icon tokens and assert absence of Copy message button specifically, allowing valid image-preview button; retain all late/overlapping clipboard response and failure checks. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/session/MobileNativeChatMessage.copy.test.tsx"
+        "mobile/src/session/MobileNativeChatMessage.copy.test.tsx",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -12364,11 +12367,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "73c86a0b5e1ac4b99fe3fd9db4e1fb404682860c"
+        "sha": "13719aa4ca88445637d9c1de6ee9009e7c19a65d"
       },
-      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions.",
+      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/session/MobileNativeChatMessage.test.ts"
+        "mobile/src/session/MobileNativeChatMessage.test.ts",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -12381,11 +12385,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "daafa5090d973742f78d8a7f7a60172ef48dd720"
+        "sha": "ea91026f55893fd2b50beccb0d615c62ccfc38dc"
       },
-      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions.",
+      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/session/MobileNativeChatMessage.tool-result-availability.test.tsx"
+        "mobile/src/session/MobileNativeChatMessage.tool-result-availability.test.tsx",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -12450,11 +12455,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "ca3480089717aa7ca454cb3cf407a10c07e089c6"
+        "sha": "d5804dd3b0a895b7e2e6908c0addfd7cd7440f84"
       },
-      "reason": "Wrap create/update in actual MobileThemeProvider and assert current Chinese Send reply label; preserve prompt identity, token positions, whitespace and allowEmpty semantics.",
+      "reason": "Wrap create/update in actual MobileThemeProvider and assert current Chinese Send reply label; preserve prompt identity, token positions, whitespace and allowEmpty semantics. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/session/MobileNativeChatQuestion.test.tsx"
+        "mobile/src/session/MobileNativeChatQuestion.test.tsx",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -12559,11 +12565,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "63eabd3fea71d1d13cd0445bf0b130e30b645faf"
+        "sha": "23ef228b58e49c1ac5117102ae1ce0daa28dc284"
       },
-      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions.",
+      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/session/MobileNativeChatToolRun.identity.test.tsx"
+        "mobile/src/session/MobileNativeChatToolRun.identity.test.tsx",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -12645,11 +12652,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "4614e7cbc2728df4a3d344409ef910a6cfce21b8"
+        "sha": "54caebbfcef1e0cbde21726b2227c4ea0dc9fb56"
       },
-      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions.",
+      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/session/MobileSessionMarkdownReader.test.tsx"
+        "mobile/src/session/MobileSessionMarkdownReader.test.tsx",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -12898,11 +12906,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "a5821374e0f36be492719a4cb273a9755d4c2d29"
+        "sha": "79c722a80970137b907a8b0faf679fd864c21ef4"
       },
-      "reason": "Expect current preflight.detectAgents worktreeId authority argument for local folder; remote connection and unresolved rejection assertions unchanged.",
+      "reason": "Expect current preflight.detectAgents worktreeId authority argument for local folder; remote connection and unresolved rejection assertions unchanged. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/session/mobile-new-tab-agent-loader.test.ts"
+        "mobile/src/session/mobile-new-tab-agent-loader.test.ts",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -13025,11 +13034,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "627006c060145f9a25c9d7029143c3935250a7b4"
+        "sha": "bc460e15f587472404be81de3f1cf1d4d893c493"
       },
-      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions.",
+      "reason": "Adapt scoped component fixture to explicit Hive light theme/current style factory and current native icon/accessibility dependencies; preserve behavioral assertions. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/session/session-markdown-source-copy.test.tsx"
+        "mobile/src/session/session-markdown-source-copy.test.tsx",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
@@ -13868,11 +13878,12 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "9e89e425d49c34e41618d9b72c090b206ed7054f"
+        "sha": "fd9245511815f3fbae0175b3c6499a858e4594f9"
       },
-      "reason": "Add actual app/pair.tsx mounted lifecycle regression: route precedence, supported URL extraction, invalid/rejected URL, unmount and changed-params cancellation. No production route/auth changes.",
+      "reason": "Add actual app/pair.tsx mounted lifecycle regression: route precedence, supported URL extraction, invalid/rejected URL, unmount and changed-params cancellation. No production route/auth changes. Apply existing mobile formatter only; independent complete AST comparison preserves types, literals, assertions and branches. Windows checkout line endings are separately bound in the maintenance parent.",
       "regressionTests": [
-        "mobile/src/transport/pair-redirect-screen.test.tsx"
+        "mobile/src/transport/pair-redirect-screen.test.tsx",
+        "pnpm --dir mobile run format:check"
       ]
     },
     {
