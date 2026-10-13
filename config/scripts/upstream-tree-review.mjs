@@ -54,6 +54,38 @@ export function reviewFileEntry(git, ref, file) {
   return { mode, sha }
 }
 
+// Scope the cache to one recomputation and immutable object names. Keep the
+// path-by-path reader for mutable refs and Git pathspecs.
+function frozenEntryReader(git) {
+  const trees = new Map()
+  return (ref, file) => {
+    if (!SHA_PATTERN.test(ref) || /[*?[\]]/.test(file) || /[\uFFFD\uD800-\uDFFF]/.test(file)) {
+      return reviewFileEntry(git, ref, file)
+    }
+    if (!trees.has(ref)) {
+      const entries = new Map()
+      // Include trees so a directory is rejected as a non-file, not treated as absent.
+      for (const record of git(['ls-tree', '-r', '-t', '-z', ref]).split('\0')) {
+        if (!record) {
+          continue
+        }
+        const separator = record.indexOf('\t')
+        const [mode, type, sha] = record.slice(0, separator).split(' ')
+        entries.set(record.slice(separator + 1), { mode, type, sha })
+      }
+      trees.set(ref, entries)
+    }
+    const entry = trees.get(ref).get(file)
+    if (!entry) {
+      return null
+    }
+    if (entry.type !== 'blob') {
+      throw new Error(`Review paths must be files: ${file}`)
+    }
+    return { mode: entry.mode, sha: entry.sha }
+  }
+}
+
 function sameEntry(left, right) {
   return left === null
     ? right === null
@@ -161,6 +193,7 @@ export function applyFrozenTreeReview(ctx, mergedTreeSha, conflictPaths, review)
   const { git, base, target, upstream, cwd } = ctx
   const resolutions = review?.resolutions ?? []
   const seen = new Set()
+  const readEntry = frozenEntryReader(git)
   for (const row of resolutions) {
     if (
       !safeReviewPath(row.path) ||
@@ -181,7 +214,7 @@ export function applyFrozenTreeReview(ctx, mergedTreeSha, conflictPaths, review)
       ['product', target],
       ['upstream', upstream]
     ]) {
-      if (!sameEntry(row[field], reviewFileEntry(git, ref, row.path))) {
+      if (!sameEntry(row[field], readEntry(ref, row.path))) {
         throw new Error(`Frozen ${field} entry differs for ${row.path}`)
       }
     }
