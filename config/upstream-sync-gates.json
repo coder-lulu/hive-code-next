@@ -156,11 +156,11 @@
           "src/main/git/runner-wsl-read-routing.test.ts",
           "src/main/git/runner-wsl-direct-read.test.ts",
           "src/main/git/runner-windows-host-environment.test.ts",
-          "src/main/providers/ssh-git-provider-exec.test.ts",
-          "src/main/providers/ssh-git-provider-merge.test.ts",
-          "src/main/providers/ssh-git-provider-worktree.test.ts",
-          "src/main/providers/ssh-git-provider-staging.test.ts",
-          "src/main/providers/ssh-git-provider-status.test.ts"
+          "src/main/providers/local-git-provider.test.ts",
+          "src/main/runtime/runtime-git-execution-host-ownership.test.ts",
+          "src/main/runtime/runtime-git-stage-worktree-scope.test.ts",
+          "src/main/ssh/orcad-runtime-conversion.test.ts",
+          "src/main/ssh/orcad-migration-terminal-gate.test.ts"
         ]
       }
     ]

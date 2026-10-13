@@ -8,6 +8,7 @@
       "config/hivecode-brand-allowlist.json",
       "config/electron-builder.config.cjs",
       "cloud/",
+      "src/relay/",
       "src/main/product/",
       "src/main/hive-account/",
       "src/main/hive-runtime-cloud/",
@@ -21,7 +22,6 @@
     "owner": "Upstream compatibility",
     "paths": [
       "src/shared/",
-      "src/relay/",
       "src/main/providers/",
       "src/main/daemon/",
       "src/main/network/",

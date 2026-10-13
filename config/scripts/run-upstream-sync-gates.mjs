@@ -220,11 +220,92 @@ export function gateInvocation(command, args) {
   )
 }
 
-export async function runCheck(check, repoRoot) {
-  console.log(`\n[upstream-sync] ${check.category}: ${check.id}`)
-  const invocation = gateInvocation(check.argv[0], [...check.argv.slice(1), ...(check.paths ?? [])])
+export function resolveGateInvocation(check, repoRoot) {
+  if (check.kind !== 'vitest' || check.argv.slice(0, 3).join(' ') !== 'pnpm exec vitest') {
+    return gateInvocation(check.argv[0], check.argv.slice(1))
+  }
+  // Do not resolve upwards: root and mobile have independent dependency graphs.
+  const packageDirectory = path.resolve(repoRoot, check.cwd, 'node_modules/vitest')
+  const manifestPath = path.join(packageDirectory, 'package.json')
+  try {
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8'))
+    const bin = typeof manifest.bin === 'string' ? manifest.bin : manifest.bin?.vitest
+    if (manifest.name !== 'vitest' || !['vitest.mjs', './vitest.mjs'].includes(bin)) {
+      throw new Error('Unexpected Vitest package name or CLI entry')
+    }
+    const entry = path.join(packageDirectory, 'vitest.mjs')
+    if (!lstatSync(entry).isFile()) {
+      throw new Error('Vitest CLI entry is not a regular file')
+    }
+    return { command: process.execPath, args: [entry, ...check.argv.slice(3)] }
+  } catch (error) {
+    throw new Error(`${check.id}: Vitest unavailable in ${packageDirectory}: ${error.message}`)
+  }
+}
+
+// Windows allows 32,767 UTF-16 code units, including NUL; direct Node avoids cmd's 8,191 limit.
+export const GATE_COMMAND_LINE_BUDGET = 24_000
+
+export function gateCommandLineLength(command, args) {
+  let length = 1 // terminating NUL
+  for (const [index, token] of [command, ...args].entries()) {
+    if (typeof token !== 'string' || token.includes('\0')) {
+      throw new Error('Gate command arguments must be strings without NUL')
+    }
+    // Always quote; account for backslashes before quotes and at the end of each argument.
+    // JS length counts UTF-16 code units, including two units per astral character.
+    let backslashes = 0
+    let escapeLength = 0
+    for (const character of token) {
+      if (character === '\\') {
+        backslashes += 1
+      } else {
+        if (character === '"') {
+          escapeLength += backslashes + 1
+        }
+        backslashes = 0
+      }
+    }
+    length += token.length + escapeLength + backslashes + 2 + (index === 0 ? 0 : 1)
+  }
+  return length
+}
+
+export function buildGateInvocations(check, invocation, budget = GATE_COMMAND_LINE_BUDGET) {
+  if (check.kind !== 'vitest') {
+    return [{ ...invocation, args: [...invocation.args, ...(check.paths ?? [])] }]
+  }
+  if (!Array.isArray(check.paths) || check.paths.length === 0) {
+    throw new Error(`${check.id} must define test paths; refusing an unfiltered Vitest run`)
+  }
+  if (!Number.isSafeInteger(budget) || budget <= 0) {
+    throw new Error('Gate command line budget must be a positive safe integer')
+  }
+  // Resolve the launcher before planning so its executable and JS entry consume budget too.
+  const prefixLength = gateCommandLineLength(invocation.command, invocation.args)
+  const batches = []
+  let args = [...invocation.args]
+  let length = prefixLength
+  for (const [index, testPath] of check.paths.entries()) {
+    const addedLength = gateCommandLineLength('', [testPath]) - gateCommandLineLength('', [])
+    if (prefixLength + addedLength > budget) {
+      throw new Error(`${check.id} test path at index ${index} exceeds the command line budget`)
+    }
+    if (length + addedLength > budget) {
+      batches.push({ ...invocation, args })
+      args = [...invocation.args]
+      length = prefixLength
+    }
+    args.push(testPath)
+    length += addedLength
+  }
+  batches.push({ ...invocation, args })
+  return batches
+}
+
+async function runGateInvocation(invocation, cwd) {
   const child = spawn(invocation.command, invocation.args, {
-    cwd: path.resolve(repoRoot, check.cwd),
+    cwd,
     env: { ...process.env, ORCA_BACKGROUND_LAUNCH: '1' },
     shell: false,
     windowsHide: true,
@@ -239,6 +320,27 @@ export async function runCheck(check, repoRoot) {
     })
     child.on('close', (code) => resolve(code === 0))
   })
+}
+
+export async function runCheck(check, repoRoot) {
+  console.log(`\n[upstream-sync] ${check.category}: ${check.id}`)
+  const base = resolveGateInvocation(check, repoRoot)
+  // Validate every path before spawning: an oversized single path cannot yield partial coverage.
+  const invocations = buildGateInvocations(check, base)
+  let passed = true
+  for (const [index, invocation] of invocations.entries()) {
+    if (invocations.length > 1) {
+      console.log(`[upstream-sync] ${check.id}: batch ${index + 1}/${invocations.length}`)
+    }
+    try {
+      const batchPassed = await runGateInvocation(invocation, path.resolve(repoRoot, check.cwd))
+      passed = batchPassed && passed
+    } catch (error) {
+      console.error(error.message)
+      passed = false
+    }
+  }
+  return passed
 }
 
 export function discoverCheckoutChanges(base, cwd) {

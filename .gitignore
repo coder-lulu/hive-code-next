@@ -29,6 +29,7 @@ out/
 release/
 native/**/.build/
 native/windows-cli-launcher/target/
+native/windows-agent-hook/target/
 # node-gyp output for the vendored Windows registry addon; generated per host and ABI.
 native/windows-registry/build/
 native/windows-registry/bin/
@@ -170,3 +171,7 @@ ci-shards/
 .codex/config.toml
 .codex/config.toml.backup.*
 AGENTS.md.backup.*
+# Paired CI timing reports and temporary baseline plugin.
+.build/preflight-benchmark/
+
+.local/static-analysis-research/
