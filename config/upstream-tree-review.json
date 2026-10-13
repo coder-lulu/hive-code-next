@@ -9783,14 +9783,14 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "44c2029de912839e853fa5e7c7f604e3261e6f32"
+        "sha": "c754734cbce08aa0ef3efe9a11cc16e452a200dc"
       },
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "44c2029de912839e853fa5e7c7f604e3261e6f32"
+        "sha": "c754734cbce08aa0ef3efe9a11cc16e452a200dc"
       },
-      "reason": "Explicit product-boundary policy maintenance: preserve private Gitlink isolation and current patch normalization, remove only retired Relay asset scope, and update exact reviewed literal paths/hashes without weakening the global scan. Authorized policy maintenance is frozen in the product parent before source absorption; the product entry therefore binds that parent policy blob.",
+      "reason": "Explicit product-boundary policy maintenance: preserve private Gitlink isolation and current patch normalization, remove only retired Relay asset scope, and update exact reviewed literal paths/hashes without weakening the global scan. Authorized policy maintenance is frozen in the product parent before source absorption; the product entry therefore binds that parent policy blob. Synchronize only .gitattributes protected normalized SHA256 after the independently approved five LF rules; preserve 776 paths, .gitignore and all other policy data.",
       "regressionTests": [
         "config/scripts/check-hivecode-brand-boundary.test.mjs",
         "config/scripts/verify-documentation-governance.test.mjs"
@@ -10401,11 +10401,15 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "0ff2a830728c1d5d3797ca453b5cf6a0e3ece65c"
+        "sha": "e8e0fddfaaaf8ffcd383eb743685c29517e9b8ae"
       },
-      "reason": "Retain owned retired publisher fail-closed contract; upstream active publishing lane tests cannot apply to Hive migration rejector.",
+      "reason": "Retain owned retired publisher fail-closed contract; upstream active publishing lane tests cannot apply to Hive migration rejector. Replace live imports of removed shared child-process helpers with the sole public @orca/process-host API; remove the obsolete TypeScript loader without changing process or build ownership.",
       "regressionTests": [
-        "config/scripts/hourly-preflight-workflow.test.mjs"
+        "config/scripts/hourly-preflight-workflow.test.mjs",
+        "config/scripts/client-build-execution.test.mjs",
+        "config/scripts/check-hivecode-brand-boundary.test.mjs",
+        "config/scripts/headless-serve-shutdown-registration.test.mjs",
+        "config/scripts/linux-cli-launch-contract-version.test.ts"
       ]
     },
     {
@@ -11284,14 +11288,16 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "ec35bd878d459b2601f09d26519d8aebc968d844"
+        "sha": "3dc98cb431d7e9b0cd4518882e47f1a58ac0a245"
       },
-      "reason": "Route exactly 12 real SQLite runtime consumers to Node for Bun orchestration; current AST import-contract test proves classification, no mocked DB replacement or pool weakening.",
+      "reason": "Route exactly 12 real SQLite runtime consumers to Node for Bun orchestration; current AST import-contract test proves classification, no mocked DB replacement or pool weakening. Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime.",
       "regressionTests": [
         "cli-tooling-final-tests.log: 22 suites, 479 passed, 33 explicit platform skips",
         "cli-tooling-lint.log: 22 changed source/test files passed",
         "cli-guided-create-green.log: 3 suites33 passed; cli-guided-create-red.log proves original failure",
-        "cli-guided-create-lint.log: two changed create files passed"
+        "cli-guided-create-lint.log: two changed create files passed",
+        "config/scripts/vitest-node-runtime-boundary.test.ts",
+        "src/main/orca-profiles/other-profile-workspace-catalog.test.ts"
       ]
     },
     {
@@ -33284,12 +33290,14 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "f767b2bf7b74b453458284354102cfcec7fa330f"
+        "sha": "d04e6f86df7e4936495b957d118c3cf33010aa23"
       },
-      "reason": "Keep Hive combined usage/provider pane and navigation while refusing account rendering for an unavailable explicitly selected Settings Host.",
+      "reason": "Keep Hive combined usage/provider pane and navigation while refusing account rendering for an unavailable explicitly selected Settings Host. Use the selected SettingsHostScope and availability for Agent detection refresh, matching AgentsPane; test explicit remote, local, unavailable and host-switch routing.",
       "regressionTests": [
         "AiServicesPane.test.tsx",
-        "settings-host-scope.test.ts"
+        "settings-host-scope.test.ts",
+        "src/renderer/src/components/settings/AgentDetectionRefreshButton.test.tsx",
+        "src/renderer/src/components/settings/HostAgentLaunchSettings.test.tsx"
       ]
     },
     {
@@ -43229,6 +43237,217 @@
         "config/scripts/upstream-tree-sync.test.mjs",
         "config/scripts/upstream-intake.test.mjs",
         "config/scripts/upstream-sync-checkpoint.test.mjs"
+      ]
+    },
+    {
+      "path": "config/renderer-layout-writer-baseline.txt",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "b4fc7833443a427bba359f36a36c4d8539da459c"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "bb875d2d39940b7be194e22fd154d64391f31638"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "b4fc7833443a427bba359f36a36c4d8539da459c"
+      },
+      "reason": "Initialize the incoming ratchet for eight explicitly reviewed Hive projections, immutable selector dependencies, test mock, same-membership metadata and existing hydration; lower the stale hydration count. Detector unchanged; all eight unreviewed new writer probes still reject.",
+      "regressionTests": [
+        "config/scripts/check-layout-writer-ratchets.test.mjs",
+        "src/renderer/src/components/native-chat/native-chat-file-link.test.ts",
+        "src/renderer/src/components/sessions/session-collection-selector.test.ts",
+        "src/renderer/src/hooks/use-temporary-session-collection.test.tsx",
+        "src/renderer/src/lib/temporary-session-actions.test.ts",
+        "src/renderer/src/store/slices/session-project-assignment.test.ts",
+        "src/renderer/src/store/slices/tabs-hydration.test.ts"
+      ]
+    },
+    {
+      "path": "config/focus-setting-read-baseline.txt",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "9290fbeb6d91237a1de431fc7ade4faebb910d86"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "20f9e85dc527b9087e7576cdc51247e3805486fa"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "9290fbeb6d91237a1de431fc7ade4faebb910d86"
+      },
+      "reason": "Initialize the incoming focus ratchet for independently reviewed existing Hive readers and explicit-owner guards; transfer TaskPage to ExternalTaskPage, reduce stale counts and remove the fixed header reader. Preserve discovered transitive readers and forbidden-helper rejection.",
+      "regressionTests": [
+        "config/scripts/check-focus-read-ratchet.test.mjs",
+        "src/renderer/src/components/settings/AgentDetectionRefreshButton.test.tsx",
+        "src/renderer/src/components/settings/HostAgentLaunchSettings.test.tsx",
+        "src/renderer/src/lib/launch-agent-execution-context.test.ts"
+      ]
+    },
+    {
+      "path": "config/main-sync-spawn-baseline.txt",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "2b212e1b788561f6ad28ca23aea8e66febe2659d"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "4d5bc37c1ff04823a4dc8a1ca9db1fb747bcb379"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2b212e1b788561f6ad28ca23aea8e66febe2659d"
+      },
+      "reason": "Transfer three existing sync responsibilities to their current files without increasing aggregate quota; remove six obsolete uses. Secure writer and Windows ACL production sources unchanged.",
+      "regressionTests": [
+        "config/scripts/check-main-sync-spawn-ratchet.test.mjs",
+        "config/scripts/check-process-host-imports.test.mjs"
+      ]
+    },
+    {
+      "path": "config/process-host-direct-import-baseline.txt",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "d819a1a5c7430ce7e5726ba889b303d55b65aaf3"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e3b7a961c5cc8dbd1f96ae634c02ddaa0251bec6"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "d819a1a5c7430ce7e5726ba889b303d55b65aaf3"
+      },
+      "reason": "Remove three stale direct-child_process import entries; actual current sources use current process ownership helpers. No new direct imports permitted.",
+      "regressionTests": [
+        "config/scripts/check-main-sync-spawn-ratchet.test.mjs",
+        "config/scripts/check-process-host-imports.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/client-build-execution.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "8724e6aa968e02f84a97c0b36decca24198e29f1"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "cf25e3910e6460f4c6fe40209b27c2a24d17cc81"
+      },
+      "reason": "Replace live imports of removed shared child-process helpers with the sole public @orca/process-host API; remove the obsolete TypeScript loader without changing process or build ownership.",
+      "regressionTests": [
+        "config/scripts/client-build-execution.test.mjs",
+        "config/scripts/check-hivecode-brand-boundary.test.mjs",
+        "config/scripts/headless-serve-shutdown-registration.test.mjs",
+        "config/scripts/hourly-preflight-workflow.test.mjs",
+        "config/scripts/linux-cli-launch-contract-version.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/headless-serve-shutdown-registration.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "f8b480fd7259e1ccc7ff3f30333c1cc481efe144"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "3471bfe2721c337fccf15cc0579ca3c86f6d5c91"
+      },
+      "reason": "Use the current process-host package and a real isolated executable AppImage payload/progress fixture. Retain current shutdown shell checks and add missing payload, retired namespace and missing progress rejection regressions.",
+      "regressionTests": [
+        "config/scripts/client-build-execution.test.mjs",
+        "config/scripts/check-hivecode-brand-boundary.test.mjs",
+        "config/scripts/headless-serve-shutdown-registration.test.mjs",
+        "config/scripts/hourly-preflight-workflow.test.mjs",
+        "config/scripts/linux-cli-launch-contract-version.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/linux-cli-launch-contract-version.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "9b6cd5f3834322f09a39025b867b38dcbbdb2ed1"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "620d20c97c2233e4d3674da645e2ce32b4f98d49"
+      },
+      "reason": "Replace live imports of removed shared child-process helpers with the sole public @orca/process-host API; remove the obsolete TypeScript loader without changing process or build ownership.",
+      "regressionTests": [
+        "config/scripts/client-build-execution.test.mjs",
+        "config/scripts/check-hivecode-brand-boundary.test.mjs",
+        "config/scripts/headless-serve-shutdown-registration.test.mjs",
+        "config/scripts/hourly-preflight-workflow.test.mjs",
+        "config/scripts/linux-cli-launch-contract-version.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/vitest-node-runtime-boundary.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "2832d03c43803faaca1482f93430e95caad832cc"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a90eff02aedd063eee774a9bd03444cbe465573a"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "2832d03c43803faaca1482f93430e95caad832cc"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "435a789c55e10fa1a7a6205d00477e5177605530"
+      },
+      "reason": "Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime.",
+      "regressionTests": [
+        "config/scripts/vitest-node-runtime-boundary.test.ts",
+        "src/main/orca-profiles/other-profile-workspace-catalog.test.ts"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/AgentDetectionRefreshButton.tsx",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "bbe6ef8c1c54cab37ad577e0f7cf310f19f05a1d"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "bd8c19ebb8fa1d489f20092feffdc57dce0972a3"
+      },
+      "reason": "Use the selected SettingsHostScope and availability for Agent detection refresh, matching AgentsPane; test explicit remote, local, unavailable and host-switch routing.",
+      "regressionTests": [
+        "src/renderer/src/components/settings/AgentDetectionRefreshButton.test.tsx",
+        "src/renderer/src/components/settings/HostAgentLaunchSettings.test.tsx"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/AgentDetectionRefreshButton.test.tsx",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "7ebd19f4858393f5fc0efc400b4018f526d0d34e"
+      },
+      "reason": "Use the selected SettingsHostScope and availability for Agent detection refresh, matching AgentsPane; test explicit remote, local, unavailable and host-switch routing.",
+      "regressionTests": [
+        "src/renderer/src/components/settings/AgentDetectionRefreshButton.test.tsx",
+        "src/renderer/src/components/settings/HostAgentLaunchSettings.test.tsx"
       ]
     }
   ],
