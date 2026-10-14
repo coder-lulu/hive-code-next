@@ -1,5 +1,9 @@
 import type { TabGroupLayoutNode } from '../../../../shared/tab-types'
-import { buildSplitNode, replaceLeaf, updateSplitRatio } from '@/store/slices/tabs/tabs-layout'
+import {
+  buildSplitNode,
+  replaceLeaf,
+  updateSplitRatio
+} from '../../../../shared/workspace-layout/tab-group-layout-tree'
 import { pruneTabGroupLayout } from '@/runtime/web-session-tabs-sync/tab-group-layout-tree'
 import type { TabDropZone } from '../tab-group/tab-drag-data'
 

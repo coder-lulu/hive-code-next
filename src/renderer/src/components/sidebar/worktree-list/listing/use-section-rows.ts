@@ -1,3 +1,4 @@
+import { collectRenderedSidebarRowKeys } from './collect-rendered-sidebar-row-keys'
 import { useCallback, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useShallow } from 'zustand/react/shallow'
@@ -10,14 +11,13 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
-import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import { useExecutionHostDisplayLabels } from '@/hooks/use-execution-host-display-labels'
-import type { buildRows } from '../grouping/build-rows'
 import {
   buildRuntimeOfflineRows,
   appendRuntimeOfflineDirectory
 } from '../grouping/runtime-offline-rows'
 import { getOfflineRuntimeEnvironmentIds } from '@/lib/runtime-offline-directory'
+import type { buildRows } from '../grouping/build-rows'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
 import { getLogicalRepoOrderRankById } from '../../project-header-drop'
@@ -55,26 +55,6 @@ type SectionRowsArgs = {
   filterRepoIds: readonly string[]
   visibleWorkspaceHostIds: readonly ExecutionHostId[] | null
   workspaceHostScope: AppState['workspaceHostScope']
-}
-
-function collectRenderedSidebarRowKeys(sectionRows: ReturnType<typeof addHostSectionRows>) {
-  const keys = new Set<string>()
-  for (const row of sectionRows) {
-    if (row.type === 'header') {
-      keys.add(row.key)
-    } else if (row.type === 'item') {
-      keys.add(row.rowKey)
-    } else if (row.type === 'folder-workspace') {
-      keys.add(folderWorkspaceKey(row.folderWorkspace.id))
-    } else if (row.type === 'pending-creation') {
-      keys.add(`pending:${row.creationId}`)
-    } else if (row.type === 'imported-worktrees-card') {
-      keys.add(row.key)
-    } else if (row.type === 'new-external-worktrees-inbox') {
-      keys.add(row.key)
-    }
-  }
-  return keys
 }
 
 // Builds the full sidebar row model: grouped worktree rows first, then the host-section
@@ -295,8 +275,8 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
     offlineCount
   ])
   const renderedSidebarRowKeys = useMemo(
-    () => collectRenderedSidebarRowKeys(sectionRows),
-    [sectionRows]
+    () => collectRenderedSidebarRowKeys(sectionRows, defaultHostId),
+    [sectionRows, defaultHostId]
   )
   const allRows = useMemo(() => [...rows, ...offlineRows], [rows, offlineRows])
 

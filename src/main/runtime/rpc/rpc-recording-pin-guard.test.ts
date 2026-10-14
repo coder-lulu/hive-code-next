@@ -2,7 +2,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
-import { runProcess } from '../../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import {
   assertReproductionSuitesExist,
   assertPinnedProductSupport,

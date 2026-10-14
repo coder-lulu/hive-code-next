@@ -1,6 +1,6 @@
 import type { AgentInstallRequest, AgentInstallResult } from '../../shared/agent-install-types'
 import { hasReachedAppVersion } from '../../shared/app-version'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { stripAnsiEscapeSequences } from '../../shared/ansi-escape-sequences'
 import { assertReviewedAgentTarget } from './agent-installation-identity'
 import { readAgentVersion } from './agent-version-service'

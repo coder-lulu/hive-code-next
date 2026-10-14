@@ -16,14 +16,14 @@ vi.mock('../../shared/remote-runtime-client', () => ({
 
 import { PairedRuntimeBrowserHostLease } from './paired-runtime-browser-host-lease'
 
-const pairing = {
+const pairing: PairingOffer = {
   v: 2,
   endpoint: 'ws://127.0.0.1:6768',
   deviceToken: 'device-token',
   publicKeyB64: 'public-key',
   pairedDeviceId: 'device-a',
   scope: 'runtime'
-} as PairingOffer
+}
 
 afterEach(() => {
   subscribeRemoteRuntimeRequestMock.mockReset()
@@ -118,7 +118,7 @@ function createLease(overrides: {
   onReconnected?: (authority: unknown) => void
 }): PairedRuntimeBrowserHostLease {
   return new PairedRuntimeBrowserHostLease({
-    pairing,
+    connection: pairing,
     authorityRuntimeId: 'runtime-a',
     browserHostClientId: 'host-a',
     hostCapabilities: ['webview'],

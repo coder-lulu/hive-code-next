@@ -248,13 +248,23 @@ export function isUserManagedRuntimeEnvironment(
   return !isEphemeralVmRuntimeEnvironment(environment)
 }
 
-export function getPreferredPairingOffer(environment: KnownRuntimeEnvironment): PairingOffer {
+type PreferredEndpointSource = Pick<
+  KnownRuntimeEnvironment,
+  'name' | 'endpoints' | 'preferredEndpointId' | 'pairedDeviceId' | 'runtimeRecordId'
+>
+
+function preferredEndpoint(environment: PreferredEndpointSource) {
   const endpoint =
     environment.endpoints.find((entry) => entry.id === environment.preferredEndpointId) ??
     environment.endpoints[0]
   if (!endpoint) {
     throw new Error(`Environment ${environment.name} has no access endpoints`)
   }
+  return endpoint
+}
+
+export function getPreferredPairingOffer(environment: PreferredEndpointSource): PairingOffer {
+  const endpoint = preferredEndpoint(environment)
   return {
     v: PAIRING_OFFER_VERSION,
     endpoint: endpoint.endpoint,

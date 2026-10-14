@@ -3,6 +3,7 @@ import type { PersistedUIState } from '../../shared/persisted-ui-state-types'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type {
   AgentLaunchTabPublishReply,
+  AgentLaunchTabViewerRule,
   AgentLaunchTabPublishRequest
 } from '../../shared/agent-launch-tab-publication'
 import type { AgentLaunchPaneVerdictEvent } from '../../shared/agent-launch-pane-verdict'
@@ -173,6 +174,7 @@ export type UiCommandEventApi = {
       focus?: boolean
       presentation?: RuntimeTerminalPresentation
       surfaceOwner?: false
+      agentLaunchViewer?: AgentLaunchTabViewerRule
       tabId?: string
       leafId?: string
       splitFromLeafId?: string
@@ -203,7 +205,7 @@ export type UiCommandEventApi = {
     }) => void
   ) => () => void
   onRenameTerminal: (
-    callback: (data: { tabId: string; title: string | null }) => void
+    callback: (data: { tabId: string; title: string | null; recordInteraction?: false }) => void
   ) => () => void
   onFocusTerminal: (
     callback: (data: {
@@ -234,7 +236,7 @@ export type UiCommandEventApi = {
       worktreeId: string
       filePath: string
       relativePath: string
-      runtimeEnvironmentId?: string
+      runtimeEnvironmentId?: string | null
       navigation?: RuntimeNavigationTarget
     }) => void
   ) => () => void
@@ -244,7 +246,7 @@ export type UiCommandEventApi = {
       filePath: string
       relativePath: string
       staged: boolean
-      runtimeEnvironmentId?: string
+      runtimeEnvironmentId?: string | null
       navigation?: RuntimeNavigationTarget
     }) => void
   ) => () => void

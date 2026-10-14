@@ -36,9 +36,9 @@ import {
 } from './remote-runtime-connect-bound'
 import {
   invalidRemoteRuntimeResponseError,
+  parseRemoteRuntimeRpcFrame,
   parseAuthenticatedFrame,
   parseReadyFrame,
-  parseRemoteRuntimeRpcFrame,
   remoteRuntimeTimeoutError,
   remoteRuntimeUnavailableError
 } from './remote-runtime-request-frames'
@@ -198,15 +198,18 @@ const REQUEST_TRANSPORT_ERRORS: TransportErrorPair[] = [
   },
   producedPair('remote-runtime-request-frames.ts:24', remoteRuntimeUnavailableError()),
   producedPair('remote-runtime-request-frames.ts:30', remoteRuntimeTimeoutError()),
-  producedPair('remote-runtime-request-frames.ts:46', parseReadyFrame('not-json')),
-  producedPair('remote-runtime-request-frames.ts:55', parseReadyFrame('{"type":"nope"}')),
-  producedPair('remote-runtime-request-frames.ts:67', parseAuthenticatedFrame('not-json')),
+  producedPair('parseReadyFrame (invalid)', parseReadyFrame('not-json')),
+  producedPair('parseReadyFrame (unexpected)', parseReadyFrame('{}')),
   producedPair(
-    'remote-runtime-request-frames.ts:81 (rejected token)',
+    'parseAuthenticatedFrame (invalid)',
+    parseAuthenticatedFrame('not-json')
+  ),
+  producedPair(
+    'parseAuthenticatedFrame (rejected token)',
     parseAuthenticatedFrame(JSON.stringify({ error: { code: 'unauthorized' } }))
   ),
   producedPair(
-    'remote-runtime-request-frames.ts:81 (unrecognized auth frame)',
+    'parseAuthenticatedFrame (unrecognized auth frame)',
     parseAuthenticatedFrame(JSON.stringify({ type: 'e2ee_other' }))
   ),
   frameError('remote-runtime-request-frames.ts:91', 'not-json'),

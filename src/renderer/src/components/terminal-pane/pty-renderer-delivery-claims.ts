@@ -1,4 +1,4 @@
-import type { PtyTransport } from './pty-transport'
+import type { PtyTransport } from './pty-transport-types'
 import { redactPtyIdForDiagnostics } from '../../../../shared/pty-delivery-diagnostics'
 import { recordTerminalFreezeBreadcrumb } from './terminal-freeze-breadcrumbs'
 

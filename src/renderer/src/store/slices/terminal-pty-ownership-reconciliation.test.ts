@@ -63,9 +63,6 @@ describe('terminal PTY ownership reconciliation', () => {
       deferredSshSessionIdsByTabId: { [hostTabId]: 'shared-pty' },
       unverifiedPtyLossTabIds: { [hostTabId]: true },
       pendingReconnectTabByWorktree: { [WT]: [hostTabId, mirrorTabId] },
-      directSshPaneRetryByTabId: { [hostTabId]: {} as never },
-      directSshLivePtyBindingByTabId: { [hostTabId]: {} as never },
-      directSshPaneRetryHistoryByTabId: { [hostTabId]: {} as never },
       sleepingAgentSessionsByPaneKey: {
         [`${hostTabId}:leaf-1`]: {} as never
       },
@@ -91,9 +88,6 @@ describe('terminal PTY ownership reconciliation', () => {
     expect(state.deferredSshSessionIdsByTabId[hostTabId]).toBeUndefined()
     expect(state.unverifiedPtyLossTabIds[hostTabId]).toBeUndefined()
     expect(state.pendingReconnectTabByWorktree[WT]).toEqual([mirrorTabId])
-    expect(state.directSshPaneRetryByTabId[hostTabId]).toBeUndefined()
-    expect(state.directSshLivePtyBindingByTabId[hostTabId]).toBeUndefined()
-    expect(state.directSshPaneRetryHistoryByTabId[hostTabId]).toBeUndefined()
     expect(state.sleepingAgentSessionsByPaneKey[`${hostTabId}:leaf-1`]).toBeUndefined()
     expect(state.unreadTerminalTabs[hostTabId]).toBeUndefined()
     expect(state.unreadTerminalPanes[`${hostTabId}:leaf-1`]).toBeUndefined()

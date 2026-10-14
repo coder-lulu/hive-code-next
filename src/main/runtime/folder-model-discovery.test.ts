@@ -1,9 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import {
-  OrcaRuntimeService,
-  registerSshFilesystemProvider,
-  unregisterSshFilesystemProvider
-} from './orca-runtime-test-mocks.spec'
+import { describe, expect, it } from 'vitest'
+import { OrcaRuntimeService } from './orca-runtime-test-mocks.spec'
 import { mkdir } from 'node:fs/promises'
 import { resolve as resolvePath } from 'node:path'
 import {
@@ -20,11 +16,7 @@ describe('folder model discovery target', () => {
       const folderPath = connectionId
         ? '/srv/platform'
         : resolvePath('logs/p5-folder-model-fixture')
-      if (connectionId) {
-        registerSshFilesystemProvider(connectionId, {
-          stat: vi.fn().mockResolvedValue({ type: 'directory', size: 0, mtime: 1 })
-        } as never)
-      } else {
+      if (!connectionId) {
         await mkdir(folderPath, { recursive: true })
       }
       const runtime = new OrcaRuntimeService(
@@ -41,6 +33,10 @@ describe('folder model discovery target', () => {
           ): Promise<unknown>
         }
       ).resolveRuntimeGitTarget.bind(runtime)
+      if (connectionId) {
+        await expect(resolve(`id:${TEST_FOLDER_WORKSPACE_KEY}`, { allowFolderWorkspace: true })).rejects.toThrow(`folder_workspace_path_unavailable:${folderPath}`)
+        return
+      }
       await expect(
         resolve(`id:${TEST_FOLDER_WORKSPACE_KEY}`, { allowFolderWorkspace: true })
       ).resolves.toMatchObject({
@@ -48,9 +44,6 @@ describe('folder model discovery target', () => {
         executionHostId: connectionId ? `ssh:${connectionId}` : 'local'
       })
       await expect(resolve(`id:${TEST_FOLDER_WORKSPACE_KEY}`)).rejects.toThrow('selector_not_found')
-      if (connectionId) {
-        unregisterSshFilesystemProvider(connectionId)
-      }
     }
   )
 })

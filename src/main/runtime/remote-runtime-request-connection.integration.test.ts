@@ -1,3 +1,4 @@
+
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -82,7 +83,9 @@ describe('remote runtime request connection integration', () => {
         if (!pairing) {
           throw new Error('invalid pairing')
         }
-        const connection = new RemoteRuntimeRequestConnection(pairing)
+        const connection = new RemoteRuntimeRequestConnection(
+          pairing
+        )
         try {
           await expect(
             connection.request('repo.list', undefined, REMOTE_RUNTIME_REQUEST_TIMEOUT_MS)
@@ -218,7 +221,9 @@ describe('remote runtime request connection integration', () => {
             }
           }
         )
-        const desktop = new RemoteRuntimeRequestConnection(pairing)
+        const desktop = new RemoteRuntimeRequestConnection(
+          pairing
+        )
         const mobile = new RemoteRuntimeRequestConnection(pairing)
         try {
           await waitFor(() => events.some((event) => event.type === 'ready'))
@@ -396,7 +401,9 @@ describe('remote runtime request connection integration', () => {
             )
           )
         )
-        const requester = new RemoteRuntimeRequestConnection(pairing)
+        const requester = new RemoteRuntimeRequestConnection(
+          pairing
+        )
         try {
           await waitFor(() =>
             clientEvents.every((events) => events.some((e) => e.type === 'ready'))
@@ -642,7 +649,9 @@ describe('remote runtime request connection integration', () => {
         }
 
         const events: RuntimeClientEventStreamMessage[] = []
-        const shared = new RemoteRuntimeSharedControlConnection(pairing)
+        const shared = new RemoteRuntimeSharedControlConnection(
+          pairing
+        )
         const subscription = await shared.subscribe<RuntimeClientEventStreamMessage>(
           'runtime.clientEvents.subscribe',
           undefined,

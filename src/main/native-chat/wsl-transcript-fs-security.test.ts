@@ -6,13 +6,11 @@ import { openRegularTranscript } from '../../shared/agent-hook-listener/safe-tra
 import {
   closeTranscriptHandle,
   openTranscriptReadStream,
-  wslGatedOpen,
+  openTranscriptFile,
   wslGatedReadFile
 } from './wsl-transcript-fs-access'
 import { WslTranscriptFsProcessOperations } from './wsl-transcript-fs-process-operations'
 import { readLocalLogTailRange } from '../ai-vault/local-log-tail-reader'
-import { createRelayAiVaultFilesystemProvider } from '../../relay/ai-vault-service-filesystem'
-import { readRelayTranscriptBytes } from '../../relay/ai-vault-transcript-stream'
 
 const fixtureRoot = resolve('logs/upstream-sync/re-review/transcript-security')
 const roots: string[] = []
@@ -33,14 +31,6 @@ afterEach(() => {
 
 const readers = {
   localTail: (path: string) => readLocalLogTailRange(path, 0),
-  relayFile: (path: string) => createRelayAiVaultFilesystemProvider().readFile(path),
-  relayStream: async (path: string) => {
-    let text = ''
-    for await (const chunk of readRelayTranscriptBytes(path)) {
-      text += chunk.toString('utf8')
-    }
-    return text
-  },
   hook: async (path: string) => {
     const opened = openRegularTranscript(path)
     if (!opened) {
@@ -49,7 +39,7 @@ const readers = {
     closeSync(opened.fd)
   },
   localHandle: async (path: string) => {
-    const handle = await wslGatedOpen(path, 'exact')
+    const handle = await openTranscriptFile(path, 'exact')
     await closeTranscriptHandle(handle, path)
   },
   localFile: (path: string) => wslGatedReadFile(path, 'utf8', 'scan'),

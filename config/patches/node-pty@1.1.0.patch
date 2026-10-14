@@ -26,7 +26,7 @@ index 5f63978b07..5cb5f2b6d1 100644
 +              'ExceptionHandling': 1,
 +              'EnablePREfast': 'true',
                'AdditionalOptions': [
-@@ -29,2 +32,9 @@
+@@ -29,2 +35,9 @@
        }],
 +      ['OS=="mac"', {
 +        'xcode_settings': {
@@ -36,7 +36,7 @@ index 5f63978b07..5cb5f2b6d1 100644
 +        },
 +      }],
      ],
-@@ -90,2 +100,12 @@
+@@ -90,2 +103,12 @@
                ]
 +            }],
 +            # Orca: pair with the .symver pins in pty.cc. Force the real
@@ -684,15 +684,16 @@ diff --git a/src/win/conpty.cc b/src/win/conpty.cc
 index 7b286d3d64..5239ba4e40 100644
 --- a/src/win/conpty.cc
 +++ b/src/win/conpty.cc
-@@ -18,6 +18,7 @@
+@@ -18,6 +18,8 @@
  #include <iostream>
  #include <string>
  #include <thread>
 +#include <mutex>
++#include <atomic>
  #include <vector>
  #include <Windows.h>
  #include <strsafe.h>
-@@ -44,15 +45,36 @@ struct pty_baton {
+@@ -44,15 +46,38 @@ struct pty_baton {
    HANDLE hOut;
    HPCON hpc;
  
@@ -724,6 +725,8 @@ index 7b286d3d64..5239ba4e40 100644
  static std::vector<std::unique_ptr<pty_baton>> ptyHandles;
 +// Orca: every table access shares the exit watcher's lock; handles can be recycled.
 +static std::mutex ptyJobMutex;
++// Orca: 0 = no per-terminal ceiling (the default); set once at daemon start.
++static std::atomic<uint32_t> ptyActiveProcessLimit{0};
  static volatile LONG ptyCounter;
  
 -static pty_baton* get_pty_baton(int id) {
@@ -731,7 +734,7 @@ index 7b286d3d64..5239ba4e40 100644
    auto it = std::find_if(ptyHandles.begin(), ptyHandles.end(), [id](const auto& ptyHandle) {
      return ptyHandle->id == id;
    });
-@@ -62,7 +84,7 @@ static pty_baton* get_pty_baton(int id) {
+@@ -62,7 +87,7 @@ static pty_baton* get_pty_baton(int id) {
    return nullptr;
  }
  
@@ -740,7 +743,7 @@ index 7b286d3d64..5239ba4e40 100644
    auto it = std::remove_if(ptyHandles.begin(), ptyHandles.end(), [id](const auto& ptyHandle) {
      return ptyHandle->id == id;
    });
-@@ -102,8 +124,31 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
+@@ -102,8 +127,31 @@ void SetupExitCallback(Napi::Env env, Napi::Function cb, pty_baton* baton) {
      // Get process exit code.
      GetExitCodeProcess(baton->hShell, (LPDWORD)(&exit_event->exit_code));
      // Clean up handles
@@ -774,14 +777,14 @@ index 7b286d3d64..5239ba4e40 100644
  
      auto status = tsfn.BlockingCall(exit_event, callback); // In main thread
      switch (status) {
-@@ -242,6 +287,6 @@ HRESULT CreateNamedPipesAndPseudoConsole(const Napi::CallbackInfo& info,
+@@ -242,6 +290,6 @@ HRESULT CreateNamedPipesAndPseudoConsole(const Napi::CallbackInfo& info,
    return HRESULT_FROM_WIN32(GetLastError());
  }
  
  static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
    Napi::Env env(info.Env());
    Napi::HandleScope scope(env);
-@@ -301,8 +346,9 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
+@@ -301,8 +349,9 @@ static Napi::Value PtyStartProcess(const Napi::CallbackInfo& info) {
      // We were able to instantiate a conpty
      const int ptyId = InterlockedIncrement(&ptyCounter);
      marshal.Set("pty", Napi::Number::New(env, ptyId));
@@ -793,7 +796,7 @@ index 7b286d3d64..5239ba4e40 100644
    } else {
      throw Napi::Error::New(env, "Cannot launch conpty");
    }
-@@ -350,11 +396,15 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+@@ -350,11 +399,15 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
    const bool useConptyDll = info[4].As<Napi::Boolean>().Value();
    Napi::Function exitCallback = info[5].As<Napi::Function>();
  
@@ -813,7 +816,7 @@ index 7b286d3d64..5239ba4e40 100644
  
    // Prepare command line
    std::unique_ptr<wchar_t[]> mutableCommandline = std::make_unique<wchar_t[]>(cmdline.length() + 1);
-@@ -409,6 +459,15 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+@@ -409,6 +462,15 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
      throw errorWithCode(info, "UpdateProcThreadAttribute failed");
    }
  
@@ -829,7 +832,7 @@ index 7b286d3d64..5239ba4e40 100644
    PROCESS_INFORMATION piClient{};
    fSuccess = !!CreateProcessW(
        nullptr,
-@@ -416,7 +475,10 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+@@ -416,7 +478,10 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
        nullptr,                      // lpProcessAttributes
        nullptr,                      // lpThreadAttributes
        false,                        // bInheritHandles VERY IMPORTANT that this is false
@@ -841,7 +844,7 @@ index 7b286d3d64..5239ba4e40 100644
        envArg,                       // lpEnvironment
        mutableCwd.get(),             // lpCurrentDirectory
        &siEx.StartupInfo,            // lpStartupInfo
-@@ -426,8 +488,44 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+@@ -426,8 +491,50 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
      throw errorWithCode(info, "Cannot create process");
    }
  
@@ -863,6 +866,12 @@ index 7b286d3d64..5239ba4e40 100644
 +    // Keep the complete tree owned until explicit teardown; clean exit still survives.
 +    JOBOBJECT_EXTENDED_LIMIT_INFORMATION jobLimits{};
 +    jobLimits.BasicLimitInformation.LimitFlags = 0;
++    // Orca: an opt-in ceiling; forks past it fail inside this terminal's tree only.
++    const uint32_t activeProcessLimit = ptyActiveProcessLimit.load();
++    if (activeProcessLimit > 0) {
++      jobLimits.BasicLimitInformation.LimitFlags |= JOB_OBJECT_LIMIT_ACTIVE_PROCESS;
++      jobLimits.BasicLimitInformation.ActiveProcessLimit = activeProcessLimit;
++    }
 +    if (!SetInformationJobObject(hJob, JobObjectExtendedLimitInformation, &jobLimits, sizeof(jobLimits)) ||
 +        !AssignProcessToJobObject(hJob, piClient.hProcess)) {
 +      // Why tolerate failure: an outer job without JOB_OBJECT_LIMIT_BREAKAWAY_OK
@@ -888,7 +897,7 @@ index 7b286d3d64..5239ba4e40 100644
    if (useConptyDll && fLoadedDll)
    {
      PFNRELEASEPSEUDOCONSOLE const pfnReleasePseudoConsole = (PFNRELEASEPSEUDOCONSOLE)GetProcAddress(
-@@ -438,8 +536,12 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
+@@ -438,8 +545,12 @@ static Napi::Value PtyConnect(const Napi::CallbackInfo& info) {
      }
    }
  
@@ -903,7 +912,7 @@ index 7b286d3d64..5239ba4e40 100644
  
    // Close the thread handle to avoid resource leak
    CloseHandle(piClient.hThread);
-@@ -472,9 +574,10 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
+@@ -472,9 +583,10 @@ static Napi::Value PtyResize(const Napi::CallbackInfo& info) {
    SHORT rows = static_cast<SHORT>(info[2].As<Napi::Number>().Uint32Value());
    const bool useConptyDll = info[3].As<Napi::Boolean>().Value();
  
@@ -916,7 +925,7 @@ index 7b286d3d64..5239ba4e40 100644
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
      bool fLoadedDll = hLibrary != nullptr;
      if (fLoadedDll)
-@@ -513,9 +616,10 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
+@@ -513,9 +625,10 @@ static Napi::Value PtyClear(const Napi::CallbackInfo& info) {
      return env.Undefined();
    }
  
@@ -929,7 +938,7 @@ index 7b286d3d64..5239ba4e40 100644
      HANDLE hLibrary = LoadConptyDll(info, useConptyDll);
      bool fLoadedDll = hLibrary != nullptr;
      if (fLoadedDll)
-@@ -544,29 +648,215 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
+@@ -544,29 +657,229 @@ static Napi::Value PtyKill(const Napi::CallbackInfo& info) {
    int id = info[0].As<Napi::Number>().Int32Value();
    const bool useConptyDll = info[1].As<Napi::Boolean>().Value();
  
@@ -1156,10 +1165,24 @@ index 7b286d3d64..5239ba4e40 100644
 +  return Napi::Boolean::New(env, true);
 +}
 +
++/**
++ * Orca: setActiveProcessLimit(limit) applies JOB_OBJECT_LIMIT_ACTIVE_PROCESS to
++ * every ConPTY job created afterwards. 0 turns it off. Existing jobs keep theirs.
++ */
++static Napi::Value PtySetActiveProcessLimit(const Napi::CallbackInfo& info) {
++  Napi::Env env(info.Env());
++  Napi::HandleScope scope(env);
++  if (info.Length() != 1 || !info[0].IsNumber()) {
++    throw Napi::Error::New(env, "Usage: pty.setActiveProcessLimit(limit)");
++  }
++  ptyActiveProcessLimit.store(info[0].As<Napi::Number>().Uint32Value());
++  return Napi::Boolean::New(env, true);
++}
++
  /**
  * Init
  */
-@@ -577,6 +867,10 @@ Napi::Object init(Napi::Env env, Napi::Object exports) {
+@@ -577,6 +890,11 @@ Napi::Object init(Napi::Env env, Napi::Object exports) {
    exports.Set("resize", Napi::Function::New(env, PtyResize));
    exports.Set("clear", Napi::Function::New(env, PtyClear));
    exports.Set("kill", Napi::Function::New(env, PtyKill));
@@ -1167,6 +1190,7 @@ index 7b286d3d64..5239ba4e40 100644
 +  exports.Set("listJobProcessIds", Napi::Function::New(env, PtyListJobProcessIds));
 +  exports.Set("assignCurrentProcessToJob", Napi::Function::New(env, PtyAssignCurrentProcessToJob));
 +  exports.Set("strictPtyJobOwnership", Napi::Boolean::New(env, true));
++  exports.Set("setActiveProcessLimit", Napi::Function::New(env, PtySetActiveProcessLimit));
    return exports;
  };
  
@@ -1230,7 +1254,7 @@ index 3c38f89..e20b3e6 100644
          // Not available until `ready` event emitted.
          _this._pid = _this._agent.innerPid;
          _this._fd = _this._agent.fd;
-@@ -76,23 +99,6 @@ var WindowsTerminal = /** @class */ (function (_super) {
+@@ -76,23 +97,6 @@ var WindowsTerminal = /** @class */ (function (_super) {
                      _this._deferreds = [];
                  }
              });
@@ -1254,7 +1278,7 @@ index 3c38f89..e20b3e6 100644
              // Cleanup after the socket is closed.
              _this._socket.on('close', function () {
                  _this.emit('exit', _this._agent.exitCode);
-@@ -103,6 +109,20 @@ var WindowsTerminal = /** @class */ (function (_super) {
+@@ -103,6 +107,20 @@ var WindowsTerminal = /** @class */ (function (_super) {
          _this._name = name;
          _this._readable = true;
          _this._writable = true;
@@ -1275,7 +1299,7 @@ index 3c38f89..e20b3e6 100644
          _this._forwardEvents();
          return _this;
      }
-@@ -196,4 +216,4 @@ var WindowsTerminal = /** @class */ (function (_super) {
+@@ -196,4 +214,4 @@ var WindowsTerminal = /** @class */ (function (_super) {
      return WindowsTerminal;
  }(terminal_1.Terminal));
  exports.WindowsTerminal = WindowsTerminal;
@@ -1346,7 +1370,7 @@ index 13f6c6d..eda63c8 100644
      // Not available until `ready` event emitted.
      this._pid = this._agent.innerPid;
      this._fd = this._agent.fd;
-@@ -82,25 +108,6 @@ export class WindowsTerminal extends Terminal {
+@@ -82,25 +106,6 @@ export class WindowsTerminal extends Terminal {
          }
        });
 -
@@ -1373,7 +1397,7 @@ index 13f6c6d..eda63c8 100644
        // Cleanup after the socket is closed.
        this._socket.on('close', () => {
          this.emit('exit', this._agent.exitCode);
-@@ -114,6 +121,19 @@ export class WindowsTerminal extends Terminal {
+@@ -114,6 +119,19 @@ export class WindowsTerminal extends Terminal {
 -
 +
      this._readable = true;

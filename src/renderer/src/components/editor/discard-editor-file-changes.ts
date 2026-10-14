@@ -105,8 +105,10 @@ async function discardCurrentEditorFileChangesAndClose(fileId: string): Promise<
     currentContext.expectedExecutionHostId !== context.expectedExecutionHostId ||
     currentContext.expectedSshTargetId !== context.expectedSshTargetId ||
     currentContext.expectedSshConnectionGeneration !== context.expectedSshConnectionGeneration ||
-    currentContext.settings?.activeRuntimeEnvironmentId !==
-      context.settings?.activeRuntimeEnvironmentId
+    currentContext.target.kind !== context.target.kind ||
+    (currentContext.target.kind === 'environment' &&
+      context.target.kind === 'environment' &&
+      currentContext.target.environmentId !== context.target.environmentId)
   ) {
     throw new Error('The file owner changed while discarding. Its edits were kept.')
   }

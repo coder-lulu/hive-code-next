@@ -1,4 +1,6 @@
+import type { AgentSessionLatestTurn } from './agent-session-turn-completion-wire'
 import type { StructuredSessionListActivity } from './structured-session-list-activity'
+import type { AgentSessionUnavailable } from './agent-session-availability'
 import type {
   AgentSessionBackgroundTask,
   AgentSessionBackgroundTaskState
@@ -18,11 +20,7 @@ export * from './agent-session-turn-completion-wire'
 import type { AgentSessionConversationCommand } from './agent-session-conversation-command'
 import type { AgentSessionContextUsage } from './agent-session-context-usage'
 // ─── Structured agent-session wire contract ─────────────────────────────────
-// The shapes `agentSession.*` accepts and publishes. Phase 2 builds provider
-// adapters and clients against exactly these types, so everything here must be
-// plain JSON. The whole surface is gated by agent-session.structured.v1, which
-// no released baseline advertises; after that capability ships, every new field
-// must remain optional to old readers (docs/reference/remote-wire-compatibility.md).
+// Plain JSON structures shared by provider adapters, desktop and mobile clients.
 
 import type {
   AgentJournalCursor,
@@ -30,8 +28,7 @@ import type {
   AgentJournalResetReason,
   AgentJournalResolution,
   AgentJournalSubmission,
-  AgentJournalThreadGoal,
-  AgentJournalTurnLifecycle
+  AgentJournalThreadGoal
 } from './agent-session-journal-types'
 import type { AgentTurnOutcome } from './agent-turn-outcome'
 import type { AgentSessionHandoffStage, AgentSessionRecord } from './agent-session-record'
@@ -60,18 +57,6 @@ export { agentSessionBackgroundTasksEqual } from './agent-session-background-tas
 export type AgentSessionTurnActivity = {
   turnId: string
   text: string
-}
-
-/** The session's newest turn record over the WHOLE journal. A page windows the timeline and a
- *  turn's record keeps the place it opened at, so a long turn's record falls off the page; this is
- *  what tells a client a turn is running. Present null: the journal records no turn. Absent: an
- *  older host, whose clients still read the loaded rows. */
-export type AgentSessionLatestTurn = {
-  /** The record's journal key, which rows of the turn name as their scope. */
-  itemId: string
-  /** Host clock at the record's creation, as on its own row; a revision does not move it. */
-  observedAt: number
-  turn: AgentJournalTurnLifecycle
 }
 
 export const AGENT_SESSION_ID_MAX_LENGTH = 512
@@ -243,9 +228,16 @@ export type AgentSessionStatusSummary = {
   /** With `hostExecutionOwned`: whether that child has proven its start. `starting` is a
    *  published session whose provider has not yet answered startup; absent on older hosts. */
   hostExecutionPhase?: 'starting' | 'ready'
+  /** This restart action's progress, derived by the live host and never persisted.
+   *  Cleared when the action returns; absent on older hosts. */
+  restartResume?: {
+    phase: 'queued' | 'starting' | 'continued' | 'refused' | 'unconfirmed' | 'skipped'
+  }
   latestPrompt: string
   /** Provider model in force for the next turn; absent until the host has read the options. */
   model?: string
+  /** The chat's saved permission mode; a client re-reads options when it or `model` moves. */
+  permissionMode?: string
   /** The tool the running turn is inside, else the last one it used. Absent unless `status`
    *  is 'working'. */
   toolName?: string
@@ -324,6 +316,8 @@ export type AgentSessionMutationResult<TValue> =
 // ─── Per-method payloads ────────────────────────────────────────────────────
 
 export type AgentSessionAttachResult = {
+  /** Create's committed opening message, even when its row is outside the returned history page. */
+  firstMessage?: AgentJournalSubmission
   sessionId: string
   fence: number
   page: AgentSessionHistoryPage
@@ -393,6 +387,12 @@ export type AgentSessionModelOption = {
   efforts: AgentSessionOptionChoice[]
   /** Provider catalog fact. Absent means the host could not determine support. */
   supportsFastMode?: boolean
+  /** Whether the model runs Approve for me; absent is unknown, which neither offers nor launches it. */
+  supportsAutoMode?: boolean
+  /** Service tiers the provider lists for this model besides its standard one, each valued by the
+   *  provider's own tier id. Absent means unknown; a client that reads it offers one speed choice
+   *  (`default` for standard) in place of the Fast toggle. */
+  serviceTiers?: AgentSessionOptionChoice[]
 }
 
 export type AgentSessionFastModeState = 'off' | 'cooldown' | 'on'
@@ -409,20 +409,30 @@ export type AgentSessionFastModeSupport = {
  * for the key yet — the client keeps its static seed. Additive read-only
  * surface: an older host simply lacks the method.
  */
-export type AgentSessionModelCatalogResult =
-  | {
-      origin: 'unknown'
-      /** The host is running its first listing for this account; a `waitForListing` read answers
-       *  when it lands. Absent from a host that predates it. */
-      listingInProgress?: true
-    }
+export type AgentSessionModelCatalogResult = {
+  /** The host is running the listing this answer is waiting on (its first for the account, or
+   *  the probe re-checking `unavailable`); a `waitForListing` read answers when it lands. Absent
+   *  from a host that predates it; such a host sends it only with `unknown`. */
+  listingInProgress?: true
+  /** Why no chat can start under the account, as the host's probe last found it. Absent is
+   *  unknown, which shows nothing; an older host never sends it. */
+  unavailable?: AgentSessionUnavailable
+} & (
+  | { origin: 'unknown' }
   | {
       /** What produced the listing; any age is served, `fetchedAt` carries it. */
       origin: 'live-session' | 'probe'
       models: AgentSessionModelOption[]
       fastModeSupport?: AgentSessionFastModeSupport
       fetchedAt: number
+      /** The listed default is the model a new chat here launches with: the agent's listing names
+       *  its configured model and no workspace config can replace it. Absent from an older host. */
+      listingNamesConfiguredModel?: boolean
+      /** The named default holds in every workspace: the agent reads no project config for its
+       *  model, so an answer naming no workspace serves any new chat. Absent from an older host. */
+      defaultHoldsInEveryWorkspace?: true
     }
+)
 
 /** One entry of the `/` menu the running provider reports for itself. `skill`
  *  marks a name the session loaded as a skill rather than a built-in command;
@@ -455,9 +465,7 @@ export type AgentSessionThreadGoalChange =
   | { kind: 'status'; status: 'active' | 'paused' }
   | { kind: 'clear' }
 
-export type AgentSessionThreadGoalResult = {
-  change: AgentSessionThreadGoalChange['kind']
-}
+export type AgentSessionThreadGoalResult = { change: AgentSessionThreadGoalChange['kind'] }
 
 /** Provider-reported choices and effective next-turn values. Additive read-only
  *  surface so older hosts can reject it without changing structured v1 writes. */
@@ -468,19 +476,25 @@ export type AgentSessionOptionsResult = {
    *  `agentSession.threadGoal` never offers the controls. `current` is the
    *  latest goal the whole journal records, for a client whose loaded page
    *  starts after it. */
-  threadGoal?: { current: AgentJournalThreadGoal | null }
+  threadGoal?: { current: AgentJournalThreadGoal | null; contextFloor?: AgentJournalCursor }
   /** Present only where this session writes context facts to its turn rows.
    *  `current` is the newest of each part the whole journal records, for a
    *  client whose loaded page starts after the row that carries it. */
-  contextUsage?: { current: AgentSessionContextUsage }
+  contextUsage?: { current: AgentSessionContextUsage; contextFloor?: AgentJournalCursor }
+  /** This session takes image attachments. Absent = unknown (an older host). */
+  acceptsImages?: boolean
   models: AgentSessionModelOption[]
   /** Session/account/transport support. Absent means unknown, never unsupported. */
   fastModeSupport?: AgentSessionFastModeSupport
   current: {
-    model: string
+    model?: string
     effort?: string
     /** Canonical preference for the next turn. Explicit false is meaningful. */
     fastMode?: boolean
+    /** Next-turn service tier id where the model lists `serviceTiers`; `default` is standard. */
+    serviceTier?: string
+    /** The permission mode a start runs now; absent from a host or agent with no picker. */
+    permissionMode?: string
     /** Provider-reported effective routing, distinct from the next-turn preference. */
     fastModeState?: AgentSessionFastModeState
     /**

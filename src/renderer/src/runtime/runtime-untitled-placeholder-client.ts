@@ -4,7 +4,7 @@ import {
   untitledPlaceholderDiscardResultSchema
 } from '../../../shared/untitled-placeholder-wire-contract'
 import type { RuntimeFileOperationArgs } from './runtime-file-client-types'
-import { RuntimeRpcCallError } from './runtime-rpc-client'
+import { RuntimeRpcCallError } from './runtime-rpc-result'
 import {
   assertLocalFilesystemFallbackAllowed,
   getRemoteFileArgs,

@@ -28,10 +28,11 @@ import { MobileNativeChatLiveLine } from './MobileNativeChatLiveLine'
 import { MobileNativeChatStopButton } from './MobileNativeChatStopButton'
 import { MobileAgentWorkingIndicator } from './MobileAgentWorkingIndicator'
 import { MobileNativeChatComposer } from './MobileNativeChatComposer'
-import { NO_QUEUED_SLOT } from './use-mobile-native-chat-queued-slot'
 import { MobileNativeChatMessage } from './MobileNativeChatMessage'
 import { MobileNativeChatPromptCard } from './MobileNativeChatPromptCard'
 import type { MobileNativeChatViewProps } from './mobile-native-chat-view-props'
+import { NO_COMPOSER_TRAY } from './use-mobile-native-chat-composer-tray'
+import { mobileNativeChatUnsentNotices } from './mobile-native-chat-unsent-notices'
 
 const EMPTY_ERROR = '无法读取对话记录。你可以切回终端继续工作。'
 const EMPTY_HINT = '让 Agent 检查代码、解释输出或进行修改。'
@@ -94,7 +95,7 @@ export function MobileNativeChatView({
   permission,
   promptKey,
   onRespondPermission,
-  queuedSlot: { cards: queuedCards, composerInputRef: inputRef } = NO_QUEUED_SLOT,
+  composerTray: { content: trayContent, composerInputRef: inputRef } = NO_COMPOSER_TRAY,
   onOpenFile,
   keyboardInset = 0
 }: MobileNativeChatViewProps): React.JSX.Element {
@@ -195,6 +196,10 @@ export function MobileNativeChatView({
     [detachFromTail, listRef]
   )
 
+  const unsentNotices = useMemo(
+    () => mobileNativeChatUnsentNotices(turnJournal, agent),
+    [turnJournal, agent]
+  )
   const renderItem = useCallback(
     ({ item, index }: { item: NativeChatMessage; index: number }) => (
       <MobileNativeChatMessage
@@ -206,10 +211,19 @@ export function MobileNativeChatView({
         onOpenFile={onOpenFile}
         structuredActivityUi={structuredActivityUi}
         onToggleTurn={turns.onToggleTurn}
+        unsentNotice={item.unsent ? unsentNotices.get(item.id) : undefined}
         {...turns.resolveRow(index, item)}
       />
     ),
-    [toolsExpanded, fontScale, onScrollToMessage, onOpenFile, structuredActivityUi, turns]
+    [
+      toolsExpanded,
+      fontScale,
+      onScrollToMessage,
+      onOpenFile,
+      structuredActivityUi,
+      turns,
+      unsentNotices
+    ]
   )
 
   const liveStatus = turns.liveLine ? (
@@ -314,7 +328,7 @@ export function MobileNativeChatView({
           ) : null}
         </GestureHandlerRootView>
       )}
-      {queuedCards}
+      {trayContent}
       <MobileNativeChatPromptCard
         key={promptKey ?? undefined}
         {...{ ask, askKey, onDismissAsk, onAnswerAsk, onCancelAsk, onCancelPrompt, onCollapseAsk }}

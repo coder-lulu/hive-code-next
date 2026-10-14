@@ -21,7 +21,7 @@ import {
   getLocalProjectExecutionRuntimeContext,
   getLocalRepoProjectExecutionRuntimeContext
 } from '@/lib/local-preflight-context'
-import type { NativeChatLaunchPromptDelivery } from '@/lib/native-chat-initial-view-mode'
+import type { NativeChatLaunchPromptDelivery } from '@/lib/native-chat-launch-prompt-delivery'
 import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { readLocalRuntimeCapabilitiesOrUnknown } from '@/runtime/local-runtime-capabilities'
@@ -72,7 +72,6 @@ export type AgentLaunchRouteArgs = {
     agentArgs?: string | null
     agentPermissionMode?: AgentLaunchPermissionMode
   }
-  initialSessionOptions?: Readonly<Record<string, unknown>>
 }
 
 export { workspaceKindForWorktreeId }
@@ -164,6 +163,13 @@ export function buildAgentLaunchRouteInput(
         ? resolveStructuredAgentSessionOwner(store, workspace.worktreeId)
         : undefined
   const executionHostId = owner ?? resolveExecutionHostId(store, workspace)
+  // OpenCode's registered ACP provider resolves and validates the owning host's Command.
+  // An unlearned catalog cannot prove that provider exists, so keep its terminal route.
+  const hostOwnsOpenCodeCommand =
+    agent === 'opencode' &&
+    readHostStructuredAgents(executionHostId, store.runtimeStatusByEnvironmentId)?.some(
+      (entry) => entry.agent === agent
+    ) === true
   return {
     agent,
     settings: store.settings,
@@ -198,7 +204,8 @@ export function buildAgentLaunchRouteInput(
       }) ||
       // A launch command override is this machine's; a paired host's createSupport reads its own.
       (executionHostId === LOCAL_EXECUTION_HOST_ID &&
-        hasExplicitTuiLaunchCommand(store.settings, agent)),
+        hasExplicitTuiLaunchCommand(store.settings, agent) &&
+        !hostOwnsOpenCodeCommand),
     startsOutsideWorkspaceRoot: requestsCwdOutsideWorkspaceRootForWorkspace({
       workspaceId: workspace.worktreeId,
       requestedCwd: tuiCustomization?.cwd,
@@ -208,7 +215,6 @@ export function buildAgentLaunchRouteInput(
       resolveFolderWorkspacePath: (folderWorkspaceId) =>
         store.folderWorkspaces?.find((entry) => entry.id === folderWorkspaceId)?.folderPath
     }),
-    initialSessionOptions: args.initialSessionOptions,
     ...hostStructuredAgentsInput(store, executionHostId)
   }
 }

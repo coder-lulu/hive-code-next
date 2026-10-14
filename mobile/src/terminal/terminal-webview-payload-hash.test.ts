@@ -7,9 +7,10 @@ import { XTERM_HTML } from './terminal-webview-html'
 // update these values only when that change is deliberate, and only after checking the
 // document still runs. Refactors that merely move slice boundaries must leave them alone.
 // Rebuilt with esbuild 0.28.2 and syntax folding disabled to retain xterm's DECRQM enum.
+// xterm beta.304, unicode11 beta.301 and webgl beta.300 change only the engine payload.
 // The document-style, engine and theme suites verify the changed seams.
-const EXPECTED_SHA256 = '832d1ee36b4ceed749f061af98f0358c7d06e36d432b020f92e9765cd7123c14'
-const EXPECTED_LENGTH = 751481
+const EXPECTED_SHA256 = '3c614fad1540e8330a388a492844f3eb04ddc89f9c12a7c45a80156a356812a5'
+const EXPECTED_LENGTH = 751595
 
 describe('terminal WebView payload', () => {
   it('composes the expected document', () => {

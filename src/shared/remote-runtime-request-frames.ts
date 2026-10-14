@@ -69,7 +69,7 @@ export function parseAuthenticatedFrame(plaintext: string): RemoteRuntimeClientE
       `Remote ${APP_DISPLAY_NAME} runtime returned an invalid E2EE auth frame.`
     )
   }
-  const type = (authenticated as { type?: unknown }).type
+  const type = (authenticated as { type?: unknown } | null)?.type
   if (type === 'e2ee_authenticated') {
     return null
   }

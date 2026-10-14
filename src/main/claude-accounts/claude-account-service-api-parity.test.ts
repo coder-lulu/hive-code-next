@@ -29,9 +29,9 @@ describe('ClaudeAccountService mutation serialization', () => {
     const first = deferred()
     const calls: string[] = []
     const mutation = service as unknown as {
-      doAddAccount(target?: ClaudeAccountAddTarget): Promise<ClaudeRateLimitAccountsState>
+      registration: { add(target?: ClaudeAccountAddTarget): Promise<ClaudeRateLimitAccountsState> }
     }
-    mutation.doAddAccount = vi.fn(async (target) => {
+    mutation.registration.add = vi.fn(async (target) => {
       calls.push(target?.wslDistro ?? 'host')
       if (calls.length === 1) {
         await first.promise
@@ -68,8 +68,10 @@ describe('ClaudeAccountService mutation serialization', () => {
       activeAccountId: null,
       activeAccountIdsByRuntime: { host: null, wsl: {} }
     }))
-    ;(firstService as unknown as { doAddAccount: typeof firstAdd }).doAddAccount = firstAdd
-    ;(secondService as unknown as { doAddAccount: typeof secondAdd }).doAddAccount = secondAdd
+    ;(firstService as unknown as { registration: { add: typeof firstAdd } }).registration.add =
+      firstAdd
+    ;(secondService as unknown as { registration: { add: typeof secondAdd } }).registration.add =
+      secondAdd
     ;(
       firstService as unknown as { cancelPendingClaudeLogin: () => boolean }
     ).cancelPendingClaudeLogin = vi.fn(() => true)

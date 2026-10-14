@@ -78,7 +78,7 @@ describe('RateLimitService', () => {
 
   it('aborts inactive Claude preview fetches on stop', async () => {
     const service = new RateLimitService()
-    const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+    const account = { id: 'account-1', managedAuthPath: '/captured/account-1' }
     const capturedSignals: { claude?: AbortSignal } = {}
     service.setInactiveClaudeAccountsResolver(() => [account])
     vi.mocked(fetchManagedAccountUsage).mockImplementation(
@@ -136,6 +136,8 @@ describe('RateLimitService', () => {
 
   it('passes WSL Codex managed homes into inactive account rate-limit fetches', async () => {
     const service = new RateLimitService()
+    const networkProxySettings = { httpProxyUrl: 'http://proxy.fixture.invalid:8080' }
+    service.setNetworkProxySettingsResolver(() => networkProxySettings)
     const wslCodexHome =
       '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.local\\share\\orca\\codex-accounts\\a\\home'
     service.setInactiveCodexAccountsResolver(() => [
@@ -148,6 +150,7 @@ describe('RateLimitService', () => {
     expect(fetchCodexRateLimits).toHaveBeenCalledWith(
       expect.objectContaining({
         codexHomePath: wslCodexHome,
+        networkProxySettings,
         signal: expect.any(AbortSignal)
       })
     )
@@ -212,7 +215,7 @@ describe('RateLimitService', () => {
 
   it('applies the platform usage-panel supplement policy to inactive Claude previews', async () => {
     const service = new RateLimitService()
-    const account = { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+    const account = { id: 'account-1', managedAuthPath: '/captured/account-1' }
     service.setInactiveClaudeAccountsResolver(() => [account])
     vi.mocked(fetchManagedAccountUsage).mockResolvedValueOnce(okProvider('claude', 33, Date.now()))
 
@@ -231,7 +234,7 @@ describe('RateLimitService', () => {
     const service = new RateLimitService()
     const accountFetch = deferred<ProviderRateLimits>()
     service.setInactiveClaudeAccountsResolver(() => [
-      { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+      { id: 'account-1', managedAuthPath: '/captured/account-1' }
     ])
     vi.mocked(fetchManagedAccountUsage).mockReturnValueOnce(accountFetch.promise)
 
@@ -401,12 +404,12 @@ describe('RateLimitService', () => {
   it('does not recache an inactive Claude account removed during fetch-on-open', async () => {
     const service = new RateLimitService()
     const accountFetch = deferred<ProviderRateLimits>()
-    let inactiveAccounts = [{ id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }]
+    let inactiveAccounts = [{ id: 'account-1', managedAuthPath: '/captured/account-1' }]
     service.setInactiveClaudeAccountsResolver(() => inactiveAccounts)
     service.setClaudeAuthPreparationResolver(async () => ({
       configDir: '/tmp/.claude',
       envPatch: {},
-      stripAuthEnv: false,
+      stripAuthEnv: true,
       provenance: 'system'
     }))
     vi.mocked(fetchClaudeRateLimits).mockResolvedValue(okProvider('claude', 7))
@@ -420,7 +423,7 @@ describe('RateLimitService', () => {
     ])
 
     service.evictInactiveClaudeCache('account-1')
-    inactiveAccounts = [{ id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }]
+    inactiveAccounts = [{ id: 'account-1', managedAuthPath: '/captured/account-1' }]
     await service.refreshForClaudeAccountChange('account-1')
     expect(service.getState().inactiveClaudeAccounts[0]?.accountId).toBe('account-1')
 
@@ -436,12 +439,12 @@ describe('RateLimitService', () => {
     const service = new RateLimitService()
     const accountFetch = deferred<ProviderRateLimits>()
     service.setInactiveClaudeAccountsResolver(() => [
-      { id: 'account-1', managedAuthPath: '/tmp/account-1/auth' }
+      { id: 'account-1', managedAuthPath: '/captured/account-1' }
     ])
     service.setClaudeAuthPreparationResolver(async () => ({
       configDir: '/tmp/.claude',
       envPatch: {},
-      stripAuthEnv: false,
+      stripAuthEnv: true,
       provenance: 'system'
     }))
     vi.mocked(fetchClaudeRateLimits).mockResolvedValue(okProvider('claude', 7))

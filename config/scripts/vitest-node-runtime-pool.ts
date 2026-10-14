@@ -4,7 +4,8 @@ import {
   serializeNodeRuntimeMessage
 } from './vitest-node-runtime-codec.mjs'
 import type { PoolOptions, PoolWorker, WorkerRequest } from 'vitest/node'
-import { spawnProcess, type ChildProcessHandle } from '../../src/shared/child-process/run-process'
+import { spawnProcess } from '@orca/process-host'
+import type { ChildProcessHandle } from '@orca/process-host/process-spec'
 
 class NodeRuntimeWorker implements PoolWorker {
   readonly name = 'node-runtime'

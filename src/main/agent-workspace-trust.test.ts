@@ -204,7 +204,7 @@ describe('applyAgentWorkspaceTrust on this machine', () => {
       wslDistro: 'Ubuntu',
       wslLinuxConfigDir: '/home/u/.claude',
       envPatch: {},
-      stripAuthEnv: false,
+      stripAuthEnv: true,
       provenance: 'test'
     } as const
     const wsl = { ...local, claudeAuth: wslAuth, wslDistro: 'Ubuntu' }

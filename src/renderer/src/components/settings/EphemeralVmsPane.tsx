@@ -14,8 +14,7 @@ import {
 } from '@/lib/agent-skill-cli-prerequisite'
 import {
   EPHEMERAL_VMS_SKILL_INSTALL_COMMAND,
-  EPHEMERAL_VMS_SKILL_NAME,
-  EPHEMERAL_VMS_SKILL_UPDATE_COMMAND
+  EPHEMERAL_VMS_SKILL_NAME
 } from '@/lib/agent-feature-install-commands'
 import {
   GLOBAL_AGENT_SKILL_SOURCE_KINDS,
@@ -61,12 +60,6 @@ export function EphemeralVmsPane(): React.JSX.Element {
     ? EPHEMERAL_VMS_SKILL_INSTALL_COMMAND
     : buildSkillCommandForRuntime(
         EPHEMERAL_VMS_SKILL_INSTALL_COMMAND,
-        activeSkillRuntime.agentRuntime
-      )
-  const updateCommand = activeSkillRuntime.installDisabledReason
-    ? EPHEMERAL_VMS_SKILL_UPDATE_COMMAND
-    : buildSkillCommandForRuntime(
-        EPHEMERAL_VMS_SKILL_UPDATE_COMMAND,
         activeSkillRuntime.agentRuntime
       )
 
@@ -170,7 +163,6 @@ export function EphemeralVmsPane(): React.JSX.Element {
           'Sets up, builds, authenticates, and validates repo-owned environment recipes.'
         )}
         command={installCommand}
-        installedCommand={updateCommand}
         terminalTitle={translate(
           'auto.components.settings.EphemeralVmsPane.cloudVmTerminalTitle',
           'Cloud VM setup'

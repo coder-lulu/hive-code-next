@@ -697,59 +697,88 @@ describe('connectPanePty', () => {
     expect(createRemoteRuntimePtyTransport).not.toHaveBeenCalled()
   })
 
-  it('routes a HUB-owned SSH PTY wake hint through the HUB without direct SSH', async () => {
-    const { connectPanePty } = await import('./pty-connection')
-    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
-    const transport = createMockTransport()
-    transportFactoryQueue.push(transport)
-    const hostPtyId = 'ssh:hub-private@@pty-2'
-    mockStoreState = {
-      ...mockStoreState,
-      tabsByWorktree: {
-        'wt-1': [{ id: 'tab-1', ptyId: hostPtyId }]
-      },
-      ptyIdsByTabId: { 'tab-1': [hostPtyId] },
-      terminalLayoutsByTabId: {
-        'tab-1': {
-          root: { type: 'leaf', leafId: LEAF_1 },
-          activeLeafId: LEAF_1,
-          expandedLeafId: null,
-          ptyIdsByLeafId: { [LEAF_1]: hostPtyId }
-        }
-      },
-      worktreesByRepo: {
-        repo1: [
+  it.each(['resolved', 'missing', 'ambiguous'] as const)(
+    'routes an SSH PTY wake hint only with a resolved HUB owner: %s',
+    async (owner) => {
+      const { connectPanePty } = await import('./pty-connection')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const transport = createMockTransport()
+      transportFactoryQueue.push(transport)
+      const hostPtyId = 'ssh:hub-private@@pty-2'
+      mockStoreState = {
+        ...mockStoreState,
+        tabsByWorktree: {
+          'wt-1': [{ id: 'tab-1', ptyId: hostPtyId }]
+        },
+        ptyIdsByTabId: { 'tab-1': [hostPtyId] },
+        terminalLayoutsByTabId: {
+          'tab-1': {
+            root: { type: 'leaf', leafId: LEAF_1 },
+            activeLeafId: LEAF_1,
+            expandedLeafId: null,
+            ptyIdsByLeafId: { [LEAF_1]: hostPtyId }
+          }
+        },
+        worktreesByRepo: {
+          repo1: [
+            {
+              id: 'wt-1',
+              repoId: 'repo1',
+              path: '/srv/wt-1',
+              hostId: 'ssh:hub-private',
+              runtimeOwnerEnvironmentId: 'hub-env'
+            }
+          ]
+        },
+        repos: [
           {
-            id: 'wt-1',
-            repoId: 'repo1',
-            path: '/srv/wt-1',
-            hostId: 'ssh:hub-private',
-            runtimeOwnerEnvironmentId: 'hub-env'
+            id: 'repo1',
+            connectionId: 'hub-private',
+            executionHostId: 'runtime:hub-env'
           }
         ]
-      },
-      repos: [
-        {
-          id: 'repo1',
-          connectionId: 'hub-private',
-          executionHostId: 'runtime:hub-env'
+      } as StoreState
+      if (owner === 'missing') {
+        mockStoreState.worktreesByRepo = {
+          repo1: [{ id: 'wt-1', repoId: 'repo1', path: '/srv/wt-1', hostId: 'ssh:hub-private' }]
         }
-      ]
-    } as StoreState
-    const deps = createDeps({
-      restoredLeafId: LEAF_1,
-      restoredPtyIdByLeafId: { [LEAF_1]: hostPtyId }
-    })
+        mockStoreState.repos = [
+          { id: 'repo1', connectionId: 'hub-private', executionHostId: 'ssh:hub-private' }
+        ] as StoreState['repos']
+      } else if (owner === 'ambiguous') {
+        mockStoreState.worktreesByRepo.repo1.push({
+          id: 'wt-1',
+          repoId: 'repo1',
+          path: '/srv/wt-1',
+          hostId: 'ssh:other-private',
+          runtimeOwnerEnvironmentId: 'other-hub'
+        } as StoreState['worktreesByRepo'][string][number])
+      }
+      const deps = createDeps({
+        restoredLeafId: LEAF_1,
+        restoredPtyIdByLeafId: { [LEAF_1]: hostPtyId }
+      })
 
-    connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
-    await flushAsyncTicks()
+      connectPanePty(createPane(1) as never, createManager(1) as never, deps as never)
+      await flushAsyncTicks()
 
-    expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith('hub-env', expect.any(Object))
-    expect(transport.connect).toHaveBeenCalledWith(
-      expect.objectContaining({ sessionId: hostPtyId })
-    )
-    expect(transport.attach).not.toHaveBeenCalled()
-    expect(window.api.ssh.connect).not.toHaveBeenCalled()
-    expect(window.api.ssh.needsPassphrasePrompt).not.toHaveBeenCalled()
-  })
+      if (owner !== 'resolved') {
+        const { createIpcPtyTransport } = await import('./pty-transport')
+        expect(createRemoteRuntimePtyTransport).not.toHaveBeenCalled()
+        expect(createIpcPtyTransport).not.toHaveBeenCalled()
+        expect(transport.connect).not.toHaveBeenCalled()
+        expect(transport.attach).not.toHaveBeenCalled()
+        expect(window.api.ssh.connect).not.toHaveBeenCalled()
+        expect(window.api.ssh.needsPassphrasePrompt).not.toHaveBeenCalled()
+        return
+      }
+      expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith('hub-env', expect.any(Object))
+      expect(transport.connect).toHaveBeenCalledWith(
+        expect.objectContaining({ sessionId: hostPtyId })
+      )
+      expect(transport.attach).not.toHaveBeenCalled()
+      expect(window.api.ssh.connect).not.toHaveBeenCalled()
+      expect(window.api.ssh.needsPassphrasePrompt).not.toHaveBeenCalled()
+    }
+  )
 })

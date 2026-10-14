@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest'
-import type * as WindowsCmdShimModule from '../../shared/child-process/windows-cmd-shim-resolution'
+import type * as WindowsCmdShimModule from '@orca/process-host/windows-cmd-shim-resolution'
 import { installAgent } from './agent-install-service'
 import { mergePathSegments } from '../startup/hydrate-shell-path'
 
@@ -15,7 +15,7 @@ const { run, runWsl, guest, current, latest, readPackage, realpath, resolveShim,
     resolveShim: vi.fn(),
     resolveCommands: vi.fn()
   }))
-vi.mock('../../shared/child-process/run-process', () => ({ runProcess: run }))
+vi.mock('@orca/process-host', () => ({ runProcess: run }))
 vi.mock('../../shared/node-cli-command-resolution', () => ({
   resolveCliCommands: resolveCommands,
   withCliRuntimeOnPath: (_program: string, env: NodeJS.ProcessEnv) => env
@@ -32,7 +32,7 @@ vi.mock('./agent-version-service', () => ({
   readLatestAgentVersion: latest
 }))
 vi.mock('node:fs', () => ({ readFileSync: readPackage, realpathSync: realpath }))
-vi.mock('../../shared/child-process/windows-cmd-shim-resolution', async (importOriginal) => ({
+vi.mock('@orca/process-host/windows-cmd-shim-resolution', async (importOriginal) => ({
   ...(await importOriginal<typeof WindowsCmdShimModule>()),
   resolveWindowsCmdShim: resolveShim
 }))

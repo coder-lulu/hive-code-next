@@ -61,6 +61,11 @@ export function updateSettings(
   if ('agentNpmRegistry' in updates) {
     sanitizedUpdates.agentNpmRegistry = updates.agentNpmRegistry === 'china' ? 'china' : 'default'
   }
+  const linkBehavior = updates.terminalLinkClickBehavior
+  if (linkBehavior === 'actions' || linkBehavior === 'open' || linkBehavior === 'none') {
+    // Loaded defaults are ambiguous; synchronize the legacy switch only on an explicit write.
+    sanitizedUpdates.terminalLinkActionPopoverEnabled = linkBehavior === 'actions'
+  }
   if ('opencodeSessionCookie' in updates && !updates.opencodeSessionCookie) {
     operations.removeRetainedBlob(PROTECTED_SECRET_SLOT.opencodeSessionCookie)
   }

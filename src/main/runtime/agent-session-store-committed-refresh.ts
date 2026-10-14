@@ -28,6 +28,7 @@ function reuseRows<K, V>(previous: Map<K, V> | undefined, loaded: Map<K, V> | un
 }
 
 function reuseState(previous: AgentSessionStoreState, loaded: AgentSessionStoreState) {
+  loaded.runtimeEnds = previous.runtimeEnds
   loaded.records = reuseRows(previous.records, loaded.records)!
   loaded.operations = reuseRows(previous.operations, loaded.operations)!
   loaded.unreadableRecords = reuseRows(previous.unreadableRecords, loaded.unreadableRecords)!

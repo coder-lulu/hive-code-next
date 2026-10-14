@@ -7,7 +7,7 @@ import {
 } from '../../shared/agent-install-providers'
 import type { AgentInstallRequest, AgentInstallResult } from '../../shared/agent-install-types'
 import { stripAnsiEscapeSequences } from '../../shared/ansi-escape-sequences'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { resolveCliCommands } from '../../shared/node-cli-command-resolution'
 import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import { hydrateShellPathForAgentDetection } from '../ipc/agent-detection-shell-path'

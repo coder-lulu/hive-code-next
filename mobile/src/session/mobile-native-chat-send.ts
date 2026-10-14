@@ -1,5 +1,5 @@
 import { reportWorkerTerminalUserInput } from '../terminal/worker-terminal-takeover-report'
-import type { RpcClient } from '../transport/rpc-client'
+import type { RpcClient } from '../transport/rpc-client-contract'
 import { isRpcDeliveryUnknown } from '../transport/rpc-delivery-ambiguity'
 import { isLogicalClientCutoverError } from '../transport/stable-logical-rpc-client'
 import { nativeChatTerminalWrite } from './mobile-session-write-operations'

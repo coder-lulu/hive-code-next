@@ -95,7 +95,8 @@ export class RemoteRuntimeSubscriptionFrameRouter<TResult> {
       return
     }
     if (authenticated.kind !== 'authenticated') {
-      const code = authenticated.unauthorized ? 'unauthorized' : 'invalid_runtime_response'
+      const code =
+        authenticated.unauthorized ? 'unauthorized' : 'invalid_runtime_response'
       this.options.fail(
         new RemoteRuntimeClientError(
           code,

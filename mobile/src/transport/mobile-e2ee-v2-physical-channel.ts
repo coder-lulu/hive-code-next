@@ -33,6 +33,7 @@ export class MobileE2EEV2PhysicalChannel {
       socket: MobileE2EEV2Socket
       deviceToken: string
       decodeBinary: (raw: unknown) => Promise<Uint8Array | null>
+      onReadyAccepted?: () => void
       onAuthenticated: () => void
       onText: (plaintext: string) => void
       onBinary: (plaintext: Uint8Array) => void
@@ -148,6 +149,7 @@ export class MobileE2EEV2PhysicalChannel {
       throw new Error('Invalid E2EE v2 ready')
     }
     this.state = 'awaiting-authenticated'
+    this.args.onReadyAccepted?.()
     this.outboundQueue.enqueue({
       kind: 'text',
       plaintext: JSON.stringify({
@@ -169,11 +171,16 @@ export class MobileE2EEV2PhysicalChannel {
 
   private isAuthenticated(plaintext: string): boolean {
     try {
-      const message = JSON.parse(plaintext) as Record<string, unknown>
+      const message: unknown = JSON.parse(plaintext)
       return (
+        typeof message === 'object' &&
+        message !== null &&
         Object.keys(message).sort().join(',') === 'transcriptHashB64,type,v' &&
+        'type' in message &&
         message.type === 'e2ee_authenticated' &&
+        'v' in message &&
         message.v === 2 &&
+        'transcriptHashB64' in message &&
         message.transcriptHashB64 === this.args.session.transcriptHashB64
       )
     } catch {

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 /**
  * Who is calling, as the host's own transport established it.
  *
@@ -59,4 +60,9 @@ export function rpcCallerOperationKey(caller: RpcCallerIdentity): string {
     case 'paired-device':
       return caller.deviceId
   }
+}
+
+/** Stable digest of a transport-authenticated identity; never caller supplied params. */
+export function fingerprintAuthenticatedPairingCredential(identity: string): string {
+  return createHash('sha256').update(identity).digest('hex')
 }

@@ -55,7 +55,10 @@ describe('runtime environment sidecar across a downgrade', () => {
       expectedEnvironment: prepared,
       requestId: 'link-request',
       verifiedRuntimeId: 'host-runtime',
-      verifiedPairing: { ...pairing, endpoint: 'ws://127.0.0.1:41000/runtime' },
+      verifiedConnection: {
+        ...pairing,
+        endpoint: 'ws://127.0.0.1:41000/runtime'
+      },
       tunnel,
       now: 90
     })
@@ -117,7 +120,7 @@ describe('runtime environment sidecar across a downgrade', () => {
   it('fails closed on an unreadable sidecar instead of dropping a pinned host key', () => {
     linked()
     writeFileSync(getRuntimeEnvironmentSidecarPath(userDataPath), '{not json')
-    expect(() => listEnvironments(userDataPath)).toThrow('Orca environment links')
+    expect(() => listEnvironments(userDataPath)).toThrow('HiveCode environment links')
   })
 
   it('overlays a reconciliation record so lifecycle changes refuse while it exists', () => {

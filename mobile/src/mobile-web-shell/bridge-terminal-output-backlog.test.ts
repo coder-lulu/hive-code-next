@@ -6,6 +6,7 @@ import {
 } from './bridge/bridge-client-subscriptions'
 import { clientFrame, createFakeRpcClient } from './bridge-host-test-fakes'
 import { harness, ID, OTHER } from './bridge-host-test-harness'
+import { readBridgeHostMessage, type BridgeHostMessage } from './bridge/bridge-envelope'
 import { TERMINAL_STREAM_MAX_PENDING_BYTES } from './bridge-terminal-output-backlog'
 import { mobileTerminalSnapshotByteBudget } from '../session/terminal-snapshot-byte-budget.web'
 import type { TerminalBacklogTimers } from './bridge-terminal-output-backlog'
@@ -97,7 +98,19 @@ type Replay = {
 function replay(chunks: readonly string[], options: { method?: string } = {}): Replay {
   const client = createFakeRpcClient()
   const timers = manualTimers()
+  const frames: BridgeHostMessage[] = []
   const bridge = harness({ client, ready: true, terminalTimers: timers })
+  // Keep decoding at the page-read boundary, without rereading its immutable posted transcript.
+  const decodePostedFrames = (): BridgeHostMessage[] => {
+    for (const json of bridge.posted.slice(frames.length)) {
+      const read = readBridgeHostMessage(json)
+      if (!read.ok) {
+        throw new Error(`the page would refuse this frame: ${read.refusal}`)
+      }
+      frames.push(read.message)
+    }
+    return frames
+  }
   bridge.host.receive(
     clientFrame({
       type: 'subscribe',
@@ -116,7 +129,7 @@ function replay(chunks: readonly string[], options: { method?: string } = {}): R
 
   /** One frame off the page's queue, or false when it has caught up. This is the drain. */
   const readOne = (): boolean => {
-    const events = bridge.frames().filter((frame) => frame.type === 'event' && frame.id === ID)
+    const events = decodePostedFrames().filter((frame) => frame.type === 'event' && frame.id === ID)
     const frame = events[readFrames]
     if (frame === undefined || frame.type !== 'event') {
       return false
@@ -159,12 +172,13 @@ function replay(chunks: readonly string[], options: { method?: string } = {}): R
   while (readOne()) {
     // The page reads; the interval acks inside `readOne` are the only ones it sends.
   }
-  const events = bridge.frames().filter((frame) => frame.type === 'event' && frame.id === ID)
+  const events = decodePostedFrames().filter((frame) => frame.type === 'event' && frame.id === ID)
+  expect(frames).toHaveLength(bridge.posted.length)
   return {
     delivered,
-    largestFrameBytes: Math.max(0, ...bridge.frames().map((frame) => JSON.stringify(frame).length)),
+    largestFrameBytes: Math.max(0, ...frames.map((frame) => JSON.stringify(frame).length)),
     frames: events.length,
-    ended: bridge.frames().some((frame) => frame.type === 'end' && frame.id === ID)
+    ended: frames.some((frame) => frame.type === 'end' && frame.id === ID)
   }
 }
 
@@ -184,15 +198,7 @@ describe.each([
     const run = replay(chunks)
     expect(run.ended).toBe(false)
     expect(run.delivered.join('')).toBe(chunks.join(''))
-  })
-
-  it('delivers it in fewer frames than it was produced in', () => {
-    const run = replay(chunks)
     expect(run.frames).toBeLessThan(chunks.length)
-  })
-
-  it('never posts a frame over the cap, however much it merged', () => {
-    const run = replay(chunks)
     expect(run.largestFrameBytes).toBeLessThanOrEqual(BRIDGE_MAX_MESSAGE_BYTES)
   })
 })

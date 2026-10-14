@@ -28,15 +28,13 @@ export function useFolderWorkspacePathStatusRows(args: {
     folderWorkspacePathStatuses,
     fetchFolderWorkspacePathStatus,
     getFolderWorkspacePathStatusCacheKey,
-    getFreshFolderWorkspacePathStatus,
-    activeRuntimeEnvironmentId
+    getFreshFolderWorkspacePathStatus
   } = useAppStore(
     useShallow((s) => ({
       folderWorkspacePathStatuses: s.folderWorkspacePathStatuses,
       fetchFolderWorkspacePathStatus: s.fetchFolderWorkspacePathStatus,
       getFolderWorkspacePathStatusCacheKey: s.getFolderWorkspacePathStatusCacheKey,
-      getFreshFolderWorkspacePathStatus: s.getFreshFolderWorkspacePathStatus,
-      activeRuntimeEnvironmentId: s.settings?.activeRuntimeEnvironmentId ?? null
+      getFreshFolderWorkspacePathStatus: s.getFreshFolderWorkspacePathStatus
     }))
   )
   const folderPathStatusRepoMembershipKey = useMemo(
@@ -65,7 +63,7 @@ export function useFolderWorkspacePathStatusRows(args: {
       string,
       {
         request: FolderPathStatusRequest
-        options?: { runtimeEnvironmentId: string | null }
+        options: { runtimeEnvironmentId: string | null }
       }
     >()
     for (const group of projectGroups) {
@@ -89,7 +87,6 @@ export function useFolderWorkspacePathStatusRows(args: {
       void fetchFolderWorkspacePathStatus(request, { force: true, ...options })
     }
   }, [
-    activeRuntimeEnvironmentId,
     fetchFolderWorkspacePathStatus,
     folderPathStatusRepoMembershipKey,
     folderPathStatusSshConnectionKey,

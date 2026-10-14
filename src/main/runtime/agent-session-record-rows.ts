@@ -16,6 +16,7 @@ import type { SqliteRow } from '../sqlite/sqlite-statement'
 import type { AgentSessionStoreState } from './agent-session-store-state'
 import { AGENT_SESSION_STORE_SCHEMA_VERSION } from './agent-session-store-contract'
 import type { AgentSessionStoreRowWrites } from './agent-session-store-draft'
+import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import {
   isReadableAgentSessionStoreOperation,
   isReadableAgentSessionStoreRecord,
@@ -195,6 +196,23 @@ function writeTabIndex(
     )
   } else {
     db.prepare('DELETE FROM agent_session_store_meta WHERE key = ?').run(SESSION_TABS_RECORDED)
+  }
+}
+
+// TEMPORARY: ledger co-write preserves cross-family identity until every mutation uses receipts.
+export function insertAgentSessionOperationRowsIfAbsent(
+  db: Database.Database,
+  rows: AgentSessionStoreRowWrites['operations']['upsert']
+): void {
+  const insert = db.prepare(
+    'INSERT INTO agent_session_operations (operation_key, row_json) VALUES (?, ?) ON CONFLICT(operation_key) DO NOTHING'
+  )
+  for (const [key, json] of rows) {
+    if (insert.run(key, json).changes === 0) {
+      throw agentSessionRefusalError('agent_session_operation_unknown', {
+        reason: 'outcomeUnknown'
+      })
+    }
   }
 }
 

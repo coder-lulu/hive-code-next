@@ -30,6 +30,13 @@ const userVisibleSharedFiles = [
   path.join(repoRoot, 'src', 'shared', 'source-control-ai-action-variables.ts'),
   path.join(repoRoot, 'src', 'shared', 'workbench-steps.ts')
 ]
+function isProductionSourceName(name) {
+  return (
+    /\.[jt]sx?$/.test(name) &&
+    !/(?:\.test|test-fixtures?|test-harness|\.test-support)\.[jt]sx?$/.test(name)
+  )
+}
+
 function sourceFilesUnder(root) {
   const files = []
   for (const entry of readdirSync(root)) {
@@ -42,11 +49,7 @@ function sourceFilesUnder(root) {
       files.push(...sourceFilesUnder(absolutePath))
       continue
     }
-    if (
-      !/\.[jt]sx?$/.test(entry) ||
-      /\.test\.[jt]sx?$/.test(entry) ||
-      /(?:test-fixtures?|test-harness)\.[jt]sx?$/.test(entry)
-    ) {
+    if (!isProductionSourceName(entry)) {
       continue
     }
     files.push(absolutePath)
@@ -106,6 +109,19 @@ function collectVisibleBrandLeaks(filePath) {
 }
 
 describe('user-visible brand boundary', () => {
+  it('excludes test support modules while continuing to scan production helpers', () => {
+    for (const name of [
+      'workspace-reference-fixtures.test-support.ts',
+      'example.test.ts',
+      'test-fixture.ts'
+    ]) {
+      expect(isProductionSourceName(name)).toBe(false)
+    }
+    for (const name of ['workspace-reference.ts', 'support.ts', 'test-support-panel.tsx']) {
+      expect(isProductionSourceName(name)).toBe(true)
+    }
+  })
+
   it('only exempts direct static values inside product-brand adapters', () => {
     const fixturePath = path.join(repoRoot, 'dynamic-brand-adapter-fixture.ts')
     const dynamicCases = [

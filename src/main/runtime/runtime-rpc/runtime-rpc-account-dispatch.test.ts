@@ -1,8 +1,9 @@
+import type { RpcBinarySender } from '../rpc/rpc-binary-sender'
 import { beforeEach, expect, it, vi } from 'vitest'
 import type { RuntimeRpcAccountConnection } from './runtime-rpc-account-dispatch'
 type DispatchOptions = {
   authorizeRequest: (method: string) => boolean
-  sendBinary: (bytes: Uint8Array) => boolean
+  sendBinary: RpcBinarySender
   registerBinaryStreamHandler: (id: string, handler: unknown) => void
   registerBinaryMessageHandler: (handler: unknown) => void
 }
@@ -55,7 +56,7 @@ function fixture(runtimeSessionId = 'runtime-session-1') {
   let text!: (
     raw: string,
     reply: (value: string) => void,
-    binary: (bytes: Uint8Array) => boolean
+    binary: RpcBinarySender
   ) => void
   let binary!: (bytes: Uint8Array) => void
   let valid = true
@@ -194,7 +195,7 @@ it('revalidates text, binary and delayed output and detaches using only its conn
   const f = fixture()
   let output!: (value: string) => void
   let options!: {
-    sendBinary: (bytes: Uint8Array) => boolean
+    sendBinary: RpcBinarySender
     registerBinaryStreamHandler: (id: string, handler: unknown) => void
     registerBinaryMessageHandler: (handler: unknown) => void
   }
@@ -306,4 +307,17 @@ it('passes the activated account session as creator authority, ignoring payload 
   await tick()
   expect(mock.dispatch).toHaveBeenCalledTimes(1)
   f.detach()
+})
+
+it('forwards binary backpressure options only while the authenticated session remains current', async () => {
+  const f = fixture()
+  f.text({ id: 'binary-options', method: 'terminal.subscribe', params: {} })
+  await tick()
+  const options = mock.dispatch.mock.calls[0][2]
+  const bytes = new Uint8Array([4])
+  expect(options.sendBinary(bytes, { dropWhenBacklogged: true })).toBe(true)
+  expect(f.sendBinary).toHaveBeenCalledWith(bytes, { dropWhenBacklogged: true })
+  f.invalidate()
+  expect(options.sendBinary(bytes, { dropWhenBacklogged: true })).toBe(false)
+  expect(f.sendBinary).toHaveBeenCalledOnce()
 })

@@ -2,7 +2,7 @@ import { mkdir, mkdtemp, open, readFile, realpath, rm, writeFile } from 'node:fs
 import { tmpdir } from 'node:os'
 import { isAbsolute, join, relative, sep } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runProcess } from './child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import type * as GitCommonDirectory from './git-common-directory'
 import { createUntitledPlaceholderRetentionHost } from './untitled-placeholder-retention'
 import { resolveUntitledPlaceholderRetentionRoot } from './untitled-placeholder-recovery-directory'

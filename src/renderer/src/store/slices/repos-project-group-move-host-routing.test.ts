@@ -70,7 +70,7 @@ describe('moveProjectToGroup host routing', () => {
     })
 
     await expect(
-      store.getState().moveProjectToGroup(localRepo.id, projectGroup.id, 4, { hostId: 'local' })
+      store.getState().moveProjectToGroup(localRepo.id, projectGroup.id, 4, 'local')
     ).resolves.toBe(true)
 
     expect(projectGroupsMoveProject).toHaveBeenCalledWith({
@@ -114,9 +114,7 @@ describe('moveProjectToGroup host routing', () => {
     })
 
     await expect(
-      store.getState().moveProjectToGroup('shared-repo', projectGroup.id, 7, {
-        hostId: 'runtime:env-dragged'
-      })
+      store.getState().moveProjectToGroup('shared-repo', projectGroup.id, 7, 'runtime:env-dragged')
     ).resolves.toBe(true)
 
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({

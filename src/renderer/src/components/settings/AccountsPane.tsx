@@ -1,3 +1,4 @@
+import { useAccountsPaneOwner } from './use-accounts-pane-owner'
 import type { SecretAtRestProtection } from '../../../../shared/secret-at-rest-protection'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -6,7 +7,6 @@ import { translate } from '@/i18n/i18n'
 import {
   emptyClaudeAccountsState,
   emptyCodexAccountsState,
-  hasRemoteProviderAccountOwner,
   watchProviderAccounts
 } from '@/runtime/runtime-provider-accounts-client'
 import { getCodexAccountAuthWarning } from './codex-account-auth-warning'
@@ -18,12 +18,18 @@ import {
 } from './provider-account-visibility'
 import type {
   AccountsPaneProps,
+  ProviderRosterLoadState as LoadState,
   AccountsPaneSectionModel,
   ClaudeAccountAction,
   CodexAccountAction,
   RemoveAccountTarget
 } from './accounts-pane-types'
-import { EMPTY_WSL_DISTROS, getSelectedAccountRuntime } from './accounts-pane-runtime'
+import {
+  EMPTY_WSL_DISTROS,
+  getSelectedAccountRuntime,
+  getRemoteAccountRuntimeLabel,
+  getAccountRuntimeSentenceLabel
+} from './accounts-pane-runtime'
 import { useCodexConfigSyncStatus } from './use-codex-config-sync-status'
 import {
   createClaudeAccountActionRunner,
@@ -39,6 +45,7 @@ import './accounts-pane.css'
 export function AccountsPane({
   settings,
   updateSettings,
+  hostScope,
   wslSupportedPlatform = false,
   wslAvailable = false,
   wslDistros = EMPTY_WSL_DISTROS,
@@ -63,9 +70,7 @@ export function AccountsPane({
   const [miniMaxCookieProtection, setMiniMaxCookieProtection] =
     useState<SecretAtRestProtection | null>(null)
   const [miniMaxCredentialBusy, setMiniMaxCredentialBusy] = useState(false)
-  const [miniMaxCredentialLoadState, setMiniMaxCredentialLoadState] = useState<
-    'loading' | 'loaded' | 'error'
-  >('loading')
+  const [miniMaxCredentialLoadState, setMiniMaxCredentialLoadState] = useState<LoadState>('loading')
   const [accountsReloadKey, setAccountsReloadKey] = useState(0)
   const localAccountRuntime = getSelectedAccountRuntime(
     settings,
@@ -74,10 +79,11 @@ export function AccountsPane({
     wslDistros,
     wslCapabilitiesLoading
   )
-  // Why: with a Remote Orca Server active the server owns provider accounts
-  // (see #7973); every list/select/remove below must scope to it, not host/WSL.
-  const isRemoteAccountScope = hasRemoteProviderAccountOwner(settings)
-  const activeRuntimeEnvironmentId = settings.activeRuntimeEnvironmentId?.trim() || null
+  // The Settings Host is the account authority, independent of the default project host.
+  const accountOwner = hostScope.target
+  const isRemoteAccountScope = accountOwner.kind === 'environment'
+  const activeRuntimeEnvironmentId =
+    accountOwner.kind === 'environment' ? accountOwner.environmentId : null
   // Why: keep the real name separate from the prose fallback below; the scope
   // label must not interpolate the fallback.
   const remoteServerName = isRemoteAccountScope
@@ -85,15 +91,12 @@ export function AccountsPane({
         ?.name ?? null)
     : null
   const remoteServerLabel = isRemoteAccountScope
-    ? (remoteServerName ??
-      translate('auto.components.settings.AccountsPane.remoteServerFallback', 'the remote server'))
+    ? getRemoteAccountRuntimeLabel(remoteServerName)
     : null
   const accountRuntime = isRemoteAccountScope
     ? { runtime: 'host' as const, label: remoteServerLabel ?? '' }
     : localAccountRuntime
-  const providerAccountOwnerKey = isRemoteAccountScope
-    ? `environment:${activeRuntimeEnvironmentId}`
-    : 'local'
+  const { providerAccountOwnerKey, isCurrentAccountOwner } = useAccountsPaneOwner(accountOwner)
   const accountScopeKey = `${providerAccountOwnerKey}:${accountRuntime.runtime}:${accountRuntime.wslDistro ?? ''}`
   const currentAccountScopeKeyRef = useRef(accountScopeKey)
   currentAccountScopeKeyRef.current = accountScopeKey
@@ -104,18 +107,13 @@ export function AccountsPane({
       searchQuery
     })
   // Why: host runtime labels are standalone UI labels; interpolated prose needs sentence casing.
-  const localAccountRuntimeSentenceLabel =
-    localAccountRuntime.runtime === 'host' && !navigator.userAgent.includes('Windows')
-      ? `${localAccountRuntime.label.charAt(0).toLocaleLowerCase()}${localAccountRuntime.label.slice(1)}`
-      : localAccountRuntime.label
+  const localAccountRuntimeSentenceLabel = getAccountRuntimeSentenceLabel(localAccountRuntime)
   const accountRuntimeSentenceLabel = isRemoteAccountScope
     ? accountRuntime.label
     : localAccountRuntimeSentenceLabel
   const [codexAccounts, setCodexAccounts] = useState(emptyCodexAccountsState)
   const [codexDataOwnerKey, setCodexDataOwnerKey] = useState<string | null>(null)
-  const [codexAccountsLoadState, setCodexAccountsLoadState] = useState<
-    'loading' | 'loaded' | 'error'
-  >('loading')
+  const [codexAccountsLoadState, setCodexAccountsLoadState] = useState<LoadState>('loading')
   const [accountsSnapshotOwnerKey, setAccountsSnapshotOwnerKey] = useState<string | null>(null)
   const displayedCodexAccountsLoadState =
     accountsSnapshotOwnerKey === providerAccountOwnerKey ? codexAccountsLoadState : 'loading'
@@ -123,9 +121,7 @@ export function AccountsPane({
   const [codexAction, setCodexAction] = useState<CodexAccountAction>('idle')
   const [claudeAccounts, setClaudeAccounts] = useState(emptyClaudeAccountsState)
   const [claudeDataOwnerKey, setClaudeDataOwnerKey] = useState<string | null>(null)
-  const [claudeAccountsLoadState, setClaudeAccountsLoadState] = useState<
-    'loading' | 'loaded' | 'error'
-  >('loading')
+  const [claudeAccountsLoadState, setClaudeAccountsLoadState] = useState<LoadState>('loading')
   const displayedClaudeAccountsLoadState =
     accountsSnapshotOwnerKey === providerAccountOwnerKey ? claudeAccountsLoadState : 'loading'
   const [claudeAction, setClaudeAction] = useState<ClaudeAccountAction>('idle')
@@ -253,60 +249,59 @@ export function AccountsPane({
     // message, so the watcher stays open for the pane's lifetime; the local
     // path resolves once and the close() is a no-op.
     let active = true
-    const watcher = watchProviderAccounts(
-      { activeRuntimeEnvironmentId },
-      {
-        onSnapshot: (snapshot) => {
-          if (!active) {
-            return
-          }
-          setAccountsSnapshotOwnerKey(providerAccountOwnerKey)
-          // Why: a failed provider's half is a substituted empty roster, not
-          // authoritative data; keep prior state and leave the loaded gate shut.
-          if (!snapshot.failedProviders?.includes('codex')) {
-            setCodexAccounts(snapshot.codex)
-            setCodexDataOwnerKey(providerAccountOwnerKey)
-            setCodexAccountsLoadState('loaded')
-          } else {
-            setCodexAccountsLoadState('error')
-          }
-          if (!snapshot.failedProviders?.includes('claude')) {
-            setClaudeAccounts(snapshot.claude)
-            setClaudeDataOwnerKey(providerAccountOwnerKey)
-            setClaudeAccountsLoadState('loaded')
-          } else {
-            setClaudeAccountsLoadState('error')
-          }
-        },
-        onError: (error, failedProvider) => {
-          if (!active) {
-            return
-          }
-          setAccountsSnapshotOwnerKey(providerAccountOwnerKey)
-          if (!failedProvider || failedProvider === 'codex') {
-            setCodexAccountsLoadState('error')
-          }
-          if (!failedProvider || failedProvider === 'claude') {
-            setClaudeAccountsLoadState('error')
-          }
-          toast.error(
-            translate(
-              'auto.components.settings.AccountsPane.loadAccountsFailed',
-              'Could not load provider accounts.'
-            ),
-            { description: String((error as Error)?.message ?? error) }
-          )
+    const watcher = watchProviderAccounts(accountOwner, {
+      onSnapshot: (snapshot) => {
+        if (!active) {
+          return
         }
+        setAccountsSnapshotOwnerKey(providerAccountOwnerKey)
+        // Why: a failed provider's half is a substituted empty roster, not
+        // authoritative data; keep prior state and leave the loaded gate shut.
+        if (!snapshot.failedProviders?.includes('codex')) {
+          setCodexAccounts(snapshot.codex)
+          setCodexDataOwnerKey(providerAccountOwnerKey)
+          setCodexAccountsLoadState('loaded')
+        } else {
+          setCodexAccountsLoadState('error')
+        }
+        if (!snapshot.failedProviders?.includes('claude')) {
+          setClaudeAccounts(snapshot.claude)
+          setClaudeDataOwnerKey(providerAccountOwnerKey)
+          setClaudeAccountsLoadState('loaded')
+        } else {
+          setClaudeAccountsLoadState('error')
+        }
+      },
+      onError: (error, failedProvider) => {
+        if (!active) {
+          return
+        }
+        setAccountsSnapshotOwnerKey(providerAccountOwnerKey)
+        if (!failedProvider || failedProvider === 'codex') {
+          setCodexAccountsLoadState('error')
+        }
+        if (!failedProvider || failedProvider === 'claude') {
+          setClaudeAccountsLoadState('error')
+        }
+        toast.error(
+          translate(
+            'auto.components.settings.AccountsPane.loadAccountsFailed',
+            'Could not load provider accounts.'
+          ),
+          { description: String((error as Error)?.message ?? error) }
+        )
       }
-    )
+    })
     return () => {
       active = false
       watcher.close()
     }
-  }, [activeRuntimeEnvironmentId, accountsReloadKey, providerAccountOwnerKey])
+  }, [accountOwner, activeRuntimeEnvironmentId, accountsReloadKey, providerAccountOwnerKey])
 
   const runCodexAccountAction = createCodexAccountActionRunner({
     settings,
+    accountOwner,
+    isCurrentAccountOwner,
     accountRuntime,
     isRemoteAccountScope,
     codexAccounts: scopedCodexAccounts,
@@ -331,6 +326,7 @@ export function AccountsPane({
   })
   const runClaudeAccountAction = createClaudeAccountActionRunner({
     settings,
+    isCurrentAccountOwner,
     accountRuntime,
     isRemoteAccountScope,
     claudeAccounts: scopedClaudeAccounts,
@@ -346,6 +342,7 @@ export function AccountsPane({
   const model: AccountsPaneSectionModel = {
     settings,
     accountScopeKey,
+    accountOwner,
     updateSettings,
     searchQuery,
     recordFeatureInteraction,

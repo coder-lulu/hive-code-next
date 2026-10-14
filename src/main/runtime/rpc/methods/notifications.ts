@@ -12,15 +12,17 @@ import {
 // notifications.subscribe calls landed on the same millisecond.
 let notificationsSubscriptionSeq = 0
 
-// Legacy paired-socket callers retain filtered live alerts and replay.
+// Current authenticated callers receive filtered live alerts and replay.
 export const NOTIFICATION_METHODS = [
   defineMethod({
     name: 'notifications.testPush',
+    permission: 'workspace',
     params: NotificationTestPushParams,
     handler: async (_params, { runtime }) => runtime.testMobileNotificationRemotePush()
   }),
   defineStreamingMethod({
     name: 'notifications.subscribe',
+    permission: 'workspace',
     params: NotificationsSubscribeParams,
     handler: async (params, { runtime, connectionId }, emit) => {
       const shouldEmit = createNotificationStreamFilter(params?.includeDesktopSuppressed)
@@ -53,6 +55,7 @@ export const NOTIFICATION_METHODS = [
   }),
   defineMethod({
     name: 'notifications.unsubscribe',
+    permission: 'workspace',
     params: NotificationUnsubscribeParams,
     handler: async (params, { runtime }) => {
       runtime.cleanupSubscription(params.subscriptionId)
@@ -61,6 +64,7 @@ export const NOTIFICATION_METHODS = [
   }),
   defineMethod({
     name: 'notifications.getMissedSince',
+    permission: 'workspace',
     params: NotificationGetMissedSinceParams,
     // Why: returns only notifications with seq > lastSeenSeq. The runtime owns
     // the monotonic seq, so this is the single source of truth for what the

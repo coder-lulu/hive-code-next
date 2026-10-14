@@ -5,7 +5,7 @@ import { beforeEach, afterEach, vi } from 'vitest'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
+import type { RuntimeClientTarget } from '../../src/shared/runtime-client-target'
 import type { NotificationSettings } from '../../src/shared/notification-settings-types'
 import type { AgentJournalRenderItem } from '../../src/shared/agent-session-journal-types'
 import type { AgentSessionHistoryPage } from '../../src/shared/agent-session-wire'
@@ -338,7 +338,7 @@ beforeEach(() => {
     settings: createGlobalSettingsFixture({ experimentalTerminalAttention: true })
   })
 })
-afterEach(() => {
+afterEach(async () => {
   cleanup()
   clearStructuredHostStub()
   resetStructuredAgentSessionReadOwnersForTests()
@@ -346,5 +346,6 @@ afterEach(() => {
   resetStructuredAgentSessionStatusFeedsForTests()
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+  await fixture.controller.closeDismissals()
   rmSync(fixture.directory, { recursive: true, force: true })
 })

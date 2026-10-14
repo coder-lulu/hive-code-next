@@ -211,7 +211,6 @@ export class RemoteRuntimeSharedControlConnection {
       getSession: () => this.session,
       environmentId: this.options.environmentId,
       deviceToken: this.pairing.deviceToken,
-      clientCapabilities: remoteRuntimeClientCapabilities(this.options.clientCapabilities),
       pendingRequests: this.pendingRequests,
       subscriptions: this.subscriptions,
       retiredRequestIds: this.retiredRequestIds,
@@ -221,6 +220,7 @@ export class RemoteRuntimeSharedControlConnection {
       },
       handleSocketClosed: (error) => this.handleSocketClosed(error, socketGeneration),
       sendEncrypted: (payload) => this.sendEncrypted(payload),
+      clientCapabilities: remoteRuntimeClientCapabilities(this.options.clientCapabilities),
       markReady: () => {
         this.diagnostics.markReady()
         // Why cleared here: these describe the attempt that just succeeded's predecessor.

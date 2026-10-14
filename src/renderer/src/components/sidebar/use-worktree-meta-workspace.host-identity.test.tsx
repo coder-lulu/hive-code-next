@@ -33,7 +33,7 @@ it('does not seed local metadata from the only row belonging to another host', (
     })
   )
   expect(result.current.worktree).toBeUndefined()
-  expect(result.current.currentIssue).toBe('')
+  expect(result.current.worktree?.linkedIssue).toBeUndefined()
 })
 
 it('uses the requested host when a same-id row makes the unqualified index ambiguous', () => {
@@ -50,13 +50,13 @@ it('uses the requested host when a same-id row makes the unqualified index ambig
     })
   )
   expect(result.current.worktree).toBe(local)
-  expect(result.current.currentIssue).toBe('17')
+  expect(result.current.worktree?.linkedIssue).toBe(17)
 })
 
 it('retains both physical SSH and logical runtime ownership of a paired row', () => {
   const paired = { ...row('repo-a', 'ssh:paired-host', 42), runtimeOwnerEnvironmentId: 'hub-a' }
   catalog.worktreesByRepo = { 'repo-a': [paired] }
-  for (const executionHostId of ['ssh:paired-host', 'runtime:hub-a']) {
+  for (const executionHostId of ['ssh:paired-host', 'runtime:hub-a'] as const) {
     const { result, unmount } = renderHook(() =>
       useWorktreeMetaWorkspace({ worktreeId: WORKSPACE, ownerRepoId: 'repo-a', executionHostId })
     )
@@ -89,5 +89,5 @@ it('does not seed a local folder dialog from a remote folder with the same id', 
     })
   )
   expect(result.current.worktree).toBeUndefined()
-  expect(result.current.currentIssue).toBe('')
+  expect(result.current.worktree?.linkedIssue).toBeUndefined()
 })

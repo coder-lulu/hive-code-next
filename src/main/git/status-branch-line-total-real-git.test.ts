@@ -1,292 +1,169 @@
-import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+/** Real current-host status totals must not double-count staged and unstaged changes. */
+import type * as childProcess from 'node:child_process'
+import { createGitTestRunner } from "./test-fixtures/git-test-runner"
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { getStatus } from './status'
 import { invalidateGitBranchLineTotalInFlight } from '../../shared/git-branch-line-total'
-import { getStatus, invalidateGitReadCaches } from './status'
+import { clearGitStatusLineStatsCache } from '../../shared/git-status-line-stats-cache'
 
-const tempRoots: string[] = []
+const fixtureGit = createGitTestRunner()
 
-function git(repo: string, args: string[]): string {
-  return execFileSync('git', args, {
-    cwd: repo,
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe']
-  }).trim()
-}
+const subjectChildren = vi.hoisted<{ closed: Promise<void>[] }>(() => ({ closed: [] }))
 
-async function createFixtureRepo(): Promise<string> {
-  const root = await mkdtemp(path.join(tmpdir(), 'orca-branch-line-total-'))
-  tempRoots.push(root)
-  const repo = path.join(root, 'repo')
-  execFileSync('git', ['init', '-q', repo])
-  git(repo, ['config', 'user.email', 'test@example.com'])
-  git(repo, ['config', 'user.name', 'Test User'])
-  git(repo, ['config', 'commit.gpgSign', 'false'])
-  return repo
-}
+// Track actual close events while preserving the subject's default Git execution path.
+vi.mock('node:child_process', async (importOriginal) => {
+  const real = await importOriginal<typeof childProcess>()
+  const execFile = new Proxy(real.execFile, {
+    apply(target, receiver, args: Parameters<typeof real.execFile>) {
+      const child = target.apply(receiver, args)
+      const closed = Promise.withResolvers<void>()
+      subjectChildren.closed.push(closed.promise)
+      child.once('close', () => closed.resolve())
+      child.once('error', () => {
+        if (!child.pid) {
+          closed.resolve()
+        }
+      })
+      return child
+    }
+  })
+  return { ...real, execFile }
+})
 
-async function write(repo: string, relativePath: string, contents: string | Buffer): Promise<void> {
-  const target = path.join(repo, relativePath)
-  await mkdir(path.dirname(target), { recursive: true })
-  await writeFile(target, contents)
-}
-
-/** The forked-from commit the chip measures against, as branch compare would resolve it. */
-function commitAll(repo: string, message: string): string {
-  git(repo, ['add', '-A'])
-  git(repo, ['commit', '-q', '-m', message])
-  return git(repo, ['rev-parse', 'HEAD'])
-}
-
+// Fork point → working tree for the fixture below:
+//   tracked.txt  +2  (branch commit only)
+//   partial.txt  +1  (staged +2 then one of those lines removed unstaged)
+//   flip.txt      0  (added in the branch commit, removed again in the worktree)
+//   moved.txt     0  (pure rename)
+//   fresh.txt    +3  (untracked)
 // No fixture path here looks like test or generated code, so it is all source.
-const NO_LINES = { added: 0, removed: 0 }
+const EXPECTED_TOTAL = {
+  added: 6,
+  removed: 0,
+  test: { added: 0, removed: 0 },
+  generated: { added: 0, removed: 0 }
+}
+// Summing the per-area status rows instead would give this — the wrong answer
+// the shared module exists to avoid.
+const AREA_ROW_SUM = { added: 5, removed: 2 }
 
-/** What a plain `git diff <mergeBase>` reports, i.e. the number the chip must not disagree with. */
-function rangedDiffTotal(repo: string, mergeBase: string): { added: number; removed: number } {
+async function runFixtureGit(repo: string, args: string[]): Promise<string> {
+  return (
+    await fixtureGit.git(repo, [
+      '-c',
+      'user.email=test@test.com',
+      '-c',
+      'user.name=Test',
+      '-c',
+      'commit.gpgSign=false',
+      ...args
+    ])
+  ).trim()
+}
+
+/** Returns the merge-base OID the chip is measured against. */
+async function seedParityFixture(repo: string): Promise<string> {
+  await fixtureGit.git(process.cwd(), ['init', '-q', repo])
+  await writeFile(path.join(repo, 'tracked.txt'), 'a\nb\n')
+  await writeFile(path.join(repo, 'partial.txt'), 'one\ntwo\nthree\n')
+  await writeFile(path.join(repo, 'renamed.txt'), 'stable\n')
+  await writeFile(path.join(repo, 'flip.txt'), 'p\n')
+  await runFixtureGit(repo, ['add', '.'])
+  await runFixtureGit(repo, ['commit', '-m', 'base'])
+  const mergeBase = await runFixtureGit(repo, ['rev-parse', 'HEAD'])
+
+  await runFixtureGit(repo, ['checkout', '-q', '-b', 'feature'])
+  await writeFile(path.join(repo, 'tracked.txt'), 'a\nb\nc\nd\n')
+  await writeFile(path.join(repo, 'flip.txt'), 'p\nq\n')
+  await runFixtureGit(repo, ['add', '-A'])
+  await runFixtureGit(repo, ['commit', '-m', 'branch commit'])
+
+  await runFixtureGit(repo, ['mv', 'renamed.txt', 'moved.txt'])
+  // Staged and unstaged hunks land on the same added lines, so an area sum
+  // double-counts them.
+  await writeFile(path.join(repo, 'partial.txt'), 'one\ntwo\nthree\nfoo\nbaz\n')
+  await runFixtureGit(repo, ['add', 'partial.txt'])
+  await writeFile(path.join(repo, 'partial.txt'), 'one\ntwo\nthree\nfoo\n')
+  // The branch commit's line, taken back out in the worktree: net zero.
+  await writeFile(path.join(repo, 'flip.txt'), 'p\n')
+  await writeFile(path.join(repo, 'fresh.txt'), 'n1\nn2\nn3\n')
+  return mergeBase
+}
+
+function sumAreaRows(entries: readonly { added?: number; removed?: number }[]): {
+  added: number
+  removed: number
+} {
   let added = 0
   let removed = 0
-  for (const line of git(repo, ['diff', '--numstat', '-M', mergeBase, '--']).split(/\r?\n/)) {
-    if (!line) {
-      continue
-    }
-    const [rawAdded, rawRemoved] = line.split('\t')
-    added += rawAdded === '-' ? 0 : Number.parseInt(rawAdded ?? '0', 10)
-    removed += rawRemoved === '-' ? 0 : Number.parseInt(rawRemoved ?? '0', 10)
+  for (const entry of entries) {
+    added += entry.added ?? 0
+    removed += entry.removed ?? 0
   }
   return { added, removed }
 }
 
-beforeEach(() => {
-  invalidateGitReadCaches()
-  invalidateGitBranchLineTotalInFlight()
-})
+describe('current host branch line totals with real Git', () => {
+  let repo: string
+  let mergeBase: string
+  let pendingSetup: Promise<string> | undefined
+  let pendingSubject: Promise<void> | undefined
 
-afterEach(async () => {
-  invalidateGitReadCaches()
-  invalidateGitBranchLineTotalInFlight()
-  await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
-})
+  beforeEach(async ({ signal }) => {
+    fixtureGit.useSignal(signal, null)
+    clearGitStatusLineStatsCache()
+    invalidateGitBranchLineTotalInFlight()
+    repo = await mkdtemp(path.join(tmpdir(), 'branch-line-total-parity-'))
+    pendingSetup = seedParityFixture(repo)
+    mergeBase = await pendingSetup
+  })
 
-describe('branch line total against a real repository', () => {
-  it('measures a partially staged line once, not once per status area', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'f.txt', 'line1\n')
-    const mergeBase = commitAll(repo, 'base')
-    // Stage "+foo", then edit that same line to "bar" without staging it: the
-    // per-area rows read +1/-0 staged and +1/-1 unstaged, summing to +2/-1.
-    await write(repo, 'f.txt', 'line1\nfoo\n')
-    git(repo, ['add', 'f.txt'])
-    await write(repo, 'f.txt', 'line1\nbar\n')
-
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-
-    expect(rangedDiffTotal(repo, mergeBase)).toEqual({ added: 1, removed: 0 })
-    expect(result.branchLineTotal).toEqual({
-      added: 1,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
-    expect(result.entries.map((entry) => [entry.area, entry.added, entry.removed])).toEqual([
-      ['staged', 1, 0],
-      ['unstaged', 1, 1]
+  afterEach(async () => {
+    await Promise.allSettled([
+      ...(pendingSetup ? [pendingSetup] : []),
+      ...(pendingSubject ? [pendingSubject] : [])
     ])
+    await fixtureGit.settle()
+    await Promise.all(subjectChildren.closed.splice(0))
+    pendingSetup = undefined
+    pendingSubject = undefined
+
+    clearGitStatusLineStatsCache()
+    invalidateGitBranchLineTotalInFlight()
+    await rm(repo, { recursive: true, force: true })
   })
 
-  it('nets a line added in a branch commit and deleted in the working tree to zero', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'f.txt', 'a\n')
-    const mergeBase = commitAll(repo, 'base')
-    await write(repo, 'f.txt', 'a\nb\n')
-    commitAll(repo, 'add b')
-    await write(repo, 'f.txt', 'a\n')
+  it('includes committed, staged, unstaged, renamed and untracked fixture changes', async ({ signal }) => {
+    pendingSubject = (async () => {
+      const mainStatus = await getStatus(repo, { branchLineTotalMergeBase: mergeBase, signal })
+      clearGitStatusLineStatsCache()
 
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-
-    expect(result.branchLineTotal).toEqual({
-      added: 0,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
+      expect(mainStatus.branchLineTotal).toEqual({ ...EXPECTED_TOTAL, mergeBase })
+    })()
+    await pendingSubject
   })
 
-  it('keeps the total across a commit and updates it on the next status call after an edit', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'f.txt', 'a\n')
-    const mergeBase = commitAll(repo, 'base')
-    await write(repo, 'f.txt', 'a\nb\nc\n')
+  it('computes a net total no per-area row sum could produce', async ({ signal }) => {
+    pendingSubject = (async () => {
+      const mainStatus = await getStatus(repo, { branchLineTotalMergeBase: mergeBase, signal })
+      clearGitStatusLineStatsCache()
 
-    const beforeCommit = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-    expect(beforeCommit.branchLineTotal).toEqual({
-      added: 2,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
-
-    commitAll(repo, 'commit the edit')
-    const afterCommit = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-    expect(afterCommit.branchLineTotal).toEqual({
-      added: 2,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
-
-    await write(repo, 'f.txt', 'a\nb\nc\nd\n')
-    const afterSecondEdit = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-    expect(afterSecondEdit.branchLineTotal).toEqual({
-      added: 3,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
+      expect(sumAreaRows(mainStatus.entries)).toEqual(AREA_ROW_SUM)
+      expect(mainStatus.branchLineTotal).not.toMatchObject(AREA_ROW_SUM)
+    })()
+    await pendingSubject
   })
 
-  it('counts a rename across the commit boundary once, using the post-rename path', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'old.txt', 'a\nb\nc\nd\ne\n')
-    const mergeBase = commitAll(repo, 'base')
-    git(repo, ['mv', 'old.txt', 'new.txt'])
-    commitAll(repo, 'rename')
-    await write(repo, 'new.txt', 'a\nb\nc\nd\ne\nf\n')
+  it('omits the total when no merge base is requested', async ({ signal }) => {
+    pendingSubject = (async () => {
+      const mainStatus = await getStatus(repo, { signal })
+      clearGitStatusLineStatsCache()
 
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-
-    expect(rangedDiffTotal(repo, mergeBase)).toEqual({ added: 1, removed: 0 })
-    expect(result.branchLineTotal).toEqual({
-      added: 1,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
-  })
-
-  it('counts an untracked-only branch from the untracked file contents', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'kept.txt', 'a\n')
-    const mergeBase = commitAll(repo, 'base')
-    await write(repo, 'src/new.ts', 'one\ntwo\nthree\n')
-
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-
-    expect(result.entries.map((entry) => entry.area)).toEqual(['untracked'])
-    expect(result.branchLineTotal).toEqual({
-      added: 3,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
-  })
-
-  it('excludes a binary-only change, matching numstat reporting it as "-"', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'blob.bin', Buffer.from([0, 1, 2, 3, 10, 65, 66]))
-    const mergeBase = commitAll(repo, 'base')
-    await write(repo, 'blob.bin', Buffer.from([0, 9, 10, 11, 12, 67, 68, 69, 70]))
-
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-
-    expect(git(repo, ['diff', '--numstat', mergeBase, '--'])).toMatch(/^-\t-\t/)
-    expect(result.branchLineTotal).toEqual({
-      added: 0,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
-  })
-
-  it('contributes nothing for a pure rename', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'f.txt', 'a\nb\nc\nd\n')
-    const mergeBase = commitAll(repo, 'base')
-    git(repo, ['mv', 'f.txt', 'g.txt'])
-
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-
-    expect(result.branchLineTotal).toEqual({
-      added: 0,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
-  })
-
-  it('splits test-path and generated files out of the published total', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'src/a.ts', 'a\n')
-    const mergeBase = commitAll(repo, 'base')
-    await write(repo, 'src/a.ts', 'a\nb\n')
-    await write(repo, 'src/a.test.ts', 't1\nt2\nt3\n')
-    await write(repo, 'pnpm-lock.yaml', 'l1\nl2\nl3\nl4\nl5\n')
-
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-
-    expect(rangedDiffTotal(repo, mergeBase)).toEqual({ added: 1, removed: 0 })
-    expect(result.branchLineTotal).toEqual({
-      added: 9,
-      removed: 0,
-      mergeBase,
-      test: { added: 3, removed: 0 },
-      generated: { added: 5, removed: 0 }
-    })
-  })
-
-  it('includes untracked additions alongside tracked range changes', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'f.txt', 'a\nb\n')
-    const mergeBase = commitAll(repo, 'base')
-    await write(repo, 'f.txt', 'a\nb\nc\n')
-    commitAll(repo, 'append c')
-    await write(repo, 'untracked.txt', 'u1\nu2\nu3\nu4\n')
-
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-
-    expect(rangedDiffTotal(repo, mergeBase)).toEqual({ added: 1, removed: 0 })
-    expect(result.branchLineTotal).toEqual({
-      added: 5,
-      removed: 0,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
-  })
-
-  // Documented deviation from a pure `git diff`: the untracked half is added on
-  // top of the tracked range, so a deleted-then-recreated path is counted twice.
-  // Locked in deliberately — changing it must be a deliberate spec change.
-  it('counts both the deletion and the recreated untracked file for the same path', async () => {
-    const repo = await createFixtureRepo()
-    await write(repo, 'gone.txt', 'a\nb\nc\n')
-    const mergeBase = commitAll(repo, 'base')
-    git(repo, ['rm', '-q', 'gone.txt'])
-    commitAll(repo, 'delete gone.txt')
-    await write(repo, 'gone.txt', 'n1\nn2\n')
-
-    const result = await getStatus(repo, { branchLineTotalMergeBase: mergeBase })
-
-    expect(result.entries.map((entry) => [entry.area, entry.path])).toEqual([
-      ['untracked', 'gone.txt']
-    ])
-    expect(rangedDiffTotal(repo, mergeBase)).toEqual({ added: 0, removed: 3 })
-    expect(result.branchLineTotal).toEqual({
-      added: 2,
-      removed: 3,
-      mergeBase,
-      test: NO_LINES,
-      generated: NO_LINES
-    })
+      expect(Object.hasOwn(mainStatus, 'branchLineTotal')).toBe(false)
+    })()
+    await pendingSubject
   })
 })

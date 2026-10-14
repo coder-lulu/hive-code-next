@@ -57,9 +57,10 @@ describe('recovered worktree root pruning', () => {
     invalidateAuthorizedRootsCache()
     __resetCreatedWorktreeRootsForTests()
     vi.mocked(listRepoWorktreeGraph).mockReset()
-    // The #16520 outage itself: `listWorktrees` softens every Git failure to `[]`, so the rebuild
-    // reports success with the recovered row missing and the probe is the only remaining evidence.
-    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([])
+    // A valid repository graph omits the recovered row, so the disk probe decides whether it is gone.
+    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([
+      { path: repo.path, head: 'abc', branch: 'main', isBare: false, isMainWorktree: true }
+    ])
     statMock.mockReset()
     statMock.mockResolvedValue({})
   })
@@ -76,6 +77,18 @@ describe('recovered worktree root pruning', () => {
     await rebuildAuthorizedRootsCache(store)
 
     await expect(resolveRegisteredWorktreePath(RECOVERED, store)).rejects.toThrow('Access denied')
+  })
+
+  it('keeps a recovered root without probing when the repository graph is unavailable', async () => {
+    const store = makeStore()
+    registerCreatedWorktreeRoot(store, repo.id, RECOVERED)
+    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([])
+    statMock.mockRejectedValue(statError('ENOENT'))
+
+    await rebuildAuthorizedRootsCache(store)
+
+    await expect(resolveRegisteredWorktreePath(RECOVERED, store)).resolves.toBe(RECOVERED)
+    expect(statMock).not.toHaveBeenCalled()
   })
 
   it('keeps a recovered root when the probe fails for any reason but ENOENT', async () => {

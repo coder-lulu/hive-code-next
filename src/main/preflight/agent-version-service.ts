@@ -8,7 +8,7 @@ import path from 'node:path'
 import { NPM_AGENT_PACKAGES } from '../../shared/agent-install-types'
 import { AGENT_NPM_REGISTRIES } from '../../shared/agent-npm-registry'
 import { isPrereleaseAppVersion, isValidAppVersion } from '../../shared/app-version'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { resolveCliCommands, withCliRuntimeOnPath } from '../../shared/node-cli-command-resolution'
 import { buildPosixCommandPathLookupScript } from '../../shared/posix-command-path-lookup'
 import {

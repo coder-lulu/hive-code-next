@@ -15,8 +15,8 @@ export default defineConfig({
   // otherwise fails before Vitest can run the test modules.
   oxc: vitestOxcConfig,
   test: {
-    // Why: match the root suite's Windows worker cap so large hosts do not overwhelm transforms.
     ...windowsTestWorkerOptions,
+    pool: 'threads',
     environment: 'node',
     setupFiles: ['./vitest.setup.ts'],
     onConsoleLog: (log) => !log.includes('react-test-renderer is deprecated'),

@@ -61,21 +61,14 @@ jobs:
       ref: ${{ github.sha }}
       build_template: true
 
-  relay-native-addons:
-    needs: plan
-    if: needs.plan.outputs.desktop == 'true'
-    uses: ./.github/workflows/relay-windows-process-tree.yml
-    with:
-      ref: ${{ github.sha }}
-
   build:
-    needs: [plan, desktop-runtime, relay-native-addons]
+    needs: [plan, desktop-runtime]
     if: >-
       !cancelled() && needs.plan.result == 'success' &&
       ((needs.plan.outputs.desktop == 'true' &&
-        needs.desktop-runtime.result == 'success' && needs.relay-native-addons.result == 'success') ||
+        needs.desktop-runtime.result == 'success') ||
        (needs.plan.outputs.desktop == 'false' &&
-        needs.desktop-runtime.result == 'skipped' && needs.relay-native-addons.result == 'skipped'))
+        needs.desktop-runtime.result == 'skipped'))
     name: ${{ matrix.target }}
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 180
@@ -118,12 +111,12 @@ jobs:
         if: startsWith(matrix.target, 'windows-') || startsWith(matrix.target, 'macos-') || startsWith(matrix.target, 'linux-')
         uses: actions/download-artifact@v8
         with:
-          name: relay-windows-process-tree
+          name: orcad-windows-process-tree
           path: .build/windows-process-tree
       - name: Require runtime resources in desktop packages
         if: startsWith(matrix.target, 'windows-') || startsWith(matrix.target, 'macos-') || startsWith(matrix.target, 'linux-')
         run: |
-          printf 'ORCA_REQUIRE_ORCAD_TEMPLATE=1\nORCA_REQUIRE_RELAY_NATIVE_ADDONS=x64,arm64\n' >> "$GITHUB_ENV"
+          printf 'ORCA_REQUIRE_ORCAD_TEMPLATE=1\n' >> "$GITHUB_ENV"
       - name: Install Linux packaging and native tools
         if: startsWith(matrix.target, 'linux-')
         run: |

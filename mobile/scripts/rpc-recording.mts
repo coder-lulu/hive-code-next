@@ -2,7 +2,7 @@
 import { createRequire } from 'node:module'
 import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { runProcess } from '../../src/shared/child-process/run-process.ts'
+import { runProcess } from '@orca/process-host'
 import { derivedGoldens } from '../src/test-support/rpc-recording/derived-goldens.ts'
 import { RECORDING_DRIVERS } from '../src/test-support/rpc-recording/recording-drivers.ts'
 import { readScenarios } from '../src/test-support/rpc-recording/scenario-input.ts'

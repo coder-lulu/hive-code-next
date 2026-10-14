@@ -1,11 +1,11 @@
-import type { GlobalSettings } from '../../../shared/global-settings-types'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import {
   createRuntimePath,
   deleteRuntimePath,
-  runtimePathExists,
   writeRuntimeFile
-} from '../runtime/runtime-file-client'
+} from '../runtime/runtime-file-mutation-client'
 import { createRuntimeUntitledPlaceholder } from '../runtime/runtime-untitled-placeholder-client'
+import { runtimePathExists } from '../runtime/runtime-file-metadata-client'
 import { detectLanguage } from './language-detect'
 import {
   applyMarkdownTemplatePlaceholders,
@@ -50,15 +50,15 @@ type CreateUntitledMarkdownOptions = {
 export async function createUntitledMarkdownFile(
   worktreePath: string,
   worktreeId: string,
-  connectionId?: string,
-  settings?: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null,
+  connectionId: string | undefined,
+  target: RuntimeClientTarget,
   options: CreateUntitledMarkdownOptions = {}
 ): Promise<UntitledMarkdownFileInfo> {
   const baseName = 'untitled'
   const ext = '.md'
   const MAX_ATTEMPTS = 100
   const context = {
-    settings,
+    target,
     worktreeId,
     worktreePath,
     connectionId,
@@ -147,8 +147,8 @@ export async function createUntitledMarkdownFile(
 export async function createUntitledMarkdownFileWithTemplateSelection(
   worktreePath: string,
   worktreeId: string,
-  connectionId?: string,
-  settings?: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null,
+  connectionId: string | undefined,
+  target: RuntimeClientTarget,
   operationProvenance?: EditorFileOperationProvenance,
   expectedSshConnectionGeneration?: number,
   expectedSshTargetId?: string,
@@ -159,7 +159,7 @@ export async function createUntitledMarkdownFileWithTemplateSelection(
     requireOperationAssertion(assertOperationCurrent)()
   }
   const context = {
-    settings,
+    target,
     worktreeId,
     worktreePath,
     connectionId,
@@ -174,7 +174,7 @@ export async function createUntitledMarkdownFileWithTemplateSelection(
     return null
   }
 
-  return createUntitledMarkdownFile(worktreePath, worktreeId, connectionId, settings, {
+  return createUntitledMarkdownFile(worktreePath, worktreeId, connectionId, target, {
     template: selection.type === 'template' ? selection.template : undefined,
     operationProvenance,
     expectedSshTargetId,

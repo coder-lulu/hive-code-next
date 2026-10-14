@@ -1,12 +1,13 @@
-import type { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
 import type { CodexRuntimeHomeService } from './codex-accounts/runtime-home-service'
+import type { ClaudeRuntimeAuthService } from './claude-accounts/runtime-auth-service'
 import type { Store } from './persistence'
 
 const AUTH_PRESERVATION_TIMEOUT_MS = 2_000
 
-type CodexRuntimeAuthSync = Pick<CodexRuntimeHomeService, 'syncForCurrentSelection'> &
+export type CodexRuntimeAuthSync = Pick<CodexRuntimeHomeService, 'syncForCurrentSelection'> &
   Partial<Pick<CodexRuntimeHomeService, 'syncActiveWslSelectionsBeforeRestart'>>
-type ClaudeRuntimeAuthSync = Pick<ClaudeRuntimeAuthService, 'syncForCurrentSelection'>
+export type ClaudeRuntimeAuthSync = Pick<ClaudeRuntimeAuthService, 'syncForCurrentSelection'>
+
 type ShutdownStore = Pick<Store, 'flushPendingOrThrowAsync'>
 
 type AuthPreservationStep =
@@ -15,8 +16,8 @@ type AuthPreservationStep =
   | 'Store persistence'
 
 export type AgentAuthRestartPreservationOptions = {
-  codexRuntimeHome?: CodexRuntimeAuthSync | null
   claudeRuntimeAuth?: ClaudeRuntimeAuthSync | null
+  codexRuntimeHome?: CodexRuntimeAuthSync | null
   store?: ShutdownStore | null
 }
 
@@ -30,17 +31,13 @@ export async function preserveAgentAuthBeforeRestart({
   // Why: the drain owns guest-process timeouts; a shared 2s cutoff can relaunch before promotion.
   const wslCodexPreservation = runWslCodexPreservationStep(codexRuntimeHome)
 
-  const claudeRemainingMs = remainingLifecycleTime(startedAt)
-  if (claudeRuntimeAuth && claudeRemainingMs > 0) {
-    await runWithinLifecycleTimeout(
-      'Claude auth preservation',
-      () => claudeRuntimeAuth.syncForCurrentSelection(),
-      claudeRemainingMs
-    )
-  } else if (claudeRuntimeAuth) {
-    logStepTimeout('Claude auth preservation', 0)
-  }
-
+  const claudePreservation = claudeRuntimeAuth
+    ? runWithinLifecycleTimeout(
+        'Claude auth preservation',
+        () => claudeRuntimeAuth.syncForCurrentSelection(),
+        remainingLifecycleTime(startedAt)
+      )
+    : Promise.resolve()
   const storePreservation = store
     ? runWithinLifecycleTimeout(
         'Store persistence',
@@ -48,7 +45,7 @@ export async function preserveAgentAuthBeforeRestart({
         remainingLifecycleTime(startedAt)
       )
     : Promise.resolve()
-  await Promise.all([wslCodexPreservation, storePreservation])
+  await Promise.all([wslCodexPreservation, claudePreservation, storePreservation])
 }
 
 function remainingLifecycleTime(startedAt: number): number {

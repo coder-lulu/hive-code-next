@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as TrackingDecisions from './web-session-tabs-sync/tracking-decisions'
 import {
   createWebRuntimeAgentSessionTerminal,
   createWebRuntimeAgentSessionTerminalWithLaunchDraft,
   createWebRuntimeSessionTerminal
-} from './web-runtime-session'
+} from './web-runtime-terminal-creation'
 import { peekWebSessionFocusIntent } from './web-session-focus-intent'
 import { resetWebSessionCloseIntentForTests } from './web-session-close-intent'
 import {
@@ -15,6 +16,7 @@ import {
   resetTerminalCreateEnvironment,
   stubTerminalCreateEnvironment
 } from './web-runtime-session-test-harness'
+import { stubRuntimeEnvironmentBridge } from './runtime-environment-bridge-fixture'
 
 const mocks = vi.hoisted(() => ({
   getState: vi.fn(),
@@ -47,16 +49,25 @@ vi.mock('../store', () => ({
   }
 }))
 
-vi.mock('./web-session-tabs-sync', () => ({
+vi.mock('./web-session-tabs-sync/tracking-lifecycle', () => ({
   acceptReplayedWebSessionTabsSnapshot: mocks.acceptReplayedWebSessionTabsSnapshot,
-  applyWebSessionTabsSnapshot: mocks.applyWebSessionTabsSnapshot,
-  decideWebSessionTabsSnapshot: mocks.decideWebSessionTabsSnapshot,
-  getWebSessionTabsTrackingGeneration: mocks.getWebSessionTabsTrackingGeneration,
+  getWebSessionTabsTrackingGeneration: mocks.getWebSessionTabsTrackingGeneration
+}))
+vi.mock('./web-session-tabs-sync/snapshot-api', () => ({
+  applyWebSessionTabsSnapshot: mocks.applyWebSessionTabsSnapshot
+}))
+vi.mock('./web-session-tabs-sync/tracking-decisions', async (importOriginal) => ({
+  ...(await importOriginal<typeof TrackingDecisions>()),
+  decideWebSessionTabsSnapshot: mocks.decideWebSessionTabsSnapshot
+}))
+vi.mock('./web-session-tabs-sync/store-patch', () => ({
   applyWebSessionTabsStorePatch: (buildPatch: (state: unknown) => unknown) => {
     mocks.setState(buildPatch)
     // The production caller invokes the returned settle receipt.
     return () => {}
-  },
+  }
+}))
+vi.mock('./web-session-tabs-sync/tracking-mappings', () => ({
   resolveHostSessionTabIdForWebSessionTab: mocks.resolveHostSessionTabIdForWebSessionTab
 }))
 
@@ -101,9 +112,7 @@ describe('createWebRuntimeSessionTerminal', () => {
         result: { tab: { id: 'host-tab-1', leafId: 'host-leaf-1' } }
       })
       .mockResolvedValueOnce({ id: 'list', ok: true, result: makeSnapshot() })
-    vi.stubGlobal('window', {
-      api: { runtimeEnvironments: { call: runtimeCall } }
-    })
+    stubRuntimeEnvironmentBridge({ call: runtimeCall })
 
     await expect(
       createWebRuntimeSessionTerminal({
@@ -165,9 +174,7 @@ describe('createWebRuntimeSessionTerminal', () => {
         }
         return { id: 'list', ok: true, result: makeSnapshot() }
       })
-      vi.stubGlobal('window', {
-        api: { runtimeEnvironments: { call: runtimeCall } }
-      })
+      stubRuntimeEnvironmentBridge({ call: runtimeCall })
 
       await expect(
         createWebRuntimeSessionTerminal({
@@ -324,9 +331,7 @@ describe('createWebRuntimeSessionTerminal', () => {
         }
         return { id: 'list', ok: true, result: makeSnapshot() }
       })
-      vi.stubGlobal('window', {
-        api: { runtimeEnvironments: { call: runtimeCall } }
-      })
+      stubRuntimeEnvironmentBridge({ call: runtimeCall })
 
       const outcome = await createWebRuntimeSessionTerminal({
         worktreeId: WORKTREE_ID,
@@ -531,13 +536,7 @@ describe('createWebRuntimeSessionTerminal', () => {
         result: snapshot
       })
 
-    vi.stubGlobal('window', {
-      api: {
-        runtimeEnvironments: {
-          call: runtimeCall
-        }
-      }
-    })
+    stubRuntimeEnvironmentBridge({ call: runtimeCall })
 
     await expect(
       createWebRuntimeSessionTerminal({
@@ -646,9 +645,7 @@ describe('createWebRuntimeSessionTerminal', () => {
         }
         return { id: 'ok', ok: true, result: makeSnapshot() }
       })
-      vi.stubGlobal('window', {
-        api: { runtimeEnvironments: { call: runtimeCall } }
-      })
+      stubRuntimeEnvironmentBridge({ call: runtimeCall })
 
       await expect(
         createWebRuntimeSessionTerminal({
@@ -706,9 +703,7 @@ describe('createWebRuntimeSessionTerminal', () => {
       }
       return { id: 'list', ok: true, result: makeSnapshot() }
     })
-    vi.stubGlobal('window', {
-      api: { runtimeEnvironments: { call: runtimeCall } }
-    })
+    stubRuntimeEnvironmentBridge({ call: runtimeCall })
 
     await expect(
       createWebRuntimeSessionTerminal({
@@ -754,9 +749,7 @@ describe('createWebRuntimeSessionTerminal', () => {
       }
       return { id: 'list', ok: true, result: makeSnapshot() }
     })
-    vi.stubGlobal('window', {
-      api: { runtimeEnvironments: { call: runtimeCall } }
-    })
+    stubRuntimeEnvironmentBridge({ call: runtimeCall })
 
     await expect(
       createWebRuntimeAgentSessionTerminal({
@@ -816,9 +809,7 @@ describe('createWebRuntimeSessionTerminal', () => {
       }
       return { id: 'list', ok: true, result: makeSnapshot() }
     })
-    vi.stubGlobal('window', {
-      api: { runtimeEnvironments: { call: runtimeCall } }
-    })
+    stubRuntimeEnvironmentBridge({ call: runtimeCall })
 
     await expect(
       createWebRuntimeAgentSessionTerminalWithLaunchDraft({

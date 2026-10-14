@@ -62,12 +62,13 @@ export type UsageRateLimitFailureKind =
   | 'unknown'
 
 export type UsageRateLimitMetadata = {
+  /** Managed refresh waits until the current Claude credential owner exits. */
+  deferredByLiveClaudeSession?: boolean
   source?: UsageRateLimitSource
   attemptedSources?: UsageRateLimitSource[]
   failureKind?: UsageRateLimitFailureKind
   credentialSource?: string
   authProvenance?: string
-  deferredByLiveClaudeSession?: boolean
   lastSuccessfulSource?: UsageRateLimitSource
   /** Unix ms timestamp before which usage refetches should not be attempted (from HTTP Retry-After). */
   retryAtMs?: number

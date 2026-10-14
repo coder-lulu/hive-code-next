@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { View, StyleSheet, PanResponder } from 'react-native'
+import { View, StyleSheet, PanResponder, Platform } from 'react-native'
 import { useGlobalSearchParams, usePathname } from 'expo-router'
 import type { MobileTheme } from '../../src/theme/mobile-theme'
 import { useMobileTheme } from '../../src/theme/mobile-theme-provider'
@@ -14,6 +14,9 @@ import {
 import { HostProtocolGate } from '../../src/components/HostProtocolGate'
 import { HostScreen } from '../../src/host-screen/HostScreen'
 import { HostStack } from '../../src/navigation/host-stack'
+import { HostSidebarRevealContext } from '../../src/layout/host-sidebar-reveal'
+import { HostAreaServingContext } from '../../src/mobile-web-shell/host-area-serving'
+import { usePageOwnsHostArea } from '../../src/mobile-web-shell/page-owns-host-area'
 
 // Keep at least this much room for the detail pane when resizing the sidebar.
 const MIN_DETAIL_WIDTH = 320
@@ -67,13 +70,18 @@ export default function HostGroupLayout() {
   }, [windowWidth])
 
   const hideSidebar = useCallback(() => setSidebarOpen(false), [])
-  const showSidebar = isWideLayout && !!hostId
+  const revealSidebar = useCallback(() => setSidebarOpen(true), [])
+  const [hostAreaServing, setHostAreaServing] = useState(false)
+  const pageOwnsHostArea = usePageOwnsHostArea()
+  // One owner: the page only with its init fact; natively all but a host route its page is serving.
+  const sidebarDrawnHere =
+    Platform.OS === 'web' ? pageOwnsHostArea : !(pathname === `/h/${hostId}` && hostAreaServing)
+  const showSidebar = isWideLayout && !!hostId && sidebarDrawnHere
   const detailHasContent = !!hostId && pathname !== `/h/${hostId}`
   const canCollapseSidebar = showSidebar && detailHasContent
 
-  // Why: there is no reveal button — navigating Back to the base host route brings
-  // the sidebar back (and that route's detail pane is only a placeholder, so a
-  // hidden sidebar would leave nothing useful).
+  // Why: the base host route's detail pane is only a placeholder, so a hidden
+  // sidebar there would leave nothing useful.
   useEffect(() => {
     if (showSidebar && !detailHasContent) {
       setSidebarOpen(true)
@@ -127,7 +135,13 @@ export default function HostGroupLayout() {
           </View>
         ) : null}
         <View style={styles.detail}>
-          <HostStack animation={showSidebar ? 'none' : 'default'} />
+          <HostAreaServingContext.Provider value={setHostAreaServing}>
+            <HostSidebarRevealContext.Provider
+              value={showSidebar && !sidebarOpen ? revealSidebar : null}
+            >
+              <HostStack animation={showSidebar ? 'none' : 'default'} />
+            </HostSidebarRevealContext.Provider>
+          </HostAreaServingContext.Provider>
         </View>
       </View>
     </HostProtocolGate>

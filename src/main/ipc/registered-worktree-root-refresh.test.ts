@@ -72,7 +72,7 @@ describe('current request follows a superseded rebuild', () => {
     await vi.waitFor(() => expect(mocks.graph).toHaveBeenCalledOnce())
     repos[0] = { ...local, path: replacement }
     invalidateAuthorizedRootsCache()
-    mocks.graph.mockResolvedValue([{ path: linked }])
+    mocks.graph.mockResolvedValue([{ path: replacement }, { path: linked }])
     const current = resolveAuthorizedPath(join(linked, 'file'), store)
     const currentResult = current.then(
       (value) => ({ value }),
@@ -81,7 +81,7 @@ describe('current request follows a superseded rebuild', () => {
     await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
-    graph.resolve([])
+    graph.resolve([{ path: root }])
     const [, result] = await Promise.all([firstResult, currentResult])
     expect(result).toEqual({ value: join(linked, 'file') })
     expect(mocks.graph).toHaveBeenCalledTimes(2)

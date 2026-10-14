@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
-import { runProcess } from '../../src/shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 
 const workflow = parse(
   readFileSync(new URL('../../.github/workflows/hourly-mac-build.yml', import.meta.url), 'utf8')

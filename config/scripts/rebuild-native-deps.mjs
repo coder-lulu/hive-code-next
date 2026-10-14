@@ -21,6 +21,10 @@
 import { readCliOptions } from './native-rebuild-cli-options.mjs'
 import { prepareNodePtyMacosExceptions } from './node-pty-macos-gyp-rebuild.mjs'
 import { rebuild } from '@electron/rebuild'
+import {
+  hasAdoptedSharedElectronDist,
+  resolveSharedElectronDistEntry
+} from './shared-electron-dist-cache.mjs'
 import { spawnSync } from 'node:child_process'
 import {
   ensureWindowsProcessTreeCommandLinePatch,
@@ -362,6 +366,16 @@ function restoreNodePtyWindowsConptyRuntime() {
 function ensureElectronPackageInstalled() {
   repairElectronPathFile()
   if (electronPackageIsUsable()) {
+    const shared = resolveSharedElectronDistEntry({
+      repoRoot: projectDir,
+      electronPackageDir,
+      version: electronVersion,
+      targetPlatform: electronInstallPlatform,
+      targetArch: electronInstallArch
+    })
+    if (shared && !hasAdoptedSharedElectronDist(shared)) {
+      runElectronPackageBinaryInstall()
+    }
     return
   }
 

@@ -65,10 +65,12 @@ export type AgentCatalogRowProps = {
   envOverride: Record<string, string>
   onSetDefault: () => void
   onSetEnabled: (enabled: boolean) => void
-  onSaveOverride: (value: string) => void
-  onSaveArgs: (value: string) => void
+  onSaveOverride: (value: string) => void | Promise<void>
+  onSaveArgs: (value: string) => void | Promise<void>
   onSaveEnv: (value: Record<string, string>) => void
   sessionSourceHome?: AgentSessionSourceHomeControl
+  environmentNames?: readonly string[]
+  environmentEditor?: React.ReactNode
   versionSnapshot?: AgentVersionSnapshot
   onRetryVersions?: () => void
   onConfigure?: () => void

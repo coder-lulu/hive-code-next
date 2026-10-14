@@ -7,7 +7,7 @@ import {
 } from '../../../../shared/worktree/host-qualified-identity'
 import { isFloatingTerminalWorkspaceId } from '@/lib/floating-terminal'
 import { resolveExplicitWorktreeOperationRouteResult } from '@/lib/worktree-operation-catalog-route'
-import { runtimeTargetForExecutionHostId } from '@/runtime/runtime-client-target'
+import { runtimeRpcTargetForAuthorityKey } from '@/runtime/runtime-client-target'
 import type { AppState } from '@/store/types'
 
 type OwnerCatalog = Pick<
@@ -27,10 +27,10 @@ export function resolveStructuredSessionRuntimeTarget(
   }
   const explicitHost = bucketHost ?? tabHost
   if (explicitHost) {
-    return runtimeTargetForExecutionHostId(explicitHost)
+    return runtimeRpcTargetForAuthorityKey(explicitHost)
   }
   if (isFloatingTerminalWorkspaceId(bucket)) {
-    return runtimeTargetForExecutionHostId('local')
+    return runtimeRpcTargetForAuthorityKey('local')
   }
   const workspaceId = getWorktreeIdFromHostIdentity(bucket)
   const scope = parseWorkspaceKey(workspaceId)
@@ -49,7 +49,7 @@ export function resolveStructuredSessionRuntimeTarget(
     if (owner.executionHostId && !host) {
       return null
     }
-    return runtimeTargetForExecutionHostId(
+    return runtimeRpcTargetForAuthorityKey(
       getRepoExecutionHostId({
         executionHostId: host?.id,
         connectionId: owner.connectionId
@@ -59,5 +59,5 @@ export function resolveStructuredSessionRuntimeTarget(
   const resolution = resolveExplicitWorktreeOperationRouteResult(state, workspaceId)
   const hostId = resolution.kind === 'resolved' ? resolution.route.executionHostId : null
   const host = parseExecutionHostId(hostId)
-  return host ? runtimeTargetForExecutionHostId(host.id) : null
+  return host ? runtimeRpcTargetForAuthorityKey(host.id) : null
 }

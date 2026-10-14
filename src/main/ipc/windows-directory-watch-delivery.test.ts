@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'nod
 import { join } from 'node:path'
 import { buildSync } from 'esbuild'
 import { afterEach, beforeAll, describe, expect, it } from 'vitest'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 
 const owners = ['shallow-probe', 'shallow-subscription', 'transcript-parent', 'orcad-stop'] as const
 const artifactRoot = join(

@@ -61,14 +61,9 @@ describe('HiveCode Windows hardware signing workflow', () => {
       'HIVECODE_WINDOWS_SIGNING_TIMEOUT_MS'
     ]
     expect(Object.keys(env).sort()).toEqual(
-      [
-        ...signingEnvironmentNames,
-        'ORCA_REQUIRE_ORCAD_TEMPLATE',
-        'ORCA_REQUIRE_RELAY_NATIVE_ADDONS'
-      ].sort()
+      [...signingEnvironmentNames, 'ORCA_REQUIRE_ORCAD_TEMPLATE'].sort()
     )
     expect(env.ORCA_REQUIRE_ORCAD_TEMPLATE).toBe('1')
-    expect(env.ORCA_REQUIRE_RELAY_NATIVE_ADDONS).toBe('x64,arm64')
     for (const name of signingEnvironmentNames) {
       const value = env[name]
       expect(value).toMatch(/^\$\{\{ vars\./u)

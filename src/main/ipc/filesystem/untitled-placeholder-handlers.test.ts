@@ -1,3 +1,4 @@
+import { getSshConnectionGeneration } from '../../ssh/ssh-connection-generation'
 import { EventEmitter } from 'node:events'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
@@ -226,4 +227,16 @@ describe('desktop ordinary untitled creation after proved unavailable retention 
     expect(ports.authorize).not.toHaveBeenCalled()
     expect(existsSync(filePath)).toBe(false)
   })
+})
+
+it('refuses retired direct SSH execution before local filesystem authorization', async () => {
+  const connectionId = 'old-ssh-target'
+  const handler = ports.handlers.get('fs:createUntitledPlaceholder')!
+  await expect(handler(event, {
+    filePath, connectionId, expectedExecutionHostId: `ssh:${connectionId}`,
+    expectedSshTargetId: connectionId,
+    expectedSshConnectionGeneration: getSshConnectionGeneration(connectionId)
+  })).rejects.toMatchObject({ code: 'ssh_host_not_served', connectionId })
+  expect(ports.authorize).not.toHaveBeenCalled()
+  expect(existsSync(filePath)).toBe(false)
 })

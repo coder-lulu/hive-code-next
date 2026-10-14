@@ -71,7 +71,7 @@ export function CodexAccountsSheetList({
                   void model.runCodexAccountAction(
                     `select:${account.id}`,
                     () =>
-                      selectCodexProviderAccount(model.settings, {
+                      selectCodexProviderAccount(model.accountOwner, {
                         accountId: account.id,
                         ...runtime
                       }),

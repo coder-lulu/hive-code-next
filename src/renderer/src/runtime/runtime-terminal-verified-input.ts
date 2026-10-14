@@ -1,14 +1,11 @@
-import type { GlobalSettings } from '../../../shared/global-settings-types'
 import type { RuntimeTerminalResolvePane, RuntimeTerminalSend } from '../../../shared/runtime-types'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import type { TerminalInputKind } from '../../../shared/terminal-input-kind'
 import { isTerminalInputTooLargeWithDeferredMeasurement } from '../../../shared/terminal-input'
 import { readTerminalSendAcknowledgment } from '../../../shared/terminal-send-acknowledgment'
 import { classifyTerminalProcessInspectionFailure } from '../../../shared/terminal-process-inspection'
-import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
-import {
-  getRemoteRuntimePtyEnvironmentId,
-  getRemoteRuntimeTerminalHandle
-} from './runtime-terminal-stream'
+import { callRuntimeRpc } from './runtime-rpc-client'
+import { getRemoteRuntimePtyOwner } from './runtime-terminal-stream'
 import { recordRuntimeTerminalInputForPtyId } from './runtime-terminal-input-recording'
 
 const DESKTOP_RUNTIME_CLIENT = { id: 'orca-desktop', type: 'desktop' } as const
@@ -17,7 +14,6 @@ import { useAppStore } from '@/store'
 import { resolvePaneKeyForPtyId } from './runtime-terminal-pane-owner'
 
 export async function sendRuntimePtyInputVerified(
-  settings: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null | undefined,
   ptyId: string,
   data: string,
   inputKind: TerminalInputKind,
@@ -30,12 +26,10 @@ export async function sendRuntimePtyInputVerified(
   if (typeof tooLarge === 'boolean' ? tooLarge : await tooLarge) {
     return false
   }
-  const ownerEnvironmentId = getRemoteRuntimePtyEnvironmentId(ptyId)
-  let target = ownerEnvironmentId
-    ? ({ kind: 'environment', environmentId: ownerEnvironmentId } as const)
-    : getActiveRuntimeTarget(settings)
-  let terminal = getRemoteRuntimeTerminalHandle(ptyId)
-  const local = target.kind !== 'environment' || !terminal
+  const owner = getRemoteRuntimePtyOwner(ptyId)
+  const local = !owner
+  let target: RuntimeClientTarget = owner?.target ?? { kind: 'local' }
+  let terminal = owner?.terminal ?? null
   if (local && !options?.requireAgentStatus) {
     if (options?.requireWriteSettlement) {
       const accepted = await window.api.pty.writeAccepted(ptyId, data, inputKind, {

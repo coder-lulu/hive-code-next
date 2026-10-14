@@ -4,8 +4,8 @@ import { join } from 'node:path'
 import type { ClaudeEnvPatch } from './environment'
 
 export type ClaudeRuntimePaths = {
-  configDir: string
   credentialsPath: string
+  configDir: string
   configPath: string
   envPatch: ClaudeEnvPatch
 }

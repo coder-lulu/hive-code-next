@@ -1,5 +1,7 @@
+import { ensureActiveOrcaProfile } from './profile-index-store'
+import { readOrcaCloudSession } from './profile-cloud-session-store'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -129,10 +131,20 @@ describe('Orca cloud dev auth service', () => {
 
   it('signs out locally without calling the cloud logout endpoint', async () => {
     await connectCurrentOrcaProfile(userDataPath)
+    const { profile } = ensureActiveOrcaProfile(userDataPath)
+    expect(readOrcaCloudSession(profile.id, userDataPath).status).toBe('found')
+    const regionCache = join(userDataPath, 'orca-relay-region-preference.json')
+    writeFileSync(regionCache, '{}')
 
     const result = await signOutCurrentOrcaProfile(userDataPath)
 
     expect(result.status).toBe('signed-out')
+    // The current profile owns its session, not retired Relay cache files.
+    expect(readOrcaCloudSession(profile.id, userDataPath)).toEqual({
+      status: 'missing',
+      persistence: 'none'
+    })
+    expect(existsSync(regionCache)).toBe(true)
     expect(revokeOrcaCloudSessionMock).not.toHaveBeenCalled()
     expect(getCurrentOrcaProfileAuthStatus(userDataPath)).toMatchObject({
       configured: true,

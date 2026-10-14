@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
-import { spawnProcess } from '../../shared/child-process/run-process'
+import { spawnProcess } from '@orca/process-host'
 import {
   __setWindowsProcessTreeRequireForTests,
   readWindowsProcessCreationTime,

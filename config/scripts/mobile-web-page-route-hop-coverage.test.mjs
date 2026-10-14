@@ -82,14 +82,10 @@ function sameRoute(pushed, declared) {
  * What is NOT here is the point of the census. `files/[worktreeId] -> files/preview/[worktreeId]`
  * is absent because the preview declares no more than the explorer, so that hop stays in the
  * document — which is C3.1's pairwise pin, now a consequence of the rule rather than a rule of its
- * own. Absent for the same reason, and measured rather than reasoned: the four hops the worktree
- * list and the history screen make into the explorer and its preview, which left this list when
- * those two declared the `externalLink` their own protocol wall reaches and took it from 23 rows
- * to 19. The four now declare the same four grants, so a tapped file costs no native frame and no
- * second bridge session.
- *
- * What remains beside the session rows is twelve: four openers holding no `native.clipboard.write`
- * into the three routes that ask for it — tasks, the hub and review.
+ * own. The explorer and preview now require `native.clipboard.write` for their copy actions.
+ * The list and history openers lack that grant, so their four file hops must hand off.
+ * Files and preview can now cover tasks, the hub and review without a handoff.
+ * Beside the seven session rows, ten hops originate from the two openers without clipboard access.
  *
  * Absent for the same reason, and the reason C4 registered its two routes in one PR:
  * `source-control ⇄ review` in both directions. The hub's rows push review and review replaces
@@ -104,22 +100,20 @@ function sameRoute(pushed, declared) {
  * the other direction would mean a route had grown a grant the session lacks.
  */
 const HANDED_OFF = [
+  '/h/[hostId] -> /h/[hostId]/files/[worktreeId]',
+  '/h/[hostId] -> /h/[hostId]/files/preview/[worktreeId]',
   '/h/[hostId] -> /h/[hostId]/review/[worktreeId]',
   '/h/[hostId] -> /h/[hostId]/session/[worktreeId]',
   '/h/[hostId] -> /h/[hostId]/source-control/[worktreeId]',
   '/h/[hostId] -> /h/[hostId]/tasks',
+  '/h/[hostId]/agent-history/[worktreeId] -> /h/[hostId]/files/[worktreeId]',
+  '/h/[hostId]/agent-history/[worktreeId] -> /h/[hostId]/files/preview/[worktreeId]',
   '/h/[hostId]/agent-history/[worktreeId] -> /h/[hostId]/review/[worktreeId]',
   '/h/[hostId]/agent-history/[worktreeId] -> /h/[hostId]/session/[worktreeId]',
   '/h/[hostId]/agent-history/[worktreeId] -> /h/[hostId]/source-control/[worktreeId]',
   '/h/[hostId]/agent-history/[worktreeId] -> /h/[hostId]/tasks',
-  '/h/[hostId]/files/[worktreeId] -> /h/[hostId]/review/[worktreeId]',
   '/h/[hostId]/files/[worktreeId] -> /h/[hostId]/session/[worktreeId]',
-  '/h/[hostId]/files/[worktreeId] -> /h/[hostId]/source-control/[worktreeId]',
-  '/h/[hostId]/files/[worktreeId] -> /h/[hostId]/tasks',
-  '/h/[hostId]/files/preview/[worktreeId] -> /h/[hostId]/review/[worktreeId]',
   '/h/[hostId]/files/preview/[worktreeId] -> /h/[hostId]/session/[worktreeId]',
-  '/h/[hostId]/files/preview/[worktreeId] -> /h/[hostId]/source-control/[worktreeId]',
-  '/h/[hostId]/files/preview/[worktreeId] -> /h/[hostId]/tasks',
   '/h/[hostId]/review/[worktreeId] -> /h/[hostId]/session/[worktreeId]',
   '/h/[hostId]/source-control/[worktreeId] -> /h/[hostId]/session/[worktreeId]',
   '/h/[hostId]/tasks -> /h/[hostId]/session/[worktreeId]'
@@ -203,10 +197,8 @@ describe('in-page hops between page routes', () => {
     expect(effectiveGrants(preview).filter((grant) => !held.includes(grant))).toEqual([])
   })
 
-  it('keeps the file hops local from the two routes whose rows open them', () => {
-    // The other half of the four rows that left the list above. Asserted as coverage rather than as
-    // their absence: an unregistered route is absent too, and a worktree row opening a file is the
-    // hop a phone actually makes.
+  it('hands file hops off when their openers lack clipboard write authority', () => {
+    // Both file routes own copy actions; their opener cannot lend a grant it lacks.
     const grantsOf = (pathname) => {
       const route = MOBILE_WEB_PAGE_ROUTES.find((entry) => entry.pathname === pathname)
       if (!route) {
@@ -222,11 +214,11 @@ describe('in-page hops between page routes', () => {
       expect(
         explorer.filter((grant) => !held.includes(grant)),
         opener
-      ).toEqual([])
+      ).toEqual(['native.clipboard.write'])
       expect(
         preview.filter((grant) => !held.includes(grant)),
         opener
-      ).toEqual([])
+      ).toEqual(['native.clipboard.write'])
     }
   })
 

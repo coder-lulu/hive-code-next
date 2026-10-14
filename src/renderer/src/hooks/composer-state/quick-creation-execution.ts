@@ -1,12 +1,10 @@
 import type { QuickCreationExecutionInput } from './composer-model'
 
 import { useCallback } from 'react'
-import type { Repo } from '../../../../shared/repo-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
 import { useAppStore } from '@/store'
 import { settleComposerSubmit } from '@/lib/composer-submit-cancellation'
-import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { runBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import { translate } from '@/i18n/i18n'
 import { buildQuickComposerStartup } from './quick-startup-plan'
@@ -36,11 +34,11 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
     resetForNextCreate,
     resolvedInitialWorkspaceStatus,
     selectedEphemeralVmRecipeId,
-    selectedRepoAgentLaunchPlatform,
+    selectedRepoAgentLaunchFact,
     selectedRepoExecutionHostId,
     selectedRepoIsGit,
     selectedRepoIsRemote,
-    selectedRepoSettings,
+    selectedRepoTarget,
     selectedRepoStartupShell,
     selectedWorkspaceTarget,
     settings,
@@ -55,8 +53,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
       requestedAgent: TuiAgent | null,
       workspaceNameSeed: string,
       workspaceRunContext: WorktreeCreationRequest['workspaceRunContext'],
-      repoId: string,
-      selectedRepo: Repo
+      repoId: string
     ): Promise<void> => {
       const prepared = await prepareQuickSubmit(
         smartGitHubResolution,
@@ -109,8 +106,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         draftPrompt: quickDraftPrompt,
         settings,
         agentPermissionMode,
-        repoConnectionId: selectedRepo.connectionId,
-        platform: selectedRepoAgentLaunchPlatform,
+        launchHost: selectedRepoAgentLaunchFact,
         shell: selectedRepoStartupShell,
         isRemote: selectedRepoIsRemote,
         telemetrySource
@@ -164,8 +160,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
             },
             prompt: quickDraftPrompt ?? quickPrompt,
             promptDelivery,
-            tuiCustomization: { agentPermissionMode },
-            initialSessionOptions: startupPlan?.sessionOptions
+            tuiCustomization: { agentPermissionMode }
           })
         : 'terminal-tui'
       const structuredLaunch = agentLaunchRoute === 'structured-native-chat'
@@ -174,8 +169,7 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         repoId,
         ephemeralVmRecipe,
         indeterminateProgress:
-          Boolean(activeEphemeralVmRecipeId) ||
-          getActiveRuntimeTarget(selectedRepoSettings).kind !== 'local',
+          Boolean(activeEphemeralVmRecipeId) || selectedRepoTarget?.kind === 'environment',
         taskSourceContext,
         linkedWorkItem: submitLinkedWorkItem,
         workspaceRunContext,
@@ -258,11 +252,11 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
       resetForNextCreate,
       resolvedInitialWorkspaceStatus,
       selectedEphemeralVmRecipeId,
-      selectedRepoAgentLaunchPlatform,
+      selectedRepoAgentLaunchFact,
       selectedRepoExecutionHostId,
       selectedRepoIsGit,
       selectedRepoIsRemote,
-      selectedRepoSettings,
+      selectedRepoTarget,
       selectedRepoStartupShell,
       selectedWorkspaceTarget,
       settings,

@@ -19,11 +19,63 @@ import {
   copyPrivateTree,
   hardlinkTree,
   makeTreeReadOnly,
+  makeTreeReadOnlyAsync,
   makeTreeWritable,
-  shareTree
+  shareTree,
+  shareTreeAsync
 } from './space-sharing-copy.mjs'
 
 const roots: string[] = []
+
+describe('asynchronous immutable sharing', () => {
+  it('preserves read-only source files on the execution host', async () => {
+    const { root, source } = makeTree()
+    await makeTreeReadOnlyAsync(source)
+    const destination = path.join(root, 'async-copy')
+    await shareTreeAsync(source, destination)
+    expect(readFileSync(path.join(destination, 'nested', 'file'), 'utf8')).toBe('contents')
+    expect(statSync(path.join(destination, 'nested', 'file')).mode & 0o222).toBe(0)
+  })
+
+  it('removes partial copies before its Linux hardlink fallback', async () => {
+    const { root, source } = makeTree()
+    const destination = path.join(root, 'async-copy')
+    const reflink = async (_source: string, target: string) => {
+      mkdirSync(target)
+      writeFileSync(path.join(target, 'partial'), 'partial')
+      throw new Error('unsupported reflink')
+    }
+    expect(await shareTreeAsync(source, destination, { platform: 'linux', reflink })).toBe(
+      'hardlink'
+    )
+    expect(existsSync(path.join(destination, 'partial'))).toBe(false)
+    expect(statSync(path.join(destination, 'nested', 'file')).ino).toBe(
+      statSync(path.join(source, 'nested', 'file')).ino
+    )
+  })
+
+  it('keeps the event loop available while a sharing process is pending', async () => {
+    const { root, source } = makeTree()
+    let finish!: () => void
+    const pending = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    let completed = false
+    const sharing = shareTreeAsync(source, path.join(root, 'async-copy'), {
+      platform: 'darwin',
+      clone: async () => {
+        await pending
+      }
+    }).then(() => {
+      completed = true
+    })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(completed).toBe(false)
+    finish()
+    await sharing
+    expect(completed).toBe(true)
+  })
+})
 
 afterEach(() => {
   while (roots.length > 0) {
@@ -255,9 +307,10 @@ describe('relative symlinks', () => {
   for (const [name, copy] of [
     ['shareTree', shareTree],
     ['hardlinkTree', hardlinkTree],
-    ['copyPrivateTree', copyPrivateTree]
+    ['copyPrivateTree', copyPrivateTree],
+    ['shareTreeAsync', shareTreeAsync]
   ] as const) {
-    it(`${name} preserves a relative link without resolving it`, (context) => {
+    it(`${name} preserves a relative link without resolving it`, async (context) => {
       const { root, source } = makeTree()
       const linkTarget = path.join('nested', 'file')
       try {
@@ -270,7 +323,7 @@ describe('relative symlinks', () => {
         throw error
       }
       const destination = path.join(root, 'shared')
-      copy(source, destination)
+      await copy(source, destination)
       expect(readlinkSync(path.join(destination, 'relative-link'))).toBe(linkTarget)
       expect(readFileSync(path.join(destination, 'relative-link'), 'utf8')).toBe('contents')
     })

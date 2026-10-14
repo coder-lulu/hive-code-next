@@ -32,6 +32,9 @@ describe('immutable upstream compatibility baseline acquisition', () => {
     )
   })
   it.each([
+    ['v1.4.224', '2bb20586ebc39d605e16d95f57420e20a16e7485'],
+    ['v1.4.190', '6e4f817101daa18d82824b69243d9079baa9c416'],
+    ['v1.4.222', '4bb6f2072b07c1f0664b809551f77754700570e4'],
     ['v1.4.205', '11aba8bdc5e492d3ba01fc7fe333495ace74128f'],
     ['v1.4.211', '5534462b50c660888487a2108700d4cf284270db'],
     ['v1.4.214', '7468e9cccb35a8494f76dc95a37627121113ee80'],

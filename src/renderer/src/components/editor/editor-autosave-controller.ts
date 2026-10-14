@@ -110,8 +110,10 @@ export function attachEditorAutosaveController(store: AppStoreApi): () => void {
         currentContext.expectedSshTargetId !== originalContext.expectedSshTargetId ||
         currentContext.expectedSshConnectionGeneration !==
           originalContext.expectedSshConnectionGeneration ||
-        currentContext.settings?.activeRuntimeEnvironmentId !==
-          originalContext.settings?.activeRuntimeEnvironmentId
+        currentContext.target.kind !== originalContext.target.kind ||
+        (currentContext.target.kind === 'environment' &&
+          originalContext.target.kind === 'environment' &&
+          currentContext.target.environmentId !== originalContext.target.environmentId)
       ) {
         return
       }

@@ -1,3 +1,4 @@
+import { setAppEnvironment, getAppEnvironment } from '../../shared/app-environment'
 import { vi } from 'vitest'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -139,6 +140,10 @@ export function setPlatform(platform: NodeJS.Platform): void {
 
 /** Shared `beforeEach` body: fresh platform, module registry, and temp homes. */
 export function resetRuntimeAuthTestState(): void {
+  setAppEnvironment({
+    ...getAppEnvironment(),
+    getPath: (name) => (name === 'userData' ? testState.userDataDir : testState.fakeHomeDir)
+  })
   setPlatform('darwin')
   vi.resetModules()
   vi.clearAllMocks()

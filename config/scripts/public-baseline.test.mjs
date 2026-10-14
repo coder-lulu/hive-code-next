@@ -1,8 +1,8 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createGit } from './upstream-sync-checkpoint.mjs'
-import { collectImportedAdaptations } from './public-baseline.mjs'
+import { collectImportedAdaptations, readPublicBaseline } from './public-baseline.mjs'
 import { collectIntakeReport } from './upstream-intake.mjs'
 import { prepareUpstreamTreeSync } from './upstream-tree-sync.mjs'
 
@@ -300,13 +300,9 @@ describe('immutable public root provenance', () => {
     f.write('new-fix.json', { fixed: true })
     const upstream = f.commit()
     f.git(['checkout', 'hivecode/main-next'])
-    mkdirSync(path.join(f.cwd, 'docs'), { recursive: true })
-    f.git(['update-index', '--add', '--cacheinfo', '160000', f.receipt.sourceCommit, 'docs'])
-    const tree = f.git(['write-tree']).trim()
-    const target = f
-      .git(['commit-tree', tree, '-m', 'Initial public fixture with private docs'])
-      .trim()
-    f.git(['update-ref', 'refs/heads/hivecode/main-next', target])
+    // fixture() already owns the public root and its exact private-document gitlink.
+    const target = f.root
+    expect(f.git(['rev-parse', `${target}:docs`]).trim()).toBe(f.receipt.sourceCommit)
     prepareUpstreamTreeSync({ cwd: f.cwd, target, upstream })
     const head = f.commit()
     const options = { cwd: f.cwd, stateRef: target, upstream, head }
@@ -322,3 +318,72 @@ describe('immutable public root provenance', () => {
     )
   }, 60000)
 })
+
+it('batches immutable metadata presence reads without sharing results across invocations', () => {
+  const f = fixture()
+  const git = vi.fn(f.git)
+  const first = readPublicBaseline({ git, head: f.root })
+  expect(first.currentLedger).toEqual(first.initialLedger)
+  expect(first.currentLedger).not.toBe(first.initialLedger)
+  expect(git.mock.calls.filter(([args]) => args[1] === 'ls-tree')).toHaveLength(1)
+  expect(git.mock.calls.filter(([args]) => args[1] === 'show')).toHaveLength(3)
+  expect(git.mock.calls.filter(([args]) => args[1] === 'rev-parse')).toHaveLength(1)
+  readPublicBaseline({ git, head: f.root })
+  expect(git.mock.calls.filter(([args]) => args[1] === 'ls-tree')).toHaveLength(2)
+  expect(git.mock.calls.filter(([args]) => args[1] === 'show')).toHaveLength(6)
+  expect(git.mock.calls.filter(([args]) => args[1] === 'rev-parse')).toHaveLength(2)
+  const poison = f.git(['hash-object', '-w', '--stdin'], '{"schemaVersion":-1}').trim()
+  f.git(['replace', f.receipt.ledgerBlob, poison])
+  f.git(['replace', f.root, f.receipt.sourceCommit])
+  try {
+    expect(f.git(['show', `${f.root}:config/upstream-change-ledger.json`])).toContain(
+      '"schemaVersion":-1'
+    )
+    expect(f.git(['rev-list', '--max-parents=0', f.root]).trim()).not.toBe(f.root)
+    expect(readPublicBaseline({ git: f.git, head: f.root })).toEqual(first)
+  } finally {
+    f.git(['replace', '-d', f.root])
+    f.git(['replace', '-d', f.receipt.ledgerBlob])
+  }
+  let fail = true
+  const failing = vi.fn((args, input) => {
+    if (fail && args[1] === 'show') {
+      fail = false
+      throw new Error('object read refused')
+    }
+    return f.git(args, input)
+  })
+  expect(() => readPublicBaseline({ git: failing, head: f.root })).toThrow('object read refused')
+  expect(readPublicBaseline({ git: failing, head: f.root })).toEqual(first)
+}, 60000)
+
+it.each(['malformed', 'tree', 'missing', 'read-error'])(
+  'preserves metadata rejection for %s',
+  (kind) => {
+    const sha = 'a'.repeat(40)
+    const file = 'config/open-source-baseline.json'
+    const git = vi.fn((args) => {
+      if (args[1] === 'rev-parse' || args[1] === 'rev-list') {
+        return `${sha}\n`
+      }
+      if (args[1] === 'ls-tree') {
+        return kind === 'missing'
+          ? ''
+          : `${kind === 'tree' ? '040000 tree' : '100644 blob'} ${sha}\t${file}\0`
+      }
+      if (args[1] === 'show') {
+        if (kind === 'read-error') {
+          throw new Error('object read refused')
+        }
+        return kind === 'tree' ? `tree ${sha}\n` : '{'
+      }
+      throw new Error('unexpected metadata command')
+    })
+    if (kind === 'missing') {
+      expect(readPublicBaseline({ git, head: sha })).toBeNull()
+      expect(git.mock.calls.some(([args]) => args[1] === 'show')).toBe(false)
+    } else {
+      expect(() => readPublicBaseline({ git, head: sha })).toThrow()
+    }
+  }
+)

@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, rmSync } from 'node:fs'
 import { join, resolve, sep } from 'node:path'
-import { z } from 'zod'
+import { stateSchema } from './state-schema'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { getAppEnvironment } from '../../shared/app-environment'
 import { writeSecureFile } from '../../shared/secure-file'
@@ -20,20 +20,6 @@ const MAX_INLINE_AUTH_BASELINES = 64
 const MAX_INLINE_AUTH_BYTES = 64 * 1024
 
 type InlineAuthBaseline = { value: string; selections: Set<string> }
-
-const stateSchema = z.object({
-  accounts: z
-    .array(
-      z.object({
-        id: z.uuid(),
-        label: z.string().min(1).max(120),
-        integrations: z.array(z.string()).max(64),
-        createdAt: z.number()
-      })
-    )
-    .max(64),
-  activeAccountId: z.uuid().nullable()
-})
 
 export class ManagedDataAccountService {
   private pending: Promise<unknown> = Promise.resolve()
@@ -153,14 +139,16 @@ export class ManagedDataAccountService {
     if (!state.activeAccountId) {
       return {}
     }
-    return this.profileEnvironment(provider, state.activeAccountId)
+    return this.environmentForAccount(provider, state.activeAccountId)
   }
 
   transcriptEnvironments(provider: ManagedDataAccountProvider): Record<string, string>[] {
     const state = this.list(provider)
     const selected = state.accounts.filter((account) => account.id === state.activeAccountId)
     const others = state.accounts.filter((account) => account.id !== state.activeAccountId)
-    return [...selected, ...others].map((account) => this.profileEnvironment(provider, account.id))
+    return [...selected, ...others].map((account) =>
+      this.environmentForAccount(provider, account.id)
+    )
   }
 
   captureOriginalEnvironment(
@@ -218,7 +206,7 @@ export class ManagedDataAccountService {
     this.inlineAuthBaselines.clear()
   }
 
-  private profileEnvironment(
+  environmentForAccount(
     provider: ManagedDataAccountProvider,
     accountId: string
   ): Record<string, string> {

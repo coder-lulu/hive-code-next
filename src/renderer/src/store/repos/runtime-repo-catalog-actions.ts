@@ -6,14 +6,11 @@ import { applyManualRepoOrder } from '../../../../shared/manual-repo-order'
 import { retainValidFilterRepoIds } from '../slices/repo-filter-selection'
 import { readRuntimeWorktreeVisibilitySnapshot } from '../slices/worktree-visibility-owner-settings'
 import { getRepoHostIdentity } from '../slices/repo-host-identity'
-import { getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { filterSetupScriptPromptDismissalsToValidRepos } from '@/lib/setup-script-prompt'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { isRemovedRuntimeHostId } from '../slices/stale-runtime-host-rows'
-import { getEnvironmentSshStateGeneration } from '../slices/runtime-environment-ssh'
-import { getRuntimeEnvironmentConnectionGeneration } from '../slices/runtime-status'
+import { claimHostCatalogFence, isHostCatalogFenceCurrent } from '../host-catalog-fencing'
 import type { RepoSlice } from './repo-state'
-import { claimRepoCatalogGeneration, isLatestRepoCatalogGeneration } from './repo-catalog-fencing'
 import {
   filterSetupsForPrunedRepoRows,
   mergeFetchedRepoCatalog,
@@ -21,7 +18,7 @@ import {
   reconcileReadoptedSshWorktreeState,
   reconcileSupersededSshRepos
 } from './repo-catalog-merge'
-import { getRuntimeTargetHostId } from '../runtime-target-host'
+import { getRuntimeTargetHostId } from '../../runtime/runtime-client-target'
 import { mergeFetchedProjectCompatibilityForHost } from '../projects/project-compatibility-host-merge'
 import { scheduleSafeAutoForkSync } from './safe-auto-fork-sync'
 import { loadRepoCatalog } from './repo-catalog-load'
@@ -30,62 +27,29 @@ import {
   retireRepoCatalogWorktreeMetadata
 } from './repo-catalog-worktree-removal'
 
-export const runtimeRepoFetchGenerationByEnvironment = new Map<string, number>()
-const MAX_RUNTIME_REPO_FETCH_GENERATIONS = 512
-let runtimeRepoFetchGenerationSequence = 0
-
-function pruneRuntimeRepoFetchGenerations(): void {
-  while (runtimeRepoFetchGenerationByEnvironment.size > MAX_RUNTIME_REPO_FETCH_GENERATIONS) {
-    const oldest = runtimeRepoFetchGenerationByEnvironment.keys().next()
-    if (oldest.done) {
-      return
-    }
-    runtimeRepoFetchGenerationByEnvironment.delete(oldest.value)
-  }
-}
-
 export function createRuntimeRepoCatalogActions(
   set: Parameters<StateCreator<AppState>>[0],
   get: Parameters<StateCreator<AppState>>[1]
 ): Pick<RepoSlice, 'fetchRuntimeEnvironmentRepos'> {
   return {
     fetchRuntimeEnvironmentRepos: async (environmentId) => {
-      const requestGeneration = ++runtimeRepoFetchGenerationSequence
-      runtimeRepoFetchGenerationByEnvironment.set(environmentId, requestGeneration)
-      pruneRuntimeRepoFetchGenerations()
-      const connectionGeneration = getEnvironmentSshStateGeneration(environmentId)
-      const runtimeConnectionGeneration = getRuntimeEnvironmentConnectionGeneration(environmentId)
-      let catalogGeneration = 0
-      set((s) => {
-        catalogGeneration = s.reposFetchGeneration + 1
-        return { reposFetchGeneration: catalogGeneration }
-      })
+      set((s) => ({ reposFetchGeneration: s.reposFetchGeneration + 1 }))
       const target = { kind: 'environment' as const, environmentId }
       const targetHostId = getRuntimeTargetHostId(target)
-      claimRepoCatalogGeneration(get, targetHostId, catalogGeneration)
+      const fence = claimHostCatalogFence(get, 'repos', target)
       try {
         const [catalog, visibilitySnapshot] = await Promise.all([
-          loadRepoCatalog(target, catalogGeneration, set, get),
+          loadRepoCatalog(target, fence, set, get),
           readRuntimeWorktreeVisibilitySnapshot(environmentId)
         ])
         const visibilityDefaults = visibilitySnapshot.defaults
-        if (
-          runtimeRepoFetchGenerationByEnvironment.get(environmentId) !== requestGeneration ||
-          !isLatestRepoCatalogGeneration(get, targetHostId, catalogGeneration) ||
-          getEnvironmentSshStateGeneration(environmentId) !== connectionGeneration ||
-          getRuntimeEnvironmentConnectionGeneration(environmentId) !== runtimeConnectionGeneration
-        ) {
+        if (!isHostCatalogFenceCurrent(get, fence)) {
           return []
         }
         let finalizedHostRepos: Repo[] = []
         let removedByRepo = new Map<string, string[]>()
         set((s) => {
-          if (
-            runtimeRepoFetchGenerationByEnvironment.get(environmentId) !== requestGeneration ||
-            !isLatestRepoCatalogGeneration(get, targetHostId, catalogGeneration) ||
-            getEnvironmentSshStateGeneration(environmentId) !== connectionGeneration ||
-            getRuntimeEnvironmentConnectionGeneration(environmentId) !== runtimeConnectionGeneration
-          ) {
+          if (!isHostCatalogFenceCurrent(get, fence)) {
             return s
           }
           // Why: skip merging a runtime env removed while this Connect-flow fetch was in flight, so purged repos aren't re-added (#8881).
@@ -135,8 +99,7 @@ export function createRuntimeRepoCatalogActions(
                   }
                 }),
             ...(visibilityDefaults !== undefined && s.settings
-              ? getActiveRuntimeTarget(s.settings).kind === 'environment' &&
-                s.settings.activeRuntimeEnvironmentId === environmentId
+              ? s.settings.activeRuntimeEnvironmentId === environmentId
                 ? visibilityDefaults
                   ? {
                       settings: {
@@ -171,7 +134,7 @@ export function createRuntimeRepoCatalogActions(
             )
           }
         })
-        scheduleSafeAutoForkSync(get, finalizedHostRepos)
+        scheduleSafeAutoForkSync(finalizedHostRepos)
         retireRepoCatalogWorktreeMetadata(targetHostId, removedByRepo)
         return finalizedHostRepos
       } catch (err) {

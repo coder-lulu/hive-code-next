@@ -46,7 +46,7 @@ describe('agent state rules bundle build', () => {
     const bundledOnly = BUNDLED_AGENT_STATE_RULE_FILES.filter(
       (file) => !LIVE_UPDATABLE_AGENT_STATE_RULE_IDS.has(file.id)
     )
-    expect(bundledOnly.map((file) => file.id)).toEqual(['gemini', 'opencode2', 'pi'])
+    expect(bundledOnly.map((file) => file.id)).toEqual(['dsh', 'gemini', 'opencode2', 'pi'])
     for (const file of bundledOnly) {
       const text = JSON.stringify({
         version: BUNDLED_AGENT_STATE_RULES_VERSION + 1,

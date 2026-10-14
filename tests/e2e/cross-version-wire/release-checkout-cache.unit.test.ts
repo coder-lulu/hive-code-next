@@ -7,6 +7,7 @@ import {
   REPO_ROOT,
   type CheckoutStagingContext
 } from './release-checkout'
+import { CHECKOUT_FORMAT } from './release-checkout-publication'
 
 const fixture = vi.hoisted(() => ({ files: new Map<string, string>(), commit: '1'.repeat(40) }))
 
@@ -51,11 +52,11 @@ vi.mock('node:fs/promises', () => ({
 
 const REF = 'fixture-revision'
 const COMMIT = '1'.repeat(40)
-const cacheIdentity = join(REF, `${COMMIT}-format-7`)
+const cacheIdentity = join(REF, `${COMMIT}-format-${CHECKOUT_FORMAT}`)
 const newRoot = join(REPO_ROOT, 'logs', 'cross-version-checkouts', cacheIdentity)
 const oldRoot = join(REPO_ROOT, 'tests', 'e2e', '.cross-version-checkouts', cacheIdentity)
 
-function seed(root: string, commit = COMMIT, format = 7): void {
+function seed(root: string, commit = COMMIT, format = CHECKOUT_FORMAT): void {
   fixture.files.set(join(root, 'checkout-stamp.json'), JSON.stringify({ commit, format }))
   fixture.files.set(join(root, 'src', 'shared', 'terminal-stream-protocol.ts'), 'verified fixture')
 }
@@ -78,7 +79,7 @@ describe('release checkout writable cache boundary', () => {
     expect(checkout.root).toBe(newRoot)
     expect(fs.rename).toHaveBeenCalledWith(expect.any(String), newRoot)
     expect(fixture.files.get(join(newRoot, 'checkout-stamp.json'))).toBe(
-      `${JSON.stringify({ commit: COMMIT, format: 7 }, null, 2)}\n`
+      `${JSON.stringify({ commit: COMMIT, format: CHECKOUT_FORMAT }, null, 2)}\n`
     )
   })
 
@@ -95,15 +96,20 @@ describe('release checkout writable cache boundary', () => {
     expect(fs.rename).toHaveBeenCalledWith(expect.any(String), newRoot)
   })
 
-  it('reuses a verified historical checkout without any cache mutations', async () => {
+  it('leaves a verified historical checkout untouched and creates the owned logs cache', async () => {
     seed(oldRoot)
-    const before = [...fixture.files]
-    const checkout = await materializeReleaseCheckout(REF)
-    expect(checkout.root).toBe(oldRoot)
-    expect([...fixture.files]).toEqual(before)
-    for (const mutation of [fs.mkdir, fs.mkdtemp, fs.writeFile, fs.rename, fs.rm, lock]) {
-      expect(mutation).not.toHaveBeenCalled()
-    }
+    const oldStamp = fixture.files.get(join(oldRoot, 'checkout-stamp.json'))
+    const checkout = await materializeReleaseCheckout(REF, {
+      testHooks: { populateStaging: populate }
+    })
+    expect(checkout.root).toBe(newRoot)
+    expect(fixture.files.get(join(oldRoot, 'checkout-stamp.json'))).toBe(oldStamp)
+    expect(fixture.files.get(join(oldRoot, 'src', 'shared', 'terminal-stream-protocol.ts'))).toBe(
+      'verified fixture'
+    )
+    expect(fs.readFile).not.toHaveBeenCalledWith(join(oldRoot, 'checkout-stamp.json'), 'utf8')
+    expect(fs.rm).not.toHaveBeenCalledWith(oldRoot, expect.anything())
+    expect(fs.rename).toHaveBeenCalledWith(expect.any(String), newRoot)
   })
 
   it.each([
@@ -144,43 +150,49 @@ describe('release checkout writable cache boundary', () => {
 
   describe('declared aliases of one immutable upstream commit', () => {
     const pinnedCommit = '5534462b50c660888487a2108700d4cf284270db'
-    const aliasIdentity = join('v1.4.211', `${pinnedCommit}-format-7`)
+    const aliasIdentity = join('v1.4.211', `${pinnedCommit}-format-${CHECKOUT_FORMAT}`)
     const aliasRoot = join(REPO_ROOT, 'logs', 'cross-version-checkouts', aliasIdentity)
     beforeEach(() => {
       fixture.commit = pinnedCommit
     })
 
     it.each(['logs', 'historical'] as const)(
-      'reuses a verified %s release label for an exact SHA without extracting or locking',
+      'leaves a verified %s release label untouched and uses the requested exact SHA',
       async (location) => {
         const root =
           location === 'logs'
             ? aliasRoot
             : join(REPO_ROOT, 'tests', 'e2e', '.cross-version-checkouts', aliasIdentity)
         seed(root, pinnedCommit)
-        const before = [...fixture.files]
-        const checkout = await materializeReleaseCheckout(pinnedCommit)
+        const oldStamp = fixture.files.get(join(root, 'checkout-stamp.json'))
+        const checkout = await materializeReleaseCheckout(pinnedCommit, {
+          testHooks: { populateStaging: populate }
+        })
+        const exactRoot = join(
+          REPO_ROOT,
+          'logs',
+          'cross-version-checkouts',
+          pinnedCommit,
+          `${pinnedCommit}-format-${CHECKOUT_FORMAT}`
+        )
         expect(checkout).toMatchObject({
           ref: pinnedCommit,
           commit: pinnedCommit,
-          label: 'v1.4.211',
-          root
+          label: pinnedCommit,
+          root: exactRoot
         })
-        expect([...fixture.files]).toEqual(before)
-        expect(fs.access).toHaveBeenCalledWith(
-          join(root, 'src/shared/terminal-stream-protocol.ts'),
-          expect.any(Number)
-        )
-        for (const mutation of [fs.mkdir, fs.mkdtemp, fs.writeFile, fs.rename, fs.rm, lock]) {
-          expect(mutation).not.toHaveBeenCalled()
-        }
+        expect(fixture.files.get(join(root, 'checkout-stamp.json'))).toBe(oldStamp)
+        expect(fs.readFile).not.toHaveBeenCalledWith(join(root, 'checkout-stamp.json'), 'utf8')
+        expect(fs.rm).not.toHaveBeenCalledWith(root, expect.anything())
+        expect(fs.rename).toHaveBeenCalledWith(expect.any(String), exactRoot)
+        expect(lock).toHaveBeenCalledWith(exactRoot, expect.any(Object))
       }
     )
 
     it.each([
-      { kind: 'commit', commit: COMMIT, format: 7, wire: true },
+      { kind: 'commit', commit: COMMIT, format: CHECKOUT_FORMAT, wire: true },
       { kind: 'format', commit: pinnedCommit, format: 5, wire: true },
-      { kind: 'wire surface', commit: pinnedCommit, format: 7, wire: false }
+      { kind: 'wire surface', commit: pinnedCommit, format: CHECKOUT_FORMAT, wire: false }
     ])(
       'rejects an alias with a mismatched $kind without repairing it',
       async ({ commit, format, wire }) => {
@@ -198,7 +210,7 @@ describe('release checkout writable cache boundary', () => {
             'logs',
             'cross-version-checkouts',
             pinnedCommit,
-            `${pinnedCommit}-format-7`
+            `${pinnedCommit}-format-${CHECKOUT_FORMAT}`
           )
         )
         expect(fixture.files.get(join(aliasRoot, 'checkout-stamp.json'))).toBe(oldStamp)
@@ -213,10 +225,12 @@ describe('release checkout writable cache boundary', () => {
         cacheRoot,
         testHooks: { populateStaging: populate }
       })
-      expect(checkout.root).toBe(join(cacheRoot, pinnedCommit, `${pinnedCommit}-format-7`))
+      expect(checkout.root).toBe(
+        join(cacheRoot, pinnedCommit, `${pinnedCommit}-format-${CHECKOUT_FORMAT}`)
+      )
       expect(fs.readFile).not.toHaveBeenCalledWith(join(aliasRoot, 'checkout-stamp.json'), 'utf8')
       expect(fixture.files.get(join(aliasRoot, 'checkout-stamp.json'))).toBe(
-        JSON.stringify({ commit: pinnedCommit, format: 7 })
+        JSON.stringify({ commit: pinnedCommit, format: CHECKOUT_FORMAT })
       )
     })
   })

@@ -1,4 +1,4 @@
-import type { RpcClient } from './rpc-client'
+import type { RpcClient } from './rpc-client-contract'
 import type { ConnectionState } from './types'
 
 // Why: a replacement session publishes these to nobody until migrateTo binds it, so a

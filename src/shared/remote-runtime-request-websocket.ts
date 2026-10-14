@@ -7,6 +7,7 @@ import {
   remoteRuntimeConnectFailureMessage,
   remoteRuntimeConnectOptions
 } from './remote-runtime-connect-bound'
+import { REMOTE_RUNTIME_MAX_WEBSOCKET_FRAME_BYTES } from './remote-runtime-memory-limits'
 import {
   invalidRemoteRuntimeResponseError,
   remoteRuntimeUnavailableError
@@ -22,6 +23,8 @@ export type RemoteRuntimeWebSocketCallbacks = {
   onClose: (ws: WebSocket, code: number, reason: Buffer) => void
   onError: (ws: WebSocket, error: RemoteRuntimeClientError) => void
   onTextFrame: (ws: WebSocket, frame: string) => void
+  // Why optional: request sockets treat a binary frame as a protocol error; a relay forwards it.
+  onBinaryFrame?: (ws: WebSocket, frame: Uint8Array<ArrayBufferLike>) => void
   // Why: protocol-level pongs (and server heartbeat pings) are the liveness
   // signal for detecting half-open tunnels that never deliver `close` (#7718).
   onPong?: (ws: WebSocket) => void
@@ -53,6 +56,10 @@ export function openRemoteRuntimeWebSocket(
   }
   const onClose = (code: number, reason: Buffer): void => callbacks.onClose(ws, code, reason)
   const onMessage = (data: WebSocket.RawData, isBinary: boolean): void => {
+    if (isBinary && callbacks.onBinaryFrame && Buffer.isBuffer(data)) {
+      callbacks.onBinaryFrame(ws, new Uint8Array(data))
+      return
+    }
     if (isBinary) {
       callbacks.onError(
         ws,
@@ -120,7 +127,14 @@ function createSocket(
   try {
     return {
       ok: true,
-      ws: new WebSocket(pairing.endpoint, remoteRuntimeConnectOptions(undefined, connectTimeoutMs)),
+      // Why: no runtime frame exceeds this, so a larger one is a broken peer, not a payload to buffer.
+      ws: new WebSocket(
+        pairing.endpoint,
+        remoteRuntimeConnectOptions(
+          { maxPayload: REMOTE_RUNTIME_MAX_WEBSOCKET_FRAME_BYTES },
+          connectTimeoutMs
+        )
+      ),
       session
     }
   } catch (error) {

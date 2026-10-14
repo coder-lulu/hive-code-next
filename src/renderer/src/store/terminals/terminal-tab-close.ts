@@ -18,6 +18,7 @@ import { omitUnverifiedPtyLossTabIds } from './terminal-unverified-pty-loss'
 import { removePaneKeysByTabPrefix } from '../slices/agent-status-pane-keyed-records'
 import { omitRecordKeys } from '../slices/worktrees/teardown/record-key-omission'
 import { deleteNativeChatComposerDraftsForTab } from '@/components/native-chat/native-chat-composer-draft-store'
+import { dropNativeChatPendingAttachmentsForTab } from '@/components/native-chat/native-chat-pending-attachment-cache'
 import { noteAgentLaunchPaneClosedByUser } from '@/lib/agent-launch-pane-closes'
 
 export function createTerminalTabCloseActions(
@@ -120,9 +121,6 @@ export function createTerminalTabCloseActions(
         const nextDeferredSshSessionIdsByTabId = omitByTabId(s.deferredSshSessionIdsByTabId)
         const nextPendingReconnectPtyIdByTabId = omitByTabId(s.pendingReconnectPtyIdByTabId)
         const nextRuntimePaneTitlesByTabId = omitByTabId(s.runtimePaneTitlesByTabId)
-        const nextDirectSshPaneRetryByTabId = omitByTabId(s.directSshPaneRetryByTabId)
-        const nextDirectSshLivePtyBindingByTabId = omitByTabId(s.directSshLivePtyBindingByTabId)
-        const nextDirectSshPaneRetryHistoryByTabId = omitByTabId(s.directSshPaneRetryHistoryByTabId)
         const nextUnverifiedPtyLossTabIds = omitUnverifiedPtyLossTabIds(s.unverifiedPtyLossTabIds, [
           tabId
         ])
@@ -207,9 +205,6 @@ export function createTerminalTabCloseActions(
           deferredSshSessionIdsByTabId: nextDeferredSshSessionIdsByTabId,
           pendingReconnectPtyIdByTabId: nextPendingReconnectPtyIdByTabId,
           runtimePaneTitlesByTabId: nextRuntimePaneTitlesByTabId,
-          directSshPaneRetryByTabId: nextDirectSshPaneRetryByTabId,
-          directSshLivePtyBindingByTabId: nextDirectSshLivePtyBindingByTabId,
-          directSshPaneRetryHistoryByTabId: nextDirectSshPaneRetryHistoryByTabId,
           ...(nextUnverifiedPtyLossTabIds !== s.unverifiedPtyLossTabIds
             ? { unverifiedPtyLossTabIds: nextUnverifiedPtyLossTabIds }
             : {}),
@@ -236,7 +231,6 @@ export function createTerminalTabCloseActions(
           expandedPaneByTabId: nextExpanded,
           canExpandPaneByTabId: nextCanExpand,
           terminalLayoutsByTabId: nextLayouts,
-          pendingDirectSshLayoutEditsByTabId: omitByTabId(s.pendingDirectSshLayoutEditsByTabId),
           localOnlyScrollbackByTabId: nextLocalOnlyScrollback,
           pendingStartupByTabId: nextPendingStartupByTabId,
           automaticAgentResumeClaimsByTabId: nextAutomaticAgentResumeClaimsByTabId,
@@ -272,6 +266,7 @@ export function createTerminalTabCloseActions(
       // workspace is removed in Orca; drafts have no budget that retires them.
       if (closeReason === 'user') {
         deleteNativeChatComposerDraftsForTab(tabId)
+        dropNativeChatPendingAttachmentsForTab(tabId)
       }
       // Why shared with the paired snapshot apply: every path that removes a tab owes it the same sweep, and a second copy of the list is how one path silently misses a new entry.
       sweepRetiredTerminalTabState(get(), tabId, closingWorktreeId)

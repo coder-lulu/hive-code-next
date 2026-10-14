@@ -7,6 +7,12 @@ import { createAfterPackFixture, seedBundledRipgrep } from './electron-builder-t
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
 const SRC_MAIN_DIR = join(REPO_ROOT, 'src', 'main')
+const MAIN_BUILD_ENTRY_POINTS_PATH = join(
+  REPO_ROOT,
+  'config',
+  'build-plugins',
+  'main-build-entry-points.ts'
+)
 
 const require = createRequire(import.meta.url)
 const electronBuilderConfig = require('../electron-builder.config.cjs')
@@ -179,19 +185,7 @@ describe('electron-builder config', () => {
     )
   })
 
-  it('unpacks the replaceable WSL transcript filesystem process entry', async () => {
-    expect(electronBuilderConfig.asarUnpack).toContain(
-      'out/main/wsl-transcript-fs-process-entry.js'
-    )
 
-    const viteConfig = await readFile(join(REPO_ROOT, 'electron.vite.config.ts'), 'utf8')
-    expect(viteConfig).toMatch(/'wsl-transcript-fs-process-entry':\s*resolve\(/)
-  })
-
-  // Why: the scanner service is forked with ELECTRON_RUN_AS_NODE, so asar is
-  // invisible to it and a packed worker entry fails closed — dropping every
-  // OpenCode session in packaged builds while dev stays green. Three legs must
-  // agree on the filename, so all three are read rather than hardcoded.
   it('unpacks the foreign SQLite reader entry the scanner service runs OpenCode reads on', async () => {
     const entryPathSource = await readFile(
       join(SRC_MAIN_DIR, 'foreign-sqlite-readers', 'foreign-sqlite-reader-entry-path.ts'),
@@ -210,7 +204,10 @@ describe('electron-builder config', () => {
     // longer exists.
     const viteConfig = await readFile(join(REPO_ROOT, 'electron.vite.config.ts'), 'utf8')
     expect(viteConfig).toContain("entryFileNames: '[name].js'")
-    expect(viteConfig).toMatch(new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`))
+    const entryPoints = await readFile(MAIN_BUILD_ENTRY_POINTS_PATH, 'utf8')
+    expect(entryPoints).toMatch(
+      new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`)
+    )
   })
 
   it('keeps the worker-thread hang watchdog inside app.asar', () => {
@@ -683,3 +680,4 @@ describe('electron-builder config', () => {
     })
   })
 })
+

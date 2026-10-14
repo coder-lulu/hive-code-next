@@ -62,7 +62,7 @@ describe('independent paired runtime SSH access persistence', () => {
       expectedEnvironment: prepare(expectedEnvironment),
       requestId: 'link-request',
       verifiedRuntimeId: 'host-runtime',
-      verifiedPairing,
+      verifiedConnection: (verifiedPairing),
       tunnel,
       now: 90
     })
@@ -153,7 +153,7 @@ describe('independent paired runtime SSH access persistence', () => {
         expectedEnvironment: prepared,
         requestId: 'link-request',
         verifiedRuntimeId: 'host-runtime',
-        verifiedPairing: wrongPairing,
+        verifiedConnection: (wrongPairing),
         tunnel
       })
     ).toThrow('did not verify')
@@ -236,7 +236,7 @@ describe('independent paired runtime SSH access persistence', () => {
       expectedEnvironment: prepared,
       requestId: 'link-request',
       verifiedRuntimeId: 'host-runtime',
-      verifiedPairing,
+      verifiedConnection: (verifiedPairing),
       tunnel
     }
     expect(() =>

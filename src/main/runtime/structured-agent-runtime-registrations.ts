@@ -1,22 +1,33 @@
 // Each runtime registration owns its adapter, location support and account resolution at start.
 
-import { createCodexStructuredLaunchResolver } from '../codex/codex-structured-launch-resolution'
+import { withSupportedCodexCli } from '../codex/codex-cli-installation-error'
+import { codexStructuredLaunchPart } from '../codex/codex-structured-launch-resolution'
+import { claudeStructuredLaunchPart } from '../claude/claude-structured-launch-resolution'
 import { supportsCodexStructuredLocation } from '../codex/codex-structured-location-support'
 import { supportsClaudeStructuredLocation } from '../claude/claude-structured-location-support'
 import { supportsSupervisedProviderChildLocation } from '../provider-process/supervised-provider-child-location'
 import { applyStructuredCodexWorkspaceTrust } from '../agent-workspace-trust-spawn'
 import type { AgentSessionExecutionLocation } from '../../shared/agent-session-record'
+import {
+  agentSessionAccountHome,
+  type AgentSessionAccountHome
+} from '../../shared/agent-session-account-home'
 import { CodexStructuredSessionAdapter } from '../codex/codex-structured-session-adapter'
 import { CODEX_STRUCTURED_AGENT } from '../codex/codex-structured-agent-definition'
 import { CLAUDE_STRUCTURED_AGENT } from '../claude/claude-structured-agent-definition'
-import type {
-  StructuredAgentSessionAdapter,
-  StructuredAgentSessionLifecycleEvent
+import { CLAUDE_CLI_CONVERSATIONS } from '../claude/claude-cli-conversations'
+import { CODEX_CLI_CONVERSATIONS } from '../codex/codex-cli-conversations'
+import type { StructuredAgentCliConversations } from '../native-chat/structured-agent-cli-conversations'
+import {
+  isAgentSessionPreSpawnError,
+  type StructuredAgentSessionAdapter,
+  type StructuredAgentSessionLifecycleEvent
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
+import type { StructuredAgentCommandSettings } from '../native-chat/structured-agent-command-resolution'
 import type { StructuredAgentDefinition } from '../native-chat/agent-session-wire/structured-agent-definition'
 import type { StructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-host'
-import { readClaudeManagedAccountGateSettings } from '../native-chat/claude-structured-managed-account-support'
 import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent-model-catalog-store'
+import { agentSessionAttachmentStoreRoot } from '../native-chat/agent-session-attachments/agent-session-attachment-references'
 import type { JournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database'
 import { replayJournal } from '../native-chat/agent-session-journal/journal-open'
 import type { AgentSessionRecordStore } from './agent-session-record-store'
@@ -27,15 +38,31 @@ import { createStructuredClaudeRuntimeAdapter } from './structured-claude-runtim
 import {
   resolveStructuredClaudeAccountHomePath,
   resolveStructuredCodexAccountHomePath,
-  resolveStructuredEnvAccountHomePath,
   type StructuredClaudeAccountHomeDeps,
   type StructuredCodexAccountHomeDeps
 } from './structured-agent-account-home'
 import { ACP_LAUNCH_SPECS, type AcpLaunchSpec } from '../acp/acp-launch-specs'
 import { acpStructuredAgentDefinition } from '../acp/acp-structured-agent-definitions'
 import { createAcpAgentConnection } from '../acp/acp-agent-connection'
-import { createAcpStructuredLaunchResolver } from '../acp/acp-structured-launch-resolution'
+import {
+  acpLaunchVersionSupported,
+  acpStructuredLaunchPart,
+  resolveAcpLaunchCommand
+} from '../acp/acp-structured-launch-resolution'
 import { AcpStructuredSessionAdapter } from '../acp/acp-structured-session-adapter'
+import { PI_RPC_RUNTIME_REGISTRATION } from '../pi/rpc-runtime-registration'
+import type { AgentModelCatalogDiscovery } from '../native-chat/agent-model-catalog/agent-model-catalog-discovery'
+import {
+  acpModelCatalogDiscovery,
+  claudeLaunchEnvOverlay,
+  claudeModelCatalogDiscovery,
+  codexModelCatalogDiscovery
+} from './structured-agent-model-catalog-discovery'
+import {
+  composeStructuredLaunch,
+  composeStructuredLaunchRead,
+  structuredAgentLaunchSources
+} from './structured-agent-launch-composition'
 
 /** What an agent's adapter is built from: the open store and the runtime around it. */
 export type StructuredAgentAdapterContext = {
@@ -76,31 +103,49 @@ export type StructuredAgentAccountHomeServices = {
   workspaceTrustSettings: () => Parameters<typeof applyStructuredCodexWorkspaceTrust>[0]['settings']
 }
 
-export type StructuredAgentRuntimeRegistration = {
+/** What a catalog probe is built from: the same runtime resolvers its sessions launch through. */
+export type StructuredAgentModelCatalogContext = Pick<
+  StructuredAgentAdapterContext,
+  'deps' | 'environment'
+>
+
+export type StructuredAgentRuntimeRegistration = StructuredAgentCliConversations & {
   definition: StructuredAgentDefinition
   createAdapter: (context: StructuredAgentAdapterContext) => StructuredAgentRuntimeAdapter
+  /** How this agent's models are listed before any session of it runs. Required: an agent that
+   *  cannot list says so, rather than being left out of the shared catalog. */
+  modelCatalog: (context: StructuredAgentModelCatalogContext) => AgentModelCatalogDiscovery
   /** Whether this agent's chats can run at `location`; answered without building the host. */
   supportsLocation: (location: AgentSessionExecutionLocation) => boolean
-  /** The account home a chat of this agent pins; see `StructuredAgentAccountHomeRequest`. */
-  resolveAccountHomePath: (
+  /** Whether the agent installed on this host runs a structured chat, asked at create with the
+   *  environment a launch starts from; absent when the location alone decides. */
+  supportsLaunch?: (input: {
+    cwd: string
+    env: Record<string, string>
+    commandSettings: StructuredAgentCommandSettings
+  }) => Promise<boolean>
+  /** The account a chat of this agent pins; see `StructuredAgentAccountHomeRequest`. */
+  resolveAccountHome: (
     request: StructuredAgentAccountHomeRequest,
     services: StructuredAgentAccountHomeServices
-  ) => Promise<string>
+  ) => Promise<AgentSessionAccountHome>
 }
 
 function createCodexAdapter(context: StructuredAgentAdapterContext): StructuredAgentRuntimeAdapter {
-  const { deps, store, followUps, host } = context
+  const { deps, followUps, host } = context
   return new CodexStructuredSessionAdapter({
-    resolveLaunch: createCodexStructuredLaunchResolver({
-      store,
-      resolveWorkspacePath: deps.resolveWorkspacePath,
-      resolveEnvironment: context.environment.resolveCodexEnvironment,
-      resolveLaunchArgs: () => deps.resolveLaunchArgs('codex'),
-      ...(deps.resolveCodexPermissionPolicy
-        ? { resolvePermissionPolicy: deps.resolveCodexPermissionPolicy }
-        : {}),
-      ...(deps.resolveCodexCommand ? { resolveCommand: deps.resolveCodexCommand } : {})
-    }),
+    resolveAccountKind: deps.resolveCodexAccountKind,
+    resolveLaunch: withSupportedCodexCli(
+      composeStructuredLaunch(
+        CODEX_STRUCTURED_AGENT,
+        structuredAgentLaunchSources(context),
+        codexStructuredLaunchPart({
+          resolveLaunchArgs: () => deps.resolveLaunchArgs('codex'),
+          ...(deps.resolveCodexCommand ? { resolveCommand: deps.resolveCodexCommand } : {})
+        })
+      ),
+      deps.readCodexInstallation
+    ),
     ...(deps.openCodexConnection ? { openConnection: deps.openCodexConnection } : {}),
     ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {}),
     modelCatalog: agentModelCatalogStore,
@@ -122,24 +167,25 @@ function createClaudeAdapter(
   context: StructuredAgentAdapterContext
 ): StructuredAgentRuntimeAdapter {
   const { deps, store, followUps, host } = context
+  const overlay = claudeLaunchEnvOverlay(deps).resolveEnv
   return createStructuredClaudeRuntimeAdapter({
     store,
     resolveWorkspacePath: deps.resolveWorkspacePath,
+    resolveLaunch: composeStructuredLaunch(
+      CLAUDE_STRUCTURED_AGENT,
+      structuredAgentLaunchSources(context),
+      claudeStructuredLaunchPart({
+        resolveLaunchArgs: () => deps.resolveLaunchArgs('claude'),
+        ...(deps.resolveClaudeCommand ? { resolveCommand: deps.resolveClaudeCommand } : {}),
+        resolveAuthPolicy: deps.resolveClaudeAuthPolicy,
+        attachmentDirectory: agentSessionAttachmentStoreRoot(deps.stateDirectory),
+        ...(deps.claudeCliFlags ? { cliFlags: deps.claudeCliFlags } : {})
+      })
+    ),
     ...(deps.resolveClaudeCommand ? { resolveClaudeCommand: deps.resolveClaudeCommand } : {}),
-    ...(deps.claudeThinkingDisplay ? { claudeThinkingDisplay: deps.claudeThinkingDisplay } : {}),
-    ...(deps.resolveClaudeLaunchEnv ? { resolveClaudeLaunchEnv: deps.resolveClaudeLaunchEnv } : {}),
-    resolveClaudeInheritedEnv: context.environment.resolveClaudeInheritedEnv,
-    resolveClaudeLaunchArgs: () => deps.resolveLaunchArgs('claude'),
-    resolveClaudeAuthPolicy: deps.resolveClaudeAuthPolicy,
-    ...(deps.resolveClaudePermissionMode
-      ? { resolveClaudePermissionMode: deps.resolveClaudePermissionMode }
-      : {}),
-    ...(deps.getClaudeManagedAccountGateSettings
-      ? {
-          readClaudeManagedAccountGate: () =>
-            readClaudeManagedAccountGateSettings(deps.getClaudeManagedAccountGateSettings!)
-        }
-      : {}),
+    ...(deps.claudeCliFlags ? { claudeCliFlags: deps.claudeCliFlags } : {}),
+    ...(overlay ? { resolveClaudeLaunchEnv: overlay } : {}),
+    resolveClaudeInheritedEnv: context.environment.resolveBaseEnvironment,
     onLifecycleEvent: context.deliverLifecycle,
     logger: deps.logger,
     onChildWorkEvidence: (sessionId, evidence) =>
@@ -147,8 +193,7 @@ function createClaudeAdapter(
     onDispatchSettledLate: followUps.onDispatchSettledLate,
     onSessionIdle: followUps.releaseUnansweredDispatches,
     ...(deps.openClaudeConnection ? { openClaudeConnection: deps.openClaudeConnection } : {}),
-    ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {}),
-    modelCatalog: agentModelCatalogStore
+    ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {})
   })
 }
 
@@ -156,25 +201,47 @@ function acpRegistration(spec: AcpLaunchSpec): StructuredAgentRuntimeRegistratio
   return {
     definition: acpStructuredAgentDefinition(spec),
     supportsLocation: (location) => supportsSupervisedProviderChildLocation(location),
-    resolveAccountHomePath: async ({ launchEnv }) =>
-      resolveStructuredEnvAccountHomePath({
-        launchEnv,
-        variable: spec.accountHomeVariable,
-        defaultPath: spec.defaultAccountHome
-      }),
+    ...(spec.supportsVersion
+      ? {
+          supportsLaunch: async ({ cwd, env, commandSettings }) => {
+            const launchEnv = { ...env, ...spec.env }
+            let command: string
+            try {
+              command = resolveAcpLaunchCommand(spec, launchEnv, { commandSettings })
+            } catch (error) {
+              // An unrunnable Command setting is the launch's refusal to state, not a terminal.
+              if (isAgentSessionPreSpawnError(error)) {
+                return true
+              }
+              throw error
+            }
+            return acpLaunchVersionSupported(spec, { command, cwd, env: launchEnv })
+          }
+        }
+      : {}),
+    resolveAccountHome: ({ launchEnv }) => spec.account.resolve({ launchEnv }),
+    modelCatalog: (context) => acpModelCatalogDiscovery(spec, context),
+    transcriptImport: null,
+    sessionHistory: spec.sessionHistory,
     createAdapter: (context) => {
-      const { deps, store, followUps } = context
+      const { deps, followUps } = context
+      const readJournal = (sessionId: string) =>
+        replayJournal(context.journalDatabase.db, sessionId)
+      const definition = acpStructuredAgentDefinition(spec)
+      const sources = structuredAgentLaunchSources(context)
+      const part = acpStructuredLaunchPart(spec, {
+        readJournal,
+        ...(deps.resolveAgentFullAccess ? { resolveFullAccess: deps.resolveAgentFullAccess } : {}),
+        logger: deps.logger
+      })
       return new AcpStructuredSessionAdapter({
         spec,
-        resolveLaunch: createAcpStructuredLaunchResolver(spec, {
-          store,
-          readJournal: (sessionId) => replayJournal(context.journalDatabase.db, sessionId),
-          resolveWorkspacePath: deps.resolveWorkspacePath,
-          resolveEnvironment: context.environment.resolveBaseEnvironment,
-          ...(deps.resolveAgentLaunchEnv ? { resolveLaunchEnv: deps.resolveAgentLaunchEnv } : {}),
-          ...(deps.resolveAgentFullAccess ? { resolveFullAccess: deps.resolveAgentFullAccess } : {})
-        }),
+        readJournal,
+        resolveLaunch: composeStructuredLaunch(definition, sources, part),
+        readLaunch: composeStructuredLaunchRead(definition, sources, part),
         connect: (launch, options) => createAcpAgentConnection(launch, options),
+        onChildWorkEvidence: (sessionId, evidence) =>
+          context.host()?.publishChildWorkEvidence(sessionId, evidence),
         ...(deps.readProcessStartTime ? { readProcessStartTime: deps.readProcessStartTime } : {}),
         onDispatchSettledLate: followUps.onDispatchSettledLate,
         logger: deps.logger,
@@ -210,22 +277,34 @@ async function resolveCodexAccountHomePath(
 
 export const STRUCTURED_AGENT_RUNTIME_REGISTRATIONS: readonly StructuredAgentRuntimeRegistration[] =
   [
+    PI_RPC_RUNTIME_REGISTRATION,
     {
       definition: CODEX_STRUCTURED_AGENT,
       createAdapter: createCodexAdapter,
+      modelCatalog: codexModelCatalogDiscovery,
+      ...CODEX_CLI_CONVERSATIONS,
       supportsLocation: (location) => supportsCodexStructuredLocation(location),
-      resolveAccountHomePath: resolveCodexAccountHomePath
+      resolveAccountHome: async (request, services) =>
+        agentSessionAccountHome(
+          CODEX_STRUCTURED_AGENT,
+          await resolveCodexAccountHomePath(request, services)
+        )
     },
     {
       definition: CLAUDE_STRUCTURED_AGENT,
       createAdapter: createClaudeAdapter,
+      modelCatalog: claudeModelCatalogDiscovery,
+      ...CLAUDE_CLI_CONVERSATIONS,
       supportsLocation: supportsClaudeStructuredLocation,
-      resolveAccountHomePath: async ({ launchEnv, location }, services) =>
-        resolveStructuredClaudeAccountHomePath({
-          launchEnv,
-          wslDistro: location?.wslDistro ?? null,
-          getClaudeConfigDirectory: services.getClaudeConfigDirectory
-        })
+      resolveAccountHome: async ({ launchEnv, location }, services) =>
+        agentSessionAccountHome(
+          CLAUDE_STRUCTURED_AGENT,
+          resolveStructuredClaudeAccountHomePath({
+            launchEnv,
+            wslDistro: location?.wslDistro ?? null,
+            getClaudeConfigDirectory: services.getClaudeConfigDirectory
+          })
+        )
     },
     ...ACP_LAUNCH_SPECS.map(acpRegistration)
   ]

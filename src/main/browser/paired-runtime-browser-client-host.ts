@@ -15,7 +15,7 @@ import { PairedRuntimeBrowserHostLease } from './paired-runtime-browser-host-lea
 type DispatcherLimits = Omit<DispatcherOptions, 'authority' | 'handler'>
 
 export type PairedRuntimeBrowserClientHostOptions = {
-  pairing: PairingOffer
+  connection: PairingOffer
   authorityRuntimeId: string
   browserHostClientId: string
   hostCapabilities: readonly string[]
@@ -45,7 +45,7 @@ export class PairedRuntimeBrowserClientHost {
 
   constructor(private readonly options: PairedRuntimeBrowserClientHostOptions) {
     this.lease = new PairedRuntimeBrowserHostLease({
-      pairing: options.pairing,
+      connection: options.connection,
       authorityRuntimeId: options.authorityRuntimeId,
       browserHostClientId: options.browserHostClientId,
       hostCapabilities: options.hostCapabilities,

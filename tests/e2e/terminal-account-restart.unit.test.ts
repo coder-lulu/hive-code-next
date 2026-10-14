@@ -3,7 +3,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { setupPtyIpcSuite, type PtyIpcSuiteFixtures } from '../../src/main/ipc/pty-ipc-test-harness'
 import { TerminalKilledError } from '../../src/main/daemon/daemon-pty-lifecycle-errors'
 import { makePaneKey } from '../../src/shared/stable-pane-id'
-import { registerPtyHandlers, setLocalPtyProvider } from '../../src/main/ipc/pty'
+import { registerPtyHandlers } from '../../src/main/ipc/pty/register-handlers'
+import { setLocalPtyProvider } from '../../src/main/ipc/pty/provider/registry'
 import { TerminalIntentionalStops } from '../../src/main/runtime/terminal-intentional-stops'
 
 vi.mock('electron', () =>
@@ -262,7 +263,7 @@ describe('account restart through renderer connection and host spawn', () => {
     registerWithFakes(mainWindow, host.runtime, host.store)
     rendererState = createInitialStoreState(() => rendererState)
     rendererState.tabsByWorktree[worktreeId][0].ptyId = 'pty-old'
-    rendererState.ptyIdsByTabId[tabId] = ['pty-old']
+    rendererState.ptyIdsByTabId![tabId] = ['pty-old']
     rendererState.sleepingAgentSessionsByPaneKey[paneKey] = {
       paneKey,
       tabId,
@@ -274,7 +275,7 @@ describe('account restart through renderer connection and host spawn', () => {
       capturedAt: 1,
       updatedAt: 1
     }
-    rendererState.terminalLayoutsByTabId[tabId].ptyIdsByLeafId[leafId] = 'pty-old'
+    rendererState.terminalLayoutsByTabId![tabId].ptyIdsByLeafId![leafId] = 'pty-old'
     await installTerminalTestGlobals()
     installIpcPtyWindow(window, {})
     window.api.pty.claimViewport = vi.fn()
@@ -308,7 +309,7 @@ describe('account restart through renderer connection and host spawn', () => {
       paneTransportsRef: { current: transports },
       clearTabPtyId: vi.fn(() => {
         rendererState.tabsByWorktree[worktreeId][0].ptyId = null
-        rendererState.ptyIdsByTabId[tabId] = []
+        rendererState.ptyIdsByTabId![tabId] = []
       })
     })
     const controller = {

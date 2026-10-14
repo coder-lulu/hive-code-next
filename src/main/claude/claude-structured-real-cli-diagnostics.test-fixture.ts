@@ -1,3 +1,7 @@
+import { createHash } from 'node:crypto'
+import * as claudeConnection from './claude-stream-json-connection'
+import { readWindowsProcessCreationTime } from '../windows/windows-process-table'
+import type { ClaudeStructuredSessionAdapterDeps } from './claude-structured-session-state'
 import type { ClaudeStructuredSessionEvent } from './claude-structured-session-adapter'
 
 export function commandLifecycleIndex(
@@ -50,4 +54,65 @@ export function streamObjectType(
           ? value.content_block
           : undefined
   return parseClaudeStreamDiagnostic(nested)?.type
+}
+
+export function observeRealClaudeConnection(
+  record: (row: Record<string, unknown>) => void,
+  sent: string[]
+): NonNullable<ClaudeStructuredSessionAdapterDeps['openConnection']> {
+  return async (launch, handlers) => {
+    record({ type: 'open-connection' })
+    const connection = await claudeConnection.openClaudeStreamJsonConnection(launch, handlers)
+    const rootPid = connection.pid
+    const rootBirth =
+      process.platform === 'win32' && rootPid !== undefined
+        ? readWindowsProcessCreationTime(rootPid)
+        : undefined
+    record({ type: 'owned-root', rootPid, rootBirth })
+    const recordClose = (type: string, detail: Record<string, unknown> = {}) =>
+      record({ type, rootPid, rootBirth, ...connection.exitVerdict, ...detail })
+    const close = connection.close.bind(connection)
+    connection.close = async () => {
+      recordClose('connection-close-before')
+      try {
+        const closed = await close()
+        recordClose('connection-close-after', { closed })
+        return closed
+      } catch (error) {
+        recordClose('connection-close-error', observedFailure(error))
+        throw error
+      }
+    }
+    const send = connection.send.bind(connection)
+    connection.send = async (message, beforeDispatch) => {
+      if (message.type === 'user' && typeof message.uuid === 'string') {
+        sent.push(message.uuid)
+        record({
+          type: 'send-user',
+          uuidHash: createHash('sha256').update(message.uuid).digest('hex')
+        })
+      }
+      await send(message, beforeDispatch)
+    }
+    const interrupt = connection.interrupt.bind(connection)
+    connection.interrupt = async (options) => {
+      record({ type: 'interrupt-request', cancelQueued: options?.cancelQueued === true })
+      try {
+        const receipt = await interrupt(options)
+        const ids = (values: readonly string[] | undefined) =>
+          values?.map((value) => createHash('sha256').update(value).digest('hex'))
+        record({
+          type: 'interrupt-response',
+          receiptPresent: receipt !== undefined,
+          cancelled: ids(receipt?.cancelled),
+          stillQueued: ids(receipt?.still_queued)
+        })
+        return receipt
+      } catch (error) {
+        record({ type: 'interrupt-error', ...observedFailure(error) })
+        throw error
+      }
+    }
+    return connection
+  }
 }

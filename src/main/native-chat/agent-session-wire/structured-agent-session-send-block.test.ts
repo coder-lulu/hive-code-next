@@ -30,7 +30,7 @@ describe('a send refused by the conversation command it follows', () => {
     ).toBeNull()
   })
 
-  it('says a committed /clear cleared the conversation', () => {
+  it('allows a send to an independently retained old-build clear source', () => {
     const blocked = structuredAgentSessionSendBlock(
       withCommand({
         ...COMMAND,
@@ -41,10 +41,7 @@ describe('a send refused by the conversation command it follows', () => {
       })
     )
 
-    expect(blocked?.refusal).toMatchObject({
-      code: 'agent_session_operation_invalid',
-      details: { reason: 'conversationCleared' }
-    })
+    expect(blocked).toBeNull()
   })
 
   it("lets a send follow an older build's unconfirmed /compact, whose child this host no longer runs", () => {

@@ -34,7 +34,6 @@ createRoot(root).render(
         }}
         isWorking={false}
         expandSignal={false}
-        fontScale={1}
       />
     </div>
   </main>

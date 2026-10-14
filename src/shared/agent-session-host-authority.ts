@@ -9,6 +9,7 @@ import { isTerminalLeafId } from './stable-pane-id'
 import { isValidTerminalTabId } from './terminal-tab-id'
 import type { TuiAgent } from './tui-agent'
 import type { AgentExplicitLaunchPermissionMode } from './tui-agent-permissions'
+import type { SpawnIntent } from './host-spawn-admission'
 
 export { AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY as AGENT_SESSION_HOST_AUTHORITY_CAPABILITY } from './protocol-version'
 export { AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY as AGENT_SESSION_LAUNCH_PERMISSION_CAPABILITY } from './protocol-version'
@@ -32,9 +33,6 @@ export const AGENT_SESSION_RPC_ERROR_CODES = [
 ] as const
 
 export const AGENT_SESSION_CLAIM_DIGEST_VERSION = 1 as const
-
-export const AGENT_SESSION_EXECUTION_OWNER_PROTOCOL_VERSION = 2 as const
-export const AGENT_SESSION_CREATE_OPERATION_PROTOCOL_VERSION = 1 as const
 
 export const AGENT_SESSION_OPERATION_FUTURE_SKEW_MS = 5 * 60 * 1000
 export const AGENT_SESSION_MAX_NEW_OPERATION_AGE_MS = 24 * 60 * 60 * 1000
@@ -121,6 +119,7 @@ export type RuntimeEnsureAgentSessionRequest =
       launchPreferences?: AgentLaunchPreferences
       presentation?: RuntimeTerminalPresentation
       placement?: { tabId?: string; leafId?: string }
+      spawnIntent?: SpawnIntent
     }
 
 export type RuntimeEnsureAgentSessionResult = {

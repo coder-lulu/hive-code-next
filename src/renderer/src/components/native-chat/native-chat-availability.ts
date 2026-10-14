@@ -13,8 +13,6 @@ export { isNativeChatSupportedAgent }
  *  unit-testable; call sites resolve `launchAgent`/`detectedAgent` from the
  *  terminal tab + agent-status before calling. */
 export type NativeChatAvailabilityInput = {
-  /** Experimental native chat availability. */
-  experimentalNativeChatEnabled?: boolean
   contentType: Tab['contentType']
   /** The coding-agent Orca launched in this terminal, if any (from TerminalTab). */
   launchAgent?: TuiAgent | null
@@ -41,9 +39,6 @@ export type NativeChatAvailabilityInput = {
  *  manually-started Claude/Codex/Grok sessions. */
 export function canToggleNativeChat(input: NativeChatAvailabilityInput): boolean {
   const agent = input.detectedAgent ?? input.launchAgent ?? input.resolvedAgent
-  if (input.experimentalNativeChatEnabled !== true) {
-    return false
-  }
   if (input.contentType !== 'terminal') {
     return false
   }

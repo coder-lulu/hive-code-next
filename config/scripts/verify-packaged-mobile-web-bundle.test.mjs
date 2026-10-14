@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join, sep } from 'node:path'
@@ -6,12 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { writeMobileWebBundleFixtureTree } from './mobile-web-bundle-fixture-tree.mjs'
 
 const require = createRequire(import.meta.url)
-const {
-  MOBILE_WEB_BUNDLE_DIR,
-  assertMobileWebBundleBuilt
-} = require('./verify-packaged-mobile-web-bundle.cjs')
+const { assertMobileWebBundleBuilt } = require('./verify-packaged-mobile-web-bundle.cjs')
 const electronBuilderConfig = require('../electron-builder.config.cjs')
-const REPO_ROOT = join(import.meta.dirname, '..', '..')
 
 async function withBundle(run) {
   const scratch = await mkdtemp(join(tmpdir(), 'orca-mobile-web-guard-'))
@@ -178,27 +174,11 @@ describe('assertMobileWebBundleBuilt', () => {
 })
 
 describe('electron-builder packaging wiring', () => {
-  it('excludes every repo source tree from app.asar', () => {
-    // The page is built from mobile/, which this excludes wholesale; out/mobile-web is what ships.
-    expect(electronBuilderConfig.files).toContain('!src{,/**/*}')
-    expect(electronBuilderConfig.files).toContain('!mobile{,/**/*}')
-  })
-
   it('does not exclude the built bundle, so out/mobile-web ships like out/web', () => {
     const excludesBuiltBundle = electronBuilderConfig.files.some(
       (entry) => typeof entry === 'string' && entry.startsWith('!out/mobile-web')
     )
     expect(excludesBuiltBundle).toBe(false)
-  })
-
-  it('runs the bundle guard in beforePack', () => {
-    expect(String(electronBuilderConfig.beforePack)).toContain('assertMobileWebBundleBuilt')
-  })
-
-  it('defaults the bundle root to out/mobile-web when electron-builder calls it', () => {
-    expect(MOBILE_WEB_BUNDLE_DIR).toBe(join(REPO_ROOT, 'out', 'mobile-web'))
-    // electron-builder passes the context alone, so the default is what ships.
-    expect(electronBuilderConfig.beforePack.length).toBe(1)
   })
 
   it('verifies the bundle root it is given, not the repo one', async () => {

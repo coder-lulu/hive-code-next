@@ -5,7 +5,7 @@ import type {
 import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-chat-ask'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import type { NativeChatTurnJournal } from '../../../src/shared/native-chat-turn-membership'
-import type { MobileQueuedSlotProps } from './use-mobile-native-chat-queued-slot'
+import type { ComposerTrayProps } from './use-mobile-native-chat-composer-tray'
 import type { PendingNativeChatImage } from './mobile-native-chat-image-attachment'
 import type { MobileNativeChatSessionOptionPickersProps } from './MobileNativeChatSessionOptionPickers'
 import type { MobileChatPermission } from './mobile-native-chat-permission'
@@ -15,7 +15,7 @@ import type { MobileNativeChatStatus } from './use-mobile-native-chat-session'
 
 export type MobileNativeChatInputLockReason = 'disconnected' | 'waiting'
 
-export type MobileNativeChatViewProps = MobileQueuedSlotProps & {
+export type MobileNativeChatViewProps = ComposerTrayProps & {
   messages: NativeChatMessage[]
   folded: NativeChatMessage[]
   status: MobileNativeChatStatus

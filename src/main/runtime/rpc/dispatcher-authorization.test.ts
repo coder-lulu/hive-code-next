@@ -5,10 +5,12 @@ import {
   defineMethod,
   defineStreamingMethod,
   type RpcRequest,
-  type RpcStreamingHandler
+  type RpcStreamingMethod
 } from './core'
 import { RpcDispatcher } from './dispatcher'
 import type { RpcDispatchStreamingOptions } from './dispatcher-stream-options'
+
+vi.mock('./methods', () => ({ ALL_RPC_METHODS: [] }))
 
 describe('authenticated remote RPC admission', () => {
   for (const transport of ['unary', 'streaming'] as const) {
@@ -33,7 +35,7 @@ describe('authenticated remote RPC admission', () => {
         const dispatcher = new RpcDispatcher({
           runtime: { getRuntimeId: () => 'host' } as OrcaRuntimeService,
           methods: [
-            defineMethod({ name: 'agent.launch', params: z.unknown().transform(parse), handler })
+            defineMethod({ permission: 'workspace', name: 'agent.launch', params: z.unknown().transform(parse), handler })
           ]
         })
         const response = await dispatch(
@@ -71,7 +73,7 @@ describe('authenticated remote RPC admission', () => {
             return { handled: false }
           }
         } as unknown as OrcaRuntimeService,
-        methods: [defineMethod({ name: 'agent.launch', params: null, handler })]
+        methods: [defineMethod({ permission: 'workspace', name: 'agent.launch', params: null, handler })]
       })
       const response = await dispatch(
         dispatcher,
@@ -84,14 +86,14 @@ describe('authenticated remote RPC admission', () => {
   }
 
   it('checks registered streaming methods and ignores payload authority claims', async () => {
-    const handler = vi.fn<RpcStreamingHandler<unknown>>(async (_params, _ctx, emit) => {
+    const handler = vi.fn<RpcStreamingMethod['handler']>(async (_params, _ctx, emit) => {
       emit({ ready: true })
     })
     const authorizeRequest = vi.fn(() => true)
     const dispatcher = new RpcDispatcher({
       runtime: { getRuntimeId: () => 'host' } as OrcaRuntimeService,
       methods: [
-        defineStreamingMethod({ name: 'nativeChat.subscribe', params: z.unknown(), handler })
+        defineStreamingMethod({ permission: 'workspace', name: 'nativeChat.subscribe', params: z.unknown(), handler })
       ]
     })
     const replies: string[] = []

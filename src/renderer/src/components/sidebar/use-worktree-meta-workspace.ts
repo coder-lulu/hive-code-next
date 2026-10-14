@@ -1,37 +1,26 @@
 import { useMemo } from 'react'
 import { useAppStore } from '@/store'
 import {
-  findIndexedFolderWorkspaceOwner,
   findIndexedWorktreeOwner,
   findIndexedWorktreeOwnerForHost
 } from '@/lib/worktree-runtime-owner-index'
 import { worktreeMatchesHost } from '@/store/slices/worktrees/listing/worktree-host-ownership'
 import { parseExecutionHostId } from '../../../../shared/execution-host'
+import { getFolderWorkspaceHostId } from '@/store/folder-workspaces/folder-workspace-catalog'
+import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { folderWorkspaceToWorktree } from '../../../../shared/folder-workspace-worktree'
-import type { IssueLinkProvider } from '../../../../shared/issue-link-input'
-import type { WorktreeMetaLiveLinks } from './worktree-meta-updates'
 
-/** Resolves the workspace the meta dialog edits and the issue-link state it
- *  seeds from. Link state is read from the store rather than threaded through
- *  the untyped modalData bag — a call site that forgot a key would otherwise
- *  seed an empty field and silently destroy the link on save. */
+/** Resolves the edited workspace within its execution host, including folders. */
 export function useWorktreeMetaWorkspace(args: {
   worktreeId: string
   /** The repo bucket the opening row belongs to, when it knows. */
   ownerRepoId: string | null
-  executionHostId?: string
+  executionHostId?: ExecutionHostId
 }): {
   worktree: Worktree | undefined
-  linkedIssue: number | null
-  linkedLinearIssue: string | null
-  /** The persisted value and its provider, from one source so they cannot drift. */
-  currentIssue: string
-  currentProvider: IssueLinkProvider
   isFolderWorkspace: boolean
-  /** Link state as it stands now, for save-time displacement decisions. */
-  liveLinks: WorktreeMetaLiveLinks
 } {
   const { worktreeId, ownerRepoId, executionHostId } = args
   const requestedHost = parseExecutionHostId(executionHostId)?.id
@@ -60,68 +49,32 @@ export function useWorktreeMetaWorkspace(args: {
     const owner = requestedHost
       ? findIndexedWorktreeOwnerForHost(s.worktreesByRepo, worktreeId, requestedHost)
       : findIndexedWorktreeOwner(s.worktreesByRepo, worktreeId)
-    return (owner as Worktree | null) ?? undefined
+    return owner && (!ownerRepoId || owner.repoId === ownerRepoId)
+      ? s.worktreesByRepo[owner.repoId]?.find((item) => item === owner)
+      : undefined
   })
   // Why: folder workspaces are absent from worktreesByRepo, so the lookup above
   // returns undefined and the row renders blank for them. The selector returns
   // the stored record — a stable reference — and the projection happens outside
   // it, because a selector that built the object would return a fresh identity
   // on every store write and re-render the dialog continuously.
-  const folderWorkspace = useAppStore((s) =>
-    workspaceScope?.type === 'folder' && (!executionHostId || requestedHost)
-      ? findIndexedFolderWorkspaceOwner(
-          s.folderWorkspaces,
-          workspaceScope.folderWorkspaceId,
-          requestedHost
-        )
-      : null
-  )
+  const folderWorkspace = useAppStore((s) => {
+    if (workspaceScope?.type !== 'folder' || (executionHostId && !requestedHost)) {
+      return null
+    }
+    const candidates = s.folderWorkspaces.filter(
+      (item) =>
+        item.id === workspaceScope.folderWorkspaceId &&
+        (!executionHostId || getFolderWorkspaceHostId(item, s.projectGroups) === requestedHost)
+    )
+    return candidates.length === 1 ? candidates[0] : null
+  })
   const worktree = useMemo(
     () => (folderWorkspace ? folderWorkspaceToWorktree(folderWorkspace) : indexedWorktree),
     [folderWorkspace, indexedWorktree]
   )
-  const linkedIssue = worktree?.linkedIssue ?? null
-  const linkedLinearIssue = worktree?.linkedLinearIssue ?? null
-  // Why: `typeof` rather than a null check — an unhydrated projection can leave
-  // linkedIssue undefined, which `!== null` would read as a GitHub link.
-  const currentProvider: IssueLinkProvider =
-    typeof linkedIssue === 'number' ? 'github' : linkedLinearIssue ? 'linear' : 'github'
-  const currentIssue =
-    currentProvider === 'linear'
-      ? (linkedLinearIssue ?? '')
-      : typeof linkedIssue === 'number'
-        ? String(linkedIssue)
-        : ''
-  // Why: displacement is decided against live state, not the frozen snapshot —
-  // the dialog's warning reads the same values, so a link added by the CLI while
-  // the dialog was open cannot outlive a save that promised to displace it.
-  const liveLinks = useMemo<WorktreeMetaLiveLinks>(
-    () => ({
-      linkedPR: worktree?.linkedPR ?? null,
-      linkedIssue,
-      linkedLinearIssue,
-      linkedLinearIssueOrganizationUrlKey: worktree?.linkedLinearIssueOrganizationUrlKey ?? null,
-      linkedWorkItemProvider: worktree?.linkedWorkItem?.provider ?? null,
-      linkedWorkItemType: worktree?.linkedWorkItem?.type ?? null
-    }),
-    [
-      linkedIssue,
-      linkedLinearIssue,
-      worktree?.linkedPR,
-      worktree?.linkedLinearIssueOrganizationUrlKey,
-      worktree?.linkedWorkItem
-    ]
-  )
-
   return {
     worktree,
-    linkedIssue,
-    linkedLinearIssue,
-    currentIssue,
-    currentProvider,
-    // Why: folder workspaces persist links only through their creation-time
-    // linkedTask; updateWorktreeMeta drops link keys for them entirely.
-    isFolderWorkspace: workspaceScope?.type === 'folder',
-    liveLinks
+    isFolderWorkspace: workspaceScope?.type === 'folder'
   }
 }

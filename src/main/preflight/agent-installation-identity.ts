@@ -1,5 +1,5 @@
 import { realpathSync } from 'node:fs'
-import { resolveWindowsCmdShim } from '../../shared/child-process/windows-cmd-shim-resolution'
+import { resolveWindowsCmdShim } from '@orca/process-host/windows-cmd-shim-resolution'
 import type { AgentInstallRequest } from '../../shared/agent-install-types'
 
 export function agentInstallationRealPath(command: string, env: NodeJS.ProcessEnv): string {

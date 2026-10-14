@@ -22,6 +22,7 @@ import {
   SessionOptionSummaryRow
 } from './MobileNativeChatSessionOptionRows'
 import { sortNativeChatSessionOptions } from '../../../src/shared/native-chat-session-option-snapshot'
+import { AGENT_CHAT_PERMISSION_MODE_OPTION_ID } from '../../../src/shared/agent-chat-permission-mode'
 import type { MobileNativeChatSessionOptionsController } from './use-mobile-native-chat-session-options'
 
 export type MobileNativeChatSessionOptionPickersProps = {
@@ -65,6 +66,8 @@ export function MobileNativeChatSessionOptionPickers({
   sendInFlight = false
 }: MobileNativeChatSessionOptionPickersProps): React.JSX.Element | null {
   const theme = useMobileTheme()
+  const permissionChoiceColor = (value: string | undefined): string | undefined =>
+    value === 'full-access' ? theme.color.status.warningText : undefined
   const styles = useMobileThemeStyles(createStyles)
   const [openDescriptorId, setOpenDescriptorId] = useState<string | null>(null)
   const [lastRequest, setLastRequest] = useState(controller.optionPickerRequest)
@@ -74,14 +77,19 @@ export function MobileNativeChatSessionOptionPickers({
   }
   const { snapshot, pendingId } = controller
   const model = snapshot.find((descriptor) => descriptor.category === 'model')
+  const permission = snapshot.find(
+    (descriptor) => descriptor.id === AGENT_CHAT_PERMISSION_MODE_OPTION_ID
+  )
   const options = sortNativeChatSessionOptions(snapshot)
-  if (!model) {
+  if (!model && !permission) {
     return null
   }
-  const disabled = isWorking || pendingId !== null || sendInFlight
   const activeDescriptor = snapshot.find((descriptor) => descriptor.id === openDescriptorId)
-  const modelView = activeDescriptor?.id === model.id
-  const modelLabel = localizeOptionValue(mobileModelPillLabel(model))
+  const permissionView = activeDescriptor !== undefined && activeDescriptor === permission
+  // The permission mode applies from the next send, so a running turn never locks it.
+  const disabled = (!permissionView && isWorking) || pendingId !== null || sendInFlight
+  const modelView = model !== undefined && activeDescriptor?.id === model.id
+  const modelLabel = model ? localizeOptionValue(mobileModelPillLabel(model)) : ''
   const optionsLabel =
     options.length > 0 ? localizeOptionValue(mobileOptionsPillLabel(options)) : null
   const pillLabel = optionsLabel ? `${modelLabel} ${optionsLabel}` : modelLabel
@@ -92,7 +100,7 @@ export function MobileNativeChatSessionOptionPickers({
   const closePicker = (): void => setOpenDescriptorId(null)
   const openPicker = (): void => {
     Keyboard.dismiss()
-    setOpenDescriptorId(model.id)
+    setOpenDescriptorId(model?.id ?? null)
   }
 
   const applyOption = (descriptor: SessionOptionDescriptor, value: SessionOptionValue): void => {
@@ -104,6 +112,10 @@ export function MobileNativeChatSessionOptionPickers({
     ) {
       closePicker()
       return
+    }
+    // A permission pick shows at once; its write may wait behind a starting agent.
+    if (descriptor === permission) {
+      closePicker()
     }
     void controller.setOption(descriptor.id, value).then((applied) => {
       if (applied) {
@@ -119,26 +131,46 @@ export function MobileNativeChatSessionOptionPickers({
     })
   }
 
+  const permissionChoice =
+    permission?.kind.type === 'select'
+      ? permission.kind.choices.find((choice) => choice.value === permission.kind.currentValue)
+      : undefined
+  const pillsBusy = pendingId !== null || sendInFlight
+
   return (
-    <View>
-      <Pill
-        label={pillLabel}
-        accessibleName={`模型，${pillLabel}`}
-        disabled={disabled}
-        onPress={openPicker}
-      />
+    <View style={styles.pills}>
+      {permission && permissionChoice ? (
+        <Pill
+          label={permissionChoice.label}
+          accessibleName={`权限，${permissionChoice.label}`}
+          disabled={pillsBusy}
+          labelColor={permissionChoiceColor(permissionChoice.value)}
+          onPress={() => {
+            Keyboard.dismiss()
+            setOpenDescriptorId(permission.id)
+          }}
+        />
+      ) : null}
+      {model ? (
+        <Pill
+          label={pillLabel}
+          accessibleName={`模型，${pillLabel}`}
+          disabled={isWorking || pillsBusy}
+          onPress={openPicker}
+        />
+      ) : null}
       <BottomDrawer visible={activeDescriptor !== undefined} onClose={closePicker}>
         {activeDescriptor ? (
           <View style={styles.sheet}>
             <View style={styles.sheetHeader}>
               <Pressable
-                accessibilityLabel={modelView ? '关闭选择器' : '返回模型列表'}
+                accessibilityLabel={modelView || permissionView ? '关闭选择器' : '返回模型列表'}
                 accessibilityRole="button"
                 style={({ pressed }) => [styles.sheetNav, pressed && styles.pressed]}
-                onPress={modelView ? closePicker : () => setOpenDescriptorId(model.id)}
+                onPress={modelView || permissionView ? closePicker : openPicker}
                 hitSlop={8}
               >
-                {modelView ? (
+                {modelView || permissionView ? (
                   <X size={20} color={theme.color.text.secondary} strokeWidth={2} />
                 ) : (
                   <ChevronLeft size={20} color={theme.color.text.secondary} strokeWidth={2} />
@@ -164,6 +196,7 @@ export function MobileNativeChatSessionOptionPickers({
                 grouped
                 onSetOption={(value) => applyOption(activeDescriptor, value)}
                 onInvokeAction={() => invokeAction(activeDescriptor)}
+                {...(permissionView ? { choiceLabelColor: permissionChoiceColor } : {})}
               />
             </View>
             {modelView && options.length > 0 ? (
@@ -189,6 +222,13 @@ export function MobileNativeChatSessionOptionPickers({
 
 function createStyles(theme: MobileTheme) {
   return StyleSheet.create({
+    pills: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexShrink: 1,
+      minWidth: 0,
+      gap: theme.spacing.space4
+    },
     sheet: {
       paddingBottom: theme.spacing.space4
     },

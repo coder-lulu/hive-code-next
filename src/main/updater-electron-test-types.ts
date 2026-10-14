@@ -43,7 +43,7 @@ export type UpdaterModuleFactories = {
   electron: () => {
     app: AppMock
     BrowserWindow: { getAllWindows: Mock<() => unknown[]> }
-    autoUpdater: { on: UpdaterSpy }
+    autoUpdater: { on: UpdaterSpy; checkForUpdates: UpdaterSpy }
     session: {
       fromPartition: Mock<
         () => {
@@ -62,7 +62,7 @@ export type UpdaterModuleFactories = {
   electronUpdater: () => { autoUpdater: AutoUpdaterMock }
   electronUpdaterLoader: () => { loadElectronAutoUpdater: () => AutoUpdaterMock }
   electronToolkitUtils: () => { is: { dev: boolean } }
-  ipcPty: () => { killAllPty: UpdaterSpy }
+  ptyKillAll: () => { killAllPty: UpdaterSpy }
   linuxUpdatePackageType: () => {
     getLinuxRootPackageType: Mock<() => 'deb' | 'rpm' | null>
     getLinuxPackageType: Mock<() => 'deb' | 'rpm' | 'non-root' | 'unusable'>
@@ -86,7 +86,7 @@ export type UpdaterModuleFactories = {
 export type UpdaterMocks = {
   appMock: AppMock
   browserWindowMock: { getAllWindows: Mock<() => unknown[]> }
-  nativeUpdaterMock: { on: UpdaterSpy }
+  nativeUpdaterMock: { on: UpdaterSpy; checkForUpdates: UpdaterSpy }
   autoUpdaterMock: AutoUpdaterMock
   isMock: { dev: boolean }
   killAllPtyMock: UpdaterSpy

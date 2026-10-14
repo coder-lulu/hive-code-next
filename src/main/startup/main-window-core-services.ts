@@ -7,13 +7,18 @@ import { mainProcessState as state } from './main-process-state'
 import { prepareCodexAiVaultSessionResume } from '../codex/codex-ai-vault-session-resume'
 import { resolveHostCodexSessionSourceHome } from '../codex/codex-session-source-home'
 import { preserveAgentAuthBeforeRestart } from '../agent-auth-restart-preservation'
+import { preserveStateBeforeUpdateRestart } from '../update-restart-preservation'
 import {
   emitPluginWorktreeLifecycle,
   handleCodexHomePtySpawned,
   handlePtyExit
 } from './main-process-pty-startup'
 import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
-import { prepareCodexSessionResumeForLaunch } from './codex-session-resume-launch'
+import { resolveHostAgentBaseEnvironment } from '../runtime/structured-agent-shell-environment'
+import {
+  prepareCodexPinnedLaunchHome,
+  prepareCodexSessionResumeForLaunch
+} from './codex-session-resume-launch'
 import { isRecoveryReloadInFlight } from './main-window-lifecycle-flags'
 
 export function attachMainWindowCoreServices(
@@ -70,7 +75,8 @@ export function attachMainWindowCoreServices(
     automations,
     {
       prepareForCodexLaunch: prepareCodexRuntimeHomeForLaunch,
-      prepareForClaudeLaunch: (target) => claudeRuntimeAuth.prepareForClaudeLaunch(target)
+      prepareForClaudeLaunch: (target) => claudeRuntimeAuth.prepareForClaudeLaunch(target),
+      resolveBaseEnvironment: () => resolveHostAgentBaseEnvironment(store.getSettings())
     },
     state.agentAwakeService ?? undefined,
     state.crashReports ?? undefined,
@@ -94,7 +100,8 @@ export function attachMainWindowCoreServices(
       prepareAiVaultSessionResume: (args) =>
         prepareCodexAiVaultSessionResume(args, {
           runtimeHome: codexRuntimeHome,
-          systemCodexHomePath: resolveHostCodexSessionSourceHome(store.getSettings())
+          systemCodexHomePath: resolveHostCodexSessionSourceHome(store.getSettings()),
+          preparePinnedLaunchHome: (home) => prepareCodexPinnedLaunchHome(home)
         }),
       onBeforeRelaunch: async () => {
         state.isQuitting = true
@@ -137,8 +144,7 @@ export function attachMainWindowCoreServices(
       onBeforeUpdateQuit: async () => {
         state.runtimeCloudPresence?.setRuntimeReady(false)
         state.runtimeCloudPresence?.setAuthorization(null)
-        await preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
-        await store.flushPendingOrThrowAsync({ fullCheckpoint: true })
+        await preserveStateBeforeUpdateRestart({ codexRuntimeHome, claudeRuntimeAuth, store })
       },
       onBeforeUpdateQuitFailure: 'abort',
       updateInstallMode: resolveUpdateInstallMode(state.isServeMode),

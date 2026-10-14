@@ -70,6 +70,21 @@ export class ClaudeAccountRegistration {
     }
   }
 
+  async addCaptured(
+    accountId: string,
+    target: ClaudeManagedAuthTarget,
+    captured: CapturedClaudeAuth
+  ): Promise<ClaudeRateLimitAccountsState> {
+    const location = await this.dependencies.createManagedAuth(accountId, target)
+    const previousSettings = this.dependencies.store.getSettings()
+    try {
+      return await this.persist(accountId, location, previousSettings, captured)
+    } catch (error) {
+      await this.cleanupFailedAdd(accountId, location.managedAuthPath, previousSettings, error)
+      throw error
+    }
+  }
+
   async addFromConfigDir(
     configDir: string,
     options?: ClaudeManagedAuthTarget & { previousLegacyCredentialsSha256?: string | null }
@@ -89,7 +104,10 @@ export class ClaudeAccountRegistration {
     }
   }
 
-  async reauthenticate(accountId: string): Promise<ClaudeRateLimitAccountsState> {
+  async reauthenticate(
+    accountId: string,
+    capturedAuth?: CapturedClaudeAuth
+  ): Promise<ClaudeRateLimitAccountsState> {
     const account = this.dependencies.selection.requireAccount(accountId)
     const managedAuthPath = await this.dependencies.assertManagedAuth(
       account.managedAuthPath,
@@ -97,12 +115,14 @@ export class ClaudeAccountRegistration {
     )
     const previousSettings = this.dependencies.store.getSettings()
     const previousAuth = await this.dependencies.readSnapshot(accountId, managedAuthPath)
-    const captured = await this.dependencies.login({
-      managedAuthPath,
-      managedAuthRuntime: account.managedAuthRuntime ?? 'host',
-      wslDistro: account.wslDistro ?? null,
-      wslLinuxAuthPath: account.wslLinuxAuthPath ?? null
-    })
+    const captured =
+      capturedAuth ??
+      (await this.dependencies.login({
+        managedAuthPath,
+        managedAuthRuntime: account.managedAuthRuntime ?? 'host',
+        wslDistro: account.wslDistro ?? null,
+        wslLinuxAuthPath: account.wslLinuxAuthPath ?? null
+      }))
     if (!captured.identity.email) {
       throw new Error(
         `Claude login completed, but ${APP_DISPLAY_NAME} could not resolve the account email.`
@@ -128,7 +148,7 @@ export class ClaudeAccountRegistration {
       await this.dependencies.writeOauth(accountId, managedAuthPath, captured.oauthAccount)
       await this.dependencies.writeCredentials(accountId, managedAuthPath, captured.credentialsJson)
       wroteCredentials = true
-      this.dependencies.store.updateSettings({ claudeManagedAccounts: nextAccounts })
+      this.dependencies.selection.saveSettings({ claudeManagedAccounts: nextAccounts })
       this.dependencies.runtimeAuth.clearLastWrittenCredentialsJson(accountId)
       this.dependencies.rateLimits.evictInactiveClaudeCache(accountId)
       const target = getClaudeSelectionTargetForAccount(account)
@@ -186,7 +206,7 @@ export class ClaudeAccountRegistration {
       lastAuthenticatedAt: now
     }
     const selection = normalizeClaudeRuntimeSelection(previousSettings)
-    this.dependencies.store.updateSettings({
+    this.dependencies.selection.saveSettings({
       claudeManagedAccounts: [...previousSettings.claudeManagedAccounts, account],
       activeClaudeManagedAccountId: selection.host,
       activeClaudeManagedAccountIdsByRuntime: selection
@@ -247,7 +267,7 @@ export class ClaudeAccountRegistration {
       this.dependencies.selection.restoreSettings(previousSettings)
       await this.dependencies.runtimeAuth.forceMaterializeCurrentSelectionForRollback()
     } else if (wroteCredentials) {
-      this.dependencies.store.updateSettings({ claudeManagedAccounts: nextAccounts })
+      this.dependencies.selection.saveSettings({ claudeManagedAccounts: nextAccounts })
     } else {
       this.dependencies.selection.restoreSettings(previousSettings)
     }

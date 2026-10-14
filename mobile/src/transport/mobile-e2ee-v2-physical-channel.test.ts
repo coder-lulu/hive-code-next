@@ -16,7 +16,7 @@ vi.mock('expo-crypto', () => ({
 
 import { deriveSharedKey } from './e2ee'
 import { MobileE2EEV2ClientSession } from './mobile-e2ee-v2-client-session'
-import { deriveMobileE2EEV2KeySchedule } from './mobile-e2ee-v2-key-schedule'
+import { deriveMobileE2EEV2KeySchedule } from '../../../src/shared/runtime-e2ee-key-schedule'
 import {
   MobileE2EEAuthenticationError,
   MobileE2EEV2PhysicalChannel,

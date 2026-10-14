@@ -43,7 +43,7 @@ export function tryReadMetadata(userDataPath: string): RuntimeMetadata | null {
 export function getDefaultUserDataPath(
   platform: NodeJS.Platform = process.platform,
   homeDir = homedir(),
-  appName = 'HiveCode'
+  appName: string = APP_DISPLAY_NAME
 ): string {
   // Why: in dev mode (and for parallel HiveCode instances), the Electron app writes
   // runtime metadata to a separate userData directory (e.g. hivecode-dev) to avoid
@@ -52,6 +52,15 @@ export function getDefaultUserDataPath(
   if (process.env.ORCA_USER_DATA_PATH) {
     return process.env.ORCA_USER_DATA_PATH
   }
+  return getPlatformUserDataPath(platform, homeDir, appName)
+}
+
+/** The packaged app's own default profile, ignoring any CLI override. */
+export function getPlatformUserDataPath(
+  platform: NodeJS.Platform = process.platform,
+  homeDir = homedir(),
+  appName: string = APP_DISPLAY_NAME
+): string {
   if (platform === 'darwin') {
     return join(homeDir, 'Library', 'Application Support', appName)
   }

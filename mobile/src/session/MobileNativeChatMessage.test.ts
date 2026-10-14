@@ -95,6 +95,7 @@ describe('MobileNativeChatMessage', () => {
       } | null
       onToggleTurn?: () => void
       reasoningIsLive?: boolean
+      unsentNotice?: string
     } = {}
   ): ReactTestRenderer {
     act(() => {
@@ -105,6 +106,32 @@ describe('MobileNativeChatMessage', () => {
 
   const textIn = (node: ReactTestInstance): string[] =>
     node.findAllByType('Text' as never).map((text) => String(text.children.join('')))
+
+  it('renders the shared clear boundary as one muted divider with prior history retained', () => {
+    const message = projectStructuredItemToNativeChat({
+      itemId: 'clear',
+      revision: 1,
+      sequence: 5,
+      observedAt: 5,
+      body: {
+        kind: 'status',
+        text: 'Context cleared',
+        presentation: 'context-cleared',
+        contextClear: { operationId: 'clear', afterFence: 3, clearedAt: 5 }
+      }
+    })!
+    const tree = render(message)
+    expect(textIn(tree.root)).toEqual(['Context cleared'])
+    expect(tree.root.findAll((node) => String(node.type) === 'MobileMarkdown')).toHaveLength(0)
+    expect(
+      tree.root.findAll(
+        (node) =>
+          String(node.type) === 'View' &&
+          JSON.stringify(node.props.style) === JSON.stringify(styles.contextBoundary)
+      )
+    ).toHaveLength(1)
+    expect(styles.contextBoundary.borderTopColor).toBe(lightTheme.color.border.subtle)
+  })
 
   it.each(['system', 'user'] as const)(
     'renders a %s host notice as selectable muted text rather than a markdown answer',
@@ -121,7 +148,9 @@ describe('MobileNativeChatMessage', () => {
         { fontScale: 1.5 }
       )
       expect(tree.root.findAll((node) => String(node.type) === 'MobileMarkdown')).toHaveLength(0)
-      const text = tree.root.find((node) => String(node.type) === 'Text')
+      const text = tree.root.find(
+        (node) => String(node.type) === 'Text' && node.props.selectable === true
+      )
       expect(text.props.children).toBe(AGENT_SESSION_HOST_STATUS_COPY['history-item-too-large'])
       expect(text.props.selectable).toBe(true)
       expect(Object.assign({}, ...text.props.style)).toMatchObject({
@@ -153,7 +182,50 @@ describe('MobileNativeChatMessage', () => {
     const rows = tree.root.findAll(
       (node) => String(node.type) === 'View' && Array.isArray(node.props.style)
     )
-    expect(rows.some((row) => row.props.style.includes(styles.rowUser))).toBe(false)
+    expect(
+      rows.some((row) =>
+        row.props.style.some(
+          (style: unknown) => JSON.stringify(style) === JSON.stringify(styles.rowUser)
+        )
+      )
+    ).toBe(false)
+  })
+
+  describe('a message the host recorded and did not deliver', () => {
+    const notSent = { ...userMessage([{ type: 'text', text: 'fix it' }]), unsent: true as const }
+    const lineIn = (tree: ReactTestRenderer) =>
+      tree.root.findAll(
+        (node) =>
+          String(node.type) === 'Text' &&
+          JSON.stringify(node.props.style) === JSON.stringify(styles.unsentNotice)
+      )
+
+    it('says why under the bubble, and draws no line without a reason, as the desktop', () => {
+      expect(textIn(render(notSent, { unsentNotice: 'Claude is not signed in.' }).root)).toEqual([
+        'fix it',
+        'Claude is not signed in.'
+      ])
+      expect(lineIn(render(notSent))).toHaveLength(0)
+    })
+
+    it("draws the line under another agent's message too", () => {
+      const fromAgent: NativeChatMessage = {
+        ...notSent,
+        from: {
+          kind: 'agent',
+          senders: [
+            {
+              party: { address: 'term_a', terminalHandle: 'term_a', orcaSessionId: null },
+              name: 'Coder'
+            }
+          ],
+          orchestration: null
+        }
+      }
+      expect(
+        lineIn(render(fromAgent, { unsentNotice: 'Your message was not sent.' }))
+      ).toHaveLength(1)
+    })
   })
 
   it('preserves an ordinary assistant answer without interpreting its text as a host notice', () => {

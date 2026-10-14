@@ -187,7 +187,8 @@ describe('round-trip stability', () => {
       'git',
       ['-c', 'core.autocrlf=false', 'apply', '-p1', '--whitespace=nowarn', patchFile],
       {
-        cwd: replay
+        cwd: replay,
+        env: { ...process.env, GIT_CEILING_DIRECTORIES: root }
       }
     )
 
@@ -210,7 +211,8 @@ describe('round-trip stability', () => {
       'git',
       ['-c', 'core.autocrlf=false', 'apply', '-p1', '--whitespace=nowarn', patchFile],
       {
-        cwd: replay
+        cwd: replay,
+        env: { ...process.env, GIT_CEILING_DIRECTORIES: root }
       }
     )
 
@@ -401,7 +403,7 @@ describe('lockfile coupling', () => {
     // A bump renames the key, so --write has nothing to rewrite until pnpm install
     // creates it. Aborting there would strand the run before the later packages.
     expect(lockfileHasPatchEntry(lockfile, '@xterm/xterm@6.1.0-beta.287')).toBe(true)
-    expect(lockfileHasPatchEntry(lockfile, '@xterm/xterm@6.1.0-beta.303')).toBe(false)
+    expect(lockfileHasPatchEntry(lockfile, '@xterm/xterm@6.1.0-beta.288')).toBe(false)
   })
 })
 

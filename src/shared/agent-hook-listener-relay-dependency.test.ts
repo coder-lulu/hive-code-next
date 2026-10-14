@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, relative, resolve, sep } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
@@ -47,7 +47,7 @@ function resolveTypeScriptImport(importer: string, specifier: string): string | 
   return null
 }
 
-describe('agent hook listener relay dependency boundary', () => {
+describe('agent hook listener host dependency boundary', () => {
   it('detects every supported runtime dependency syntax while excluding type imports', () => {
     const source = [
       "import type { TypeOnly } from './type-only'",
@@ -76,12 +76,17 @@ describe('agent hook listener relay dependency boundary', () => {
   it('keeps the transitive runtime graph inside Node builtins and shared modules', () => {
     const sharedRoot = resolve(__dirname)
     const listenerPathPrefix = resolve(sharedRoot, 'agent-hook-listener')
-    const relayConsumers = [
-      resolve(sharedRoot, '../relay/agent-hook-server.ts'),
-      resolve(sharedRoot, '../relay/agent-hook-request.ts'),
-      resolve(sharedRoot, '../relay/agent-hook-result-retry-scheduler.ts')
+    const hostRoot = resolve(sharedRoot, '../main/agent-hooks')
+    const hostConsumers = [
+      resolve(hostRoot, 'server.ts'),
+      ...readdirSync(resolve(hostRoot, 'server'), { withFileTypes: true })
+        .filter(
+          (entry) =>
+            entry.isFile() && entry.name.endsWith('.ts') && !entry.name.endsWith('.test.ts')
+        )
+        .map((entry) => resolve(hostRoot, 'server', entry.name))
     ]
-    const pending = relayConsumers.flatMap((consumer) =>
+    const pending = hostConsumers.flatMap((consumer) =>
       readRuntimeSpecifiers(readFileSync(consumer, 'utf8'))
         .map((specifier) => resolveTypeScriptImport(consumer, specifier))
         .filter(
@@ -129,6 +134,10 @@ describe('agent hook listener relay dependency boundary', () => {
       'agent-hook-listener/listener-limits.ts',
       'agent-hook-listener/listener-state.ts',
       'agent-hook-listener/opencode-session-registry.ts',
+      'agent-hook-listener/provider-event-names.ts',
+      'agent-hook-listener/provider-event-routing.ts',
+      'agent-hook-listener/providers/claude-roster-state.ts',
+      'agent-hook-listener/providers/codex-state.ts',
       'agent-hook-listener/providers/codex-transcript-poll.ts',
       'agent-hook-listener/request-body.ts',
       'agent-hook-listener/source-routing.ts',

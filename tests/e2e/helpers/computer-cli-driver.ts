@@ -164,7 +164,7 @@ async function ensureOrcaRuntimeServed(): Promise<void> {
   await waitForOrcaRuntimeReady()
 }
 
-async function createComputerE2ERuntimeEnv(): Promise<NodeJS.ProcessEnv> {
+async function createComputerE2ERuntimeEnv(): Promise<Record<string, string | undefined>> {
   const userDataDir =
     process.env.ORCA_DEV_USER_DATA_PATH ?? (await getComputerE2eOrcaDevUserDataPath())
   // Why: agent runtimes export ELECTRON_RUN_AS_NODE, which would make the

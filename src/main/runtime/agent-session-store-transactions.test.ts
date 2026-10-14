@@ -280,8 +280,8 @@ describe('one published store per live host database', () => {
       readOnly: () => false,
       highestFence: () => 1,
       nextSequence: () => sequence,
-      commit: (row) => {
-        sequence = row.seq + 1
+      commit: (rows) => {
+        sequence = rows.at(-1)!.seq + 1
       }
     })
     const row = (seq: number, ts: number): JournalRow => ({

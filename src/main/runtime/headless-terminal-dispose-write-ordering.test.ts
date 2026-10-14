@@ -81,7 +81,7 @@ describe('disposeHeadlessTerminal write ordering', () => {
     const runtime = createRuntime()
     // Queued but not yet parsed: the chain link is still pending here.
     runtime.onPtyData(PTY_ID, 'QUEUED-BEFORE-DISPOSE\r\n', 1)
-    runtime.resetPtyModelAfterMigrationFailure(PTY_ID)
+    runtime.preparePtyExecutionContext(PTY_ID, null, { resetIncarnation: true })
     runtime.onPtyData(PTY_ID, 'ISSUED-AFTER-DISPOSE\r\n', 2)
     await runtime.serializeHiddenOutputRecoveryBuffer(PTY_ID)
 
@@ -98,7 +98,7 @@ describe('disposeHeadlessTerminal write ordering', () => {
   it('leaves the post-disposal emulator holding only post-disposal output', async () => {
     const runtime = createRuntime()
     runtime.onPtyData(PTY_ID, 'QUEUED-BEFORE-DISPOSE\r\n', 1)
-    runtime.resetPtyModelAfterMigrationFailure(PTY_ID)
+    runtime.preparePtyExecutionContext(PTY_ID, null, { resetIncarnation: true })
     runtime.onPtyData(PTY_ID, 'ISSUED-AFTER-DISPOSE\r\n', 2)
 
     const snapshot = await runtime.serializeMainTerminalBuffer(PTY_ID)
@@ -107,6 +107,10 @@ describe('disposeHeadlessTerminal write ordering', () => {
     expect(painted).not.toContain('QUEUED-BEFORE-DISPOSE')
     // A failed migration's headless suffix cannot prove restored history. The
     // direct model assertion above must not relax the provider recovery fence.
+    runtime.synchronizePtyOutputSequenceFromProvider(PTY_ID, {
+      value: 1000,
+      generation: 'continued'
+    })
     await expect(runtime.serializeHiddenOutputRecoveryBuffer(PTY_ID)).resolves.toBeNull()
   })
 })

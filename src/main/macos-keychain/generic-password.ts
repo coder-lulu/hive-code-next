@@ -79,20 +79,6 @@ export function execSecurityCommand(args: string[]): Promise<SecurityCommandResu
   })
 }
 
-export function execSecurity(
-  args: string[],
-  options?: { ignoreFailure?: boolean; ignoreNotFound?: boolean }
-): Promise<void> {
-  return execSecurityCommand(args).then(undefined, (error: unknown) => {
-    if (options?.ignoreNotFound && isKeychainNotFoundError(error)) {
-      return
-    }
-    if (!options?.ignoreFailure) {
-      throw error
-    }
-  })
-}
-
 export async function readKeychainPassword(
   service: string,
   account: string
@@ -119,6 +105,20 @@ export async function readKeychainPassword(
     }
     throw error
   }
+}
+
+export function execSecurity(
+  args: string[],
+  options?: { ignoreFailure?: boolean; ignoreNotFound?: boolean }
+): Promise<void> {
+  return execSecurityCommand(args).then(undefined, (error: unknown) => {
+    if (options?.ignoreNotFound && isKeychainNotFoundError(error)) {
+      return
+    }
+    if (!options?.ignoreFailure) {
+      throw error
+    }
+  })
 }
 
 export async function writeKeychainPassword(

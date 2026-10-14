@@ -10,7 +10,6 @@ type TerminalPtyOwnershipReleaseState = Pick<
   | 'lastKnownRelayPtyIdByTabId'
   | 'deferredSshSessionIdsByTabId'
   | 'pendingReconnectPtyIdByTabId'
-  | 'directSshLivePtyBindingByTabId'
   | 'sleepingAgentSessionsByPaneKey'
   | 'unreadTerminalPanes'
   | 'unreadAgentCompletionPanes'
@@ -25,9 +24,6 @@ type RemovedTerminalAuxiliaryState = Pick<
   | 'pendingReconnectPtyIdByTabId'
   | 'pendingReconnectTabByWorktree'
   | 'unverifiedPtyLossTabIds'
-  | 'directSshPaneRetryByTabId'
-  | 'directSshLivePtyBindingByTabId'
-  | 'directSshPaneRetryHistoryByTabId'
   | 'sleepingAgentSessionsByPaneKey'
   | 'unreadTerminalTabs'
   | 'unreadTerminalPanes'
@@ -80,15 +76,6 @@ export function buildRemovedTerminalAuxiliaryStatePatch(
       )
     },
     unverifiedPtyLossTabIds: withoutTabIds(state.unverifiedPtyLossTabIds, removedTabIds),
-    directSshPaneRetryByTabId: withoutTabIds(state.directSshPaneRetryByTabId, removedTabIds),
-    directSshLivePtyBindingByTabId: withoutTabIds(
-      state.directSshLivePtyBindingByTabId,
-      removedTabIds
-    ),
-    directSshPaneRetryHistoryByTabId: withoutTabIds(
-      state.directSshPaneRetryHistoryByTabId,
-      removedTabIds
-    ),
     sleepingAgentSessionsByPaneKey: withoutPaneKeysForTabs(
       state.sleepingAgentSessionsByPaneKey,
       removedTabIds
@@ -118,7 +105,6 @@ export function buildTerminalPtyOwnershipReleasePatch(
   | 'lastKnownRelayPtyIdByTabId'
   | 'deferredSshSessionIdsByTabId'
   | 'pendingReconnectPtyIdByTabId'
-  | 'directSshLivePtyBindingByTabId'
   | 'sleepingAgentSessionsByPaneKey'
   | 'unreadTerminalPanes'
   | 'unreadAgentCompletionPanes'
@@ -137,7 +123,6 @@ export function buildTerminalPtyOwnershipReleasePatch(
   const lastKnownRelayPtyIdByTabId = { ...state.lastKnownRelayPtyIdByTabId }
   const deferredSshSessionIdsByTabId = { ...state.deferredSshSessionIdsByTabId }
   const pendingReconnectPtyIdByTabId = { ...state.pendingReconnectPtyIdByTabId }
-  const directSshLivePtyBindingByTabId = { ...state.directSshLivePtyBindingByTabId }
   const releasedPaneKeys = new Set<string>()
 
   for (const [tabId, releasedPtyIds] of releasedPtyIdsByTabId) {
@@ -171,9 +156,6 @@ export function buildTerminalPtyOwnershipReleasePatch(
     if (releasedPtyIds.has(pendingReconnectPtyIdByTabId[tabId] ?? '')) {
       delete pendingReconnectPtyIdByTabId[tabId]
     }
-    if (releasedPtyIds.has(directSshLivePtyBindingByTabId[tabId]?.ptyId ?? '')) {
-      delete directSshLivePtyBindingByTabId[tabId]
-    }
   }
 
   return {
@@ -183,7 +165,6 @@ export function buildTerminalPtyOwnershipReleasePatch(
     lastKnownRelayPtyIdByTabId,
     deferredSshSessionIdsByTabId,
     pendingReconnectPtyIdByTabId,
-    directSshLivePtyBindingByTabId,
     sleepingAgentSessionsByPaneKey: withoutPaneKeys(
       state.sleepingAgentSessionsByPaneKey,
       releasedPaneKeys

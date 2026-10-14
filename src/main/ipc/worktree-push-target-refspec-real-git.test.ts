@@ -8,7 +8,7 @@ import { appendFile, cp, mkdir, mkdtemp, realpath, rm, writeFile } from 'node:fs
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import type { WorktreeMeta } from '../../shared/worktree/meta-types'
 import type { GitPushTarget } from '../../shared/worktree/types'
 import type { GitRemoteExec, WorktreePushTargetStore } from './worktree-push-target-cleanup'

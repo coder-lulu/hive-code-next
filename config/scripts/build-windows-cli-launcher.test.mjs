@@ -13,10 +13,11 @@ import { dirname, join, resolve } from 'node:path'
 import { spawnSync } from 'node:child_process'
 import { describe, expect, it } from 'vitest'
 import {
-  shouldReuseCompiledWindowsCliLauncher,
-  windowsCliLauncherFileVersion,
-  windowsCliLauncherFingerprint
-} from './build-windows-cli-launcher.mjs'
+  shouldReuseCompiledWindowsRustExecutable,
+  windowsRustExecutableFileVersion,
+  windowsRustExecutableTarget,
+  windowsRustExecutableFingerprint
+} from './windows-rust-executable-build.mjs'
 import { findDynamicVcRuntimeImports, readPeImportedDllNames } from './windows-pe-imports.mjs'
 
 const itCrossHost = process.platform === 'win32' ? it.skip : it
@@ -58,33 +59,33 @@ describe('Windows CLI launcher', () => {
         }
       )
       const outputPath = join(root, 'orca.exe')
-      const fingerprint = windowsCliLauncherFingerprint(inputs, '1.4.214')
-      expect(shouldReuseCompiledWindowsCliLauncher(outputPath, fingerprint)).toBe(false)
+      const fingerprint = windowsRustExecutableFingerprint(inputs, '1.4.214')
+      expect(shouldReuseCompiledWindowsRustExecutable(outputPath, fingerprint)).toBe(false)
       writeFileSync(outputPath, 'binary')
-      expect(shouldReuseCompiledWindowsCliLauncher(outputPath, fingerprint)).toBe(false)
+      expect(shouldReuseCompiledWindowsRustExecutable(outputPath, fingerprint)).toBe(false)
       writeFileSync(`${outputPath}.sha256`, fingerprint)
       for (const input of inputs) {
         utimesSync(input, new Date(), new Date())
       }
       expect(
-        shouldReuseCompiledWindowsCliLauncher(
+        shouldReuseCompiledWindowsRustExecutable(
           outputPath,
-          windowsCliLauncherFingerprint(inputs, '1.4.214')
+          windowsRustExecutableFingerprint(inputs, '1.4.214')
         )
       ).toBe(true)
       expect(
-        shouldReuseCompiledWindowsCliLauncher(
+        shouldReuseCompiledWindowsRustExecutable(
           outputPath,
-          windowsCliLauncherFingerprint(inputs, '1.4.215')
+          windowsRustExecutableFingerprint(inputs, '1.4.215')
         )
       ).toBe(false)
       for (const input of inputs) {
         const original = readFileSync(input)
         writeFileSync(input, 'changed')
         expect(
-          shouldReuseCompiledWindowsCliLauncher(
+          shouldReuseCompiledWindowsRustExecutable(
             outputPath,
-            windowsCliLauncherFingerprint(inputs, '1.4.214')
+            windowsRustExecutableFingerprint(inputs, '1.4.214')
           )
         ).toBe(false)
         writeFileSync(input, original)
@@ -95,10 +96,10 @@ describe('Windows CLI launcher', () => {
   })
 
   it('reduces a prerelease to the numeric version Windows can record', () => {
-    expect(windowsCliLauncherFileVersion('1.4.214-daily.202609281300')).toBe('1.4.214.0')
-    expect(windowsCliLauncherFileVersion('1.4.214')).toBe('1.4.214.0')
+    expect(windowsRustExecutableFileVersion('1.4.214-daily.202609281300')).toBe('1.4.214.0')
+    expect(windowsRustExecutableFileVersion('1.4.214')).toBe('1.4.214.0')
     for (const version of ['1.4.65535', '1.4', '1.4.214"', undefined]) {
-      expect(() => windowsCliLauncherFileVersion(version)).toThrow('Invalid Windows')
+      expect(() => windowsRustExecutableFileVersion(version)).toThrow('Invalid Windows')
     }
   })
 
@@ -247,84 +248,78 @@ describe('Windows CLI launcher', () => {
     }
   })
 
-  itWindows('launches HiveCode.exe and preserves the hive command identity', () => {
-    const appRoot = mkdtempSync(join(artifactRoot, 'hivecode cli launcher '))
+  it('cross-compiles only the architectures the orcad template ships', () => {
+    expect(windowsRustExecutableTarget(undefined)).toBeNull()
+    expect(windowsRustExecutableTarget('x64')).toBe('x86_64-pc-windows-msvc')
+    expect(windowsRustExecutableTarget('arm64')).toBe('aarch64-pc-windows-msvc')
+    expect(() => windowsRustExecutableTarget('ia32')).toThrow('Unsupported')
+  })
+
+  itWindows('runs a server profile CLI on pinned Node with argv and profile intact', () => {
+    const root = mkdtempSync(join(artifactRoot, 'orca server launcher '))
     try {
-      const resourcesPath = join(appRoot, 'resources')
-      const launcherPath = join(resourcesPath, 'bin', 'hive.exe')
-      const cliPath = join(resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
-      mkdirSync(dirname(launcherPath), { recursive: true })
+      const profile = join(root, 'server profile')
+      const launcherPath = join(profile, 'cli', 'bin', 'orca.exe')
+      const cliPath = join(root, 'server slot', 'out', 'cli', 'index.js')
       mkdirSync(dirname(cliPath), { recursive: true })
-      copyFileSync(process.execPath, join(appRoot, 'HiveCode.exe'))
       writeFileSync(
         cliPath,
         `process.stdout.write(JSON.stringify({
   argv: process.argv.slice(2),
-  command: process.env.ORCA_CLI_COMMAND,
-  electronRunAsNode: process.env.ELECTRON_RUN_AS_NODE,
-  inheritedCrashpadPipe: process.env.CHROME_CRASHPAD_PIPE_NAME ?? null
+  profile: process.env.ORCA_USER_DATA_PATH,
+  electronRunAsNode: process.env.ELECTRON_RUN_AS_NODE ?? null,
+  nodeOptions: process.env.NODE_OPTIONS ?? null
 }))\n`,
         'utf8'
       )
-
       const build = spawnSync(
         process.execPath,
         ['config/scripts/build-windows-cli-launcher.mjs', '--output', launcherPath],
         { cwd: projectRoot, encoding: 'utf8' }
       )
       expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0)
-
-      const launch = spawnSync(launcherPath, ['--help'], {
-        encoding: 'utf8',
-        env: { ...process.env, CHROME_CRASHPAD_PIPE_NAME: 'invalid-parent-pipe' }
-      })
-      expect(launch.status, launch.stderr).toBe(0)
-      expect(JSON.parse(launch.stdout)).toEqual({
-        argv: ['--help'],
-        command: 'hive',
-        electronRunAsNode: '1',
-        inheritedCrashpadPipe: null
-      })
-    } finally {
-      removeFixtureTree(appRoot)
-    }
-  })
-
-  itWindows('preserves every compatibility command identity', () => {
-    const appRoot = mkdtempSync(join(artifactRoot, 'hivecode cli aliases '))
-    try {
-      const resourcesPath = join(appRoot, 'resources')
-      const binPath = join(resourcesPath, 'bin')
-      const canonicalLauncherPath = join(binPath, 'hive.exe')
-      const cliPath = join(resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
-      mkdirSync(binPath, { recursive: true })
-      mkdirSync(dirname(cliPath), { recursive: true })
-      copyFileSync(process.execPath, join(appRoot, 'HiveCode.exe'))
       writeFileSync(
-        cliPath,
-        'process.stdout.write(process.env.ORCA_CLI_COMMAND ?? "missing")\n',
-        'utf8'
+        join(dirname(launcherPath), 'orca-launcher.cfg'),
+        `node=${process.execPath}\ncli=${cliPath}\nuser-data=${profile}\n`
       )
 
-      const build = spawnSync(
-        process.execPath,
-        ['config/scripts/build-windows-cli-launcher.mjs', '--output', canonicalLauncherPath],
-        { cwd: projectRoot, encoding: 'utf8' }
-      )
-      expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0)
-
-      for (const alias of ['hivecode', 'orca', 'orca-ide']) {
-        const aliasPath = join(binPath, `${alias}.exe`)
-        copyFileSync(canonicalLauncherPath, aliasPath)
-        const launch = spawnSync(aliasPath, [], {
-          encoding: 'utf8',
-          env: { ...process.env, ORCA_CLI_COMMAND: undefined }
-        })
-        expect(launch.status, launch.stderr).toBe(0)
-        expect(launch.stdout).toBe(alias)
+      const inherited = {
+        ...process.env,
+        ELECTRON_RUN_AS_NODE: '1',
+        NODE_OPTIONS: '--require C:\\missing\\preload.js',
+        ORCA_USER_DATA_PATH: 'C:\\another\\owner',
+        ORCA_TEST_LAUNCHER: launcherPath
       }
+      const expected = (body) => ({
+        argv: ['orchestration', 'send', '--body', body, '--json'],
+        profile,
+        electronRunAsNode: null,
+        nodeOptions: null
+      })
+      // Windows PowerShell 5.1 itself drops embedded double quotes, so its body has none.
+      const shellBody = 'line one & %PATH% ^caret\n\nline three'
+      const powershell = spawnSync(
+        'powershell.exe',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          '& $env:ORCA_TEST_LAUNCHER orchestration send --body $env:ORCA_TEST_BODY --json'
+        ],
+        { encoding: 'utf8', env: { ...inherited, ORCA_TEST_BODY: shellBody } }
+      )
+      expect(powershell.status, powershell.stderr).toBe(0)
+      expect(JSON.parse(powershell.stdout)).toEqual(expected(shellBody))
+
+      const body = 'line one "quoted" \\"escaped\\" & %PATH% ^caret\\\n\nline three\\'
+      const direct = spawnSync(launcherPath, expected(body).argv, {
+        encoding: 'utf8',
+        env: inherited
+      })
+      expect(direct.status, direct.stderr).toBe(0)
+      expect(JSON.parse(direct.stdout)).toEqual(expected(body))
     } finally {
-      removeFixtureTree(appRoot)
+      removeFixtureTree(root)
     }
   })
 
@@ -380,6 +375,88 @@ describe('Windows CLI launcher', () => {
       removeFixtureTree(appRoot)
     }
   })
+  itWindows('launches HiveCode.exe and preserves the hive command identity', () => {
+    const appRoot = mkdtempSync(join(artifactRoot, 'hivecode cli launcher '))
+    try {
+      const resourcesPath = join(appRoot, 'resources')
+      const launcherPath = join(resourcesPath, 'bin', 'hive.exe')
+      const cliPath = join(resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
+      mkdirSync(dirname(launcherPath), { recursive: true })
+      mkdirSync(dirname(cliPath), { recursive: true })
+      copyFileSync(process.execPath, join(appRoot, 'HiveCode.exe'))
+      writeFileSync(
+        cliPath,
+        `process.stdout.write(JSON.stringify({
+  argv: process.argv.slice(2),
+  command: process.env.ORCA_CLI_COMMAND,
+  electronRunAsNode: process.env.ELECTRON_RUN_AS_NODE,
+  inheritedCrashpadPipe: process.env.CHROME_CRASHPAD_PIPE_NAME ?? null
+}))\n`,
+        'utf8'
+      )
+
+      const build = spawnSync(
+        process.execPath,
+        ['config/scripts/build-windows-cli-launcher.mjs', '--output', launcherPath],
+        { cwd: projectRoot, encoding: 'utf8' }
+      )
+      expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0)
+
+      const launch = spawnSync(launcherPath, ['--help'], {
+        encoding: 'utf8',
+        env: { ...process.env, CHROME_CRASHPAD_PIPE_NAME: 'invalid-parent-pipe' }
+      })
+      expect(launch.status, launch.stderr).toBe(0)
+      expect(JSON.parse(launch.stdout)).toEqual({
+        argv: ['--help'],
+        command: 'hive',
+        electronRunAsNode: '1',
+        inheritedCrashpadPipe: null
+      })
+    } finally {
+      removeFixtureTree(appRoot)
+    }
+  })
+
+
+  itWindows('preserves every compatibility command identity', () => {
+    const appRoot = mkdtempSync(join(artifactRoot, 'hivecode cli aliases '))
+    try {
+      const resourcesPath = join(appRoot, 'resources')
+      const binPath = join(resourcesPath, 'bin')
+      const canonicalLauncherPath = join(binPath, 'hive.exe')
+      const cliPath = join(resourcesPath, 'app.asar.unpacked', 'out', 'cli', 'index.js')
+      mkdirSync(binPath, { recursive: true })
+      mkdirSync(dirname(cliPath), { recursive: true })
+      copyFileSync(process.execPath, join(appRoot, 'HiveCode.exe'))
+      writeFileSync(
+        cliPath,
+        'process.stdout.write(process.env.ORCA_CLI_COMMAND ?? "missing")\n',
+        'utf8'
+      )
+
+      const build = spawnSync(
+        process.execPath,
+        ['config/scripts/build-windows-cli-launcher.mjs', '--output', canonicalLauncherPath],
+        { cwd: projectRoot, encoding: 'utf8' }
+      )
+      expect(build.status, `${build.stdout}\n${build.stderr}`).toBe(0)
+
+      for (const alias of ['hivecode', 'orca', 'orca-ide']) {
+        const aliasPath = join(binPath, `${alias}.exe`)
+        copyFileSync(canonicalLauncherPath, aliasPath)
+        const launch = spawnSync(aliasPath, [], {
+          encoding: 'utf8',
+          env: { ...process.env, ORCA_CLI_COMMAND: undefined }
+        })
+        expect(launch.status, launch.stderr).toBe(0)
+        expect(launch.stdout).toBe(alias)
+      }
+    } finally {
+      removeFixtureTree(appRoot)
+    }
+  })
+
 })
 
 function findFrameworkCompiler() {

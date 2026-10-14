@@ -165,9 +165,7 @@ export function useWorktreeSidebarHeaderDrag(args: {
       order: number,
       sourceExecutionHostId: ExecutionHostId
     ) => {
-      void moveProjectToGroup(repoId, projectGroupId, order, {
-        hostId: sourceExecutionHostId
-      })
+      void moveProjectToGroup(repoId, projectGroupId, order, sourceExecutionHostId)
     },
     [moveProjectToGroup]
   )

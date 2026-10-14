@@ -1,3 +1,5 @@
+import type { AgentLaunchTabViewerRule } from '../../shared/agent-launch-tab-publication'
+import type { SpawnIntent } from '../../shared/host-spawn-admission'
 import type { ParsedAgentStatusPayload } from '../../shared/agent-status-types'
 import type {
   AgentLaunchPreferences,
@@ -75,6 +77,8 @@ export type TerminalCreateOptions = {
   terminalKittyKeyboardProtocol?: boolean
   terminalColorQueryReplies?: TerminalOscColorQueryReplyColors
   viewMode?: 'terminal' | 'chat'
+  /** The tab group a background create joins; defaults to the first group. */
+  targetGroupId?: string
   startupCommandDelivery?: WorktreeStartupLaunch['startupCommandDelivery']
   telemetry?: WorktreeStartupLaunch['telemetry']
   /** The surface that asked for this `startupAgent` launch; the runtime attributes every one it
@@ -86,6 +90,8 @@ export type TerminalCreateOptions = {
   activate?: boolean
   presentation?: RuntimeTerminalPresentation
   surfaceOwner?: false
+  /** Main-internal: recheck early publication when the host is ready to reveal its pane. */
+  agentLaunchViewer?: () => AgentLaunchTabViewerRule
   tabId?: string
   leafId?: string
   /** Refuse, rather than attach, when `tabId`/`leafId` name a pane whose PTY is already live. */
@@ -96,7 +102,11 @@ export type TerminalCreateOptions = {
   persistHostSessionBinding?: boolean
   agentSessionClaim?: AgentSessionExecutionClaim
   agentSessionCreateOperationId?: string
+  /** The paired client's declared intent; the host's fork gate validates and may defer it. */
+  spawnIntent?: SpawnIntent
   signal?: AbortSignal
+  /** Refuse (`worktree_terminals_sleeping`) instead of waking a worktree the host has put to sleep. */
+  refuseSleptWorktree?: boolean
   onPtySpawnCommitted?: () => void
   /** Called before the spawn request leaves this process; a throw before it proves nothing spawned. */
   onPtySpawnDispatched?: (
@@ -161,11 +171,6 @@ export type HookLiveAgentRow = Pick<
   RuntimeAgentRowSnapshot,
   'payload' | 'updatedAt' | 'evidenceObservedAt' | 'observation' | 'stateStartedAt' | 'worktreeId'
 >
-
-export type RuntimePtyDataAdmission = Readonly<{
-  sequence: number
-  completion: Promise<void>
-}>
 
 export type TerminalHandleRecord = {
   handle: string

@@ -31,7 +31,7 @@ describe('shared build toolchain contract', () => {
   it('keeps Node-based build containers on the shared immutable baseline', () => {
     const dockerfiles = [
       'config/docker/headless-pairing/Dockerfile.build',
-      'tests/e2e/fixtures/docker-ssh-relay/Dockerfile'
+      'tests/e2e/fixtures/docker-ssh-host/Dockerfile'
     ]
 
     for (const relativePath of dockerfiles) {

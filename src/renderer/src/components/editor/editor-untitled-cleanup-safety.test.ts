@@ -7,7 +7,7 @@ import {
   createUntitledNoteStore,
   stubEditorWindowWithDisk
 } from './editor-autosave-controller-test-fixture'
-import { deleteRuntimePath } from '@/runtime/runtime-file-client'
+import { deleteRuntimePath } from '@/runtime/runtime-file-mutation-client'
 
 const FILE_ID = '/repo/untitled.md'
 
@@ -122,7 +122,7 @@ describe('untitled automatic cleanup without an atomic delete capability', () =>
     await writeFile(filePath, 'delete explicitly')
 
     await deleteRuntimePath(
-      { settings: { activeRuntimeEnvironmentId: null }, worktreeId: 'wt-1', worktreePath: '/repo' },
+      { target: { kind: 'local' }, worktreeId: 'wt-1', worktreePath: '/repo' },
       FILE_ID
     )
 

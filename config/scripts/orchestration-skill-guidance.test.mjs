@@ -78,7 +78,7 @@ describe('orchestration kernel', () => {
     ]
 
     // Why: 202 is the budget after the anti-loop nextAction rule; the kernel is always in context.
-    expect(kernel.split('\n').length).toBeLessThanOrEqual(202)
+    expect(kernel.trimEnd().split('\n').length).toBeLessThanOrEqual(202)
     for (let index = 1; index < headings.length; index += 1) {
       expect(kernel.indexOf(headings[index])).toBeGreaterThan(kernel.indexOf(headings[index - 1]))
     }

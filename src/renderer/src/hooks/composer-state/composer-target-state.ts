@@ -84,7 +84,7 @@ export function useComposerTargetState(
     newWorkspaceDraft: composerTargetStore.newWorkspaceDraft,
     persistDraft: composerTargetStore.persistDraft,
     selectedRepoConnectionId: runtimeTargetSelection.selectedRepoConnectionId,
-    selectedRepoSettings: runtimeTargetSelection.selectedRepoSettings,
+    selectedRepoRuntimeEnvironmentId: runtimeTargetSelection.selectedRepoRuntimeEnvironmentId,
     settings: composerTargetStore.settings
   })
   const asyncComposerState = useComposerAsyncState({
@@ -105,7 +105,6 @@ export function useComposerTargetState(
     selectedRepoConnectionId: runtimeTargetSelection.selectedRepoConnectionId,
     selectedRepoHookContextKey: runtimeTargetSelection.selectedRepoHookContextKey,
     selectedRepoIsGit: runtimeTargetSelection.selectedRepoIsGit,
-    selectedRepoSettings: runtimeTargetSelection.selectedRepoSettings,
     setName: sourceContextState.setName
   })
   const providerRuntimeSync = useComposerProviderRuntimeSync({
@@ -116,8 +115,7 @@ export function useComposerTargetState(
     selectedRepoHookContextKey: runtimeTargetSelection.selectedRepoHookContextKey,
     selectedRepoIsGit: runtimeTargetSelection.selectedRepoIsGit,
     selectedRepoPath: asyncComposerState.selectedRepoPath,
-    selectedRepoSettings: runtimeTargetSelection.selectedRepoSettings,
-    selectedRepoSettingsRef: asyncComposerState.selectedRepoSettingsRef,
+    selectedRepoTarget: runtimeTargetSelection.selectedRepoTarget,
     setCheckedHooksContextKey: asyncComposerState.setCheckedHooksContextKey,
     setSelectedRepoSlug: asyncComposerState.setSelectedRepoSlug,
     setSetupAgentStartupPolicy: asyncComposerState.setSetupAgentStartupPolicy,

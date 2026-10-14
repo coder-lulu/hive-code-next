@@ -61,11 +61,7 @@ export async function subscribeRemoteRuntimeTransport<TResult>(
     method,
     params
   })
-  const serializedAuth = serializeRemoteRuntimePayload({
-    type: 'e2ee_auth',
-    deviceToken: pairing.deviceToken,
-    clientCapabilities: remoteRuntimeClientCapabilities(options?.clientCapabilities)
-  })
+  const serializedAuth = serializeRemoteRuntimePayload({ type: 'e2ee_auth', deviceToken: pairing.deviceToken, clientCapabilities: remoteRuntimeClientCapabilities(options?.clientCapabilities) })
   return await new Promise((resolve, reject) => {
     const session = RuntimeE2EEClientSession.create({
       desktopPublicKeyB64: pairing.publicKeyB64,

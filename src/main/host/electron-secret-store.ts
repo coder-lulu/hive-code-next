@@ -1,5 +1,6 @@
 import { safeStorage } from 'electron'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
+import { guardedSafeStorage, safeStorageWithheldReason } from './safe-storage-availability'
 import type { SecretStore } from '../../shared/secret-store'
 
 /**
@@ -8,18 +9,22 @@ import type { SecretStore } from '../../shared/secret-store'
  */
 export class ElectronSecretStore implements SecretStore {
   isEncryptionAvailable(): boolean {
-    return safeStorage.isEncryptionAvailable()
+    return guardedSafeStorage.isEncryptionAvailable()
   }
 
   encryptString(plainText: string): Buffer {
-    return safeStorage.encryptString(plainText)
+    return guardedSafeStorage.encryptString(plainText)
   }
 
   decryptString(cipher: Buffer): string {
-    return safeStorage.decryptString(cipher)
+    return guardedSafeStorage.decryptString(cipher)
   }
 
   describeProtectionGap(): string | null {
+    const withheld = safeStorageWithheldReason()
+    if (withheld !== null) {
+      return `The OS keychain is unavailable for this run (${withheld}), so new secrets cannot be saved securely. Start orca serve from a logged-in desktop session, or unlock the login keychain, to seal them.`
+    }
     // Why availability first: it is the call that actually probes the keyring, so every
     // backend read below is free and cannot change which call blocks.
     if (!safeStorage.isEncryptionAvailable()) {

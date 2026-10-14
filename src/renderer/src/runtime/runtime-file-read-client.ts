@@ -3,7 +3,8 @@ import type {
   RuntimeFileReadChunkResult,
   RuntimeFileReadResult
 } from '../../../shared/runtime-types'
-import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
+import { callRuntimeRpc } from './runtime-rpc-client'
+import { RuntimeRpcCallError } from './runtime-rpc-result'
 import { applyProductBranding } from '@/product-brand'
 import type {
   RuntimeFileDownloadResult,
@@ -18,7 +19,9 @@ import {
   hasRemoteRuntimeOwner
 } from './runtime-file-routing'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
+import { isAgentSessionAttachmentStorePath } from '../../../shared/agent-session-attachments'
 import type { LocalFileAccess } from '../../../shared/local-file-access'
+import { readRuntimeTerminalArtifactContent } from './runtime-terminal-artifact-read'
 
 const REMOTE_DOWNLOAD_CHUNK_BYTES = 384 * 1024
 const REMOTE_DOWNLOAD_UPDATE_REQUIRED_MESSAGE = applyProductBranding(
@@ -36,23 +39,31 @@ export function localAccess(
 }
 
 export async function readRuntimeFileContent({
-  settings,
+  target,
   filePath,
   relativePath,
   worktreeId,
   connectionId,
   expectedExternalSshTargetId,
   includeLocalLogMetadata,
-  access
+  access,
+  terminalArtifactGrantId
 }: RuntimeFileReadArgs): Promise<RuntimeReadableFileContent> {
-  assertExternalSshReadOwnership(settings, connectionId, expectedExternalSshTargetId)
-  const target = getActiveRuntimeTarget(settings)
+  assertExternalSshReadOwnership(target, connectionId, expectedExternalSshTargetId)
   if (target.kind !== 'environment' || !worktreeId) {
     return window.api.fs.readFile({
       filePath,
       connectionId,
       includeLocalLogMetadata,
       ...localAccess(connectionId, access)
+    })
+  }
+  if (terminalArtifactGrantId) {
+    return readRuntimeTerminalArtifactContent({
+      target,
+      worktreeId,
+      absolutePath: filePath,
+      grantId: terminalArtifactGrantId
     })
   }
   if (!canReadRelativeRuntimeFile(relativePath)) {
@@ -96,11 +107,26 @@ export async function readRuntimeFilePreview(
   access?: LocalFileAccess
 ): Promise<RuntimeFilePreviewResult> {
   assertExternalSshReadOwnership(
-    context.settings,
+    context.target,
     context.connectionId,
     context.expectedExternalSshTargetId
   )
   const remoteArgs = getRemoteFileArgs(context, filePath)
+  const runtimeTarget = context.target
+  // A chat attachment lives in the paired server's store, outside every worktree; that server
+  // reads it back itself (an older one answers method_not_found, and the preview falls back).
+  if (
+    !remoteArgs &&
+    runtimeTarget.kind === 'environment' &&
+    isAgentSessionAttachmentStorePath(filePath)
+  ) {
+    return callRuntimeRpc<RuntimeFilePreviewResult>(
+      runtimeTarget,
+      'agentSessionAttachment.read',
+      { path: filePath },
+      { timeoutMs: 15_000 }
+    )
+  }
   if (!remoteArgs) {
     if (hasRemoteRuntimeOwner(context)) {
       throw new Error('Remote file is outside the owning runtime worktree')
@@ -125,7 +151,7 @@ export async function downloadRuntimeFile(
   suggestedName: string
 ): Promise<RuntimeFileDownloadResult> {
   assertExternalSshReadOwnership(
-    context.settings,
+    context.target,
     context.connectionId,
     context.expectedExternalSshTargetId
   )

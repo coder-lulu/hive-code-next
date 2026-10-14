@@ -1,4 +1,4 @@
-import type { RpcClient } from './rpc-client'
+import type { RpcClient } from './rpc-client-contract'
 
 // Where a relay dial is waiting, so a bound can tell "the cell never answered the
 // upgrade" from "the cell took the dial and is slow" — the two look identical from

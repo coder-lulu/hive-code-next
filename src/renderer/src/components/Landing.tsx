@@ -306,7 +306,7 @@ export default function Landing(): React.JSX.Element {
         temporaryLaunchCleanup.current = null
         console.error('Could not launch temporary session', error)
       }
-      if (launched && tracker.markLaunched(launched.tabId)) {
+      if (launched && tracker.markLaunched(launched.tabId ?? null)) {
         temporaryLaunchCleanup.current = null
       } else if (launched) {
         setHomeTaskDraft('')

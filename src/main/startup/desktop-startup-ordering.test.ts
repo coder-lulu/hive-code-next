@@ -322,7 +322,7 @@ describe('startup ordering', () => {
     // Why: the barrier fails open, so the serve-ready payload must carry the
     // reconciliation state and the bounded wait must be traceable via a milestone.
     const readyStart = serveSource.indexOf('await state.serveReadinessPublisher.publish(')
-    const readyEnd = serveSource.indexOf('pairing: pairing.available', readyStart)
+    const readyEnd = serveSource.indexOf('\n    output\n', readyStart)
     const readyPayload = serveSource.slice(readyStart, readyEnd)
 
     // Why: unbounded, a renamed pairing key slices to EOF and the status only has to survive
@@ -486,11 +486,16 @@ describe('startup ordering', () => {
       'utf8'
     )
     const serveStart = source.indexOf('async function launchServeMode(')
-    const signalHandlers = source.indexOf('registerServeSignalHandlers(process', serveStart)
+    const signalHandlers = source.indexOf('installServeQuitHandling()', serveStart)
     const serveReady = source.indexOf('await printServeReady(serveOptions)', serveStart)
 
     expect(serveStart).toBeGreaterThanOrEqual(0)
     expect(signalHandlers).toBeGreaterThan(serveStart)
-    expect(signalHandlers).toBeLessThan(serveReady)
+    expect(serveReady).toBeGreaterThan(signalHandlers)
+    const quitHandling = readFileSync(
+      join(process.cwd(), 'src/main/startup/serve-quit-handling.ts'),
+      'utf8'
+    )
+    expect(quitHandling).toContain('registerServeSignalHandlers(process, quitProcess)')
   })
 })

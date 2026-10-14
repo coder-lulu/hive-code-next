@@ -73,14 +73,8 @@ jobs:
       ref: ${{ github.sha }}
       build_template: true
 
-  relay-native-addons:
-    needs: reserve
-    uses: ./.github/workflows/relay-windows-process-tree.yml
-    with:
-      ref: ${{ github.sha }}
-
   build:
-    needs: [reserve, desktop-runtime, relay-native-addons]
+    needs: [reserve, desktop-runtime]
     strategy:
       fail-fast: false
       matrix:
@@ -101,7 +95,6 @@ jobs:
       HIVECODE_EMBED_RELEASE_IDENTITY: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ORCA_REQUIRE_ORCAD_TEMPLATE: '1'
-      ORCA_REQUIRE_RELAY_NATIVE_ADDONS: x64,arm64
     steps:
       - uses: actions/checkout@v6
         with:
@@ -113,10 +106,10 @@ jobs:
           name: orcad-template
           path: out/orcad-template
 
-      - name: Stage the qualified Windows relay addons
+      - name: Stage the qualified Windows process-tree addons
         uses: actions/download-artifact@v8
         with:
-          name: relay-windows-process-tree
+          name: orcad-windows-process-tree
           path: .build/windows-process-tree
 
       - uses: pnpm/setup@v2
@@ -155,16 +148,6 @@ jobs:
           mkdir -p "$TMPDIR"
           node config/scripts/runtime-file-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../node.log"
           ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../electron.log"
-
-      - name: Gate SSH relay watcher process isolation
-        shell: bash
-        env:
-          ORCA_BACKGROUND_LAUNCH: '1'
-        run: |
-          set -euo pipefail
-          export TMPDIR="$GITHUB_WORKSPACE/logs/release-watcher-gates/${{ matrix.architecture }}/relay/tmp"
-          mkdir -p "$TMPDIR"
-          node config/scripts/relay-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../node.log"
 
       - name: Package AppImage without external publishing
         shell: bash

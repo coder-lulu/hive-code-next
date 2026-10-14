@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AiVaultSession } from '../../../shared/ai-vault-types'
 import {
   dropDeletedSshResumeCwd,
+  prepareAiVaultSessionForFork,
   prepareAiVaultSessionForResume
 } from './ai-vault-session-resume-preparation'
 
@@ -98,6 +99,46 @@ describe('prepareAiVaultSessionForResume', () => {
   })
 })
 
+describe('prepareAiVaultSessionForFork', () => {
+  // A fork of a chat-owned conversation must run under the selected account, as a resume does.
+  it('repins a chat-owned per-account session, asking the host as a fork', async () => {
+    const prepareSessionResume = vi.fn().mockResolvedValue({
+      useRealCodexHome: false,
+      substituteCodexHome: '/tmp/orca/codex-accounts/account-2/home'
+    })
+    stubPreparation(prepareSessionResume)
+    const owned = session({
+      codexHome: '/tmp/orca/codex-accounts/account-1/home',
+      structuredSession: { sessionId: 'session-1', workspaceId: 'worktree-1' }
+    })
+
+    const prepared = await prepareAiVaultSessionForFork(owned)
+
+    expect(prepared.codexHome).toBe('/tmp/orca/codex-accounts/account-2/home')
+    expect(prepareSessionResume).toHaveBeenCalledWith({
+      agent: 'codex',
+      sessionId: owned.sessionId,
+      filePath: owned.filePath,
+      codexHome: owned.codexHome,
+      executionHostId: 'local',
+      fork: true
+    })
+  })
+
+  it('does not ask the host for a home that needs no preparation', async () => {
+    const prepareSessionResume = vi.fn()
+    stubPreparation(prepareSessionResume)
+    const owned = session({
+      agent: 'claude',
+      codexHome: null,
+      structuredSession: { sessionId: 'session-1', workspaceId: 'worktree-1' }
+    })
+
+    await expect(prepareAiVaultSessionForFork(owned)).resolves.toBe(owned)
+    expect(prepareSessionResume).not.toHaveBeenCalled()
+  })
+})
+
 describe('dropDeletedSshResumeCwd', () => {
   it('leaves a live SSH session alone, scanner command and all', async () => {
     const pathExists = vi.fn().mockResolvedValue(true)
@@ -170,3 +211,37 @@ function session(overrides: Partial<AiVaultSession> = {}): AiVaultSession {
     ...overrides
   }
 }
+
+it('uses only the owning runtime verdict to drop a deleted recorded directory', async () => {
+  const prepareSessionResume = vi
+    .fn()
+    .mockResolvedValue({ useRealCodexHome: false, recordedCwdMissing: true })
+  const pathExists = vi.fn()
+  vi.stubGlobal('window', { api: { aiVault: { prepareSessionResume }, fs: { pathExists } } })
+  const remote = session({ executionHostId: 'runtime:owner', cwd: '/deleted/worktree' })
+  const result = await dropDeletedSshResumeCwd(remote)
+  expect(result.cwd).toBeNull()
+  expect(result.resumeCommand).toBeUndefined()
+  expect(prepareSessionResume).toHaveBeenCalledWith(
+    expect.objectContaining({
+      executionHostId: 'runtime:owner',
+      sessionId: remote.sessionId,
+      filePath: remote.filePath,
+      checkRecordedCwd: true
+    })
+  )
+  expect(pathExists).not.toHaveBeenCalled()
+})
+it.each([{}, { recordedCwdMissing: false }])(
+  'keeps cwd without affirmative host absence %j',
+  async (verdict) => {
+    stubPreparation(vi.fn().mockResolvedValue({ useRealCodexHome: false, ...verdict }))
+    const remote = session({ executionHostId: 'runtime:owner' })
+    await expect(dropDeletedSshResumeCwd(remote)).resolves.toBe(remote)
+  }
+)
+it('keeps cwd when its runtime is unavailable', async () => {
+  stubPreparation(vi.fn().mockRejectedValue(new Error('unauthorized')))
+  const remote = session({ executionHostId: 'runtime:owner' })
+  await expect(dropDeletedSshResumeCwd(remote)).resolves.toBe(remote)
+})

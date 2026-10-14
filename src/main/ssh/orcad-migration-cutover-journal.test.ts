@@ -33,6 +33,8 @@ describe('migration cutover journal sidecar', () => {
 
   it.each([
     ['corrupt JSON', '{not json'],
+    ['unsupported legacy terminal grant', JSON.stringify({ ...cutover(), bridgedPtyIds: ['running'] })],
+    ['unsupported empty bridge grant', JSON.stringify({ ...cutover(), bridgedPtyIds: [] })],
     ['a manifest bound to another target', JSON.stringify({ ...cutover(), sshTargetId: 'ssh-2' })],
     ['a tampered manifest', JSON.stringify({ ...cutover(), manifestSha256: 'f'.repeat(64) })],
     ['an unknown version', JSON.stringify({ ...cutover(), version: 2 })]

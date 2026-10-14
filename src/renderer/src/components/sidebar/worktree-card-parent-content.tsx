@@ -1,6 +1,7 @@
 import React from 'react'
 
 import { cn } from '@/lib/utils'
+import { getWorkspaceAttachments } from '../../../../shared/workspace-attachments'
 import { WorktreeCardHeader } from './worktree-card-header'
 import { WorktreeCardMetaRow } from './worktree-card-meta-row'
 import { WorktreeCardDetailsHover } from './WorktreeCardMeta'
@@ -29,10 +30,12 @@ export function WorktreeCardParentContent({
     stopQuickActionPointerPropagation,
     handleToggleUnreadQuick,
     statusLaneReview,
+    reviewChecks,
     branchIdentityDisplay,
     showInlineAgentList,
     titleRenaming,
     isDeleting,
+    referenceDetails,
     hoverIssue,
     hoverLinearIssue,
     hoverJiraIssue,
@@ -44,6 +47,7 @@ export function WorktreeCardParentContent({
     detailsHoverControl,
     handleRenameTitle,
     handleEditIssue,
+    handleManageLinks,
     handleEditComment,
     handleOpenGitHubIssueInOrca,
     handleOpenIssueInBrowser,
@@ -81,6 +85,9 @@ export function WorktreeCardParentContent({
   const identityContentWithHover =
     hasHoverDetails && !titleRenaming ? (
       <WorktreeCardDetailsHover
+        workspace={worktree}
+        referenceDetails={referenceDetails}
+        onManageLinks={affiliateListMode ? undefined : handleManageLinks}
         issue={hoverIssue}
         linearIssue={hoverLinearIssue}
         jiraIssue={hoverJiraIssue}
@@ -151,6 +158,7 @@ export function WorktreeCardParentContent({
             onPointerDown={stopQuickActionPointerPropagation}
             onToggleUnread={handleToggleUnreadQuick}
             prDisplay={statusLaneReview}
+            reviewChecks={reviewChecks.total > 0 ? reviewChecks : undefined}
             newCardStyle={newCardStyle}
             hasBranchIdentity={Boolean(branchIdentityDisplay)}
           />
@@ -162,7 +170,9 @@ export function WorktreeCardParentContent({
         className={cn(
           'flex min-w-0 flex-1 flex-col gap-1.5',
           // Why: inline agent rows intentionally outdent into the card gutter; inner elements handle truncation.
-          showInlineAgentList || (!newCardStyle && lineageChildren)
+          showInlineAgentList ||
+            getWorkspaceAttachments(worktree).length > 1 ||
+            (!newCardStyle && lineageChildren)
             ? 'overflow-visible'
             : 'overflow-hidden'
         )}

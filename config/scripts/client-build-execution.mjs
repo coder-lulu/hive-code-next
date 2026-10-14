@@ -1,32 +1,8 @@
-import {
-  createWriteStream,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  unlinkSync
-} from 'node:fs'
+import { createWriteStream, mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 import { join } from 'node:path'
-import { registerHooks } from 'node:module'
-import { fileURLToPath } from 'node:url'
+import { loadClientBuildProcessHost } from './client-build-process-host.mjs'
 
-const loader = registerHooks({
-  resolve(specifier, context, nextResolve) {
-    if (
-      specifier.startsWith('.') &&
-      !/\.[cm]?[jt]s$/.test(specifier) &&
-      context.parentURL?.includes('/src/shared/child-process/')
-    ) {
-      const candidate = new URL(`${specifier}.ts`, context.parentURL)
-      if (existsSync(fileURLToPath(candidate))) {
-        return { url: candidate.href, shortCircuit: true }
-      }
-    }
-    return nextResolve(specifier, context)
-  }
-})
-const { spawnProcess, runProcess } = await import('../../src/shared/child-process/run-process.ts')
-loader.deregister()
+const { spawnProcess, runProcess } = await loadClientBuildProcessHost()
 
 export async function capture(context, program, args, cwd = context.root) {
   const result = await runProcess({ program, args, cwd, env: context.env, timeoutMs: 60_000 })

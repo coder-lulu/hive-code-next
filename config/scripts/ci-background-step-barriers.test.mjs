@@ -89,8 +89,9 @@ describe('CI background step barriers', () => {
     const steps = mobile.jobs.verify.steps
     assertJoinedBefore(steps, 'production-types', (step) => step.name === 'Test')
     const ratchet = steps.findIndex((step) => step.name === 'Typecheck tests (ratchet)')
-    const join = steps.findIndex((step) => step.wait === 'production-types')
-    expect(steps[ratchet].background).toBeUndefined()
+    const join = steps.findIndex((step) => [step.wait].flat().includes('production-types'))
+    assertJoinedBefore(steps, 'test-types', (step) => step.name === 'Test')
+    expect(steps[ratchet].background).toBe(true)
     expect(ratchet).toBeLessThan(join)
   })
 

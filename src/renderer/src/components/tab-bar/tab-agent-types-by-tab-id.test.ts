@@ -307,7 +307,7 @@ describe('selectTabAgentTypesByTabId', () => {
     expect(select({ settings: { experimentalNativeChat: true } })).toBe(first)
   })
 
-  it('retains cached host identity and split safety when experiments are toggled', () => {
+  it('keeps agent evidence available for explicit chat toggles while the default is off', () => {
     const onStatusEntryVisited = vi.fn()
     const onAgentTypeLayoutVisited = vi.fn()
     const onUnsafeLayoutVisited = vi.fn()
@@ -323,16 +323,17 @@ describe('selectTabAgentTypesByTabId', () => {
     }
 
     const first = select(state)
-    select({ ...state, settings: { experimentalNativeChat: false } })
+    const disabled = select({ ...state, settings: { experimentalNativeChat: false } })
     const afterReenable = select(state)
 
+    expect(disabled.tabAgentTypesByTabId).toEqual({ 'tab-1': 'claude' })
     expect(afterReenable).not.toBe(first)
     expect(onStatusEntryVisited).toHaveBeenCalledTimes(1)
     expect(onAgentTypeLayoutVisited).toHaveBeenCalledTimes(1)
     expect(onUnsafeLayoutVisited).toHaveBeenCalledTimes(1)
   })
 
-  it('production selector preserves split safety with experiments off and shares cached projections', () => {
+  it('production selector scans once and reuses agent evidence with Chat UI off', () => {
     let statusEnumerations = 0
     let layoutEnumerations = 0
     const statuses = new Proxy(

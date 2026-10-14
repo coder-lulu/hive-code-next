@@ -754,6 +754,7 @@ describe('WebRuntimeClient', () => {
     })
     const sharedKey = createWebRuntimeTestSession()
     const onBinary = vi.fn()
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the test reaches the client's private transport state; a renamed field fails the test.
     const internals = client as unknown as {
       state: 'connected'
       session: RuntimeE2EEClientSession | null

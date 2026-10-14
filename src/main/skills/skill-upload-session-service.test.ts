@@ -124,7 +124,21 @@ describe('SkillUploadSessionService', () => {
     expect(await stagedArchives(uploads)).toEqual([firstPath])
     await first.cancel(firstUpload.uploadId)
     expect(await stagedArchives(uploads)).toEqual([])
-    await Promise.all([first.dispose(), second.dispose()])
+    const firstDisposal = await first.begin({ package: identity(firstBytes) })
+    const secondBytes = Buffer.from('second live package')
+    const secondDisposal = await second.begin({ package: identity(secondBytes) })
+    await second.append({
+      uploadId: secondDisposal.uploadId,
+      offset: 0,
+      bytesBase64: secondBytes.toString('base64')
+    })
+    await first.dispose()
+    const remaining = await stagedArchives(uploads)
+    expect(remaining).toHaveLength(1)
+    expect(remaining[0]).toContain(secondDisposal.uploadId)
+    expect(remaining[0]).not.toContain(firstDisposal.uploadId)
+    await expect(readFile(remaining[0])).resolves.toEqual(secondBytes)
+    await second.dispose()
     expect(await readdir(uploads)).toEqual([])
   })
 

@@ -8,7 +8,7 @@ export async function verifyRuntimeEnvironmentSshTunnel(
   localPort: number,
   signal?: AbortSignal
 ): Promise<{
-  verifiedPairing: PairingOffer
+  verifiedConnection: PairingOffer
   verifiedRuntimeId: string
   runtimeStatus: RuntimeStatus
 }> {

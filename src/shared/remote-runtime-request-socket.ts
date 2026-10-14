@@ -56,11 +56,7 @@ export async function sendRemoteRuntimeRequestOnSocket<TResult>(
         method: 'status.get'
       })
     : null
-  const serializedAuth = serializeRemoteRuntimePayload({
-    type: 'e2ee_auth',
-    deviceToken: pairing.deviceToken,
-    clientCapabilities: remoteRuntimeClientCapabilities(clientCapabilities)
-  })
+  const serializedAuth = serializeRemoteRuntimePayload({ type: 'e2ee_auth', deviceToken: pairing.deviceToken, clientCapabilities: remoteRuntimeClientCapabilities(clientCapabilities) })
   const pendingRequest = {
     preparedRequest: prepareRemoteRuntimeRequest(new Map(), () =>
       serializeRemoteRuntimeRpcRequest({

@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { quoteStartupArg } from '../../shared/tui-agent-startup-shell'
 import { readAgentVersion } from './agent-version-service'
 import { buildAgentInstallationsGuestScript } from './agent-installations-guest'

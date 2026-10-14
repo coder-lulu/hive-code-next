@@ -45,14 +45,14 @@ export class ClaudeAccountSelection {
     const wasSelected = getSelectedClaudeAccountIdForTarget(settings, target) === accountId
     try {
       if (wasSelected) {
-        this.store.updateSettings({
+        this.saveSettings({
           activeClaudeManagedAccountId: nextActiveId,
           activeClaudeManagedAccountIdsByRuntime: nextSelection
         })
         await this.syncRuntimeAuth(target)
-        this.store.updateSettings({ claudeManagedAccounts: nextAccounts })
+        this.saveSettings({ claudeManagedAccounts: nextAccounts })
       } else {
-        this.store.updateSettings({
+        this.saveSettings({
           claudeManagedAccounts: nextAccounts,
           activeClaudeManagedAccountId: nextActiveId,
           activeClaudeManagedAccountIdsByRuntime: nextSelection
@@ -99,7 +99,7 @@ export class ClaudeAccountSelection {
       accountId,
       effectiveTarget
     )
-    this.store.updateSettings({
+    this.saveSettings({
       activeClaudeManagedAccountId:
         effectiveTarget?.runtime === 'wsl' ? nextSelection.host : accountId,
       activeClaudeManagedAccountIdsByRuntime: nextSelection
@@ -118,6 +118,7 @@ export class ClaudeAccountSelection {
   snapshot(): ClaudeRateLimitAccountsState {
     const settings = this.store.getSettings()
     return {
+      ...this.runtimeAuth.getSystemDefaultSummary?.(),
       accounts: settings.claudeManagedAccounts
         .map(toClaudeAccountSummary)
         .sort((a, b) => b.updatedAt - a.updatedAt),
@@ -137,7 +138,7 @@ export class ClaudeAccountSelection {
   }
 
   restoreSettings(settings: ReturnType<Store['getSettings']>): void {
-    this.store.updateSettings({
+    this.saveSettings({
       claudeManagedAccounts: settings.claudeManagedAccounts,
       activeClaudeManagedAccountId: settings.activeClaudeManagedAccountId,
       activeClaudeManagedAccountIdsByRuntime: settings.activeClaudeManagedAccountIdsByRuntime
@@ -156,6 +157,10 @@ export class ClaudeAccountSelection {
     }
   }
 
+  saveSettings(patch: Parameters<Store['updateSettings']>[0]): void {
+    this.store.updateSettings(patch, { notifyListeners: true })
+  }
+
   private normalizeActiveSelection(): void {
     const settings = this.store.getSettings()
     const currentSelection = normalizeClaudeRuntimeSelection(settings)
@@ -167,7 +172,7 @@ export class ClaudeAccountSelection {
       nextSelection.host !== settings.activeClaudeManagedAccountId ||
       JSON.stringify(nextSelection) !== JSON.stringify(currentSelection)
     ) {
-      this.store.updateSettings({
+      this.saveSettings({
         activeClaudeManagedAccountId: nextSelection.host,
         activeClaudeManagedAccountIdsByRuntime: nextSelection
       })

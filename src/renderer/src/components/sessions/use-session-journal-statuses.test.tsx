@@ -1,3 +1,4 @@
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 // @vitest-environment happy-dom
 
 import { act, cleanup, renderHook } from '@testing-library/react'
@@ -10,10 +11,7 @@ import type {
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import { AGENT_STATUS_STALE_AFTER_MS } from '../../../../shared/agent-status-types'
 import type { Tab } from '../../../../shared/tab-types'
-import {
-  runtimeTargetForExecutionHostId,
-  type RuntimeClientTarget
-} from '@/runtime/runtime-client-target'
+import { runtimeRpcTargetForAuthorityKey } from '@/runtime/runtime-client-target'
 import type { SessionListItem } from './session-list-types'
 
 const mocks = vi.hoisted(() => ({
@@ -172,7 +170,7 @@ describe('session list journal and host-summary projection', () => {
   })
 
   it('isolates identical session ids on local and remote hosts', async () => {
-    const remote = runtimeTargetForExecutionHostId('runtime:cloud')!
+    const remote = runtimeRpcTargetForAuthorityKey('runtime:cloud')!
     const items = [item(), item('runtime:cloud')]
     await activateHost()
     await activateHost(remote)

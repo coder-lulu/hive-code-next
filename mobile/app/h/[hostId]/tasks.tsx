@@ -17,9 +17,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Clipboard from 'expo-clipboard'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { MobileWebShellScreen } from '../../../src/mobile-web-shell/MobileWebShellScreen'
-import { ShellSwitchPendingScreen } from '../../../src/mobile-web-shell/ShellSwitchPendingScreen'
 import { shellScreenRoute } from '../../../src/mobile-web-shell/shell-screen-route'
-import { useShellSwitchDecision } from '../../../src/mobile-web-shell/shell-switch-decision'
+import { shellSwitchDecision } from '../../../src/mobile-web-shell/shell-switch-decision'
 import { firstParam } from '../../../src/navigation/route-param-reader'
 import {
   AlertTriangle,
@@ -2074,17 +2073,15 @@ export default function MobileTasksRoute() {
   const hostId = firstParam(params.hostId)
   const taskSource = firstParam(params.taskSource)
   const native = <MobileTasksScreen />
+
   const route = hostId
     ? shellScreenRoute({
         pathname: `/h/${encodeURIComponent(hostId)}/tasks`,
         ...(taskSource === '' ? {} : { params: { taskSource } })
       })
     : null
-  const decision = useShellSwitchDecision(route)
+  const decision = shellSwitchDecision(route)
 
-  if (decision.kind === 'pending') {
-    return <ShellSwitchPendingScreen />
-  }
   if (decision.kind === 'native') {
     return native
   }

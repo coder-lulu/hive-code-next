@@ -1,6 +1,13 @@
+import type { CloudManagedE2EEAuth } from './cloud-managed-e2ee-auth-validation'
 import { randomBytes } from 'node:crypto'
 import type { WebSocket } from 'ws'
 import type { DeviceEntry, DeviceRegistry } from '../device-registry'
+import { isPendingTokenRow } from '../device-entry'
+import {
+  INSECURE_WEB_ORIGIN_AUTH_CODE,
+  isInsecureRemoteWebOrigin
+} from '../../../shared/web-origin-security'
+import { devicePrincipalOf } from '../device-principal'
 import type { E2EEKeypair } from '../e2ee-keypair'
 import {
   E2EEChannel,
@@ -9,93 +16,31 @@ import {
 } from './e2ee-channel'
 import { createMobileE2EEOutboundMemoryBudget } from './mobile-e2ee-outbound-memory-budget'
 import type { RuntimeCapability } from '../../../shared/protocol-version'
-import type { CloudManagedE2EEAuth } from './cloud-managed-e2ee-auth-validation'
-import type { WebSocketConnectionRequest } from './ws-transport'
 
-type MobileSocketPayload = string | Uint8Array<ArrayBufferLike>
-
-export type MobileSocketTransportMetadata =
-  | { transport: 'direct'; request?: WebSocketConnectionRequest }
-  | {
-      transport: 'relay'
-      relayHostId: string
-      relayDeviceId: string
-      basisConnId: string
-      credentialKind: 'invite' | 'resume'
-    }
-
-export type MobileSocketTransport = {
-  onMessage(
-    handler: (
-      message: MobileSocketPayload,
-      reply: (response: string) => void,
-      ws: WebSocket
-    ) => void
-  ): void
-  onConnectionClose(
-    handler: (clientId: string | null, ws: WebSocket, hasOtherConnections: boolean) => void
-  ): void
-  setClientId(ws: WebSocket, clientId: string): void
-  terminateClientConnections(clientId: string): number
-}
-
-export type AuthenticatedMobileSocket = {
-  ws: WebSocket
-  connectionId: string
-  device: E2EEAuthenticatedDevice
-  clientCapabilities: readonly RuntimeCapability[]
-  transport: MobileSocketTransportMetadata
-}
-
-export type AuthenticatedCloudManagedSocket = {
-  ws: WebSocket
-  connectionId: string
-  principal: E2EEAuthenticatedCloudSession
-  clientCapabilities: readonly RuntimeCapability[]
-  transport: Extract<MobileSocketTransportMetadata, { transport: 'direct' }>
-}
-
-type MobileSocketWiringOptions = {
-  deviceRegistry: DeviceRegistry
-  e2eeKeypair: E2EEKeypair
-  onText: (
-    socket: AuthenticatedMobileSocket,
-    plaintext: string,
-    reply: (response: string) => void,
-    sendBinary: (response: Uint8Array<ArrayBufferLike>) => boolean | void
-  ) => void
-  onBinary: (socket: AuthenticatedMobileSocket, bytes: Uint8Array<ArrayBufferLike>) => void
-  onClose: (socket: AuthenticatedMobileSocket | null, hasOtherConnections: boolean) => void
-  onReady?: (socket: AuthenticatedMobileSocket) => void
-  resolveCloudManagedSession?: (
-    auth: CloudManagedE2EEAuth,
-    metadata: MobileSocketTransportMetadata
-  ) => E2EEAuthenticatedCloudSession | null
-  onCloudText?: (
-    socket: AuthenticatedCloudManagedSocket,
-    plaintext: string,
-    reply: (response: string) => void,
-    sendBinary: (response: Uint8Array<ArrayBufferLike>) => boolean | void
-  ) => void
-  onCloudBinary?: (
-    socket: AuthenticatedCloudManagedSocket,
-    bytes: Uint8Array<ArrayBufferLike>
-  ) => void
-  onCloudClose?: (socket: AuthenticatedCloudManagedSocket, hasOtherConnections: boolean) => void
-  onCloudReady?: (socket: AuthenticatedCloudManagedSocket) => void
-  // Why: stale keys and missing registry entries both fail before RPC can explain the re-pair action.
-  onUnpairedDeviceAuthFailure?: (metadata: MobileSocketTransportMetadata) => void
-}
+import type {
+  MobileSocketWiringOptions,
+  MobileSocketPayload,
+  MobileSocketTransportMetadata,
+  MobileSocketTransport,
+  AuthenticatedMobileSocket,
+  AuthenticatedCloudManagedSocket
+} from './mobile-socket-wiring-types'
+export type {
+  MobileSocketTransportMetadata,
+  MobileSocketTransport,
+  AuthenticatedMobileSocket,
+  AuthenticatedCloudManagedSocket
+} from './mobile-socket-wiring-types'
 
 function toAuthenticatedDevice(device: DeviceEntry): E2EEAuthenticatedDevice {
   return {
-    deviceId: device.deviceId,
-    deviceToken: device.token,
-    scope: device.scope
+    ...devicePrincipalOf(device),
+    deviceToken: device.token
   }
 }
 
 export class MobileSocketWiring {
+  private disposed = false
   private readonly deviceRegistry: DeviceRegistry
   private readonly e2eeKeypair: E2EEKeypair
   private readonly onText: MobileSocketWiringOptions['onText']
@@ -108,6 +53,7 @@ export class MobileSocketWiring {
   private readonly onCloudBinary: MobileSocketWiringOptions['onCloudBinary']
   private readonly onCloudClose: MobileSocketWiringOptions['onCloudClose']
   private readonly onCloudReady: MobileSocketWiringOptions['onCloudReady']
+  private readonly allowInsecureWebPairing: () => boolean
   private readonly channels = new Map<WebSocket, E2EEChannel>()
   private readonly connectionIds = new Map<WebSocket, string>()
   private readonly authenticatedSockets = new Map<WebSocket, AuthenticatedMobileSocket>()
@@ -128,6 +74,7 @@ export class MobileSocketWiring {
     this.onCloudBinary = options.onCloudBinary
     this.onCloudClose = options.onCloudClose
     this.onCloudReady = options.onCloudReady
+    this.allowInsecureWebPairing = options.allowInsecureWebPairing ?? (() => false)
   }
 
   attachTransport(
@@ -136,6 +83,9 @@ export class MobileSocketWiring {
       transport: 'direct'
     })
   ): () => void {
+    if (this.disposed) {
+      throw new Error('mobile_socket_wiring_disposed')
+    }
     this.transports.add(transport)
     transport.onMessage((message, _reply, ws) => {
       this.handleRawMessage(transport, ws, message, getMetadata(ws))
@@ -163,10 +113,10 @@ export class MobileSocketWiring {
     return this.connectionIds.size
   }
 
-  terminateDeviceConnections(deviceToken: string): number {
+  terminateDeviceConnections(deviceId: string): number {
     let terminated = 0
     for (const transport of this.transports) {
-      terminated += transport.terminateClientConnections(deviceToken)
+      terminated += transport.terminateClientConnections(deviceId)
     }
     return terminated
   }
@@ -185,6 +135,9 @@ export class MobileSocketWiring {
     message: MobileSocketPayload,
     metadata: MobileSocketTransportMetadata
   ): void {
+    if (this.disposed) {
+      return
+    }
     let channel = this.channels.get(ws)
     if (!channel) {
       const connectionId = randomBytes(8).toString('hex')
@@ -200,6 +153,16 @@ export class MobileSocketWiring {
           const device = this.deviceRegistry.validateToken(token)
           if (!device) {
             return null
+          }
+          if (
+            isPendingTokenRow(device) &&
+            metadata.transport === 'direct' &&
+            // Why the marker too: phones send an http Origin as well, and must never be gated.
+            metadata.webClient === true &&
+            isInsecureRemoteWebOrigin(metadata.webOrigin) &&
+            !this.allowInsecureWebPairing()
+          ) {
+            return { refused: INSECURE_WEB_ORIGIN_AUTH_CODE }
           }
           // Why: outer relay authorization cannot choose the local Orca
           // identity; E2EE must resolve the same device before readiness.
@@ -231,6 +194,7 @@ export class MobileSocketWiring {
             ws,
             connectionId,
             device,
+            transcriptHashB64: channel.transcriptHashB64,
             // Why: the channel owns the set for the whole connection, so this reads
             // through rather than snapshotting. It must also WRITE through — the
             // capability RPC updates the socket, and a getter-only property makes
@@ -244,7 +208,7 @@ export class MobileSocketWiring {
             transport: metadata
           }
           this.authenticatedSockets.set(ws, socket)
-          transport.setClientId(ws, device.deviceToken)
+          transport.setClientId(ws, device.deviceId)
           // Why: deferred — the client's e2ee_authenticated must not wait on a secure-file rewrite.
           this.deviceRegistry.updateLastSeenDeferred(device.deviceId)
           this.onReady?.(socket)
@@ -294,7 +258,25 @@ export class MobileSocketWiring {
     channel.handleRawMessage(message)
   }
 
+  dispose(): void {
+    if (this.disposed) {
+      return
+    }
+    this.disposed = true
+    this.transports.clear()
+    for (const ws of this.connectionIds.keys()) {
+      try {
+        this.handleClose(ws)
+      } catch (error) {
+        console.error('[mobile] Failed to notify socket disposal:', error)
+      }
+    }
+  }
+
   private handleClose(ws: WebSocket): void {
+    if (!this.connectionIds.has(ws)) {
+      return
+    }
     const socket = this.authenticatedSockets.get(ws) ?? null
     const cloudSocket = this.authenticatedCloudSockets.get(ws) ?? null
     this.authenticatedSockets.delete(ws)
@@ -305,7 +287,7 @@ export class MobileSocketWiring {
     const hasOtherConnections =
       socket !== null &&
       Array.from(this.authenticatedSockets.values()).some(
-        (candidate) => candidate.device.deviceToken === socket.device.deviceToken
+        (candidate) => candidate.device.deviceId === socket.device.deviceId
       )
     this.onClose(socket, hasOtherConnections)
     if (cloudSocket) {

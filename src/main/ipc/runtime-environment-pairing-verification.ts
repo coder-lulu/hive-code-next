@@ -39,7 +39,7 @@ export async function verifyAndAddRuntimeEnvironmentFromPairingCode(
   let runtimeStatus: RuntimeStatus
   try {
     const response = await sendRemoteRuntimeRequest<RuntimeStatus>(
-      parsed.value.pairing,
+      (parsed.value.pairing),
       'status.get',
       undefined,
       15_000,

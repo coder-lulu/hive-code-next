@@ -121,7 +121,7 @@ describe('CLI emit lifecycle', () => {
   it('keeps every release entry on the same cleanup-before-compile path', () => {
     const { scripts } = JSON.parse(readFileSync('package.json', 'utf8'))
     expect(scripts['build:cli']).toMatch(
-      /^node config\/scripts\/prune-stale-cli-emits.mjs && node .*tsc /
+      /^pnpm run build:packages && node config\/scripts\/prune-stale-cli-emits.mjs && node .*tsc /
     )
     expect(scripts['build:cli']).toContain('&& pnpm run prepare:cli-output')
     expect(scripts['build:release:javascript']).toContain('pnpm run build:cli')

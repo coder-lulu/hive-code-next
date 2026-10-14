@@ -27,7 +27,7 @@ export function openLiveAgentSessionRecordStore(
     })
   }
   const loaded = loadAgentSessionStoreRows(args.journalDatabase.db, args.hostId)
-  const transactions = new AgentSessionStoreTransactions(args.journalDatabase, loaded)
+  const transactions = new AgentSessionStoreTransactions(args.journalDatabase, loaded, args.hostId)
   const store = create(transactions, args.hostId)
   hosts ??= new Map()
   hosts.set(args.hostId, { store, transactions })

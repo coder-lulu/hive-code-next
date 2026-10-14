@@ -1,5 +1,5 @@
 import type * as childProcess from 'node:child_process'
-import { createGitTestRunner } from '../../relay/git-handler-test-setup'
+import { createGitTestRunner } from "../git/test-fixtures/git-test-runner"
 import { mkdtemp, rm } from 'node:fs/promises'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { tmpdir } from 'node:os'

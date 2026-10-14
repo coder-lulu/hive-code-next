@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService, getDefaultWorkspaceSession } from './orca-runtime-test-mocks.spec'
+import type { RuntimePtyController } from './runtime-pty-controller-contract'
 import type { ResolvedWorktree } from './runtime-worktree-path-identity'
 import {
   HEADLESS_LEAF_ID,
@@ -46,7 +47,17 @@ describe('runtime-owned terminal surface census', () => {
       branch: 'main'
     } as never)
     runtime.setPtyController({
-      spawn: vi.fn(async () => ({ id: ptyId, incarnationId: 'hive-incarnation' })),
+      spawn: vi.fn(async (args: Parameters<NonNullable<RuntimePtyController['spawn']>>[0]) => {
+        if (args.persistHostSessionBinding) {
+          await runtimeStore.persistPtyBinding({
+            worktreeId: args.worktreeId!,
+            tabId: args.tabId!,
+            leafId: args.leafId!,
+            ptyId
+          })
+        }
+        return { id: ptyId, incarnationId: 'hive-incarnation' }
+      }),
       write: () => true,
       kill: () => {
         alive = false
@@ -90,6 +101,12 @@ describe('runtime-owned terminal surface census', () => {
       tabId: 'hive-background-tab',
       leafId: HEADLESS_LEAF_ID,
       launchAgent: 'pi'
+    })
+    expect(runtimeStore.persistPtyBinding).toHaveBeenCalledWith({
+      worktreeId: TEST_WORKTREE_ID,
+      tabId: 'hive-background-tab',
+      leafId: HEADLESS_LEAF_ID,
+      ptyId
     })
     omit(2)
     omit(3)

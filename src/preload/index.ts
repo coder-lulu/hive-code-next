@@ -1,9 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { PreloadApi } from './api-types'
-import {
-  installBrowserFindListener,
-  installNativeFileDropHandlers
-} from './preload-runtime-support'
+import { installBrowserFindListener } from './preload-runtime-support'
 import { appApi } from './api/app-bridge'
 import { orcaProfilesApi } from './api/orca-profiles-bridge'
 import { hiveAccountApi } from './api/hive-account-bridge'
@@ -59,7 +56,6 @@ import { hooksApi } from './api/hooks-bridge'
 import { ephemeralVmApi } from './api/ephemeral-vm-bridge'
 import { cacheApi } from './api/cache-bridge'
 import { sessionApi } from './api/session-bridge'
-import { remoteWorkspaceApi } from './api/remote-workspace-bridge'
 import { updaterApi } from './api/updater-bridge'
 import { docPreviewApi } from './api/doc-preview-bridge'
 import { notebookApi } from './api/notebook-bridge'
@@ -89,7 +85,6 @@ import { mobileApi } from './api/mobile-bridge'
 import { agentStatusApi } from './api/agent-status-bridge'
 import { speechApi } from './api/speech-bridge'
 
-installNativeFileDropHandlers()
 installBrowserFindListener()
 
 const telemetryTrackApi: PreloadApi['telemetryTrack'] = (name, props) =>
@@ -161,7 +156,6 @@ const api = {
   ephemeralVm: ephemeralVmApi,
   cache: cacheApi,
   session: sessionApi,
-  remoteWorkspace: remoteWorkspaceApi,
   updater: updaterApi,
   docPreview: docPreviewApi,
   notebook: notebookApi,

@@ -88,7 +88,7 @@ test.describe('Terminal Panes', () => {
       .toBe(otherPane.leafId)
 
     const titleBar = orcaPage.locator('.pane-title-bar', { hasText: title }).first()
-    await expect(titleBar).toHaveAttribute('data-native-file-drop-target', 'terminal')
+    await expect(titleBar).toHaveAttribute('data-os-file-drop-owner', '')
     await expect(titleBar).toHaveAttribute('data-terminal-tab-id', splitSnapshot.tabId)
 
     await titleBar.evaluate((element, path) => {

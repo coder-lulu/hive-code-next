@@ -1,4 +1,3 @@
-import { publicKeyToBase64 } from './e2ee'
 import { MobileE2EEV2ClientSession } from './mobile-e2ee-v2-client-session'
 import {
   MobileE2EEAuthenticationError,
@@ -7,7 +6,7 @@ import {
 import { isRpcResponse } from './rpc-response-shape'
 import { isStaleRpcSocketEvent, logRpcSocketClose } from './rpc-socket-close-evidence'
 import { describeSocketEvent, redactSocketEndpoint } from './socket-event-debug'
-import type { ConnectionLogEmitter, ConnectionState, RpcResponse } from './types'
+import type { ConnectionLogEmitter, ConnectionState, RpcRequest, RpcResponse } from './types'
 import { websocketPayloadToUint8 } from './websocket-payload-bytes'
 
 const CONNECT_TIMEOUT_MS = 12_000
@@ -17,7 +16,7 @@ const WEBSOCKET_CONNECTING_STATE = 0
 type SocketSessionOptions = {
   endpoint: string
   deviceToken: string
-  serverPublicKey: Uint8Array
+  serverPublicKeyB64: string
   getCurrentSocket: () => WebSocket | null
   getState: () => ConnectionState
   getReconnectAttempt: () => number
@@ -49,7 +48,7 @@ export class RpcClientSocketSession {
     this.armConnectTimeout()
   }
 
-  sendEncrypted(request: unknown): boolean {
+  sendEncrypted(request: RpcRequest): boolean {
     if (this.socket.readyState === WebSocket.OPEN && this.channel) {
       try {
         return this.channel.sendText(JSON.stringify(request))
@@ -111,7 +110,7 @@ export class RpcClientSocketSession {
       try {
         this.channel = new MobileE2EEV2PhysicalChannel({
           session: MobileE2EEV2ClientSession.create({
-            desktopPublicKeyB64: publicKeyToBase64(this.options.serverPublicKey),
+            desktopPublicKeyB64: this.options.serverPublicKeyB64,
             transport: 'direct'
           }),
           socket: this.socket,
@@ -151,7 +150,7 @@ export class RpcClientSocketSession {
               return
             }
             this.clearHandshakeTimer()
-            if (error instanceof MobileE2EEAuthenticationError) {
+            if (error instanceof MobileE2EEAuthenticationError || !this.authenticated) {
               this.options.onAuthRejected('Unauthorized — pairing may be revoked')
             } else {
               this.options.onForcedClose(this)

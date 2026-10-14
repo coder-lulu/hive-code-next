@@ -4,7 +4,7 @@
  */
 import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
-import { spawnProcess } from '../../../src/shared/child-process/run-process'
+import { spawnProcess } from '@orca/process-host'
 import { createElectronHomeIsolation } from './electron-home-isolation'
 import { getE2ECompletedOnboardingProfile } from './e2e-completed-onboarding-profile'
 import { resolveElectronExecutable } from './daemon-generation-runtime-fixture'
@@ -20,7 +20,7 @@ export type CliServe = {
 /** Writes the onboarded profile into `userDataDir` and isolates the launch home around it. */
 export function isolatedServeProfile(
   userDataDir: string,
-  launchEnv: NodeJS.ProcessEnv
+  launchEnv: Record<string, string | undefined>
 ): ReturnType<typeof createElectronHomeIsolation> {
   writeFileSync(
     path.join(userDataDir, 'orca-data.json'),
@@ -37,7 +37,10 @@ export function isolatedServeProfile(
 }
 
 /** A fresh isolated profile the CLI and whichever host it starts both use. */
-export function cliServeProfile(parent: string): { userDataDir: string; env: NodeJS.ProcessEnv } {
+export function cliServeProfile(parent: string): {
+  userDataDir: string
+  env: Record<string, string | undefined>
+} {
   const userDataDir = mkdtempSync(path.join(parent, 'cli-serve-'))
   // The lock flag makes e2e builds take the profile lock this test reads, as the host helper does.
   const isolation = isolatedServeProfile(userDataDir, {
@@ -69,7 +72,7 @@ export async function spawnUntilReady<T>(options: {
   label: string
   program: string
   args: string[]
-  env: NodeJS.ProcessEnv
+  env: Record<string, string | undefined>
   timeoutMs: number
   parseReady: (stdout: string) => T | null
 }): Promise<ReadyProcess<T>> {
@@ -112,8 +115,8 @@ export async function spawnUntilReady<T>(options: {
 }
 
 export async function startCliServe(
-  profile: { userDataDir: string; env: NodeJS.ProcessEnv },
-  extraEnv: NodeJS.ProcessEnv = {}
+  profile: { userDataDir: string; env: Record<string, string | undefined> },
+  extraEnv: Record<string, string | undefined> = {}
 ): Promise<CliServe> {
   const stopHost = async (): Promise<void> => {
     if (process.platform === 'win32') {

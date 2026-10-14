@@ -1,6 +1,6 @@
+import { applyProductBranding } from '../../shared/brand'
 import type * as NodeCliCommandResolutionModule from '../../shared/node-cli-command-resolution'
 import { EventEmitter } from 'node:events'
-import { createHash } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { delimiter } from 'node:path'
 import type * as NodeFs from 'node:fs'
@@ -34,6 +34,16 @@ vi.mock('node:fs', async (importOriginal) => {
   return { ...actual, rmSync: rmSyncMock }
 })
 
+vi.mock('@orca/process-host', () => ({
+  spawnProcess: spawnMock,
+  runProcess: vi.fn(() => {
+    throw new Error('Unexpected process execution in account unit test')
+  }),
+  runProcessSync: vi.fn(() => {
+    throw new Error('Unexpected synchronous process execution in account unit test')
+  })
+}))
+
 vi.mock('node:child_process', () => ({
   execFile: vi.fn(),
   execFileSync: vi.fn(),
@@ -63,7 +73,10 @@ import {
   WINDOWS_BATCH_UNSAFE_ARGUMENTS_ERROR,
   WINDOWS_BATCH_UNSAFE_CHARACTERS_LABEL
 } from '../../shared/windows-batch-spawn'
-import { ACCOUNT_IMPORT_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
+import {
+  ACCOUNT_IMPORT_RUNTIME_CAPABILITY,
+  CLAUDE_SIGN_IN_RUNTIME_CAPABILITY
+} from '../../shared/protocol-version'
 
 function successfulChild(): EventEmitter {
   const child = new EventEmitter()
@@ -131,8 +144,14 @@ describe('account CLI handlers', () => {
         ok: true,
         result:
           method === 'status.get'
-            ? { capabilities: [ACCOUNT_IMPORT_RUNTIME_CAPABILITY] }
-            : accountState(method.includes('Claude') ? 'claude@example.com' : 'codex@example.com'),
+            ? {
+                capabilities: [ACCOUNT_IMPORT_RUNTIME_CAPABILITY, CLAUDE_SIGN_IN_RUNTIME_CAPABILITY]
+              }
+            : method === 'accounts.beginClaudeSignIn'
+              ? { accountId: 'draft', configDir: '/fake/final-profile', runtime: 'host' }
+              : accountState(
+                  method.includes('Claude') ? 'claude@example.com' : 'codex@example.com'
+                ),
         _meta: { runtimeId: 'test-runtime' }
       })
     )
@@ -173,14 +192,14 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex', true))
 
     expect(spawnMock).toHaveBeenCalledWith(
-      'codex',
-      ['login', '--device-auth'],
       expect.objectContaining({
+        program: 'codex',
+        args: ['login', '--device-auth'],
         stdio: ['inherit', process.stderr, 'inherit'],
         env: expect.objectContaining({ CODEX_HOME: expect.any(String) })
       })
     )
-    const spawnOptions = spawnMock.mock.calls[0]?.[2]
+    const spawnOptions = spawnMock.mock.calls[0]?.[0]
     expect(spawnOptions.env.ELECTRON_RUN_AS_NODE).toBeUndefined()
     expect(existsSync(spawnOptions.env.CODEX_HOME)).toBe(false)
     expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', {
@@ -199,9 +218,11 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
     expect(spawnMock).toHaveBeenCalledWith(
-      'codex',
-      ['login', '--device-auth'],
-      expect.objectContaining({ stdio: [11, 'inherit', 'inherit'] })
+      expect.objectContaining({
+        program: 'codex',
+        args: ['login', '--device-auth'],
+        stdio: [11, 'inherit', 'inherit']
+      })
     )
     expect(dispose).toHaveBeenCalledTimes(1)
   })
@@ -232,9 +253,11 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex', true))
 
     expect(spawnMock).toHaveBeenCalledWith(
-      'codex',
-      ['login', '--device-auth'],
-      expect.objectContaining({ stdio: [11, process.stderr, 'inherit'] })
+      expect.objectContaining({
+        program: 'codex',
+        args: ['login', '--device-auth'],
+        stdio: [11, process.stderr, 'inherit']
+      })
     )
   })
 
@@ -245,9 +268,11 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
     expect(spawnMock).toHaveBeenCalledWith(
-      getCmdExePath(),
-      ['/d', '/c', 'C:\\tools\\codex.cmd', 'login', '--device-auth'],
-      expect.objectContaining({ stdio: ['inherit', 'inherit', 'inherit'] })
+      expect.objectContaining({
+        program: getCmdExePath(),
+        args: ['/d', '/c', 'C:\\tools\\codex.cmd', 'login', '--device-auth'],
+        stdio: ['inherit', 'inherit', 'inherit']
+      })
     )
   })
 
@@ -259,9 +284,10 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
     expect(spawnMock).toHaveBeenCalledWith(
-      getCmdExePath(),
-      ['/d', '/c', shim, 'login', '--device-auth'],
-      expect.anything()
+      expect.objectContaining({
+        program: getCmdExePath(),
+        args: ['/d', '/c', shim, 'login', '--device-auth']
+      })
     )
   })
 
@@ -286,7 +312,7 @@ describe('account CLI handlers', () => {
 
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
-    const path = spawnMock.mock.calls[0]?.[2].env.PATH as string
+    const path = spawnMock.mock.calls[0]?.[0].env.PATH as string
     expect(path.split(delimiter)[0]).toBe(nodeBin)
   })
 
@@ -299,44 +325,24 @@ describe('account CLI handlers', () => {
 
     await ACCOUNT_HANDLERS['account add'](context('codex'))
 
-    const env = spawnMock.mock.calls[0]?.[2].env as NodeJS.ProcessEnv
+    const env = spawnMock.mock.calls[0]?.[0].env as NodeJS.ProcessEnv
     const pathValues = Object.entries(env)
       .filter(([key]) => key.toLowerCase() === 'path')
       .map(([, value]) => value)
     expect(pathValues).toContain(`${nodeBin}${delimiter}${effectivePathBefore}`)
   })
 
-  it('removes scoped Claude credentials and restores the legacy Keychain item', async () => {
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
-    readKeychainMock.mockResolvedValue('legacy-credentials')
-
+  it('runs login in the final profile and never reads, writes or cleans up Keychain credentials', async () => {
     await ACCOUNT_HANDLERS['account add'](context('claude'))
-
-    const configDir = spawnMock.mock.calls[0]?.[2].env.CLAUDE_CONFIG_DIR
-    expect(deleteKeychainMock).toHaveBeenCalledWith(configDir)
-    expect(writeKeychainMock).toHaveBeenCalledWith('legacy-credentials')
-    expect(callMock).toHaveBeenCalledWith('accounts.addClaudeFromConfigDir', {
-      configDir,
-      previousLegacyCredentialsSha256: createHash('sha256')
-        .update('legacy-credentials')
-        .digest('hex')
-    })
-    expect(existsSync(configDir)).toBe(false)
-  })
-
-  it('attributes a Claude account added through the WSL bridge to the cwd distro', async () => {
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
-
-    await ACCOUNT_HANDLERS['account add'](
-      context('claude', false, String.raw`\\wsl.localhost\Ubuntu-22.04\home\user\project`)
+    expect(spawnMock.mock.calls[0]?.[0].env.CLAUDE_CONFIG_DIR).toBe('/fake/final-profile')
+    expect(callMock).toHaveBeenCalledWith(
+      'accounts.finishClaudeSignIn',
+      { accountId: 'draft', runtime: 'host', wslDistro: undefined },
+      { timeoutMs: 300000 }
     )
-
-    const configDir = spawnMock.mock.calls[0]?.[2].env.CLAUDE_CONFIG_DIR
-    expect(callMock).toHaveBeenCalledWith('accounts.addClaudeFromConfigDir', {
-      configDir,
-      runtime: 'wsl',
-      wslDistro: 'Ubuntu-22.04'
-    })
+    expect(readKeychainMock).not.toHaveBeenCalled()
+    expect(writeKeychainMock).not.toHaveBeenCalled()
+    expect(deleteKeychainMock).not.toHaveBeenCalled()
   })
 
   it('attributes a Codex account added through the WSL bridge to the cwd distro', async () => {
@@ -346,7 +352,7 @@ describe('account CLI handlers', () => {
       context('codex', false, String.raw`\\wsl$\Ubuntu\home\user`)
     )
 
-    const sourceHome = spawnMock.mock.calls[0]?.[2].env.CODEX_HOME
+    const sourceHome = spawnMock.mock.calls[0]?.[0].env.CODEX_HOME
     expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', {
       sourceHome,
       runtime: 'wsl',
@@ -364,8 +370,9 @@ describe('account CLI handlers', () => {
     )
 
     expect(callMock).toHaveBeenCalledWith(
-      'accounts.addClaudeFromConfigDir',
-      expect.objectContaining({ runtime: 'wsl', wslDistro: 'Debian' })
+      'accounts.beginClaudeSignIn',
+      expect.objectContaining({ runtime: 'wsl', wslDistro: 'Debian' }),
+      { timeoutMs: 300000 }
     )
   })
 
@@ -375,10 +382,14 @@ describe('account CLI handlers', () => {
       Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
       process.env.ORCA_CLI_WSL_DISTRO = 'Ubuntu Work'
       await ACCOUNT_HANDLERS['account add'](context(agent, false, String.raw`C:\work with spaces`))
-      expect(callMock).toHaveBeenCalledWith(
-        agent === 'claude' ? 'accounts.addClaudeFromConfigDir' : 'accounts.addCodexFromHome',
-        expect.objectContaining({ runtime: 'wsl', wslDistro: 'Ubuntu Work' })
-      )
+      expect(
+        callMock.mock.calls.some(
+          ([method, params]) =>
+            method ===
+              (agent === 'claude' ? 'accounts.beginClaudeSignIn' : 'accounts.addCodexFromHome') &&
+            params.wslDistro === 'Ubuntu Work'
+        )
+      ).toBe(true)
     }
   )
 
@@ -386,7 +397,7 @@ describe('account CLI handlers', () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
     process.env.WSL_DISTRO_NAME = 'stale-Windows-value'
     await ACCOUNT_HANDLERS['account add'](context('codex', false, String.raw`C:\work`))
-    const sourceHome = spawnMock.mock.calls[0]?.[2].env.CODEX_HOME
+    const sourceHome = spawnMock.mock.calls[0]?.[0].env.CODEX_HOME
     expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', { sourceHome })
   })
 
@@ -401,7 +412,7 @@ describe('account CLI handlers', () => {
 
       await ACCOUNT_HANDLERS['account add'](context('codex'))
 
-      const sourceHome = spawnMock.mock.calls[0]?.[2].env.CODEX_HOME
+      const sourceHome = spawnMock.mock.calls[0]?.[0].env.CODEX_HOME
       expect(callMock).toHaveBeenCalledWith('accounts.addCodexFromHome', { sourceHome })
     }
   )
@@ -412,7 +423,7 @@ describe('account CLI handlers', () => {
     const kill = vi.fn()
     const child = Object.assign(new EventEmitter(), { kill })
     let codexHome = ''
-    spawnMock.mockImplementation((_command, _args, options: { env: Record<string, string> }) => {
+    spawnMock.mockImplementation((options: { env: Record<string, string> }) => {
       codexHome = options.env.CODEX_HOME
       return child
     })
@@ -445,7 +456,7 @@ describe('account CLI handlers', () => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
     const child = Object.assign(new EventEmitter(), { kill: vi.fn() })
     let codexHome = ''
-    spawnMock.mockImplementation((_command, _args, options: { env: Record<string, string> }) => {
+    spawnMock.mockImplementation((options: { env: Record<string, string> }) => {
       codexHome = options.env.CODEX_HOME
       return child
     })
@@ -470,62 +481,6 @@ describe('account CLI handlers', () => {
     exitSpy.mockRestore()
   })
 
-  it('waits for in-flight cleanup when a second signal arrives', async () => {
-    // Why: a boolean latch lets the second signal's process.exit fire while the
-    // first cleanup is still inside a Keychain call, stranding the credentials.
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
-    readKeychainMock.mockResolvedValue('legacy-credentials')
-    let releaseKeychainDelete: (() => void) | undefined
-    deleteKeychainMock.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolvePromise) => {
-          releaseKeychainDelete = () => resolvePromise()
-        })
-    )
-    const child = Object.assign(new EventEmitter(), { kill: vi.fn() })
-    let configDir = ''
-    spawnMock.mockImplementation((_command, _args, options: { env: Record<string, string> }) => {
-      configDir = options.env.CLAUDE_CONFIG_DIR
-      return child
-    })
-    const exitSpy = vi.spyOn(process, 'exit').mockImplementation((() => undefined) as never)
-    const sigintBefore = process.listeners('SIGINT')
-    const sigtermBefore = process.listeners('SIGTERM')
-
-    const pending = ACCOUNT_HANDLERS['account add'](context('claude')).catch(() => {})
-    await vi.waitFor(() => expect(configDir).not.toBe(''))
-
-    const onSigint = newSignalListener('SIGINT', sigintBefore)
-    const onSigterm = newSignalListener('SIGTERM', sigtermBefore)
-    // Why: `rawListeners` exposes the `once` wrapper, so this fails if the handler
-    // is registered with `once` — where a second Ctrl-C falls through to Node's
-    // default and kills the process mid-cleanup.
-    expect(process.rawListeners('SIGINT')).toContain(onSigint)
-
-    onSigint('SIGINT')
-    await vi.waitFor(() => expect(child.kill).toHaveBeenCalledWith('SIGINT'))
-    child.emit('exit', 1)
-    child.emit('close', 1)
-    await vi.waitFor(() => expect(deleteKeychainMock).toHaveBeenCalledWith(configDir))
-    onSigterm('SIGTERM')
-    await new Promise<void>((resolvePromise) => {
-      setImmediate(resolvePromise)
-    })
-
-    expect(exitSpy).not.toHaveBeenCalled()
-    expect(writeKeychainMock).not.toHaveBeenCalled()
-    expect(existsSync(configDir)).toBe(true)
-
-    releaseKeychainDelete?.()
-    await vi.waitFor(() => expect(exitSpy).toHaveBeenCalled())
-    expect(writeKeychainMock).toHaveBeenCalledWith('legacy-credentials')
-    expect(existsSync(configDir)).toBe(false)
-    expect(child.kill).toHaveBeenCalledOnce()
-
-    await pending
-    exitSpy.mockRestore()
-  })
-
   it('warns that the account may already be registered when interrupted mid-RPC', async () => {
     // Why: the runtime finishes the add independently of this process, so an
     // interrupt after sign-in cannot honestly be reported as "not added".
@@ -540,7 +495,9 @@ describe('account CLI handlers', () => {
         ? Promise.resolve({
             id: 'test',
             ok: true,
-            result: { capabilities: [ACCOUNT_IMPORT_RUNTIME_CAPABILITY] },
+            result: {
+              capabilities: [ACCOUNT_IMPORT_RUNTIME_CAPABILITY, CLAUDE_SIGN_IN_RUNTIME_CAPABILITY]
+            },
             _meta: { runtimeId: 'test-runtime' }
           })
         : method === 'accounts.list'
@@ -569,32 +526,6 @@ describe('account CLI handlers', () => {
     exitSpy.mockRestore()
   })
 
-  it('stays armed for signals until post-success cleanup finishes', async () => {
-    // Why: detaching the handlers before cleanup leaves the multi-second Keychain
-    // calls covered only by Node's default handling, which kills mid-cleanup.
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
-    readKeychainMock.mockResolvedValue('legacy-credentials')
-    let releaseKeychainDelete: (() => void) | undefined
-    deleteKeychainMock.mockImplementationOnce(
-      () =>
-        new Promise<void>((resolvePromise) => {
-          releaseKeychainDelete = () => resolvePromise()
-        })
-    )
-
-    const listenersBefore = process.listeners('SIGINT')
-
-    const pending = ACCOUNT_HANDLERS['account add'](context('claude'))
-    await vi.waitFor(() => expect(deleteKeychainMock).toHaveBeenCalled())
-
-    // Why: cleanup is still in flight here, so this add's guard must still be installed.
-    const handler = newSignalListener('SIGINT', listenersBefore)
-
-    releaseKeychainDelete?.()
-    await pending
-    expect(process.listeners('SIGINT')).not.toContain(handler)
-  })
-
   it('fails before the login when the runtime is unreachable', async () => {
     // Why: discovering a dead runtime after sign-in wastes a full OAuth round trip.
     callMock.mockRejectedValue(new Error('runtime not running'))
@@ -606,21 +537,39 @@ describe('account CLI handlers', () => {
     expect(spawnMock).not.toHaveBeenCalled()
   })
 
-  it('fails before login when the running runtime predates account imports', async () => {
+  it('still adds Codex through an older host that advertises only the retired import capability', async () => {
     callMock.mockResolvedValue({
       id: 'test',
       ok: true,
-      result: { capabilities: [] },
+      result: { capabilities: [ACCOUNT_IMPORT_RUNTIME_CAPABILITY] },
       _meta: { runtimeId: 'test-runtime' }
     })
+    spawnMock.mockImplementation(() => {
+      throw new Error('stop after the capability gate')
+    })
 
-    await expect(ACCOUNT_HANDLERS['account add'](context('codex'))).rejects.toThrow(
-      'runtime is too old'
-    )
-    expect(callMock).toHaveBeenCalledOnce()
-    expect(callMock).toHaveBeenCalledWith('status.get')
-    expect(spawnMock).not.toHaveBeenCalled()
+    await expect(ACCOUNT_HANDLERS['account add'](context('codex'))).rejects.toThrow()
+    expect(spawnMock).toHaveBeenCalled()
   })
+
+  it.each(['claude', 'codex'] as const)(
+    'refuses %s login before spawning when its capability is absent',
+    async (agent) => {
+      callMock.mockResolvedValue({
+        id: 'test',
+        ok: true,
+        result: { capabilities: [] },
+        _meta: { runtimeId: 'test-runtime' }
+      })
+
+      await expect(ACCOUNT_HANDLERS['account add'](context(agent))).rejects.toThrow(
+        applyProductBranding('The running Orca runtime is too old to add accounts from the CLI.')
+      )
+      expect(callMock).toHaveBeenCalledOnce()
+      expect(callMock).toHaveBeenCalledWith('status.get')
+      expect(spawnMock).not.toHaveBeenCalled()
+    }
+  )
 
   it.each(['environment', 'pairing-code'])(
     'rejects --%s instead of silently ignoring it',
@@ -667,7 +616,9 @@ describe('account CLI handlers', () => {
         ? Promise.resolve({
             id: 'test',
             ok: true,
-            result: { capabilities: [ACCOUNT_IMPORT_RUNTIME_CAPABILITY] },
+            result: {
+              capabilities: [ACCOUNT_IMPORT_RUNTIME_CAPABILITY, CLAUDE_SIGN_IN_RUNTIME_CAPABILITY]
+            },
             _meta: { runtimeId: 'test-runtime' }
           })
         : method === 'accounts.list'
@@ -699,15 +650,14 @@ describe('account CLI handlers', () => {
     expect(logSpy).not.toHaveBeenCalled()
   })
 
-  it('fails a successful Claude add when Keychain cleanup fails', async () => {
-    Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' })
-    readKeychainMock.mockResolvedValue('legacy-credentials')
-    deleteKeychainMock.mockRejectedValueOnce(new Error('Keychain denied cleanup'))
-
-    await expect(ACCOUNT_HANDLERS['account add'](context('claude'))).rejects.toThrow(
-      'Failed to clean up Claude login artifacts'
-    )
-    expect(writeKeychainMock).toHaveBeenCalledWith('legacy-credentials')
+  it('does not touch a locked Keychain while the CLI signs in', async () => {
+    readKeychainMock.mockRejectedValue(new Error('locked'))
+    deleteKeychainMock.mockRejectedValue(new Error('locked'))
+    writeKeychainMock.mockRejectedValue(new Error('locked'))
+    await ACCOUNT_HANDLERS['account add'](context('claude'))
+    expect(readKeychainMock).not.toHaveBeenCalled()
+    expect(deleteKeychainMock).not.toHaveBeenCalled()
+    expect(writeKeychainMock).not.toHaveBeenCalled()
   })
 
   it('rejects `--agent` with no value instead of defaulting to Claude', async () => {
@@ -739,6 +689,32 @@ describe('account CLI handlers', () => {
     await ACCOUNT_HANDLERS['account list']({ ...context('claude'), flags: new Map() })
 
     expect(logSpy).toHaveBeenCalledWith(expect.stringContaining('claude@example.com (active)'))
+  })
+
+  it('tells the user which saved Claude accounts need a fresh sign-in', async () => {
+    callMock.mockResolvedValue({
+      id: 'test',
+      ok: true,
+      result: {
+        claude: {
+          accounts: [
+            { id: 'old', email: 'old@example.com', needsSignIn: true },
+            { id: 'ok', email: 'ok@example.com' }
+          ],
+          activeAccountId: 'old'
+        },
+        codex: { accounts: [], activeAccountId: null }
+      },
+      _meta: { runtimeId: 'test-runtime' }
+    })
+
+    await ACCOUNT_HANDLERS['account list']({ ...context('claude'), flags: new Map() })
+
+    expect(logSpy).toHaveBeenCalledWith(
+      expect.stringContaining(
+        '  old@example.com (active) (sign in again in HiveCode Settings > AI Provider Accounts)\n  ok@example.com\n'
+      )
+    )
   })
 
   it('lists accounts without forcing a provider usage refresh', async () => {

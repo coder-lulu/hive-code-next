@@ -48,6 +48,8 @@ function registerGuard(
     getKnownReleaseUrl: () => undefined,
     getUpdateMetadata: () => ({}),
     performQuitAndInstall,
+    commitStagedMacInstall: vi.fn(),
+    failMacStaging: vi.fn(),
     shouldDeferMacQuitForInstall: () => true,
     sendStatus: vi.fn()
   })

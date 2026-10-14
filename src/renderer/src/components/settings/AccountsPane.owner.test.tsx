@@ -1,3 +1,4 @@
+import { LOCAL_SETTINGS_HOST_SCOPE } from './settings-host-scope'
 // @vitest-environment happy-dom
 import { act, cleanup, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -108,7 +109,13 @@ describe('AccountsPane owner transitions', () => {
 
   it('keeps the healthy provider loaded after the other local provider fails', () => {
     const settings = getDefaultSettings('/tmp')
-    render(<AccountsPane settings={settings} updateSettings={vi.fn()} />)
+    render(
+      <AccountsPane
+        hostScope={LOCAL_SETTINGS_HOST_SCOPE}
+        settings={settings}
+        updateSettings={vi.fn()}
+      />
+    )
 
     act(() => {
       handlers[0]?.onSnapshot({ ...codexSnapshot('healthy'), failedProviders: ['claude'] })
@@ -122,12 +129,24 @@ describe('AccountsPane owner transitions', () => {
 
   it('does not expose a prior owner when a remote environment named local fails', () => {
     const local = getDefaultSettings('/tmp')
-    const { rerender } = render(<AccountsPane settings={local} updateSettings={vi.fn()} />)
+    const { rerender } = render(
+      <AccountsPane
+        hostScope={LOCAL_SETTINGS_HOST_SCOPE}
+        settings={local}
+        updateSettings={vi.fn()}
+      />
+    )
     act(() => handlers[0]?.onSnapshot(codexSnapshot('desktop')))
     expect(screen.getByTestId('system-email').textContent).toBe('desktop@example.com')
 
     const remote: GlobalSettings = { ...local, activeRuntimeEnvironmentId: 'local' }
-    rerender(<AccountsPane settings={remote} updateSettings={vi.fn()} />)
+    rerender(
+      <AccountsPane
+        hostScope={{ target: { kind: 'environment', environmentId: 'local' }, available: true }}
+        settings={remote}
+        updateSettings={vi.fn()}
+      />
+    )
     expect(screen.getByTestId('codex-state').textContent).toBe('loading')
     expect(screen.getByTestId('codex-ids').textContent).toBe('')
     expect(screen.getByTestId('system-email').textContent).toBe('')

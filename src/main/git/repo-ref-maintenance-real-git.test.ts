@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process'
 import type * as childProcess from 'node:child_process'
-import { createGitTestRunner } from '../../relay/git-handler-test-setup'
+import { createGitTestRunner } from "./test-fixtures/git-test-runner"
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'

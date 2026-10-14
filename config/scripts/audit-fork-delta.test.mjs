@@ -311,6 +311,8 @@ describe('classifySyncBoundaryPath', () => {
     expect(classifySyncBoundaryPath('src/main/runtime/rpc/methods/session.ts')).toBe('manualReview')
     expect(classifySyncBoundaryPath('src/shared/remote-wire.ts')).toBe('directAbsorb')
     expect(classifySyncBoundaryPath('cloud/apps/relay/src/index.ts')).toBe('productBoundary')
+    expect(classifySyncBoundaryPath('src/relay/fs-handler.ts')).toBe('productBoundary')
+    expect(classifySyncBoundaryPath('src/relay/new-helper.ts')).toBe('productBoundary')
     expect(classifySyncBoundaryPath('src/renderer/src/App.tsx')).toBeNull()
   })
 

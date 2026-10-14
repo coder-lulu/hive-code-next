@@ -140,6 +140,7 @@ function App() {
             onResume={(session, target) => setResult(`Resume ${session.sessionId} in ${target}`)}
             onContinueInNewSession={ignore}
             onResumeInNewChat={ignore}
+            onResumeInNewCli={ignore}
             onCopyResume={ignore}
             onCopyId={ignore}
             onCopyPath={ignore}

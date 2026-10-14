@@ -12,6 +12,7 @@ import {
 } from './markdown-floating-actions-layout'
 import type { MarkdownDocState } from './mobile-session-route-types'
 import { createMobileSessionReaderStyles } from './mobile-session-reader-styles'
+import { MobileLoadErrorState } from '../components/MobileLoadErrorState'
 
 type Props = {
   documentId: string
@@ -50,15 +51,7 @@ export function MobileMarkdownReader({
     )
   }
   if (doc.status === 'error') {
-    return (
-      <View style={styles.markdownState}>
-        <Text style={styles.markdownError}>{doc.message}</Text>
-        <Pressable style={styles.markdownRefreshButton} onPress={onRefresh}>
-          <RefreshCw size={16} color={theme.color.text.primary} />
-          <Text style={styles.markdownRefreshText}>重试</Text>
-        </Pressable>
-      </View>
-    )
+    return <MobileLoadErrorState message={doc.message} onRetry={onRefresh} />
   }
 
   const statusText = doc.saveError

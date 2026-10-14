@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Animated, Pressable, Text, View } from 'react-native'
 import { ChevronDown, SquareChevronRight, SquareTerminal, Wrench } from 'lucide-react-native'
 import { diffFromText, diffFromToolCall } from '../../../src/shared/native-chat-diff'
@@ -19,8 +19,9 @@ import type { NativeChatBlock } from '../../../src/shared/native-chat-types'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
 import { createMobileNativeChatMessageStyles } from './mobile-native-chat-message-styles'
+import { nativeChatToolLineIdentity } from '../../../src/shared/native-chat-tool-line-identity'
 
-const MAX_VISIBLE_TOOL_PAIRS = 6
+const TOOL_PAIR_REVEAL_PAGE = 6
 const MAX_TOOL_RUN_DIFF_ROWS = 240
 
 function DiffView({ lines }: { lines: DiffLine[] }): React.JSX.Element {
@@ -204,16 +205,28 @@ export function ToolRun({
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   const [open, setOpen] = useState(defaultExpanded)
-  const pairs = pairToolBlocks(blocks, MAX_VISIBLE_TOOL_PAIRS)
-  const diffLineLimit = Math.max(1, Math.floor(MAX_TOOL_RUN_DIFF_ROWS / (pairs.length * 2 || 1)))
+  const [visibleCount, setVisibleCount] = useState(TOOL_PAIR_REVEAL_PAGE)
+  const pairs = useMemo(
+    () => (open ? pairToolBlocks(blocks, visibleCount + 1) : []),
+    [blocks, open, visibleCount]
+  )
+  const visiblePairs = pairs.slice(0, visibleCount)
+  const seen = new Map<string, number>()
+  const diffLineLimit = Math.max(
+    1,
+    Math.floor(MAX_TOOL_RUN_DIFF_ROWS / (visiblePairs.length * 2 || 1))
+  )
   let callCount = 0
+  let resultCount = 0
   for (const block of blocks) {
     if (block.type === 'tool-call') {
       callCount++
+    } else if (block.type === 'tool-result') {
+      resultCount++
     }
   }
-  callCount ||= pairs.length
-  const summary = summarizeToolRun(blocks)
+  const count = callCount || resultCount
+  const summary = callCount > 0 ? summarizeToolRun(blocks) : '结果'
   const activity = activeCall ? describeActiveToolCall(activeCall) : null
   const activitySubject = activity?.isCommand
     ? activity.preview || '命令'
@@ -249,33 +262,52 @@ export function ToolRun({
             hitSlop={6}
             accessibilityRole="button"
             accessibilityState={{ expanded: open }}
-            accessibilityLabel={`${callCount} 次工具调用`}
+            accessibilityLabel={`${count} 次工具调用`}
           >
             {open ? (
               <ChevronDown size={16} color={theme.color.text.tertiary} strokeWidth={2} />
             ) : (
               <SquareChevronRight size={16} color={theme.color.text.tertiary} strokeWidth={2} />
             )}
-            <Text style={styles.toolRunCount}>{callCount}×</Text>
+            <Text style={styles.toolRunCount}>{count}×</Text>
             <Text style={styles.toolRunLabel} numberOfLines={1}>
-              {summary || `${callCount} 次工具调用`}
+              {summary || `${count} 次工具调用`}
             </Text>
           </Pressable>
         )}
       </View>
       {open ? (
         <View style={styles.toolRunBody}>
-          {pairs.map((pair, i) => (
+          {visiblePairs.map((pair) => (
             <ToolLine
-              key={i}
+              key={nativeChatToolLineIdentity(pair.call ?? pair.result!, seen, true)}
               pair={pair}
               defaultExpanded={expandChildren}
               diffLineLimit={diffLineLimit}
               onOpenFile={onOpenFile}
             />
           ))}
-          {callCount > pairs.length ? (
-            <Text style={styles.toolPreview}>还有 {callCount - pairs.length} 次工具调用</Text>
+          {pairs.length > visiblePairs.length ? (
+            <Pressable
+              style={styles.toolLine}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: visibleCount > TOOL_PAIR_REVEAL_PAGE }}
+              onPress={() => setVisibleCount((count) => count + TOOL_PAIR_REVEAL_PAGE)}
+              hitSlop={6}
+            >
+              <Text style={styles.toolPreview}>显示更多</Text>
+            </Pressable>
+          ) : null}
+          {visiblePairs.length > TOOL_PAIR_REVEAL_PAGE ? (
+            <Pressable
+              style={styles.toolLine}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: true }}
+              onPress={() => setVisibleCount(TOOL_PAIR_REVEAL_PAGE)}
+              hitSlop={6}
+            >
+              <Text style={styles.toolPreview}>收起</Text>
+            </Pressable>
           ) : null}
         </View>
       ) : null}

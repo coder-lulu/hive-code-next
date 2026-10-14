@@ -1,5 +1,5 @@
-import { spawnProcess } from '../shared/child-process/run-process'
 import { APP_DISPLAY_NAME } from '../shared/brand'
+import { spawnProcess } from '@orca/process-host'
 
 export const LINUX_LID_SLEEP_ASSERTION_RETRY_MS = 30_000
 

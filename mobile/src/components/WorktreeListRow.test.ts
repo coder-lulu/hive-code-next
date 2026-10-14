@@ -11,7 +11,8 @@ import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeWorktreeAgentRow } from '../../../src/shared/runtime-types'
 import { WorktreeAgentRow } from './WorktreeAgentRow'
-import { WorktreeListRow, type WorktreeListRowItem } from './WorktreeListRow'
+import { WorktreeListRow } from './WorktreeListRow'
+import type { Worktree } from '../worktree/workspace-list-types'
 import { darkTheme, lightTheme } from '../theme/mobile-theme'
 
 const { agentSpinnerRender, agentStateDotRender } = vi.hoisted(() => ({
@@ -58,10 +59,7 @@ vi.mock('./WorktreeMetaGlyphs', () => ({
   WorktreeMetaGlyphs: () => null
 }))
 
-type TestItem = WorktreeListRowItem & {
-  status: 'working' | 'active' | 'permission' | 'done' | 'inactive'
-  lastOutputAt: number
-}
+type TestItem = Worktree & { status: NonNullable<Worktree['status']> }
 
 const stableRepoIcon = { type: 'emoji', emoji: 'o' } as const
 let updateSibling: Dispatch<SetStateAction<number>> = () => undefined
@@ -116,11 +114,14 @@ function agent(overrides: Partial<RuntimeWorktreeAgentRow> = {}): RuntimeWorktre
 
 const baseItem: TestItem = {
   worktreeId: 'worktree-1',
+  repoId: 'repo-1',
   repo: 'orca',
+  path: 'mobile-list',
+  hasAttachedPty: true,
+  isPinned: false,
   branch: 'feature/mobile-list',
   displayName: 'mobile-list',
   liveTerminalCount: 1,
-  preview: 'Waiting',
   unread: false,
   linkedPR: null,
   agents: [agent()],
@@ -152,7 +153,6 @@ describe('memoized worktree rows', () => {
 
     let expectedRenders = 1
     const liveUpdates: TestItem[] = [
-      { ...baseItem, preview: 'Running tests' },
       { ...baseItem, unread: true },
       { ...baseItem, lastOutputAt: 2_000 },
       { ...baseItem, agents: [agent({ state: 'waiting', updatedAt: 2_000 })] },
@@ -173,6 +173,42 @@ describe('memoized worktree rows', () => {
       renderer!.update(createElement(ListRowHarness, { item: baseItem, now: 32_000 }))
     )
     expect(agentSpinnerRender).toHaveBeenCalledTimes(++expectedRenders)
+  })
+
+  it('skips a value-equal item and re-renders for time, callbacks and nested agent fields', async () => {
+    const onPress = () => undefined
+    const row = (item: TestItem, overrides: { now?: number; onPress?: () => void } = {}) =>
+      createElement(WorktreeListRow, {
+        theme: lightTheme,
+        item,
+        isReadOnly: false,
+        now: overrides.now ?? 2_000,
+        repoColor: '#000000',
+        repoIcon: { type: 'emoji', emoji: 'o' },
+        status: item.status,
+        onPress: overrides.onPress ?? onPress
+      })
+    await act(async () => {
+      renderer = create(row(baseItem))
+    })
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(1)
+
+    // A fresh parse of the same row, with a fresh repo icon object, is not a change.
+    await act(async () => renderer!.update(row(structuredClone(baseItem))))
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(1)
+
+    await act(async () => renderer!.update(row(baseItem, { now: 32_000 })))
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(2)
+
+    const nestedChange = structuredClone(baseItem)
+    nestedChange.agents![0]!.lastAssistantMessage = 'Tests pass'
+    await act(async () => renderer!.update(row(nestedChange, { now: 32_000 })))
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(3)
+
+    await act(async () =>
+      renderer!.update(row(nestedChange, { now: 32_000, onPress: () => undefined }))
+    )
+    expect(agentSpinnerRender).toHaveBeenCalledTimes(4)
   })
 
   it('memoizes agent rows without hiding agent updates', async () => {
@@ -286,7 +322,32 @@ describe('memoized worktree rows', () => {
       )
     })
     expect(textNodes()).toContain('openclaw')
+    expect(textNodes().some((text) => text.includes('Disconnected'))).toBe(false)
     expect(renderer!.root.findAllByType('Server' as never)).toHaveLength(1)
+
+    await act(async () =>
+      renderer!.update(
+        createElement(ListRowHarness, {
+          item: {
+            ...baseItem,
+            hostId: 'ssh:ssh-1',
+            hostContextLabel: 'openclaw',
+            hostContextHealthLabel: 'Disconnected'
+          },
+          now: 2_000
+        })
+      )
+    )
+    // Separate nodes: the name truncates while the health word stays whole.
+    expect(textNodes()).toEqual(expect.arrayContaining(['openclaw', '· Disconnected']))
+    const healthText = renderer!.root
+      .findAllByType('Text' as never)
+      .find((node) => node.props.children === '· Disconnected')
+    expect([healthText?.props.style].flat()).toContainEqual({ flexShrink: 0 })
+    const announcedBadges = renderer!.root.findAll(
+      (node) => node.props.accessibilityLabel === 'openclaw, Disconnected'
+    )
+    expect(announcedBadges).toHaveLength(1)
     expect(renderer!.root.findAllByType('Monitor' as never)).toHaveLength(0)
 
     await act(async () =>

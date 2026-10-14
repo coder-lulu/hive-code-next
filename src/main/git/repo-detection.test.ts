@@ -82,7 +82,7 @@ describe('isGitRepo', () => {
     git(realRepo, ['init', '--quiet'])
 
     withGitUnavailable(() => {
-      expect(getGitRepoRoot(nestedDir)).toBe(realRepo.replace(/\\/g, '/'))
+      expect(getGitRepoRoot(nestedDir)).toBe(realRepo.replaceAll('\\', '/'))
     })
   })
 
@@ -332,7 +332,7 @@ describe('isGitRepo', () => {
     const bareRepo = path.join(tmpDir, 'bare.git')
     git(tmpDir, ['init', '--bare', '--quiet', bareRepo])
 
-    expect(getGitRepoRoot(bareRepo)).toBe(bareRepo.replace(/\\/g, '/'))
+    expect(getGitRepoRoot(bareRepo)).toBe(bareRepo.replaceAll('\\', '/'))
   })
 })
 

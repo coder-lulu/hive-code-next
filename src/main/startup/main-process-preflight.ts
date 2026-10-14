@@ -4,8 +4,6 @@ import { app, ipcMain, powerMonitor, session } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import os from 'node:os'
 import { prepareUserDataMigration } from './main-process-user-data-migration'
-import { hasConfiguredProductUpdateChannel } from '../../shared/product-update-policy'
-import { ensureAutoUpdaterConfigured } from '../window/attach-main-window-services'
 import { maybeRedirectCliLaunch } from './cli-launch-redirect'
 import { runProfileStateRecoveryPreflight } from './profile-state-recovery-preflight'
 import { argvRequestsServeMode, normalizeServeModeArgv } from './serve-mode-argv'
@@ -26,25 +24,20 @@ import {
   installUnhandledRejectionLogging
 } from './main-process-error-guards'
 import { hydrateShellPath, mergePathSegments } from './hydrate-shell-path'
-import { configureRemoteServerUpdater } from '../runtime/remote-server-updater'
-import {
-  getRemoteServerUpdaterSnapshot,
-  checkForRemoteServerUpdate,
-  downloadRemoteServerUpdate,
-  installRemoteServerUpdate,
-  isQuittingForUpdate
-} from '../updater'
+import { configureMainProcessRemoteServerUpdater } from './main-process-updater-wiring'
+import { isQuittingForUpdate } from '../updater'
 import { getDevInstanceIdentity, shouldApplyPreReadyAppName } from './dev-instance-identity'
 import { enableRendererHeapHeadroom } from './renderer-heap-headroom'
 import { configureLinuxDevShmUsage } from './linux-dev-shm-policy'
 import { isStartupDiagnosticsEnabled, logStartupDiagnostic } from './startup-diagnostics'
 import { startEventLoopStallProbe } from './event-loop-stall-probe'
+import { startEventLoopDelayProbe } from '../diagnostics/event-loop-delay-probe'
 import {
   isMainThreadDiagnosticsEnabled,
   recordSubprocessSpawn,
   startMainThreadChurnProbe
 } from '../diagnostics/main-thread-churn-probe'
-import { setSpawnObserver } from '../../shared/child-process/spawn-observer'
+import { setSpawnObserver } from '@orca/process-host/spawn-observer'
 import { settledDiffCache } from '../git/source-control/git-read-cache-invalidation'
 import { reserveServeStdoutForReadiness } from '../server/serve-stdout-boundary'
 import { createServeDesktopActivationGate } from './serve-desktop-activation'
@@ -65,8 +58,7 @@ import { selectLinuxKeyringBackend } from './select-linux-keyring-backend'
 import { setPtyHostBindings } from '../ipc/pty-host-bindings'
 import { electronRuntimeDesktopSurface } from '../host/electron-runtime-desktop-surface'
 import { setRuntimeDesktopSurface } from '../runtime/runtime-desktop-surface'
-import { electronRuntimeBrowserCommandsFactory } from '../host/electron-browser-commands'
-import { setRuntimeBrowserCommandsFactory } from '../runtime/runtime-browser-commands-factory'
+import { installElectronBrowserCommands } from '../host/electron-browser-commands'
 import { electronHttpClient } from '../host/electron-http-client'
 import { setMainHttpClient } from '../network/http-client'
 import { electronSpeechServiceFactories } from '../host/electron-speech-services'
@@ -182,17 +174,7 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
   installUnhandledRejectionLogging()
   // Why: expose the app version via process.env so main and the forked daemon can set TERM_PROGRAM_VERSION without importing electron.
   process.env.ORCA_APP_VERSION = app.getVersion()
-  configureRemoteServerUpdater({
-    getSnapshot: getRemoteServerUpdaterSnapshot,
-    check: (runtimeId, options) => {
-      if (options?.localBuild || hasConfiguredProductUpdateChannel()) {
-        ensureAutoUpdaterConfigured()
-      }
-      return checkForRemoteServerUpdate(runtimeId, options)
-    },
-    download: downloadRemoteServerUpdate,
-    install: installRemoteServerUpdate
-  })
+  configureMainProcessRemoteServerUpdater()
   patchPackagedProcessPath()
   // Why: the sync seed above covers early IPC (homebrew/nix); the async login-shell probe below (packaged only) then adds the user's rc PATH.
   if (app.isPackaged && process.platform !== 'win32') {
@@ -226,6 +208,7 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
   // Why captured now: after the dev/E2E override above, and before app.setName('Orca') (whenReady)
   // changes how userData resolves on a case-sensitive filesystem. See persistence.ts:20-28.
   initDataPath()
+  startEventLoopDelayProbe('main', getCanonicalUserDataPath())
   antigravityHookService.setWindowsRuntimePathProvider(
     () => getRelocatedDaemonHost()?.execPath ?? process.execPath
   )
@@ -316,7 +299,7 @@ function initializeMainProcessPreflight(options: MainProcessPreflightOptions): b
   // Why here: constructing RuntimeBrowserCommands is what pulls the Chromium browser
   // cluster into the graph. The desktop installs it; a Node host installs none and every
   // browser RPC rejects, which capability filtering already tells clients about.
-  setRuntimeBrowserCommandsFactory(electronRuntimeBrowserCommandsFactory)
+  installElectronBrowserCommands()
   // Why here: proxy-settings only needed electron for `session.defaultSession`. The
   // desktop supplies it; a Node host has no Chromium proxy config to consult, so the
   // environment variables are the whole answer there.

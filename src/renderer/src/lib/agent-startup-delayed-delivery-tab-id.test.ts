@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { toWebTerminalSurfaceTabId } from '@/runtime/web-terminal-surface-id'
+import { toWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
 import { resolveAgentStartupTabId } from './agent-startup-delayed-delivery'
 
 describe('agent startup delayed-delivery tab resolution', () => {

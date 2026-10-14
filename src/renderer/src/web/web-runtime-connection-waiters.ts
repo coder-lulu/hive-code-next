@@ -1,11 +1,11 @@
 import { withRemoteRuntimeTailscaleHint } from '../../../shared/remote-runtime-tailscale-hint'
-import { createWebRuntimeUnauthorizedError } from './web-runtime-client-error'
 import type { WebRuntimeConnectionState } from './web-runtime-connection-frame-router'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 
 type WebRuntimeConnectionWaiterOptions = {
   endpoint: string
   getState: () => WebRuntimeConnectionState
+  getAuthError: () => Error
   isIntentionallyClosed: () => boolean
 }
 
@@ -22,7 +22,7 @@ export class WebRuntimeConnectionWaiters {
       return Promise.resolve()
     }
     if (this.options.getState() === 'auth-failed') {
-      return Promise.reject(createWebRuntimeUnauthorizedError())
+      return Promise.reject(this.options.getAuthError())
     }
     if (this.options.isIntentionallyClosed()) {
       return Promise.reject(new Error(`Remote ${APP_DISPLAY_NAME} runtime connection closed.`))

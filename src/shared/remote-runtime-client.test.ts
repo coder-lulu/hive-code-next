@@ -1,7 +1,7 @@
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import WebSocketClient, { WebSocketServer, type WebSocket } from 'ws'
-import { encodePairingOffer, parsePairingCode, type PairingOffer } from './pairing'
+import { PAIRING_OFFER_VERSION, encodePairingOffer, parsePairingCode, type PairingOffer } from './pairing'
 import { generateKeyPair, publicKeyToBase64 } from './e2ee-crypto'
 import { DesktopMobileE2EEV2Session } from './runtime-e2ee-server-session'
 import { sendRemoteRuntimeRequest, subscribeRemoteRuntimeRequest } from './remote-runtime-client'
@@ -334,7 +334,12 @@ describe('sendRemoteRuntimeRequest', () => {
     'rejects invalid timer delay %s before reading pairing data',
     async (timeoutMs) => {
       await expect(
-        sendRemoteRuntimeRequest({} as PairingOffer, 'status.get', {}, timeoutMs)
+        sendRemoteRuntimeRequest(
+          { v: PAIRING_OFFER_VERSION, endpoint: '', deviceToken: '', publicKeyB64: '' },
+          'status.get',
+          {},
+          timeoutMs
+        )
       ).rejects.toMatchObject({ code: 'invalid_argument' })
     }
   )
@@ -622,7 +627,7 @@ async function createSubscriptionServer(
   if (!pairing) {
     throw new Error('Failed to create test pairing')
   }
-  return { pairing, nextBinary, nextAuth }
+  return { pairing: (pairing), nextBinary, nextAuth }
 }
 
 function sendEncrypted(ws: WebSocket, session: DesktopMobileE2EEV2Session, message: unknown): void {
@@ -653,7 +658,7 @@ async function createClosingServer(
   if (!pairing) {
     throw new Error('Failed to create test pairing')
   }
-  return { pairing }
+  return { pairing: (pairing) }
 }
 
 async function createInvalidHandshakeServer(): Promise<{ pairing: PairingOffer }> {
@@ -677,7 +682,7 @@ async function createInvalidHandshakeServer(): Promise<{ pairing: PairingOffer }
   if (!pairing) {
     throw new Error('Failed to create test pairing')
   }
-  return { pairing }
+  return { pairing: (pairing) }
 }
 
 async function createOneShotServer(
@@ -769,5 +774,5 @@ async function createOneShotServer(
   if (!pairing) {
     throw new Error('Failed to create test pairing')
   }
-  return { pairing }
+  return { pairing: (pairing) }
 }

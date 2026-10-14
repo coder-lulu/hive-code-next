@@ -28,7 +28,7 @@ const localRelease: PreloadStub = vi.fn()
 const path = '/remote/repo/untitled.md'
 const token = 'actual-host-issued-opaque-token'
 const context = {
-  settings: { activeRuntimeEnvironmentId: 'env-1' },
+  target: { kind: 'environment' as const, environmentId: 'env-1' },
   worktreeId: 'wt-1',
   worktreePath: '/remote/repo',
   expectedExecutionHostId: 'ssh:build-host' as const,
@@ -37,7 +37,7 @@ const context = {
 }
 const localContext = {
   ...context,
-  settings: { activeRuntimeEnvironmentId: null },
+  target: { kind: 'local' as const },
   connectionId: 'build-host'
 }
 const params = {

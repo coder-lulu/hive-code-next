@@ -18,6 +18,8 @@ import type { WorktreeVirtualRowContext } from '../rows/virtual-row-dispatch'
 import { getRepoOwnerWorktreeVisibilityDefaults } from '../../../../store/worktree-visibility-defaults-by-host'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 
+import type { RepoSshGateResolver } from '@/hooks/use-repo-ssh-gate-resolver'
+
 type BuildArgs = {
   projectTree?: boolean
   props: VirtualizedWorktreeViewportProps
@@ -29,7 +31,7 @@ type BuildArgs = {
   settings: AppState['settings']
   defaultHostId: ExecutionHostId
   worktreeVisibilityDefaultsByHost: AppState['worktreeVisibilityDefaultsByHost']
-  sshConnectionStates: AppState['sshConnectionStates']
+  getRepoSshGate: RepoSshGateResolver
   newCardStyle: boolean
   folderBackedProjectGroupIds: ReadonlySet<string>
   session: WorktreeDragSession
@@ -81,7 +83,7 @@ export function buildWorktreeVirtualRowContext(args: BuildArgs): WorktreeVirtual
       collapsedGroups: props.collapsedGroups,
       workspaceStatuses: props.workspaceStatuses,
       projectGroups: args.projectGroups,
-      sshConnectionStates: args.sshConnectionStates,
+      getRepoSshGate: args.getRepoSshGate,
       highlightedRevealRowKey: reveal.highlightedRevealRowKey,
       dragOverStatus: runtime.dragOverStatus,
       pinDragOver: runtime.pinDragOver,

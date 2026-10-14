@@ -21,7 +21,7 @@ vi.mock('node:fs', async (importOriginal) => ({
   rmSync: mocks.rmSync
 }))
 vi.mock('./keychain', () => ({
-  readActiveClaudeKeychainCredentials: mocks.readLegacy,
+  readActiveClaudeKeychainCredentialsStrict: mocks.readLegacy,
   deleteActiveClaudeKeychainCredentialsStrict: mocks.deleteKeychain,
   writeActiveClaudeKeychainCredentials: mocks.writeLegacy
 }))
@@ -157,8 +157,8 @@ describe('Claude login allocated-temp cleanup', () => {
       expect(deps.runCommand.mock.calls[0]).toEqual([
         ['auth', 'login', '--claudeai'],
         { windowsPath: 'mock-canonical-temp', linuxPath: null, wslDistro: null },
-        180_000,
-        { signal: expect.any(AbortSignal), keepStdinOpen: true }
+        600_000,
+        { signal: expect.any(AbortSignal), keepStdinOpen: true, browser: undefined }
       ])
       expect(deps.runCommand.mock.calls[1][2]).toBe(20_000)
       expect(deps.runCommand.mock.calls[1][3]).toEqual({ allowFailure: true })

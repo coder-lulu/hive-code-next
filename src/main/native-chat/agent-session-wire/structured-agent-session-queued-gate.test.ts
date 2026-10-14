@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
 import { structuredQueueHold } from './structured-agent-session-queued-messages'
+import { openTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
 import {
   editPersistedTestAgentSessionStore,
   openTestAgentSessionRecordStore
@@ -234,7 +235,7 @@ describe('the hand-off link on answers', () => {
     expect(await submission(working)).not.toHaveProperty('queuedMessageId')
   })
 
-  it('a queued send asked again after its ledger row is gone answers with its hand-off, never sending twice', async () => {
+  it('a queued send asked again after its receipt is gone answers with its hand-off, never sending twice', async () => {
     const working = await workingSend()
     const body = hostTestMessage('asked again')
     const clientOperationId = hostTestOperationId()
@@ -251,16 +252,10 @@ describe('the hand-off link on answers', () => {
     await settleAccepted(working, 'a')
     await eventually(async () => expect(await rig.handoff(clientOperationId)).toBeDefined())
     const handedOffAs = await rig.handoffId(clientOperationId)
-    // The ledger forgot the id, so the send runs again rather than replaying.
-    await editPersistedTestAgentSessionStore(rig.root, (persisted) => {
-      for (const [key, row] of Object.entries(persisted.operations)) {
-        if (row.operationId === clientOperationId) {
-          delete persisted.operations[key]
-        }
-      }
-    })
-    // Refresh the same canonical store: this fixture forgot the row in memory and on disk.
-    await openTestAgentSessionRecordStore(rig.root)
+    // Simulate a missing durable command receipt: the send runs again rather than replaying.
+    openTestJournalHostDatabase(rig.root)
+      .db.prepare('DELETE FROM agent_session_command_receipts WHERE operation_id = ?')
+      .run(clientOperationId)
     const count = (await host.journalSnapshot(SESSION)).submissions.length
     expect(await host.send(CALLER, params)).toMatchObject({
       ok: true,

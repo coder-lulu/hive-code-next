@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { runProcess } from '../../src/shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { PRIMARY_CLI_COMMAND, CLI_COMPATIBILITY_ALIASES } from '../../src/shared/brand'
 import { verifyPackageCliBin } from './verify-cli-bin.mjs'
 import type { readOrcaCliVersion } from '../../src/cli/cli-version'

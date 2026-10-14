@@ -13,6 +13,8 @@ export function registerMacUpdaterEvents({
   getPendingInstallVersion,
   getKnownReleaseUrl,
   performQuitAndInstall,
+  commitStagedMacInstall,
+  failMacStaging,
   shouldDeferMacQuitForInstall,
   sendStatus,
   getUpdateMetadata
@@ -22,11 +24,14 @@ export function registerMacUpdaterEvents({
   getPendingInstallVersion: () => string
   getKnownReleaseUrl: () => string | undefined
   performQuitAndInstall: () => void | Promise<void>
+  commitStagedMacInstall: () => void
+  failMacStaging: (error: unknown) => void
   shouldDeferMacQuitForInstall: () => boolean
   sendStatus: (status: UpdateStatus) => void
   getUpdateMetadata: () => UpdateStatusMetadata
 }): void {
   if (process.platform === 'darwin') {
+    nativeUpdater.on('error', failMacStaging)
     nativeUpdater.on('update-downloaded', () => {
       const generation = consumePendingMacNativeReadyGeneration()
       if (generation === null) {
@@ -41,6 +46,7 @@ export function registerMacUpdaterEvents({
           ...getUpdateMetadata()
         })
       })
+      commitStagedMacInstall()
     })
   }
 
@@ -206,6 +212,17 @@ export function isMacInstallerReady(): boolean {
 
 export function hasMacInstallAuthority(): boolean {
   return process.platform !== 'darwin' || isMacInstallerReady()
+}
+
+/** Starts deferred staging only for the one unambiguous physical download in this process. */
+export function hasMacStagingAuthority(): boolean {
+  return (
+    process.platform !== 'darwin' ||
+    isMacInstallerReady() ||
+    (!macNativeReadyPoisoned &&
+      pendingMacNativeReadyGeneration === macDownloadGeneration &&
+      macNativeReadyLifetimeGeneration === macDownloadGeneration)
+  )
 }
 
 export function isWaitingForMacInstallerReadiness(

@@ -9,7 +9,8 @@ import {
 } from './release-javascript-artifact.mjs'
 import { releaseJavascriptSupport } from './release-javascript-support.mjs'
 import { resolvePnpmCliInvocation } from './pnpm-cli-invocation.mjs'
-import { describeProcessFailure, runProcessSync } from './script-child-process.mjs'
+import { runProcessSync } from '@orca/process-host'
+import { describeProcessFailure } from './process-failure-message.mjs'
 import {
   annotateJavascriptParityFiles,
   compareJavascriptParityFiles

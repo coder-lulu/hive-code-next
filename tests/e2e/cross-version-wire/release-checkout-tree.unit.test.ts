@@ -1,284 +1,221 @@
-import type { Dirent } from 'node:fs'
-import { readFile, rm, writeFile } from 'node:fs/promises'
+import { execFileSync } from 'node:child_process'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync
+} from 'node:fs'
+import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { beforeEach, expect, it, vi } from 'vitest'
-import { runProcess } from '../../../src/shared/child-process/run-process'
+import { afterEach, describe, expect, it } from 'vitest'
+import * as currentProcessHost from '@orca/process-host'
+import { importReleaseCheckoutModule } from './release-checkout'
 import { extractReleaseCheckoutTree } from './release-checkout-tree'
 
-const fixture = vi.hoisted(() => ({
-  directories: new Map<string, Dirent<string>[]>(),
-  archiveEntries: ['src/source.ts'],
-  readSource: vi.fn(async (_path: string) => '')
-}))
+const temporaryRoots: string[] = []
 
-vi.mock('../../../src/shared/child-process/run-process', () => ({ runProcess: vi.fn() }))
-vi.mock('tar', () => ({
-  list: vi.fn(async (options: { onReadEntry: (entry: { type: string; path: string }) => void }) => {
-    for (const path of fixture.archiveEntries) {
-      options.onReadEntry({ type: 'File', path })
-    }
-  })
-}))
-vi.mock('node:fs/promises', () => ({
-  readFile: fixture.readSource,
-  readdir: vi.fn(async (path: string) => fixture.directories.get(path) ?? []),
-  rm: vi.fn(),
-  writeFile: vi.fn()
-}))
-
-beforeEach(() => {
-  vi.clearAllMocks()
-  fixture.directories.clear()
-  fixture.archiveEntries = ['src/source.ts']
-  fixture.readSource.mockReset()
-  vi.mocked(writeFile).mockReset()
-  vi.mocked(runProcess).mockResolvedValue({
-    code: 0,
-    signal: null,
-    timedOut: false,
-    stdout: '',
-    stderr: ''
-  })
-})
-
-it('excludes discarded test sources before they consume the shared extraction deadline', async () => {
-  await extractReleaseCheckoutTree('/repository', '/staging', 'a'.repeat(40), undefined, 'linux')
-  const archive = vi
-    .mocked(runProcess)
-    .mock.calls.find(([spec]) => spec.args?.[0] === 'archive')![0]
-  expect(archive.program).toBe('git')
-  expect(archive.args?.slice(4)).toEqual([
-    '--',
-    'src/main',
-    'src/shared',
-    'src/preload',
-    'src/relay',
-    'src/renderer',
-    'src/types',
-    'mobile/src/worktree/agent-row-display.ts',
-    ':(glob,exclude)**/*.test.ts',
-    ':(glob,exclude)**/*.test.tsx',
-    ':(glob,exclude)**/*.bench.ts',
-    ':(glob,exclude)**/*.bench.tsx',
-    ':(glob,exclude)**/*.spec.ts',
-    ':(glob,exclude)**/*.spec.tsx'
-  ])
-  const extraction = vi.mocked(runProcess).mock.calls.find(([spec]) => spec.program !== 'git')![0]
-  expect(extraction.args).toEqual(
-    expect.arrayContaining([
-      '--exclude=*.test.ts',
-      '--exclude=*.test.tsx',
-      '--exclude=*.spec.ts',
-      '--exclude=*.spec.tsx',
-      '--exclude=*.bench.ts',
-      '--exclude=*.bench.tsx'
-    ])
-  )
-  expect(extraction.timeoutMs).toBeLessThanOrEqual(45_000)
-  expect(extraction.terminationBarrier).toBe(true)
-})
-
-function treeEntry(name: string, kind: 'file' | 'directory' | 'symlink' = 'file'): Dirent {
-  return {
-    name,
-    parentPath: '',
-    isFile: () => kind === 'file',
-    isDirectory: () => kind === 'directory',
-    isSymbolicLink: () => kind === 'symlink',
-    isBlockDevice: () => false,
-    isCharacterDevice: () => false,
-    isFIFO: () => false,
-    isSocket: () => false
+afterEach(() => {
+  for (const root of temporaryRoots.splice(0)) {
+    rmSync(root, { recursive: true, force: true })
   }
+})
+
+function temporaryDirectory(prefix: string): string {
+  // Why realpath: vite reports module urls through macOS's /var -> /private/var symlink.
+  const root = realpathSync(mkdtempSync(join(tmpdir(), prefix)))
+  temporaryRoots.push(root)
+  return root
 }
 
-it('prepares every nested source and alias with bounded concurrent filesystem work', async () => {
-  const sourceRoot = join('/staging', 'src')
-  const names = Array.from({ length: 16 }, (_, index) => `source-${index}.ts`)
-  fixture.directories.set(sourceRoot, [
-    ...names.map((name) => treeEntry(name)),
-    treeEntry('nested', 'directory'),
-    treeEntry('outside.ts', 'symlink')
-  ])
-  fixture.directories.set(join(sourceRoot, 'nested'), [
-    treeEntry('source.tsx'),
-    treeEntry('discard.test.ts'),
-    treeEntry('discard.bench.tsx'),
-    treeEntry('discard.spec.ts'),
-    treeEntry('asset.txt')
-  ])
-  let active = 0
-  let peak = 0
-  fixture.readSource.mockImplementation(async () => {
-    active++
-    peak = Math.max(peak, active)
-    await Promise.resolve()
-    active--
-    return "import value from '@/value'\nconst lazy = import('@renderer/lazy')\nconst required = require('@/required')\n"
-  })
+// Every fixed archive path must exist in a release, or `git archive` refuses the pathspec.
+const RELEASE_SKELETON: Record<string, string> = Object.fromEntries(
+  [
+    'src/main/placeholder.ts',
+    'src/shared/placeholder.ts',
+    'src/preload/placeholder.ts',
+    'src/renderer/src/placeholder.ts',
+    'src/types/placeholder.ts',
+    'mobile/src/worktree/agent-row-display.ts'
+  ].map((path) => [path, 'export {}\n'])
+)
 
-  await extractReleaseCheckoutTree('/repository', '/staging', 'a'.repeat(40), undefined, 'linux')
+/** A throwaway repository whose single commit plays the release. */
+function commitRelease(files: Record<string, string>): { repo: string; commit: string } {
+  const repo = temporaryDirectory('orca-cross-version-release-repo-')
+  for (const [path, source] of Object.entries({ ...RELEASE_SKELETON, ...files })) {
+    mkdirSync(join(repo, path, '..'), { recursive: true })
+    writeFileSync(join(repo, path), source)
+  }
+  const git = (args: string[]): string =>
+    execFileSync('git', ['-c', 'core.autocrlf=false', ...args], {
+      cwd: repo,
+      encoding: 'utf8'
+    }).trim()
+  git(['init', '--quiet'])
+  git(['config', 'core.autocrlf', 'false'])
+  git(['add', '--all'])
+  git([
+    '-c',
+    'user.name=release',
+    '-c',
+    'user.email=release@example.invalid',
+    '-c',
+    'commit.gpgsign=false',
+    'commit',
+    '--quiet',
+    '--message',
+    'release'
+  ])
+  // Working-tree root manifest the stand-in logic compares against.
+  writeFileSync(join(repo, 'package.json'), '{ "dependencies": {} }\n')
+  return { repo, commit: git(['rev-parse', 'HEAD']) }
+}
 
-  expect(peak).toBe(8)
-  expect(active).toBe(0)
-  expect(readFile).toHaveBeenCalledTimes(17)
-  expect(writeFile).toHaveBeenCalledTimes(17)
-  for (const name of names) {
-    expect(writeFile).toHaveBeenCalledWith(
-      join(sourceRoot, name),
-      "import value from './renderer/src/value'\nconst lazy = import('./renderer/src/lazy')\nconst required = require('./renderer/src/required')\n"
+const RELEASE_PROCESS_HOST = {
+  'src/packages/process-host/package.json': JSON.stringify({
+    name: '@orca/process-host',
+    type: 'commonjs',
+    exports: {
+      '.': { 'orca-source': './src/run-process.ts', default: './dist/run-process.js' },
+      './process-spec': {
+        'orca-source': './src/process-spec.ts',
+        default: './dist/process-spec.js'
+      }
+    }
+  }),
+  'src/packages/process-host/src/run-process.ts': [
+    "import { describeSpec } from './process-spec'",
+    "export const runProcess = () => 'release runProcess'",
+    'export const releaseOnlyExport = describeSpec',
+    ''
+  ].join('\n'),
+  'src/packages/process-host/src/process-spec.ts':
+    "export const describeSpec = () => 'release process-spec'\n",
+  'src/packages/process-host/src/run-process.test.ts': 'throw new Error("stale spec")\n',
+  // A JavaScript source package that itself depends on another release workspace package.
+  'src/packages/release-tool/package.json': JSON.stringify({
+    name: '@orca/release-tool',
+    type: 'module',
+    exports: {
+      '.': { 'orca-source': './src/index.mjs', default: './dist/index.js' },
+      './private': { default: './dist/private.js' }
+    }
+  }),
+  'src/packages/release-tool/src/index.mjs':
+    "import { runProcess } from '@orca/process-host'\nexport const tool = () => `tool:${runProcess()}`\n",
+  'src/packages/release-tool/src/index.test.mjs': 'throw new Error("stale spec")\n'
+}
+
+describe('release checkout workspace packages', () => {
+  it('loads the release workspace package rather than the current one', async () => {
+    expect('releaseOnlyExport' in currentProcessHost).toBe(false)
+    const { repo, commit } = commitRelease({
+      'pnpm-workspace.yaml': "packages:\n  - src/packages/*\n  - '!src/packages/ignored'\n",
+      ...RELEASE_PROCESS_HOST,
+      'src/main/consumer.ts': [
+        "import { runProcess, releaseOnlyExport } from '@orca/process-host'",
+        "import * as spec from '@orca/process-host/process-spec'",
+        'export { describeSpec as reexported } from "@orca/process-host/process-spec"',
+        'export const staticRun = runProcess()',
+        'export const releaseOnly = releaseOnlyExport()',
+        'export const specValue = spec.describeSpec()',
+        "export const lazyRun = async () => (await import('@orca/process-host')).runProcess()",
+        ''
+      ].join('\n'),
+      'src/main/esm-consumer.mjs': [
+        "import { describeSpec } from '@orca/process-host/process-spec'",
+        "import { tool } from '@orca/release-tool'",
+        'export const esm = `${describeSpec()}|${tool()}`',
+        ''
+      ].join('\n'),
+      'src/main/commonjs-consumer.cjs':
+        "module.exports = () => require('@orca/process-host/process-spec')\n",
+      'src/renderer/src/lib/view.ts': [
+        "import { label } from '@/lib/label'",
+        "export const view = async () => `${label}:${(await import('@orca/process-host')).runProcess()}`",
+        ''
+      ].join('\n'),
+      'src/renderer/src/lib/label.ts': "export const label = 'renderer'\n"
+    })
+    const staging = temporaryDirectory('orca-cross-version-release-staging-')
+
+    await extractReleaseCheckoutTree(repo, staging, commit)
+    const checkout = { ref: 'v0.0.0-synthetic', commit, label: 'v0.0.0-synthetic', root: staging }
+    const consumer = await importReleaseCheckoutModule(checkout, '/src/main/consumer.ts')
+    const view = await importReleaseCheckoutModule(checkout, '/src/renderer/src/lib/view.ts')
+    const esm = await importReleaseCheckoutModule(checkout, '/src/main/esm-consumer.mjs')
+    const call = async (module: Record<string, unknown>, name: string): Promise<unknown> => {
+      const exported = module[name]
+      if (typeof exported !== 'function') {
+        throw new Error(`synthetic release has no ${name} export`)
+      }
+      return exported()
+    }
+
+    expect(consumer.staticRun).toBe('release runProcess')
+    expect(consumer.releaseOnly).toBe('release process-spec')
+    expect(consumer.specValue).toBe('release process-spec')
+    expect(await call(consumer, 'reexported')).toBe('release process-spec')
+    expect(await call(consumer, 'lazyRun')).toBe('release runProcess')
+    expect(await call(view, 'view')).toBe('renderer:release runProcess')
+    expect(esm.esm).toBe('release process-spec|tool:release runProcess')
+    expect(readFileSync(join(staging, 'src/main/commonjs-consumer.cjs'), 'utf8')).toContain(
+      "require('../packages/process-host/src/process-spec.ts')"
     )
-  }
-  expect(writeFile).toHaveBeenCalledWith(
-    join(sourceRoot, 'nested', 'source.tsx'),
-    "import value from '../renderer/src/value'\nconst lazy = import('../renderer/src/lazy')\nconst required = require('../renderer/src/required')\n"
-  )
-  for (const name of ['discard.test.ts', 'discard.bench.tsx', 'discard.spec.ts']) {
-    expect(rm).toHaveBeenCalledWith(join(sourceRoot, 'nested', name))
-  }
-  expect(readFile).not.toHaveBeenCalledWith(join(sourceRoot, 'nested', 'asset.txt'), 'utf8')
-  expect(readFile).not.toHaveBeenCalledWith(join(sourceRoot, 'outside.ts'), 'utf8')
-})
+    expect(existsSync(join(staging, 'src/packages/process-host/src/run-process.test.ts'))).toBe(
+      false
+    )
+    expect(existsSync(join(staging, 'src/packages/release-tool/src/index.test.mjs'))).toBe(false)
+    // A rewritten workspace import never becomes a stand-in package.
+    expect(existsSync(join(staging, 'node_modules'))).toBe(false)
+  })
 
-it('rejects a failed source only after every already-issued sibling operation settles', async () => {
-  const sourceRoot = join('/staging', 'src')
-  fixture.directories.set(
-    sourceRoot,
-    Array.from({ length: 16 }, (_, index) => treeEntry(`source-${index}.ts`))
-  )
-  let release!: () => void
-  const gate = new Promise<void>((resolveGate) => {
-    release = resolveGate
-  })
-  let active = 0
-  let settled = false
-  fixture.readSource.mockImplementation(async (path) => {
-    if (path === join(sourceRoot, 'source-0.ts')) {
-      throw new Error('unreadable checkout source')
-    }
-    active++
-    await gate
-    active--
-    return 'export const intact = true\n'
-  })
-  const extraction = extractReleaseCheckoutTree(
-    '/repository',
-    '/staging',
-    'a'.repeat(40),
-    undefined,
-    'linux'
-  )
-  const outcome = extraction.then(
-    () => {
-      settled = true
-      return null
-    },
-    (error: unknown) => {
-      settled = true
-      return error
+  it.each(['@orca/process-host/internal', '@orca/release-tool/private', '@orca/not-in-release'])(
+    'fails extraction rather than loading the current tree for %s',
+    async (specifier) => {
+      const { repo, commit } = commitRelease({
+        'pnpm-workspace.yaml': 'packages:\n  - src/packages/*\n',
+        ...RELEASE_PROCESS_HOST,
+        'src/main/private.ts': `import { x } from '${specifier}'\nexport { x }\n`
+      })
+      const staging = temporaryDirectory('orca-cross-version-release-staging-')
+
+      const failure = await extractReleaseCheckoutTree(repo, staging, commit).then(
+        () => null,
+        (error: unknown) => String(error)
+      )
+
+      expect(failure).toMatch(/src[/\\]main[/\\]private\.ts: /)
+      expect(failure).toContain(`No public orca-source export for ${specifier}`)
     }
   )
-  try {
-    await vi.waitFor(() => expect(active).toBe(7))
-    expect(settled).toBe(false)
-  } finally {
-    release()
-    await outcome
-  }
 
-  await expect(extraction).rejects.toThrow('unreadable checkout source')
-  expect(active).toBe(0)
-  expect(readFile).toHaveBeenCalledTimes(8)
-  expect(writeFile).not.toHaveBeenCalled()
-})
+  it('extracts a release that predates workspace packages unchanged', async () => {
+    const source = "import { lock } from 'proper-lockfile'\nexport const locker = typeof lock\n"
+    const { repo, commit } = commitRelease({ 'src/main/old.ts': source })
+    const staging = temporaryDirectory('orca-cross-version-release-staging-')
 
-it('extracts every Windows archive member exactly once with eight bounded owners', async () => {
-  fixture.archiveEntries = Array.from({ length: 128 }, (_, index) => `src/source-${index}.ts`)
-  await extractReleaseCheckoutTree('/repository', '/staging', 'a'.repeat(40), undefined, 'win32')
-  const manifests = vi
-    .mocked(writeFile)
-    .mock.calls.map(([, contents]) => String(contents).split('\n').filter(Boolean))
-  expect(manifests).toHaveLength(8)
-  expect(manifests.flat().toSorted()).toEqual(fixture.archiveEntries.toSorted())
-  const extractions = vi
-    .mocked(runProcess)
-    .mock.calls.filter(([spec]) => spec.program !== 'git')
-    .map(([spec]) => spec)
-  expect(extractions).toHaveLength(8)
-  for (const spec of extractions) {
-    expect(spec.args).toContain('-T')
-    expect(spec.timeoutMs).toBeLessThanOrEqual(45_000)
-    expect(spec.terminationBarrier).toBe(true)
-  }
-  expect(rm).toHaveBeenCalledTimes(9)
-})
+    await extractReleaseCheckoutTree(repo, staging, commit)
 
-it('settles every issued Windows extractor before cleaning its manifests or archive', async () => {
-  fixture.archiveEntries = Array.from({ length: 128 }, (_, index) => `src/source-${index}.ts`)
-  let release!: () => void
-  const barrier = new Promise<void>((resolve) => {
-    release = resolve
+    expect(readFileSync(join(staging, 'src/main/old.ts'), 'utf8')).toBe(source)
+    expect(existsSync(join(staging, 'pnpm-workspace.yaml'))).toBe(false)
+    expect(existsSync(join(staging, 'src/wsl-guest'))).toBe(false)
   })
-  let issued = 0
-  vi.mocked(runProcess).mockImplementation(async (spec) => {
-    if (spec.program === 'git') {
-      return { code: 0, signal: null, timedOut: false, stdout: '', stderr: '' }
-    }
-    issued++
-    if (issued === 1) {
-      return { code: 1, signal: null, timedOut: false, stdout: '', stderr: 'extraction failed' }
-    }
-    await barrier
-    return { code: 0, signal: null, timedOut: false, stdout: '', stderr: '' }
-  })
-  const extracting = extractReleaseCheckoutTree(
-    '/repository',
-    '/staging',
-    'a'.repeat(40),
-    undefined,
-    'win32'
-  )
-  const assertion = expect(extracting).rejects.toThrow('extraction failed')
-  try {
-    await vi.waitFor(() => expect(issued).toBe(8))
-    expect(rm).not.toHaveBeenCalled()
-  } finally {
-    release()
-    await assertion
-  }
-  expect(rm).toHaveBeenCalledTimes(9)
-})
 
-it('settles every manifest write before cleaning a failed Windows preparation', async () => {
-  let release!: () => void
-  const barrier = new Promise<void>((resolve) => {
-    release = resolve
+  it('extracts the WSL guest sources a release relay imports when the release has them', async () => {
+    const source = "export { RELAY_SENTINEL } from '../wsl-guest/protocol'\n"
+    const { repo, commit } = commitRelease({
+      'src/relay/relay.ts': source,
+      'src/wsl-guest/protocol.ts': "export const RELAY_SENTINEL = 'sentinel'\n"
+    })
+    const staging = temporaryDirectory('orca-cross-version-release-staging-')
+
+    await extractReleaseCheckoutTree(repo, staging, commit)
+
+    expect(readFileSync(join(staging, 'src/relay/relay.ts'), 'utf8')).toBe(source)
+    expect(existsSync(join(staging, 'src/wsl-guest/protocol.ts'))).toBe(true)
   })
-  let issued = 0
-  vi.mocked(writeFile).mockImplementation(async () => {
-    issued++
-    if (issued === 1) {
-      throw new Error('manifest write failed')
-    }
-    await barrier
-  })
-  const preparing = extractReleaseCheckoutTree(
-    '/repository',
-    '/staging',
-    'a'.repeat(40),
-    undefined,
-    'win32'
-  )
-  const assertion = expect(preparing).rejects.toThrow('manifest write failed')
-  try {
-    await vi.waitFor(() => expect(issued).toBe(8))
-    expect(
-      vi.mocked(runProcess).mock.calls.map(([spec]) => [spec.program, spec.args?.[0]])
-    ).toEqual([['git', 'archive']])
-    expect(rm).not.toHaveBeenCalled()
-  } finally {
-    release()
-    await assertion
-  }
-  expect(rm).toHaveBeenCalledTimes(9)
 })

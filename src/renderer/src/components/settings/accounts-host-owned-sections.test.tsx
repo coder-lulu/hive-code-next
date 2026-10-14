@@ -27,6 +27,7 @@ afterEach(() => {
 function model(patch: Partial<AccountsPaneSectionModel> = {}): AccountsPaneSectionModel {
   return {
     settings: {},
+    accountOwner: { kind: 'local' },
     accountScopeKey: 'local:host:',
     accountRuntime: { runtime: 'host', label: 'This device' },
     isRemoteAccountScope: false,
@@ -56,6 +57,7 @@ describe('current account overview host-owned providers', () => {
           settings: {
             activeRuntimeEnvironmentId: 'server-2'
           } as AccountsPaneSectionModel['settings'],
+          accountOwner: { kind: 'environment', environmentId: 'server-2' },
           isRemoteAccountScope: true,
           accountScopeKey: 'environment:server-2:host:'
         })}
@@ -79,7 +81,7 @@ describe('current account overview host-owned providers', () => {
     expect(props('antigravity').target).toEqual({ runtime: 'wsl', wslDistro: 'Ubuntu' })
     expect(screen.getByText(/unavailable for this WSL runtime/)).toBeTruthy()
   })
-  it.each([{ isRemoteAccountScope: true }, { accountRuntimeUnavailable: true }])(
+  it.each([{ accountOwner: undefined }, { accountRuntimeUnavailable: true }])(
     'does not fall back to a local credential owner when scope is unavailable',
     (patch) => {
       render(<AccountsHostOwnedSections model={model(patch)} />)

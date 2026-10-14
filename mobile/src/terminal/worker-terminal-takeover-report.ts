@@ -1,4 +1,4 @@
-import type { RpcClient } from '../transport/rpc-client'
+import type { RpcClient } from '../transport/rpc-client-contract'
 import { workerTerminalTakeoverReport } from './mobile-terminal-operations'
 
 type ReportClient = RpcClient

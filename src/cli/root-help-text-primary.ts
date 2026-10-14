@@ -20,6 +20,12 @@ export const ROOT_HELP_TEXT_PRIMARY = [
   'Agent Discovery:',
   '  agent-context             Print the machine-readable command schema for agents',
   '',
+  'References:',
+  "  reference list            List a workspace's linked reviews and issues",
+  '  reference add             Attach review or issue URLs to a workspace',
+  '  reference remove          Detach review or issue URLs from a workspace',
+  '  reference find            Find workspaces and agents by URL or issue key',
+  '',
   'Agent Sessions:',
   applyProductCliBranding(
     '  search                    Search the full text of agent sessions on one Orca host'
@@ -103,6 +109,9 @@ export const ROOT_HELP_TEXT_PRIMARY = [
   applyProductCliBranding('  worktree set              Update Orca metadata for a worktree'),
   applyProductCliBranding('  worktree rm               Remove a worktree from Orca and git'),
   '  worktree ps               Show a compact orchestration summary across worktrees',
+  '',
+  'Agents:',
+  '  agent launch              Start an agent in a worktree, as a chat or terminal per your settings',
   '',
   'Files:',
   '  file open                 Open a file as a tab, view stays put (--focus brings you to it)',

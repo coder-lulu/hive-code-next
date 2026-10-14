@@ -1,3 +1,5 @@
+import { join } from 'node:path'
+import { extractReleaseCheckoutTree } from './release-checkout-tree'
 import { createSessionSearchService } from '../../../src/main/ai-vault-search/session-search-service'
 import {
   addSyntheticSession,
@@ -19,7 +21,11 @@ import {
   sessionSearchServiceStatus,
   setSessionSearchService
 } from '../../../src/main/ai-vault-search/session-search-service-registry'
-import { importReleaseCheckoutModule, materializeReleaseCheckout } from './release-checkout'
+import {
+  importReleaseCheckoutModule,
+  materializeReleaseCheckout,
+  REPO_ROOT
+} from './release-checkout'
 
 const LEGACY_REF = 'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c'
 const baselines = new Map<string, Awaited<ReturnType<typeof importReleaseCheckoutModule>>>()
@@ -28,7 +34,18 @@ beforeAll(async () => {
     [LEGACY_REF, LEGACY_REF],
     ['v1.4.211', '5534462b50c660888487a2108700d4cf284270db']
   ]) {
-    const checkout = await materializeReleaseCheckout(ref)
+    const checkout = await materializeReleaseCheckout(ref, {
+      // Only the real shared contract is imported. Keep this source subset in a
+      // distinct cache so it cannot stand in for a complete historical runtime.
+      cacheRoot: join(REPO_ROOT, 'logs', 'session-search-contract-checkouts'),
+      testHooks: {
+        populateStaging: async ({ staging }) => {
+          await extractReleaseCheckoutTree(REPO_ROOT, staging, commit, true, {
+            archivePaths: ['src/shared']
+          })
+        }
+      }
+    })
     expect(checkout.commit).toBe(commit)
     baselines.set(
       ref,
@@ -159,7 +176,15 @@ test.each([{ supportedAgents: [] }, { supportedAgents: ['future-agent'] }])(
       const retrieve = vi.spyOn(harness.engine, 'search')
       const service = createSessionSearchService({
         engine: harness.engine,
-        indexer: { status: unavailableSessionSearchStatus, reconcile: async () => {} }
+        indexer: {
+          status: () => ({
+            ...unavailableSessionSearchStatus(),
+            messagesIndexed: 0,
+            degradedRoots: [],
+            sessionsByAgent: {}
+          }),
+          reconcile: async () => {}
+        }
       })
       setSessionSearchService(service)
       const reply = await searchSessionService({ query: 'needle', supportedAgents }, 'runtime')
@@ -193,15 +218,16 @@ test.each(['v1.4.211', LEGACY_REF])(
     ) {
       throw new Error('Pinned release has no request parser')
     }
+    const parse = parser.parse.bind(parser)
     const call = vi.fn(async (method: string, request: Record<string, unknown>) => {
       if (method === 'aiVault.searchStatus') {
         throw { code: 'method_not_found' }
       }
-      parser.parse(request)
+      parse(request)
       expect(request).toMatchObject({
         filters: {
           agents: AI_VAULT_AGENTS.filter(
-            (agent) => !['codebuddy', 'zcode', 'qoder', 'jcode'].includes(agent)
+            (agent) => !['codebuddy', 'zcode', 'qoder', 'jcode', 'kiro'].includes(agent)
           ),
           scopePaths: ['/execution-host/folder']
         }

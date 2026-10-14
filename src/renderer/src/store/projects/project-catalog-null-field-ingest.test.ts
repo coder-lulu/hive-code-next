@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from 'vitest'
 import type { Project, ProjectHostSetup } from '../../../../shared/project-types'
 import type { Repo } from '../../../../shared/repo-types'
 import { getProjectHostSetupProjectionFromState } from '../project-host-setup-selector'
-import { fetchProjectHostSetupCompatibility, setupWithFetchedOwner } from './project-host-routing'
+import { fetchProjectHostSetupCatalog } from './project-host-routing'
+import { adoptFromEndpoint } from '../adopt-from-endpoint'
 
 // Crash 3bcc5be3 (v1.4.188, Linux, page.settings boundary): a setup row whose repoId arrived
 // null reached Settings' projectByRepoId useMemo and threw "Cannot read properties of null
@@ -79,7 +80,7 @@ function stubProjectsApi(setups: ProjectHostSetup[], projectRows: Project[] = pr
 describe('project catalog ingest with non-string row fields', () => {
   it('coerces a null repoId and path on the local IPC boundary', async () => {
     stubProjectsApi(badSetups())
-    const projection = await fetchProjectHostSetupCompatibility({ kind: 'local' }, repos)
+    const projection = await fetchProjectHostSetupCatalog({ kind: 'local' })
     const row = projection.setups.find((setup) => setup.id === 'repo:repo-1::local::2')
     expect(row?.repoId).toBe('')
     expect(row?.path).toBe('')
@@ -88,10 +89,10 @@ describe('project catalog ingest with non-string row fields', () => {
   // Why: a remote host on a different Orca version is a first-class source of these rows, and
   // decoders hand them over verbatim — the client cannot assume the host already repaired them.
   it('coerces on the remote adoption boundary too', () => {
-    const adopted = setupWithFetchedOwner(badSetups()[1]!, {
-      kind: 'environment',
-      environmentId: 'env-1'
-    })
+    const adopted = adoptFromEndpoint(
+      { kind: 'environment', environmentId: 'env-1' },
+      { kind: 'projectHostSetup', row: badSetups()[1]! }
+    )
     expect(adopted.repoId).toBe('')
     expect(adopted.path).toBe('')
     expect(adopted.hostId).toBe('runtime:env-1')
@@ -99,7 +100,7 @@ describe('project catalog ingest with non-string row fields', () => {
 
   it('lets the Settings projectByRepoId memo run instead of throwing on .trim()', async () => {
     stubProjectsApi(badSetups())
-    const ingested = await fetchProjectHostSetupCompatibility({ kind: 'local' }, repos)
+    const ingested = await fetchProjectHostSetupCatalog({ kind: 'local' })
     const projection = getProjectHostSetupProjectionFromState({
       repos,
       projects: [...ingested.projects],
@@ -118,19 +119,19 @@ describe('project catalog ingest with non-string row fields', () => {
   // the sidebar grouping index is built on every render.
   it('lets the sidebar checkout identity run instead of throwing on a null path', async () => {
     stubProjectsApi(badSetups())
-    const ingested = await fetchProjectHostSetupCompatibility({ kind: 'local' }, repos)
+    const ingested = await fetchProjectHostSetupCatalog({ kind: 'local' })
     expect(() => ingested.setups.map(checkoutIdentityLikeSidebar)).not.toThrow()
   })
 
   // Why: a coerced field must change one value, never which rows exist.
   it('does not add or drop rows because a field was repaired', async () => {
     stubProjectsApi(badSetups())
-    const repaired = await fetchProjectHostSetupCompatibility({ kind: 'local' }, repos)
+    const repaired = await fetchProjectHostSetupCatalog({ kind: 'local' })
     const clean = badSetups()
     ;(clean[1] as { repoId: string; path: string }).repoId = ''
     ;(clean[1] as { repoId: string; path: string }).path = ''
     stubProjectsApi(clean)
-    const untouched = await fetchProjectHostSetupCompatibility({ kind: 'local' }, repos)
+    const untouched = await fetchProjectHostSetupCatalog({ kind: 'local' })
     expect(repaired.setups.map((setup) => setup.id)).toEqual(
       untouched.setups.map((setup) => setup.id)
     )
@@ -142,7 +143,7 @@ describe('project catalog ingest with non-string row fields', () => {
   // Why: this is a zustand selector compared with Object.is, so instability is a re-render storm.
   it('keeps the projection reference-stable per (repos, projects, setups) input', async () => {
     stubProjectsApi(badSetups())
-    const ingested = await fetchProjectHostSetupCompatibility({ kind: 'local' }, repos)
+    const ingested = await fetchProjectHostSetupCatalog({ kind: 'local' })
     const args = {
       repos,
       projects: [...ingested.projects],
@@ -160,8 +161,26 @@ describe('project catalog ingest with non-string row fields', () => {
     ;(clean[1] as { repoId: string; path: string }).repoId = ''
     ;(clean[1] as { repoId: string; path: string }).path = ''
     stubProjectsApi(clean)
-    const projection = await fetchProjectHostSetupCompatibility({ kind: 'local' }, repos)
+    const projection = await fetchProjectHostSetupCatalog({ kind: 'local' })
     expect(projection.setups[0]).toBe(clean[0])
     expect(projection.setups[1]).toBe(clean[1])
   })
+})
+
+it('does not fabricate a catalog when current IPC is unavailable', async () => {
+  vi.stubGlobal('window', { api: {} })
+  await expect(fetchProjectHostSetupCatalog({ kind: 'local' })).rejects.toThrow(
+    'projects_api_unavailable'
+  )
+})
+it('preserves authorization failure from current catalog owner', async () => {
+  vi.stubGlobal('window', {
+    api: {
+      projects: {
+        list: vi.fn().mockRejectedValue(new Error('unauthorized')),
+        listHostSetups: vi.fn()
+      }
+    }
+  })
+  await expect(fetchProjectHostSetupCatalog({ kind: 'local' })).rejects.toThrow('unauthorized')
 })

@@ -1,5 +1,5 @@
 import { compareAppVersions, isValidAppVersion } from '../../shared/app-version'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { resolveCliCommands } from '../../shared/node-cli-command-resolution'
 
 export async function ensureAgentBunRuntime(

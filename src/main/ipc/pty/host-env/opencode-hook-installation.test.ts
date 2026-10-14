@@ -11,6 +11,10 @@ import { buildPtyHostEnv } from './assembly'
 import type { BuildPtyHostEnvOptions } from './types'
 
 const fixture = vi.hoisted(() => ({ userData: '', guestOverlay: '' }))
+const { noteWslActivityMock } = vi.hoisted(() => ({ noteWslActivityMock: vi.fn() }))
+vi.mock('../../../wsl/wsl-interop-health', () => ({
+  wslInteropHealthMonitor: { noteActivity: noteWslActivityMock }
+}))
 vi.mock('../../../../shared/app-environment', () => ({
   getAppEnvironment: () => ({ getPath: () => fixture.userData, onWillQuit: vi.fn() })
 }))
@@ -41,6 +45,7 @@ let options: BuildPtyHostEnvOptions
 const plugin = (dir: string, agent: string) => join(dir, 'plugins', `orca-${agent}-status.js`)
 
 beforeEach(() => {
+  noteWslActivityMock.mockClear()
   root = mkdtempSync(join(tmpdir(), 'orca-opencode-disabled-'))
   const home = join(root, 'home')
   const xdg = join(root, 'xdg')
@@ -297,6 +302,9 @@ describe('OpenCode installation uses the current enabled agents', () => {
     )
     expect(disabled.OPENCODE_CONFIG_DIR).toBeUndefined()
     expect(disabled.ORCA_AGENT_HOOK_ENDPOINT).toBe('/guest/endpoint.json')
+    expect(noteWslActivityMock).toHaveBeenCalledTimes(2)
+    expect(noteWslActivityMock).toHaveBeenNthCalledWith(1, null)
+    expect(noteWslActivityMock).toHaveBeenNthCalledWith(2, null)
     expect(existsSync(config)).toBe(false)
   })
 })

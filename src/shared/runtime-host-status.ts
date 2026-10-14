@@ -42,6 +42,22 @@ export type RuntimeEnvironmentStatus = {
   hostContactEpoch?: number
 }
 
+/** The store entry a status snapshot stands for: its status counts only while verified and current. */
+export function runtimeEnvironmentStatusFromSnapshot(
+  snapshot: RuntimeHostStatusSnapshot
+): RuntimeEnvironmentStatus {
+  const status = snapshot.verification === 'verified' && !snapshot.retired ? snapshot.status : null
+  return {
+    snapshot,
+    checkedAt: snapshot.checkedAt,
+    status:
+      status && snapshot.remoteControl
+        ? { ...status, remoteControl: snapshot.remoteControl }
+        : status,
+    remoteControl: snapshot.remoteControl
+  }
+}
+
 /**
  * The last status a currently usable route answered with. The effective entry wins when an
  * account Relay route answered after a local snapshot; otherwise the snapshot retains the last

@@ -1,5 +1,5 @@
-import { lstat } from 'node:fs/promises'
-import { resolve } from 'node:path'
+import { lstat, readdir } from 'node:fs/promises'
+import { resolve, sep } from 'node:path'
 import { resolveWorktreeHostPath } from '../../shared/git-metadata-path'
 
 // Why this is a leaf module rather than part of ipc/worktree-symlinks: status
@@ -24,18 +24,65 @@ export function getSafeRelativePath(rawPath: string): SafeRelativePathResult {
   // Why: split on both separators so a Windows-authored `..\escape` is
   // rejected the same way POSIX `../escape` is; the split catches relative
   // backslash traversal that `.split('/')` would otherwise miss.
-  // Why the drive check runs on every host: the same entry — per-user Shared
-  // Paths setting or repo `orca.yaml` — is evaluated on every host Orca runs
-  // on, so the verdict must not depend on which one is asking.
-  if (!rel || WINDOWS_DRIVE_DESIGNATOR.test(rel) || rel.split(/[\\/]/).includes('..')) {
+  // Why the drive check runs on every host, past `.` segments: the same entry — per-user
+  // Shared Paths setting or repo `orca.yaml` — is evaluated on every host Orca runs on, so
+  // the verdict must not depend on which one is asking, and `./C:x` is still `C:x`.
+  const segments = rel.split(/[\\/]/).filter((segment) => segment !== '' && segment !== '.')
+  if (
+    segments.length === 0 ||
+    WINDOWS_DRIVE_DESIGNATOR.test(segments[0]) ||
+    segments.includes('..')
+  ) {
     return { safe: false }
   }
-  return { safe: true, rel }
+  // Why: callers match `rel` against git's output, which never spells `./x`, `x/` or `a//b`.
+  // Split only on separators this host's `resolve` honours, so `rel` names what lstat probes.
+  const gitRel =
+    sep === '\\'
+      ? segments.join('/')
+      : rel
+          .split('/')
+          .filter((segment) => segment !== '' && segment !== '.')
+          .join('/')
+  return gitRel ? { safe: true, rel: gitRel } : { safe: false }
 }
 
 export type WorktreeSymlinkDetectionOptions = {
   /** Distro that spelled `worktreePath`, for a Windows host reopening a guest path. */
   wslDistro?: string
+}
+
+async function canonicalRelativePath(root: string, relativePath: string): Promise<string> {
+  let directory = root
+  const segments: string[] = []
+  for (const segment of relativePath.split('/')) {
+    const names = await readdir(directory)
+    let canonical = names.includes(segment) ? segment : undefined
+    if (canonical === undefined) {
+      const identity = await lstat(resolve(directory, segment), { bigint: true })
+      for (const candidate of names) {
+        if (candidate.toLowerCase() !== segment.toLowerCase()) {
+          continue
+        }
+        const observed = await lstat(resolve(directory, candidate), { bigint: true })
+        if (
+          identity.ino > 0n &&
+          observed.ino > 0n &&
+          observed.dev === identity.dev &&
+          observed.ino === identity.ino
+        ) {
+          canonical = candidate
+          break
+        }
+      }
+    }
+    if (canonical === undefined) {
+      throw new Error('Cannot identify the verified shared link in its directory')
+    }
+    segments.push(canonical)
+    directory = resolve(directory, canonical)
+  }
+  return segments.join('/')
 }
 
 export async function findExistingWorktreeSymlinkPaths(
@@ -52,12 +99,16 @@ export async function findExistingWorktreeSymlinkPaths(
     if (!safePath.safe) {
       continue
     }
+    let isSymlink = false
     try {
-      if ((await lstat(resolve(hostWorktreePath, safePath.rel))).isSymbolicLink()) {
-        symlinkPaths.push(safePath.rel)
-      }
+      isSymlink = (await lstat(resolve(hostWorktreePath, safePath.rel))).isSymbolicLink()
     } catch {
       // Why: only a positively identified symlink may bypass dirty preflight.
+    }
+    if (isSymlink) {
+      // Match Git's spelling only after disk identity proves a case alias. WSL/POSIX names
+      // remain distinct; failed canonicalization refuses staging instead of omitting a link.
+      symlinkPaths.push(await canonicalRelativePath(hostWorktreePath, safePath.rel))
     }
   }
   return symlinkPaths

@@ -176,7 +176,7 @@ async function createServer(): Promise<TestServer> {
 
   return {
     wss,
-    pairing,
+    pairing: (pairing),
     requests,
     auths,
     connectionCount: () => connectionCount

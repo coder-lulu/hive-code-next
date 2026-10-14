@@ -21,10 +21,9 @@ import {
   useReconnectAttempt,
   useRelayRecoveryStatus
 } from '../transport/client-context-connection-metrics'
-import { applyWorktreeRowDisplayState } from '../worktree/worktree-host-row-identity'
-import { applyWorktreeHostContextLabels } from '../worktree/worktree-host-context-labels'
 import { useWorkspaceSections } from '../worktree/use-workspace-sections'
 import { useAllHostClients } from '../transport/use-all-host-clients'
+import { useHostDisplayWorktrees } from './use-host-display-worktrees'
 import { useHostRepoMetadata } from './use-host-repo-metadata'
 import { useHostScreenIdentity } from './use-host-screen-identity'
 import { useHostScreenState } from './use-host-screen-state'
@@ -167,28 +166,7 @@ export function useHostScreenController({
   }
   const showNewWorktree = resolvedRouteActionState.showNewWorktree
 
-  const displayWorktrees = useMemo(() => {
-    // Why: live `worktrees` is authoritative only while connected; under the amber
-    // mount default, connecting/handshaking must keep the pre-reconnect list too.
-    const base = connState === 'connected' ? state.worktrees : state.lastKnownWorktrees
-    return applyWorktreeHostContextLabels(
-      applyWorktreeRowDisplayState(base, state.sleptIds, state.optimisticActiveWorktreeIdentity),
-      {
-        repoHostIdByRepoId: state.repoHostIdByRepoId,
-        hostLabelById: state.hostLabelById,
-        hostPlatform: state.hostPlatform
-      }
-    )
-  }, [
-    connState,
-    state.worktrees,
-    state.lastKnownWorktrees,
-    state.sleptIds,
-    state.optimisticActiveWorktreeIdentity,
-    state.repoHostIdByRepoId,
-    state.hostLabelById,
-    state.hostPlatform
-  ])
+  const displayWorktrees = useHostDisplayWorktrees(connState, state)
   const sectionsResult = useWorkspaceSections({
     displayWorktrees,
     sortMode: state.sortMode,

@@ -10,6 +10,7 @@ const {
   gitExecFileAsyncMock,
   gitExecFileAsyncBufferMock,
   gitStreamOptionsMock,
+  readdirMock,
   lstatMock,
   realpathMock,
   readFileMock,
@@ -20,6 +21,7 @@ const {
   gitExecFileAsyncMock: vi.fn(),
   gitExecFileAsyncBufferMock: vi.fn(),
   gitStreamOptionsMock: vi.fn(),
+  readdirMock: vi.fn(),
   lstatMock: vi.fn(),
   realpathMock: vi.fn(),
   readFileMock: vi.fn(),
@@ -38,6 +40,7 @@ vi.mock('./runner', () =>
 
 vi.mock('fs/promises', () =>
   createFsPromisesModuleMock({
+    readdirMock,
     lstatMock,
     realpathMock,
     readFileMock,
@@ -62,6 +65,7 @@ describe('getStatus', () => {
     gitExecFileAsyncMock.mockReset()
     gitExecFileAsyncBufferMock.mockReset()
     gitStreamOptionsMock.mockReset()
+    readdirMock.mockReset()
     lstatMock.mockReset()
     readFileMock.mockReset()
     accessMock.mockReset()
@@ -180,6 +184,7 @@ describe('getStatus', () => {
   it('probes shared symlinks through the distro spelling on Windows', async () => {
     const platformSpy = vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
     readFileMock.mockResolvedValue('gitdir: /home/me/repo/.git/worktrees/feature\n')
+    readdirMock.mockResolvedValue(['node_modules'])
     lstatMock.mockResolvedValue({ isSymbolicLink: () => true })
     gitExecFileAsyncMock.mockResolvedValueOnce({ stdout: '? node_modules\n' })
 

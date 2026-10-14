@@ -1,3 +1,4 @@
+import type { RpcBinarySendOptions, RpcBinarySendResult } from './rpc-binary-sender'
 import type { E2EEChannelOptions, E2EETextMessageHandler } from './e2ee-channel-options'
 export type { E2EEChannelOptions } from './e2ee-channel-options'
 import {
@@ -47,7 +48,7 @@ export class E2EEChannel {
   private handshakeTimer: ReturnType<typeof setTimeout> | null = null
   private readonly ws: WebSocket
   private readonly serverSecretKey: Uint8Array
-  private readonly resolveAuthenticatedDevice: (token: string) => E2EEAuthenticatedDevice | null
+  private readonly resolveAuthenticatedDevice: E2EEChannelOptions['resolveAuthenticatedDevice']
   private readonly onReady: (channel: E2EEChannel, device: E2EEAuthenticatedDevice) => void
   private readonly resolveCloudManagedSession: E2EECloudManagedSessionResolver | undefined
   private readonly onCloudReady:
@@ -62,6 +63,11 @@ export class E2EEChannel {
   private binaryMessageHandler: ((plaintext: Uint8Array<ArrayBufferLike>) => void) | null = null
 
   deviceToken: string | null = null
+
+  /** The current transcript; null until the handshake is established. */
+  get transcriptHashB64(): string | null {
+    return this.v2Session?.transcriptHashB64 ?? null
+  }
   authenticatedDevice: E2EEAuthenticatedDevice | null = null
   authenticatedCloudSession: E2EEAuthenticatedCloudSession | null = null
   clientCapabilities: readonly RuntimeCapability[] = []
@@ -75,7 +81,7 @@ export class E2EEChannel {
     this.onCloudReady = options.onCloudReady
     this.onError = options.onError
     this.transportContext = options.transportContext ?? { transport: 'direct' }
-    this.outbound = new MobileE2EEDesktopOutboundOwner(ws, options.outboundMemoryBudget)
+    this.outbound = new MobileE2EEDesktopOutboundOwner(ws, () => this.closeForOutboundBudget('queue'), options.outboundMemoryBudget)
 
     this.accountAuthentication = new E2EEAccountAuthentication(
       options.onAccountReady ? options.resolveAccountSession : undefined,
@@ -222,13 +228,13 @@ export class E2EEChannel {
         this.messageHandler?.(
           plaintext,
           (response) => this.enqueueV2({ kind: 'text', plaintext: response }),
-          (response) => this.enqueueV2({ kind: 'binary', plaintext: response })
+          (response, options) => this.enqueueV2({ kind: 'binary', plaintext: response }, options)
         ),
       onProtocolError: () => this.onError(4001, 'Invalid binary message before authentication')
     })
   }
 
-  private enqueueV2(item: V2OutboundItem): boolean {
+  private enqueueV2(item: V2OutboundItem, options?: RpcBinarySendOptions): RpcBinarySendResult {
     if (!this.v2Session || this.ws.readyState !== this.ws.OPEN) {
       return false
     }
@@ -236,7 +242,7 @@ export class E2EEChannel {
       this.closeForOutboundBudget('size')
       return false
     }
-    return this.outbound.enqueueV2(item, this.v2Session, () => this.closeForOutboundBudget('queue'))
+    return this.outbound.enqueueV2(item, this.v2Session, options)
   }
 
   private closeForOutboundBudget(emitter: OutboundBudgetEmitter): void {

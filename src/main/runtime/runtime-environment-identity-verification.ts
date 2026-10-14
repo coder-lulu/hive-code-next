@@ -25,15 +25,15 @@ export function verifyRuntimeEnvironmentIdentity(
   )
 }
 
-/** Proves the runtime at `pairing` holds its keys and is the expected runtime. */
+/** Proves the runtime at `connection` holds its keys and is the expected runtime. */
 export async function verifyRuntimePairingIdentity(
-  verifiedPairing: PairingOffer,
+  connection: PairingOffer,
   expected: Pick<KnownRuntimeEnvironment, 'runtimeId' | 'pairedDeviceId'>,
   signal?: AbortSignal
 ) {
   signal?.throwIfAborted()
   const response = await sendRemoteRuntimeRequest<RuntimeStatus>(
-    verifiedPairing,
+    connection,
     'status.get',
     undefined,
     15_000,
@@ -60,7 +60,7 @@ export async function verifyRuntimePairingIdentity(
     throw new Error(RUNTIME_IDENTITY_MISMATCH_MESSAGE)
   }
   return {
-    verifiedPairing,
+    verifiedConnection: connection,
     verifiedRuntimeId: runtimeId,
     runtimeStatus: status.runtimeStatus
   }

@@ -1,7 +1,8 @@
+import type { RpcBinarySender } from '../rpc/rpc-binary-sender'
 import type { WebSocket } from 'ws'
 import type { RpcRequest } from '../rpc/core'
 import type { AuthenticatedCloudManagedSocket } from '../rpc/mobile-socket-wiring'
-import { fingerprintAuthenticatedPairingCredential } from '../rpc/orchestration-mutation-executor'
+import { fingerprintAuthenticatedPairingCredential } from '../rpc/rpc-caller-identity'
 import { RuntimeRpcRequestAdmission } from './runtime-rpc-request-admission'
 import { classifyRuntimeLongPoll } from './runtime-rpc-long-poll'
 import { HiveRuntimeDisplayMetadataError } from '../../hive-runtime-cloud/hive-runtime-cloud-display-metadata-service'
@@ -88,7 +89,7 @@ export class RuntimeRpcCloudDispatch extends RuntimeRpcRequestAdmission {
   protected async handleCloudManagedWebSocketMessage(
     request: RpcRequest,
     reply: (response: string) => void,
-    sendBinary: (response: Uint8Array<ArrayBufferLike>) => boolean | void,
+    sendBinary: RpcBinarySender,
     ws: WebSocket | undefined,
     socket: AuthenticatedCloudManagedSocket
   ): Promise<void> {

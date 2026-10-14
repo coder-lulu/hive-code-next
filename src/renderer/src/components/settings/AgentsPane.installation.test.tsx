@@ -1,3 +1,4 @@
+import { LOCAL_SETTINGS_HOST_SCOPE } from './settings-host-scope'
 // @vitest-environment happy-dom
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -34,7 +35,11 @@ function mountPane() {
     const settings = useAppStore((state) => state.settings!)
     return (
       <TooltipProvider>
-        <AgentsPane settings={settings} updateSettings={() => {}} />
+        <AgentsPane
+          hostScope={LOCAL_SETTINGS_HOST_SCOPE}
+          settings={settings}
+          updateSettings={() => {}}
+        />
       </TooltipProvider>
     )
   }

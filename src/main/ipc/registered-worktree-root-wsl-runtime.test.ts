@@ -92,6 +92,7 @@ beforeEach(() => {
   vi.resetAllMocks()
   mocks.realpath.mockImplementation(async (path: string) => path)
   mocks.graph.mockImplementation(async (listed: Repo, options?: { wslDistro?: string }) => [
+    { path: listed.path },
     {
       path:
         listed.id === hostRepo.id
@@ -191,7 +192,8 @@ describe('authorized worktree roots for a drive repo whose project runtime is WS
     mocks.graph.mockImplementationOnce(
       (_repo: Repo) =>
         new Promise((resolveListing) => {
-          releaseHostListing = () => resolveListing([{ path: hostGitSpelling }])
+          releaseHostListing = () =>
+            resolveListing([{ path: _repo.path }, { path: hostGitSpelling }])
         })
     )
     const earlier = resolveAuthorizedPath(resolve('/wsl-drive/outside'), store)

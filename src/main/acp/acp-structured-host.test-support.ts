@@ -39,6 +39,8 @@ import {
 } from './acp-structured-agent-definitions'
 import type { AcpStructuredLaunch } from './acp-structured-launch-resolution'
 import type { AcpStructuredSessionAdapterDeps } from './acp-structured-session-adapter-deps'
+import type { AgentModelCatalogService } from '../native-chat/agent-model-catalog/agent-model-catalog-service'
+import type { StructuredAgentSessionStatusSink } from '../native-chat/agent-session-wire/structured-agent-session-status-ownership'
 
 export const hello: AgentJournalMessageItem = {
   kind: 'message',
@@ -62,6 +64,7 @@ export function launch(resume: () => boolean): () => Promise<AcpStructuredLaunch
     args: [],
     cwd: '/workspace',
     env: {},
+    envToDelete: [],
     fullAccess: false,
     resume: resume()
       ? {
@@ -84,6 +87,8 @@ export async function openHostRig(
     initialize?: Record<string, unknown>
     deps?: Partial<AcpStructuredSessionAdapterDeps>
     hostDeps?: Pick<StructuredAgentSessionHostDeps, 'platform' | 'probeOwner' | 'stopOwnerProcess'>
+    modelCatalog?: AgentModelCatalogService
+    statusSink?: StructuredAgentSessionStatusSink
   } = {}
 ) {
   const state = hostTestState()
@@ -96,6 +101,8 @@ export async function openHostRig(
     ...options,
     deps: {
       onEvent: (event) => void hosted.host?.handleAdapterEvent(event),
+      onChildWorkEvidence: (sessionId, evidence) =>
+        hosted.host?.publishChildWorkEvidence(sessionId, evidence),
       onDispatchSettledLate: (settlement) => void hosted.host?.settleLateDispatch(settlement),
       now: () => HOST_TEST_NOW,
       readProcessStartTime: async () => 1_700_000_000_000 + ++generation,
@@ -115,7 +122,9 @@ export async function openHostRig(
     claimKeyId: 'key-1',
     mintSpawnToken: () => 'spawn-a',
     now: () => HOST_TEST_NOW,
-    ...options.hostDeps
+    ...options.hostDeps,
+    statusSink: options.statusSink,
+    ...(options.modelCatalog ? { modelCatalog: options.modelCatalog } : {})
   })
   hosted.host = host
   replaceHostTestState({ store, host })
@@ -180,10 +189,16 @@ export const framesOf = (child: FakeAcpChild, method: string) =>
   child.agent.frames.filter((frame) => frame.method === method)
 
 /** A new Grok chat the host attached; Grok loads its session on a later start, counting each. */
-export async function openAttachedHostRig(deps: Partial<AcpStructuredSessionAdapterDeps> = {}) {
+export async function openAttachedHostRig(
+  deps: Partial<AcpStructuredSessionAdapterDeps> = {},
+  statusSink?: StructuredAgentSessionStatusSink,
+  modelCatalog?: AgentModelCatalogService
+) {
   const count = { loads: 0 }
   let resumed = false
   const rig = await openHostRig({
+    statusSink,
+    ...(modelCatalog ? { modelCatalog } : {}),
     initialize: RESUMES,
     script: (agent) =>
       agent.on('session/load', (frame) => {

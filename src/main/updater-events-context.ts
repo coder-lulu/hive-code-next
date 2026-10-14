@@ -3,6 +3,7 @@ import type { ElectronAutoUpdater } from './electron-updater-loader'
 
 export const AUTO_UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000
 export const AUTO_UPDATE_RETRY_INTERVAL_MS = 60 * 60 * 1000
+export const MAC_DEFERRED_STAGING_TIMEOUT_MS = 120_000
 
 export type UpdaterHandlerContext = {
   autoUpdater: ElectronAutoUpdater
@@ -36,6 +37,11 @@ export type UpdaterHandlerContext = {
   markUpdateAvailableEventPending: (attemptId: number | null) => void
   markMissingManifestPrereleaseFallbackChecking: () => void
   performQuitAndInstall: () => void | Promise<void>
+  startMacStaging: () => void
+  commitStagedMacInstall: () => void
+  failMacStaging: (error: unknown) => void
+  isAwaitingMacStaging: () => boolean
+  isMacStagingDeferredToInstall: () => boolean
   shouldDeferMacQuitForInstall: () => boolean
   recordCompletedUpdateCheck: () => void
   restoreReleaseUpdateSource: () => void

@@ -166,7 +166,7 @@ describe('Markdown document ripgrep lifecycle', () => {
   })
 
   it.each([
-    { path: root, options: { wslDistro: 'Ubuntu' }, distro: 'Ubuntu' },
+    { path: '/home/workspace/docs', options: { wslDistro: 'Ubuntu' }, distro: 'Ubuntu' },
     { path: '\\\\wsl.localhost\\Debian\\home\\repo', options: {}, distro: 'Debian' }
   ])('selects the Linux binary for $distro', async ({ path, options, distro }) => {
     Object.defineProperty(process, 'platform', { configurable: true, value: 'win32' })
@@ -175,6 +175,18 @@ describe('Markdown document ripgrep lifecycle', () => {
       cwd: path,
       wslDistro: options.wslDistro,
       wslDistroForOutput: distro,
+      stdio: ['ignore', 'pipe', 'pipe']
+    })
+    child.emit('close', 1, null)
+    await result
+  })
+
+  it('keeps the host binary for a Windows-drive root under a WSL runtime', async () => {
+    const result = listMarkdownDocuments('C:\\repo', { wslDistro: 'Ubuntu' })
+    expect(spawnMock).toHaveBeenCalledWith(expect.any(Array), {
+      cwd: 'C:\\repo',
+      wslDistro: undefined,
+      wslDistroForOutput: undefined,
       stdio: ['ignore', 'pipe', 'pipe']
     })
     child.emit('close', 1, null)
@@ -215,7 +227,7 @@ it.each(['abort', 'timeout', 'capacity'] as const)(
   async (reason) => {
     vi.useFakeTimers()
     const controller = new AbortController()
-    const result = listMarkdownDocuments(root, {
+    const result = listMarkdownDocuments('/home/workspace/docs', {
       wslDistro: 'Ubuntu',
       signal: controller.signal
     })

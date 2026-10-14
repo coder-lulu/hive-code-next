@@ -60,7 +60,10 @@ describe('headless PTY registry hydration ordering', () => {
     const store = source.indexOf('createOrcadProfileStateStartup(runtimeUserDataPath)')
     const hookStart = source.indexOf('await agentHookServer.start(', store)
     const daemon = source.indexOf('await startOrcadDaemon()', hookStart)
-    const hookEnv = source.indexOf('buildAgentHookPtyEnv:', daemon)
+    const hookEnv = source.indexOf(
+      '...agentHookRuntimeDeps(agentHookServer, observedPaneIdentities,',
+      daemon
+    )
     const handlersAndHydration = source.indexOf('await registerHeadlessPtyRuntime(', hookEnv)
 
     expect(cleanup).toBeGreaterThanOrEqual(0)
@@ -69,22 +72,37 @@ describe('headless PTY registry hydration ordering', () => {
     expect(hookStart).toBeGreaterThan(store)
     expect(daemon).toBeGreaterThan(hookStart)
     expect(hookEnv).toBeGreaterThan(daemon)
-    expect(source.slice(hookEnv, handlersAndHydration)).toContain('agentHookServer.buildPtyEnv()')
+    const deps = readFileSync(
+      join(process.cwd(), 'src/main/agent-hooks/agent-hook-runtime-deps.ts'),
+      'utf8'
+    )
+    expect(deps).toContain('buildAgentHookPtyEnv:')
+    expect(deps).toContain('isAgentStatusHooksEnabled(getSettings()) ? server.buildPtyEnv() : {}')
     expect(handlersAndHydration).toBeGreaterThan(hookEnv)
   })
 
   it('captures orcad status identity at ingest for fleet stale-row fencing', () => {
     const source = readFileSync(join(process.cwd(), 'src/main/orcad/orcad-entry.ts'), 'utf8')
     const runtime = source.indexOf('const runtime = new OrcaRuntimeService(')
-    const identityReader = source.indexOf('readObservedAgentStatusPaneIdentity:', runtime)
+    const identityReader = source.indexOf(
+      '...agentHookRuntimeDeps(agentHookServer, observedPaneIdentities,',
+      runtime
+    )
     const identitySubscription = source.indexOf('agentHookServer.subscribeEnrichedStatus(')
     const hookStart = source.indexOf('await agentHookServer.start(', identitySubscription)
-    const settingsListener = source.indexOf('profileStore.onSettingsChanged(', hookStart)
+    const settingsListener = source.indexOf('startOrcadManagedAgentHooks(', hookStart)
     const daemon = source.indexOf('await startOrcadDaemon()', hookStart)
     const identityFlush = source.indexOf('observedStatusCapture.attach(runtime)', runtime)
 
     expect(runtime).toBeGreaterThanOrEqual(0)
     expect(identityReader).toBeGreaterThan(runtime)
+    const deps = readFileSync(
+      join(process.cwd(), 'src/main/agent-hooks/agent-hook-runtime-deps.ts'),
+      'utf8'
+    )
+    expect(deps).toContain(
+      'readObservedAgentStatusPaneIdentity: (paneKey) => observedPaneIdentities.read(paneKey)'
+    )
     expect(identitySubscription).toBeGreaterThanOrEqual(0)
     expect(identitySubscription).toBeLessThan(runtime)
     expect(hookStart).toBeGreaterThan(identitySubscription)
@@ -98,8 +116,14 @@ describe('headless PTY registry hydration ordering', () => {
       'statusHooksEnabled: isAgentStatusHooksEnabled(profileStore.getSettings())'
     )
     expect(source.slice(settingsListener, daemon)).toContain(
-      'agentHookServer.setStatusHooksEnabled(isAgentStatusHooksEnabled(settings))'
+      '(enabled) => agentHookServer.setStatusHooksEnabled(enabled)'
     )
+    const managedHooks = readFileSync(
+      join(process.cwd(), 'src/main/orcad/orcad-managed-agent-hooks.ts'),
+      'utf8'
+    )
+    expect(managedHooks).toContain('store.onSettingsChanged((updates, settings) => {')
+    expect(managedHooks).toContain('setStatusHooksEnabled(isAgentStatusHooksEnabled(settings))')
     expect(identityFlush).toBeGreaterThan(runtime)
     expect(source.slice(identitySubscription, runtime)).toContain(
       'observedStatusCapture.observe(enriched)'

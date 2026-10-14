@@ -15,7 +15,6 @@ const remoteRepo: Repo = {
 
 const reposList = vi.fn()
 const reposClone = vi.fn()
-const reposCloneRemote = vi.fn()
 const runtimeEnvironmentCall = vi.fn()
 const runtimeEnvironmentTransportCall = vi.fn()
 let runtimeCapabilities: string[] = []
@@ -43,7 +42,6 @@ beforeEach(() => {
   clearRuntimeCompatibilityCacheForTests()
   reposList.mockReset()
   reposClone.mockReset()
-  reposCloneRemote.mockReset()
   runtimeEnvironmentCall.mockReset()
   runtimeEnvironmentTransportCall.mockReset()
   runtimeCapabilities = []
@@ -57,8 +55,7 @@ beforeEach(() => {
     api: {
       repos: {
         list: reposList,
-        clone: reposClone,
-        cloneRemote: reposCloneRemote
+        clone: reposClone
       },
       runtimeEnvironments: { call: runtimeEnvironmentTransportCall }
     }
@@ -66,7 +63,7 @@ beforeEach(() => {
 })
 
 describe('repo slice project-host setup runtime capability', () => {
-  it('falls back to repo-derived project setup state when a remote runtime lacks support', async () => {
+  it('keeps an unsupported project catalog unavailable without fabricating setup state', async () => {
     runtimeEnvironmentCall.mockResolvedValue({
       id: 'rpc-1',
       ok: true,
@@ -76,11 +73,11 @@ describe('repo slice project-host setup runtime capability', () => {
     const store = createTestStore()
     store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
-    expect(store.getState().projectHostSetups).toEqual([
-      expect.objectContaining({ id: 'remote-repo', hostId: 'runtime:env-1' })
-    ])
+    expect(store.getState().projectHostSetups).toEqual([])
+    expect(store.getState().repos).toEqual([])
+    expect(store.getState().repoCatalogStatusByHost['runtime:env-1']).toBe('unavailable')
     expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(1)
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
@@ -145,3 +142,10 @@ describe('repo slice project-host setup runtime capability', () => {
     expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
   })
 })
+
+// The catalog these tests read is the one the focused host would have shown.
+function catalogOwner(store: {
+  getState: () => { settings: { activeRuntimeEnvironmentId?: string | null } | null }
+}): { runtimeEnvironmentId: string | null } {
+  return { runtimeEnvironmentId: store.getState().settings?.activeRuntimeEnvironmentId ?? null }
+}

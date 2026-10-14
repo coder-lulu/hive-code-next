@@ -128,7 +128,6 @@ export type PreloadApi = {
   ephemeralVm: EphemeralVmApi
   cache: WorkspaceSessionApi['cache']
   session: WorkspaceSessionApi['session']
-  remoteWorkspace: WorkspaceSessionApi['remoteWorkspace']
   updater: UpdaterApi
   notebook: FilesystemApi['notebook']
   docPreview: DocPreviewApi['docPreview']
@@ -208,7 +207,9 @@ export type {
   PtyManagementDaemonCwdClass,
   PtyManagementFolderAccessMismatch,
   PtyManagementMacTccAttributionHealth,
-  PtyManagementSession
+  PtyManagementSession,
+  PtyManagementSeveredDaemon,
+  PtyManagementSeveredDaemonRestartResult
 } from './api/pty-management-api'
 export type {
   ShellOpenExternalEditorRequest,

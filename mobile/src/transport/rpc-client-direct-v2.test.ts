@@ -45,7 +45,7 @@ function setup() {
   const session = new RpcClientSocketSession({
     endpoint: 'ws://127.0.0.1:6769',
     deviceToken: 'test-token',
-    serverPublicKey: serverKey.publicKey,
+    serverPublicKeyB64: Buffer.from(serverKey.publicKey).toString('base64'),
     getCurrentSocket: () => session.socket,
     getState: () => 'handshaking',
     getReconnectAttempt: () => 0,
@@ -142,7 +142,31 @@ it('rejects a server ready with a different pinned public key', async () => {
       desktopPublicKeyB64: Buffer.from(nacl.box.keyPair().publicKey).toString('base64')
     })
   })
-  await vi.waitFor(() => expect(ctx.onForcedClose).toHaveBeenCalledOnce())
+  await vi.waitFor(() => expect(ctx.onAuthRejected).toHaveBeenCalledOnce())
+  expect(ctx.onForcedClose).not.toHaveBeenCalled()
+  expect(ctx.session.sendEncrypted({ id: 'blocked', method: 'status.get' })).toBe(false)
   expect(ctx.onAuthenticated).not.toHaveBeenCalled()
   expect(ctx.socket.sent).toHaveLength(1)
+})
+
+it('forces reconnect rather than rejecting credentials when an authenticated socket send fails', async () => {
+  const ctx = setup()
+  expect((await ready(ctx)).ok).toBe(true)
+  ctx.socket.onmessage!({
+    data: ctx.server.sealText(
+      JSON.stringify({
+        type: 'e2ee_authenticated',
+        v: 2,
+        transcriptHashB64: ctx.server.transcriptHashB64
+      })
+    )
+  })
+  await vi.waitFor(() => expect(ctx.onAuthenticated).toHaveBeenCalledOnce())
+  vi.spyOn(ctx.socket, 'send').mockImplementationOnce(() => {
+    throw new Error('socket write failed')
+  })
+  ctx.session.sendEncrypted({ id: 'failed', method: 'status.get' })
+  expect(ctx.onForcedClose).toHaveBeenCalledOnce()
+  expect(ctx.onAuthRejected).not.toHaveBeenCalled()
+  expect(ctx.socket.sent).toHaveLength(2)
 })

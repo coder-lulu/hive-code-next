@@ -8,7 +8,7 @@ import type { PairingOffer } from '../../shared/pairing'
 import type { RemoteRuntimeSubscriptionOptions } from '../../shared/remote-runtime-client'
 
 export type PairedRuntimeBrowserHostLeaseOptions = {
-  pairing: PairingOffer
+  connection: PairingOffer
   authorityRuntimeId: string
   browserHostClientId: string
   hostCapabilities: readonly string[]

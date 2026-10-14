@@ -2,12 +2,47 @@ import { chmodSync, mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync 
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { acquireBuildLock } from './client-build-execution.mjs'
+import { acquireBuildLock, capture, step } from './client-build-execution.mjs'
+import { loadClientBuildProcessHost } from './client-build-process-host.mjs'
 import { deliverArtifacts } from './client-build-artifacts.mjs'
 import { installedResourceFingerprint, sha256 } from './client-build-contract.mjs'
 import { copyWritableElectronRuntime } from './client-build-desktop.mjs'
 
 describe('client build ownership and publication', () => {
+  it('captures successful tool output and rejects a failed tool', async () => {
+    const context = { root: process.cwd(), env: process.env }
+    expect(await capture(context, process.execPath, ['-e', 'console.log("tool-ready")'])).toBe(
+      'tool-ready'
+    )
+    await expect(
+      capture(context, process.execPath, ['-e', 'console.error("tool-failed"); process.exit(7)'])
+    ).rejects.toThrow('tool-failed')
+  })
+  it('closes tool stdin and retains failed step output in its log', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'hive-client-step-'))
+    try {
+      const context = { root, logs: join(root, 'logs'), env: process.env }
+      await expect(
+        step(context, 'closed-input', process.execPath, [
+          '-e',
+          'process.stdin.resume(); process.stdin.on("end", () => { console.error("closed"); process.exit(7) })'
+        ])
+      ).rejects.toThrow('closed-input failed (7)')
+      expect(readFileSync(join(context.logs, 'closed-input.log'), 'utf8')).toContain('closed')
+    } finally {
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+  it('retains the public process host shell safety boundary during bootstrap', async () => {
+    const { runProcess } = await loadClientBuildProcessHost()
+    const literal = '& echo unexpected | more > unexpected.txt'
+    const result = await runProcess({
+      program: process.execPath,
+      args: ['-e', 'process.stdout.write(process.argv[1])', literal]
+    })
+    expect(result.code).toBe(0)
+    expect(result.stdout).toBe(literal)
+  })
   it('can package twice from read-only runtime files without modifying the source', () => {
     const root = mkdtempSync(join(tmpdir(), 'hive-client-runtime-'))
     try {

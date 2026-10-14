@@ -385,6 +385,7 @@ it.skipIf(!origin)(
           userDataPath: directory,
           methods: [
             defineMethod({
+              permission: 'workspace',
               name: 'capacity.echo',
               params: z.object({
                 runtimeRecordId: z.string().uuid(),

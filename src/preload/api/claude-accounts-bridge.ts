@@ -6,6 +6,7 @@ export const claudeAccountsApi: PreloadApi['claudeAccounts'] = {
   add: (args) => ipcRenderer.invoke('claudeAccounts:add', args),
   cancelPendingLogin: () => ipcRenderer.invoke('claudeAccounts:cancelPendingLogin'),
   reauthenticate: (args) => ipcRenderer.invoke('claudeAccounts:reauthenticate', args),
+  waitForSignInLink: () => ipcRenderer.invoke('claudeAccounts:waitForSignInLink'),
   remove: (args) => ipcRenderer.invoke('claudeAccounts:remove', args),
   select: (args) => ipcRenderer.invoke('claudeAccounts:select', args)
 }

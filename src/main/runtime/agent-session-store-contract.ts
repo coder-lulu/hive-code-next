@@ -1,3 +1,4 @@
+import type { AgentSessionOrcaStopCause } from '../../shared/agent-session-orca-stop'
 import type { AgentSessionTabTable } from './agent-session-tab-table'
 import type { AgentSessionOperationRow } from '../../shared/agent-session-operation-ledger'
 import type { AgentSessionRecord } from '../../shared/agent-session-record'
@@ -17,4 +18,6 @@ export type AgentSessionStoreState = {
   unreadableRecords: Map<string, { reason: string; raw: unknown }>
   sessionTabs: AgentSessionTabTable | null
   unrecordedSessionTabs?: AgentSessionTabTable
+  /** Runtime end evidence is read once at startup, never inferred from SQL refresh. */
+  runtimeEnds?: ReadonlyMap<string, AgentSessionOrcaStopCause> | null
 }

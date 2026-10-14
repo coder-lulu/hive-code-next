@@ -1,5 +1,5 @@
 import type { ConnectionState, RpcResponse } from './types'
-import type { RpcClient } from './rpc-client'
+import type { RpcClient } from './rpc-client-contract'
 import {
   forwardMigrationDialState,
   type MigrationDialStateForwarder

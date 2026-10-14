@@ -100,14 +100,15 @@ export function AgentAdvancedConfiguration({
                   argsOverride={props.argsOverride}
                   onSaveArgs={props.onSaveArgs}
                 />
-                {defaultEnvSummary || envSummary ? (
-                  <AgentDefaultEnvInput
-                    key={envSummary}
-                    defaultEnv={props.defaultEnv}
-                    envOverride={props.envOverride}
-                    onSaveEnv={props.onSaveEnv}
-                  />
-                ) : null}
+                {props.environmentEditor ??
+                  (defaultEnvSummary || envSummary ? (
+                    <AgentDefaultEnvInput
+                      key={envSummary}
+                      defaultEnv={props.defaultEnv}
+                      envOverride={props.envOverride}
+                      onSaveEnv={props.onSaveEnv}
+                    />
+                  ) : null)}
                 {props.sessionSourceHome ? (
                   <AgentSessionSourceHomeInput
                     key={`${props.sessionSourceHome.runtimeLabel}:${props.sessionSourceHome.value}`}

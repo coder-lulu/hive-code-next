@@ -55,9 +55,12 @@ describe('Hive Runtime Cloud Presence wiring', () => {
   })
 
   it('fences relaunch, update and quit synchronously and joins cloud shutdown to the committed barrier', () => {
-    for (const anchor of ['onBeforeRelaunch: async () => {', 'onBeforeUpdateQuit: async () => {']) {
+    for (const [anchor, preservation] of [
+      ['onBeforeRelaunch: async () => {', 'preserveAgentAuthBeforeRestart('],
+      ['onBeforeUpdateQuit: async () => {', 'preserveStateBeforeUpdateRestart(']
+    ]) {
       const start = core.indexOf(anchor)
-      const end = core.indexOf('preserveAgentAuthBeforeRestart(', start)
+      const end = core.indexOf(preservation, start)
       expect(start).toBeGreaterThanOrEqual(0)
       expect(end).toBeGreaterThan(start)
       expect(core.slice(start, end)).toContain('state.runtimeCloudPresence?.setRuntimeReady(false)')

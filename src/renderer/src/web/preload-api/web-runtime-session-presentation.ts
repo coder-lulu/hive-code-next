@@ -54,3 +54,14 @@ export function manuallyDisconnectedResponse(
     _meta: { runtimeId: environment.runtimeId }
   }
 }
+
+export function isSameWebRuntimePairing(
+  active: StoredWebRuntimeEnvironment | null,
+  environment: StoredWebRuntimeEnvironment
+): boolean {
+  return (
+    active?.id === environment.id &&
+    (active.pairingRevision ?? active.createdAt) ===
+      (environment.pairingRevision ?? environment.createdAt)
+  )
+}

@@ -1,8 +1,9 @@
+import type { PairingOffer } from './pairing'
 import type { AddressInfo } from 'node:net'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WebSocketServer } from 'ws'
 import { generateKeyPair, publicKeyToBase64 } from './e2ee-crypto'
-import { encodePairingOffer, parsePairingCode, type PairingOffer } from './pairing'
+import { encodePairingOffer, parsePairingCode } from './pairing'
 import { sendRemoteRuntimeRequest, subscribeRemoteRuntimeRequest } from './remote-runtime-client'
 import {
   REMOTE_RUNTIME_MAX_PENDING_REQUESTS,
@@ -350,7 +351,10 @@ describe('remote runtime outbound admission', () => {
   })
 })
 
-async function createServer(): Promise<{ pairing: PairingOffer; server: WebSocketServer }> {
+async function createServer(): Promise<{
+  pairing: PairingOffer
+  server: WebSocketServer
+}> {
   const keyPair = generateKeyPair()
   // host must match the 127.0.0.1 clients dial: a wildcard bind lets a foreign loopback listener claim the port and answer here.
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 })
@@ -368,5 +372,5 @@ async function createServer(): Promise<{ pairing: PairingOffer; server: WebSocke
   if (!pairing) {
     throw new Error('Failed to create test pairing')
   }
-  return { pairing, server }
+  return { pairing: pairing, server }
 }

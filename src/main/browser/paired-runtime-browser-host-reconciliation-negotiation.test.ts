@@ -214,7 +214,7 @@ function createLease(
   overrides: Partial<PairedRuntimeBrowserHostLeaseOptions> = {}
 ): PairedRuntimeBrowserHostLease {
   return new PairedRuntimeBrowserHostLease({
-    pairing,
+    connection: (pairing),
     authorityRuntimeId: 'runtime-a',
     browserHostClientId: 'host-a',
     hostCapabilities: ['webview'],

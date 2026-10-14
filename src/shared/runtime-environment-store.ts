@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { parsePairingCode, type PairingOffer } from './pairing'
 import { classifyRemotePairingHostname } from './remote-pairing-address'
 import { APP_DISPLAY_NAME } from './brand'
+import { isProfileRuntimePublicKey } from './runtime-e2ee-keypair-file'
 import {
   createEnvironmentFromPairingOffer,
   getPreferredPairingOffer,
@@ -42,13 +43,7 @@ export function addEnvironmentFromPairingCode(
     connectionDependency?: 'ssh-tunnel'
   }
 ): KnownRuntimeEnvironment {
-  const offer = parsePairingCode(args.pairingCode)
-  if (!offer) {
-    throw new RuntimeEnvironmentStoreError(
-      'invalid_argument',
-      'Invalid pairing code. Expected a hivecode://pair?... URL or bare pairing payload.'
-    )
-  }
+  const offer = parseRemotePairingCode(userDataPath, args.pairingCode)
   const store = readPersistedEnvironmentStore(userDataPath)
   const now = args.now ?? Date.now()
   const existing = store.environments.find((entry) => entry.name === args.name)
@@ -81,6 +76,24 @@ export function addEnvironmentFromPairingCode(
   return environment
 }
 
+function parseRemotePairingCode(userDataPath: string, pairingCode: string): PairingOffer {
+  const offer = parsePairingCode(pairingCode)
+  if (!offer) {
+    throw new RuntimeEnvironmentStoreError(
+      'invalid_argument',
+      'Invalid pairing code. Expected a hivecode://pair?... URL or bare pairing payload.'
+    )
+  }
+  // Why the key, not the address: a loopback or LAN address proves nothing either way.
+  if (isProfileRuntimePublicKey(userDataPath, offer.publicKeyB64)) {
+    throw new RuntimeEnvironmentStoreError(
+      'invalid_argument',
+      `This pairing code is for this ${APP_DISPLAY_NAME} itself. Generate the code on the other computer instead.`
+    )
+  }
+  return offer
+}
+
 export function removeEnvironment(userDataPath: string, selector: string): KnownRuntimeEnvironment {
   const environment = resolveEnvironmentFromStore(readEnvironmentStore(userDataPath), selector)
   assertNoIndependentSshAccess(environment)
@@ -98,13 +111,7 @@ export function updateEnvironmentFromPairingCode(
   selector: string,
   args: { pairingCode: string; now?: number }
 ): KnownRuntimeEnvironment {
-  const offer = parsePairingCode(args.pairingCode)
-  if (!offer) {
-    throw new RuntimeEnvironmentStoreError(
-      'invalid_argument',
-      'Invalid pairing code. Expected a hivecode://pair?... URL or bare pairing payload.'
-    )
-  }
+  const offer = parseRemotePairingCode(userDataPath, args.pairingCode)
   assertNoIndependentSshAccess(
     resolveEnvironmentFromStore(readEnvironmentStore(userDataPath), selector)
   )
@@ -277,7 +284,7 @@ function assertNoIndependentSshAccess(environment: KnownRuntimeEnvironment): voi
   if (environment.orcadDeployment) {
     throw new RuntimeEnvironmentStoreError(
       'invalid_argument',
-      `This server is managed by ${APP_DISPLAY_NAME} over SSH; its pairing cannot be replaced or removed here. To decommission it, run \`orca environment stop --environment <name> --yes\` or use Settings > Managed servers.`
+      `This server is managed by ${APP_DISPLAY_NAME} over SSH; its pairing cannot be replaced or removed here. To decommission it, run \`orca environment stop --environment <name> --yes\` or use Settings > Managed servers; for a host that is gone, run \`orca environment forget --environment <name> --yes\`.`
     )
   }
   if (environment.sshAccess || environment.pendingSshAccessOperation) {

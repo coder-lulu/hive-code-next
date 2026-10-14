@@ -128,7 +128,7 @@ export default function SessionCreateDialog({
           translate('components.sessions.create.failed', 'Could not start the session.')
         )
       }
-      tracker.markLaunched(result.tabId)
+      tracker.markLaunched(result.tabId ?? null)
     } catch (cause) {
       tracker.stop()
       setPending(false)

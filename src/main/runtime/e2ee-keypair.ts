@@ -6,11 +6,9 @@ import { join, resolve } from 'node:path'
 import nacl from 'tweetnacl'
 import { hardenExistingSecureFile, isUnreadableError } from '../../shared/secure-file'
 import { writeSecureJsonFileAsync } from '../../shared/secure-file-async'
-import { E2EE_KEYPAIR_FILENAME } from './mobile-pairing-files'
+import { E2EE_KEYPAIR_FILENAME as KEYPAIR_FILENAME, MAX_E2EE_KEYPAIR_FILE_BYTES as MAX_KEYPAIR_FILE_BYTES } from '../../shared/runtime-e2ee-keypair-file'
 
-const KEYPAIR_FILENAME = E2EE_KEYPAIR_FILENAME
 const KEYPAIR_VERSION = 1
-const MAX_KEYPAIR_FILE_BYTES = 8 * 1024
 
 type KeypairFile = {
   v: number
@@ -22,6 +20,19 @@ export type E2EEKeypair = {
   publicKey: Uint8Array
   secretKey: Uint8Array
   publicKeyB64: string
+}
+
+// The listener decrypts with the secret key, so the advertised key must be the
+// one derived from it; a file whose stored public key disagrees would otherwise
+// put a key in every pairing offer that no listener holds. The file is left as is.
+function keypairFromSecret(secretKey: Uint8Array, storedPublicKey: Uint8Array): E2EEKeypair {
+  const { publicKey } = nacl.box.keyPair.fromSecretKey(secretKey)
+  if (!Buffer.from(publicKey).equals(Buffer.from(storedPublicKey))) {
+    console.warn(
+      '[e2ee] stored public key does not match the secret key; advertising the derived key'
+    )
+  }
+  return { publicKey, secretKey, publicKeyB64: Buffer.from(publicKey).toString('base64') }
 }
 
 const pendingKeypairs = new Map<string, Promise<E2EEKeypair>>()
@@ -54,7 +65,7 @@ async function loadOrCreateKeypair(userDataPath: string): Promise<E2EEKeypair> {
         const publicKey = Uint8Array.from(Buffer.from(raw.publicKeyB64, 'base64'))
         const secretKey = Uint8Array.from(Buffer.from(raw.secretKeyB64, 'base64'))
         if (publicKey.length === 32 && secretKey.length === 32) {
-          return { publicKey, secretKey, publicKeyB64: raw.publicKeyB64 }
+          return keypairFromSecret(secretKey, publicKey)
         }
       }
     } catch (error) {

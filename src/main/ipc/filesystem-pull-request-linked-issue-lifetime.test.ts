@@ -4,12 +4,12 @@ import {
   handlers,
   store,
   WORKTREE_FEATURE_PATH,
+  listWorktreesMock,
   resolveCommitMessageSettingsMock,
   generatePullRequestFieldsFromContextMock,
   getPullRequestDraftContextMock,
   resolveHostedReviewBodyForGenerationMock,
   loadPullRequestLinkedIssueMock,
-  getSshGitProviderMock,
   resetFilesystemIpcMocks
 } from './filesystem-test-harness'
 
@@ -26,10 +26,6 @@ vi.mock(
   async () => (await import('./filesystem-test-harness')).crashBreadcrumbMock
 )
 vi.mock(
-  '../local-downloaded-folder-promotion',
-  async () => (await import('./filesystem-test-harness')).folderPromotionMock
-)
-vi.mock(
   '../git/status',
   async () => (await import('./filesystem-test-harness')).gitStatusModuleMock
 )
@@ -41,10 +37,6 @@ vi.mock('../git/worktree', async () => (await import('./filesystem-test-harness'
 vi.mock(
   '../providers/ssh-filesystem-dispatch',
   async () => (await import('./filesystem-test-harness')).sshFilesystemDispatchMock
-)
-vi.mock(
-  '../providers/ssh-git-dispatch',
-  async () => (await import('./filesystem-test-harness')).sshGitDispatchMock
 )
 vi.mock(
   '../text-generation/commit-message-text-generation',
@@ -72,7 +64,7 @@ vi.mock('../source-control/pull-request-linked-issue', async () => {
 import { registerFilesystemHandlers } from './filesystem'
 import { invalidateAuthorizedRootsCache } from './registered-worktree-roots-cache'
 
-describe.each(['local', 'SSH'])('PR linked-issue lifetime on %s', (host) => {
+describe('PR linked-issue lifetime on a local worktree', () => {
   const draftContext = {
     base: 'main',
     branch: 'feature/ai',
@@ -89,8 +81,7 @@ describe.each(['local', 'SSH'])('PR linked-issue lifetime on %s', (host) => {
     title: '',
     body: '',
     draft: false,
-    worktreePath: host === 'SSH' ? '/remote/repo' : WORKTREE_FEATURE_PATH,
-    ...(host === 'SSH' ? { connectionId: 'conn-1' } : {})
+    worktreePath: WORKTREE_FEATURE_PATH
   }
 
   beforeEach(() => {
@@ -103,12 +94,26 @@ describe.each(['local', 'SSH'])('PR linked-issue lifetime on %s', (host) => {
     })
     resolveHostedReviewBodyForGenerationMock.mockResolvedValue('')
     getPullRequestDraftContextMock.mockResolvedValue(draftContext)
-    getSshGitProviderMock.mockReturnValue({
-      exec: vi.fn(),
-      executeCommitMessagePlan: vi.fn()
-    })
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: The existing IPC harness provides every Store member reached by this handler.
     registerFilesystemHandlers(store as never)
+  })
+
+  it('refuses a feature graph missing its registered repository before starting the lookup', async () => {
+    listWorktreesMock.mockResolvedValue([
+      {
+        path: WORKTREE_FEATURE_PATH,
+        head: 'abc',
+        branch: 'feature/ai',
+        isBare: false,
+        isMainWorktree: false
+      }
+    ])
+    await expect(handlers.get('git:generatePullRequestFields')!(null, request)).rejects.toThrow(
+      'Access denied: unknown repository or worktree path'
+    )
+    expect(loadPullRequestLinkedIssueMock).not.toHaveBeenCalled()
+    expect(getPullRequestDraftContextMock).not.toHaveBeenCalled()
+    expect(generatePullRequestFieldsFromContextMock).not.toHaveBeenCalled()
   })
 
   it.each(['no changes', 'context error', 'template error'])(

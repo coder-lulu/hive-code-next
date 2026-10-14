@@ -1,17 +1,18 @@
+import type { WriteFlushBarrierOperations } from './write-flush-barriers'
 import type { RemovedSshTargetTombstone, SshTarget } from '../../../shared/ssh-types'
 import {
   type SshTargetStateOperations,
+  getClaudeLivePtySessionIds as getClaudeLivePtySessionIdsOperation,
   addClaudeLivePtySessionId as addClaudeLivePtySessionIdOperation,
+  removeClaudeLivePtySessionId as removeClaudeLivePtySessionIdOperation,
   addDeletedSshConfigAlias as addDeletedSshConfigAliasOperation,
   addRemovedSshTargetTombstone as addRemovedSshTargetTombstoneOperation,
   addSshTarget as addSshTargetOperation,
   clearDeletedSshConfigAliases as clearDeletedSshConfigAliasesOperation,
-  getClaudeLivePtySessionIds as getClaudeLivePtySessionIdsOperation,
   getDeletedSshConfigAliases as getDeletedSshConfigAliasesOperation,
   getRemovedSshTargetTombstones as getRemovedSshTargetTombstonesOperation,
   getSshTarget as getSshTargetOperation,
   getSshTargets as getSshTargetsOperation,
-  removeClaudeLivePtySessionId as removeClaudeLivePtySessionIdOperation,
   removeDeletedSshConfigAlias as removeDeletedSshConfigAliasOperation,
   removeRemovedSshTargetTombstone as removeRemovedSshTargetTombstoneOperation,
   releaseRemovedSshTargetTombstone as releaseRemovedSshTargetTombstoneOperation,
@@ -26,16 +27,12 @@ import { allocateSshTargetGeneration as allocateSshTargetGenerationOperation } f
 
 import type { StoreRuntimeState } from './store-runtime-state'
 import type { WriteSchedulingOperations } from './write-scheduling'
-import type { WriteFlushBarrierOperations } from './write-flush-barriers'
 import type { RepoLifecycleOperations } from './repo-lifecycle-operations'
 import { syncProjectHostSetupCompatibilityState } from './repo-lifecycle-operations'
 import { scheduleSave } from './write-scheduling'
 import { forgetSshConnectionGeneration } from '../../ssh/ssh-connection-generation'
 
-type SshProfileOperationsRuntime = Pick<
-  StoreRuntimeState,
-  'dirtyProfileStateDomains' | 'protectedSecrets' | 'state'
->
+type SshProfileOperationsRuntime = Pick<StoreRuntimeState, 'dirtyProfileStateDomains' | 'protectedSecrets' | 'state'>
 
 const sshProfileOperationsContext = Symbol('SshProfileOperations')
 type SshProfileOperationsContext = {
@@ -150,19 +147,8 @@ export function getSshTargetStateOperations(owner: SshProfileOperations): SshTar
     protectedSecrets: owner[sshProfileOperationsContext].runtime.protectedSecrets,
     scheduleSave: () => scheduleSave(owner[sshProfileOperationsContext].scheduling),
     flush: () => {
-      owner[sshProfileOperationsContext].runtime.dirtyProfileStateDomains?.add(
-        'claudeLivePtySessionIds'
-      )
+      owner[sshProfileOperationsContext].runtime.dirtyProfileStateDomains?.add('claudeLivePtySessionIds')
       owner[sshProfileOperationsContext].flushBarriers.flush()
     }
   }
-}
-
-export function installSshProfileOperationsContext(
-  target: SshProfileOperations,
-  source: SshProfileOperations
-): void {
-  Object.defineProperty(target, sshProfileOperationsContext, {
-    value: source[sshProfileOperationsContext]
-  })
 }

@@ -1,4 +1,5 @@
 import { EventEmitter } from 'node:events'
+import type { PipedChildProcess } from '@orca/process-host/process-spec'
 import { managedChild } from './claude-child-exit-proof-fixture'
 import { PassThrough } from 'node:stream'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -38,15 +39,36 @@ beforeEach(() => {
   })
 })
 
+function mockChild(): PipedChildProcess {
+  const stdin = new PassThrough()
+  const stdout = new PassThrough()
+  const stderr = new PassThrough()
+  const stdio: PipedChildProcess['stdio'] = [stdin, stdout, stderr, undefined, undefined]
+  return Object.assign(new EventEmitter(), {
+    pid: rootRow.pid,
+    connected: false,
+    killed: false,
+    exitCode: null,
+    signalCode: null,
+    spawnargs: [],
+    spawnfile: 'fixture-provider',
+    disconnect: vi.fn(),
+    ref: vi.fn(),
+    unref: vi.fn(),
+    send: vi.fn(() => true),
+    [Symbol.dispose]: vi.fn(),
+    stdin,
+    stdout,
+    stderr,
+    stdio,
+    kill: vi.fn(() => true)
+  })
+}
+
 function fixture(onRootExit: () => void = () => {}) {
   let exited = false
   const exit = Promise.withResolvers<void>()
-  const child = Object.assign(new EventEmitter(), {
-    pid: rootRow.pid,
-    stdin: new PassThrough(),
-    stderr: new PassThrough(),
-    kill: vi.fn(() => true)
-  })
+  const child = mockChild()
   child.stdin.on('finish', () => {
     rows = rows.filter((row) => row.pid !== rootRow.pid)
     exited = true
@@ -169,12 +191,7 @@ describe('Windows Claude descendants after owned root exit', () => {
 
   it('does not infer ownership of an unobserved child after an already exited root', async () => {
     rows = [childRow, foreignRow]
-    const child = Object.assign(new EventEmitter(), {
-      pid: rootRow.pid,
-      stdin: new PassThrough(),
-      stderr: new PassThrough(),
-      kill: vi.fn(() => true)
-    })
+    const child = mockChild()
     const tree = createClaudeChildTreeReaper(child, { platform: 'win32', exited: () => true })
 
     const managed = managedChild(child)

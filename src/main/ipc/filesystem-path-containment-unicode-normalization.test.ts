@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -75,6 +76,7 @@ async function makeDistinctSiblings(
 }
 
 function makeStore(repoPath: string): Store {
+  execFileSync('git', ['init', '-q', repoPath], { windowsHide: true, stdio: 'pipe' })
   const repo: Repo = {
     id: 'repo-1',
     path: repoPath,

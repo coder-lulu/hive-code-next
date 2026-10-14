@@ -1,9 +1,10 @@
-import {
-  getRuntimeEnvironmentIdForWorktree,
-  type WorktreeRuntimeOwnerState
-} from '@/lib/worktree-runtime-owner'
+import { getRuntimeEnvironmentIdForWorktree } from '@/lib/worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from '@/lib/worktree-runtime-owner-state'
 import type { AppState } from '@/store/types'
-import { findTerminalTabWorktreeId } from './native-chat-file-link'
+import {
+  createNativeChatTabOwnerSelector,
+  findNativeChatTabOwnerWorktreeId
+} from './native-chat-file-link'
 
 export type NativeChatRuntimeOwnerState = Pick<AppState, 'tabsByWorktree'> &
   WorktreeRuntimeOwnerState
@@ -18,13 +19,21 @@ export type NativeChatRuntimeOwnerState = Pick<AppState, 'tabsByWorktree'> &
  * still knowable and the transport must route to the runtime — reusing the
  * path-coupled context would fall back to local session data, the exact bug this
  * kills. Resolve the owner from the tab→worktree mapping alone; do not merge the
- * two selections. The shared helper (`findTerminalTabWorktreeId`) is the right
+ * two selections. The shared helper (`findNativeChatTabOwnerWorktreeId`) is the right
  * level of reuse.
  */
 export function selectNativeChatRuntimeEnvironmentId(
   state: NativeChatRuntimeOwnerState,
   terminalTabId: string
 ): string | null {
-  const worktreeId = findTerminalTabWorktreeId(state.tabsByWorktree, terminalTabId)
+  const worktreeId = findNativeChatTabOwnerWorktreeId({ tabsByWorktree: state.tabsByWorktree }, terminalTabId)
   return worktreeId ? getRuntimeEnvironmentIdForWorktree(state, worktreeId) : null
+}
+
+export function createNativeChatRuntimeSelector(terminalTabId: string) {
+  const selectOwner = createNativeChatTabOwnerSelector(terminalTabId)
+  return (state: NativeChatRuntimeOwnerState): string | null => {
+    const worktreeId = selectOwner({ tabsByWorktree: state.tabsByWorktree })
+    return worktreeId ? getRuntimeEnvironmentIdForWorktree(state, worktreeId) : null
+  }
 }

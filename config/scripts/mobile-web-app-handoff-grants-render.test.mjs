@@ -1,5 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { chromium, webkit } from 'playwright-core'
@@ -71,7 +70,9 @@ beforeAll(async () => {
   cspHeader = await readShellCsp()
   bridgeVersion = await readBridgeProtocolVersion()
   faultGrant = await readBridgeFaultGrant()
-  scratch = await mkdtemp(join(tmpdir(), 'orca-mobile-web-app-handoff-'))
+  const artifactRoot = join(process.cwd(), 'logs', 'mobile-web-app-handoff')
+  await mkdir(artifactRoot, { recursive: true })
+  scratch = await mkdtemp(join(artifactRoot, 'bundle-'))
   const built = await buildMobileWebAppBundle({ outDir: join(scratch, 'bundle') })
   tasksChunk = built.routeChunks[TASKS_ROUTE_KEY]
   // The precondition the absence assertions below need: a chunk that cannot be named cannot be
@@ -97,7 +98,8 @@ async function openHostRoute(
     grants,
     pageRouteGrants = PAGE_ROUTE_GRANTS,
     route = HOST_ROUTE,
-    awaitText = SHELL_HOST.name
+    awaitText = SHELL_HOST.name,
+    ownsHostArea = false
   }
 ) {
   const page = await browser.newPage({ viewport })
@@ -112,7 +114,8 @@ async function openHostRoute(
     faultGrant,
     grants,
     pageRoutes: [HOST_PATTERN, FILES_PATTERN, TASKS_PATTERN],
-    pageRouteGrants
+    pageRouteGrants,
+    ownsHostArea
   })
   const errors = []
   // Every script answer with its status, not only the ones that arrived. A 200-only list cannot
@@ -215,6 +218,7 @@ describeRender.each([
   it('hands the hop to the shell when the session cannot cover tasks', async () => {
     const opened = await openHostRoute(browser, {
       viewport: WIDE,
+      ownsHostArea: true,
       grants: [faultGrant, 'navigate', 'storage', 'haptics']
     })
     const { page, errors, jsResponses } = opened
@@ -240,6 +244,7 @@ describeRender.each([
     // page that simply never navigates.
     const opened = await openHostRoute(browser, {
       viewport: WIDE,
+      ownsHostArea: true,
       grants: [
         faultGrant,
         'navigate',
@@ -284,6 +289,7 @@ describeRender.each([
     // every hop over on the strength of a field nobody sent.
     const opened = await openHostRoute(browser, {
       viewport: WIDE,
+      ownsHostArea: true,
       grants: [faultGrant, 'navigate', 'storage', 'haptics'],
       pageRouteGrants: null
     })
@@ -296,26 +302,45 @@ describeRender.each([
     await page.close()
   }, 60_000)
 
-  it('hands the sidebar hop over from a files route too, which is the general shape', async () => {
-    // The defect is not "the worktree list pushes tasks": on a wide layout the sidebar renders
-    // beside EVERY `/h` route, so the same hop exists from files, whose session carries
-    // `externalLink` but not `native.clipboard.write`. One opener proving it would leave the
-    // general case to inference.
+  it('draws no sidebar beside a files route in a wide viewport, so there is no hop to make', async () => {
+    // The defect this case used to pin was the sidebar a detail page drew beside the shell's own,
+    // which is the double sidebar. A page draws it only when `init` says it owns the host area,
+    // and no detail route's session is told that, so the files page is the files page alone.
     const opened = await openHostRoute(browser, {
       viewport: WIDE,
       grants: [faultGrant, 'navigate', 'storage', 'externalLink', 'haptics'],
       route: FILES_ROUTE,
-      awaitText: SHELL_HOST.name
+      ownsHostArea: false,
+      awaitText: '文件'
     })
-    const { page, errors, jsResponses } = opened
-    await page.getByRole('button', { name: '任务', exact: true }).click()
-    await page.waitForTimeout(1_500)
-    expect(await navigates(page)).toEqual([
-      { v: bridgeVersion, type: 'notify', name: 'navigate', href: `${HOST_ROUTE}/tasks` }
-    ])
-    expect(await page.evaluate(() => location.pathname)).toBe(FILES_ROUTE)
-    expect(jsResponses.filter(({ path }) => path.endsWith(tasksChunk))).toEqual([])
+    const { page, errors } = opened
+    await page.waitForTimeout(1_000)
+    expect(
+      await page.evaluate((name) => document.body.innerText.includes(name), SHELL_HOST.name)
+    ).toBe(false)
+    expect(await page.getByRole('button', { name: '任务', exact: true }).count()).toBe(0)
     expect(errors).toEqual([])
     await page.close()
+  }, 60_000)
+
+  it('draws the sidebar on the host route only for the session that owns the host area', async () => {
+    const hostArea = await openHostRoute(browser, {
+      viewport: WIDE,
+      ownsHostArea: true,
+      grants: [faultGrant, 'navigate', 'storage', 'externalLink', 'haptics']
+    })
+    // The sidebar's list beside the empty detail pane.
+    await hostArea.page.getByText('No workspace open').first().waitFor({ timeout: 30_000 })
+    expect(hostArea.errors).toEqual([])
+    await hostArea.page.close()
+    const detailOnly = await openHostRoute(browser, {
+      viewport: WIDE,
+      ownsHostArea: false,
+      grants: [faultGrant, 'navigate', 'storage', 'externalLink', 'haptics']
+    })
+    await detailOnly.page.waitForTimeout(1_000)
+    expect(await detailOnly.page.getByText('No workspace open').count()).toBe(0)
+    expect(detailOnly.errors).toEqual([])
+    await detailOnly.page.close()
   }, 60_000)
 })

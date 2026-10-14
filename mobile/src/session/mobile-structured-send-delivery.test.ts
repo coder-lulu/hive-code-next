@@ -1,5 +1,5 @@
+import { DISPATCH_REJECTED_CANCELLED } from '../../../src/shared/structured-agent-session-dispatch-rejection'
 import { describe, expect, it } from 'vitest'
-import { APP_DISPLAY_NAME } from '../product-brand'
 import type { AgentJournalDispatchState } from '../../../src/shared/agent-session-journal-types'
 import type { AgentSessionSendResult } from '../../../src/shared/agent-session-wire'
 import { mobileStructuredSendDelivery } from './mobile-structured-send-delivery'
@@ -14,255 +14,148 @@ function accepted(
 }
 
 describe('mobileStructuredSendDelivery', () => {
-  it.each(['unknown', 'rejected', 'pending'] as const)(
-    'uses the confirmed journal state for a recovered %s submission',
-    (state) => {
-      const value = structuredSendResultFixture(state, 'not_delivered')
-      if (!('submission' in value)) {
-        throw new Error('expected a submission answer')
-      }
-      value.submission.recovered = true
-      expect(mobileStructuredSendDelivery({ status: 'accepted', value })).toEqual(
-        mobileStructuredSendDelivery(accepted(state, 'not_delivered'))
-      )
+  // The host's row draws it in place, as not sent, with the reason under it; the composer stays empty.
+  it.each([
+    ['a sign-in rejection', 'Sign in to Grok with `grok login`.', { kind: 'notSignedIn' as const }],
+    ['a content rejection', 'Claude does not support .bmp', undefined],
+    ['a write failure', 'provider_write_failed: broken pipe', undefined]
+  ])('leaves %s to its recorded row', (_name, reason, rejection) => {
+    const value = structuredSendResultFixture('rejected', reason)
+    if (rejection && 'submission' in value) {
+      value.submission.rejection = rejection
     }
-  )
+    expect(mobileStructuredSendDelivery({ status: 'accepted', value })).toEqual({
+      outcome: 'accepted',
+      error: null
+    })
+  })
 
-  it('keeps the operation id for every unknown, host-recorded or ack-lost', () => {
-    // The one answer that may be a delivery. Spending the id here turns the next
-    // identical send into a second copy in front of the model.
+  it('reports transport and host uncertainty on this send', () => {
     expect(mobileStructuredSendDelivery({ status: 'unknown' })).toEqual({
       outcome: 'unknown',
-      operationIdSpent: false,
       error: null
     })
     expect(mobileStructuredSendDelivery(accepted('unknown'))).toEqual({
       outcome: 'unknown',
-      operationIdSpent: false,
       error: null
     })
   })
 
-  it('reports a written send as sent and spends its id', () => {
-    // `pending` is written and awaiting the provider's acknowledgement — not doubt.
-    for (const dispatchState of ['accepted', 'pending'] as const) {
-      expect(mobileStructuredSendDelivery(accepted(dispatchState))).toEqual({
-        outcome: 'accepted',
-        operationIdSpent: true,
-        error: null
-      })
-    }
-  })
-
-  it('classifies a queued draft answer as spent, card-rendered, never a bubble', () => {
-    // The host holds the message now; a later identical send is a new message.
-    // A dispatched draft answers as `queued` only when the host lost its
-    // submission, so no echo would retire a bubble: it too shows nothing.
-    for (const state of ['waiting', 'dispatched', 'returned', 'withdrawn'] as const) {
-      const queued: StructuredAgentSessionMutationCallResult<AgentSessionSendResult> = {
-        status: 'accepted',
-        value: {
-          clientMessageId: 'client-1',
-          queued: { messageId: 'client-1', position: 1, state }
-        }
-      }
-      const outcome = 'queued'
-      expect(mobileStructuredSendDelivery(queued)).toEqual({
-        outcome,
-        operationIdSpent: true,
-        error: null
-      })
-      expect(mobileStructuredSendDelivery(queued, true)).toEqual({
-        outcome,
-        operationIdSpent: true,
-        error: null
-      })
-    }
-  })
-
-  it("reads a replay answered by its draft's hand-off as unconfirmed, and spends the id", () => {
-    // The hand-off names the replayed id as its draft: the host's answer states the link, so the
-    // id is spent without waiting for a stream that may never carry the hand-off.
-    const handedOff = structuredSendResultFixture('accepted')
-    if (!('submission' in handedOff)) {
-      throw new Error('expected a submission answer')
-    }
-    const replay: StructuredAgentSessionMutationCallResult<AgentSessionSendResult> = {
-      status: 'accepted',
-      value: {
-        clientMessageId: 'retained-draft-id',
-        submission: {
-          ...handedOff.submission,
-          clientMessageId: 'fresh-id',
-          queuedMessageId: 'retained-draft-id'
-        }
-      }
-    }
-    expect(mobileStructuredSendDelivery(replay, true)).toEqual({
-      outcome: 'unknown',
-      operationIdSpent: true,
+  it.each(['accepted', 'pending'] as const)('reports a written %s send as accepted', (state) => {
+    expect(mobileStructuredSendDelivery(accepted(state))).toEqual({
+      outcome: 'accepted',
       error: null
     })
   })
 
-  it('never spends a retained id on a malformed answer with no submission and no id', () => {
-    const malformed: StructuredAgentSessionMutationCallResult<AgentSessionSendResult> = {
-      status: 'accepted',
-      value: JSON.parse('{}')
-    }
-    expect(mobileStructuredSendDelivery(malformed, true)).toEqual({
-      outcome: 'unknown',
-      operationIdSpent: false,
-      error: null
-    })
-  })
-
-  it('does not report a retained payload replay as a new accepted send', () => {
-    for (const dispatchState of ['accepted', 'pending'] as const) {
-      expect(mobileStructuredSendDelivery(accepted(dispatchState), true)).toEqual({
-        outcome: 'unknown',
-        operationIdSpent: false,
-        error: null
-      })
-    }
-  })
-
-  it('spends the id of a rejection and withholds its internal reason', () => {
-    // Provably undelivered and terminal, so the id can only replay it: spending the
-    // id makes the retry a first delivery. The marker itself names nothing a person
-    // can act on, so it must not reach the screen.
-    expect(
-      mobileStructuredSendDelivery(accepted('rejected', 'provider_write_failed: broken pipe'))
-    ).toEqual({
-      outcome: 'rejected',
-      operationIdSpent: true,
-      error: `${APP_DISPLAY_NAME} couldn't reach the agent. Your message was not sent. Send it again.`
-    })
-  })
-
-  it.each(['Claude does not support .bmp', 'Orca provider does not support .bmp'])(
-    'shows a provider content rejection verbatim: %s',
-    (reason) => {
-      expect(mobileStructuredSendDelivery(accepted('rejected', reason))).toEqual({
-        outcome: 'rejected',
-        operationIdSpent: true,
-        error: reason
-      })
+  it.each(['waiting', 'dispatched', 'returned'] as const)(
+    'lets the host own its %s queued message without an optimistic bubble',
+    (state) => {
+      expect(
+        mobileStructuredSendDelivery({
+          status: 'accepted',
+          value: {
+            clientMessageId: 'client-1',
+            queued: { messageId: 'client-1', position: 1, state }
+          }
+        })
+      ).toEqual({ outcome: 'queued', error: null })
     }
   )
 
-  it('spends only refusals that prove the operation is settled', () => {
+  it('hands back a withdrawn card instead of silently sending again', () => {
     expect(
       mobileStructuredSendDelivery({
-        status: 'refused',
-        code: 'agent_session_operation_invalid',
-        message: 'Invalid operation'
+        status: 'accepted',
+        value: {
+          clientMessageId: 'client-1',
+          queued: { messageId: 'client-1', position: 1, state: 'withdrawn' }
+        }
       })
-    ).toEqual({ outcome: 'rejected', operationIdSpent: true, error: 'Invalid operation' })
+    ).toEqual({ outcome: 'rejected', error: 'Message not sent' })
+  })
+
+  it('keeps a handed-off queued message unconfirmed until the stream identifies it', () => {
+    const value = structuredSendResultFixture('accepted')
+    if (!('submission' in value)) {
+      throw new Error('expected a submission answer')
+    }
     expect(
       mobileStructuredSendDelivery({
-        status: 'refused',
-        code: 'agent_session_checkpoint_stale',
-        message: 'Fence moved'
+        status: 'accepted',
+        value: {
+          clientMessageId: 'draft-id',
+          submission: {
+            ...value.submission,
+            clientMessageId: 'fresh-id',
+            queuedMessageId: 'draft-id'
+          }
+        }
       })
-    ).toEqual({ outcome: 'rejected', operationIdSpent: false, error: 'Fence moved' })
+    ).toEqual({ outcome: 'unknown', error: null })
+  })
+
+  it('fails closed when a malformed answer has no submission', () => {
+    expect(mobileStructuredSendDelivery({ status: 'accepted', value: JSON.parse('{}') })).toEqual({
+      outcome: 'unknown',
+      error: null
+    })
+  })
+
+  it('lets a kept queued card hold the text after a provider rejection', () => {
+    const value = structuredSendResultFixture('rejected', 'Orca restarted before this was sent.')
+    if (!('submission' in value)) {
+      throw new Error('expected a submission answer')
+    }
+    value.submission.keptAsQueuedMessageId = 'card-id'
+    expect(mobileStructuredSendDelivery({ status: 'accepted', value })).toEqual({
+      outcome: 'queued',
+      error: null
+    })
+  })
+
+  it.each([
+    { reason: DISPATCH_REJECTED_CANCELLED, typed: false },
+    { reason: 'This message was withdrawn before the agent started it.', typed: true }
+  ])('leaves a stopped submission in its existing chat row (typed $typed)', ({ reason, typed }) => {
+    const value = structuredSendResultFixture('rejected', reason)
+    if (typed && 'submission' in value) {
+      value.submission.rejection = { kind: 'cancelled' }
+    }
+    expect(mobileStructuredSendDelivery({ status: 'accepted', value })).toEqual({
+      outcome: 'accepted',
+      error: null
+    })
+  })
+
+  it.each([
+    ['agent_session_operation_invalid', 'Invalid operation'],
+    ['agent_session_checkpoint_stale', 'Fence moved'],
+    ['agent_session_operation_expired', 'Operation expired'],
+    ['agent_session_operation_conflict', 'Operation conflict']
+  ] as const)('reports the current %s refusal', (code, message) => {
+    expect(mobileStructuredSendDelivery({ status: 'refused', code, message })).toEqual({
+      outcome: 'rejected',
+      error: message
+    })
+  })
+
+  it('preserves an unknown operation refusal as uncertainty', () => {
     expect(
       mobileStructuredSendDelivery({
         status: 'refused',
         code: 'agent_session_operation_unknown',
         message: 'Outcome unknown'
       })
-    ).toEqual({ outcome: 'unknown', operationIdSpent: false, error: null })
+    ).toEqual({ outcome: 'unknown', error: null })
+  })
+
+  it('reports a request failure without consulting earlier sends', () => {
     expect(
       mobileStructuredSendDelivery({
         status: 'failed',
         message: 'Your message was not sent. Send it again.'
       })
-    ).toEqual({
-      outcome: 'rejected',
-      operationIdSpent: true,
-      error: 'Your message was not sent. Send it again.'
-    })
-  })
-
-  it('spends an ambiguous id the host has expired, and says to check the chat', () => {
-    // The host refuses an expired id on every replay; keeping it would refuse this text forever.
-    // The earlier attempt may still be in the chat, so the words never say it was not sent.
-    expect(
-      mobileStructuredSendDelivery(
-        {
-          status: 'refused',
-          code: 'agent_session_operation_expired',
-          message: 'Operation expired'
-        },
-        true
-      )
-    ).toEqual({
-      outcome: 'rejected',
-      operationIdSpent: true,
-      error: `${APP_DISPLAY_NAME} couldn't confirm your message reached the agent. Check the chat, then send it again if needed.`
-    })
-  })
-
-  it('never releases an ambiguous id on any other later RPC refusal or failure', () => {
-    expect(
-      mobileStructuredSendDelivery(
-        {
-          status: 'refused',
-          code: 'agent_session_operation_conflict',
-          message: 'Operation conflict'
-        },
-        true
-      )
-    ).toEqual({ outcome: 'rejected', operationIdSpent: false, error: 'Operation conflict' })
-    expect(
-      mobileStructuredSendDelivery(
-        { status: 'failed', message: 'Your message was not sent. Send it again.' },
-        true
-      )
-    ).toEqual({
-      outcome: 'rejected',
-      operationIdSpent: false,
-      error: 'Your message was not sent. Send it again.'
-    })
-  })
-
-  it('releases a replay only when the host refuses its request shape itself', () => {
-    // An older host's strict schema refuses `delivery` before it runs anything:
-    // that replay can never be accepted, so keeping the id refuses the text forever.
-    expect(
-      mobileStructuredSendDelivery(
-        {
-          status: 'failed',
-          message: 'Your message was not sent. Send it again.',
-          hostRejectedByRequestSchema: true
-        },
-        true
-      )
-    ).toEqual({
-      outcome: 'rejected',
-      operationIdSpent: true,
-      error: 'Your message was not sent. Send it again.'
-    })
-    // Any other refusal (an auth failure, a host without the method) proves nothing
-    // about an earlier delivery of this id.
-    expect(
-      mobileStructuredSendDelivery(
-        { status: 'failed', message: 'Your message was not sent.' },
-        true
-      )
-    ).toMatchObject({ operationIdSpent: false })
-  })
-
-  it('fails closed when an invalid host response omits the required submission', () => {
-    const result = {
-      status: 'accepted',
-      value: { clientMessageId: 'msg-1' }
-    } as unknown as StructuredAgentSessionMutationCallResult<AgentSessionSendResult>
-    expect(mobileStructuredSendDelivery(result)).toEqual({
-      outcome: 'unknown',
-      operationIdSpent: false,
-      error: null
-    })
+    ).toEqual({ outcome: 'rejected', error: 'Your message was not sent. Send it again.' })
   })
 })

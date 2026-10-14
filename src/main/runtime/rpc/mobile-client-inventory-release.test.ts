@@ -53,10 +53,9 @@ describe('direct session-tab inventory release', () => {
       let nextId = 0
       const client = new RpcClientStreamRegistry({
         nextId: () => `inventory-${++nextId}`,
-        deviceToken: 'test-device',
         getState: () => 'connected',
-        sendEncrypted: (request) => {
-          sent.push(request as RpcRequest)
+        sendFrame: (request) => {
+          sent.push({ ...request, authToken: '' })
           return true
         }
       })

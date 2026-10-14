@@ -31,6 +31,15 @@ pnpm dev
 
 Ordinary installs include native dependencies for the current OS and CPU. Before cross-architecture packaging, including the dual-architecture macOS build, run `pnpm install:release`; see [the install policy](https://github.com/coder-lulu/hive-code-docs/blob/main/reference/pnpm-install-policy.md).
 
+Linux `pnpm build`, `pnpm build:native`, and Linux packaging require a running Docker
+daemon to build the clipboard helper against Ubuntu 20.04 rather than the host's
+newer libraries. A verified cached helper can be reused without Docker. For native
+Wayland development, run `pnpm build:native` before `pnpm dev` to make text copying
+available. See the [clipboard build guide](../native/wayland-clipboard/README.md#building-and-testing).
+macOS and Windows builds do not use this helper or require Docker for it.
+
+
+
 Before opening a change, run the checks relevant to its scope. The normal
 baseline is:
 

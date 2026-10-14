@@ -41,6 +41,7 @@ function createModel(): AccountsPaneSectionModel {
   return {
     settings,
     accountScopeKey: 'local:host:',
+    accountOwner: { kind: 'local' },
     updateSettings: vi.fn(),
     searchQuery: '',
     recordFeatureInteraction: vi.fn(),

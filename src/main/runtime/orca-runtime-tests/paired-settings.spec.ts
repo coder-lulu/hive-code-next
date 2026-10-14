@@ -6,8 +6,21 @@ import {
   electronMocks
 } from '../orca-runtime-test-mocks.spec'
 import { deferred, store } from '../orca-runtime-test-fixtures.spec'
+import { RuntimeClientSettingsController } from '../runtime-client-settings'
 
 describe('OrcaRuntimeService', () => {
+  it.each([true, false])('projects only the current Chat UI switch (%s)', (enabled) => {
+    const controller = new RuntimeClientSettingsController({
+      getSettings: () => ({ ...store.getSettings(), experimentalNativeChat: enabled }),
+      updateSettings: () => undefined
+    })
+    expect(controller.get()).toMatchObject({
+      experimentalNativeChat: enabled
+    })
+    expect(controller.get()).not.toHaveProperty('experimentalStructuredNativeChat')
+    expect(controller.get()).not.toHaveProperty('openAgentTabsInChatByDefault')
+  })
+
   it('projects runtime-backed settings to paired clients', () => {
     const terminalQuickCommands = [
       {

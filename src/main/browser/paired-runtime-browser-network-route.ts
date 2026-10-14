@@ -17,7 +17,7 @@ import { RemoteBrowserSocksServer } from './remote-browser-socks-server'
 const outboundMemoryBudgets = new BrowserNetworkTunnelOutboundMemoryBudgetRegistry()
 
 type PairedRuntimeBrowserNetworkRouteOptions = {
-  pairing: PairingOffer
+  connection: PairingOffer
   lease: BrowserHostLeaseAuthority
   executionHostRevision: number
   executionHost?: BrowserNetworkExecutionHost
@@ -139,7 +139,7 @@ export class PairedRuntimeBrowserNetworkRoute {
       throw new Error('Browser network route memory lease is unavailable')
     }
     const transport = new PairedRuntimeBrowserNetworkTransport({
-      pairing: this.options.pairing,
+      connection: this.options.connection,
       lease: this.options.lease,
       executionHost: this.options.executionHost ?? {
         kind: 'native',

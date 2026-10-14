@@ -44,7 +44,7 @@ const STYLE_MODULES = [
   // native seam is that size, so the move is the same number and the swap is the whole change.
   'src/components/CustomKeyModal.styles.ts',
   'src/components/TextInputModal.tsx',
-  'src/session/MobileNativeChatAsk.tsx',
+  'src/session/mobile-native-chat-ask-styles.ts',
   'src/session/QuickCommandEditorForm.tsx',
   'src/session/QuickCommandsList.tsx',
   'src/session/mobile-session-command-input-styles.ts'

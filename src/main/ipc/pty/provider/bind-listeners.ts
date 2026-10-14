@@ -88,11 +88,11 @@ export function bindProviderListeners(session: PtyIpcSession): void {
       if (!isCurrentPtyExit(payload)) {
         return
       }
+      markClaudePtyExited(payload.id)
       const syntheticExit = session.consumeSyntheticKillExit(payload.id, payload.incarnationId)
       if (!isLocalProvider) {
         clearProviderPtyState(payload.id)
         ptyOwnership.delete(payload.id)
-        markClaudePtyExited(payload.id)
         if (syntheticExit) {
           session.runtime?.markPtyStopRequested(payload.id)
         }

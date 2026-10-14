@@ -64,8 +64,7 @@ const SCENARIOS: Scenario[] = [
       leafId: TEST_LEAF_1,
       ptyId: 'pty-new',
       incarnationId: 'inc-new',
-      startupCwd: '/fixture/local/sub',
-      hostAdmittedMembership: true
+      startupCwd: '/fixture/local/sub'
     },
     placements: (leaf) => [
       [NEW_TAB, 'agrees'],
@@ -110,8 +109,7 @@ const SCENARIOS: Scenario[] = [
       worktreeId: FOLDER_WORKTREE,
       tabId: 'tab-folder',
       leafId: TEST_LEAF_1,
-      ptyId: 'pty-folder',
-      hostAdmittedMembership: true
+      ptyId: 'pty-folder'
     },
     placements: () => [
       [NEW_TAB, 'agrees'],
@@ -232,7 +230,7 @@ describe('placement on the binding write is inert', () => {
     it(`${scenario.name}: memory and saved state match a write without placement`, async () => {
       const baseline = await bindAndSave(scenario, undefined)
       expect(baseline.result).toBe(true)
-      expect(placementAttributes).toEqual(['absent'])
+      expect(placementAttributes).toEqual([scenario.prebind ? 'leaf_present' : 'absent'])
       const cases = scenario.placements('<existing leaf>')
       for (const [index, [, agreement]] of cases.entries()) {
         const placed = await bindAndSave(scenario, (leaf) => scenario.placements(leaf)[index][0])

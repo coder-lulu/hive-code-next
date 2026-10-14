@@ -2,7 +2,7 @@ import { parsePairingCode, type PairingOffer } from '../../shared/pairing'
 import { resolveEnvironmentPairingOffer } from './environments'
 import { RuntimeClientError } from './types'
 
-export function resolveRemotePairing(
+export function resolveRemoteConnection(
   userDataPath: string,
   pairingCode: string | null,
   environmentSelector: string | null

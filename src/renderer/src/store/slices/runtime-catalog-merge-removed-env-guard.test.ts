@@ -28,13 +28,21 @@ const rpcResult = vi.hoisted(() => ({ current: { repos: [] as Repo[], projects: 
 
 vi.mock('@/runtime/runtime-rpc-client', async (importOriginal) => {
   const actual = await importOriginal<typeof RuntimeRpcClientModule>()
-  return { ...actual, callRuntimeRpc: vi.fn(async () => rpcResult.current) }
+  return {
+    ...actual,
+    callRuntimeRpc: vi.fn(async () => rpcResult.current),
+    assertRuntimeEnvironmentCapability: vi.fn(async () => {})
+  }
 })
 
 const localReposList = vi.fn<() => Promise<Repo[]>>()
 
-// @ts-expect-error -- minimal window.api stub for the store under test
-globalThis.window = { api: { repos: { list: localReposList } } }
+vi.stubGlobal('window', {
+  api: {
+    repos: { list: localReposList },
+    projects: { list: async () => [], listHostSetups: async () => [] }
+  }
+})
 
 import { createTestStore, seedStore, TEST_REPO } from './store-test-helpers'
 
@@ -110,8 +118,15 @@ describe('environment-catalog merge guard drops catalogs for a removed env', () 
       repo('localStamped', { executionHostId: 'runtime:some-client' })
     ])
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().repos.map((r) => r.id)).toContain('localStamped')
   })
 })
+
+// The catalog these tests read is the one the focused host would have shown.
+function catalogOwner(store: {
+  getState: () => { settings: { activeRuntimeEnvironmentId?: string | null } | null }
+}): { runtimeEnvironmentId: string | null } {
+  return { runtimeEnvironmentId: store.getState().settings?.activeRuntimeEnvironmentId ?? null }
+}

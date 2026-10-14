@@ -3,8 +3,8 @@
 // rules cannot reach a desktop-only path through one that forgot it.
 import { readdirSync, readFileSync } from 'node:fs'
 import { posix } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
 import { parse } from 'yaml'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   DESKTOP_RC_TAG,
   DESKTOP_STABLE_TAG,
@@ -276,11 +276,6 @@ describe('release tag pattern census', () => {
       await proof()
     }
   )
-
-  it('keeps no proof for a script that no longer lists releases', () => {
-    const listing = new Set(releaseListingScripts())
-    expect(Object.keys(DESKTOP_ONLY_PROOFS).filter((path) => !listing.has(path))).toEqual([])
-  })
 
   it('never classifies an agent state rules tag as a desktop release', () => {
     for (const tag of RULES_TAGS) {

@@ -2,15 +2,11 @@ import { mutateAgentSessionDraftRecord } from './agent-session-store-draft'
 /** Durable single-writer session records and their operation ledger, as rows in the host's chat
  *  journal database. */
 
-import {
-  commitConversationClearRecord,
-  commitConversationCommandRecord,
-  type AgentSessionConversationClear
-} from './agent-session-conversation-command-record'
+import { createAgentSessionConversationReceipts } from './agent-session-conversation-receipts'
+import { commitConversationCommandRecord } from './agent-session-conversation-command-record'
 import { pinAgentSessionRecordLaunchDirectory } from './agent-session-record-launch-directory'
 import {
   agentSessionOperationKey,
-  type AgentSessionOperationClaim,
   type AgentSessionOperationDecision,
   type AgentSessionOperationRow
 } from '../../shared/agent-session-operation-ledger'
@@ -65,7 +61,7 @@ import {
   type AgentSessionReserveRequest,
   type AgentSessionReserveResult
 } from './agent-session-reservation-admission'
-import type { AgentSessionStoreState } from './agent-session-store-state'
+import { heldAgentSessionIds, type AgentSessionStoreState } from './agent-session-store-state'
 import {
   agentSessionVisibleTabIndex,
   listVisibleAgentSessionIds,
@@ -77,13 +73,13 @@ import type { JournalOperationReceipt } from '../native-chat/agent-session-journ
 import { openLiveAgentSessionRecordStore } from './agent-session-live-host-store'
 import type { AgentSessionStoreTransactions } from './agent-session-store-transactions'
 import type { AgentSessionRecordTransition } from './agent-session-store-contract'
+import { agentSessionOperationOutcomeReceipt } from './agent-session-operation-receipt'
+import { createAgentSessionFoundingStore } from './agent-session-founding-store'
 import {
   compareAndSetAgentSessionRecordName,
   type CompareAndSetConversationName,
   setAgentSessionRecordConversationName
 } from './agent-session-record-conversation-name'
-
-type AgentSessionOperationSettlement = Parameters<typeof settleAgentSessionOperationInto>[1]
 
 export const AGENT_SESSION_LEASE_TTL_MS = 30_000,
   AGENT_SESSION_LEASE_RENEW_INTERVAL_MS = 10_000
@@ -91,11 +87,15 @@ export const AGENT_SESSION_LEASE_TTL_MS = 30_000,
 export class AgentSessionRecordStore {
   private readonly deathEvidenceListeners = new Set<(sessionId: string) => void>()
   private readonly firstRecordListeners = new Set<() => void>()
+  readonly conversationReceipts: ReturnType<typeof createAgentSessionConversationReceipts>
 
   private constructor(
     private readonly transactions: AgentSessionStoreTransactions,
     readonly hostId: string
-  ) {}
+  ) {
+    this.founding = createAgentSessionFoundingStore(transactions, this.firstRecordListeners)
+    this.conversationReceipts = createAgentSessionConversationReceipts(transactions)
+  }
 
   /** One live store per host database; committed SQL drift is revalidated before guarded writes. */
   static open(args: {
@@ -121,6 +121,12 @@ export class AgentSessionRecordStore {
     this.state.records.get(sessionId) ?? null
 
   listRecords = (): AgentSessionRecord[] => [...this.state.records.values()]
+
+  /** The runtimes this one replaced for a chat, as found at load; absent for a chat it began. */
+  replacedRuntime = (sessionId: string) => this.transactions.replacedRuntimes.get(sessionId)
+
+  /** Every chat this host holds a row for, readable or not. */
+  listHeldSessionIds = (): string[] => heldAgentSessionIds(this.state)
 
   /** Whether this host has recorded a chat, readable or not. Nothing removes a record row. */
   holdsRecords = (): boolean => this.state.records.size > 0 || this.state.unreadableRecords.size > 0
@@ -163,10 +169,6 @@ export class AgentSessionRecordStore {
     )
   }
 
-  /** A committed /clear and the at-rest conversation it continues in, in one write. */
-  commitConversationClear = (clear: AgentSessionConversationClear): Promise<void> =>
-    this.transact((draft) => commitConversationClearRecord(draft, clear))
-
   /** Unfenced on purpose: the name is a durable note, so writing it never contends with the
    *  writer lease. `null` clears it. */
   setConversationName = (sessionId: string, name: string | null): Promise<AgentSessionRecord> =>
@@ -194,11 +196,12 @@ export class AgentSessionRecordStore {
   isClaimKeyVerifiable = (keyId: string, now: number): boolean =>
     isAgentSessionClaimKeyVerifiable(this.state, keyId, now)
 
-  async reserveOwner(request: AgentSessionReserveRequest): Promise<AgentSessionReserveResult> {
-    return this.transact((draft) =>
+  reserveOwner = (request: AgentSessionReserveRequest): Promise<AgentSessionReserveResult> =>
+    this.transact((draft) =>
       commitAgentSessionReservation(draft, request, AGENT_SESSION_LEASE_TTL_MS)
     )
-  }
+
+  readonly founding: ReturnType<typeof createAgentSessionFoundingStore>
 
   commitProcessIdentity = (args: AgentSessionProcessIdentityCommit): Promise<AgentSessionRecord> =>
     this.mutate(args.sessionId, (record) => commitAgentSessionProcessIdentity({ ...args, record }))
@@ -288,10 +291,7 @@ export class AgentSessionRecordStore {
   /** Durable compare-and-swap for the right to run an admitted operation's effect: two replays both
    *  read `pending`, and only a conditional swap tells the one that may run from the one that must
    *  replay. */
-  claimOperation = (args: {
-    callerKey: string
-    operationId: string
-  }): Promise<AgentSessionOperationClaim> =>
+  claimOperation = (args: Parameters<typeof claimAgentSessionOperationInto>[1]) =>
     this.transact((draft) => claimAgentSessionOperationInto(draft, args))
 
   /** Admission and, when `claimAfter` allows, the claim: one durable write before the effect. */
@@ -300,14 +300,20 @@ export class AgentSessionRecordStore {
     claimAfter: ClaimAfterAdmission
   ) => this.transact((draft) => admitAndClaimAgentSessionOperationInto(draft, args, claimAfter))
 
-  async recordOperationOutcome(args: AgentSessionOperationSettlement): Promise<void> {
-    await this.transact((draft) => settleAgentSessionOperationInto(draft, args))
-  }
+  recordOperationOutcome = (
+    args: Parameters<typeof settleAgentSessionOperationInto>[1]
+  ): Promise<void> => this.transact((draft) => settleAgentSessionOperationInto(draft, args))
 
-  /** The same settlement, committed by the journal write that makes it true. It changes only the
-   *  ledger, so no record listener is owed. */
-  operationOutcomeReceipt = (args: AgentSessionOperationSettlement): JournalOperationReceipt =>
-    this.transactions.receipt((draft) => settleAgentSessionOperationInto(draft, args))
+  /** That settlement, or an accepted row inserted if absent, committed by the journal write that
+   *  makes it true. It changes only the ledger, so no record listener is owed. */
+  operationOutcomeReceipt = (args: Parameters<typeof agentSessionOperationOutcomeReceipt>[1]) =>
+    agentSessionOperationOutcomeReceipt(this.transactions, args)
+
+  commitOperationReceipt = (receipt: JournalOperationReceipt) =>
+    this.transactions.commitReceipt(receipt)
+
+  readCommandReceipt = (...args: Parameters<AgentSessionStoreTransactions['readCommandReceipt']>) =>
+    this.transactions.readCommandReceipt(...args)
 
   replaceSessionOptions = (args: AgentSessionOptionsReplacement): Promise<AgentSessionRecord> =>
     this.mutate(args.sessionId, (record) => replaceAgentSessionRecordOptions(record, args))

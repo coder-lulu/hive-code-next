@@ -1,9 +1,6 @@
-import {
-  spawnProcess,
-  type ChildProcessHandle,
-  type ProcessSpec
-} from '../../../shared/child-process/run-process'
-import { forceTerminateProcessTree } from '../../../shared/child-process/process-tree-termination'
+import { spawnProcess } from '@orca/process-host'
+import type { ChildProcessHandle, ProcessSpec } from '@orca/process-host/process-spec'
+import { forceTerminateProcessTree } from '@orca/process-host/process-tree-termination'
 import { bootAvdArgs } from './avd-manager'
 
 const MAX_LAUNCH_OUTPUT_BYTES = 16 * 1024

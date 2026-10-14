@@ -1,3 +1,5 @@
+import { AgentPreferencesHint } from './AgentPreferencesHint'
+import { useMountedRef } from '@/hooks/useMountedRef'
 import { useMemo } from 'react'
 import { Laptop, Server } from 'lucide-react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
@@ -16,11 +18,6 @@ import {
 } from '@/lib/local-preflight-context'
 import { getRendererAppPlatform } from '@/lib/renderer-app-platform'
 import { isPairedWebClientWindow } from '@/lib/desktop-window-chrome'
-import {
-  getAgentWorkspaceTrustDescription,
-  getAgentWorkspaceTrustTitle
-} from './agent-workspace-trust-copy'
-import { SettingsSwitchRow } from './SettingsFormControls'
 import { CodexTerminalServerIsolationSetting } from './CodexTerminalServerIsolationSetting'
 import {
   getTuiAgentDefaultArgs,
@@ -44,7 +41,9 @@ import {
 import { AgentAvailabilityControl, type AgentCatalogRowProps } from './AgentCatalogRow'
 import { AgentDefaultSetting } from './AgentDefaultSetting'
 import { AgentDetectionCatalog } from './AgentDetectionCatalog'
-import { AgentRunPreferences } from './AgentRunPreferences'
+import { AgentRunPreferences, AgentPermissionsSetting } from './AgentRunPreferences'
+import { AgentWorkspaceTrustSetting } from './AgentWorkspaceTrustSetting'
+export { AgentWorkspaceTrustSetting } from './AgentWorkspaceTrustSetting'
 import { AgentAdvancedConfiguration } from './AgentAdvancedConfiguration'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
 import type { AgentsSettingsTab } from './agents-settings-navigation'
@@ -53,6 +52,13 @@ import { useAgentVersions } from './use-agent-versions'
 import { useAgentInstallation } from './use-agent-installation'
 import { AgentNpmRegistrySetting } from './AgentNpmRegistrySetting'
 import './agents-settings.css'
+import { AgentLaunchSettingsSection } from './AgentLaunchSettingsSection'
+import type { SettingsHostScope } from './settings-host-scope'
+import type {
+  AgentLaunchSettings,
+  AgentLaunchSettingsMutation
+} from '../../../../shared/agent-launch-settings'
+import { HostAgentEnvironmentEditor } from './HostAgentEnvironmentEditor'
 
 export {
   buildAgentAvailabilitySettingsUpdate,
@@ -66,28 +72,56 @@ export {
   AgentStatusHooksSetting
 } from './AgentRunPreferences'
 
-type AgentsPaneProps = {
+type AgentSettingProps = {
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
+}
+
+type AgentsPaneProps = AgentSettingProps & {
+  /** Host whose agent launch settings and detected agents the pane shows. */
+  hostScope: SettingsHostScope
   wslSupportedPlatform?: boolean
   wslAvailable?: boolean
   wslDistros?: string[]
   wslCapabilitiesLoading?: boolean
 }
-const enqueueAgentAvailabilityUpdate = createAgentAvailabilityUpdateQueue()
 const EMPTY_OVERRIDES = {}
 const EMPTY_AGENTS: TuiAgent[] = []
 
 export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
+  return (
+    <AgentLaunchSettingsSection
+      {...props}
+      renderPermissions={(mode, onChange) => (
+        <AgentPermissionsSetting mode={mode} onChange={onChange} />
+      )}
+      renderSettings={(launchSettings, mutate) => (
+        <AgentsPaneContent {...props} launchSettings={launchSettings} mutate={mutate} />
+      )}
+    />
+  )
+}
+
+function AgentsPaneContent(
+  props: AgentsPaneProps & {
+    launchSettings: AgentLaunchSettings
+    mutate: (mutation: AgentLaunchSettingsMutation) => Promise<void>
+  }
+): React.JSX.Element {
   const {
     settings,
     updateSettings,
+    hostScope,
+    launchSettings,
+    mutate,
     wslSupportedPlatform,
     wslAvailable,
     wslDistros,
     wslCapabilitiesLoading
   } = props
-  const activeServerEnvironmentId = settings.activeRuntimeEnvironmentId?.trim() || null
+  const mountedRef = useMountedRef()
+  const activeServerEnvironmentId =
+    hostScope.target.kind === 'environment' ? hostScope.target.environmentId : null
   const localContext = useAppStore((state) => getLocalAgentPreflightContext(state))
   const contextKey = localPreflightContextKey(localContext)
   const agentDetectionTarget = useMemo<AgentDetectionTarget>(
@@ -114,11 +148,13 @@ export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
     [detectedList]
   )
   const catalog = getAgentCatalog()
-  const defaultAgent = settings.defaultTuiAgent
-  const cmdOverrides = settings.agentCmdOverrides ?? EMPTY_OVERRIDES
-  const agentDefaultArgs = settings.agentDefaultArgs ?? EMPTY_OVERRIDES
-  const agentDefaultEnv = settings.agentDefaultEnv ?? EMPTY_OVERRIDES
-  const disabledAgents = normalizeDisabledTuiAgents(settings.disabledTuiAgents)
+  const defaultAgent = launchSettings.defaultTuiAgent
+  const cmdOverrides = launchSettings.agentCmdOverrides
+  const agentDefaultArgs = launchSettings.agentDefaultArgs
+  const agentDefaultEnv = activeServerEnvironmentId
+    ? EMPTY_OVERRIDES
+    : (settings.agentDefaultEnv ?? EMPTY_OVERRIDES)
+  const disabledAgents = normalizeDisabledTuiAgents(launchSettings.disabledTuiAgents)
   const detectedAgents =
     detectedIds === null ? [] : catalog.filter((agent) => detectedIds.has(agent.id))
   const enabledDetectedAgents = detectedAgents.filter((agent) =>
@@ -154,7 +190,7 @@ export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
         const context = getLocalAgentPreflightContext(state)
         if (
           (context?.wslDistro ?? null) !== wslDistro ||
-          state.settings?.activeRuntimeEnvironmentId?.trim() ||
+          (!mountedRef.current && Boolean(state.settings?.activeRuntimeEnvironmentId?.trim())) ||
           context?.wslDefault ||
           (context?.projectRuntime && context.projectRuntime.status !== 'resolved')
         ) {
@@ -177,14 +213,8 @@ export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
     defaultAgent,
     wslSupportedPlatform
   )
-  const setAgentEnabled = (id: TuiAgent, enabled: boolean): void => {
-    void enqueueAgentAvailabilityUpdate({
-      getSettings: () => useAppStore.getState().settings,
-      fallbackSettings: settings,
-      updateSettings,
-      agentId: id,
-      enabled
-    })
+  const save = (mutation: AgentLaunchSettingsMutation): void => {
+    void mutate(mutation).catch(() => {})
   }
   const getRowProps = (
     agent: (typeof catalog)[number],
@@ -224,24 +254,27 @@ export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
         : undefined,
     installDisabled: !installationAvailable,
     onConfigure: () => openConfiguration(agent.id),
-    onSetDefault: isDetected ? () => updateSettings({ defaultTuiAgent: agent.id }) : () => {},
-    onSetEnabled: (enabled) => setAgentEnabled(agent.id, enabled),
-    onSaveOverride:
-      isDetected || Boolean(cmdOverrides[agent.id]?.trim())
-        ? (value) => {
-            const next = { ...cmdOverrides }
-            if (value) {
-              next[agent.id] = value
-            } else {
-              delete next[agent.id]
-            }
-            updateSettings({ agentCmdOverrides: next })
-          }
-        : () => {},
-    onSaveArgs: (value) =>
-      updateSettings({ agentDefaultArgs: { ...agentDefaultArgs, [agent.id]: value } }),
-    onSaveEnv: (value) =>
-      updateSettings({ agentDefaultEnv: { ...agentDefaultEnv, [agent.id]: value } }),
+    onSetDefault: isDetected ? () => save({ type: 'default', agent: agent.id }) : () => {},
+    onSetEnabled: (enabled) => save({ type: 'availability', agent: agent.id, enabled }),
+    onSaveOverride: (value) => mutate({ type: 'command', agent: agent.id, value }),
+    onSaveArgs: (value) => mutate({ type: 'arguments', agent: agent.id, value }),
+    onSaveEnv: (value) => {
+      if (!activeServerEnvironmentId) {
+        void updateSettings({ agentDefaultEnv: { ...agentDefaultEnv, [agent.id]: value } })
+      }
+    },
+    ...(activeServerEnvironmentId
+      ? {
+          environmentNames: launchSettings.environmentNames[agent.id] ?? [],
+          environmentEditor: (
+            <HostAgentEnvironmentEditor
+              agent={agent.id}
+              names={launchSettings.environmentNames[agent.id] ?? []}
+              mutate={mutate}
+            />
+          )
+        }
+      : {}),
     sessionSourceHome:
       isDetected && !activeServerEnvironmentId && agent.id === 'codex'
         ? buildCodexSessionSourceHomeControl(settings, updateSettings)
@@ -304,7 +337,7 @@ export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
             enabledDetectedAgents={enabledDetectedAgents}
             catalog={catalog}
             description={getSettingOwnershipSummary('agentLaunchDefaults').description}
-            onSetDefault={(agent) => updateSettings({ defaultTuiAgent: agent })}
+            onSetDefault={(agent) => save({ type: 'default', agent })}
           />
         </div>
         <TabsContent
@@ -331,24 +364,21 @@ export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
             )}
             getRowProps={getRowProps}
           />
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-[13px] leading-[18px] text-muted-foreground">
-            <p>
-              {translate(
-                'agentsSettings.preferencesHint',
-                'Status hooks, tab titles, sleep, cache and permissions are in Run preferences.'
-              )}
-            </p>
-            <button
-              type="button"
-              className="rounded-md px-2 py-1 font-medium outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => setNavigation({ ...navigation, tab: 'preferences', focusTarget: '' })}
-            >
-              {translate('agentsSettings.openPreferences', 'Run preferences →')}
-            </button>
-          </div>
+          <AgentPreferencesHint
+            onOpen={() => setNavigation({ ...navigation, tab: 'preferences', focusTarget: '' })}
+          />
         </TabsContent>
         <TabsContent value="preferences" forceMount hidden={navigation.tab !== 'preferences'}>
-          <AgentRunPreferences settings={settings} updateSettings={updateSettings} />
+          <AgentRunPreferences
+            settings={settings}
+            updateSettings={updateSettings}
+            permissions={
+              <AgentPermissionsSetting
+                mode={launchSettings.permissionMode}
+                onChange={(mode) => save({ type: 'permissions', mode })}
+              />
+            }
+          />
           {!isPairedWebClientWindow() ? (
             <div className="mt-6 space-y-6">
               <AgentWorkspaceTrustSetting settings={settings} updateSettings={updateSettings} />
@@ -371,20 +401,5 @@ export function AgentsPane(props: AgentsPaneProps): React.JSX.Element {
         </TabsContent>
       </Tabs>
     </div>
-  )
-}
-
-export function AgentWorkspaceTrustSetting({ settings, updateSettings }: AgentsPaneProps) {
-  const enabled = settings.agentWorkspaceTrustEnabled !== false
-  return (
-    <section className="space-y-3">
-      <SettingsSwitchRow
-        label={getAgentWorkspaceTrustTitle()}
-        description={getAgentWorkspaceTrustDescription()}
-        checked={enabled}
-        onChange={() => updateSettings({ agentWorkspaceTrustEnabled: !enabled })}
-        ariaLabel={getAgentWorkspaceTrustTitle()}
-      />
-    </section>
   )
 }

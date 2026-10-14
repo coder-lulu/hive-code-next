@@ -3,6 +3,7 @@ import type { AgentProviderSessionMetadata } from '../../../../shared/agent-sess
 import { agentProviderSessionsEqual } from '../../../../shared/agent-session-resume'
 import {
   AGENT_SESSION_HISTORY_MAX_LIMIT,
+  type AgentSessionHistoryPage,
   type AgentSessionHistoryResult
 } from '../../../../shared/agent-session-wire'
 import {
@@ -11,7 +12,7 @@ import {
   type StructuredAgentSessionAction,
   type StructuredAgentSessionState
 } from '../../../../shared/structured-agent-session-reducer'
-import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { callStructuredAgentSession } from '@/runtime/structured-agent-session-client'
 import { NATIVE_CHAT_INITIAL_LIMIT, type NativeChatOlderPageResult } from './native-chat-pagination'
 import { startStructuredAgentSessionReadTransport } from './structured-agent-session-read-transport'
@@ -32,6 +33,7 @@ export type StructuredAgentSessionReadSnapshot = {
 }
 
 export type StructuredAgentSessionReadOwner = {
+  publishCreated: (page: AgentSessionHistoryPage) => void
   activate: () => () => void
   dispose: () => void
   getSnapshot: () => StructuredAgentSessionReadSnapshot
@@ -50,6 +52,7 @@ export {
   findStructuredAgentSessionReadOwner,
   getExistingStructuredAgentSessionReadOwner,
   subscribeStructuredAgentSessionReadSnapshots,
+  retireStructuredAgentSessionReadOwner,
   resetStructuredAgentSessionReadOwnersForTests
 } from './structured-agent-session-read-owner-registry'
 
@@ -222,6 +225,11 @@ function createReadOwner(
     }
   }
   owner = {
+    publishCreated: (page) => {
+      if (snapshot.state.epoch === null) {
+        apply({ type: 'history-page', page })
+      }
+    },
     activate: () => {
       // Remounts and StrictMode re-run setup on an owner whose cleanup just forgot it.
       adoptStructuredReadOwner(key, owner)

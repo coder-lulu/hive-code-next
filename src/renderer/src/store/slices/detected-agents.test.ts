@@ -796,8 +796,9 @@ describe('createDetectedAgentsSlice remote detection', () => {
     ).toHaveLength(1)
   })
 
-  it('falls back to plain runtime re-detection when the server lacks preflight.refreshAgents', async () => {
+  it('keeps unsupported runtime refresh failed and retryable without an older RPC fallback', async () => {
     const store = createTestStore()
+    store.setState({ runtimeDetectedAgentIds: { 'env-1': ['claude'] } } as Partial<AppState>)
     runtimeEnvironmentCall.mockImplementation(({ method }: { method: string }) => {
       if (method === 'preflight.refreshAgents') {
         return Promise.resolve({
@@ -828,9 +829,15 @@ describe('createDetectedAgentsSlice remote detection', () => {
       })
     })
 
-    await expect(store.getState().refreshRuntimeDetectedAgents('env-1')).resolves.toEqual(['kilo'])
-    expect(store.getState().runtimeDetectedAgentIds['env-1']).toEqual(['kilo'])
+    await expect(store.getState().refreshRuntimeDetectedAgents('env-1')).resolves.toEqual([
+      'claude'
+    ])
+    expect(store.getState().runtimeDetectedAgentIds['env-1']).toEqual(['claude'])
     expect(store.getState().isRefreshingRuntimeAgents['env-1']).toBe(false)
+    expect(store.getState().didRuntimeAgentDetectionFail['env-1']).toBe(true)
+    expect(
+      runtimeEnvironmentCall.mock.calls.filter(([{ method }]) => method.startsWith('preflight.'))
+    ).toEqual([[expect.objectContaining({ selector: 'env-1', method: 'preflight.refreshAgents' })]])
   })
 
   it('does not retry ordinary runtime refresh failures with a second RPC', async () => {

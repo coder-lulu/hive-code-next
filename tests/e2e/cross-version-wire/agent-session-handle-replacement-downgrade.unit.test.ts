@@ -87,7 +87,7 @@ function storeMaps(value: unknown) {
   ) {
     throw new Error('old store must expose its readable and unreadable rows')
   }
-  return value
+  return { ...value, records: value.records, unreadableRecords: value.unreadableRecords }
 }
 
 function legacyRow(provider: 'claude' | 'codex') {

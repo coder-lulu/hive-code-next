@@ -6,7 +6,8 @@ const ProcessDeathSchema = z
     detail: z.string().min(1).max(512),
     observedAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     ownerFence: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
-    lastProvenAliveAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional()
+    lastProvenAliveAt: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+    runtimeEnd: z.string().min(1).max(512).optional()
   })
   .refine(
     (value) => value.lastProvenAliveAt === undefined || value.lastProvenAliveAt <= value.observedAt

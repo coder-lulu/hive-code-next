@@ -28,7 +28,6 @@ describe('release JavaScript job boundaries', () => {
           'cut',
           'create-release',
           'release-preflight',
-          'relay-windows-process-tree',
           'release-javascript'
         ])
       )
@@ -68,8 +67,7 @@ describe('release JavaScript job boundaries', () => {
     for (const job of [release.jobs.build, mac.jobs['build-mac']]) {
       expect(job.steps.map((step) => step.name)).toEqual(
         expect.arrayContaining([
-          'Gate runtime file-watcher process isolation',
-          'Gate SSH relay watcher process isolation'
+          'Gate runtime file-watcher process isolation'
         ])
       )
     }

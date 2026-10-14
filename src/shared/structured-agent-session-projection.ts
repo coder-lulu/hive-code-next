@@ -39,6 +39,7 @@ import { sha256 } from './sha256'
 import { readAgentMessageSource } from './agent-session-message-source'
 import { structuredAgentSessionStatusStartedAt } from './structured-agent-session-status-started-at'
 import { owesStructuredAgentSessionWork } from './structured-agent-session-owed-work'
+import { agentSessionCurrentContextRows } from './agent-session-context-clear'
 
 // Re-exported so the live-turn readers' and the unanswered-send rule's existing consumers keep one
 // import site.
@@ -150,6 +151,7 @@ export function projectStructuredAgentSessionStatus(
   submissions: readonly AgentJournalSubmission[] = [],
   currentFence?: number | null
 ): StructuredAgentSessionProjectedStatus {
+  ;({ items, submissions } = agentSessionCurrentContextRows(items, submissions))
   if (items.some(isPendingStructuredAgentSessionPrompt)) {
     return 'attention'
   }
@@ -204,6 +206,7 @@ export function projectStructuredAgentSessionStatusState(
   /** Item ids of the approvals and questions waiting on the user: what makes the status `attention`. */
   pendingPromptIds: string[]
 } {
+  const latestPrompt = latestStructuredAgentSessionPrompt(items)
   if (!hasStructuredAgentSessionRequest(items, submissions, currentFence)) {
     return {
       summary: { status: null, latestPrompt: '' },
@@ -212,6 +215,7 @@ export function projectStructuredAgentSessionStatusState(
       pendingPromptIds: []
     }
   }
+  ;({ items, submissions } = agentSessionCurrentContextRows(items, submissions))
   const status = projectStructuredAgentSessionStatus(items, submissions, currentFence)
   const activityFields = structuredSessionListActivityFields(
     structuredSessionListActivity(status, items, submissions, currentFence)
@@ -253,7 +257,7 @@ export function projectStructuredAgentSessionStatusState(
     summary: {
       status,
       ...activityFields,
-      latestPrompt: normalizePromptField(latestStructuredAgentSessionPrompt(items)),
+      latestPrompt: normalizePromptField(latestPrompt),
       ...(toolName ? { toolName } : {}),
       ...(toolInput ? { toolInput } : {}),
       ...(lastAssistantMessage ? { lastAssistantMessage } : {}),

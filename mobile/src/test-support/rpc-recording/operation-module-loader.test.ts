@@ -32,6 +32,47 @@ afterAll(() => {
 })
 
 describe('the mounted module loader', () => {
+  it('retains split capability exports through nested star barrels', () => {
+    const modules = loaderOver({
+      'capabilities.ts': `export const capability = 'files.mutation-ownership.v1';
+        export default 'private-default'`,
+      'protocol.ts': `export * from './capabilities'`,
+      'facade.ts': `export * from './protocol'`,
+      'operation.ts': `import { capability } from './facade';
+        export const read = () => capability`
+    })
+    expect(modules.load<{ read: () => string }>('mobile/src/operation.ts').read()).toBe(
+      'files.mutation-ownership.v1'
+    )
+    expect(Object.keys(modules.load('mobile/src/facade.ts'))).toEqual(['capability'])
+  })
+
+  it('keeps enumerated namespace bindings live and exposes exactly one anchored mutation', () => {
+    const root = sourceTree({
+      'state.ts': `export let count = 1; export const advance = () => ++count`,
+      'barrel.ts': `export * from './state'`,
+      'operation.ts': `import * as state from './barrel';
+        export const read = () => state.count;
+        export const advance = () => state.advance()`
+    })
+    const modules = operationModuleLoader(root, {
+      name: 'initial-count',
+      file: 'state.ts',
+      before: '= 1',
+      after: '= 2'
+    })
+    const operation = modules.load<{ read: () => number; advance: () => number }>(
+      'mobile/src/operation.ts'
+    )
+    expect(operation.read()).toBe(2)
+    expect(operation.advance()).toBe(3)
+    expect(operation.read()).toBe(3)
+    expect(modules.mutationsApplied()).toBe(1)
+    expect(
+      operationModuleLoader(root).load<{ read: () => number }>('mobile/src/operation.ts').read()
+    ).toBe(1)
+  })
+
   it('reuses code without sharing exports, module state, mounting dependencies or effects', () => {
     const root = sourceTree({
       'state.ts': `

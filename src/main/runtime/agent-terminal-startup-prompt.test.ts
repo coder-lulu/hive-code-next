@@ -7,7 +7,7 @@
  * dropped `followupPrompt` would spawn the agent with no prompt and no error anywhere.
  */
 
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 
 vi.mock('electron', () => ({
@@ -19,20 +19,28 @@ vi.mock('electron', () => ({
 
 // The shell the host names for a local line; bash takes no multi-line line, zsh does.
 function runtimeWithAgentLaunch(
-  options: { terminalDefaultShell?: string; connectionId?: string } = {}
+  options: {
+    terminalDefaultShell?: string
+    connectionId?: string
+    launchPlatform?: NodeJS.Platform
+  } = {}
 ): {
   runtime: OrcaRuntimeService
   spawn: ReturnType<typeof vi.fn>
 } {
   const runtime = new OrcaRuntimeService()
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the resolver under test is a protected member; the assertion names only the two internals this stub replaces, each of which is assigned before the create reaches it.
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the resolver under test is a protected member; the assertion names only the internals this stub replaces, each of which is assigned before the create reaches it.
   const internal = runtime as unknown as {
     store: { getSettings: () => Record<string, unknown> }
     resolveTerminalWorkspaceLaunchScope: (selector: string) => Promise<unknown>
+    getAgentLaunchPlatformForWorkspace: () => NodeJS.Platform
   }
   internal.store = {
     getSettings: () => ({ terminalDefaultShell: options.terminalDefaultShell ?? '/bin/bash' })
   }
+  vi.spyOn(internal, 'getAgentLaunchPlatformForWorkspace').mockReturnValue(
+    options.launchPlatform ?? 'linux'
+  )
   vi.spyOn(internal, 'resolveTerminalWorkspaceLaunchScope').mockResolvedValue({
     id: 'wt-1',
     path: '/repo/app',
@@ -57,6 +65,11 @@ function spawnedCommand(spawn: ReturnType<typeof vi.fn>): string {
 }
 
 describe('a terminal create that is handed a launch prompt', () => {
+  beforeEach(() => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('linux')
+  })
+  afterEach(() => vi.restoreAllMocks())
+
   it('folds an argv agent’s prompt into the command it spawns, and says it did', async () => {
     const { runtime, spawn } = runtimeWithAgentLaunch()
     const onStartupPromptCarry = vi.fn()
@@ -117,6 +130,22 @@ describe('a terminal create that is handed a launch prompt', () => {
 
     expect(spawnedCommand(spawn)).not.toContain('summarize')
     expect(onStartupPromptCarry).toHaveBeenCalledWith(false)
+  })
+
+  it('carries the Windows prompt with shell escaping when the host cannot prove a safe paste', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    const { runtime, spawn } = runtimeWithAgentLaunch({ launchPlatform: 'win32' })
+    const onStartupPromptCarry = vi.fn()
+
+    await runtime.createTerminal('id:wt-1', {
+      startupAgent: 'claude',
+      startupPrompt: 'summarize the diff\nthen list the risks',
+      onStartupPromptCarry
+    })
+
+    expect(spawnedCommand(spawn)).toContain('summarize the diff`nthen list the risks')
+    expect(spawnedCommand(spawn)).not.toContain('\n')
+    expect(onStartupPromptCarry).toHaveBeenCalledWith(true)
   })
 
   it('starts Hermes clean instead of refusing when its env budget cannot hold the prompt', async () => {

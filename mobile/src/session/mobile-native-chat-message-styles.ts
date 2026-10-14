@@ -46,6 +46,17 @@ export function createMobileNativeChatMessageStyles(theme: MobileTheme) {
       backgroundColor: theme.color.brand.subtle,
       borderRadius: theme.radii.card
     },
+    contextBoundary: {
+      borderTopWidth: StyleSheet.hairlineWidth,
+      borderTopColor: theme.color.border.subtle,
+      paddingTop: theme.spacing.space8
+    },
+    unsentNotice: {
+      maxWidth: '88%',
+      marginTop: theme.spacing.space4,
+      color: theme.color.status.dangerText,
+      ...theme.typography.meta
+    },
     hostNotice: {
       ...theme.typography.body,
       color: theme.color.text.secondary

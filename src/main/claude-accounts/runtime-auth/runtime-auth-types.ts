@@ -9,6 +9,7 @@ export type ClaudeRuntimeAuthPreparation = {
   envPatch: ClaudeEnvPatch
   stripAuthEnv: boolean
   managedRefreshDeferredByLivePty?: boolean
+  usageError?: string
   provenance: string
 }
 

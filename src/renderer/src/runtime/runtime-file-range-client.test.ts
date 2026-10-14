@@ -15,7 +15,7 @@ import {
 
 installRuntimeFileClientEnvironment()
 const localArgs = {
-  settings: null,
+  target: { kind: 'local' as const },
   filePath: '/repo/large.csv',
   relativePath: 'large.csv',
   worktreeId: 'folder:workspace'
@@ -66,7 +66,7 @@ describe('CSV range routing', () => {
       result: { contentBase64: 'YWJj', bytesRead: 3, eof: false }
     })
     await readRuntimeFileRange(
-      { ...localArgs, settings: { activeRuntimeEnvironmentId: 'env-1' } },
+      { ...localArgs, target: { kind: 'environment' as const, environmentId: 'env-1' } },
       10,
       3
     )
@@ -87,7 +87,11 @@ describe('CSV range routing', () => {
   it('does not substitute a local file for an unavailable or changed remote owner', async () => {
     await expect(
       readRuntimeFileRange(
-        { ...localArgs, settings: { activeRuntimeEnvironmentId: 'env-1' }, worktreeId: undefined },
+        {
+          ...localArgs,
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
+          worktreeId: undefined
+        },
         0,
         3
       )
@@ -102,7 +106,7 @@ describe('CSV range routing', () => {
     await expect(
       statRuntimeReadTarget({
         ...localArgs,
-        settings: { activeRuntimeEnvironmentId: 'env-1' },
+        target: { kind: 'environment' as const, environmentId: 'env-1' },
         relativePath: '/other/large.csv'
       })
     ).rejects.toThrow('outside')
@@ -117,7 +121,7 @@ describe('CSV range routing', () => {
     })
     await expect(
       readRuntimeFileRange(
-        { ...localArgs, settings: { activeRuntimeEnvironmentId: 'env-1' } },
+        { ...localArgs, target: { kind: 'environment' as const, environmentId: 'env-1' } },
         0,
         3
       )

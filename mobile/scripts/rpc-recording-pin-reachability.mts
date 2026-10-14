@@ -2,7 +2,7 @@
  * Whether the RPC recording pin names a commit this repository keeps: one in this history, or one in
  * the head of a pull request that GitHub associates with the pinned commit.
  */
-import { runProcess } from '../../src/shared/child-process/run-process.ts'
+import { runProcess } from '@orca/process-host'
 
 export const PIN_MANIFEST = 'mobile/rpc-foundation/hive/manifest.json'
 const PIN_REMOTE = 'origin'

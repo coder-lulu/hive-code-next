@@ -67,6 +67,8 @@ function importsSqliteRuntime(file: string, source: string): boolean {
 }
 
 it.each([
+  ['import { createRestTestRig } from "./structured-agent-session-rest-test-rig"', true],
+  ['import type { RestTestRig } from "./structured-agent-session-rest-test-rig"', false],
   ['import Database, { type Options } from "./sync-database"', true],
   ['import {} from "./sync-database"', true],
   ['import "./sync-database"', true],

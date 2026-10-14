@@ -124,7 +124,7 @@ describe('Codex child-work evidence', () => {
         residency: 'background',
         description: 'audit_build',
         invocation: { invocationId: 'c1', generation: 1 },
-        stoppable: false
+        stoppable: true
       })
     ])
     const aliases = store.getAliasesForChild(records()[0]!.childWorkId)
@@ -193,9 +193,11 @@ describe('Codex child-work evidence', () => {
       expect.objectContaining({ membership: 'settled', state: 'done', outcome: 'unknown' })
     ])
     expect(tracker.state).toBeNull()
-    // The first ending a turn gets stands.
+    // Lost contact is no verdict: the turn's own ending still says how it went.
     send(turn('turn/completed', CHILD, 'c1', 'completed'))
-    expect(records()).toEqual([expect.objectContaining({ outcome: 'unknown' })])
+    expect(records()).toEqual([expect.objectContaining({ outcome: 'succeeded' })])
+    send(turn('turn/completed', CHILD, 'c1', 'failed'))
+    expect(records()).toEqual([expect.objectContaining({ outcome: 'succeeded' })])
   })
 
   it.each(['c1', undefined])(
@@ -429,14 +431,20 @@ describe('Codex child-work evidence', () => {
       expect.objectContaining({
         membership: 'live',
         description: 'npm run dev',
-        residency: 'background',
+        residency: 'foreground',
         parentChildWorkId: agent!.childWorkId,
         firstObservedAt: 1_040
       })
     ])
     send(turn('turn/completed', CHILD, 'c1'))
     expect(byKind('agent')[0]).toMatchObject({ membership: 'settled', outcome: 'succeeded' })
-    expect(byKind('command')).toEqual([expect.objectContaining({ membership: 'live' })])
+    expect(byKind('command')).toEqual([
+      expect.objectContaining({
+        membership: 'live',
+        residency: 'background',
+        firstObservedAt: 1_040
+      })
+    ])
     expect(display(agent!.childWorkId)).toBe('monitoring')
     send(
       item('item/completed', CHILD, 'c1', {
@@ -571,7 +579,7 @@ describe('Codex child-work evidence', () => {
     expect(records()).toEqual([
       expect.objectContaining({ kind: 'agent', membership: 'settled', outcome: 'succeeded' })
     ])
-    // One edge when each shell starts and one when it exits, as the strip republishes today.
+    // Raw status evidence keeps every start and exit, including foreground processes.
     expect(
       log
         .slice(before)

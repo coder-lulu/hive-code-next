@@ -1,10 +1,11 @@
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { chmodSync, mkdtempSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type * as CodexCommand from '../codex-cli/command'
 import type * as TrustDerivation from './codex-hook-trust-derivation'
+import { writeFileAtomically } from '../codex-accounts/fs-utils'
 import type { CodexHookAnswer, CodexHookHashes } from './codex-hook-trust-derivation'
 
 const mocks = vi.hoisted(() => ({
@@ -225,18 +226,14 @@ describe('what a lookup may spawn', () => {
 
 describe('the answer status reads', () => {
   it("does not report a replaced Codex's answer as its own", async () => {
-    allowAsking()
-    await resolveCodexHookAnswer()
     const originalFingerprint = fingerprintCodex(mocks.codexPath)
     expect(originalFingerprint).not.toBeNull()
+    allowAsking()
+    await resolveCodexHookAnswer()
     expect(hashesOf(readKnownCodexHookAnswer())).toEqual(HASHES)
-    // Why new bytes: a codex the lookup has not asked about yet.
-    const replacementPath = join(userData, 'replacement-codex')
-    writeFileSync(replacementPath, 'codex 0.161.0')
-    renameSync(replacementPath, mocks.codexPath)
-    const replacementFingerprint = fingerprintCodex(mocks.codexPath)
-    expect(replacementFingerprint).not.toBeNull()
-    expect(replacementFingerprint).not.toBe(originalFingerprint)
+    // Replace the file itself so equal-size writes cannot reuse its cached identity.
+    writeFileAtomically(mocks.codexPath, 'codex 0.161.0')
+    expect(fingerprintCodex(mocks.codexPath)).not.toBe(originalFingerprint)
 
     expect(readKnownCodexHookAnswer()).toBeNull()
   })

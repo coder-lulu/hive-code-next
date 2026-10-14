@@ -33,7 +33,7 @@ export type FolderWorkspaceRowContext = {
   newCardStyle: boolean
   settings: AppState['settings']
   activeWorktreeId: string | null
-  activeWorkspaceExecutionHostId: ExecutionHostId | null
+  activeWorkspaceExecutionHostId: AppState['activeWorkspaceExecutionHostId']
   currentWorktreeId: string | null
   selectedWorktreeIds: ReadonlySet<string>
   repoMap: Map<string, Repo>

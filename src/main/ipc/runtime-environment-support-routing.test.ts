@@ -160,7 +160,10 @@ function acceptedOutcome(verdict: 'capable' | 'absent') {
     deviceToken: 'token',
     publicKeyB64: 'key'
   }
-  const evidence = captureRuntimeEnvironmentCapabilityEvidence(environmentId, pairing)
+  const evidence = captureRuntimeEnvironmentCapabilityEvidence(
+    environmentId,
+    (pairing)
+  )
   applyRuntimeEnvironmentCapabilityVerdict({ evidence, verdict, runtimeId: 'runtime' })
   return runtimeEnvironmentCapabilityOutcome(evidence, verdict, 'runtime')
 }

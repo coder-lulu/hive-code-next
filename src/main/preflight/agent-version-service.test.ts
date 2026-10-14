@@ -15,7 +15,7 @@ const { run, runWsl, resolveCommands, buildEnv, hydratePath, fetchMetadata } = v
   fetchMetadata: vi.fn()
 }))
 
-vi.mock('../../shared/child-process/run-process', () => ({ runProcess: run }))
+vi.mock('@orca/process-host', () => ({ runProcess: run }))
 vi.mock('../../shared/node-cli-command-resolution', () => ({
   resolveCliCommands: resolveCommands,
   withCliRuntimeOnPath: (_program: string, env: NodeJS.ProcessEnv) => env

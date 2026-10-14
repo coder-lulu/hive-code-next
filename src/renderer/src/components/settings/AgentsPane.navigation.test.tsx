@@ -1,3 +1,4 @@
+import { LOCAL_SETTINGS_HOST_SCOPE } from './settings-host-scope'
 // @vitest-environment happy-dom
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -36,7 +37,11 @@ function mountPane(settings = getDefaultSettings('/tmp')) {
     const current = useAppStore((state) => state.settings!)
     return (
       <TooltipProvider>
-        <AgentsPane settings={current} updateSettings={updateSettings} />
+        <AgentsPane
+          hostScope={LOCAL_SETTINGS_HOST_SCOPE}
+          settings={current}
+          updateSettings={updateSettings}
+        />
       </TooltipProvider>
     )
   }
@@ -56,7 +61,7 @@ describe('Agents settings navigation', () => {
     await i18n.changeLanguage('en')
   })
 
-  it('can repair an existing undetected command override without exposing other launch fields', () => {
+  it('can repair an existing undetected command override without exposing other launch fields', async () => {
     const updateSettings = mountPane({
       ...getDefaultSettings('/tmp'),
       agentCmdOverrides: { grok: '/missing/grok', claude: '/kept/claude' }
@@ -73,6 +78,7 @@ describe('Agents settings navigation', () => {
     command.focus()
     fireEvent.change(command, { target: { value: '/valid/grok' } })
     fireEvent.keyDown(command, { key: 'Enter' })
+    await act(async () => {})
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({
       agentCmdOverrides: { grok: '/valid/grok', claude: '/kept/claude' }
     })
@@ -86,7 +92,7 @@ describe('Agents settings navigation', () => {
     expect(document.querySelector('#agent-card-grok')?.getAttribute('data-installed')).toBe('false')
   })
 
-  it('can restore an undetected override to the default while preserving the no-override policy', () => {
+  it('can restore an undetected override to the default while preserving the no-override policy', async () => {
     const updateSettings = mountPane({
       ...getDefaultSettings('/tmp'),
       agentCmdOverrides: { grok: '/missing/grok', claude: '/kept/claude' }
@@ -99,6 +105,7 @@ describe('Agents settings navigation', () => {
     const command = screen.getByRole('textbox', { name: 'Command' })
     fireEvent.change(command, { target: { value: 'grok' } })
     fireEvent.keyDown(command, { key: 'Enter' })
+    await act(async () => {})
     expect(updateSettings).toHaveBeenCalledExactlyOnceWith({
       agentCmdOverrides: { claude: '/kept/claude' }
     })
@@ -111,17 +118,19 @@ describe('Agents settings navigation', () => {
     ).toBeTruthy()
   })
 
-  it('preserves detected-agent command and arguments editing', () => {
+  it('preserves detected-agent command and arguments editing', async () => {
     const initialSettings = getDefaultSettings('/tmp')
     const updateSettings = mountPane(initialSettings)
     fireEvent.click(screen.getByRole('button', { name: 'Launch configuration for Claude' }))
     const command = screen.getByRole('textbox', { name: 'Command' })
     fireEvent.change(command, { target: { value: '/valid/claude' } })
     fireEvent.blur(command)
+    await act(async () => {})
     expect(updateSettings).toHaveBeenCalledWith({ agentCmdOverrides: { claude: '/valid/claude' } })
     const args = screen.getByRole('textbox', { name: 'Arguments' })
     fireEvent.change(args, { target: { value: '--debug' } })
     fireEvent.blur(args)
+    await act(async () => {})
     expect(updateSettings).toHaveBeenCalledWith({
       agentDefaultArgs: { ...initialSettings.agentDefaultArgs, claude: '--debug' }
     })
@@ -312,7 +321,9 @@ describe('Agents settings navigation', () => {
     await act(async () => {
       fireEvent.click(screen.getByRole('switch', { name: 'Claude availability' }))
     })
-    expect(screen.getByRole('combobox', { name: 'Default Agent' }).textContent).toContain('Auto')
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Default Agent' }).textContent).toContain('Auto')
+    )
     const card = screen.getByRole('article', { name: 'Claude' })
     expect(within(card).getByText('Current version')).toBeTruthy()
     expect(within(card).queryByRole('button', { name: 'Set as default' })).toBeNull()

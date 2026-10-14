@@ -1,24 +1,10 @@
 import '../unused-default-rpc-methods.test-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from '../dispatcher'
-import type { RpcRequest } from '../core'
+import { repo, makeRequest } from './worktree-test-fixture'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import { WORKTREE_METHODS } from './worktree'
 import { createAutomationDispatchToken } from '../../../automations/dispatch-tokens'
-
-const repo = {
-  id: 'repo-1',
-  path: '/workspace/repo',
-  displayName: 'repo',
-  badgeColor: '#000',
-  addedAt: 1,
-  kind: 'git' as const,
-  executionHostId: 'ssh:ssh-target-1' as const
-}
-
-function makeRequest(method: string, params?: unknown): RpcRequest {
-  return { id: 'req-1', authToken: 'tok', method, params }
-}
 
 // worktree.create routes through the runtime's clientMutationId idempotency
 // wrapper; these unit mocks run the create straight through (no dedupe).
@@ -590,10 +576,12 @@ describe('worktree RPC methods', () => {
   })
 
   it('forwards task startup drafts to runtime worktree creation', async () => {
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fixture implements every runtime method a draft create reaches, including the draft agent's choice.
     const runtime = {
       getRuntimeId: () => 'test-runtime',
       dedupeWorktreeCreate: passthroughDedupe,
       showRepo: vi.fn().mockResolvedValue(repo),
+      resolveStartupDraftAgent: vi.fn().mockResolvedValue('codex'),
       createManagedWorktree: vi.fn().mockResolvedValue({ worktree: { id: 'wt-1' } })
     } as unknown as OrcaRuntimeService
     const dispatcher = new RpcDispatcher({ runtime, methods: WORKTREE_METHODS })

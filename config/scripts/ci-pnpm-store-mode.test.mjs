@@ -1,10 +1,12 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { resolveGitBashPath } from '../../src/main/git-bash'
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runInNewContext } from 'node:vm'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
-import { runProcessSync } from './script-child-process.mjs'
+import { runProcessSync } from '@orca/process-host'
+import { removeTreeSync } from '../../src/shared/windows-transient-lock-removal.ts'
 
 const action = parse(readFileSync('.github/actions/install-node-dependencies/action.yml', 'utf8'))
 const mode = action.runs.steps.find((step) => step.id === 'pnpm-store-mode')
@@ -38,7 +40,7 @@ function resolveMode(request, node, manager) {
       JSON.stringify({ engines: { node }, packageManager: manager })
     )
     const result = runProcessSync({
-      program: 'bash',
+      program: process.platform === 'win32' ? resolveGitBashPath() : 'bash',
       args: ['-e', '-o', 'pipefail', '-c', mode.run],
       cwd: directory,
       env: { ...process.env, LOOKUP_REQUEST: request, GITHUB_OUTPUT: output }
@@ -46,7 +48,7 @@ function resolveMode(request, node, manager) {
     expect(result.code, result.stderr || result.stdout).toBe(0)
     return readFileSync(output, 'utf8')
   } finally {
-    rmSync(directory, { recursive: true, force: true })
+    removeTreeSync(directory)
   }
 }
 

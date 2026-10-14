@@ -3,12 +3,8 @@ import type * as childProcess from 'node:child_process'
 import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import * as path from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { getBranchCompare } from './status'
-import { branchCompare } from '../../relay/git-handler-ops'
-import { gitChangeListArgs, parseGitChangeList } from '../../shared/git-change-list'
-import { createGitTestRunner } from '../../relay/git-handler-test-setup'
-
 const subjectChildren = vi.hoisted<{ closed: Promise<void>[] }>(() => ({ closed: [] }))
 
 vi.mock('node:child_process', async (importOriginal) => {
@@ -30,13 +26,9 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...real, execFile }
 })
 
+
 const tempRoots: string[] = []
-const equalCommitCase =
-  'reports equal commits as empty on native and relay despite staged and unstaged changes'
-const fixtureRunner = createGitTestRunner()
 const pendingComparisons: Promise<unknown>[] = []
-let equalFixture: { repo: string; oid: string } | undefined
-let pendingSetup: Promise<void> | undefined
 
 function git(repo: string, args: string[]): string {
   return execFileSync('git', args, {
@@ -46,90 +38,55 @@ function git(repo: string, args: string[]): string {
   }).trim()
 }
 
-function relayCompare(repo: string, baseRef: string) {
-  return branchCompare(
-    async (args, cwd) => ({ stdout: git(cwd, args), stderr: '' }),
-    repo,
-    baseRef,
-    async (mergeBase, headOid) =>
-      parseGitChangeList(git(repo, gitChangeListArgs(mergeBase, headOid)))
-  )
-}
-
-beforeEach(async ({ task, signal }) => {
-  if (task.name !== equalCommitCase) {
-    return
-  }
-  fixtureRunner.useSignal(signal, null)
-  pendingSetup = (async () => {
-    const repo = await mkdtemp(path.join(tmpdir(), 'orca-equal-branch-compare-'))
-    tempRoots.push(repo)
-    await fixtureRunner.git(repo, ['init', '-q'])
-    await fixtureRunner.git(repo, ['config', 'user.email', 'test@example.com'])
-    await fixtureRunner.git(repo, ['config', 'user.name', 'Test User'])
-    await fixtureRunner.git(repo, [
-      '-c',
-      'commit.gpgSign=false',
-      'commit',
-      '--allow-empty',
-      '-m',
-      'initial'
-    ])
-    await fixtureRunner.git(repo, ['branch', 'base'])
-    await fixtureRunner.git(repo, ['checkout', '-q', '-b', 'feature'])
-    const oid = (await fixtureRunner.git(repo, ['rev-parse', 'HEAD'])).trim()
-    await writeFile(path.join(repo, 'changes.txt'), 'staged\n')
-    await fixtureRunner.git(repo, ['add', 'changes.txt'])
-    await writeFile(path.join(repo, 'changes.txt'), 'unstaged\n')
-    equalFixture = { repo, oid }
-  })()
-  await pendingSetup
-})
-
 afterEach(async () => {
-  await Promise.allSettled([
-    ...(pendingSetup ? [pendingSetup] : []),
-    ...pendingComparisons.splice(0)
-  ])
-  await fixtureRunner.settle()
+  await Promise.allSettled(pendingComparisons.splice(0))
   await Promise.all(subjectChildren.closed.splice(0))
-  pendingSetup = undefined
-  equalFixture = undefined
   await Promise.all(tempRoots.splice(0).map((root) => rm(root, { recursive: true, force: true })))
 })
 
 describe('getBranchCompare real refs', () => {
-  it(equalCommitCase, async ({ signal }) => {
-    const { repo, oid } = equalFixture!
-    const comparisons = [getBranchCompare(repo, 'base', { signal }), relayCompare(repo, 'base')]
-    pendingComparisons.push(...comparisons)
-    for (const result of await Promise.all(comparisons)) {
-      expect(result).toEqual({
-        summary: {
-          baseRef: 'base',
-          baseOid: oid,
-          compareRef: 'feature',
-          headOid: oid,
-          mergeBase: oid,
-          changedFiles: 0,
-          commitsAhead: 0,
-          commitsBehind: 0,
-          status: 'ready'
-        },
-        entries: []
-      })
-    }
+  it('reports equal commits as empty despite staged and unstaged changes', async ({ signal }) => {
+    const repo = await mkdtemp(path.join(tmpdir(), 'orca-equal-branch-compare-'))
+    tempRoots.push(repo)
+    git(repo, ['init', '-q'])
+    git(repo, ['config', 'user.email', 'test@example.com'])
+    git(repo, ['config', 'user.name', 'Test User'])
+    git(repo, ['-c', 'commit.gpgSign=false', 'commit', '--allow-empty', '-m', 'initial'])
+    git(repo, ['branch', 'base'])
+    git(repo, ['checkout', '-q', '-b', 'feature'])
+    const oid = git(repo, ['rev-parse', 'HEAD'])
+    await writeFile(path.join(repo, 'changes.txt'), 'staged\n')
+    git(repo, ['add', 'changes.txt'])
+    await writeFile(path.join(repo, 'changes.txt'), 'unstaged\n')
+
+    const comparison = getBranchCompare(repo, 'base', { signal })
+    pendingComparisons.push(comparison)
+    expect(await comparison).toEqual({
+      summary: {
+        baseRef: 'base',
+        baseOid: oid,
+        compareRef: 'feature',
+        headOid: oid,
+        mergeBase: oid,
+        changedFiles: 0,
+        commitsAhead: 0,
+        commitsBehind: 0,
+        status: 'ready'
+      },
+      entries: []
+    })
   })
 
-  it('keeps the merge-base failure for identical blob tips on the relay', async () => {
+  it('keeps the merge-base refusal for identical non-commit blob tips', async () => {
     const repo = await mkdtemp(path.join(tmpdir(), 'orca-blob-branch-compare-'))
     tempRoots.push(repo)
     git(repo, ['init', '-q'])
     await writeFile(path.join(repo, 'blob.txt'), 'not a commit\n')
     const oid = git(repo, ['hash-object', '-w', 'blob.txt'])
     await writeFile(path.join(repo, '.git', 'HEAD'), `${oid}\n`)
-
-    await expect(relayCompare(repo, oid)).resolves.toMatchObject({
+    const comparison = getBranchCompare(repo, oid)
+    pendingComparisons.push(comparison)
+    await expect(comparison).resolves.toMatchObject({
       summary: { headOid: oid, baseOid: oid, status: 'no-merge-base', mergeBase: null },
       entries: []
     })
@@ -163,19 +120,14 @@ describe('getBranchCompare real refs', () => {
     ])
     expect(rawOid).not.toBe(peeledOid)
 
-    for (const result of await Promise.all([
-      getBranchCompare(client, 'origin/tagbase'),
-      relayCompare(client, 'origin/tagbase')
-    ])) {
-      expect(result.summary).toMatchObject({
-        baseOid: rawOid,
-        headOid: peeledOid,
-        mergeBase: peeledOid,
-        changedFiles: 0,
-        commitsAhead: 0,
-        commitsBehind: 0,
-        status: 'ready'
-      })
-    }
+    expect((await getBranchCompare(client, 'origin/tagbase')).summary).toMatchObject({
+      baseOid: rawOid,
+      headOid: peeledOid,
+      mergeBase: peeledOid,
+      changedFiles: 0,
+      commitsAhead: 0,
+      commitsBehind: 0,
+      status: 'ready'
+    })
   })
 })

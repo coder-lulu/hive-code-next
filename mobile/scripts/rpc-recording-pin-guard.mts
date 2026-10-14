@@ -15,7 +15,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { cp, lstat, mkdir, mkdtemp, rm, symlink, unlink } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
-import { runProcess } from '../../src/shared/child-process/run-process.ts'
+import { runProcess } from '@orca/process-host'
 import { RECORDING_DRIVERS } from '../src/test-support/rpc-recording/recording-drivers.ts'
 import { checkPinReachable } from './rpc-recording-pin-reachability.mts'
 

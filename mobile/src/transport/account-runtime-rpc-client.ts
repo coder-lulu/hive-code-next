@@ -1,4 +1,7 @@
-import type { AccountRuntimeStream as Stream } from './account-runtime-rpc-stream'
+import {
+  createAccountRuntimeStream,
+  type AccountRuntimeStream as Stream
+} from './account-runtime-rpc-stream'
 import {
   accountRuntimeRecovery,
   logAccountRuntimeRecovery,
@@ -69,6 +72,9 @@ export class AccountRuntimeRpcClient implements RpcClient {
     params?: unknown,
     options?: SendRequestOptions
   ): Promise<RpcResponse> {
+    if (options?.envelope && Object.keys(options.envelope).length > 0) {
+      return Promise.reject(new Error('Account Runtime does not support transport envelope fields'))
+    }
     if (this.closed || this.terminalFailure || AppState.currentState !== 'active') {
       return Promise.reject(new Error('Account Runtime client is inactive'))
     }
@@ -93,19 +99,13 @@ export class AccountRuntimeRpcClient implements RpcClient {
     listener: Parameters<RpcClient['subscribe']>[2],
     options?: Parameters<RpcClient['subscribe']>[3]
   ): () => void {
+    if (options?.envelope && Object.keys(options.envelope).length > 0) {
+      throw new Error('Account Runtime does not support transport envelope fields')
+    }
     if (this.closed || this.terminalFailure) {
       return () => {}
     }
-    const stream: Stream = {
-      method,
-      params,
-      listener,
-      options,
-      physical: null,
-      generation: 0,
-      retryAttempt: 0,
-      retryTimer: null
-    }
+    const stream = createAccountRuntimeStream(method, params, listener, options)
     this.streams.add(stream)
     this.resume()
     if (this.pool) {

@@ -39,10 +39,9 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
     suppressPtyExit,
     toggleTabViewMode
   } = useTerminalPaneStoreActions()
-  const { pendingCodexPaneRestartIds, nativeChatEnabled, savedLayout, terminalTab } = useAppStore(
+  const { pendingCodexPaneRestartIds, savedLayout, terminalTab } = useAppStore(
     useShallow((store) => ({
       pendingCodexPaneRestartIds: store.pendingCodexPaneRestartIds,
-      nativeChatEnabled: store.settings?.experimentalNativeChat === true,
       savedLayout: store.terminalLayoutsByTabId[tabId] ?? EMPTY_LAYOUT,
       terminalTab: getCachedTerminalTabForWorktree(store.tabsByWorktree, worktreeId, tabId)
     }))
@@ -54,6 +53,7 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
       selectUnifiedTerminalTabFields(store.unifiedTabsByWorktree, worktreeId, tabId)
     )
   )
+  const effectiveChatViewMode = isChatViewMode
   const runtimePaneTitlesByPaneId = useAppStore(
     useShallow((store) => store.runtimePaneTitlesByTabId[tabId] ?? {})
   )
@@ -64,7 +64,6 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
       store.paneForegroundAgentByPaneKey
     )
   )
-  const effectiveChatViewMode = nativeChatEnabled && isChatViewMode
   const restoredLayout = useMemo(
     () => (terminalTab ? sanitizeTerminalLayoutPaneTitles(savedLayout, terminalTab) : savedLayout),
     [savedLayout, terminalTab]
@@ -131,7 +130,6 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
         leafIds: getNativeChatLeafIds()
       })
       return canToggleNativeChat({
-        experimentalNativeChatEnabled: nativeChatEnabled,
         contentType: 'terminal',
         launchAgent: detectedAgent ? null : launchAgent,
         detectedAgent,
@@ -141,7 +139,6 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
     },
     [
       tabAgentTypeByLeaf,
-      nativeChatEnabled,
       nativeChatTranscriptIsLocalReadable,
       terminalTab?.launchAgent,
       getNativeChatLeafIds,
@@ -263,7 +260,6 @@ export function useTerminalPaneChatState(controller: TerminalPaneTitleController
     clearCodexRestartNotice,
     unifiedTabId,
     isChatViewMode,
-    nativeChatEnabled,
     effectiveChatViewMode,
     unifiedTabLabel,
     isTabPinned,

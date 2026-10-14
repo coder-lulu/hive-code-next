@@ -1,10 +1,10 @@
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { setActivityTerminalPortals } from '../activity/activity-terminal-portal'
 // @vitest-environment happy-dom
 
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Tab, TabGroup } from '../../../../shared/tab-types'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
 
 type MockAppState = {
   activeView: 'terminal' | 'sessions'
@@ -58,17 +58,6 @@ vi.mock('@/store', async () => {
 vi.mock('@/lib/worktree-runtime-owner', () => ({
   getExecutionHostIdForWorktree: (state: MockAppState) =>
     state.runtimeEnvironmentId ? `runtime:${state.runtimeEnvironmentId}` : 'local'
-}))
-
-vi.mock('@/runtime/runtime-rpc-client', () => ({
-  getActiveRuntimeTarget: ({
-    activeRuntimeEnvironmentId
-  }: {
-    activeRuntimeEnvironmentId: string | null
-  }) =>
-    activeRuntimeEnvironmentId
-      ? { kind: 'environment', environmentId: activeRuntimeEnvironmentId }
-      : { kind: 'local' }
 }))
 
 vi.mock('./NativeChatView', async () => {

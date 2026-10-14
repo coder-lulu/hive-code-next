@@ -124,7 +124,7 @@ describe('fetchReposForAllHosts generation', () => {
     store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
 
     const startup = store.getState().fetchReposForAllHosts({ remoteHosts: 'skip' })
-    const remoteRefresh = store.getState().fetchRepos()
+    const remoteRefresh = store.getState().fetchRepos(catalogOwner(store))
     let remoteSettled = false
     void remoteRefresh.then(() => {
       remoteSettled = true
@@ -339,7 +339,7 @@ describe('fetchReposForAllHosts generation', () => {
     expect(store.getState().folderWorkspacePathStatuses).toEqual({})
   })
 
-  it('rejects a targeted repo catalog that started before a reconnect', async () => {
+  it('drops a targeted repo catalog that started before a reconnect', async () => {
     const { promise: repoList, resolve: resolveRepoList } = Promise.withResolvers<unknown>()
     const { promise: repoListStarted, resolve: markRepoListStarted } = Promise.withResolvers<void>()
     runtimeEnvironmentCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
@@ -375,11 +375,10 @@ describe('fetchReposForAllHosts generation', () => {
     })
     await pending
 
-    // A previous connection cannot authoritatively retire the current host's workspaces.
     expect(store.getState().repos[0]?.path).toBe(freshRemoteRepo.path)
   })
 
-  it('rejects an all-host repo result that started before a reconnect', async () => {
+  it('drops an all-host repo result that started before a reconnect (#20811)', async () => {
     const { promise: repoList, resolve: resolveRepoList } = Promise.withResolvers<unknown>()
     const { promise: repoListStarted, resolve: markRepoListStarted } = Promise.withResolvers<void>()
     runtimeEnvironmentCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
@@ -527,3 +526,10 @@ describe('fetchReposForAllHosts generation', () => {
     expect(store.getState().repos.map((repo) => repo.id)).toEqual(['local-repo', 'remote-repo'])
   })
 })
+
+// The catalog these tests read is the one the focused host would have shown.
+function catalogOwner(store: {
+  getState: () => { settings: { activeRuntimeEnvironmentId?: string | null } | null }
+}): { runtimeEnvironmentId: string | null } {
+  return { runtimeEnvironmentId: store.getState().settings?.activeRuntimeEnvironmentId ?? null }
+}

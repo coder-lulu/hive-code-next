@@ -1,4 +1,4 @@
-import { net, session } from 'electron'
+import { getMainHttpClient } from '../network/http-client'
 import { ensureElectronProxyFromEnvironment } from '../network/proxy-settings'
 
 // Why: the OAuth client id and token endpoint are the public Claude Code
@@ -130,16 +130,18 @@ export async function refreshClaudeOauthCredentials(
     return null
   }
 
-  await ensureElectronProxyFromEnvironment({
-    proxySession: session.defaultSession,
-    probeUrl: OAUTH_TOKEN_URL
-  }).catch(() => {})
+  const client = getMainHttpClient()
+  const proxySession = client.proxySession()
+  if (proxySession)
+    {await ensureElectronProxyFromEnvironment({ proxySession, probeUrl: OAUTH_TOKEN_URL }).catch(
+      () => {}
+    )}
 
   try {
     // Why: the `claude` CLI posts grant_type=refresh_token as
     // application/x-www-form-urlencoded with the public client id. net.fetch
     // routes through Chromium's stack so the env proxy bridge above applies.
-    const res = await net.fetch(OAUTH_TOKEN_URL, {
+    const res = await client.fetch(OAUTH_TOKEN_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -155,6 +157,7 @@ export async function refreshClaudeOauthCredentials(
       // field, instead of a silent null that looks identical to success.
       // Callers keep the existing credentials on null — a transient 429 just
       // means the still-valid token is reused until the next attempt.
+      await res.body?.cancel().catch(() => {})
       console.warn(`[claude-oauth-refresh] token endpoint returned ${res.status}`)
       return null
     }

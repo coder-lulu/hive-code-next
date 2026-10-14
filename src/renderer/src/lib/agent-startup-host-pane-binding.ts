@@ -2,7 +2,7 @@ import { useAppStore } from '@/store'
 import {
   isWebTerminalSurfaceTabId,
   toWebTerminalSurfaceTabId
-} from '@/runtime/web-terminal-surface-id'
+} from '../../../shared/terminal-surface-id'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import { makePaneKey } from '../../../shared/stable-pane-id'
 import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'

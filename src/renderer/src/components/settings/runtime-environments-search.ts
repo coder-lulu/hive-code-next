@@ -57,6 +57,19 @@ export const getRuntimeEnvironmentsSearchEntry = createLocalizedCatalog(
         'dev box'
       ),
       ...translateSearchKeyword(
+        'auto.components.settings.runtime.environments.search.defaultHostKeyword',
+        'default host'
+      ),
+      ...translateSearchKeyword(
+        'auto.components.settings.runtime.environments.search.newProjectsKeyword',
+        'new projects'
+      ),
+      // Why: the setting's former name, so existing users can still find it.
+      ...translateSearchKeyword(
+        'auto.components.settings.runtime.environments.search.activeServerKeyword',
+        'active server'
+      ),
+      ...translateSearchKeyword(
         'auto.components.settings.managedServers.search.title',
         'Managed servers'
       ),

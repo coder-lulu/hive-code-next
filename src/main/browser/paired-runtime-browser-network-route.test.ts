@@ -58,7 +58,7 @@ describe('PairedRuntimeBrowserNetworkRoute', () => {
       })
     )
     const route = new PairedRuntimeBrowserNetworkRoute({
-      pairing,
+      connection: (pairing),
       lease,
       executionHostRevision: 1
     })
@@ -334,7 +334,7 @@ describe('PairedRuntimeBrowserNetworkRoute', () => {
     const attempts = mockSubscriptionAttempts()
     const commandLease = { ...lease, pageCommandProtocolVersion: 1 }
     const route = new PairedRuntimeBrowserNetworkRoute({
-      pairing,
+      connection: (pairing),
       lease: commandLease,
       executionHostRevision: 1
     })
@@ -649,7 +649,7 @@ function createRoute(
   } = {}
 ): PairedRuntimeBrowserNetworkRoute {
   return new PairedRuntimeBrowserNetworkRoute({
-    pairing,
+    connection: (pairing),
     lease,
     executionHostRevision: 1,
     ...overrides

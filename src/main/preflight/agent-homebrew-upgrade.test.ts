@@ -3,7 +3,7 @@ import { homebrewTargetFromPath, readHomebrewTargetVersion } from './agent-homeb
 import { upgradeHomebrewAgent } from './agent-homebrew-upgrade'
 
 const mocks = vi.hoisted(() => ({ run: vi.fn(), version: vi.fn(), guard: vi.fn() }))
-vi.mock('../../shared/child-process/run-process', () => ({ runProcess: mocks.run }))
+vi.mock('@orca/process-host', () => ({ runProcess: mocks.run }))
 vi.mock('./agent-version-service', () => ({ readAgentVersion: mocks.version }))
 vi.mock('./agent-installation-identity', () => ({ assertReviewedAgentTarget: mocks.guard }))
 const target = {

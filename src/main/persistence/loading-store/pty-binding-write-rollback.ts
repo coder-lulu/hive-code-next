@@ -1,3 +1,4 @@
+import { isTerminalLeafId } from '../../../shared/stable-pane-id'
 import { isDeepStrictEqual } from 'node:util'
 import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
 import { rollbackWorkspaceSessionAfterFailedAsyncWrite } from '../restoring-sessions/workspace-session-write-rollback'
@@ -91,4 +92,28 @@ export function rollbackFailedPtyBinding(
       `${tabId}:${leafId}`
     )
   }
+}
+
+/** Compare execution ownership only; presentation edits do not invalidate a failed-write rollback. */
+export function ptyBindingOwnerMatches(
+  current: WorkspaceSessionState,
+  staged: WorkspaceSessionState,
+  worktreeId: string,
+  tabId: string,
+  leafId: string,
+  paneKey: string
+): boolean {
+  const ownerState = (value: WorkspaceSessionState) => {
+    const tab = value.tabsByWorktree[worktreeId]?.find((tab) => tab.id === tabId)
+    return {
+      createdAt: tab?.createdAt,
+      generation: tab?.generation,
+      worktreeId: tab?.worktreeId,
+      ptyId: isTerminalLeafId(leafId)
+        ? value.terminalLayoutsByTabId[tabId]?.ptyIdsByLeafId?.[leafId]
+        : tab?.ptyId,
+      incarnation: value.terminalPtyIncarnationsByPaneKey?.[paneKey]
+    }
+  }
+  return isDeepStrictEqual(ownerState(current), ownerState(staged))
 }

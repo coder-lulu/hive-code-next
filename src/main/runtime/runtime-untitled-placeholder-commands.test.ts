@@ -1,3 +1,4 @@
+import type { ExecutionHostId } from '../../shared/execution-host'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -55,6 +56,7 @@ let workspace: string
 let filePath: string
 let otherPath: string
 let targetPath: string
+let executionHostId: ExecutionHostId
 let service: RuntimeUntitledPlaceholderCommands
 let onResolve: (() => void) | undefined
 let onOrdinaryCreated: (() => void) | undefined
@@ -82,6 +84,7 @@ beforeEach(async () => {
   filePath = join(workspace, 'untitled.md')
   otherPath = join(workspace, 'other.md')
   targetPath = filePath
+  executionHostId = 'local'
   ports.authorize.mockReset().mockImplementation(async (path) => path)
   ports.userData = null
   ports.environmentError = null
@@ -100,7 +103,7 @@ beforeEach(async () => {
       return {
         worktree: { id: 'worktree-a' } as RuntimeFileExplorerPath['worktree'],
         path: targetPath,
-        executionHostId: 'local'
+        executionHostId
       }
     },
     createFileExplorerFile: ordinary
@@ -251,4 +254,14 @@ describe('runtime ordinary untitled creation after proved unavailable retention 
       expect(existsSync(filePath)).toBe(false)
     }
   )
+})
+
+describe('placeholder execution host authority', () => {
+  it.each(['ssh:other', 'runtime:other'] as const)('refuses %s before reading or creating local files', async (hostId) => {
+    executionHostId = hostId
+    await expect(service.createUntitledPlaceholder('workspace-a', 'untitled.md', CLIENT)).rejects.toThrow()
+    expect(ports.authorize).not.toHaveBeenCalled()
+    expect(ordinary).not.toHaveBeenCalled()
+    expect(existsSync(filePath)).toBe(false)
+  })
 })

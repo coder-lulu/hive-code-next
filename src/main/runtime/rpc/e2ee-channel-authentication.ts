@@ -12,6 +12,8 @@ type E2EEPrincipalKind = 'paired_device' | 'cloud_managed_web_session'
 export type E2EEAuthenticatedDevice = {
   deviceId: string
   deviceToken: string
+  credentialRevision?: number
+  clientId?: string
   scope: 'mobile' | 'runtime'
 }
 
@@ -42,13 +44,13 @@ type AuthenticationResult =
   | {
       ok: false
       principalKind: 'paired_device' | 'cloud_managed_web_session'
-      code: 'bad_auth' | 'unauthorized'
+      code: 'bad_auth' | 'unauthorized' | 'insecure_origin'
     }
 
 export function authenticateE2EEChannel(args: {
   plaintext: string
   v2Session: DesktopMobileE2EEV2Session | null
-  resolveDevice: (token: string) => E2EEAuthenticatedDevice | null
+  resolveDevice: (token: string) => E2EEAuthenticatedDevice | { refused: 'insecure_origin' } | null
   resolveCloudSession?: E2EECloudManagedSessionResolver
 }): AuthenticationResult {
   if (args.resolveCloudSession) {
@@ -90,13 +92,13 @@ export function authenticateE2EEChannel(args: {
 }
 
 export function rejectE2EEAuthentication(
-  code: 'bad_auth' | 'unauthorized',
+  code: 'bad_auth' | 'unauthorized' | 'insecure_origin',
   principalKind: E2EEPrincipalKind,
   send: (message: unknown) => void,
   close: (code: number, reason: string, principalKind?: E2EEPrincipalKind) => void
 ): void {
   send({ type: 'e2ee_error', error: { code } })
-  const reason = code === 'bad_auth' ? 'Invalid e2ee_auth' : 'Unauthorized'
+  const reason = code === 'bad_auth' ? 'Invalid e2ee_auth' : code === 'insecure_origin' ? 'Insecure web origin' : 'Unauthorized'
   if (principalKind === 'cloud_managed_web_session') {
     close(4001, reason, principalKind)
   } else {

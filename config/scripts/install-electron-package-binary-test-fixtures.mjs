@@ -1,7 +1,7 @@
 import { execFileSync, spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { copyScriptWithLocalModules } from './script-module-dependencies.mjs'
 
@@ -12,8 +12,8 @@ const sourceScriptPath = fileURLToPath(
 export const sharedEntryName = '41.5.0-linux-x64'
 export const sharedEntryNameFor = (version) => `${version}-linux-x64`
 
-export function mkTempProject() {
-  const projectDir = mkdtempSync(join(tmpdir(), 'orca-install-electron-'))
+export function mkTempProject(parentDirectory = tmpdir()) {
+  const projectDir = mkdtempSync(join(parentDirectory, 'orca-install-electron-'))
   copyScriptWithLocalModules(sourceScriptPath, join(projectDir, 'config', 'scripts'))
   return projectDir
 }
@@ -26,6 +26,9 @@ export function runInstallScript(projectDir, extraEnv = {}) {
       ...process.env,
       ELECTRON_CACHE: undefined,
       ORCA_ELECTRON_PACKAGE_CACHE_ROOT: undefined,
+      // A logs-local fixture can sit inside a real checkout. Standalone fixtures must not
+      // adopt its distribution cache; a fixture's own repository/worktree still resolves.
+      GIT_CEILING_DIRECTORIES: dirname(projectDir),
       npm_config_platform: 'linux',
       npm_config_arch: 'x64',
       ORCA_ELECTRON_PACKAGE_EXTRACTOR: join(projectDir, 'fake-extractor.cjs'),

@@ -5,7 +5,7 @@ import type {
   AgentInstallationSource
 } from '../../shared/agent-installation-types'
 import { resolveCliCommands } from '../../shared/node-cli-command-resolution'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import { verifyAgentBunOwnership } from './agent-upgrade-target'
 import { sameAgentInstallationPath } from './agent-installation-identity'

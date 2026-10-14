@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
-import { runProcess } from '../../src/shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { resolveGitBashPath } from '../../src/main/git-bash'
 
 const retiredNames = ['adhoc-mac-build', 'daily-mac-build', 'dev-channel-win-build']

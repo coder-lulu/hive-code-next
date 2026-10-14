@@ -2,12 +2,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { resolve } from 'node:path'
 import { getStatus } from './source-control/status-read'
 
-const { lstat, stream, conflict } = vi.hoisted(() => ({
+const { lstat, readdir, stream, conflict } = vi.hoisted(() => ({
   lstat: vi.fn(),
+  readdir: vi.fn(),
   stream: vi.fn(),
   conflict: vi.fn()
 }))
-vi.mock('node:fs/promises', () => ({ lstat }))
+vi.mock('node:fs/promises', () => ({ lstat, readdir }))
 vi.mock('./source-control/git-conflict-operation', () => ({ detectConflictOperation: conflict }))
 vi.mock('./runner', () => ({
   gitStreamStdout: stream,
@@ -16,6 +17,7 @@ vi.mock('./runner', () => ({
 
 beforeEach(() => {
   vi.clearAllMocks()
+  readdir.mockResolvedValue(['link', '日本 語', 'unrelated.txt'])
   conflict.mockResolvedValue(undefined)
   lstat.mockResolvedValue({ isSymbolicLink: () => true })
   stream.mockImplementation(async (_args, options) => {

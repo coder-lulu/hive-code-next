@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { translate } from '@/i18n/i18n'
 import { PRIMARY_CLI_COMMAND } from '@/product-brand'
-import { callRuntimeRpc, type RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type {
   ManagedDataAccountProvider,
   ManagedDataAccountsState

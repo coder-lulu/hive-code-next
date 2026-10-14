@@ -90,6 +90,7 @@ export function normalizeLoadedProfileState(
       workspaceSession,
       markNeedsSave
     ),
+    claudeLivePtySessionIds: normalizeClaudeLivePtySessionIds(parsed.claudeLivePtySessionIds),
     sshTargets: (parsed.sshTargets ?? []).map(normalizeSshTarget),
     deletedSshConfigAliases: Array.isArray(parsed.deletedSshConfigAliases)
       ? parsed.deletedSshConfigAliases.filter((alias): alias is string => typeof alias === 'string')
@@ -102,7 +103,6 @@ export function normalizeLoadedProfileState(
       .map(normalizeSshRemotePtyLease)
       .filter((lease): lease is SshRemotePtyLease => lease !== null),
     sshPtyConsumerRecoveries: parsed.sshPtyConsumerRecoveries,
-    claudeLivePtySessionIds: normalizeClaudeLivePtySessionIds(parsed.claudeLivePtySessionIds),
     migrationUnsupportedPtyEntries: normalizeMigrationUnsupportedPtyEntries(
       parsed.migrationUnsupportedPtyEntries
     ),

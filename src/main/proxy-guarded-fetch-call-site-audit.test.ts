@@ -21,10 +21,12 @@ const AUDITED_NON_NET_FETCH_CALLS = new Map<string, number>([
   // Injected HttpClient, not a session: resolves to net.fetch on defaultSession
   // (main/host/electron-http-client.ts) or to the global-fetch-audited Node fallback.
   ['main/jira/authenticated-request.ts', 1],
+  ['main/claude-accounts/oauth-refresh.ts', 1],
+  ['main/rate-limits/codex-fetcher.ts', 1],
   // MainHttpClient delegates to guarded net.fetch on desktop or the audited Node host port.
   ['main/hive-runtime-cloud/hive-runtime-cloud-http-client.ts', 1],
   ['main/hive-runtime-cloud/relay-host/hive-runtime-relay-region-measurement.ts', 1],
-  // Startup injects MainHttpClient.fetch into the local Pi capability broker.
+  // Preflight uses the injected MainHttpClient rather than a separate session.
   ['main/preflight/agent-installer-download.ts', 1],
   ['main/preflight/agent-version-service.ts', 1],
   // The existing electron-updater partition gap described above also applies to Hive metadata.
@@ -44,6 +46,8 @@ const DEFAULT_SESSION_RECEIVERS = new Set(['net', 'globalThis', 'global'])
 const NET_REQUEST_CALL = /(?<![.\w$])net\.(?:fetch|request)\s*\(/g
 // Matches `{ session: x }` and the `{ url, session }` shorthand both `net.request` overloads take.
 const SESSION_SCOPED_OPTION = /(?:^|[{,\s])(?:session|partition)\s*[:,}]/
+// The sole caller passes defaultSession after proxy readiness; its host tests exercise that fence.
+const AUDITED_SESSION_SCOPED_REQUESTS = new Map([['main/host/electron-proxy-login-fetch.ts', 1]])
 
 /** Text between the call's parentheses, skipping string bodies so quoted parens don't unbalance. */
 function callArgumentText(content: string, callEnd: number): string {
@@ -102,11 +106,16 @@ describe('proxy-guarded fetch call-site audit (main)', () => {
 
   it('keeps every net.fetch/net.request on the guarded default session', () => {
     const offenders: string[] = []
+    const audited = new Map<string, number>()
     for (const { file, content } of sources) {
       for (const match of content.matchAll(NET_REQUEST_CALL)) {
         const args = callArgumentText(content, match.index + match[0].length)
         if (SESSION_SCOPED_OPTION.test(args)) {
-          offenders.push(`${file}:${content.slice(0, match.index).split('\n').length}`)
+          if (AUDITED_SESSION_SCOPED_REQUESTS.has(file)) {
+            audited.set(file, (audited.get(file) ?? 0) + 1)
+          } else {
+            offenders.push(`${file}:${content.slice(0, match.index).split('\n').length}`)
+          }
         }
       }
     }
@@ -117,6 +126,22 @@ describe('proxy-guarded fetch call-site audit (main)', () => {
         'persisted proxy to it. Either drop the option, or apply the proxy to that session ' +
         'yourself (see main/rate-limits/opencode-go-request-session.ts) and allowlist it here.'
     ).toEqual([])
+    expect(audited).toEqual(AUDITED_SESSION_SCOPED_REQUESTS)
+  })
+
+  it('keeps the proxy-login adapter exclusively behind the default-session host client', () => {
+    const callers = sources.filter(
+      ({ file, content }) =>
+        file !== 'main/host/electron-proxy-login-fetch.ts' &&
+        /\bfetchWithProxyLogin\b/.test(content)
+    )
+    expect(callers.map(({ file }) => file)).toEqual(['main/host/electron-http-client.ts'])
+    expect(callers[0]?.content).toMatch(/const proxySession = session\.defaultSession/)
+    expect(callers[0]?.content).toMatch(/await hasConfiguredProxyCredentials\(proxySession,/)
+    expect(callers[0]?.content).toMatch(/getProxySessionApplicationReadiness\(proxySession\)/)
+    expect(callers[0]?.content).toMatch(
+      /fetchWithProxyLogin\(new Request\(url, init\), proxySession\)/
+    )
   })
 
   it('keeps every non-default-session fetcher audited with its expected count', () => {

@@ -10,6 +10,7 @@ const useDetectedAgents = vi.fn<() => UseDetectedAgentsResult>(() => ({
   isLoading: false,
   detectionFailed: false,
   isRefreshing: false,
+  needsServerUpdate: false,
   refresh: vi.fn()
 }))
 
@@ -24,6 +25,7 @@ describe('OrchestrationSkillAgentCoverage', () => {
       isLoading: false,
       detectionFailed: false,
       isRefreshing: false,
+      needsServerUpdate: false,
       refresh: vi.fn()
     })
   })
@@ -59,6 +61,7 @@ describe('OrchestrationSkillAgentCoverage', () => {
       isLoading: false,
       detectionFailed: true,
       isRefreshing: false,
+      needsServerUpdate: false,
       refresh
     })
     render(<OrchestrationSkillAgentCoverage loading={false} skills={[]} sources={[]} collapsible />)
@@ -93,6 +96,7 @@ describe('OrchestrationSkillAgentCoverage', () => {
       isLoading: false,
       detectionFailed: true,
       isRefreshing: false,
+      needsServerUpdate: false,
       refresh
     }
     useDetectedAgents.mockReturnValue(failed)
@@ -126,6 +130,7 @@ describe('OrchestrationSkillAgentCoverage', () => {
       isLoading: false,
       detectionFailed: true,
       isRefreshing: false,
+      needsServerUpdate: false,
       refresh: vi.fn()
     })
     render(<OrchestrationSkillAgentCoverage loading={false} skills={[]} sources={[]} />)

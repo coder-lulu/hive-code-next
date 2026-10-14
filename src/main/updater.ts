@@ -1,6 +1,22 @@
 import { getMacUpdateRunningInstances } from './macos-update-running-instances'
+import { homedir } from 'node:os'
+import { macCoordinationRoot } from '../shared/serve-bundle-coordination'
+import {
+  commitServeSupervisorPark,
+  parkServeSupervisorsForInstall,
+  releaseServeSupervisorPark,
+  serveInstallRefusalMessage
+} from './updater/serve-supervisor-install-park'
+import { prepareThisProcessShipItStaging } from './updater/shipit-leftover-recovery'
+import { releaseSessionsForInstaller } from './updater/updater-installer-session-release'
 /* eslint-disable max-lines */
-import { app, BrowserWindow, powerMonitor, shell } from 'electron'
+import {
+  app,
+  autoUpdater as nativeUpdater,
+  type BrowserWindow,
+  powerMonitor,
+  shell
+} from 'electron'
 import { is } from '@electron-toolkit/utils'
 import { parse } from 'yaml'
 import type {
@@ -23,12 +39,7 @@ import {
 import * as productUpdateSourceModule from '../shared/product-update-source'
 import { isProductVersion } from '../shared/product-version'
 import { profileStateBuildCompatibilityError } from '../shared/profile-state-build-compatibility'
-import {
-  APP_DISPLAY_NAME,
-  PRIMARY_CLI_COMMAND,
-  applyProductBranding,
-  applyProductCliBranding
-} from '../shared/brand'
+import { APP_DISPLAY_NAME, applyProductBranding, applyProductCliBranding } from '../shared/brand'
 import {
   installProductUpdaterNetworkBoundary,
   type ProductUpdaterHttpExecutor
@@ -38,7 +49,6 @@ import {
   isWindowsSignatureCheckUnavailableFailure,
   isWindowsSignatureMismatchFailure
 } from '../shared/updater-windows-signature-check'
-import { killAllPty } from './ipc/pty'
 import { withUpdaterSpan } from './observability/instrumentation'
 import { loadElectronAutoUpdater, type ElectronAutoUpdater } from './electron-updater-loader'
 import { writeMainThreadDiagnosticMarker } from './diagnostics/main-thread-churn-probe'
@@ -49,6 +59,7 @@ import {
   setMacInstallPreflightInProgress,
   deferMacQuitUntilInstallerReady,
   hasMacInstallAuthority,
+  hasMacStagingAuthority,
   isMacInstallerReady,
   isWaitingForMacInstallerReadiness,
   markMacQuitAndInstallInFlight,
@@ -59,6 +70,7 @@ import {
   disarmUpdateInstallExitWatchdog
 } from './update-install-exit-watchdog'
 import { registerAutoUpdaterHandlers } from './updater-events'
+import { MAC_DEFERRED_STAGING_TIMEOUT_MS } from './updater-events-context'
 import { recordUpdaterLifecycle } from './updater-lifecycle-diagnostics'
 import {
   getLinuxPackageType,
@@ -200,6 +212,8 @@ let autoUpdateCheckTimer: ReturnType<typeof setTimeout> | null = null
 let autoUpdateCheckScheduleGeneration = 0
 let nudgeCheckTimer: ReturnType<typeof setTimeout> | null = null
 let pendingQuitAndInstallTimer: ReturnType<typeof setTimeout> | null = null
+let macNativeStagingInProgress = false
+let macDeferredStagingTimer: ReturnType<typeof setTimeout> | null = null
 let quitAndInstallInProgress = false
 let updateInstallMode: UpdateInstallMode = 'interactive'
 let lastInstallDeferralVersion = { download: null as string | null, install: null as string | null }
@@ -1025,18 +1039,26 @@ async function performQuitAndInstall(): Promise<void> {
         recordUpdaterLifecycle('macos_running_instances_check_failed')
         return
       }
-      if (blockers.length > 0) {
+      const park =
+        blockers.length > 0
+          ? await parkServeSupervisorsForInstall(process.execPath, blockers, {
+              macUserDataRoot: macCoordinationRoot(homedir()),
+              listBlockers: () => getMacUpdateRunningInstances()
+            })
+          : null
+      if (park && park.kind === 'refused') {
         resetQuitForUpdateState()
         mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
         sendInstallFailureStatus({
           state: 'error',
           version: pendingVersion,
           retryAction: 'install',
-          message: `Close the other ${APP_DISPLAY_NAME} instances (process IDs: ${blockers.slice(0, 10).join(', ')}) before installing this update. Background ${PRIMARY_CLI_COMMAND} serve instances also need to stop. ${APP_DISPLAY_NAME} remains open; retry the update after closing them.`
+          message: serveInstallRefusalMessage(park)
         })
         recordUpdaterLifecycle('macos_install_blocked_by_running_instances', {
-          pids: blockers.slice(0, 10).join(', '),
-          count: blockers.length
+          pids: park.pids.slice(0, 10).join(', '),
+          count: park.pids.length,
+          reason: park.reason
         })
         return
       }
@@ -1081,6 +1103,33 @@ async function performQuitAndInstall(): Promise<void> {
         return
       }
 
+      await commitServeSupervisorPark(() => getMacUpdateRunningInstances())
+      if (isMacStagingDeferredToInstall() && (await prepareThisProcessShipItStaging()) !== true) {
+        throw new Error('macOS staging preparation was not approved')
+      }
+      if (
+        !quitAndInstallInProgress ||
+        !hasInstallableDownloadedVersion() ||
+        !hasMacStagingAuthority()
+      ) {
+        throw new Error('Update install authority changed during preparation')
+      }
+      if (process.platform === 'darwin' && !isMacInstallerReady()) {
+        setMacInstallPreflightInProgress(false)
+        startMacStaging()
+        if (isAwaitingMacStaging()) {
+          macDeferredStagingTimer = setTimeout(() => {
+            macDeferredStagingTimer = null
+            sendInstallFailureStatus({
+              state: 'error',
+              message: `macOS has not finished preparing the update. ${APP_DISPLAY_NAME} keeps serving and installs it once ready; restart the service if it never does.`,
+              ...(pendingVersion ? { version: pendingVersion } : {}),
+              retryable: false
+            })
+          }, MAC_DEFERRED_STAGING_TIMEOUT_MS)
+        }
+        return
+      }
       recordUpdaterLifecycle('quit_and_install_invoking_native', {
         version: pendingVersion || null
       })
@@ -1117,21 +1166,13 @@ async function performQuitAndInstall(): Promise<void> {
         armUpdateInstallExitWatchdog()
       }
 
-      killAllPty()
+      const windowCount = releaseSessionsForInstaller()
       span.addEvent('local_pty_kill_all')
-
-      for (const win of BrowserWindow.getAllWindows()) {
-        win.removeAllListeners('close')
-      }
-      span.addEvent('window_close_listeners_removed', {
-        windowCount: BrowserWindow.getAllWindows().length
-      })
+      span.addEvent('window_close_listeners_removed', { windowCount })
 
       // Why: committed installs keep quittingForUpdate so dock activate can't reopen the old process; macOS without Squirrel stays uncommitted so late native errors can still recover.
       if (!updateInstallCommitted && (process.platform !== 'darwin' || isMacInstallerReady())) {
-        updateInstallCommitted = true
-        // Why: past commit the installer waits for this process to exit; a wedged async shutdown would strand the user with no app and no update (#4438).
-        armUpdateInstallExitWatchdog()
+        commitInFlightInstall()
       }
     })
   } catch (error) {
@@ -1174,14 +1215,101 @@ async function performQuitAndInstall(): Promise<void> {
   }
 }
 
+function isMacStagingDeferredToInstall(): boolean {
+  return process.platform === 'darwin' && updateInstallMode === 'supervised-headless-serve'
+}
+
+function isAwaitingMacStaging(): boolean {
+  return (
+    isMacStagingDeferredToInstall() &&
+    quitAndInstallInProgress &&
+    macNativeStagingInProgress &&
+    !updateInstallCommitted
+  )
+}
+
+function commitStagedMacInstall(): void {
+  if (!isAwaitingMacStaging() || !hasMacInstallAuthority() || !hasInstallableDownloadedVersion()) {
+    return
+  }
+  macNativeStagingInProgress = false
+  clearMacDeferredStagingTimer()
+  commitInFlightInstall()
+  recordUpdaterLifecycle('macos_deferred_staging_committed', {
+    version: getPendingInstallVersion() || null
+  })
+  try {
+    releaseSessionsForInstaller()
+  } catch (error) {
+    recordUpdaterLifecycle(
+      'post_commit_cleanup_failed',
+      { errorType: error instanceof Error ? error.name : typeof error },
+      {
+        level: 'warn',
+        message: 'Update install cleanup failed after commit; install already applied'
+      }
+    )
+  }
+  quitAndInstallNativeInvoked = true
+  runWithLaunchPath(() => getAutoUpdater().quitAndInstall(true, false))
+}
+
+function startMacStaging(): void {
+  if (
+    macNativeStagingInProgress ||
+    !hasInstallableDownloadedVersion() ||
+    !hasMacStagingAuthority()
+  ) {
+    return
+  }
+  macNativeStagingInProgress = true
+  try {
+    nativeUpdater.checkForUpdates()
+  } catch (error) {
+    failMacStaging(error)
+  }
+}
+
+function failMacStaging(error: unknown): void {
+  if (!macNativeStagingInProgress) {
+    return
+  }
+  if (quitAndInstallInProgress) {
+    failServeUpdateHandoff('The native updater rejected staging.')
+  }
+  resetQuitForUpdateState()
+  sendInstallFailureStatus({
+    state: 'error',
+    message: withInstallFailureCause(getPreCommitInstallFailureMessage(), error)
+  })
+}
+
+function commitInFlightInstall(): void {
+  if (!quitAndInstallInProgress || updateInstallCommitted) {
+    return
+  }
+  updateInstallCommitted = true
+  armUpdateInstallExitWatchdog()
+}
+
+function clearMacDeferredStagingTimer(): void {
+  if (macDeferredStagingTimer) {
+    clearTimeout(macDeferredStagingTimer)
+    macDeferredStagingTimer = null
+  }
+}
+
 function resetQuitForUpdateState(): void {
+  macNativeStagingInProgress = false
   setMacInstallPreflightInProgress(false)
   quitAndInstallInProgress = false
   quittingForUpdate = false
   updateInstallCommitted = false
   quitAndInstallNativeInvoked = false
+  clearMacDeferredStagingTimer()
   disarmUpdateInstallExitWatchdog()
   resetMacInstallState()
+  void releaseServeSupervisorPark()
 }
 
 /**
@@ -2304,7 +2432,10 @@ async function checkForLocalBuildFromMenu(): Promise<void> {
     if (!candidate) {
       return
     }
-    const compatibilityError = profileStateBuildCompatibilityError(app.getVersion(), candidate.version)
+    const compatibilityError = profileStateBuildCompatibilityError(
+      app.getVersion(),
+      candidate.version
+    )
     if (compatibilityError) {
       await candidate.close()
       throw new Error(compatibilityError)
@@ -2552,7 +2683,7 @@ function hasInstallablePendingUpdate(): boolean {
   }
   return (
     (currentStatus.state === 'downloaded' || getActiveLinuxPackageRecovery() !== null) &&
-    hasMacInstallAuthority()
+    (hasMacInstallAuthority() || (isMacStagingDeferredToInstall() && hasMacStagingAuthority()))
   )
 }
 
@@ -2717,6 +2848,7 @@ export function quitAndInstall(): boolean {
   finishActiveUpdateCheckAttempt()
   clearBackgroundCheckLaunchPending()
   if (
+    !isMacStagingDeferredToInstall() &&
     deferMacQuitUntilInstallerReady(
       currentStatus,
       hasInstallableDownloadedVersion(),
@@ -2840,8 +2972,11 @@ export type UpdaterSetupOptions = {
   localOnly?: boolean
 }
 
-export function setupAutoUpdater(mainWindow: BrowserWindow, opts?: UpdaterSetupOptions): void {
-  mainWindowRef = mainWindow
+export function setupAutoUpdater(
+  mainWindow: BrowserWindow | null,
+  opts?: UpdaterSetupOptions
+): void {
+  mainWindowRef = mainWindow ?? mainWindowRef
   onBeforeQuitCleanup = opts?.onBeforeQuit ?? null
   onBeforeQuitFailure = opts?.onBeforeQuitFailure ?? 'continue'
   persistLastUpdateCheckAt = opts?.setLastUpdateCheckAt ?? null
@@ -2914,6 +3049,11 @@ export function setupAutoUpdater(mainWindow: BrowserWindow, opts?: UpdaterSetupO
       acceptDownloadedUpdateCandidate,
       shouldHandleUpdaterErrorEvent,
       performQuitAndInstall,
+      commitStagedMacInstall,
+      failMacStaging,
+      isAwaitingMacStaging,
+      isMacStagingDeferredToInstall,
+      startMacStaging,
       clearUpdateAvailableEventPending,
       isActiveUpdateCheckAttempt,
       markUpdateCheckEventAttempt,
@@ -3079,15 +3219,59 @@ export function downloadUpdate(): void {
   beginMacUpdateDownload()
   // Why: setup can take seconds before progress emits; surface acceptance now so the action never looks inert.
   sendStatus({ state: 'downloading', percent: 0, version, ...getHiveCloudStatusMetadata() })
-  getAutoUpdater()
-    .downloadUpdate()
-    .catch((err) => {
-      downloadInFlight = false
-      const message = String(err?.message ?? err)
-      if (localBuildDownload) {
-        sendLocalBuildErrorAndRestore(message)
-      } else {
-        sendErrorStatus(message)
-      }
-    })
+  const acceptedDownloadCandidate = downloadingUpdateCandidate
+  const startDownload = (): void => {
+    if (
+      downloadingUpdateCandidate !== acceptedDownloadCandidate ||
+      !isUpdateCandidateCurrent(acceptedDownloadCandidate)
+    ) {
+      return
+    }
+    getAutoUpdater()
+      .downloadUpdate()
+      .catch((err) => {
+        downloadInFlight = false
+        const message = String(err?.message ?? err)
+        if (localBuildDownload) {
+          sendLocalBuildErrorAndRestore(message)
+        } else {
+          sendErrorStatus(message)
+        }
+      })
+  }
+  const preparingStaging = isMacStagingDeferredToInstall()
+    ? null
+    : prepareThisProcessShipItStaging()
+  if (preparingStaging) {
+    void preparingStaging
+      .then((approved) => {
+        if (
+          downloadingUpdateCandidate !== acceptedDownloadCandidate ||
+          !isUpdateCandidateCurrent(acceptedDownloadCandidate)
+        ) {
+          return
+        }
+        if (process.platform === 'darwin' && approved !== true) {
+          downloadInFlight = false
+          downloadingUpdateCandidate = null
+          sendErrorStatus('macOS staging preparation was not approved.', true)
+          return
+        }
+        startDownload()
+      })
+      .catch((error) => {
+        if (downloadingUpdateCandidate !== acceptedDownloadCandidate) {
+          return
+        }
+        downloadingUpdateCandidate = null
+        downloadInFlight = false
+        sendErrorStatus(String(error), true)
+      })
+  } else if (process.platform === 'darwin' && !isMacStagingDeferredToInstall()) {
+    downloadInFlight = false
+    downloadingUpdateCandidate = null
+    sendErrorStatus('macOS staging preparation was not approved.', true)
+  } else {
+    startDownload()
+  }
 }

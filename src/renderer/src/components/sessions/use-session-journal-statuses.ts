@@ -1,9 +1,7 @@
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { useMemo, useSyncExternalStore } from 'react'
 import { AGENT_STATUS_STALE_AFTER_MS } from '../../../../shared/agent-status-types'
-import {
-  runtimeTargetForExecutionHostId,
-  type RuntimeClientTarget
-} from '@/runtime/runtime-client-target'
+import { runtimeRpcTargetForAuthorityKey } from '@/runtime/runtime-client-target'
 import {
   getStructuredAgentSessionStatusFeed,
   type StructuredAgentSessionStatusFeedOwner
@@ -48,7 +46,7 @@ function sessionSources(items: readonly SessionListItem[]): Map<string, SessionS
     if (item.kind !== 'structured' || !identity || !item.ownerBucketKey) {
       continue
     }
-    const target = runtimeTargetForExecutionHostId(identity.executionHostId)
+    const target = runtimeRpcTargetForAuthorityKey(identity.executionHostId)
     const tabs =
       state.unifiedTabsByWorktree[item.ownerBucketKey]?.filter(
         (tab) => tab.id === item.unifiedTabId && tab.contentType === 'agent-session'

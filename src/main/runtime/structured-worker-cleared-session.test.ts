@@ -43,8 +43,7 @@ const { listAddressableStructuredWorkers } =
   await import('./orchestration/structured-worker-group-addressing')
 const { readStructuredLineageJournalPage, STRUCTURED_JOURNAL_PAGE_LIMIT } =
   await import('./orchestration/structured-worker-journal-page')
-const { structuredSessionChildIdentityEnv } =
-  await import('./structured-session-child-identity-env')
+const { sealedChildEnv } = await import('./structured-session-child-env.test-support')
 const { foundAgentSessionRecord } = await import('./agent-session-record-founding')
 const { OrcaRuntimeService } = await import('./orca-runtime')
 const { OrchestrationDb } = await import('./orchestration/db')
@@ -492,9 +491,7 @@ describe.each(['live', 'at-rest'] as const)(
 
     it("gives the successor's child the worker's handle", () => {
       const identity = registerWorker()
-      expect(structuredSessionChildIdentityEnv(SUCCESSOR, {}).ORCA_TERMINAL_HANDLE).toBe(
-        identity.handle
-      )
+      expect(sealedChildEnv(SUCCESSOR).ORCA_TERMINAL_HANDLE).toBe(identity.handle)
     })
 
     it("records the user's takeover when they type into the successor", () => {

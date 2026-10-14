@@ -1,5 +1,6 @@
 import type { Dispatch, SetStateAction } from 'react'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type { FeatureInteractionId } from '../../../../shared/feature-interaction-catalog'
 import type {
   ClaudeRateLimitAccountsState,
@@ -32,6 +33,8 @@ import { getClaudeAccountLabel } from './accounts-pane-runtime'
 
 type CodexActionContext = {
   settings: GlobalSettings
+  /** Host whose roster the action writes. */
+  accountOwner: RuntimeClientTarget
   accountRuntime: LocalAccountRuntime
   isRemoteAccountScope: boolean
   codexAccounts: CodexRateLimitAccountsState
@@ -41,15 +44,19 @@ type CodexActionContext = {
   fetchSettings: () => Promise<void>
   recordFeatureInteraction: (featureId: FeatureInteractionId) => void
   isCurrentScope: () => boolean
+  /** False once the pane shows a different account owner than this action targeted. */
+  isCurrentAccountOwner: () => boolean
 }
 
 export function createCodexAccountActionRunner(
   context: CodexActionContext
 ): CodexAccountActionRunner {
   const {
+    accountOwner,
     accountRuntime,
     codexAccounts,
     fetchSettings,
+    isCurrentAccountOwner,
     isRemoteAccountScope,
     isCurrentScope,
     recordFeatureInteraction,
@@ -58,8 +65,11 @@ export function createCodexAccountActionRunner(
     setCodexAction
   } = context
   const syncCodexAccounts = async (next: CodexRateLimitAccountsState): Promise<void> => {
-    setCodexAccounts(next)
-    setCodexAccountsLoaded(true)
+    // Why: only the roster is the shown owner's; the toast and follow-up still describe this action.
+    if (isCurrentAccountOwner()) {
+      setCodexAccounts(next)
+      setCodexAccountsLoaded(true)
+    }
     // Why: remote mutations never change local GlobalSettings account fields.
     if (!isRemoteAccountScope) {
       await fetchSettings()
@@ -123,6 +133,7 @@ export function createCodexAccountActionRunner(
           nextAccountId: nextActiveAccountId ?? null,
           // Why: the mutation wrote this row's slot only, so panes on any other
           // lane still launch under the account they already had.
+          owner: accountOwner,
           target: addedAccount ? getProviderAccountRuntime(addedAccount) : actionRuntime,
           // Why: clearing a distro-less WSL row nulls every distro slot at once.
           clearsEveryWslDistro: action === 'select:system'
@@ -163,6 +174,8 @@ type ClaudeActionContext = {
   fetchSettings: () => Promise<void>
   recordFeatureInteraction: (featureId: FeatureInteractionId) => void
   isCurrentScope: () => boolean
+  /** False once the pane shows a different account owner than this action targeted. */
+  isCurrentAccountOwner: () => boolean
 }
 
 export function createClaudeAccountActionRunner(
@@ -172,6 +185,7 @@ export function createClaudeAccountActionRunner(
     accountRuntime,
     claudeAccounts,
     fetchSettings,
+    isCurrentAccountOwner,
     isRemoteAccountScope,
     isCurrentScope,
     recordFeatureInteraction,
@@ -179,7 +193,9 @@ export function createClaudeAccountActionRunner(
     setClaudeAction
   } = context
   const syncClaudeAccounts = async (next: ClaudeRateLimitAccountsState): Promise<void> => {
-    setClaudeAccounts(next)
+    if (isCurrentAccountOwner()) {
+      setClaudeAccounts(next)
+    }
     if (!isRemoteAccountScope) {
       await fetchSettings()
     }
@@ -202,24 +218,25 @@ export function createClaudeAccountActionRunner(
       }
       recordFeatureInteraction('claude-account-switching')
       const nextActiveAccountId = getProviderAccountActiveIdForView(next, actionRuntime)
-      const shouldPromptRestart =
-        action === 'adding' ||
-        previousActiveAccountId !== nextActiveAccountId ||
-        (action.startsWith('reauth:') &&
-          nextActiveAccountId !== null &&
-          action === `reauth:${nextActiveAccountId}`)
-      if (shouldPromptRestart) {
+      // Why: switching reaches the next `claude` started in any terminal, so nothing restarts.
+      if (action === 'adding' || previousActiveAccountId !== nextActiveAccountId) {
         toast.info(
           translate('auto.components.settings.AccountsPane.f921d32606', 'Claude account updated.'),
           {
-            description: translate(
-              'auto.components.settings.AccountsPane.b15ce90870',
-              '{{value0}} -> {{value1}}. Restart live Claude terminals before continuing old sessions.',
-              {
-                value0: getClaudeAccountLabel(claudeAccounts, previousActiveAccountId),
-                value1: getClaudeAccountLabel(next, nextActiveAccountId)
-              }
-            )
+            description:
+              previousActiveAccountId === nextActiveAccountId
+                ? translate(
+                    'accounts.claude.added',
+                    'Account added. Select it to use it for the next Claude you start.'
+                  )
+                : translate(
+                    'accounts.claude.nextLaunch',
+                    '{{value0}} → {{value1}}. The next Claude you start uses it. Running sessions keep their account.',
+                    {
+                      value0: getClaudeAccountLabel(claudeAccounts, previousActiveAccountId),
+                      value1: getClaudeAccountLabel(next, nextActiveAccountId)
+                    }
+                  )
           }
         )
       }

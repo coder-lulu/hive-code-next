@@ -1,104 +1,82 @@
 import type { ProviderRateLimits } from '../../shared/rate-limit-types'
+import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
+import { ClaudeManagedAuthStorage } from '../claude-accounts/claude-managed-auth-storage'
 import {
   isOauthTokenExpiring,
   refreshClaudeOauthCredentials
 } from '../claude-accounts/oauth-refresh'
-import {
-  readClaudeManagedCredentialsJson,
-  resolveClaudeManagedCredentialsLocation,
-  writeClaudeManagedCredentialsJson,
-  type InactiveClaudeAccount
-} from './claude-managed-account-credentials'
-import { fetchClaudeManagedUsagePanelSupplement } from './claude-managed-usage-panel'
+import { hasLiveClaudePtys } from '../claude-accounts/live-pty-gate'
+import { isWslDistroRunning } from '../wsl-background-distro-gate'
 import { parseClaudeOAuthCredentialsJson } from './claude-oauth-credentials'
 import { fetchClaudeOAuthUsage } from './claude-oauth-usage-request'
-import type { ClaudeManagedAccountUsageOptions } from './claude-usage-fetch-options'
+import { OAuthUsageError } from './claude-oauth-usage-error'
+import { classifyClaudeOAuthUsageError } from './claude-usage-error-classification'
 import {
   abortedClaudeRateLimitResult,
-  canSupplementClaudeOAuthUsage,
-  mergeClaudeUsageWindows,
-  warnClaudeUsageFetchFailure
+  claudeUsageUnavailable,
+  makeClaudeUsageResult
 } from './claude-usage-result'
+import type { ClaudeManagedAccountUsageOptions } from './claude-usage-fetch-options'
 
-function noClaudeManagedCredentialsResult(): ProviderRateLimits {
-  return {
-    provider: 'claude',
-    session: null,
-    weekly: null,
-    updatedAt: Date.now(),
-    error: 'No credentials',
-    status: 'error'
-  }
-}
+export type InactiveClaudeAccount = Pick<
+  ClaudeManagedAccount,
+  'id' | 'managedAuthPath' | 'managedAuthRuntime' | 'wslDistro' | 'wslLinuxAuthPath'
+>
 
+/** Read the existing owned captured store; no profile-folder authority or login staging. */
 export async function fetchInactiveClaudeAccountUsage(
   account: InactiveClaudeAccount,
   options: ClaudeManagedAccountUsageOptions = {}
 ): Promise<ProviderRateLimits> {
-  if (options.signal?.aborted) {
-    return abortedClaudeRateLimitResult()
+  if (options.signal?.aborted) {return abortedClaudeRateLimitResult()}
+  if (
+    account.managedAuthRuntime === 'wsl' &&
+    (!account.wslDistro || !(await isWslDistroRunning(account.wslDistro)))
+  )
+    {return claudeUsageUnavailable()}
+  const storage = new ClaudeManagedAuthStorage()
+  let raw: string | null
+  try {
+    raw = (await storage.readSnapshot(account.id, account.managedAuthPath)).credentialsJson
+  } catch {
+    return claudeUsageUnavailable()
   }
-  const location = resolveClaudeManagedCredentialsLocation(account)
-  let credentialsJson = location ? await readClaudeManagedCredentialsJson(location) : null
-  if (options.signal?.aborted) {
-    return abortedClaudeRateLimitResult()
-  }
-  if (!location || !credentialsJson) {
-    return noClaudeManagedCredentialsResult()
-  }
-
-  let token = parseClaudeOAuthCredentialsJson(credentialsJson, 'credentials-file').token
-  if (isOauthTokenExpiring(credentialsJson)) {
-    const refreshed = await refreshClaudeOauthCredentials(credentialsJson)
-    if (options.signal?.aborted) {
-      return abortedClaudeRateLimitResult()
-    }
+  if (!raw)
+    {return makeClaudeUsageResult('error', 'Sign in again to use this account.', {
+      failureKind: 'missing-credentials',
+      attemptedSources: []
+    })}
+  if (options.signal?.aborted) {return abortedClaudeRateLimitResult()}
+  // A surviving CLI may still own this token even when another account is selected.
+  if (isOauthTokenExpiring(raw) && !hasLiveClaudePtys()) {
+    const refreshed = await refreshClaudeOauthCredentials(raw)
     if (refreshed) {
       try {
-        await writeClaudeManagedCredentialsJson(location, refreshed)
+        await storage.writeCredentials(account.id, account.managedAuthPath, refreshed)
       } catch {
-        // Keep the refreshed token for this fetch; a later poll can persist it.
+        return claudeUsageUnavailable()
       }
-      credentialsJson = refreshed
-      token = parseClaudeOAuthCredentialsJson(refreshed, 'credentials-file').token
+      raw = refreshed
     }
   }
-
-  if (!token) {
-    return noClaudeManagedCredentialsResult()
-  }
-  const oauthLimits = await fetchClaudeOAuthUsage(token, options.signal)
-  if (options.signal?.aborted) {
-    return abortedClaudeRateLimitResult()
-  }
-  if (
-    !canSupplementClaudeOAuthUsage({
-      oauthLimits,
-      authPreparation: undefined,
-      allowUsagePanelSupplement: options.allowUsagePanelSupplement === true
-    })
-  ) {
-    return oauthLimits
-  }
-
+  if (options.signal?.aborted) {return abortedClaudeRateLimitResult()}
+  const source = process.platform === 'darwin' ? 'scoped-keychain' : 'credentials-file'
+  const token = parseClaudeOAuthCredentialsJson(raw, source).token
+  if (!token) {return claudeUsageUnavailable()}
   try {
-    return mergeClaudeUsageWindows(
-      oauthLimits,
-      await fetchClaudeManagedUsagePanelSupplement({
-        account,
-        location,
-        credentialsJson,
-        oauthLimits,
-        networkProxySettings: options.networkProxySettings,
-        signal: options.signal
-      })
-    )
+    return await fetchClaudeOAuthUsage(token, options.signal)
   } catch (error) {
-    warnClaudeUsageFetchFailure(
-      undefined,
-      parseClaudeOAuthCredentialsJson(credentialsJson, 'credentials-file'),
-      error
+    const { failureKind } = classifyClaudeOAuthUsageError(error)
+    const retryAfterMs = error instanceof OAuthUsageError ? error.retryAfterMs : null
+    return makeClaudeUsageResult(
+      'error',
+      error instanceof OAuthUsageError ? error.message : 'Claude usage is unavailable.',
+      {
+        failureKind,
+        credentialSource: source,
+        attemptedSources: ['oauth'],
+        ...(retryAfterMs ? { retryAtMs: Date.now() + retryAfterMs } : {})
+      }
     )
-    return oauthLimits
   }
 }

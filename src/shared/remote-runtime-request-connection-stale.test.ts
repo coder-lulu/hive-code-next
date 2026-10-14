@@ -62,13 +62,14 @@ function createFakeOpenedSocket(callbacks: RemoteRuntimeWebSocketCallbacks): Fak
   }
 }
 
-function authenticate(socket: FakeOpenedSocket): void {
+function authenticate(socket: FakeOpenedSocket, beforeAuthenticated?: () => void): void {
   socket.callbacks.onTextFrame(socket.ws, JSON.stringify(socket.serverSession.ready))
   expect(JSON.parse(socket.serverSession.openText(socket.sent[0]!)!)).toMatchObject({
     type: 'e2ee_auth',
     v: 2,
     transcriptHashB64: socket.serverSession.transcriptHashB64
   })
+  beforeAuthenticated?.()
   socket.callbacks.onTextFrame(
     socket.ws,
     socket.serverSession.sealText(
@@ -127,10 +128,11 @@ describe('RemoteRuntimeRequestConnection stale socket callbacks', () => {
     })
     const request = connection.request('status.get', undefined, 1000)
     const socket = opens[0]!
-    authenticate(socket)
-    socket.ws.send = (() => {
-      throw new Error('send failed')
-    }) as WebSocket['send']
+    await authenticate(socket, () => {
+      socket.ws.send = (() => {
+        throw new Error('send failed')
+      }) as WebSocket['send']
+    })
 
     await expect(request).rejects.toThrow('send failed')
     expect(
@@ -156,7 +158,7 @@ describe('RemoteRuntimeRequestConnection stale socket callbacks', () => {
       })
 
       const first = connection.request('slow.method', undefined, 10)
-      authenticate(opens[0]!)
+      await authenticate(opens[0]!)
       const firstRejected = expect(first).rejects.toThrow('Timed out')
       await vi.advanceTimersByTimeAsync(11)
       await firstRejected
@@ -166,7 +168,7 @@ describe('RemoteRuntimeRequestConnection stale socket callbacks', () => {
       })
 
       const second = connection.request('status.get', undefined, 1000)
-      authenticate(opens[1]!)
+      await authenticate(opens[1]!)
       await vi.waitFor(() => expect(opens[1]!.sent.length).toBeGreaterThan(1))
 
       opens[0]!.callbacks.onError(opens[0]!.ws, new Error('stale socket error') as never)

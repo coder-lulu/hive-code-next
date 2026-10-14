@@ -17,6 +17,7 @@ import { resolveLeftSidebarStyleVariables } from '@/lib/left-sidebar-appearance'
 import { useSystemPrefersDark } from '@/components/terminal-pane/use-system-prefers-dark'
 import { lazyWithRetry } from '@/lib/lazy-with-retry'
 import { translate } from '@/i18n/i18n'
+import { SeveredTerminalDaemonBanner } from './SeveredTerminalDaemonBanner'
 
 // Why lazy: the Agents list pulls the whole activity pipeline (virtualizer, markdown
 // previews, thread derivation); users on the workspace view should not load or render any of it.
@@ -87,7 +88,7 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
     () => resolveLeftSidebarStyleVariables(settings, systemPrefersDark),
     [settings, systemPrefersDark]
   ) as React.CSSProperties | undefined
-  const { nativeDropTarget, dropHandlers, affordance } = useSidebarProjectDrop()
+  const { dropOwnerRef, dropHandlers, affordance } = useSidebarProjectDrop()
   const {
     workspaceBoardRenderedOpen,
     workspaceBoardDragPreviewOpen,
@@ -128,11 +129,19 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
     onDraftWidthChange: setLiveSidebarWidth
   })
 
+  // A collapsed sidebar takes no drops.
+  const sidebarRef = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      containerRef.current = node
+      dropOwnerRef(sidebarOpen ? node : null)
+    },
+    [containerRef, dropOwnerRef, sidebarOpen]
+  )
+
   return (
     <TooltipProvider delayDuration={400}>
       <div
-        ref={containerRef}
-        data-native-file-drop-target={sidebarOpen ? nativeDropTarget : undefined}
+        ref={sidebarRef}
         className="relative min-h-0 flex-shrink-0 bg-worktree-sidebar flex flex-col overflow-hidden scrollbar-sleek-parent"
         style={leftSidebarStyle}
         {...dropHandlers}
@@ -141,6 +150,7 @@ function Sidebar({ workspaceBoardPanel }: SidebarProps): React.JSX.Element {
           <>
             {/* Fixed controls */}
             <SidebarNav onNavigate={closeWorkspaceBoard} />
+            <SeveredTerminalDaemonBanner />
             <section
               className="sidebar-workspace-section"
               aria-label={translate('dashboard.sidebar.activityView', 'Activity view')}

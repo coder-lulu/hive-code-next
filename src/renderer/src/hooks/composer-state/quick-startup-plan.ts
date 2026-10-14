@@ -16,9 +16,11 @@ import {
   resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv
 } from '../../../../shared/tui-agent-launch-defaults'
-import { resolveInitialNativeChatSessionOptions } from '@/components/native-chat/native-chat-launch-session-options'
-import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
 import { tuiAgentToAgentKind } from '@/lib/telemetry'
+import {
+  requireExecutionHostPlatform,
+  type ExecutionHostPlatformFact
+} from '@/lib/execution-host-facts'
 
 export type QuickComposerStartupInput = {
   agent: TuiAgent | null
@@ -26,8 +28,7 @@ export type QuickComposerStartupInput = {
   draftPrompt: string | null | undefined
   settings: GlobalSettings | null | undefined
   agentPermissionMode?: AgentLaunchPermissionMode
-  repoConnectionId: string | null | undefined
-  platform: NodeJS.Platform
+  launchHost: ExecutionHostPlatformFact
   shell: AgentStartupShell | null | undefined
   isRemote: boolean
   telemetrySource: WorktreeCreationRequest['telemetrySource']
@@ -49,27 +50,11 @@ export function buildQuickComposerStartup(input: QuickComposerStartupInput): Qui
           mode: input.agentPermissionMode ?? 'default',
           agentArgs: resolveTuiAgentLaunchArgs(agent, settings?.agentDefaultArgs),
           agentEnv: resolveTuiAgentLaunchEnv(agent, settings?.agentDefaultEnv),
-          shell: resolveStartupShell(input.platform, input.shell ?? undefined)
+          shell: resolveStartupShell(
+            requireExecutionHostPlatform(input.launchHost),
+            input.shell ?? undefined
+          )
         })
-  const sessionOptions =
-    agent === null
-      ? undefined
-      : resolveInitialNativeChatSessionOptions(
-          {
-            experimentalNativeChat: settings?.experimentalNativeChat,
-            openAgentTabsInChatByDefault: settings?.openAgentTabsInChatByDefault,
-            nativeChatSessionOptions: settings?.nativeChatSessionOptions
-          },
-          {
-            agent,
-            ...(draftPrompt
-              ? { promptDelivery: 'draft' as const, launchDraftText: draftPrompt }
-              : {}),
-            nativeChatTranscriptIsLocalReadable: isNativeChatTranscriptLocalReadable(
-              input.repoConnectionId
-            )
-          }
-        )
   const draftLaunchPlan =
     agent === null || !draftPrompt
       ? null
@@ -80,8 +65,7 @@ export function buildQuickComposerStartup(input: QuickComposerStartupInput): Qui
           agentArgs: permissionLaunchConfig?.agentArgs,
           agentEnv: permissionLaunchConfig?.agentEnv,
           agentPermissionMode: input.agentPermissionMode,
-          sessionOptions,
-          platform: input.platform,
+          platform: requireExecutionHostPlatform(input.launchHost),
           shell: input.shell ?? undefined,
           isRemote: input.isRemote
         })
@@ -93,7 +77,6 @@ export function buildQuickComposerStartup(input: QuickComposerStartupInput): Qui
       expectedProcess: draftLaunchPlan.expectedProcess,
       followupPrompt: null,
       launchConfig: draftLaunchPlan.launchConfig,
-      ...(draftLaunchPlan.sessionOptions ? { sessionOptions: draftLaunchPlan.sessionOptions } : {}),
       ...(draftLaunchPlan.startupCommandDelivery
         ? { startupCommandDelivery: draftLaunchPlan.startupCommandDelivery }
         : {}),
@@ -107,8 +90,7 @@ export function buildQuickComposerStartup(input: QuickComposerStartupInput): Qui
       agentArgs: permissionLaunchConfig?.agentArgs,
       agentEnv: permissionLaunchConfig?.agentEnv,
       agentPermissionMode: input.agentPermissionMode,
-      sessionOptions,
-      platform: input.platform,
+      platform: requireExecutionHostPlatform(input.launchHost),
       shell: input.shell ?? undefined,
       isRemote: input.isRemote,
       allowEmptyPromptLaunch: true

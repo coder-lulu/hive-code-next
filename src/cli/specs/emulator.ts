@@ -65,12 +65,14 @@ export const EMULATOR_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['emulator', 'kill'],
+    destructive: true,
     summary: 'Stop helper for device',
     usage: 'hive emulator kill [--device <id>] [--worktree <selector>] [--json]',
     allowedFlags: [...GLOBAL_FLAGS, 'device', 'emulator', 'worktree']
   },
   {
     path: ['emulator', 'shutdown'],
+    destructive: true,
     summary: 'Stop helper and shut down the simulator device',
     usage:
       'hive emulator shutdown [--device <id>] [--emulator <id>] [--worktree <selector>] [--json]',

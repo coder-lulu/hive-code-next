@@ -10,6 +10,7 @@ import { notifyHostOfMirroredEditorClose } from '@/runtime/close-mirrored-editor
 import { type OpenFile, MAX_RECENT_CLOSED_EDITOR_TABS } from '../types/open-file'
 import { getUntitledFileCleanupResult } from '../tabs/untitled-file-cleanup'
 import { unifiedTabsKeepWorktreeSelected } from './unified-tabs-keep-worktree-selected'
+import { isEditorTabContentType } from '../tabs/editor-tab-content-type'
 
 export function createRecentlyClosedEditorTabs(
   set: EditorSet,
@@ -58,10 +59,7 @@ export function createRecentlyClosedEditorTabs(
         .flat()
         .filter(
           (item) =>
-            (item.contentType === 'editor' ||
-              item.contentType === 'diff' ||
-              item.contentType === 'conflict-review' ||
-              item.contentType === 'check-details') &&
+            isEditorTabContentType(item.contentType) &&
             (!activeWorktreeId || item.worktreeId === activeWorktreeId)
         )
         .map((item) => item.id)
@@ -87,7 +85,7 @@ export function createRecentlyClosedEditorTabs(
           // One index per owner avoids repeatedly scanning tab order and group membership.
           const positionIndex = createRecentlyClosedTabPositionIndex(s, worktreeId)
           for (const file of files.toReversed()) {
-            if (file.mode === 'markdown-preview') {
+            if (file.mode === 'markdown-preview' || file.mode === 'chat-visual') {
               continue
             }
             const {

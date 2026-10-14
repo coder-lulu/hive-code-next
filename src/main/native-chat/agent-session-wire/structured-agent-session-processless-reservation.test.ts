@@ -114,6 +114,7 @@ describe('processless structured session reservation', () => {
           probe: { outcome: 'reservation-unused' }
         },
         callerKey: 'client-1',
+        optionRevision: () => 0,
         params: attachParams(),
         now: () => NOW,
         onAttached: () => {}
@@ -162,6 +163,7 @@ describe('processless structured session reservation', () => {
         probe: { outcome: 'reservation-unused' as const }
       },
       callerKey: 'client-1',
+      optionRevision: () => 0,
       params: attachParams(),
       now: () => NOW,
       onAttached: () => {}
@@ -201,6 +203,7 @@ describe('processless structured session reservation', () => {
         probe: { outcome: 'reservation-unused' as const }
       },
       callerKey: 'client-1',
+      optionRevision: () => 0,
       params: attachParams(),
       now: () => NOW,
       onAttached: () => {}
@@ -254,6 +257,7 @@ describe('processless structured session reservation', () => {
           probe: { outcome: 'reservation-unused' }
         },
         callerKey: 'client-1',
+        optionRevision: () => 0,
         params: attachParams(),
         now: () => NOW,
         onAttached: () => {}
@@ -323,6 +327,7 @@ describe('processless structured session reservation', () => {
         probe: { outcome: 'reservation-unused' as const }
       },
       callerKey: 'client-1',
+      optionRevision: () => 0,
       params: attachParams(),
       now: () => NOW,
       onAttached: () => {}

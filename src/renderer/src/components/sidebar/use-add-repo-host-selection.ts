@@ -34,7 +34,6 @@ export function useAddRepoHostSelection({
   /** The host the picker shows: the chosen one, even while it is still coming up. */
   displayedHostId: ExecutionHostId | null
   selectedParsedHost: ReturnType<typeof parseExecutionHostId>
-  selectedSshTargetId: string | null
   hostSelectorOpen: boolean
   setHostSelectorOpen: (open: boolean) => void
   handleSelectAddProjectHost: (hostId: ExecutionHostId) => Promise<void>
@@ -75,16 +74,17 @@ export function useAddRepoHostSelection({
     : undefined
 
   // Why through the index: a connect saves the SSH id, which may now stand under its server's row.
-  const resolvedHost = indexExecutionHostsById(hostOptions).get(selectedAddProjectHostId)
+  const hostsById = useMemo(() => indexExecutionHostsById(hostOptions), [hostOptions])
+  const resolvedHost = hostsById.get(selectedAddProjectHostId)
   const requestedHost =
     resolvedHost && selectableHostOptions.includes(resolvedHost) ? resolvedHost : undefined
   const requestedHostSelectable = requestedHost ? canSelectAddRepoHost(requestedHost) : false
-  // Why: a merged SSH host is still coming up on its server right after its connect; that blocks
-  // the actions rather than silently turning into this computer.
+  // Why: right after a connect the SSH host is still coming up on its server (or not yet merged
+  // into its row); that blocks the actions rather than silently turning into this computer.
   const requestedHostPending =
     requestedHost !== undefined &&
     !requestedHostSelectable &&
-    (requestedHost.aliasHostIds?.length ?? 0) > 0
+    (requestedHost.kind === 'ssh' || (requestedHost.aliasHostIds?.length ?? 0) > 0)
   const selectedHost = requestedHostSelectable
     ? requestedHost
     : requestedHostPending
@@ -98,25 +98,26 @@ export function useAddRepoHostSelection({
     selectedHost?.id ?? (isWebClient || requestedHostPending ? null : LOCAL_EXECUTION_HOST_ID)
   const displayedHostId = requestedHostPending ? (requestedHost?.id ?? null) : selectedHostId
   const selectedParsedHost = parseExecutionHostId(selectedHostId)
-  const selectedSshTargetId =
-    selectedParsedHost?.kind === 'ssh' ? selectedParsedHost.targetId : null
 
   useEffect(() => {
     if (isOpen && !previousOpenRef.current) {
       const focusedHostId = getSettingsFocusedExecutionHostId(settings)
+      const preferredHost = preferredHostId ? hostsById.get(preferredHostId) : undefined
+      const focusedHost = hostsById.get(focusedHostId)
       const preferredHostSelectable = Boolean(
-        preferredHostId &&
-        selectableHostOptions.some(
-          (host) => host.id === preferredHostId && canSelectAddRepoHost(host)
-        )
+        preferredHost &&
+        selectableHostOptions.includes(preferredHost) &&
+        canSelectAddRepoHost(preferredHost)
       )
-      const focusedHostSelectable = selectableHostOptions.some(
-        (host) => host.id === focusedHostId && canSelectAddRepoHost(host)
+      const focusedHostSelectable = Boolean(
+        focusedHost &&
+        selectableHostOptions.includes(focusedHost) &&
+        canSelectAddRepoHost(focusedHost)
       )
       const nextHostId = preferredHostSelectable
-        ? preferredHostId
+        ? preferredHost?.id
         : focusedHostSelectable
-          ? focusedHostId
+          ? focusedHost?.id
           : (pairedWebRuntimeHost?.id ?? (isWebClient ? null : LOCAL_EXECUTION_HOST_ID))
       if (nextHostId) {
         setSelectedAddProjectHostId(nextHostId)
@@ -131,6 +132,7 @@ export function useAddRepoHostSelection({
     isWebClient,
     pairedWebRuntimeHost?.id,
     preferredHostId,
+    hostsById,
     selectableHostOptions,
     settings
   ])
@@ -218,7 +220,6 @@ export function useAddRepoHostSelection({
     selectedHostId,
     displayedHostId,
     selectedParsedHost,
-    selectedSshTargetId,
     hostSelectorOpen,
     setHostSelectorOpen,
     handleSelectAddProjectHost,

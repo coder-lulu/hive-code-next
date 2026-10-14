@@ -59,8 +59,7 @@ describe('quick composer creation request', () => {
         draftPrompt: null,
         settings: undefined,
         agentPermissionMode,
-        repoConnectionId: null,
-        platform: 'linux',
+        launchHost: { kind: 'known', platform: 'linux', hostKind: 'local' },
         shell: 'posix',
         isRemote: false,
         telemetrySource: 'unknown'

@@ -15,21 +15,25 @@ function requireLocalControl(context: RpcContext): HiveRuntimeCloudControl {
 export const HIVE_RUNTIME_CLOUD_METHODS = [
   defineMethod({
     name: 'cloudRuntime.status',
+    permission: 'host-admin',
     params: null,
     handler: (_params, context) => requireLocalControl(context).getLocalRuntimeStatus()
   }),
   defineMethod({
     name: 'cloudRuntime.claim',
+    permission: 'host-admin',
     params: null,
     handler: (_params, context) => requireLocalControl(context).beginHeadlessClaim()
   }),
   defineMethod({
     name: 'cloudRuntime.claimPoll',
+    permission: 'host-admin',
     params: HiveRuntimeClaimPollParams,
     handler: (params, context) => requireLocalControl(context).pollHeadlessClaim(params.challengeId)
   }),
   defineMethod({
     name: 'cloudRuntime.resetIdentity',
+    permission: 'host-admin',
     params: HiveRuntimeResetIdentityParams,
     handler: (_params, context) => requireLocalControl(context).resetCloudIdentity()
   })

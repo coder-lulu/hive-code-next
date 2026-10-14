@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => ({
   bunOwnership: vi.fn(),
   guard: vi.fn()
 }))
-vi.mock('../../shared/child-process/run-process', () => ({ runProcess: mocks.run }))
+vi.mock('@orca/process-host', () => ({ runProcess: mocks.run }))
 vi.mock('../../shared/node-cli-command-resolution', () => ({
   resolveCliCommands: mocks.resolveCommands,
   withCliRuntimeOnPath: (_program: string, env: NodeJS.ProcessEnv) => env

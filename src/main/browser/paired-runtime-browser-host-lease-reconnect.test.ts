@@ -279,7 +279,7 @@ describe('PairedRuntimeBrowserHostLease reconnect', () => {
     subscribeRemoteRuntimeRequestMock.mockReset()
     const unsolicitedAttempts = mockAttempts()
     const unsolicited = new PairedRuntimeBrowserHostLease({
-      pairing,
+      connection: (pairing),
       authorityRuntimeId: 'runtime-a',
       browserHostClientId: 'host-a',
       hostCapabilities: ['webview']
@@ -414,7 +414,7 @@ function createReconnectLease(
   overrides: Partial<PairedRuntimeBrowserHostLeaseOptions>
 ): PairedRuntimeBrowserHostLease {
   return new PairedRuntimeBrowserHostLease({
-    pairing,
+    connection: (pairing),
     authorityRuntimeId: 'runtime-a',
     browserHostClientId: 'host-a',
     hostCapabilities: ['webview'],

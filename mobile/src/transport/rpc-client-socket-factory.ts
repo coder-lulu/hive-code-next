@@ -24,14 +24,14 @@ type SocketFactoryOptions = {
 }
 
 export class RpcClientSocketFactory {
-  private readonly serverPublicKey: Uint8Array
   private lastInboundAt: number | null = null
   private lastSocketClosedAt: number | null = null
   private constructionCount = 0
   private dialStartedAt = 0
 
   constructor(private readonly options: SocketFactoryOptions) {
-    this.serverPublicKey = publicKeyFromBase64(options.serverPublicKeyB64)
+    // Why: an invalid pairing key fails construction, not every dial.
+    publicKeyFromBase64(options.serverPublicKeyB64)
   }
 
   open(): RpcClientSocketSession {
@@ -57,7 +57,7 @@ export class RpcClientSocketFactory {
     return new RpcClientSocketSession({
       endpoint: this.options.endpoint,
       deviceToken: this.options.deviceToken,
-      serverPublicKey: this.serverPublicKey,
+      serverPublicKeyB64: this.options.serverPublicKeyB64,
       getCurrentSocket: this.options.getCurrentSocket,
       getState: this.options.getState,
       getReconnectAttempt: this.options.getReconnectAttempt,

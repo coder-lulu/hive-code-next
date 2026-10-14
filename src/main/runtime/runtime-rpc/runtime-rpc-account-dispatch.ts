@@ -1,7 +1,8 @@
+import type { RpcBinarySender } from '../rpc/rpc-binary-sender'
 import type { WebSocket } from 'ws'
 import type { E2EEChannel } from '../rpc/e2ee-channel'
 import type { RpcRequest } from '../rpc/core'
-import { fingerprintAuthenticatedPairingCredential } from '../rpc/orchestration-mutation-executor'
+import { fingerprintAuthenticatedPairingCredential } from '../rpc/rpc-caller-identity'
 import { RuntimeRpcCloudDispatch, LOCAL_ONLY_RPC_METHODS } from './runtime-rpc-cloud-dispatch'
 import { classifyRuntimeLongPoll } from './runtime-rpc-long-poll'
 import { z } from 'zod'
@@ -71,7 +72,7 @@ export class RuntimeRpcAccountDispatch extends RuntimeRpcCloudDispatch {
             reply(response)
           }
         },
-        (bytes) => (current() ? binary(bytes) : false),
+        (bytes, options) => (current() ? binary(bytes, options) : false),
         current
       )
         .catch(() => {
@@ -114,7 +115,7 @@ export class RuntimeRpcAccountDispatch extends RuntimeRpcCloudDispatch {
     socket: RuntimeRpcAccountConnection,
     raw: string,
     reply: (value: string) => void,
-    sendBinary: (bytes: Uint8Array<ArrayBufferLike>) => boolean | void,
+    sendBinary: RpcBinarySender,
     current: () => boolean
   ): Promise<void> {
     let request: RpcRequest

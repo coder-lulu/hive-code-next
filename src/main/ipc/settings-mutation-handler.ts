@@ -126,10 +126,14 @@ export function registerSettingsMutationHandler(
     }
 
     const before = store.getSettings()
-    const result = store.updateSettings(sanitizedArgs, {
+    const updateOptions = {
       notifyListeners: true,
       originWebContentsId: event.sender.id
-    })
+    }
+    const result =
+      'alwaysForceDeleteWorktrees' in sanitizedArgs
+        ? await store.updateSettingsAndFlush(sanitizedArgs, updateOptions)
+        : store.updateSettings(sanitizedArgs, updateOptions)
     const proxySettingsChanged =
       ('httpProxyUrl' in sanitizedArgs && before.httpProxyUrl !== result.httpProxyUrl) ||
       ('httpProxyBypassRules' in sanitizedArgs &&
@@ -203,6 +207,6 @@ export function registerSettingsMutationHandler(
       }
       track('settings_changed', { setting_key: key as SettingsChangedKey, value_kind: 'bool' })
     }
-    return result
+    return store.getSettings()
   })
 }

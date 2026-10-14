@@ -29,6 +29,31 @@ import {
 } from './install-electron-package-binary-test-fixtures.mjs'
 
 describe('install-electron-package-binary', () => {
+  it('does not adopt an ancestor repository cache for a standalone fixture', () => {
+    const parent = mkTempProject()
+    try {
+      initGitRepo(parent)
+      writeFakeElectronPackage(parent)
+      writeFakeElectronGet(parent)
+      writeFakeExtractor(parent, { createExecutable: true })
+      const parentResult = runInstallScript(parent)
+      expect(parentResult.status, parentResult.stderr).toBe(0)
+      expect(existsSync(join(sharedCacheRoot(parent), sharedEntryName))).toBe(true)
+
+      const child = mkTempProject(parent)
+      writeFakeElectronPackage(child)
+      writeFakeElectronGet(child)
+      writeFakeExtractor(child, { createExecutable: true })
+      const childResult = runInstallScript(child)
+      expect(childResult.status, childResult.stderr).toBe(0)
+      expect(existsSync(join(child, 'electron-get.log'))).toBe(true)
+      expect(childResult.stdout).not.toContain(sharedCacheRoot(parent))
+      expect(readSharedDistMarker(child)).toBeNull()
+    } finally {
+      rmSync(parent, { recursive: true, force: true })
+    }
+  })
+
   it('installs Electron from an isolated cache and repairs path.txt', () => {
     const projectDir = mkTempProject()
 

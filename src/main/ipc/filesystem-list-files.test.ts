@@ -268,14 +268,14 @@ describe('filesystem-list-files', () => {
     ])
   })
 
-  it('spawns the bundled Linux rg inside the registered WSL runtime for Windows-path worktrees', async () => {
+  it('spawns the bundled Linux rg inside the registered WSL runtime', async () => {
     const p1 = createMockProcess()
     getLocalGitOptionsForRegisteredWorktreeMock.mockReturnValue({ wslDistro: 'Ubuntu' })
 
     spawnMock.mockReturnValue(p1)
 
     const storeMock = {} as unknown as Store
-    const promise = listQuickOpenFiles('C:\\repo', storeMock)
+    const promise = listQuickOpenFiles('/repo', storeMock)
 
     setTimeout(() => {
       p1.stdout?.emit('data', 'src/index.ts\0')
@@ -285,8 +285,8 @@ describe('filesystem-list-files', () => {
     await expect(promise).resolves.toEqual(['src/index.ts'])
     expect(getLocalGitOptionsForRegisteredWorktreeMock).toHaveBeenCalledWith(
       storeMock,
-      'C:\\repo',
-      'C:\\repo'
+      '/repo',
+      '/repo'
     )
     expect(bundledRipgrepCommandMock).toHaveBeenCalledWith({ wsl: true })
     for (const [command, args] of spawnMock.mock.calls) {
@@ -303,21 +303,23 @@ describe('filesystem-list-files', () => {
     }
   })
 
-  it('normalizes absolute WSL rg output for Windows-path worktrees', async () => {
+  it('keeps the host rg for a Windows-drive worktree under a WSL runtime', async () => {
     const p1 = createMockProcess()
     getLocalGitOptionsForRegisteredWorktreeMock.mockReturnValue({ wslDistro: 'Ubuntu' })
 
     spawnMock.mockReturnValue(p1)
 
-    const storeMock = {} as unknown as Store
-    const promise = listQuickOpenFiles('C:\\repo', storeMock)
+    const store: Store = Object.create(null)
+    const promise = listQuickOpenFiles('C:\\repo', store)
 
     setTimeout(() => {
-      p1.stdout?.emit('data', '/mnt/c/repo/src/index.ts\0')
+      p1.stdout?.emit('data', 'src/index.ts\0')
       p1.emit('close', 0, null)
     }, 10)
 
     await expect(promise).resolves.toEqual(['src/index.ts'])
+    expect(bundledRipgrepCommandMock).not.toHaveBeenCalledWith({ wsl: true })
+    expect(spawnMock.mock.calls.every((call) => call[0] === BUNDLED_RG)).toBe(true)
   })
 
   it('treats a WSL launcher exit 127 as the bundled rg failing to start', async () => {
@@ -326,7 +328,8 @@ describe('filesystem-list-files', () => {
     getLocalGitOptionsForRegisteredWorktreeMock.mockReturnValue({ wslDistro: 'Ubuntu' })
     spawnMock.mockReturnValue(p1)
 
-    const promise = listQuickOpenFiles('C:\\repo', {} as unknown as Store)
+    const store: Store = Object.create(null)
+    const promise = listQuickOpenFiles('/repo', store)
     setTimeout(() => {
       p1.emit('close', 127, null)
     }, 0)

@@ -1,22 +1,22 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { runProcess, spawnProcess } from '../../../src/shared/child-process/run-process'
-import { forceTerminateProcessTree } from '../../../src/shared/child-process/process-tree-termination'
-import { createFakeSpawnedChild } from '../../../src/shared/child-process/__fixtures__/fake-spawned-child'
+import { runProcess, spawnProcess } from '@orca/process-host'
+import { forceTerminateProcessTree } from '@orca/process-host/process-tree-termination'
+import { createFakePipedChild } from '../../../src/shared/__fixtures__/fake-spawned-child'
 import { startAccountRelayCell } from './hive-account-relay-cell-fixture'
 
-vi.mock('../../../src/shared/child-process/run-process', () => ({
+vi.mock('@orca/process-host', () => ({
   runProcess: vi.fn(),
   spawnProcess: vi.fn()
 }))
-vi.mock('../../../src/shared/child-process/process-tree-termination', () => ({
+vi.mock('@orca/process-host/process-tree-termination', () => ({
   forceTerminateProcessTree: vi.fn()
 }))
 
 const artifactRoot = resolve('logs/open-source-baseline/relay-cell-startup')
 let directory: string
-let child: ReturnType<typeof spawnProcess>
+let child: ReturnType<typeof createFakePipedChild>
 const nextTurn = () => new Promise<void>((done) => setImmediate(done))
 
 function close(code = 0, signal: NodeJS.Signals | null = null) {
@@ -58,7 +58,7 @@ beforeEach(() => {
   vi.stubEnv('HIVE_RELAY_CELL_SOURCE', undefined)
   mkdirSync(artifactRoot, { recursive: true })
   directory = mkdtempSync(join(artifactRoot, 'cell-'))
-  child = createFakeSpawnedChild() as ReturnType<typeof spawnProcess>
+  child = createFakePipedChild()
   Object.assign(child, { exitCode: null, signalCode: null })
   vi.mocked(child.kill).mockImplementation(() => {
     queueMicrotask(() => close(0, 'SIGKILL'))

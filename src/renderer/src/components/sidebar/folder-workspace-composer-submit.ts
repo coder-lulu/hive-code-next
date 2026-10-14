@@ -1,3 +1,6 @@
+import { getFolderWorkspaceAgentLaunchFact } from './folder-workspace-agent-startup'
+import { resolveTuiAgentLaunchPermission } from '../../../../shared/tui-agent-permissions'
+import { resolveStartupShell } from '../../../../shared/tui-agent-startup-shell'
 import type { SubmitFolderWorkspaceCreateParams } from './folder-workspace-composer-helpers'
 import { ensureAgentStartupInTerminal } from '@/lib/new-workspace'
 import { seedNativeChatLaunchDraftForAgentTab } from '@/lib/agent-launch-prompt-delivery'
@@ -5,8 +8,7 @@ import { createBrowserUuid } from '@/lib/browser-uuid'
 import { buildAgentStartupPlan } from '@/lib/tui-agent-startup'
 import { tuiAgentToAgentKind } from '@/lib/telemetry'
 import { activateAndRevealFolderWorkspace } from '@/lib/worktree-activation'
-import { isWorkItemLookupText } from '@/lib/work-item-lookup-text'
-
+import { shouldApplyWorkspaceSourceAutoName } from '../../../../shared/new-workspace/workspace-source'
 import { folderWorkspaceKey } from '../../../../shared/workspace-scope'
 import { AGENT_SESSION_LAUNCH_PERMISSION_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import { assertRuntimeEnvironmentCapability } from '@/runtime/runtime-rpc-client'
@@ -19,12 +21,13 @@ import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import { beginStructuredAgentSessionProvisionalLaunch } from '@/lib/structured-agent-session-provisional-tab'
 import { getNewWorkspaceProjectGroupHostId } from '@/lib/new-workspace-project-options'
 import { useAppStore } from '@/store'
-import { resolveFolderWorkspaceAgentLaunch } from './folder-workspace-agent-launch'
+import { resolveExecutionHostAgentStartupShell } from '@/lib/execution-host-facts'
 import {
   buildFolderWorkspaceLinkedStartupPlan,
   resolveFolderWorkspaceLaunchDraft
 } from './folder-workspace-startup-plan'
 
+export { getFolderWorkspaceAgentLaunchFact } from './folder-workspace-agent-startup'
 export { getFolderWorkspaceAgentLaunchPlatform } from './folder-workspace-agent-launch'
 export {
   buildFolderWorkspaceLinkedStartupPlan,
@@ -53,29 +56,36 @@ export async function submitFolderWorkspaceCreate({
   onOpenChange
 }: SubmitFolderWorkspaceCreateParams): Promise<boolean> {
   const linkedName = linkedWorkItem ? getLinkedItemDisplayName(linkedWorkItem) : null
-  const nameIsAutoManaged = !name.trim() || name === lastAutoName || isWorkItemLookupText(name)
+  const nameIsAutoManaged = shouldApplyWorkspaceSourceAutoName({
+    currentName: name,
+    lastAutoName,
+    lookupTextIsQuery: !linkedWorkItem
+  })
   const workspaceName =
     nameIsAutoManaged && linkedName
       ? linkedName
       : name.trim() || linkedName || `${projectGroup.name} workspace`
+  const launchHost = getFolderWorkspaceAgentLaunchFact(useAppStore.getState(), projectGroup)
+  if (quickAgent && launchHost.kind === 'withheld') {
+    throw new Error(launchHost.reason)
+  }
+  const launchPlatform = launchHost.kind === 'known' ? launchHost.platform : null
   // Why: an SSH folder group runs the plain `orca` relay shim, so the Linux-only
   // `orca-ide` rename must not be applied for remote launches.
   const launchIsRemote = isRemote ?? Boolean(projectGroup.connectionId)
-  const {
-    platform: launchPlatform,
-    shell: launchShell,
-    permissionConfig: permissionLaunchConfig
-  } = resolveFolderWorkspaceAgentLaunch({
-    projectGroup,
-    agent: quickAgent,
-    permissionMode: agentPermissionMode,
-    agentArgs,
-    agentEnv,
-    terminalWindowsShell,
-    isRemote: launchIsRemote
-  })
+  const launchShell = resolveExecutionHostAgentStartupShell(launchHost, terminalWindowsShell)
+  const permissionLaunchConfig =
+    quickAgent && launchPlatform
+      ? resolveTuiAgentLaunchPermission({
+          agent: quickAgent,
+          mode: agentPermissionMode,
+          agentArgs,
+          agentEnv,
+          shell: resolveStartupShell(launchPlatform, launchShell)
+        })
+      : null
   const startupPlan =
-    quickAgent && linkedWorkItem
+    quickAgent && launchPlatform && linkedWorkItem
       ? buildFolderWorkspaceLinkedStartupPlan({
           agent: quickAgent,
           linkedWorkItem,
@@ -89,7 +99,7 @@ export async function submitFolderWorkspaceCreate({
           shell: launchShell,
           isRemote: launchIsRemote
         })
-      : quickAgent
+      : quickAgent && launchPlatform
         ? buildAgentStartupPlan({
             agent: quickAgent,
             prompt: note,
@@ -132,8 +142,7 @@ export async function submitFolderWorkspaceCreate({
         },
         prompt: launchDraftPrompt ?? note,
         promptDelivery: launchDraftPrompt ? 'draft' : 'auto-submit',
-        tuiCustomization: { agentArgs, agentPermissionMode },
-        initialSessionOptions: startupPlan?.sessionOptions
+        tuiCustomization: { agentArgs, agentPermissionMode }
       })
     : null
   const structuredLaunch = plan?.route === 'structured-native-chat'
@@ -179,9 +188,6 @@ export async function submitFolderWorkspaceCreate({
             : {}),
           ...(startupPlan.sessionOptions ? { sessionOptions: startupPlan.sessionOptions } : {}),
           ...(startupPlan.draftPrompt ? { draftPrompt: startupPlan.draftPrompt } : {}),
-          // Why: view-mode only. The argv-prefill plan sets no draftPrompt, so
-          // without this the tab opens in chat with nothing mirrored into it.
-          ...(launchDraftPrompt ? { launchDraftText: launchDraftPrompt } : {}),
           ...(startupPlan.startupCommandDelivery
             ? { startupCommandDelivery: startupPlan.startupCommandDelivery }
             : {}),

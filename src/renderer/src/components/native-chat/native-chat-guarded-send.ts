@@ -6,7 +6,6 @@ import { wrapTerminalBracketedPasteText } from '../terminal-pane/terminal-bracke
 import type { NativeChatSendHandle, NativeChatSendOptions } from './native-chat-runtime-send'
 
 export function sendGuardedNativeChatMessage(
-  settings: Parameters<typeof sendRuntimePtyInputVerified>[0],
   ptyId: string,
   text: string,
   options: NativeChatSendOptions
@@ -22,7 +21,7 @@ export function sendGuardedNativeChatMessage(
     ({ isCancelled, delay, markSubmitted }) => {
       const write = async (data: string) =>
         !isCancelled() &&
-        sendRuntimePtyInputVerified(settings, ptyId, data, 'driving', {
+        sendRuntimePtyInputVerified(ptyId, data, 'driving', {
           requireAgentStatus: 'sendable',
           signal: controller.signal
         })

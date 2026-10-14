@@ -10,12 +10,12 @@ import {
 } from './tab-group-reference-repair'
 import {
   dedupeEditorTabsWithinGroups,
-  dedupeTabOrder,
   getPersistedEditFileIdsByWorktree,
   isTransientEditorContentType,
   sanitizeRecentTabIds,
   selectHydratedActiveGroupId
 } from './tab-group-state'
+import { dedupeTabOrder } from '../../../../shared/workspace-layout/tab-order'
 
 /** Drops leaves whose group is gone, and repeat leaves for a group already
  *  placed earlier in the tree — one column per group is the render invariant,

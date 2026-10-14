@@ -96,6 +96,14 @@ describe('filesystem auth worktree roots', () => {
     vi.mocked(listRepoWorktreeGraph).mockReset()
   })
 
+  const rootWorktree: GitWorktreeInfo = {
+    path: repo.path,
+    head: '',
+    branch: 'main',
+    isBare: false,
+    isMainWorktree: true
+  }
+
   it('rebuilds the authorized roots cache for large worktree lists', async () => {
     const worktrees: GitWorktreeInfo[] = Array.from(
       { length: LARGE_WORKTREE_ROOT_COUNT },
@@ -107,7 +115,7 @@ describe('filesystem auth worktree roots', () => {
         isMainWorktree: false
       })
     )
-    vi.mocked(listRepoWorktreeGraph).mockResolvedValue(worktrees)
+    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([rootWorktree, ...worktrees])
     const store = makeStore()
 
     await rebuildAuthorizedRootsCache(store)
@@ -141,7 +149,7 @@ describe('filesystem auth worktree roots', () => {
     await mkdir(recovered)
     const store = makeStore()
     registerCreatedWorktreeRoot(store, repo.id, recovered)
-    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([])
+    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([rootWorktree])
 
     await rebuildAuthorizedRootsCache(store)
 
@@ -170,6 +178,7 @@ describe('filesystem auth worktree roots', () => {
     const store = makeStore()
     registerCreatedWorktreeRoot(store, repo.id, '/linked/feature')
     vi.mocked(listRepoWorktreeGraph).mockResolvedValue([
+      rootWorktree,
       {
         path: '/linked/feature',
         head: '',
@@ -184,7 +193,7 @@ describe('filesystem auth worktree roots', () => {
     await expect(resolveRegisteredWorktreePath('/linked/feature', store)).resolves.toBe(
       resolve('/linked/feature')
     )
-    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([])
+    vi.mocked(listRepoWorktreeGraph).mockResolvedValue([rootWorktree])
     await rebuildAuthorizedRootsCache(store)
 
     await expect(resolveRegisteredWorktreePath('/linked/feature', store)).rejects.toThrow(

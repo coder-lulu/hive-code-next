@@ -78,6 +78,7 @@ export async function postFeedback(
     throw error
   } finally {
     clearTimeout(timeout)
+    controller.abort()
   }
 }
 

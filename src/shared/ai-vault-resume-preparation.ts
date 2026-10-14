@@ -4,9 +4,17 @@ export type AiVaultPrepareSessionResumeArgs = Pick<
   AiVaultSession,
   'agent' | 'filePath' | 'codexHome' | 'executionHostId'
 > &
-  Partial<Pick<AiVaultSession, 'sessionId'>>
+  Partial<Pick<AiVaultSession, 'sessionId'>> & {
+    /** Ask the owning host to check the directory of its identity-matched scanned session. */
+    checkRecordedCwd?: boolean
+    /** A fork only reads the conversation, so a native chat that owns it does not refuse it.
+     *  Older hosts drop the field and refuse as for a resume. */
+    fork?: boolean
+  }
 
 export type AiVaultPrepareSessionResumeResult = {
+  /** Only the transcript-owning host can establish this from its scanned session. */
+  recordedCwdMissing?: boolean
   useRealCodexHome: boolean
   // Why: cross-account hardlinking lists one rollout under several per-account
   // homes, so the owning host repins resume to the selected account's home.

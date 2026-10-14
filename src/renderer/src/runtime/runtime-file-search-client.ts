@@ -16,7 +16,8 @@ import {
   searchLegacyQuickOpenInventory,
   validateLegacyQuickOpenRecentCandidates
 } from './runtime-legacy-quick-open-inventory'
-import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
+import { callRuntimeRpc } from './runtime-rpc-client'
+import { RuntimeRpcCallError } from './runtime-rpc-result'
 import { applyProductBranding } from '@/product-brand'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 
@@ -33,7 +34,7 @@ export async function searchRuntimeFiles(
   if (getRuntimeFileSearchRejectedField(options)) {
     return createEmptyRuntimeFileSearchResult()
   }
-  const target = getActiveRuntimeTarget(context.settings)
+  const target = context.target
   if (target.kind !== 'environment' || !context.worktreeId) {
     const requestToken = createBrowserUuid()
     const cancel = (): void => {
@@ -82,7 +83,7 @@ export async function listRuntimeFiles(
     signal?: AbortSignal
   }
 ): Promise<string[]> {
-  const target = getActiveRuntimeTarget(context.settings)
+  const target = context.target
   if (target.kind !== 'environment' || !context.worktreeId) {
     return window.api.fs.listFiles({
       ...(args.includeIgnored === undefined ? {} : { includeIgnored: args.includeIgnored }),
@@ -172,7 +173,7 @@ export async function searchRuntimeFilePaths(
     signal?: AbortSignal
   }
 ): Promise<{ files: string[]; truncated: boolean }> {
-  const target = getActiveRuntimeTarget(context.settings)
+  const target = context.target
   if (target.kind !== 'environment') {
     if (!context.connectionId || !context.worktreePath) {
       return { files: [], truncated: false }
@@ -282,7 +283,7 @@ export function cancelRuntimeFileList(
   context: RuntimeFileOperationArgs,
   requestToken: string
 ): void {
-  const target = getActiveRuntimeTarget(context.settings)
+  const target = context.target
   if (target.kind !== 'environment' || !context.worktreeId) {
     void window.api.fs.cancelListFiles({ requestToken }).catch(() => {
       /* cancellation is advisory; the request path has its own timeouts */

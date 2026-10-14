@@ -8,7 +8,6 @@ import {
   GitHubIntegrationCard,
   GitLabIntegrationCard
 } from './cli-source-control-integration-cards'
-import { applyProductBranding } from '@/product-brand'
 
 const LOCAL_HOST_LABEL = getExecutionHostLabel('local')
 
@@ -94,9 +93,7 @@ describe('CLI source-control integration card account scope', () => {
     expect(rendered.textContent).toContain('Connected')
     expect(rendered.textContent).toContain(`Account scope: ${LOCAL_HOST_LABEL}`)
     expect(rendered.textContent).toContain(
-      applyProductBranding(
-        'Credentials and account checks for this provider are owned by this desktop client. Use Settings > Remote Orca Servers > Advanced to edit server-owned credentials.'
-      )
+      'Credentials and account checks for this provider are owned by this desktop client. To use another host, change the default host for new projects in Settings.'
     )
     await act(async () => {
       Array.from(rendered.querySelectorAll('button'))
@@ -125,9 +122,7 @@ describe('CLI source-control integration card account scope', () => {
     expect(rendered.textContent).toContain('GitLab')
     expect(rendered.textContent).toContain('Account scope: Remote server: runtime-1')
     expect(rendered.textContent).toContain(
-      applyProductBranding(
-        'Credentials and account checks for this provider are owned by this remote server. Use Settings > Remote Orca Servers > Advanced to edit another default runtime scope.'
-      )
+      'Credentials and account checks for this provider are owned by this remote server. To use another host, change the default host for new projects in Settings.'
     )
     expect(rendered.textContent).toContain('glab auth login')
   })

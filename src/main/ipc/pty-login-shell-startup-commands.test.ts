@@ -8,7 +8,7 @@ import { posixOnlyIt } from './pty-ipc-test-constants'
 import { setupPtyIpcSuite } from './pty-ipc-test-harness'
 import { userInfo } from 'node:os'
 import { resetMacosLoginShellPreflightForTests } from '../providers/macos-tcc-login-shell'
-import { registerPtyHandlers } from './pty'
+import { registerPtyHandlers } from './pty/register-handlers'
 import { POSIX_SHELL_STARTUP_COMMAND_ENV } from '../pty/posix-shell-startup-command'
 // Why resolved rather than hardcoded: the wrapper tree is content-addressed.
 import { getShellReadyWrapperRoot } from '../providers/local-pty-shell-ready-wrapper-root'
@@ -191,7 +191,8 @@ describe('registerPtyHandlers', () => {
     try {
       await spawnAndGetCall({ cwd: '/tmp', command: 'echo hello' })
 
-      const { getBashShellReadyRcfileContent } = await import('./pty')
+      const { getBashShellReadyRcfileContent } =
+        await import('../providers/local-pty-shell-ready-bash-rcfile')
       const bashRcContent = getBashShellReadyRcfileContent()
       expect(bashRcContent).toContain('source "$HOME/.bash_profile"')
       expect(bashRcContent).not.toContain('source "$HOME/.bashrc"')

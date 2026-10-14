@@ -1,10 +1,12 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseMuseSettingsText } from './hook-config-json'
 import { MuseHookService } from './hook-service'
-import { MUSE_HOOK_EVENTS } from './hook-settings'
+import { MUSE_HOOK_EVENTS, buildMuseManagedHooksFile, getMuseManagedCommand } from './hook-settings'
+import { wrapWindowsHookCommand } from '../agent-hooks/windows-hook-command'
+import { createAgentHookMemorySftp } from '../agent-hooks/agent-hook-memory-sftp.test-fixture'
 
 // Why: the shared script uses homedir(), which reads USERPROFILE on Windows
 // and HOME on POSIX. Isolate both plus the CLI's XDG config directory.
@@ -14,18 +16,24 @@ beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'orca-muse-hook-'))
   vi.stubEnv('HOME', home)
   vi.stubEnv('USERPROFILE', home)
-  vi.stubEnv('XDG_CONFIG_HOME', join(home, '.config'))
+  vi.stubEnv('XDG_CONFIG_HOME', undefined)
 })
 
 afterEach(() => {
   vi.unstubAllEnvs()
+  vi.restoreAllMocks()
   rmSync(home, { recursive: true, force: true })
 })
 
 const configPath = (): string => join(home, '.config', 'muse', 'settings.json')
 const managedHooksPath = (): string => join(home, '.orca', 'agent-hooks', 'muse-hooks.json')
-const scriptFileName = process.platform === 'win32' ? 'muse-hook.cmd' : 'muse-hook.sh'
-const scriptPath = (): string => join(home, '.orca', 'agent-hooks', scriptFileName)
+const scriptPath = (): string =>
+  join(
+    home,
+    '.orca',
+    'agent-hooks',
+    process.platform === 'win32' ? 'muse-hook.cmd' : 'muse-hook.sh'
+  )
 
 describe('MuseHookService', () => {
   it('reports not_installed before install', () => {
@@ -45,12 +53,20 @@ describe('MuseHookService', () => {
     expect(settings?.managed_hooks_env_vars).toContain('ORCA_PANE_KEY')
 
     const managedText = readFileSync(managedHooksPath(), 'utf-8')
+    expect(managedText).toContain(process.platform === 'win32' ? 'muse-hook.cmd' : 'muse-hook.sh')
     expect(MUSE_HOOK_EVENTS.every((event) => managedText.includes(`"${event}"`))).toBe(true)
     if (process.platform === 'win32') {
       const launchers = [...managedText.matchAll(/-EncodedCommand ([A-Za-z0-9+/=]+)/g)]
-      expect(launchers).toHaveLength(MUSE_HOOK_EVENTS.length)
-      for (const [, encoded] of launchers) {
-        expect(Buffer.from(encoded, 'base64').toString('utf16le')).toContain(scriptPath())
+      if (launchers.length === 0) {
+        // Safe drive-letter paths skip a PowerShell process per hook event.
+        expect(managedText.split(scriptPath().replaceAll('\\', '/')).length - 1).toBe(
+          MUSE_HOOK_EVENTS.length
+        )
+      } else {
+        expect(launchers).toHaveLength(MUSE_HOOK_EVENTS.length)
+        for (const [, encoded] of launchers) {
+          expect(Buffer.from(encoded, 'base64').toString('utf16le')).toContain(scriptPath())
+        }
       }
     } else {
       expect(managedText).toContain('agent-hooks/muse-hook.sh')
@@ -137,5 +153,58 @@ describe('MuseHookService', () => {
     writeFileSync(managedPath, JSON.stringify(damaged))
     expect(() => service.getStatus()).not.toThrow()
     expect(service.getStatus().state).toBe('partial')
+  })
+
+  it.skipIf(process.platform !== 'win32')(
+    'upgrades encoded registrations once during refresh',
+    async () => {
+      const service = new MuseHookService()
+      service.install()
+      const settings = readFileSync(configPath(), 'utf8')
+      writeFileSync(
+        managedHooksPath(),
+        buildMuseManagedHooksFile(wrapWindowsHookCommand(scriptPath()))
+      )
+      await service.refreshManagedScripts()
+      const upgraded = readFileSync(managedHooksPath(), 'utf8')
+      expect(upgraded).toBe(buildMuseManagedHooksFile(getMuseManagedCommand(scriptPath())))
+      expect(upgraded).toContain(getMuseManagedCommand(scriptPath()))
+      const modified = statSync(managedHooksPath()).mtimeMs
+      await service.refreshManagedScripts()
+      expect(readFileSync(managedHooksPath(), 'utf8')).toBe(upgraded)
+      expect(statSync(managedHooksPath()).mtimeMs).toBe(modified)
+      expect(readFileSync(configPath(), 'utf8')).toBe(settings)
+      expect(service.getStatus().state).toBe('installed')
+    }
+  )
+
+  it('refresh never registers absent hooks or replaces a user-owned pointer', async () => {
+    const service = new MuseHookService()
+    await service.refreshManagedScripts()
+    expect(service.getStatus().state).toBe('not_installed')
+    service.install()
+    const managed = readFileSync(managedHooksPath(), 'utf8')
+    writeFileSync(configPath(), JSON.stringify({ managed_hooks_path: '/user/hooks.json' }))
+    await service.refreshManagedScripts()
+    expect(readFileSync(managedHooksPath(), 'utf8')).toBe(managed)
+    expect(
+      parseMuseSettingsText(readFileSync(configPath(), 'utf8'), 'test')?.managed_hooks_path
+    ).toBe('/user/hooks.json')
+  })
+
+  it('installs POSIX hooks on the SSH host even from a Windows client', async () => {
+    vi.spyOn(process, 'platform', 'get').mockReturnValue('win32')
+    const remote = createAgentHookMemorySftp()
+    const service = new MuseHookService()
+    expect((await service.installRemote(remote.sftp, '/home/alice smith')).state).toBe('installed')
+    const remoteHooksPath = '/home/alice smith/.orca/agent-hooks/muse-hooks.json'
+    const installed = remote.fs.files.get(remoteHooksPath)
+    expect(installed).toContain('/home/alice smith/.orca/agent-hooks/muse-hook.sh')
+    expect(installed).not.toMatch(/powershell|EncodedCommand|muse-hook.cmd/)
+    expect(remote.fs.files.get('/home/alice smith/.orca/agent-hooks/muse-hook.sh')).toContain(
+      '#!/bin/sh'
+    )
+    await service.installRemote(remote.sftp, '/home/alice smith')
+    expect(remote.fs.files.get(remoteHooksPath)).toBe(installed)
   })
 })

@@ -5,20 +5,23 @@ import { applyManualRepoOrder } from '../../../../shared/manual-repo-order'
 import { retainValidFilterRepoIds } from '../slices/repo-filter-selection'
 import { readRuntimeWorktreeVisibilitySnapshot } from '../slices/worktree-visibility-owner-settings'
 import { getRepoHostIdentity } from '../slices/repo-host-identity'
-import { getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { filterSetupScriptPromptDismissalsToValidRepos } from '@/lib/setup-script-prompt'
-import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
+import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import { isRemovedRuntimeHostId } from '../slices/stale-runtime-host-rows'
 import type { FetchedRepoCatalog } from './repo-catalog-merge'
 import type { LocalRepoCatalogFetchOutcome } from './repo-catalog-fencing'
 import type { RepoSlice } from './repo-state'
 import { arrayElementsUnchanged } from '../catalog-identity'
 import {
-  claimRepoCatalogGeneration,
-  isLatestRepoCatalogGeneration,
   latestAllHostRepoCatalogGenerationByStore,
   startLocalRepoCatalogFetch
 } from './repo-catalog-fencing'
+import {
+  claimHostCatalogFence,
+  isHostCatalogFenceCurrent,
+  loadRuntimeHostCatalogs,
+  type HostCatalogFence
+} from '../host-catalog-fencing'
 import {
   filterSetupsForPrunedRepoRows,
   filterTrustedOrcaHooksToValidRepos,
@@ -27,13 +30,10 @@ import {
   reconcileReadoptedSshWorktreeState,
   reconcileSupersededSshRepos
 } from './repo-catalog-merge'
-import { getRuntimeTargetHostId } from '../runtime-target-host'
-import { listRuntimeEnvironmentsForAllHostLoad } from '../runtime-catalog-hosts'
+import { getRuntimeTargetHostId } from '../../runtime/runtime-client-target'
 import { mergeFetchedProjectCompatibilityForHost } from '../projects/project-compatibility-host-merge'
 import { scheduleSafeAutoForkSync } from './safe-auto-fork-sync'
 import { loadRepoCatalog } from './repo-catalog-load'
-import { getEnvironmentSshStateGeneration } from '../slices/runtime-environment-ssh'
-import { getRuntimeEnvironmentConnectionGeneration } from '../slices/runtime-status'
 import {
   reconcileRepoCatalogWorktrees,
   retireRepoCatalogWorktreeMetadata
@@ -52,15 +52,15 @@ export function createAllHostRepoCatalogActions(
         return { reposFetchGeneration: generation }
       })
       latestAllHostRepoCatalogGenerationByStore.set(get, generation)
-      claimRepoCatalogGeneration(get, LOCAL_EXECUTION_HOST_ID, generation)
+      const isCurrent = (fence: HostCatalogFence): boolean =>
+        latestAllHostRepoCatalogGenerationByStore.get(get) === generation &&
+        isHostCatalogFenceCurrent(get, fence)
       // Why: fetching only the active host hides every other host's repos ("my projects vanished"); load local + all runtime envs, each failing soft.
-      const applyCatalog = (catalog: FetchedRepoCatalog): void => {
-        // Why: a concurrent all-host refresh must not let the older catalog resurrect a migrated SSH owner.
-        if (
-          latestAllHostRepoCatalogGenerationByStore.get(get) !== generation ||
-          !isLatestRepoCatalogGeneration(get, catalog.hostId, generation)
-        ) {
-          return
+      // Returns false for a dropped catalog: a superseded fetch or replaced connection is not an answer.
+      const applyCatalog = (catalog: FetchedRepoCatalog, fence: HostCatalogFence): boolean => {
+        // Why: a concurrent refresh or a replaced connection must not let an older catalog resurrect a migrated SSH owner.
+        if (!isCurrent(fence)) {
+          return false
         }
         let hostRepos: Repo[] = []
         let removedByRepo = new Map<string, string[]>()
@@ -114,8 +114,9 @@ export function createAllHostRepoCatalogActions(
           }
         })
         // Why: keep the safe-auto fork sync (as fetchRepos does) so cold-start, which now routes here, still updates safe-auto forks.
-        scheduleSafeAutoForkSync(get, hostRepos)
+        scheduleSafeAutoForkSync(hostRepos)
         retireRepoCatalogWorktreeMetadata(catalog.hostId, removedByRepo)
+        return true
       }
       const validateRepoScopedUi = (): void => {
         set((s) => {
@@ -137,8 +138,13 @@ export function createAllHostRepoCatalogActions(
       // Local first so local repos are present even if a remote fetch stalls.
       let failed = false
       let localCatalogOutcome: LocalRepoCatalogFetchOutcome = { status: 'fulfilled' }
+      const localFence = claimHostCatalogFence(get, 'repos', { kind: 'local' })
       try {
-        applyCatalog(await loadRepoCatalog({ kind: 'local' }, generation, set, get))
+        if (
+          !applyCatalog(await loadRepoCatalog({ kind: 'local' }, localFence, set, get), localFence)
+        ) {
+          failed = true
+        }
       } catch (err) {
         failed = true
         localCatalogOutcome = { status: 'rejected', reason: err }
@@ -154,38 +160,27 @@ export function createAllHostRepoCatalogActions(
         return
       }
 
-      const environments = await listRuntimeEnvironmentsForAllHostLoad()
       // Why: unreachable remotes can spend the full connect timeout; merge each resolved host via the state updater so parallel loads don't clobber.
-      await Promise.all(
-        environments.map(async (environment) => {
-          const target = {
-            kind: 'environment' as const,
-            environmentId: environment.id
-          }
-          claimRepoCatalogGeneration(get, getRuntimeTargetHostId(target), generation)
-          const connectionGeneration = getRuntimeEnvironmentConnectionGeneration(environment.id)
-          const sshGeneration = getEnvironmentSshStateGeneration(environment.id)
+      // A superseded load must not claim remote fences, or it would void the newer load's catalogs.
+      await loadRuntimeHostCatalogs(
+        get,
+        'repos',
+        async (target, fence) => {
           const [catalogResult, visibilitySnapshot] = await Promise.all([
-            loadRepoCatalog(target, generation, set, get).then(
+            loadRepoCatalog(target, fence, set, get).then(
               (catalog) => ({ ok: true as const, catalog }),
               (error: unknown) => ({ ok: false as const, error })
             ),
-            readRuntimeWorktreeVisibilitySnapshot(environment.id)
+            readRuntimeWorktreeVisibilitySnapshot(target.environmentId)
           ])
           // The catalog may finish before visibility settings; recheck at the actual merge boundary.
-          if (
-            getRuntimeEnvironmentConnectionGeneration(environment.id) !== connectionGeneration ||
-            getEnvironmentSshStateGeneration(environment.id) !== sshGeneration
-          ) {
+          if (!isCurrent(fence)) {
+            failed = true
             return
           }
           const visibilityDefaults = visibilitySnapshot.defaults
           const hostId = getRuntimeTargetHostId(target)
-          if (
-            visibilityDefaults !== undefined &&
-            latestAllHostRepoCatalogGenerationByStore.get(get) === generation &&
-            isLatestRepoCatalogGeneration(get, hostId, generation)
-          ) {
+          if (visibilityDefaults !== undefined && isCurrent(fence)) {
             set((state) =>
               isRemovedRuntimeHostId(hostId, state.removedRuntimeEnvironmentIds)
                 ? state
@@ -194,26 +189,29 @@ export function createAllHostRepoCatalogActions(
                       ...state.worktreeVisibilityDefaultsByHost,
                       [hostId]: visibilityDefaults
                     },
-                    ...(getActiveRuntimeTarget(state.settings).kind === 'environment' &&
-                    state.settings?.activeRuntimeEnvironmentId === environment.id
+                    // Why: the settings page mirrors only the default host's source-defaults support.
+                    ...(state.settings?.activeRuntimeEnvironmentId === target.environmentId
                       ? {
                           worktreeVisibilitySourceDefaultsSupportedRuntimeEnvironmentId:
-                            visibilitySnapshot.sourceDefaultsSupported ? environment.id : null
+                            visibilitySnapshot.sourceDefaultsSupported ? target.environmentId : null
                         }
                       : {})
                   }
             )
           }
           if (catalogResult.ok) {
-            applyCatalog(catalogResult.catalog)
+            if (!applyCatalog(catalogResult.catalog, fence)) {
+              failed = true
+            }
           } else {
             failed = true
             console.warn(
-              `Skipped repos for runtime environment ${environment.id}:`,
+              `Skipped repos for runtime environment ${target.environmentId}:`,
               catalogResult.error
             )
           }
-        })
+        },
+        () => latestAllHostRepoCatalogGenerationByStore.get(get) === generation
       )
       // Why: validate repo-scoped UI only after every host answers; first-paint loads only local repos, so an offline runtime would erase its saved filters.
       if (!failed && get().reposFetchGeneration === generation) {

@@ -21,7 +21,7 @@ test('shares one board while keeping global agents, independent filters and a se
       () =>
         page.evaluate(async (repoId) => {
           const store = window.__store!
-          await store.getState().fetchRepos()
+          await store.getState().fetchRepos({ runtimeEnvironmentId: null })
           if (!store.getState().repos.some((repo) => repo.id === repoId)) {
             return false
           }

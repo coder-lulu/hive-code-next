@@ -15,7 +15,7 @@ import {
 import { HOST_TEST_SESSION as SESSION } from '../native-chat/agent-session-wire/structured-agent-session-host-test-data'
 import type { AcpScriptedAgent } from './acp-scripted-agent.test-support'
 import type { AcpAdapterRig } from './acp-structured-adapter.test-support'
-import { PROVIDER_SPAWN_TOKEN_ENV } from '../provider-process/provider-spawned-process-identity'
+import { ORCA_AGENT_SESSION_SPAWN_TOKEN_ENV as PROVIDER_SPAWN_TOKEN_ENV } from '../../shared/agent-session-caller-env'
 import {
   GROK_CONFIG_OPTIONS,
   PROVIDER_SESSION,
@@ -181,6 +181,12 @@ describe('closing or stopping a Grok chat while it starts', () => {
     })
     const { rig, host } = await openHostRig({
       script: (agent) => agent.on('initialize', () => {}),
+      deps: {
+        resolveLaunch: async ({ spawnToken }) => ({
+          ...(await launch(() => false)()),
+          env: { [PROVIDER_SPAWN_TOKEN_ENV]: spawnToken }
+        })
+      },
       // This scripted launch is /fake/grok on /workspace. Give its POSIX recovery host the
       // exact child's identity and signal port; the real Windows host never signals a saved PID.
       hostDeps: {

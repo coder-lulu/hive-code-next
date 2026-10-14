@@ -5,6 +5,7 @@ import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import type { AgentSessionLaunchPlan } from '@/lib/agent-session-launch-plan'
 import type { StructuredAgentLaunchSettlement } from '@/lib/structured-agent-launch-settlement'
 import type { AgentLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
+import type { StructuredLaunchTerminal } from '@/lib/structured-agent-session-launch-admission'
 import type { TuiAgent } from '../../../shared/tui-agent'
 import type { LaunchSource } from '../../../shared/telemetry-events'
 import { getConnectionIdFromState } from '@/lib/connection-context'
@@ -43,6 +44,8 @@ export type LaunchAgentInNewTabArgs = LaunchAgentRequest & {
   launchPlatform?: NodeJS.Platform
   /** Called after the prompt is actually delivered to the agent input path. */
   onPromptDelivered?: () => void
+  promptKeptByCaller?: true
+  onStructuredHostDeclined?: () => StructuredLaunchTerminal
   onPromptDeliveryUnconfirmed?: () => void
   activate?: boolean
   /** Keeps an activation-triggered empty-workspace launch pending until its surface opens. */
@@ -64,7 +67,7 @@ export type AgentLaunchSurface =
 export type LaunchAgentInNewTabResult = {
   surface: AgentLaunchSurface
   /** Compatibility projection for existing product callers. */
-  tabId: string | null
+  tabId?: string | null
   startupPlan: AgentStartupPlan
   pasteDraftAfterLaunch: boolean
   /** The structured host will finish focus asynchronously. */

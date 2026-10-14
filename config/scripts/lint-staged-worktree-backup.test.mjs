@@ -1,4 +1,4 @@
-import { createGitTestRunner } from '../../src/relay/git-handler-test-setup'
+import { createGitTestRunner } from "../../src/main/git/test-fixtures/git-test-runner"
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'

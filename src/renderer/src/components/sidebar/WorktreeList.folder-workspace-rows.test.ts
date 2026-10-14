@@ -68,7 +68,7 @@ function setFolderWorkspaceFixtureState(
     experimentalNewWorktreeCardStyle?: boolean
     nestedGroup?: boolean
   } = {}
-): void {
+) {
   const parentGroup: ProjectGroup | null = options.nestedGroup
     ? {
         id: 'folder-parent-group-1',
@@ -152,6 +152,7 @@ function setFolderWorkspaceFixtureState(
     worktreeLineageById: {},
     worktreesByRepo: {}
   }
+  return { folderWorkspace, group }
 }
 
 // Why: describe title is shared across the split files so test full names stay stable.
@@ -159,6 +160,33 @@ describe('WorktreeList lineage child card renderer', () => {
   beforeAll(async () => {
     await loadWorktreeList()
   }, 60_000)
+
+  it.each(['runtime:host-a', 'runtime:host-b'] as const)(
+    'marks only the selected folder host %s as active',
+    async (selectedHost) => {
+      const { folderWorkspace, group } = setFolderWorkspaceFixtureState()
+      const hosts = ['runtime:host-a', 'runtime:host-b'] as const
+      mockStore.state.folderWorkspaces = hosts.map((executionHostId) => ({
+        ...folderWorkspace,
+        executionHostId,
+        projectGroupId: executionHostId,
+        name: executionHostId
+      }))
+      mockStore.state.projectGroups = hosts.map((executionHostId) => ({
+        ...group,
+        id: executionHostId,
+        executionHostId
+      }))
+      mockStore.state.activeWorkspaceExecutionHostId = selectedHost
+      const markup = await renderWorktreeListMarkup()
+      const options = Array.from(markup.matchAll(/<div[^>]*role="option"[^>]*>/g), ([tag]) => tag)
+      expect(options).toHaveLength(2)
+      const active = options.filter((tag) => tag.includes('aria-current="page"'))
+      expect(active).toHaveLength(1)
+      expect(active[0]).toContain(`data-worktree-host-identity="${selectedHost}|folder:`)
+      expect(markup.match(/data-worktree-card-active="true"/g)).toHaveLength(1)
+    }
+  )
 
   it('points aria-activedescendant at the active folder workspace row', async () => {
     setFolderWorkspaceFixtureState()

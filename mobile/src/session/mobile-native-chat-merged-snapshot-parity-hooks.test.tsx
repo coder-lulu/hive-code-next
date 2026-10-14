@@ -66,6 +66,7 @@ vi.mock('./MobileNativeChatMessage', () => ({ MobileNativeChatMessage: 'ChatMess
 vi.mock('./MobileNativeChatLiveLine', () => ({ MobileNativeChatLiveLine: 'LiveStatus' }))
 vi.mock('./MobileNativeChatComposer', () => ({ MobileNativeChatComposer: 'Composer' }))
 vi.mock('./MobileNativeChatQueuedMessages', () => ({ MobileNativeChatQueuedMessages: 'Queued' }))
+vi.mock('./MobileNativeChatVisual', () => ({ useMobileNativeChatVisualRenderer: () => null }))
 vi.mock('../components/ActionSheetModal', () => ({ ActionSheetModal: 'ActionSheetModal' }))
 vi.mock('./MobileNativeChatAsk', () => ({ MobileNativeChatAsk: 'ChatAsk' }))
 vi.mock('./MobileNativeChatPermission', () => ({ MobileNativeChatPermission: 'ChatPermission' }))
@@ -89,6 +90,7 @@ const HOST_SUPPORT = {
   promptCancel: true,
   questionAnswers: true,
   queuedMessages: true,
+  queuedCommands: false,
   statusFeed: true,
   quietRepeatedStop: true
 }

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { spawnProcess } from '../../shared/child-process/run-process'
+import type { PipedProcessSpawner } from '@orca/process-host/process-spec'
 import {
   openCodexAppServerConnection,
   type CodexAppServerConnection
@@ -16,7 +16,7 @@ describe('Codex transport stdout frame bound', () => {
   it.each([0, -1, Number.NaN, Number.POSITIVE_INFINITY, 1.5])(
     'rejects invalid limit %s before spawning',
     async (maxFrameBytes) => {
-      const spawn = vi.fn<typeof spawnProcess>(() => {
+      const spawn = vi.fn<PipedProcessSpawner>(() => {
         throw new Error('unexpected spawn')
       })
       await expect(

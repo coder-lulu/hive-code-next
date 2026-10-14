@@ -2,13 +2,14 @@ import type { RuntimeFileReadChunkResult } from '../../../shared/runtime-types'
 import { validateFileRangeRequest } from '../../../shared/file-range-read'
 import type { RuntimeFileReadArgs } from './runtime-file-client-types'
 import { assertExternalSshReadOwnership, canReadRelativeRuntimeFile } from './runtime-file-routing'
-import { callRuntimeRpc, getActiveRuntimeTarget, RuntimeRpcCallError } from './runtime-rpc-client'
+import { callRuntimeRpc } from './runtime-rpc-client'
+import { RuntimeRpcCallError } from './runtime-rpc-result'
 import { toRuntimeWorktreeSelector } from './runtime-worktree-selector'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 
 function rangeReadTarget(args: RuntimeFileReadArgs) {
-  assertExternalSshReadOwnership(args.settings, args.connectionId, args.expectedExternalSshTargetId)
-  const target = getActiveRuntimeTarget(args.settings)
+  assertExternalSshReadOwnership(args.target, args.connectionId, args.expectedExternalSshTargetId)
+  const target = args.target
   if (target.kind !== 'environment') {
     return null
   }

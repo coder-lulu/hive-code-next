@@ -71,7 +71,8 @@ describe('active web preload upstream adaptations', () => {
           'cline',
           'kimi',
           'muse',
-          'jcode'
+          'jcode',
+          'kiro'
         ],
         supportsQoderHistory: true,
         supportsJcodeHistory: true

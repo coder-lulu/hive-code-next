@@ -211,7 +211,7 @@ describe('terminal prompt presentation with the production view, card and compos
     expect(approvalAction().props.disabled).toBe(false)
   })
 
-  it.each(['toggle', 'hold'])(
+  it.each(['toggle', 'hold'] as const)(
     'keeps %s dictation and attachments available while a prompt blocks Send',
     async (dictationMode) => {
       const onMicPress = vi.fn()

@@ -369,7 +369,7 @@ async function createServer(options: ServerOptions = {}): Promise<{
   if (!pairing) {
     throw new Error('Failed to create test pairing')
   }
-  return { pairing, nextRequest }
+  return { pairing: (pairing), nextRequest }
 }
 
 function sendEncrypted(ws: WebSocket, session: DesktopMobileE2EEV2Session, message: unknown): void {

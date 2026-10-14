@@ -6,7 +6,7 @@ import type { TuiAgent } from '../../../shared/tui-agent'
 import type { AgentExplicitLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import { useAppStore } from '../store'
 import { agentResumeHostAuthorityCapability } from './agent-resume-host-authority-capability'
-import { toWebTerminalSurfaceTabId } from './web-terminal-surface-id'
+import { toWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
 
 export function resolveWebRuntimeAgentHostAuthorityCapabilities(args: {
   agent: TuiAgent

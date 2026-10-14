@@ -5,12 +5,12 @@ import { AGENT_UPGRADE_COMMANDS } from '../../shared/agent-install-providers'
 import { resolveCliCommands, withCliRuntimeOnPath } from '../../shared/node-cli-command-resolution'
 import { TUI_AGENT_CONFIG } from '../../shared/tui-agent-config'
 import { quoteStartupArg, tokenizeStartupCommand } from '../../shared/tui-agent-startup-shell'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { stripAnsiEscapeSequences } from '../../shared/ansi-escape-sequences'
 import {
   parseWindowsCmdShim,
   resolveWindowsCmdShim
-} from '../../shared/child-process/windows-cmd-shim-resolution'
+} from '@orca/process-host/windows-cmd-shim-resolution'
 
 export type AgentUpgradeTarget = {
   command: string

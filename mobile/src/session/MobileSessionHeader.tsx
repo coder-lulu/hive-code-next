@@ -8,6 +8,7 @@ import {
   GitBranch,
   Globe,
   MoreHorizontal,
+  PanelLeftOpen,
   Plus
 } from 'lucide-react-native'
 import { MobileSessionHeaderIconButton } from './MobileSessionHeaderIconButton'
@@ -21,6 +22,7 @@ import {
 import { QuickCommandsTabButton } from './QuickCommandsTabButton'
 import { useMobileSessionThemeStyles } from './mobile-session-styles'
 import { useKeyboardPersistingTaps } from '../platform/keyboard-persisting-taps'
+import { useHostSidebarReveal } from '../layout/host-sidebar-reveal'
 import type { MobileSessionController } from './use-mobile-session-controller'
 
 export function MobileSessionHeader({ controller }: { controller: MobileSessionController }) {
@@ -60,9 +62,21 @@ export function MobileSessionHeader({ controller }: { controller: MobileSessionC
     showHeaderMoreButton
   } = controller
   const tabBarKeepsKeyboard = useKeyboardPersistingTaps('handled')
+  const revealSidebar = useHostSidebarReveal()
   return (
     <SafeAreaView style={styles.sessionChrome} edges={['top']}>
       <View style={styles.sessionTopBar}>
+        {revealSidebar ? (
+          <Pressable
+            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+            onPress={revealSidebar}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="Show sidebar"
+          >
+            <PanelLeftOpen size={18} color={theme.color.text.secondary} />
+          </Pressable>
+        ) : null}
         <Pressable
           style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
           onPress={requestLeaveSession}

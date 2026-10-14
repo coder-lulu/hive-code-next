@@ -1,15 +1,13 @@
+import { presentAgentLaunchTab } from '@/lib/agent-launch-tab-presentation'
 import { releaseAgentLaunchPaneSpawn } from '@/lib/agent-launch-pane-spawn-hold'
 import { requestBackgroundTerminalWorktreeMount } from '@/components/terminal/background-terminal-worktree-mount'
-import { hasRegisteredRuntimeTerminalTab } from '@/runtime/sync-runtime-graph'
+import { hasRegisteredRuntimeTerminalTab } from '@/runtime/mounted-terminal-tab-registry'
 import { planMobileTerminalTabMount } from '@/lib/mobile-terminal-tab-mount'
 import { resolveTerminalTabPtyOwnership } from '@/lib/terminal-tab-for-pty-id'
 import { SPLIT_TERMINAL_PANE_EVENT } from '@/constants/terminal'
 import type { SplitTerminalPaneDetail } from '@/constants/terminal'
 import { singlePaneLayoutSnapshot } from '@/store/slices/terminal-helpers'
 import { verifyTerminalRevealIdentity } from '@/lib/terminal-reveal-identity'
-import { initialAgentTabViewModeProps } from '@/lib/native-chat-initial-view-mode'
-import { getConnectionIdFromState } from '@/lib/connection-context'
-import { isNativeChatTranscriptLocalReadable } from '@/lib/native-chat-transcript-readability'
 import { tryMakePaneKey } from './agent-status-routing'
 import { wasAgentLaunchPaneClosedByUser } from '@/lib/agent-launch-pane-closes'
 import { useAppStore } from '../../store'
@@ -41,6 +39,7 @@ export function registerTerminalPresentationIpcBridge(unsubs: (() => void)[]): v
         focus,
         presentation,
         surfaceOwner,
+        agentLaunchViewer,
         tabId,
         leafId,
         splitFromLeafId,
@@ -54,8 +53,12 @@ export function registerTerminalPresentationIpcBridge(unsubs: (() => void)[]): v
             activate,
             focus
           })
-          const shouldActivate = terminalPresentation === 'focused'
-          const shouldSurfaceOwner = terminalPresentation !== 'background' && surfaceOwner !== false
+          const shouldActivate =
+            agentLaunchViewer === undefined && terminalPresentation === 'focused'
+          const shouldSurfaceOwner =
+            agentLaunchViewer === undefined &&
+            terminalPresentation !== 'background' &&
+            surfaceOwner !== false
           if (shouldActivate) {
             activateTerminalInitiatedWorktree(store, worktreeId)
           }
@@ -103,20 +106,15 @@ export function registerTerminalPresentationIpcBridge(unsubs: (() => void)[]): v
             (ptyId
               ? store.createTab(worktreeId, undefined, undefined, {
                   initialPtyId: ptyId,
-                  activate: shouldActivate,
+                  activate:
+                    shouldActivate ||
+                    agentLaunchViewer === 'focus-window' ||
+                    agentLaunchViewer === 'focus-in-workspace',
                   ...(launchAgent
                     ? {
                         launchAgent,
                         // Why: a paired client resolved explicit mode before PTY materialization; only omitted mode uses host defaults.
-                        ...(viewMode
-                          ? { viewMode }
-                          : initialAgentTabViewModeProps(store.settings, {
-                              agent: launchAgent,
-                              nativeChatTranscriptIsLocalReadable:
-                                isNativeChatTranscriptLocalReadable(
-                                  getConnectionIdFromState(store, worktreeId)
-                                )
-                            }))
+                        ...(viewMode ? { viewMode } : {})
                       }
                     : {}),
                   ...(cwd ? { startupCwd: cwd } : {}),
@@ -150,6 +148,9 @@ export function registerTerminalPresentationIpcBridge(unsubs: (() => void)[]): v
           if (shouldSurfaceOwner) {
             store.revealWorktreeInSidebar(worktreeId)
             focusTerminalInitiatedTab(tab.id, leafId, worktreeId)
+          }
+          if (agentLaunchViewer) {
+            presentAgentLaunchTab(agentLaunchViewer, worktreeId, tab.id, leafId)
           }
           // Why: only stamp the runtime title on fresh tabs; reused tabs may have a user customTitle it would overwrite on focus.
           if (title && !reusedTab) {

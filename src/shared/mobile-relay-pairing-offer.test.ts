@@ -17,6 +17,11 @@ describe('local pairing contract', () => {
     }
     expect(decodePairingOffer(encodePairingOffer(current))).toEqual(current)
   })
+  it('round-trips advisory host metadata without weakening the pinned key', () => {
+    const current = { ...offer, hostDescriptor: { installationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' } }
+    expect(decodePairingOffer(encodePairingOffer(current))).toEqual(current)
+    expect(PairingOfferSchema.parse({ ...offer, hostDescriptor: { installationId: 'invalid' } }).hostDescriptor).toBeUndefined()
+  })
   it.each([
     { ...offer, v: 1 },
     { ...offer, relay: { inviteToken: 'obsolete' } }

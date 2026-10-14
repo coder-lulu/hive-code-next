@@ -37,7 +37,7 @@ export function parseRemoteRuntimeAuthenticatedFrame(
   } catch {
     return { kind: 'invalid' }
   }
-  if ((authenticated as { type?: unknown }).type === 'e2ee_authenticated') {
+  if ((authenticated as { type?: unknown } | null)?.type === 'e2ee_authenticated') {
     return session.isAuthenticated(plaintext) ? { kind: 'authenticated' } : { kind: 'invalid' }
   }
   return {

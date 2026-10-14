@@ -6,13 +6,13 @@ const { run, readFile, realpath } = vi.hoisted(() => ({
   readFile: vi.fn(),
   realpath: vi.fn()
 }))
-vi.mock('../../shared/child-process/run-process', () => ({ runProcess: run }))
+vi.mock('@orca/process-host', () => ({ runProcess: run }))
 vi.mock('node:fs', () => ({ readFileSync: readFile, realpathSync: realpath }))
 vi.mock('../../shared/node-cli-command-resolution', () => ({
   resolveCliCommands: vi.fn(),
   withCliRuntimeOnPath: (_cmd: string, env: NodeJS.ProcessEnv) => env
 }))
-vi.mock('../../shared/child-process/windows-cmd-shim-resolution', () => ({
+vi.mock('@orca/process-host/windows-cmd-shim-resolution', () => ({
   resolveWindowsCmdShim: () => null,
   parseWindowsCmdShim: () => null
 }))

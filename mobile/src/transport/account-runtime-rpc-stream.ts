@@ -92,3 +92,21 @@ export function attachAccountRuntimeStream(
       }
     })
 }
+
+export function createAccountRuntimeStream(
+  method: string,
+  params: unknown,
+  listener: AccountRuntimeStream['listener'],
+  options: AccountRuntimeStream['options']
+): AccountRuntimeStream {
+  return {
+    method,
+    params,
+    listener,
+    options,
+    physical: null,
+    generation: 0,
+    retryAttempt: 0,
+    retryTimer: null
+  }
+}

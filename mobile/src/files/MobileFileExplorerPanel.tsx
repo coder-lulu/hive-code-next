@@ -34,6 +34,7 @@ import { createFileExplorerStyles } from './mobile-file-explorer-styles'
 import { fileDirectoryRead, legacyFileListRead } from './mobile-file-explorer-operations'
 import { MobileFileExplorerRow } from './mobile-file-explorer-row'
 import { navigateToMobileFilePreview } from './mobile-file-preview-navigation'
+import { MobileLoadErrorState } from '../components/MobileLoadErrorState'
 
 export function MobileFileExplorerPanel(props: {
   hostId: string
@@ -336,14 +337,7 @@ export function MobileFileExplorerPanel(props: {
       <ActivityIndicator size="small" color={theme.color.text.secondary} />
     </View>
   ) : error ? (
-    <View style={styles.state}>
-      <Text style={styles.errorText}>{error}</Text>
-      {rootRetry ? (
-        <Pressable style={styles.retryButton} onPress={rootRetry}>
-          <Text style={styles.retryText}>重试</Text>
-        </Pressable>
-      ) : null}
-    </View>
+    <MobileLoadErrorState message={error} onRetry={rootRetry} />
   ) : rows.length === 0 ? (
     <View style={styles.state}>
       <Text style={styles.emptyText}>未找到文件</Text>

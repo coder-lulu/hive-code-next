@@ -5,6 +5,7 @@ import { AgentCapabilitiesPane } from './AgentCapabilitiesPane'
 import { LinearAgentSkillPane } from './LinearAgentSkillPane'
 import { VoicePane } from './VoicePane'
 import { SettingsSection } from './SettingsSection'
+import { SettingsHostScopeUnavailableNotice } from './SettingsHostScopePicker'
 import { translate } from '@/i18n/i18n'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { SettingsRenderContext } from './settings-render-context'
@@ -24,7 +25,7 @@ export function renderAgentsSettingsSection(context: SettingsRenderContext): Rea
       bodyClassName="rounded-none border-0 bg-transparent p-0 shadow-none"
       headerAction={
         view.isSectionMounted('agents') ? (
-          <AgentDetectionRefreshButton settings={model.settings} />
+          <AgentDetectionRefreshButton hostScope={model.settingsHostScope} />
         ) : null
       }
     >
@@ -32,6 +33,7 @@ export function renderAgentsSettingsSection(context: SettingsRenderContext): Rea
         <AgentsPane
           settings={model.settings}
           updateSettings={model.updateSettings}
+          hostScope={model.settingsHostScope}
           wslSupportedPlatform={terminal.localWslSupportedPlatform}
           wslAvailable={terminal.localWindowsRuntimeCapabilities.wslAvailable}
           wslDistros={terminal.localWindowsRuntimeCapabilities.wslDistros}
@@ -60,11 +62,12 @@ export function renderAccountsSettingsSection(context: SettingsRenderContext): R
       headerClassName="border-0 pb-0"
       bodyClassName="rounded-none border-0 bg-transparent p-0 shadow-none"
     >
-      {view.isSectionMounted('accounts') ? (
+      {!view.isSectionMounted('accounts') ? null : model.settingsHostScope.available ? (
         <AiServicesPane
           navigationRequest={model.settingsNavigationTarget}
           settings={model.settings}
           updateSettings={model.updateSettings}
+          hostScope={model.settingsHostScope}
           wslSupportedPlatform={terminal.runtimeWslSupportedPlatform}
           wslAvailable={terminal.windowsTerminalCapabilities.wslAvailable}
           wslDistros={terminal.windowsTerminalCapabilities.wslDistros}
@@ -76,7 +79,9 @@ export function renderAccountsSettingsSection(context: SettingsRenderContext): R
               : pendingAccountsTarget
           }
         />
-      ) : null}
+      ) : (
+        <SettingsHostScopeUnavailableNotice />
+      )}
     </SettingsSection>
   )
 }

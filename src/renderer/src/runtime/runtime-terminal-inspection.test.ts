@@ -110,14 +110,7 @@ describe('runtime terminal owner routing', () => {
   })
 
   it('sends input through the PTY owning environment instead of the active one', async () => {
-    expect(
-      sendRuntimePtyInput(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1',
-        'x',
-        'driving'
-      )
-    ).toBe(true)
+    expect(sendRuntimePtyInput('remote:env-1@@terminal-1', 'x', 'driving')).toBe(true)
 
     await vi.waitFor(() => {
       expect(runtimeCall).toHaveBeenCalledWith({
@@ -135,12 +128,10 @@ describe('runtime terminal owner routing', () => {
   })
 
   it('inspects the PTY owning environment instead of the active one', async () => {
-    await expect(
-      inspectRuntimeTerminalProcess(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1'
-      )
-    ).resolves.toMatchObject({ foregroundProcess: 'bash', hasChildProcesses: true })
+    await expect(inspectRuntimeTerminalProcess('remote:env-1@@terminal-1')).resolves.toMatchObject({
+      foregroundProcess: 'bash',
+      hasChildProcesses: true
+    })
 
     expect(runtimeCall).toHaveBeenCalledWith({
       selector: 'env-1',
@@ -157,11 +148,7 @@ describe('runtime terminal owner routing', () => {
   // scan and answered `unverifiable`, which the guard reads as running work -- a confirmation
   // dialog on every idle close of a remote Windows pane. Found by review on #18591.
   it('forwards scanChildProcesses to the PTY owning environment', async () => {
-    await inspectRuntimeTerminalProcess(
-      { activeRuntimeEnvironmentId: 'env-2' },
-      'remote:env-1@@terminal-1',
-      { scanChildProcesses: true }
-    )
+    await inspectRuntimeTerminalProcess('remote:env-1@@terminal-1', { scanChildProcesses: true })
 
     expect(runtimeCall).toHaveBeenCalledWith({
       selector: 'env-1',
@@ -172,11 +159,10 @@ describe('runtime terminal owner routing', () => {
   })
 
   it('forwards scanChildProcesses alongside the incarnation fence', async () => {
-    await inspectRuntimeTerminalProcess(
-      { activeRuntimeEnvironmentId: 'env-2' },
-      'remote:env-1@@terminal-1',
-      { expectedIncarnationId: 'incarnation-1', scanChildProcesses: true }
-    )
+    await inspectRuntimeTerminalProcess('remote:env-1@@terminal-1', {
+      expectedIncarnationId: 'incarnation-1',
+      scanChildProcesses: true
+    })
 
     expect(runtimeCall).toHaveBeenCalledWith({
       selector: 'env-1',
@@ -191,10 +177,7 @@ describe('runtime terminal owner routing', () => {
   })
 
   it('omits scanChildProcesses when the caller is only polling', async () => {
-    await inspectRuntimeTerminalProcess(
-      { activeRuntimeEnvironmentId: 'env-2' },
-      'remote:env-1@@terminal-1'
-    )
+    await inspectRuntimeTerminalProcess('remote:env-1@@terminal-1')
 
     expect(runtimeCall).toHaveBeenCalledWith({
       selector: 'env-1',
@@ -213,12 +196,7 @@ describe('runtime terminal owner routing', () => {
       _meta: { runtimeId: 'runtime-1' }
     })
 
-    await expect(
-      inspectRuntimeTerminalProcess(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1'
-      )
-    ).resolves.toEqual({
+    await expect(inspectRuntimeTerminalProcess('remote:env-1@@terminal-1')).resolves.toEqual({
       foregroundProcess: null,
       hasChildProcesses: false,
       verdict: 'unverifiable',
@@ -233,7 +211,7 @@ describe('runtime terminal owner routing', () => {
       foregroundProcessEvidence: liveEvidence('pty-1', 'codex')
     })
 
-    await expect(inspectRuntimeTerminalProcess(null, 'ssh:host@@pty-1')).resolves.toMatchObject({
+    await expect(inspectRuntimeTerminalProcess('ssh:host@@pty-1')).resolves.toMatchObject({
       foregroundProcess: 'codex',
       hasChildProcesses: true
     })
@@ -248,7 +226,7 @@ describe('runtime terminal owner routing', () => {
       hasChildProcesses: true
     })
 
-    await expect(inspectRuntimeTerminalProcess(null, 'ssh:host@@pty-1')).resolves.toEqual({
+    await expect(inspectRuntimeTerminalProcess('ssh:host@@pty-1')).resolves.toEqual({
       foregroundProcess: null,
       hasChildProcesses: false,
       verdict: 'unverifiable',
@@ -264,12 +242,7 @@ describe('runtime terminal owner routing', () => {
         error: { code, message: code }
       })
 
-      await expect(
-        inspectRuntimeTerminalProcess(
-          { activeRuntimeEnvironmentId: 'env-2' },
-          'remote:env-1@@terminal-stale'
-        )
-      ).resolves.toEqual({
+      await expect(inspectRuntimeTerminalProcess('remote:env-1@@terminal-stale')).resolves.toEqual({
         foregroundProcess: null,
         hasChildProcesses: false,
         verdict: 'unverifiable',
@@ -281,10 +254,7 @@ describe('runtime terminal owner routing', () => {
   it('maps lost contact and timeout to client-only unverifiable results', async () => {
     runtimeCall.mockRejectedValueOnce(new Error('SSH connection lost, reconnecting...'))
     await expect(
-      inspectRuntimeTerminalProcess(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-transport'
-      )
+      inspectRuntimeTerminalProcess('remote:env-1@@terminal-transport')
     ).resolves.toEqual({
       foregroundProcess: null,
       hasChildProcesses: false,
@@ -294,10 +264,7 @@ describe('runtime terminal owner routing', () => {
 
     runtimeCall.mockRejectedValueOnce(new Error('Request timed out before completion'))
     await expect(
-      inspectRuntimeTerminalProcess(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-timeout'
-      )
+      inspectRuntimeTerminalProcess('remote:env-1@@terminal-timeout')
     ).resolves.toMatchObject({ verdict: 'unverifiable', reason: 'timeout' })
   })
 
@@ -320,12 +287,9 @@ describe('runtime terminal owner routing', () => {
 
   it('still throws an unclassified programming error', async () => {
     runtimeCall.mockRejectedValueOnce(new Error('inspection invariant violated'))
-    await expect(
-      inspectRuntimeTerminalProcess(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-bug'
-      )
-    ).rejects.toThrow('inspection invariant violated')
+    await expect(inspectRuntimeTerminalProcess('remote:env-1@@terminal-bug')).rejects.toThrow(
+      'inspection invariant violated'
+    )
   })
 
   it('records accepted fire-and-forget runtime input against the owning pane key', async () => {
@@ -346,14 +310,7 @@ describe('runtime terminal owner routing', () => {
       }
     })
 
-    expect(
-      sendRuntimePtyInput(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1',
-        'x',
-        'driving'
-      )
-    ).toBe(true)
+    expect(sendRuntimePtyInput('remote:env-1@@terminal-1', 'x', 'driving')).toBe(true)
 
     await vi.waitFor(() => {
       expect(useAppStore.getState().lastTerminalInputAtByPaneKey[PANE_KEY]).toEqual(
@@ -382,14 +339,7 @@ describe('runtime terminal owner routing', () => {
     recordRuntimeTerminalInputForPtyId('remote:env-1@@terminal-1', 123)
     useAppStore.setState({ lastTerminalInputAtByPaneKey: {} })
 
-    expect(
-      sendRuntimePtyInput(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1',
-        'x',
-        'driving'
-      )
-    ).toBe(true)
+    expect(sendRuntimePtyInput('remote:env-1@@terminal-1', 'x', 'driving')).toBe(true)
     const nextLeafId = '22222222-2222-4222-8222-222222222222'
     useAppStore.setState({
       terminalLayoutsByTabId: {
@@ -432,14 +382,7 @@ describe('runtime terminal owner routing', () => {
       }
     })
 
-    expect(
-      sendRuntimePtyInput(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1',
-        'x',
-        'driving'
-      )
-    ).toBe(true)
+    expect(sendRuntimePtyInput('remote:env-1@@terminal-1', 'x', 'driving')).toBe(true)
 
     await vi.waitFor(() => {
       expect(runtimeCall).toHaveBeenCalled()
@@ -454,12 +397,7 @@ describe('runtime terminal owner routing', () => {
     })
 
     await expect(
-      sendRuntimePtyInputVerified(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-stale',
-        'x',
-        'driving'
-      )
+      sendRuntimePtyInputVerified('remote:env-1@@terminal-stale', 'x', 'driving')
     ).resolves.toBe(false)
   })
 
@@ -471,12 +409,7 @@ describe('runtime terminal owner routing', () => {
     })
 
     await expect(
-      sendRuntimePtyInputVerified(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1',
-        'x',
-        'driving'
-      )
+      sendRuntimePtyInputVerified('remote:env-1@@terminal-1', 'x', 'driving')
     ).resolves.toBe(false)
 
     expect(runtimeCall).toHaveBeenCalledWith({
@@ -494,9 +427,7 @@ describe('runtime terminal owner routing', () => {
   it('uses accepted local writes for verified input', async () => {
     localWriteAccepted.mockResolvedValue(true)
 
-    await expect(
-      sendRuntimePtyInputVerified({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x', 'driving')
-    ).resolves.toBe(true)
+    await expect(sendRuntimePtyInputVerified('local-pty', 'x', 'driving')).resolves.toBe(true)
 
     expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
     expect(localWrite).not.toHaveBeenCalled()
@@ -505,9 +436,7 @@ describe('runtime terminal owner routing', () => {
   it('rejects oversized fire-and-forget local input before IPC writes', () => {
     const text = 'x'.repeat(TERMINAL_INPUT_MAX_BYTES + 1)
 
-    expect(
-      sendRuntimePtyInput({ activeRuntimeEnvironmentId: null }, 'local-pty', text, 'driving')
-    ).toBe(false)
+    expect(sendRuntimePtyInput('local-pty', text, 'driving')).toBe(false)
 
     expect(localWrite).not.toHaveBeenCalled()
     expect(localWriteAccepted).not.toHaveBeenCalled()
@@ -516,14 +445,7 @@ describe('runtime terminal owner routing', () => {
   it('rejects oversized fire-and-forget remote input before runtime RPC', () => {
     const text = 'x'.repeat(TERMINAL_INPUT_MAX_BYTES + 1)
 
-    expect(
-      sendRuntimePtyInput(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1',
-        text,
-        'driving'
-      )
-    ).toBe(false)
+    expect(sendRuntimePtyInput('remote:env-1@@terminal-1', text, 'driving')).toBe(false)
 
     expect(runtimeTransportCall).not.toHaveBeenCalled()
     expect(localWrite).not.toHaveBeenCalled()
@@ -534,9 +456,7 @@ describe('runtime terminal owner routing', () => {
     try {
       const text = 'x'.repeat(CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS + 1)
 
-      expect(
-        sendRuntimePtyInput({ activeRuntimeEnvironmentId: null }, 'local-pty', text, 'driving')
-      ).toBe(true)
+      expect(sendRuntimePtyInput('local-pty', text, 'driving')).toBe(true)
       expect(localWrite).not.toHaveBeenCalled()
 
       await vi.advanceTimersByTimeAsync(0)
@@ -553,9 +473,7 @@ describe('runtime terminal owner routing', () => {
     try {
       const text = makeByteOversizedTerminalInput()
 
-      expect(
-        sendRuntimePtyInput({ activeRuntimeEnvironmentId: null }, 'local-pty', text, 'driving')
-      ).toBe(true)
+      expect(sendRuntimePtyInput('local-pty', text, 'driving')).toBe(true)
 
       await vi.runAllTimersAsync()
 
@@ -569,14 +487,7 @@ describe('runtime terminal owner routing', () => {
   it('rejects oversized verified input before fallback fire-and-forget writes', async () => {
     const text = 'x'.repeat(TERMINAL_INPUT_MAX_BYTES + 1)
 
-    await expect(
-      sendRuntimePtyInputVerified(
-        { activeRuntimeEnvironmentId: null },
-        'local-pty',
-        text,
-        'driving'
-      )
-    ).resolves.toBe(false)
+    await expect(sendRuntimePtyInputVerified('local-pty', text, 'driving')).resolves.toBe(false)
 
     expect(localWriteAccepted).not.toHaveBeenCalled()
     expect(localWrite).not.toHaveBeenCalled()
@@ -587,12 +498,7 @@ describe('runtime terminal owner routing', () => {
     localWriteAccepted.mockResolvedValue(true)
     try {
       const text = 'x'.repeat(CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS + 1)
-      const accepted = sendRuntimePtyInputVerified(
-        { activeRuntimeEnvironmentId: null },
-        'local-pty',
-        text,
-        'driving'
-      )
+      const accepted = sendRuntimePtyInputVerified('local-pty', text, 'driving')
 
       expect(localWriteAccepted).not.toHaveBeenCalled()
 
@@ -610,12 +516,7 @@ describe('runtime terminal owner routing', () => {
     vi.useFakeTimers()
     try {
       const text = makeByteOversizedTerminalInput()
-      const accepted = sendRuntimePtyInputVerified(
-        { activeRuntimeEnvironmentId: null },
-        'local-pty',
-        text,
-        'driving'
-      )
+      const accepted = sendRuntimePtyInputVerified('local-pty', text, 'driving')
 
       await vi.runAllTimersAsync()
 
@@ -646,12 +547,7 @@ describe('runtime terminal owner routing', () => {
     })
 
     await expect(
-      sendRuntimePtyInputVerified(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1',
-        'x',
-        'driving'
-      )
+      sendRuntimePtyInputVerified('remote:env-1@@terminal-1', 'x', 'driving')
     ).resolves.toBe(true)
 
     expect(useAppStore.getState().lastTerminalInputAtByPaneKey[PANE_KEY]).toEqual(
@@ -678,12 +574,7 @@ describe('runtime terminal owner routing', () => {
     })
 
     await expect(
-      sendRuntimePtyInputVerified(
-        { activeRuntimeEnvironmentId: 'env-2' },
-        'remote:env-1@@terminal-1',
-        'x',
-        'driving'
-      )
+      sendRuntimePtyInputVerified('remote:env-1@@terminal-1', 'x', 'driving')
     ).resolves.toBe(false)
 
     expect(useAppStore.getState().lastTerminalInputAtByPaneKey[PANE_KEY]).toBeUndefined()
@@ -849,9 +740,7 @@ describe('runtime terminal owner routing', () => {
   it('reports success after fallback fire-and-forget writes when local acceptance cannot be verified', async () => {
     localWriteAccepted.mockResolvedValue(false)
 
-    await expect(
-      sendRuntimePtyInputVerified({ activeRuntimeEnvironmentId: null }, 'local-pty', 'x', 'driving')
-    ).resolves.toBe(true)
+    await expect(sendRuntimePtyInputVerified('local-pty', 'x', 'driving')).resolves.toBe(true)
 
     expect(localWriteAccepted).toHaveBeenCalledWith('local-pty', 'x', 'driving')
     expect(localWrite).toHaveBeenCalledWith('local-pty', 'x', 'driving')

@@ -53,7 +53,7 @@ for (const newCardStyle of [false, true]) {
         groupBy: 'none',
         sortBy: 'manual',
         sidebarOpen: true,
-        settings: { ...state.settings, experimentalNewWorktreeCardStyle: newCardStyle },
+        settings: { ...state.settings!, experimentalNewWorktreeCardStyle: newCardStyle },
         showActiveOnly: false,
         showSleepingWorkspaces: true,
         hideDefaultBranchWorkspace: false,

@@ -17,7 +17,7 @@ export async function showActivePaneAsNativeChat(
       }
       store.setState({ settings })
       const state = store.getState()
-      state.setAgentStatus(paneKey, { state: 'idle', agentType, prompt: '' }, title, undefined, {
+      state.setAgentStatus(paneKey, { state: 'waiting', agentType, prompt: '' }, title, undefined, {
         worktreeId
       })
       const [tabId] = paneKey.split(':')

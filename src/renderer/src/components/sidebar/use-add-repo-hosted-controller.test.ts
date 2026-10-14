@@ -13,8 +13,8 @@ vi.mock('react', async (importOriginal) => {
 const mocks = vi.hoisted(() => ({
   state: {
     closeModal: vi.fn(),
-    openSettingsPage: vi.fn(),
-    openSettingsTarget: vi.fn()
+    openSettingsTarget: vi.fn(),
+    openSettingsPage: vi.fn()
   },
   markOnboardingProjectAdded: vi.fn(() => Promise.resolve())
 }))

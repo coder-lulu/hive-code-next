@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { runProcess } from '../../../src/shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 
 export async function createCellPrivatePki(directory: string, openssl: string) {
   const root = join(directory, 'private-pki')

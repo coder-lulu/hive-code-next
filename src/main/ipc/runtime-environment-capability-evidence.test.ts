@@ -15,8 +15,14 @@ beforeEach(resetRuntimeEnvironmentCapabilityEvidence)
 
 describe('runtime environment capability evidence', () => {
   it('accepts evidence by dispatch order instead of completion order', () => {
-    const older = captureRuntimeEnvironmentCapabilityEvidence('env', pairing())
-    const newer = captureRuntimeEnvironmentCapabilityEvidence('env', pairing())
+    const older = captureRuntimeEnvironmentCapabilityEvidence(
+      'env',
+      (pairing())
+    )
+    const newer = captureRuntimeEnvironmentCapabilityEvidence(
+      'env',
+      (pairing())
+    )
 
     expect(
       applyRuntimeEnvironmentCapabilityVerdict({
@@ -37,8 +43,14 @@ describe('runtime environment capability evidence', () => {
   })
 
   it('rejects an older same-verdict outcome from a different runtime identity', () => {
-    const older = captureRuntimeEnvironmentCapabilityEvidence('env', pairing())
-    const newer = captureRuntimeEnvironmentCapabilityEvidence('env', pairing())
+    const older = captureRuntimeEnvironmentCapabilityEvidence(
+      'env',
+      (pairing())
+    )
+    const newer = captureRuntimeEnvironmentCapabilityEvidence(
+      'env',
+      (pairing())
+    )
     applyRuntimeEnvironmentCapabilityVerdict({
       evidence: newer,
       verdict: 'capable',
@@ -53,7 +65,10 @@ describe('runtime environment capability evidence', () => {
   })
 
   it('rejects every pre-invalidation completion, including a same-pairing cycle', () => {
-    const evidence = captureRuntimeEnvironmentCapabilityEvidence('env', pairing())
+    const evidence = captureRuntimeEnvironmentCapabilityEvidence(
+      'env',
+      (pairing())
+    )
     advanceRuntimeEnvironmentCapabilityIncarnation('env')
 
     expect(
@@ -71,14 +86,20 @@ describe('runtime environment capability evidence', () => {
   })
 
   it('invalidates cached outcomes symmetrically on contradictory evidence', () => {
-    const supportedEvidence = captureRuntimeEnvironmentCapabilityEvidence('env', pairing())
+    const supportedEvidence = captureRuntimeEnvironmentCapabilityEvidence(
+      'env',
+      (pairing())
+    )
     applyRuntimeEnvironmentCapabilityVerdict({
       evidence: supportedEvidence,
       verdict: 'capable',
       runtimeId: 'runtime'
     })
     const supported = runtimeEnvironmentCapabilityOutcome(supportedEvidence, 'capable', 'runtime')
-    const absentEvidence = captureRuntimeEnvironmentCapabilityEvidence('env', pairing())
+    const absentEvidence = captureRuntimeEnvironmentCapabilityEvidence(
+      'env',
+      (pairing())
+    )
     applyRuntimeEnvironmentCapabilityVerdict({
       evidence: absentEvidence,
       verdict: 'absent',
@@ -88,12 +109,19 @@ describe('runtime environment capability evidence', () => {
     expect(isRuntimeEnvironmentCapabilityOutcomeCurrent(supported)).toBe(false)
     expect(isRuntimeEnvironmentCapabilityPaused('env')).toBe(true)
     expect(
-      getAcceptedRuntimeEnvironmentCapabilityOutcome('env', pairing(), 'runtime')
+      getAcceptedRuntimeEnvironmentCapabilityOutcome(
+        'env',
+        (pairing()),
+        'runtime'
+      )
     ).toMatchObject({
       kind: 'unsupported'
     })
 
-    const recoveredEvidence = captureRuntimeEnvironmentCapabilityEvidence('env', pairing())
+    const recoveredEvidence = captureRuntimeEnvironmentCapabilityEvidence(
+      'env',
+      (pairing())
+    )
     applyRuntimeEnvironmentCapabilityVerdict({
       evidence: recoveredEvidence,
       verdict: 'capable',
@@ -105,14 +133,21 @@ describe('runtime environment capability evidence', () => {
       )
     ).toBe(false)
     expect(
-      getAcceptedRuntimeEnvironmentCapabilityOutcome('env', pairing(), 'runtime')
+      getAcceptedRuntimeEnvironmentCapabilityOutcome(
+        'env',
+        (pairing()),
+        'runtime'
+      )
     ).toMatchObject({
       kind: 'supported'
     })
   })
 
   it('does not reuse accepted evidence across runtime identities', () => {
-    const evidence = captureRuntimeEnvironmentCapabilityEvidence('env', pairing())
+    const evidence = captureRuntimeEnvironmentCapabilityEvidence(
+      'env',
+      (pairing())
+    )
     applyRuntimeEnvironmentCapabilityVerdict({
       evidence,
       verdict: 'capable',
@@ -120,11 +155,21 @@ describe('runtime environment capability evidence', () => {
     })
 
     expect(
-      getAcceptedRuntimeEnvironmentCapabilityOutcome('env', pairing(), 'runtime-a')
+      getAcceptedRuntimeEnvironmentCapabilityOutcome(
+        'env',
+        (pairing()),
+        'runtime-a'
+      )
     ).toMatchObject({
       kind: 'supported'
     })
-    expect(getAcceptedRuntimeEnvironmentCapabilityOutcome('env', pairing(), 'runtime-b')).toBeNull()
+    expect(
+      getAcceptedRuntimeEnvironmentCapabilityOutcome(
+        'env',
+        (pairing()),
+        'runtime-b'
+      )
+    ).toBeNull()
   })
 })
 

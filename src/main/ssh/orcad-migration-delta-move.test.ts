@@ -2,6 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import * as windowsAcl from '../../shared/secure-path-windows-acl'
 import { getManagedOrcadFenceEnvironmentId } from '../../shared/managed-orcad-ssh-owner'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
 import { addManagedOrcadEnvironment } from '../../shared/runtime-environment-managed-orcad-store'
@@ -10,7 +11,13 @@ import type { Repo } from '../../shared/repo-types'
 import type { SshTarget } from '../../shared/ssh-types'
 import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
-import { closeTestStores, createSqliteTestStore } from '../persistence-test-harness'
+import {
+  closeTestStores,
+  createSqliteTestStore,
+  readPersistedStateJson,
+  writePersistedStateJson
+} from '../persistence-test-harness'
+import type { PersistedState } from '../../shared/persisted-state-types'
 import { Store } from '../persistence/loading-store/store'
 import { listOrcadMigrationSourceCutovers } from './orcad-migration-cutover-journal'
 import { fakeOrcadMigrationDestination } from './orcad-migration-destination-fake'
@@ -30,8 +37,7 @@ const mocks = vi.hoisted(() => {
 })
 vi.mock('./ssh-target-registry', () => ({
   getSshConnectionManager: () => ({}),
-  getSshTargetRegistryStore: () => mocks.state.targetStore,
-  hasRegisteredDirectSshAuthority: () => false
+  getSshTargetRegistryStore: () => mocks.state.targetStore
 }))
 vi.mock('./orcad-runtime-deployment', () => ({ createManagedOrcadEnvironment: mocks.deploy }))
 vi.mock('./orcad-managed-tunnel', () => ({ ensureOrcadManagedTunnel: mocks.ensureTunnel }))
@@ -46,6 +52,9 @@ const TARGET: SshTarget = {
   username: 'deploy',
   generation: 2
 }
+
+const hardenPath = windowsAcl.bestEffortRestrictWindowsPath
+let pendingAclJobs: Promise<boolean>[] = []
 
 let userDataPath: string
 let store: Store
@@ -66,6 +75,30 @@ function repo(id: string, path: string): Repo {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  pendingAclJobs = []
+  vi.spyOn(windowsAcl, 'bestEffortRestrictWindowsPath').mockImplementation(
+    (path, isDirectory, onSettled) => {
+      let settle!: (restricted: boolean) => void
+      let fail!: (error: unknown) => void
+      const pending = new Promise<boolean>((resolve, reject) => {
+        settle = resolve
+        fail = reject
+      })
+      pendingAclJobs.push(pending)
+      try {
+        hardenPath(path, isDirectory, (restricted) => {
+          try {
+            onSettled?.(restricted)
+          } finally {
+            settle(restricted)
+          }
+        })
+      } catch (error) {
+        fail(error)
+        throw error
+      }
+    }
+  )
   userDataPath = mkdtempSync(join(tmpdir(), 'orcad-delta-'))
   store = createSqliteTestStore(Store, { dataFile: join(userDataPath, 'orca-data.json') })
   store.addSshTarget(TARGET)
@@ -101,7 +134,13 @@ beforeEach(() => {
 
 afterEach(async () => {
   await closeTestStores()
-  rmSync(userDataPath, { recursive: true, force: true })
+  try {
+    await Promise.all(pendingAclJobs)
+  } finally {
+    await Promise.allSettled(pendingAclJobs)
+    vi.restoreAllMocks()
+    rmSync(userDataPath, { recursive: true, force: true })
+  }
 })
 
 const now = () => new Date('2026-10-03T00:00:00.000Z')
@@ -112,10 +151,8 @@ async function convertedThenChangedOnOlderBuild(): Promise<void> {
     convertSshTargetToManagedOrcad(userDataPath, {
       sshTargetId: TARGET.id,
       name: 'Managed',
-      listRelayPtyIds: Object.assign(async () => [], { previous: async () => [] }),
       censusHost: async () => ({ verdict: 'exited', count: 0 }),
       destinationFor: () => destination,
-      releaseDirectSession: async () => {},
       now
     })
   ).resolves.toMatchObject({ outcome: 'converted' })
@@ -125,7 +162,7 @@ async function convertedThenChangedOnOlderBuild(): Promise<void> {
   expect(store.getSshTarget(TARGET.id)?.orcadFence?.sourceChangedAt).toBeDefined()
 }
 
-function deltaMove(at: () => Date = now) {
+function deltaMove(at: () => Date = now, census: 'exited' | 'live' = 'exited') {
   const target = store.getSshTarget(TARGET.id)!
   return runOrcadDeltaMove({
     userDataPath,
@@ -134,10 +171,7 @@ function deltaMove(at: () => Date = now) {
     target,
     environment: listEnvironments(userDataPath)[0]!,
     destination,
-    // This relay and every earlier-build relay answer that nothing runs.
-    listRelayPtyIds: Object.assign(async () => [], { previous: async () => [] }),
-    censusHost: async () => ({ verdict: 'exited', count: 0 }),
-    releaseDirectSession: async () => {},
+    censusHost: async () => ({ verdict: census, count: census === 'live' ? 1 : 0 }),
     ensureTunnel: async () => {},
     runTargetLifecycle,
     now: at
@@ -147,7 +181,7 @@ function deltaMove(at: () => Date = now) {
 const LEAF = '11111111-1111-4111-8111-111111111111'
 
 /** What v1.4.218 leaves after a downgrade: a terminal in what it added, and client focus there. */
-function olderBuildSessionAfterDowngrade(): void {
+async function olderBuildSessionAfterDowngrade(): Promise<void> {
   const hostId = `ssh:${TARGET.id}` as const
   const group = store.createProjectGroup({
     name: 'downgrade-added',
@@ -222,14 +256,43 @@ function olderBuildSessionAfterDowngrade(): void {
     },
     hostId
   )
-  store.upsertSshRemotePtyLease({
-    targetId: TARGET.id,
-    ptyId: 'pty2:relay:1',
-    worktreeId: folderKey,
-    tabId: 'tab-term',
-    leafId: LEAF,
-    state: 'expired'
+  // Only the older build writes relay lease and consumer-recovery rows; this build loads them.
+  await reopenWithOlderBuildRelayRows({
+    sshRemotePtyLeases: [
+      {
+        targetId: TARGET.id,
+        ptyId: 'pty2:relay:1',
+        worktreeId: folderKey,
+        tabId: 'tab-term',
+        leafId: LEAF,
+        state: 'expired',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ],
+    sshPtyConsumerRecoveries: [
+      {
+        targetId: TARGET.id,
+        clientInstanceId: 'client-1',
+        serverBuildId: '0.1.0',
+        clientGeneration: 1,
+        ownerGeneration: 1,
+        ownerLease: '9ab3f53d-0de9-4b80-af38-0cc15f62a6ba'
+      }
+    ]
   })
+}
+
+async function reopenWithOlderBuildRelayRows(rows: Partial<PersistedState>): Promise<void> {
+  const dataFile = join(userDataPath, 'orca-data.json')
+  await store.flushPendingOrThrowAsync()
+  await store.freezeWritesAsync()
+  const persisted = JSON.parse(readPersistedStateJson(dataFile))
+  writePersistedStateJson(dataFile, JSON.stringify({ ...persisted, ...rows }))
+  store = createSqliteTestStore(Store, { dataFile })
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: SshConnectionStore wraps the real test store it is given.
+  sshStore = new SshConnectionStore(store as never)
+  mocks.state.targetStore = sshStore
 }
 
 /** The delta's commit and every read after it fail, as when the tunnel drops mid-commit. */
@@ -325,15 +388,8 @@ describe('moving what an older build added to a converted host', () => {
 
   it('moves what a downgrade added despite its exited terminal, tabs and client focus', async () => {
     await convertedThenChangedOnOlderBuild()
-    olderBuildSessionAfterDowngrade()
-    await store.upsertSshPtyConsumerRecovery({
-      targetId: TARGET.id,
-      clientInstanceId: 'client-1',
-      serverBuildId: '0.1.0',
-      clientGeneration: 1,
-      ownerGeneration: 1,
-      ownerLease: 'lease'
-    })
+    await olderBuildSessionAfterDowngrade()
+    expect(store.getSshRemotePtyLeases(TARGET.id)).toHaveLength(1)
     reconcileManagedOrcadSshTargets(userDataPath, store, now)
 
     const plan = planOrcadDeltaMove(userDataPath, store, store.getSshTarget(TARGET.id)!)
@@ -353,6 +409,19 @@ describe('moving what an older build added to a converted host', () => {
       { id: 'tab-term', ptyId: null }
     ])
     expect(session?.unifiedTabs?.['repo-1::/srv/app']).toBeUndefined()
+  })
+
+  it('refuses a move while a downgrade’s terminal still runs', async () => {
+    await convertedThenChangedOnOlderBuild()
+    await olderBuildSessionAfterDowngrade()
+    reconcileManagedOrcadSshTargets(userDataPath, store, now)
+    await expect(deltaMove(now, 'live')).resolves.toMatchObject({ outcome: 'refused' })
+    const delta = listOrcadMigrationSourceCutovers(userDataPath).find(
+      (journal) => journal.supersedesMigrationId
+    )
+    const [lease] = store.getSshRemotePtyLeases(TARGET.id)
+    expect(delta).toBeUndefined()
+    expect(lease.state).not.toBe('terminated')
   })
 
   it('resumes a delta whose commit lost contact, keeping the host marked meanwhile', async () => {
@@ -465,10 +534,8 @@ async function convertKeepingSource(): Promise<void> {
     convertSshTargetToManagedOrcad(userDataPath, {
       sshTargetId: TARGET.id,
       name: 'Managed',
-      listRelayPtyIds: Object.assign(async () => [], { previous: async () => [] }),
       censusHost: async () => ({ verdict: 'exited', count: 0 }),
       destinationFor: () => destination,
-      releaseDirectSession: async () => {},
       now
     })
   ).resolves.toMatchObject({ outcome: 'converted' })
@@ -523,7 +590,7 @@ describe('a retained source is never deleted', () => {
     [
       'a folder workspace on a folder-only host',
       () => {
-        store.removeProject('repo-1')
+        store.removeProjectForHost('repo-1', `ssh:${TARGET.id}`)
         const group = store.createProjectGroup({
           name: 'folders',
           parentPath: '/srv/folders',
@@ -640,7 +707,7 @@ describe('a delta move against a rollback of an update taken before it', () => {
 
   it('protects a folder-only delta the same way', async () => {
     await convertedThenChangedOnOlderBuild()
-    store.removeProject('repo-2')
+    store.removeProjectForHost('repo-2', `ssh:${TARGET.id}`)
     const group = store.createProjectGroup({
       name: 'folders',
       parentPath: '/srv/folders',

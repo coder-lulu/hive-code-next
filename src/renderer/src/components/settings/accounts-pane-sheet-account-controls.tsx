@@ -1,4 +1,4 @@
-import { Ellipsis, RefreshCw, Trash2 } from 'lucide-react'
+import { Link, Ellipsis, RefreshCw, Trash2 } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Button } from '../ui/button'
 import {
@@ -13,12 +13,14 @@ export function AccountActionMenu({
   busy,
   reauthDisabled,
   onReauthenticate,
-  onRemove
+  onRemove,
+  onCopySignInLink
 }: {
   busy: boolean
   reauthDisabled: boolean
   onReauthenticate: () => void
   onRemove: () => void
+  onCopySignInLink?: () => void
 }): React.JSX.Element {
   return (
     <DropdownMenu>
@@ -40,6 +42,12 @@ export function AccountActionMenu({
           <RefreshCw className="size-4" />
           {translate('auto.components.settings.AccountsPane.8a0f870153', 'Re-authenticate')}
         </DropdownMenuItem>
+        {onCopySignInLink ? (
+          <DropdownMenuItem disabled={reauthDisabled} onSelect={onCopySignInLink}>
+            <Link className="size-4" />
+            {translate('accounts.claude.copySignInLink', 'Copy sign-in link instead')}
+          </DropdownMenuItem>
+        ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive focus:text-destructive" onSelect={onRemove}>
           <Trash2 className="size-4" />

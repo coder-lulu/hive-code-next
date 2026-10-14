@@ -7,6 +7,7 @@ import {
 import { REMOTE_RUNTIME_MAX_SUBSCRIPTIONS } from '../../shared/remote-runtime-memory-limits'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime-client'
+import type { RuntimeRpcResponse } from '../../shared/runtime-rpc-envelope'
 import { isRuntimeEnvironmentManuallyDisconnected } from './runtime-environment-connectivity-handlers'
 import { getRuntimeEnvironmentTransportGeneration } from './runtime-environment-transport-generation'
 
@@ -27,8 +28,14 @@ export function registerRuntimeEnvironmentSubscriptionHandlers(args: {
   getUserDataPath: () => string
   remoteRuntimeSubscriptions: Map<string, RetainedRemoteRuntimeSubscription>
   pendingSubscriptions: Map<string, PendingRuntimeSubscription>
+  recordLayoutFrame: (
+    environmentId: string,
+    method: string,
+    response: RuntimeRpcResponse<unknown>
+  ) => void
 }): void {
-  const { getUserDataPath, remoteRuntimeSubscriptions, pendingSubscriptions } = args
+  const { getUserDataPath, remoteRuntimeSubscriptions, pendingSubscriptions, recordLayoutFrame } =
+    args
   ipcMain.handle(
     'runtimeEnvironments:subscribe',
     async (
@@ -162,6 +169,10 @@ export function registerRuntimeEnvironmentSubscriptionHandlers(args: {
                   subscriptionId,
                   ...payload
                 })
+                // After the send, so recording never delays or changes what the window gets.
+                if (payload.type === 'response') {
+                  recordLayoutFrame(environment.id, args.method, payload.response)
+                }
               }
             },
             onClose: () => {

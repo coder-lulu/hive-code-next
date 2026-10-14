@@ -1,8 +1,26 @@
-import type { RuntimeHostStatusSnapshot } from '../../../../shared/runtime-host-status'
+import {
+  runtimeEnvironmentStatusFromSnapshot,
+  type RuntimeHostStatusSnapshot
+} from '../../../../shared/runtime-host-status'
 import type { AppState } from '../types'
 import type { RuntimeEnvironmentStatus } from './runtime-status-types'
 import { ensureBrowserClientHostsForRestoredPages } from '@/runtime/restored-client-hosted-browser-host-attach'
 import { replayClientHostedBrowserCloseIntents } from '@/runtime/client-hosted-browser-close-intent-replay'
+
+/**
+ * Main re-paired this environment (an update or rollback run from the CLI) and nothing told this
+ * renderer; the status it now publishes under the new revision is that notice (P1-C).
+ */
+export function snapshotOutrunsCatalog(
+  snapshot: RuntimeHostStatusSnapshot,
+  state: Pick<AppState, 'runtimeEnvironments'>
+): boolean {
+  const environment = state.runtimeEnvironments.find((entry) => entry.id === snapshot.environmentId)
+  return (
+    environment !== undefined &&
+    snapshot.pairingRevision > (environment.pairingRevision ?? environment.createdAt)
+  )
+}
 
 export function applyRuntimeHostStatusSnapshot(
   snapshot: RuntimeHostStatusSnapshot,
@@ -30,8 +48,7 @@ export function applyRuntimeHostStatusSnapshot(
   // will publish null only when every available route is actually unavailable.
   const alternateRouteStatus = shouldRefreshAlternateRoutes ? (previous?.status ?? null) : null
   const entry: RuntimeEnvironmentStatus = {
-    snapshot,
-    checkedAt: snapshot.checkedAt,
+    ...runtimeEnvironmentStatusFromSnapshot(snapshot),
     connectionGeneration: previous?.connectionGeneration,
     hostContactEpoch: previous?.hostContactEpoch,
     status:

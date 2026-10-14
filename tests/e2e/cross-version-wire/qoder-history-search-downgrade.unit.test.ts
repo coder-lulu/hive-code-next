@@ -1,4 +1,4 @@
-import { afterEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeAll, expect, test, vi } from 'vitest'
 import {
   createSessionSearchClient,
   unavailableSessionSearchStatus
@@ -20,9 +20,17 @@ import { importReleaseCheckoutModule, materializeReleaseCheckout } from './relea
 const PRE_QODER_HOSTS = ['v1.4.211', 'b49abdb1f4da6b3d62dfa9ccf3c74dc9e74d291c']
 const QODER_HOST = 'f97ca2a49d9c711dab54a656a7f8a47ae6c6749c'
 const LEGACY_AGENTS = AI_VAULT_AGENTS.filter(
-  (agent) => !['codebuddy', 'zcode', 'qoder', 'jcode'].includes(agent)
+  (agent) => !['codebuddy', 'zcode', 'qoder', 'jcode', 'kiro'].includes(agent)
 )
 afterEach(() => setSessionSearchService(null))
+
+// Published source extraction is setup, not the search behavior's 30-second budget.
+// Use the same bounded cold-checkout budget as the cross-version wire suite.
+beforeAll(async () => {
+  for (const ref of [...PRE_QODER_HOSTS, QODER_HOST]) {
+    await releaseSearchSchemas(ref)
+  }
+}, 180_000)
 
 async function releaseSearchSchemas(ref: string) {
   const checkout = await materializeReleaseCheckout(ref)
@@ -250,7 +258,7 @@ test('the shipped Qoder capability proves its historical trio while withholding 
   expect(call).toHaveBeenLastCalledWith(
     'aiVault.searchSessions',
     expect.objectContaining({
-      filters: { agents: AI_VAULT_AGENTS.filter((agent) => agent !== 'jcode') }
+      filters: { agents: AI_VAULT_AGENTS.filter((agent) => !['jcode', 'kiro'].includes(agent)) }
     })
   )
 })

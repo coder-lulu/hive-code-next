@@ -30,13 +30,13 @@ export function MobileNativeChatQuestion({
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   const [selectedOptionIndexes, setSelectedOptionIndexes] = useState<number[]>([])
-  const [freeText, setFreeText] = useState('')
+  const [freeText, setFreeText] = useState(() => question.freeTextInput?.initialValue ?? '')
   const [sending, setSending] = useState(false)
   const sendingRef = useRef(false)
   const allowOther = question.allowOther !== false
 
   const hasOptions = question.options.length > 0
-  const trimmedFreeText = freeText.trim()
+  const answerText = question.freeTextInput?.allowEmpty ? freeText : freeText.trim()
 
   const toggle = (optionIndex: number): void => {
     setSelectedOptionIndexes((prev) =>
@@ -72,8 +72,8 @@ export function MobileNativeChatQuestion({
       return
     }
     const answer =
-      question.freeTextToken && trimmedFreeText.length > 0
-        ? formatQuestionAnswerWithOtherByIndexes(question, selectedOptionIndexes, trimmedFreeText)
+      question.freeTextToken && answerText.length > 0
+        ? formatQuestionAnswerWithOtherByIndexes(question, selectedOptionIndexes, answerText)
         : formatQuestionAnswerByIndexes(question, selectedOptionIndexes)
     if (await sendAnswer(answer)) {
       setFreeText('')
@@ -81,20 +81,21 @@ export function MobileNativeChatQuestion({
   }
 
   const submitFreeText = async (): Promise<void> => {
-    if (!allowOther || trimmedFreeText.length === 0) {
+    if (!allowOther || (answerText.length === 0 && !question.freeTextInput?.allowEmpty)) {
       return
     }
     const answer =
       question.multiSelect && question.freeTextToken && selectedOptionIndexes.length > 0
-        ? formatQuestionAnswerWithOtherByIndexes(question, selectedOptionIndexes, trimmedFreeText)
-        : formatQuestionFreeTextAnswer(question, trimmedFreeText)
+        ? formatQuestionAnswerWithOtherByIndexes(question, selectedOptionIndexes, answerText)
+        : formatQuestionFreeTextAnswer(question, answerText)
     if (await sendAnswer(answer)) {
       setFreeText('')
     }
   }
 
   const canSubmitMulti = selectedOptionIndexes.length > 0 && !sending
-  const canSendFreeText = allowOther && trimmedFreeText.length > 0 && !sending
+  const canSendFreeText =
+    allowOther && (answerText.length > 0 || question.freeTextInput?.allowEmpty === true) && !sending
 
   // Stable keys for option rows even if an agent repeats a label.
   const optionRows = useMemo(
@@ -180,12 +181,15 @@ export function MobileNativeChatQuestion({
             style={styles.freeInput}
             value={freeText}
             onChangeText={setFreeText}
-            placeholder={hasOptions ? '或输入回复…' : '输入你的回复…'}
+            placeholder={
+              question.freeTextInput?.placeholder ?? (hasOptions ? '或输入回复…' : '输入你的回复…')
+            }
             placeholderTextColor={theme.color.text.tertiary}
             selectionColor={theme.color.brand.primary}
             onSubmitEditing={submitFreeText}
             returnKeyType="send"
-            multiline
+            // A declared input (Pi's `input`) is one line unless it asks for more, as on desktop.
+            multiline={question.freeTextInput ? question.freeTextInput.multiline === true : true}
           />
           <Pressable
             accessibilityLabel="发送回复"

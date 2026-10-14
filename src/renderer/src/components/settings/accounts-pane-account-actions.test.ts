@@ -27,6 +27,8 @@ describe('provider account actions across scope changes', () => {
       const fetchSettings = vi.fn(async () => {})
       const recordFeatureInteraction = vi.fn()
       const common = {
+        accountOwner: { kind: 'local' as const },
+        isCurrentAccountOwner: () => currentScope,
         settings: getDefaultSettings('/tmp'),
         accountRuntime: { runtime: 'host' as const, label: 'This device' },
         isRemoteAccountScope,

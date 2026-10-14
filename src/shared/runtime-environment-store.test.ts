@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { encodePairingOffer } from './pairing'
+import { APP_DISPLAY_NAME } from './brand'
 import {
   RuntimeEnvironmentStoreError,
   addEnvironmentFromPairingCode,
@@ -39,6 +40,57 @@ describe('runtime environment store', () => {
     for (const dir of tempDirs.splice(0)) {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+
+  function writeProfileKeypair(userDataPath: string, fill: number): void {
+    const publicKeyB64 = Buffer.from(new Uint8Array(32).fill(fill)).toString('base64')
+    writeFileSync(
+      join(userDataPath, 'orca-e2ee-keypair.json'),
+      JSON.stringify({ v: 1, publicKeyB64, secretKeyB64: publicKeyB64 })
+    )
+  }
+
+  it('refuses a pairing code that this same Orca profile issued', () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-env-store-'))
+    tempDirs.push(userDataPath)
+    writeProfileKeypair(userDataPath, 1)
+
+    expect(() =>
+      addEnvironmentFromPairingCode(userDataPath, {
+        name: 'myself',
+        pairingCode: pairingCode('ws://192.0.2.10:6768')
+      })
+    ).toThrow(`this ${APP_DISPLAY_NAME} itself`)
+    expect(listEnvironments(userDataPath)).toEqual([])
+  })
+
+  it('refuses re-pairing a saved server with a code this same Orca profile issued', () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-env-store-'))
+    tempDirs.push(userDataPath)
+    const environment = addEnvironmentFromPairingCode(userDataPath, {
+      name: 'dev box',
+      pairingCode: pairingCode()
+    })
+    writeProfileKeypair(userDataPath, 1)
+
+    expect(() =>
+      updateEnvironmentFromPairingCode(userDataPath, environment.id, {
+        pairingCode: pairingCode('ws://192.0.2.10:6768')
+      })
+    ).toThrow(RuntimeEnvironmentStoreError)
+    expect(listEnvironments(userDataPath)).toEqual([environment])
+  })
+
+  it('pairs a server with a different key even at a loopback address', () => {
+    const userDataPath = mkdtempSync(join(tmpdir(), 'orca-runtime-env-store-'))
+    tempDirs.push(userDataPath)
+    writeProfileKeypair(userDataPath, 2)
+
+    const environment = addEnvironmentFromPairingCode(userDataPath, {
+      name: 'tunnel',
+      pairingCode: pairingCode('ws://127.0.0.1:6768')
+    })
+    expect(listEnvironments(userDataPath)).toEqual([environment])
   })
 
   it('rejects duplicate server names instead of silently replacing the saved server', () => {

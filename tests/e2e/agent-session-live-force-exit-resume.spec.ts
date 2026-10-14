@@ -1,3 +1,4 @@
+import { setTimeout, clearTimeout } from 'node:timers'
 import {
   readPersistedProfileState,
   mutateStoppedProfileState
@@ -191,7 +192,8 @@ async function captureOutputRow(page: Page, expected: string, proofPath: string)
 test.describe.configure({ mode: 'serial' })
 
 for (const agent of ['codex', 'cursor'] as const) {
-  const providerSessionKey = agent === 'cursor' ? 'conversation_id' : 'session_id'
+  const providerSessionKey =
+    agent === 'cursor' ? ('conversation_id' as const) : ('session_id' as const)
   test(`resumes a live ${agent} record after force-exit restart when pane PTY ownership is gone`, async (// oxlint-disable-next-line no-empty-pattern -- Playwright's second fixture arg is testInfo; the first must be an object destructure to opt out of the default fixture set.
   {}, testInfo) => {
     const repoPath = readFileSync(TEST_REPO_PATH_FILE, 'utf-8').trim()

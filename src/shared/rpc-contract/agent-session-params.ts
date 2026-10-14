@@ -12,6 +12,7 @@ import type {
 } from '../agent-session-host-authority'
 import { isTuiAgent } from '../tui-agent-config'
 import { supportsTuiAgentLaunchPermission } from '../tui-agent-permissions'
+import { RESTORE_SPAWN_INTENTS } from '../host-spawn-admission'
 
 export const MAX_WORKTREE_SELECTOR_LENGTH = 32_768
 
@@ -69,6 +70,9 @@ export const LaunchPreferences = z
   .strict()
 
 export const PromptDelivery = z.enum(['auto-submit', 'draft'])
+
+/** Sent only to hosts advertising `terminal.spawn-intent.v1`; presence opts into deferral. */
+export const SpawnIntentParam = z.enum(RESTORE_SPAWN_INTENTS)
 
 export const AgentArgs = z
   .string()
@@ -134,7 +138,8 @@ export const ExplicitEnsure = z
     agentPermissionMode: z.enum(['manual', 'yolo']).optional(),
     launchPreferences: LaunchPreferences.optional(),
     presentation: Presentation.optional(),
-    placement: Placement.optional()
+    placement: Placement.optional(),
+    spawnIntent: SpawnIntentParam.optional()
   })
   .strict()
   .superRefine((value, context) => {

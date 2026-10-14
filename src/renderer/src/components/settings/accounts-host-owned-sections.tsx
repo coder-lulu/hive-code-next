@@ -1,5 +1,4 @@
 import { translate } from '@/i18n/i18n'
-import type { RuntimeClientTarget } from '@/runtime/runtime-client-target'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 import { AntigravityAccountsSection } from './AntigravityAccountsSection'
 import { ManagedDataAccountsSection } from './ManagedDataAccountsSection'
@@ -9,12 +8,7 @@ export function AccountsHostOwnedSections({
 }: {
   model: AccountsPaneSectionModel
 }): React.JSX.Element {
-  const environmentId = model.settings.activeRuntimeEnvironmentId?.trim()
-  const owner: RuntimeClientTarget | null = model.isRemoteAccountScope
-    ? environmentId
-      ? { kind: 'environment', environmentId }
-      : null
-    : { kind: 'local' }
+  const owner = model.accountOwner
   if (model.accountRuntimeUnavailable || !owner) {
     return (
       <p role="alert" className="text-xs text-destructive">

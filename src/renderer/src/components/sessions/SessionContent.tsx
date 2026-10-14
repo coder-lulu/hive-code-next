@@ -4,7 +4,7 @@ import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
 import { resolveCurrentSession, resolveSessionConnectionState } from '@/lib/session-navigation'
-import { runtimeTargetForExecutionHostId } from '@/runtime/runtime-client-target'
+import { runtimeRpcTargetForAuthorityKey } from '@/runtime/runtime-client-target'
 import { requestBackgroundTerminalWorktreeMount } from '../terminal/background-terminal-worktree-mount'
 import { setSessionPanelPortal } from '../activity/activity-terminal-portal'
 import { sessionPanelAnchorName } from './session-detail-anchor'
@@ -43,7 +43,7 @@ export default function SessionContent({
       }
       if (
         item.kind === 'structured' &&
-        !runtimeTargetForExecutionHostId(resolved.executionHostId)
+        !runtimeRpcTargetForAuthorityKey(resolved.executionHostId)
       ) {
         return { error: 'unavailable', bucket: null, tabId: null }
       }

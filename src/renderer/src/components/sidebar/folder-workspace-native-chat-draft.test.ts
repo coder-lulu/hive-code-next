@@ -31,8 +31,6 @@ vi.mock('@/lib/new-workspace', async (importOriginal) => {
 })
 
 import { useAppStore } from '@/store'
-import { decideInitialAgentTabViewMode } from '@/lib/native-chat-initial-view-mode'
-import { resolveStartupLaunchDraftText } from '@/lib/worktree-startup-payload'
 import { submitFolderWorkspaceCreate } from './folder-workspace-composer-submit'
 
 function makeProjectGroup(): ProjectGroup {
@@ -181,7 +179,7 @@ describe('submitFolderWorkspaceCreate native-chat launch draft', () => {
   })
 })
 
-describe('folder-workspace draft: seeded set == chat-opening set', () => {
+describe('folder-workspace draft: linked drafts remain available to terminal chat', () => {
   const ISSUE_URL = 'https://github.com/stablyai/orca/issues/42'
   const linkedIssue = {
     provider: 'github' as const,
@@ -232,20 +230,10 @@ describe('folder-workspace draft: seeded set == chat-opening set', () => {
 
     const startup = mocks.activateAndRevealFolderWorkspace.mock.calls[0]?.[1]?.startup
     const seeded = useAppStore.getState().nativeChatLaunchDraftByTabId['tab-1'] != null
-    const draftText = resolveStartupLaunchDraftText(startup)
-    const opensInChat =
-      decideInitialAgentTabViewMode({
-        experimentalNativeChat: true,
-        openAgentTabsInChatByDefault: true,
-        agent: quickAgent,
-        ...(draftText != null
-          ? { promptDelivery: 'draft' as const, launchDraftText: draftText }
-          : {})
-      }) === 'chat'
-
+    const draftText = useAppStore.getState().nativeChatLaunchDraftByTabId['tab-1']?.text
+    expect(draftText).toBe(note ? `${note}\n\n${ISSUE_URL}` : ISSUE_URL)
     // The draft always reaches the TUI, whichever way it is delivered.
     expect(`${startup?.command ?? ''}${startup?.draftPrompt ?? ''}`).toContain(ISSUE_URL)
     expect(seeded).toBe(expectMirrored)
-    expect(opensInChat).toBe(expectMirrored)
   })
 })

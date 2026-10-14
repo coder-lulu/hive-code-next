@@ -9,7 +9,11 @@ import { normalizeTerminalCustomThemes } from '../../../shared/terminal-custom-t
 import { projectSourceControlAiToLegacyCommitMessageAi } from '../../../shared/source-control-ai'
 import { normalizeUiLanguage } from '../../../shared/ui-language'
 import { normalizeNativeChatShellEnvironmentVariables } from '../../../shared/native-chat-shell-environment'
-import { stripRetiredGlobalSettings } from '../applying-settings/terminal-settings-migrations'
+import { loadedChatPermissionSetting } from '../../../shared/agent-chat-permission-mode'
+import {
+  savedChatUiWithTerminalDefaultView,
+  stripRetiredGlobalSettings
+} from '../applying-settings/terminal-settings-migrations'
 import { readLegacySidekickFlag } from '../applying-settings/onboarding-normalization'
 import { normalizeMachineName } from '../../../shared/machine-name'
 import { isTuiAgent } from '../../../shared/tui-agent-config'
@@ -66,6 +70,10 @@ export function normalizeLoadedGlobalSettings(
       parsed.settings?.defaultTuiAgent === 'blank' || isTuiAgent(parsed.settings?.defaultTuiAgent)
         ? parsed.settings.defaultTuiAgent
         : null,
+    // Why: Chat UI on now opens new tabs in chat; keep users whose new tabs opened in the terminal there.
+    ...(savedChatUiWithTerminalDefaultView(parsed.settings)
+      ? { experimentalNativeChat: false }
+      : {}),
     nativeChatAppearance: normalizeNativeChatAppearanceSettings(
       parsed.settings?.nativeChatAppearance
     ),
@@ -130,6 +138,11 @@ export function normalizeLoadedGlobalSettings(
     nativeChatInheritShellEnvironment: parsed.settings?.nativeChatInheritShellEnvironment !== false,
     nativeChatShellEnvironmentVariables: normalizeNativeChatShellEnvironmentVariables(
       parsed.settings?.nativeChatShellEnvironmentVariables
+    ),
+    // Why: the next settings save stores the seed; until then a reload derives the same one.
+    nativeChatPermissionMode: loadedChatPermissionSetting(
+      parsed.settings?.nativeChatPermissionMode,
+      migratedAgentYoloDefaults
     ),
     defaultTaskSource: taskProviderSettings.defaultTaskSource,
     visibleTaskProviders: taskProviderSettings.visibleTaskProviders,

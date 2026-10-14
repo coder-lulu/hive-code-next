@@ -1,4 +1,9 @@
 import type { ClaudeManagedAccount } from '../../shared/managed-account-types'
+import {
+  CLAUDE_INJECTED_CONFIG_DIR_ENV,
+  CLAUDE_PROFILE_POINTER_ENV,
+  CLAUDE_USER_CONFIG_DIR_ENV
+} from '../../shared/claude-profile-routing'
 
 export const CLAUDE_AUTH_ENV_VARS = [
   'ANTHROPIC_API_KEY',
@@ -8,8 +13,9 @@ export const CLAUDE_AUTH_ENV_VARS = [
 ] as const
 
 export type ClaudeEnvPatch = {
-  ORCA_CLAUDE_PROFILE_POINTER?: string
-  ORCA_CLAUDE_INJECTED_CONFIG_DIR?: string
+  [CLAUDE_PROFILE_POINTER_ENV]?: string
+  [CLAUDE_INJECTED_CONFIG_DIR_ENV]?: string
+  [CLAUDE_USER_CONFIG_DIR_ENV]?: string
   CLAUDE_CONFIG_DIR?: string
   ANTHROPIC_CUSTOM_HEADERS?: string
 }
@@ -35,11 +41,15 @@ export function applyClaudeEnvPatch(
     }
   }
 
-  if (patch.ORCA_CLAUDE_PROFILE_POINTER) {
-    baseEnv.ORCA_CLAUDE_PROFILE_POINTER = patch.ORCA_CLAUDE_PROFILE_POINTER
-  }
-  if (patch.ORCA_CLAUDE_INJECTED_CONFIG_DIR) {
-    baseEnv.ORCA_CLAUDE_INJECTED_CONFIG_DIR = patch.ORCA_CLAUDE_INJECTED_CONFIG_DIR
+  for (const key of [
+    CLAUDE_PROFILE_POINTER_ENV,
+    CLAUDE_INJECTED_CONFIG_DIR_ENV,
+    CLAUDE_USER_CONFIG_DIR_ENV
+  ] as const) {
+    const value = patch[key]
+    if (value) {
+      baseEnv[key] = value
+    }
   }
   if (patch.CLAUDE_CONFIG_DIR) {
     baseEnv.CLAUDE_CONFIG_DIR = patch.CLAUDE_CONFIG_DIR
@@ -49,6 +59,26 @@ export function applyClaudeEnvPatch(
   }
 
   return baseEnv
+}
+
+/** Whether the selected account is a host-managed one; an id no account explains counts as one. */
+export function isHostManagedClaudeAccount(
+  accounts: readonly ClaudeManagedAccount[] | undefined,
+  activeAccountId: string | null | undefined
+): boolean {
+  if (!activeAccountId) {
+    return false
+  }
+  return (
+    (accounts ?? []).find((account) => account.id === activeAccountId)?.managedAuthRuntime !== 'wsl'
+  )
+}
+
+function isAuthLikeCustomHeaders(value: string | undefined): boolean {
+  if (!value) {
+    return false
+  }
+  return /authorization|x-api-key|api-key|bearer/i.test(value)
 }
 
 /** One string for every transport, so a terminal launch and a structured launch
@@ -109,11 +139,4 @@ export function hasClaudeAuthEnvConflict(
     }
   }
   return false
-}
-
-function isAuthLikeCustomHeaders(value: string | undefined): boolean {
-  if (!value) {
-    return false
-  }
-  return /authorization|x-api-key|api-key|bearer/i.test(value)
 }

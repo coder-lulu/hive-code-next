@@ -2,20 +2,20 @@ import { describe, expect, it, vi } from 'vitest'
 import type { PairingOffer } from '../../shared/pairing'
 import { createBrowserClientHostAttachRequest } from './browser-client-host-attach-request'
 
-const pairing = {
+const pairing: PairingOffer = {
   v: 2,
   endpoint: 'ws://127.0.0.1:6768',
   deviceToken: 'device-token',
   publicKeyB64: 'public-key',
   pairedDeviceId: 'device-a',
   scope: 'runtime'
-} as PairingOffer
+}
 
 describe('browser client host attach request', () => {
   it('omits unencodable inventory without changing legacy page-command negotiation', () => {
     const onPageCommand = vi.fn(() => ({ status: 'completed' as const }))
     const attach = createBrowserClientHostAttachRequest({
-      pairing,
+      connection: pairing,
       authorityRuntimeId: 'runtime-a',
       browserHostClientId: 'host-a',
       hostCapabilities: ['webview'],
@@ -48,7 +48,7 @@ describe('browser client host attach request', () => {
 
   it('includes reconnect negotiation only beside an encoded inventory snapshot', () => {
     const attach = createBrowserClientHostAttachRequest({
-      pairing,
+      connection: (pairing),
       authorityRuntimeId: 'runtime-a',
       browserHostClientId: 'host-a',
       hostCapabilities: ['webview'],

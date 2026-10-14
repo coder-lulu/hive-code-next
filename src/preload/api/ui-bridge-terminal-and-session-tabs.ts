@@ -3,6 +3,7 @@ import type { TerminalPaneSplitSource } from '../../shared/feature-education-tel
 import type { TerminalTabCreateReply } from '../../shared/terminal-reveal-identity'
 import type {
   AgentLaunchTabPublishReply,
+  AgentLaunchTabViewerRule,
   AgentLaunchTabPublishRequest
 } from '../../shared/agent-launch-tab-publication'
 import type { AgentLaunchPaneVerdictEvent } from '../../shared/agent-launch-pane-verdict'
@@ -38,6 +39,7 @@ export const uiTerminalAndSessionTabsApi = {
       focus?: boolean
       presentation?: RuntimeTerminalPresentation
       surfaceOwner?: false
+      agentLaunchViewer?: AgentLaunchTabViewerRule
       tabId?: string
       leafId?: string
       splitFromLeafId?: string
@@ -64,6 +66,7 @@ export const uiTerminalAndSessionTabsApi = {
         focus?: boolean
         presentation?: RuntimeTerminalPresentation
         surfaceOwner?: false
+        agentLaunchViewer?: AgentLaunchTabViewerRule
         tabId?: string
         leafId?: string
         splitFromLeafId?: string
@@ -145,11 +148,11 @@ export const uiTerminalAndSessionTabsApi = {
     return () => ipcRenderer.removeListener('ui:splitTerminal', listener)
   },
   onRenameTerminal: (
-    callback: (data: { tabId: string; title: string | null }) => void
+    callback: (data: { tabId: string; title: string | null; recordInteraction?: false }) => void
   ): (() => void) => {
     const listener = (
       _event: Electron.IpcRendererEvent,
-      data: { tabId: string; title: string | null }
+      data: { tabId: string; title: string | null; recordInteraction?: false }
     ) => callback(data)
     ipcRenderer.on('ui:renameTerminal', listener)
     return () => ipcRenderer.removeListener('ui:renameTerminal', listener)
@@ -227,7 +230,7 @@ export const uiTerminalAndSessionTabsApi = {
       worktreeId: string
       filePath: string
       relativePath: string
-      runtimeEnvironmentId?: string
+      runtimeEnvironmentId?: string | null
       navigation?: RuntimeNavigationTarget
     }) => void
   ): (() => void) => {
@@ -237,7 +240,7 @@ export const uiTerminalAndSessionTabsApi = {
         worktreeId: string
         filePath: string
         relativePath: string
-        runtimeEnvironmentId?: string
+        runtimeEnvironmentId?: string | null
         navigation?: RuntimeNavigationTarget
       }
     ) => callback(data)

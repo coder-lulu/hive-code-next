@@ -1,3 +1,4 @@
+import type { RpcBinarySender } from './rpc-binary-sender'
 import type { E2EEChannel } from './e2ee-channel'
 import type {
   E2EEAccountSessionResolver,
@@ -12,7 +13,7 @@ import type { DesktopMobileE2EEV2Context } from './mobile-e2ee-v2-desktop-sessio
 import type { MobileE2EEOutboundMemoryBudget } from './mobile-e2ee-outbound-memory-budget'
 export type E2EEChannelOptions = {
   serverSecretKey: Uint8Array
-  resolveAuthenticatedDevice: (token: string) => E2EEAuthenticatedDevice | null
+  resolveAuthenticatedDevice: (token: string) => E2EEAuthenticatedDevice | { refused: 'insecure_origin' } | null
   onReady: (channel: E2EEChannel, device: E2EEAuthenticatedDevice) => void
   resolveAccountSession?: E2EEAccountSessionResolver
   onAccountReady?: (channel: E2EEChannel, principal: E2EEAuthenticatedAccountSession) => void
@@ -30,5 +31,5 @@ export type E2EEChannelOptions = {
 export type E2EETextMessageHandler = (
   plaintext: string,
   encryptedReply: (response: string) => void,
-  encryptedBinaryReply: (response: Uint8Array<ArrayBufferLike>) => boolean | void
+  encryptedBinaryReply: RpcBinarySender
 ) => void

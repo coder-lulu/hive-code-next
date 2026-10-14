@@ -73,16 +73,13 @@ describe('HiveCode CLI skill guidance', () => {
     expect(skill).toContain(
       'hive worktree create --name <task-name> --no-parent --agent codex --prompt'
     )
-    expect(skill).toContain('codex --model gpt-6-astra -c model_reasoning_effort="xhigh"')
-    expect(skill).toContain('wait for TUI readiness')
-    expect(skill).toContain('stop after confirming the send was accepted')
-    // `terminal wait` prints an ordinary success envelope on timeout and only signals the
-    // unsatisfied wait through the exit code, so the gate and its failure direction have to
-    // sit beside the recipe or the brief gets typed into a half-started TUI.
-    expect(skill).toContain('Send only when the wait result reports `satisfied: true`')
-    expect(skill).toContain('report the handoff as not started and do not send')
+    expect(skill).toContain('--agent codex --model gpt-6-astra --effort high --prompt')
+    expect(skill).toContain('Do not wait for the receiving agent to finish.')
+    expect(skill).toContain("the launch's `prompt.outcome` is `journaled` or `handed-to-terminal`")
+    expect(skill).toContain('the send receipt reported `accepted: true`')
+    expect(skill).toContain('Do not retry as a fresh launch.')
     expect(skill).toContain(
-      "A handoff is done when the new worktree id and agent handle have been reported and the prompt's send receipt reported `accepted: true`"
+      'A host that cannot safely carry prompts or honor background/focus requests is refused before launch'
     )
   })
 
@@ -112,19 +109,16 @@ describe('HiveCode CLI skill guidance', () => {
   it('prefers agent-first workers without duplicating terminal delivery', () => {
     const skill = readSkill()
 
-    expect(skill).toContain('Prefer agent-first create for agent workers')
-    expect(skill).toContain('fallback shell plus a later `terminal create')
+    expect(skill).toContain(
+      '`worktree create --agent` (new checkout) and `agent launch` (existing worktree) are how to start an agent.'
+    )
+    expect(skill).toContain('`terminal create` makes a terminal for shells and commands.')
     expect(skill).toContain('Repo setup or default-terminal settings may still add tabs or splits')
     expect(skill).toContain(
-      'when no repo default-terminal configuration supplies a primary terminal'
+      'Configured default tabs are intentional; never close one without verifying it is an unused shell.'
     )
-    expect(skill).toContain('Configured default tabs are materialized instead')
-    expect(skill).toContain(
-      'only after `terminal list` or `terminal show` confirms it is an unused shell'
-    )
-    expect(skill).not.toContain('bare `worktree create` (no `--agent`) still opens')
     expect(skill).not.toContain('ends with **one** tab')
-    expect(skill).toContain('Use `startupTerminal.handle` as the sole agent handle')
+    expect(skill).toContain('Address the agent through exactly one handle: `launch.outcome.handle`')
     expect(skill).toContain('never dual-send to old and replacement handles')
     expect(skill).toContain(
       "this checks the caller's inbox and does not remotely deliver input to another terminal"

@@ -1,15 +1,15 @@
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
-import type { RuntimeClientTarget } from '../../runtime/runtime-rpc-client'
-import { getRuntimeTargetHostId } from '../runtime-target-host'
+import { getRuntimeTargetHostId } from '../../runtime/runtime-client-target'
 import { getEnvironmentSshStateGeneration } from '../slices/runtime-environment-ssh'
 import { getRuntimeEnvironmentConnectionGeneration } from '../slices/runtime-status'
-import { isLatestRepoCatalogGeneration } from './repo-catalog-fencing'
+import { isHostCatalogFenceCurrent, type HostCatalogFence } from '../host-catalog-fencing'
 import { fetchRepoCatalogForTarget } from './repo-catalog-merge'
 
 export async function loadRepoCatalog(
   target: RuntimeClientTarget,
-  generation: number,
+  fence: HostCatalogFence,
   set: Parameters<StateCreator<AppState>>[0],
   get: () => AppState
 ) {
@@ -21,7 +21,7 @@ export async function loadRepoCatalog(
   const sshGeneration =
     target.kind === 'environment' ? getEnvironmentSshStateGeneration(target.environmentId) : null
   const updateStatus = (status: AppState['repoCatalogStatusByHost'][string]) => {
-    if (isLatestRepoCatalogGeneration(get, hostId, generation)) {
+    if (isHostCatalogFenceCurrent(get, fence)) {
       set((state) => ({
         repoCatalogStatusByHost: { ...state.repoCatalogStatusByHost, [hostId]: status }
       }))

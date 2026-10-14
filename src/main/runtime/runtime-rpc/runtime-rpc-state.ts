@@ -8,6 +8,7 @@ import type { RpcTransport } from '../rpc/transport'
 import type { WebSocket } from 'ws'
 import type { DeviceRegistry } from '../device-registry'
 import type { E2EEKeypair } from '../e2ee-keypair'
+import type { RuntimeHostDescriptor } from '../../../shared/runtime-host-descriptor'
 import type { UnpairedDeviceAuthThrottle } from '../rpc/unpaired-device-auth-throttle'
 import type { MobileSocketWiring } from '../rpc/mobile-socket-wiring'
 import { RuntimeBinaryMessageRouter } from '../runtime-binary-message-router'
@@ -56,6 +57,7 @@ export class RuntimeRpcState {
   protected readonly specializedLongPollCap: number
   protected deviceRegistry: DeviceRegistry | null = null
   protected e2eeKeypair: E2EEKeypair | null = null
+  protected hostDescriptor: RuntimeHostDescriptor | null = null
   protected pairingInitializationFailure: PairingOfferUnavailable | null = null
   protected tlsFingerprint: string | null = null
   protected activeTransports: RpcTransport[] = []

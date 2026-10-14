@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { IPtyProvider } from '../providers/pty-provider-contract'
 import {
   SkillInstallFailureCategorySchema,
   type SkillInstallFailure
@@ -14,7 +13,6 @@ vi.mock('../ipc/runtime-environment-transport-routing', () => ({
 
 import { skillInstallFailureFromError } from './skill-install-operation-error'
 import { installSkillOnRemoteRuntime } from './skill-remote-install-service'
-import { installSkillOnSshHost } from './skill-ssh-relay-service'
 
 const request: SkillInstallRequest = {
   operationId: 'operation-1',
@@ -72,21 +70,20 @@ describe('remote skill failure category parity', () => {
       })
     )
 
-    const requestHostRpc = vi.fn(async (method: string) => {
-      if (method === 'relay.status') {
-        return { capabilities: ['skills.install.v1'] }
-      }
-      throw Object.assign(new Error(failure.code), { code: -32000, data: failure })
-    })
     const ssh = await capturedFailure(
-      installSkillOnSshHost({
-        provider: { requestHostRpc } as unknown as IPtyProvider,
+      installSkillOnRemoteRuntime({
         userDataPath: '/state',
+        environmentId: 'managed-ssh-environment',
         request,
+        capabilities: ['skills.install.v1'],
         requireHttps: true
       })
     )
 
     expect({ paired, ssh }).toEqual({ paired: failure, ssh: failure })
+    expect(mocks.callRuntimeEnvironment.mock.calls.map((args) => args[1])).toEqual([
+      'environment-1',
+      'managed-ssh-environment'
+    ])
   })
 })

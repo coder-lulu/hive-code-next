@@ -9,6 +9,9 @@ import { APP_DISPLAY_NAME } from '@/product-brand'
 export function createWebAppApi(): Partial<PreloadApi> {
   return {
     app: {
+      // Browser preferences do not use the desktop profile writer.
+      isProfileStateSaveDelayed: () => Promise.resolve(false),
+      onProfileStateSaveDelayChanged: () => () => undefined,
       getIdentity: () =>
         Promise.resolve({
           name: APP_DISPLAY_NAME,

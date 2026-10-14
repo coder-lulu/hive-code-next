@@ -267,11 +267,8 @@ test('reuses the full workbench from project management and creates in context',
     const repo = state.repos.find((candidate) =>
       state.worktreesByRepo[candidate.id]?.some((worktree) => worktree.id === id)
     )!
-    const group = await state.createProjectGroup('Project navigation group')
-    if (
-      !group ||
-      !(await state.moveProjectToGroup(repo.id, group.id, undefined, { hostId: 'local' }))
-    ) {
+    const group = await state.createProjectGroup('Project navigation group', 'local')
+    if (!group || !(await state.moveProjectToGroup(repo.id, group.id, undefined, 'local'))) {
       throw new Error('Could not seed project group')
     }
   }, fixture.worktreeId)

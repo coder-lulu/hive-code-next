@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
-import { runProcess, spawnProcess } from '../../shared/child-process/run-process'
+import { runProcess, spawnProcess } from '@orca/process-host'
 import { NODE_RUNTIME_ASSETS } from '../../shared/node-runtime-pin'
 import { orcadNodeRuntimeRelativePath } from '../../shared/orcad-artifacts'
 import { shellEscape } from '../ssh/ssh-connection-utils'
@@ -100,6 +100,9 @@ function launch(
     detached: true
   })
   children.add(child)
+  if (!child.stdout || !child.stderr) {
+    throw new Error('The runtime fixture requires stdout and stderr pipes')
+  }
   let output = ''
   child.stdout.on('data', (data: Buffer) => {
     output += data.toString()

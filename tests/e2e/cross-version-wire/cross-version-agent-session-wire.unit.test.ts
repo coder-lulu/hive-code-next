@@ -38,6 +38,7 @@ import {
   resolveReleaseCheckoutCommit,
   selectLatestStableReleaseTag
 } from './release-checkout'
+import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../../src/shared/agent-session-create-capabilities'
 import {
   callBuild,
   expectDeclaredSurfaceExecutes,
@@ -108,7 +109,9 @@ beforeAll(async () => {
  */
 function legacyClientCapabilities(): string[] {
   return baseline.capabilities.filter(
-    (capability) => capability !== STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
+    (capability) =>
+      capability !== STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY &&
+      capability !== AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY
   )
 }
 
@@ -188,7 +191,10 @@ describe('cross-version structured agent sessions', () => {
     const SEED = { model: 'seeded-model' }
     const settingOff = (): unknown =>
       runtimeStub({
-        getClientSettings: () => ({ experimentalStructuredNativeChat: false }),
+        getClientSettings: () => ({
+          experimentalNativeChat: false,
+          experimentalStructuredNativeChat: false
+        }),
         structuredAgentSessionLaunchSeedOptions: () => SEED
       })
     // The release's own list, so the day a release ships the launch-mode capability this still
@@ -408,7 +414,15 @@ describe('cross-version structured agent sessions', () => {
         // runner's module graph. It is the only place the "registered means
         // usable" claim is executable today, because the baseline registers none
         // of these methods — so it has to carry the whole manifest, not a sample.
-        const releasedCurrent = await loadAgentSessionWireBuild('HEAD')
+        // Diagnostic review may supply an immutable candidate commit before integration.
+        // Normal/final execution always reads HEAD; never pretend an older HEAD is this tree.
+        const candidateRef = process.env.ORCA_CROSS_VERSION_CANDIDATE_REF?.trim() || 'HEAD'
+        if (candidateRef !== 'HEAD') {
+          expect(candidateRef).toMatch(/^[0-9a-f]{40}$/)
+        }
+        const candidateCommit = resolveReleaseCheckoutCommit(candidateRef)
+        const releasedCurrent = await loadAgentSessionWireBuild(candidateCommit)
+        expect(releasedCurrent.revision).toBe(candidateCommit)
         expect(releasedCurrent.capabilities).toContain(STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY)
         expect(
           releasedCurrent.methodNames.filter((name) => name.startsWith('agentSession.'))

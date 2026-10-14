@@ -96,15 +96,9 @@ describe('runtime terminal owner routing', () => {
             : { send: { accepted: true } }
       }))
       await expect(
-        sendRuntimePtyInputVerified(
-          { activeRuntimeEnvironmentId: 'unrelated' },
-          ptyId,
-          'chat',
-          'driving',
-          {
-            requireAgentStatus: 'sendable'
-          }
-        )
+        sendRuntimePtyInputVerified(ptyId, 'chat', 'driving', {
+          requireAgentStatus: 'sendable'
+        })
       ).resolves.toBe(true)
       expect(runtimeCall).toHaveBeenCalledWith({
         method: 'terminal.resolvePane',
@@ -165,7 +159,7 @@ describe('runtime terminal owner routing', () => {
         controller.abort()
       }
       await expect(
-        sendRuntimePtyInputVerified(null, 'local-pty', 'chat', 'driving', {
+        sendRuntimePtyInputVerified('local-pty', 'chat', 'driving', {
           requireAgentStatus: 'sendable',
           signal: controller.signal
         })
@@ -183,13 +177,9 @@ describe('runtime terminal owner routing', () => {
   it('forwards the guard to the remote owner and refuses rejected writes', async () => {
     runtimeCall.mockResolvedValue({ ok: true, result: { send: { accepted: false } } })
     await expect(
-      sendRuntimePtyInputVerified(
-        { activeRuntimeEnvironmentId: 'env-other' },
-        'remote:env-1@@terminal-1',
-        'chat',
-        'driving',
-        { requireAgentStatus: 'sendable' }
-      )
+      sendRuntimePtyInputVerified('remote:env-1@@terminal-1', 'chat', 'driving', {
+        requireAgentStatus: 'sendable'
+      })
     ).resolves.toBe(false)
     expect(runtimeCall).toHaveBeenCalledWith(
       expect.objectContaining({

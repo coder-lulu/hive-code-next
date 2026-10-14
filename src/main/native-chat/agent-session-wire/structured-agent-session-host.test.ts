@@ -464,7 +464,7 @@ describe('respondToPrompt', () => {
     expect(answerPrompt).not.toHaveBeenCalled()
   })
 
-  it("does not turn a recorded refusal into another client's successful answer", async () => {
+  it("does not turn a refused answer into another client's successful answer", async () => {
     await attach()
     const prompt = await seedApproval()
     const rejectedFields = {
@@ -489,10 +489,12 @@ describe('respondToPrompt', () => {
       }
     )
 
+    // A refusal records nothing, so the retry is judged afresh: the prompt has moved on.
     expect(await host.respondToPrompt(CALLER, rejected)).toMatchObject({
       ok: false,
-      refusal: { code: 'agent_session_operation_invalid' }
+      refusal: { code: 'agent_session_item_revision_stale' }
     })
+    expect(answerPrompt).toHaveBeenCalledOnce()
   })
 
   it('keeps the answer and reports it undelivered when the provider callback throws', async () => {

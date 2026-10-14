@@ -98,7 +98,10 @@ export function RuntimeEnvironmentRemoveDialog({
     ? getRuntimeEnvironmentRemovalPresentation(pendingRemove, removingActiveServer)
     : null
   return (
-    <Dialog open={pendingRemove !== null && removalPresentation !== null} onOpenChange={onOpenChange}>
+    <Dialog
+      open={pendingRemove !== null && removalPresentation !== null}
+      onOpenChange={onOpenChange}
+    >
       <DialogContent className="max-w-sm sm:max-w-sm" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="text-sm">{removalPresentation?.title}</DialogTitle>

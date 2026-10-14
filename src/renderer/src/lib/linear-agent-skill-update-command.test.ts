@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { DiscoveredSkill } from '../../../shared/skills'
 import {
-  LINEAR_TICKETS_SKILL_UPDATE_COMMAND,
+  buildAgentFeatureSkillUpdateCommand,
   ORCA_LINEAR_SKILL_UPDATE_COMMAND
 } from './agent-feature-install-commands'
 import { getLinearAgentSkillUpdateTarget } from './linear-agent-skill-update-command'
@@ -43,7 +43,7 @@ describe('getLinearAgentSkillUpdateTarget', () => {
   it('keeps the update and freshness identity on a legacy-only install', () => {
     expect(getLinearAgentSkillUpdateTarget([skill('linear-tickets')], true)).toEqual({
       skillName: 'linear-tickets',
-      command: LINEAR_TICKETS_SKILL_UPDATE_COMMAND
+      command: buildAgentFeatureSkillUpdateCommand(['linear-tickets'])
     })
   })
 })

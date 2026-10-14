@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto'
 import { PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 import {
   isDurableMutation,
@@ -284,8 +283,4 @@ export function getOrchestrationMutationExecutor(
   const executor = new OrchestrationMutationExecutor(runtime)
   executorsByRuntime.set(runtime, executor)
   return executor
-}
-
-export function fingerprintAuthenticatedPairingCredential(token: string): string {
-  return createHash('sha256').update(token).digest('hex')
 }

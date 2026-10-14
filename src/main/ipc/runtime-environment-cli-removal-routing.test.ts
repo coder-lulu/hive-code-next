@@ -169,7 +169,7 @@ function seedEnvironment(): KnownRuntimeEnvironment {
 function absentOutcome(environment: KnownRuntimeEnvironment) {
   const evidence = captureRuntimeEnvironmentCapabilityEvidence(
     environment.id,
-    getPreferredPairingOffer(environment)
+    (getPreferredPairingOffer(environment))
   )
   applyRuntimeEnvironmentCapabilityVerdict({
     evidence,

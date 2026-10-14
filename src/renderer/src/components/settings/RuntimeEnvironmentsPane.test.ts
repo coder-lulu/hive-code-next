@@ -24,7 +24,7 @@ import {
   resolveRuntimeCloudRenameEnvironment,
   supportsLocalRuntimeEnvironmentRemoval,
   type RuntimeHostDetails
-} from './RuntimeEnvironmentsPane'
+} from './runtime-environment-host-details'
 import type { PublicKnownRuntimeEnvironment } from '../../../../shared/runtime-environments'
 
 function details(overrides: Partial<RuntimeHostDetails>): RuntimeHostDetails {
@@ -365,9 +365,11 @@ describe('RuntimeEnvironmentsPane host details', () => {
     ).toBe('disconnected')
   })
 
-  it('explains that selecting a saved server is the explicit default Host mode', () => {
-    expect(getActiveServerModeDescription(true)).toContain('Use this computer by default')
-    expect(getActiveServerModeDescription(true)).toContain('browser/mobile handoff')
+  it('explains that the choice only picks the host for new projects', () => {
+    expect(getActiveServerModeDescription(true)).toContain(
+      'New projects are created on this computer'
+    )
+    expect(getActiveServerModeDescription(true)).toContain('stay on their own host')
     expect(getActiveServerModeDescription(false)).toContain('default Host')
     expect(getActiveServerModeDescription(false)).toContain(
       applyProductBranding('paired Orca runtime')
@@ -422,14 +424,14 @@ describe('RuntimeEnvironmentsPane host details', () => {
     expect(getRuntimeEnvironmentRemovalPresentation(environment, false)).toEqual({
       title: 'Remove Server',
       description: applyProductBranding(
-        'This removes the saved server from Orca. It does not change the active server.'
+        'This removes the saved server from Orca. It does not change the default host for new projects.'
       ),
       actionLabel: 'Remove',
       actionAriaLabel: 'Remove Build host',
       successMessage: 'Removed Build host.'
     })
     expect(getRuntimeEnvironmentRemovalPresentation(environment, true)?.description).toBe(
-      'Choose another Active Server in Advanced before removing this server. Existing host sessions are left alone.'
+      'This server is the default host for new projects. Choose another one in Advanced before removing it. Existing host sessions are left alone.'
     )
   })
 

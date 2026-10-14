@@ -65,9 +65,10 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
   },
   {
     path: ['worktree', 'create'],
+    repeatableFlags: ['reference'],
     summary: 'Create a new HiveCode-managed worktree',
     usage:
-      'hive worktree create --name <name> [--repo <selector>|--project <id> [--host <host-id>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--setup run|skip|inherit] [--base-branch <ref>] [--issue <number>] [--pr <number>] [--linear-issue <identifier-or-url>] [--gitlab-issue <number-or-url>] [--gitlab-mr <number-or-url>] [--comment <text>] [--parent-worktree <selector>] [--no-parent] [--run-hooks] [--activate] [--json]',
+      'hive worktree create --name <name> [--repo <selector>|--project <id> [--host <host-id>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--model <id>] [--effort <level>] [--setup run|skip|inherit] [--base-branch <ref>] [--reference <url>...] [--issue <number>] [--pr <number>] [--linear-issue <identifier-or-url>] [--gitlab-issue <number-or-url>] [--gitlab-mr <number-or-url>] [--comment <text>] [--parent-worktree <selector>] [--no-parent] [--run-hooks] [--activate] [--retry-launch <operationId>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'repo',
@@ -77,7 +78,11 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'name',
       'agent',
       'prompt',
+      'model',
+      'effort',
+      'retry-launch',
       'base-branch',
+      'reference',
       'issue',
       'pr',
       'linear-issue',
@@ -91,7 +96,8 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'activate'
     ],
     notes: [
-      'This creates a new checkout. For a fresh agent in an existing worktree, use `hive terminal create --worktree active --command "codex"` instead.',
+      'Repeat --reference to attach full issue or review URLs before setup or agent startup. Cannot combine with legacy link flags.',
+      'This creates a new checkout. For a fresh agent in an existing worktree, use `hive agent launch` instead.',
       'By default, HiveCode records the new worktree as a child of the caller context when it can infer one from the HiveCode terminal or current directory.',
       'If --repo is omitted, HiveCode infers the repo from the current HiveCode-managed worktree.',
       'Use --project with --host to create on a ready project host setup without spelling the backing repo id.',
@@ -100,8 +106,9 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'Use --no-parent when the new worktree should be independent of the current context.',
       '--no-parent only affects HiveCode lineage; omit --base-branch to use the repo default base, or pass the default base ref explicitly for independent top-level work.',
       'By default this creates the worktree and its first terminal without switching the active HiveCode view.',
-      'Pass --agent to launch an agent in the first terminal; --prompt sends initial work to that agent.',
-      'With --agent --json, read the new agent handle from result.agentTerminalHandle; older runtimes return only result.startupTerminal.handle, and may return neither for folder-based repos.',
+      'Pass --agent to start an agent with the worktree, as a chat or a terminal per your Chat UI setting, exactly as a new agent tab does; --prompt sends initial work to it. --model and --effort pick its model and reasoning effort.',
+      'After a lost agent launch reply, re-issue the same command from the same directory on the same host with --retry-launch <operationId> from the error. Never retry as a fresh launch.',
+      'With --agent --json, result.launch says what started: launch.outcome.kind (structured chat or terminal), launch.outcome.handle, and launch.receipt.detail for why.',
       'Repo-defined setup hooks follow the repository setup policy; pass --setup run to force them.',
       'Pass --activate when the CLI caller intentionally wants to reveal the new worktree in the app.',
       'Passing --run-hooks is kept as a legacy alias for --setup run and reveals the worktree.',
@@ -109,6 +116,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: [
       'hive worktree create --name agent-task --agent codex --prompt "hi" --json',
+      'hive worktree create --name design --no-parent --agent codex --model gpt-6-astra --effort high --prompt "Write the design doc" --json',
       'hive worktree create --repo id:<repoId> --name related-task --json',
       'hive worktree create --project github:stablyai/orca --host runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3 --name benchmark --json',
       'hive worktree create --repo id:<repoId> --name linear-task --linear-issue https://linear.app/stably/issue/STA-335/test-issue --json',
@@ -211,7 +219,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     allowedFlags: [...GLOBAL_FLAGS, 'worktree', 'command', 'shell', 'title', 'focus'],
     notes: [
       'Creates a visible terminal tab without switching focus when possible; falls back to a background handle if the UI cannot adopt it. Pass --focus to switch to it.',
-      'Use this, not worktree create, for a fresh agent in the current checkout.',
+      'This creates a terminal and runs --command in it. To start an agent, use `hive agent launch` (or `hive worktree create --agent` for a new checkout), which follows your Chat UI setting.',
       '--shell picks the shell the terminal IS on a Windows host (cmd.exe, powershell.exe, pwsh.exe, wsl.exe, bash.exe, git-bash); --command is typed into whatever shell the host started, so `--command cmd.exe` leaves a cmd running INSIDE the default shell and exiting it drops back to that shell.',
       applyProductBranding(
         'A host that cannot apply --shell refuses the create rather than quietly spawning its default shell: macOS and Linux execution hosts spawn the login shell, terminals routed over SSH resolve their shell on the SSH host, a --shell that contradicts the project execution runtime (WSL vs Windows host) is refused, and an Orca host older than --shell is refused by the CLI.'
@@ -219,9 +227,9 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     ],
     examples: [
       'hive terminal create --json',
-      'hive terminal create --worktree active --command "codex" --json',
-      'hive terminal create --worktree path:/projects/myapp --title "RUNNER" --command "opencode"',
-      'hive terminal create --worktree path:/projects/myapp --command "opencode" --focus',
+      'hive terminal create --worktree active --command "pnpm dev" --json',
+      'hive terminal create --worktree path:/projects/myapp --title "RUNNER" --command "npm test"',
+      'hive terminal create --worktree path:/projects/myapp --command "pnpm dev" --focus',
       'hive terminal create --worktree path:C:/src/app --shell cmd.exe --json'
     ]
   },

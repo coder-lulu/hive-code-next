@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { join } from 'node:path'
 import type { ParsedDaemonPid } from './daemon-pid-file-parse'
 import { validate } from '../telemetry/validator'
 
@@ -8,6 +9,7 @@ const {
   existsSyncMock,
   readFileSyncMock,
   getVersionMock,
+  getPathMock,
   codeIdentityMock
 } = vi.hoisted(() => ({
   trackMock: vi.fn(),
@@ -15,6 +17,7 @@ const {
   existsSyncMock: vi.fn(() => true),
   readFileSyncMock: vi.fn(),
   getVersionMock: vi.fn(() => '1.4.191'),
+  getPathMock: vi.fn((_name: string) => '/Users/alice/Library/Application Support/Orca'),
   codeIdentityMock: vi.fn(async () => 'parked')
 }))
 vi.mock('../telemetry/client', () => ({ track: trackMock }))
@@ -35,7 +38,7 @@ vi.mock('node:os', async (importOriginal) => ({
   homedir: () => '/Users/alice'
 }))
 vi.mock('../../shared/app-environment', () => ({
-  getAppEnvironment: () => ({ getVersion: getVersionMock })
+  getAppEnvironment: () => ({ getVersion: getVersionMock, getPath: getPathMock })
 }))
 
 import {
@@ -109,6 +112,32 @@ describe('classifyDaemonAdoptionOrigin', () => {
       spawner_path_class: 'unknown'
     })
     expect(codeIdentityMock).toHaveBeenLastCalledWith(undefined)
+  })
+
+  it('reports a daemon started from the private stable copy', async () => {
+    const copies = join('/Users/alice/Library/Application Support/Orca', 'daemon-host', 'macos')
+    const stableCopy = {
+      ...stalePidRecord,
+      spawnerExecPath: join(
+        copies,
+        'terminal-host-0f3c',
+        'app.noindex',
+        'Orca Terminal Host.app',
+        'Contents',
+        'MacOS',
+        'orca-terminal-host'
+      )
+    }
+    expect(await classifyDaemonAdoptionOrigin(stableCopy)).toMatchObject({
+      spawner_path_class: 'stable-copy'
+    })
+    expect(getPathMock).toHaveBeenCalledWith('userData')
+    getPathMock.mockImplementationOnce(() => {
+      throw new Error('AppEnvironment not initialized')
+    })
+    expect(await classifyDaemonAdoptionOrigin(stableCopy)).toMatchObject({
+      spawner_path_class: 'other'
+    })
   })
 })
 

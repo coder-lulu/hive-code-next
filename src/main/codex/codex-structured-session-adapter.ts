@@ -1,5 +1,4 @@
 import * as codexRewind from './codex-structured-rewind'
-import { cancelCodexStructuredTurn } from './codex-structured-prompt-ownership'
 import type { AgentJournalMessageItem } from '../../shared/agent-session-journal-types'
 import type { AgentSessionBackgroundTaskState } from '../../shared/agent-session-wire'
 import { isCodexAppServerRequestError } from './codex-app-server-connection'
@@ -41,7 +40,12 @@ import {
 import { createCodexStructuredNotificationRetry } from './codex-structured-notification-retry'
 import { acquireCodexStructuredSession } from './codex-structured-session-acquire'
 import { changeCodexThreadGoal } from './codex-structured-thread-goal'
-import { answerCodexStructuredPrompt } from './codex-structured-prompt-ownership'
+import { startCodexTerminalStopProbe } from './codex-background-terminals'
+import { codexBackgroundTaskStops, stopCodexBackgroundTasks } from './codex-background-task-stops'
+import {
+  answerCodexStructuredPrompt,
+  cancelCodexStructuredTurn
+} from './codex-structured-prompt-ownership'
 
 export type {
   CodexStructuredLaunch,
@@ -140,6 +144,7 @@ export class CodexStructuredSessionAdapter implements StructuredAgentSessionAdap
       session.backgroundTasks.observe(event, session.prompts.takeAbandonedCommands())
       // After the journal and the parent's republished row, never ahead of either.
       session.backgroundTasks.publishChildWork()
+      startCodexTerminalStopProbe(this.sessions, event.sessionId, session, this.deps)
     }
     this.deps.onEvent?.(event)
     return admission
@@ -179,11 +184,13 @@ export class CodexStructuredSessionAdapter implements StructuredAgentSessionAdap
     )
   }
 
-  // Codex exposes no honest stop for a child thread or a persistent command.
   backgroundTaskStops: NonNullable<StructuredAgentSessionAdapter['backgroundTaskStops']> = (
     sessionId
-  ) =>
-    this.sessions.has(sessionId) ? { supportsTaskStop: false, supportsStopAll: false } : undefined
+  ) => codexBackgroundTaskStops(this.sessions.get(sessionId))
+
+  stopBackgroundTasks: NonNullable<StructuredAgentSessionAdapter['stopBackgroundTasks']> = (
+    input
+  ) => stopCodexBackgroundTasks(this.sessions, input, this.deps.requestTimeoutMs)
 
   bindPromptItemId = (
     sessionId: string,
@@ -277,7 +284,8 @@ export class CodexStructuredSessionAdapter implements StructuredAgentSessionAdap
   async setOption(
     input: StructuredAgentSessionSetOptionInput
   ): Promise<Readonly<Record<string, string>>> {
-    if (!isCodexTurnOptionKey(input.key)) {
+    // `fastMode` is an older client's toggle, applied as a tier; it never rides on a turn.
+    if (!isCodexTurnOptionKey(input.key) && input.key !== 'fastMode') {
       throw new Error(`codex app-server has no thread option named ${input.key}`)
     }
     return applyCodexStructuredSessionOption(this.session(input.sessionId), input.key, input.value)

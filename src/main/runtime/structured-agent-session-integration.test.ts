@@ -62,6 +62,7 @@ import {
 } from './structured-agent-session-runtime'
 import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
+import { scriptedCodexTransport } from './scripted-codex-transport.test-fixture'
 
 // The fake child has a synthetic PID; its process-tree proof must be synthetic too.
 vi.mock('../codex/codex-structured-turn-processes', () => ({
@@ -260,7 +261,7 @@ beforeEach(async () => {
   shellEnvironmentPolicy = { inheritAll: true, names: [] }
   const runtime = {
     getRuntimeId: () => 'runtime-1',
-    getClientSettings: () => ({ experimentalStructuredNativeChat: true }),
+    getClientSettings: () => ({ experimentalNativeChat: true }),
     getStructuredAgentSessionCreateSupport: async () => ({ supported: true }),
     resolveStructuredAgentSessionCreateIntent: async () => {
       const {
@@ -280,7 +281,7 @@ beforeEach(async () => {
         resolveWorkspacePath: async (workspaceId) => `/repos/${workspaceId}`,
         resolveCodexCommand: () => '/usr/local/bin/codex',
         resolveLaunchArgs: () => [],
-        resolveClaudeAuthPolicy: () => ({ stripAuthEnv: true }),
+        resolveClaudeAuthPolicy: () => ({ account: 'managed' }),
         resolveEnvironment: async () => {
           bootEnvironmentReads += 1
           return {
@@ -290,12 +291,14 @@ beforeEach(async () => {
           }
         },
         resolveShellEnvironmentPolicy: () => shellEnvironmentPolicy,
-        resolveCodexOverrides: () => {
+        resolveAgentLaunchEnv: (agent): Record<string, string> => {
+          if (agent !== 'codex') {
+            return {}
+          }
           codexOverrideReads += 1
           return { CODEX_PROFILE: configuredCodexProfile }
         },
-        openCodexConnection: codex.openConnection,
-        readProcessStartTime: async () => 1_700_000_000_000
+        ...scriptedCodexTransport(codex.openConnection)
       }).then(() => undefined),
     registerOwnedSubscriptionCleanup: vi.fn((_id: string, dispose: () => void) => ({
       releaseIfCurrent: dispose

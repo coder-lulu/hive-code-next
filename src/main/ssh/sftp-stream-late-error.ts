@@ -15,7 +15,7 @@ import { APP_DISPLAY_NAME } from '../../shared/brand'
  * chroot makes a late `SSH_FX_NO_SUCH_FILE` the normal answer, so the listener has to
  * outlive the transfer rather than the other way round.
  *
- * `runSftpFallbackTransfer` already does this for the session emitter; this is the same
+ * `latchLateSftpSessionErrors` does this for the session emitter; this is the same
  * guarantee one level down, on the streams.
  */
 

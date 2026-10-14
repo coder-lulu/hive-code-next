@@ -24,6 +24,12 @@ export function describeReleasedStopNoteProjection(port: ScenarioPort): void {
     (ref) => {
       const rig = createReleasedStopNoteRig(port, ref)
       const { page, subscribe, events, reduce, render, turn, note, seed } = rig
+      it('rejects an unknown producer kind before passing released output to the current reducer', async () => {
+        await turn('running')
+        const item = rig.journal.snapshot().items[0]!
+        expect(rig.parseReleasedItem({ ...item, producerKind: 'agent' }).producerKind).toBe('agent')
+        expect(() => rig.parseReleasedItem({ ...item, producerKind: 'future-producer' })).toThrow()
+      })
       it('renders the derived page with the interrupted turn outside the page', async () => {
         await turn('interrupted')
         await note()

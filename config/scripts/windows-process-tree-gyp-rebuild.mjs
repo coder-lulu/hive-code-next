@@ -125,7 +125,7 @@ const IDENTIFIED_TERMINATION_EXPORT = 'terminateProcessIfCreationTimeMatches'
  * `.build` dir or cached artifact would ship and the relay would fall back to
  * WMI, which refuses a standard user.
  */
-export function windowsProcessTreeAddonHasRelayLauncher(addonPath) {
+export function windowsProcessTreeAddonHasBreakawayLauncher(addonPath) {
   return readFileSync(addonPath).includes(RELAY_LAUNCHER_EXPORT)
 }
 
@@ -136,7 +136,7 @@ export function windowsProcessTreeAddonHasRelayLauncher(addonPath) {
  * @param {'x64' | 'arm64'} arch
  * @returns {string | null}
  */
-export function relayWindowsProcessTreeAddonDefect(addonPath, arch) {
+export function windowsProcessTreeAddonDefect(addonPath, arch) {
   const state = inspectWindowsProcessTreeAddon(addonPath)
   if (state === 'missing') {
     return 'it is missing'
@@ -151,7 +151,7 @@ export function relayWindowsProcessTreeAddonDefect(addonPath, arch) {
   if (machine !== PE_MACHINE[arch]) {
     return `it is ${describePeMachine(machine)}, not ${arch} (0x${PE_MACHINE[arch].toString(16)})`
   }
-  if (!windowsProcessTreeAddonHasRelayLauncher(addonPath)) {
+  if (!windowsProcessTreeAddonHasBreakawayLauncher(addonPath)) {
     return `it does not export ${RELAY_LAUNCHER_EXPORT}, so it predates the relay launcher patch`
   }
   if (!readFileSync(addonPath).includes(IDENTIFIED_TERMINATION_EXPORT)) {

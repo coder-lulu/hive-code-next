@@ -4,7 +4,7 @@ import { mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 
 const { afterStat } = vi.hoisted(() => {
   const afterStat: { run: null | (() => Promise<void>) } = { run: null }
@@ -21,9 +21,9 @@ vi.mock('node:fs/promises', async (original) => {
     }
   }
 })
+import { readRegularTranscriptFile } from '../../shared/agent-hook-listener/safe-transcript-opener'
 import { readNodeFileWithinLimit } from '../../shared/node-bounded-file-reader'
 import { readLocalAntigravityHistory } from './session-scanner-antigravity-history'
-import { readRelayTranscriptBytes } from '../../relay/ai-vault-transcript-stream'
 
 const roots: string[] = []
 async function filePath() {
@@ -55,14 +55,14 @@ describe('bounded regular metadata reads', () => {
         await expect(readNodeFileWithinLimit(path, 64, { regularFileOnly: true })).rejects.toThrow(
           'regular file'
         )
-        // Relay transcript admission preserves the stricter no-follow safe opener.
-        const relayRefusal =
+        // Current transcript admission preserves the stricter no-follow safe opener.
+        const transcriptRefusal =
           path === alias && constants.O_NOFOLLOW !== undefined && constants.O_NONBLOCK !== undefined
             ? 'ELOOP'
             : 'Unsafe transcript file'
         await expect(
-          readRelayTranscriptBytes(path, undefined, { regularFileOnly: true, maxBytes: 64 }).next()
-        ).rejects.toThrow(relayRefusal)
+          readRegularTranscriptFile(path, 'utf8')
+        ).rejects.toThrow(transcriptRefusal)
       }
     },
     2000

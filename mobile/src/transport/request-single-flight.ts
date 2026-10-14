@@ -1,4 +1,4 @@
-import type { RpcClient } from './rpc-client'
+import type { RpcClient } from './rpc-client-contract'
 import type { RpcResponse } from './types'
 
 type Deferred = {

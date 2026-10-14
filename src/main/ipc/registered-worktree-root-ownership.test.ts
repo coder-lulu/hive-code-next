@@ -72,7 +72,7 @@ beforeEach(() => {
   invalidateAuthorizedRootsCache()
   __resetCreatedWorktreeRootsForTests()
   vi.resetAllMocks()
-  mocks.graph.mockResolvedValue([])
+  mocks.graph.mockResolvedValue([{ path: root }])
   mocks.stat.mockResolvedValue({})
   mocks.realpath.mockImplementation(async (path: string) => path)
 })
@@ -208,7 +208,7 @@ describe('recovered grant ownership and prune completion', () => {
     const rebuilding = rebuildAuthorizedRootsCache(store)
     expect(mocks.graph).toHaveBeenCalledOnce()
     registerWorktreeRootsForRepo(store, local.id, [replacement])
-    graph.resolve([{ path: linked }])
+    graph.resolve([{ path: root }, { path: linked }])
     await rebuilding
     await expectDenied(join(linked, 'file'), store)
     await expect(resolveAuthorizedPath(join(replacement, 'file'), store)).resolves.toBe(
@@ -284,7 +284,7 @@ describe('qualified registration', () => {
           ? { ...local, executionHostId: 'ssh:remote' }
           : { ...local, connectionId: 'remote' }
       invalidateAuthorizedRootsCache()
-      graph.resolve([{ path: linked }])
+      graph.resolve([{ path: root }, { path: linked }])
       await rebuilding
       await expectDenied(join(linked, 'file'), store)
       expect(mocks.graph).toHaveBeenCalledOnce()

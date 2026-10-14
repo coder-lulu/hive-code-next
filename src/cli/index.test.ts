@@ -311,6 +311,39 @@ describe('unknown command surfaces a suggestion', () => {
     expect(stderr).toContain('hive worktree')
   })
 
+  it.each([
+    ['orchestration resume', 'orchestration reset'],
+    ['artifacts deset', 'artifacts delete'],
+    ['emulator ball', 'emulator kill'],
+    ['emulator showdown', 'emulator shutdown'],
+    ['orchestration worker-showw', 'orchestration worker-stop'],
+    ['orchestration worker-relay', 'orchestration worker-release'],
+    ['tab clues', 'tab close'],
+    ['environment rollbook', 'environment rollback'],
+    ['linear relation move', 'linear relation remove']
+  ])('keeps %s recovery away from %s before runtime lookup', async (input, forbidden) => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    runtimeClientConstructorMock.mockClear()
+    try {
+      await main([...input.split(' '), '--json'], '/tmp/repo')
+      expect(process.exitCode).toBe(1)
+      const output = logSpy.mock.calls.flat().join('\n')
+      expect(output).toContain('invalid_argument')
+      expect(output).toContain('"runtimeId": null')
+      expect(output).not.toContain(`orca ${forbidden}`)
+      expect(output).not.toContain(`"${forbidden}"`)
+      expect(runtimeClientConstructorMock).not.toHaveBeenCalled()
+      expect(callMock).not.toHaveBeenCalled()
+    } finally {
+      logSpy.mockRestore()
+    }
+
+    await main(input.split(' '), '/tmp/repo')
+    expect(errorSpy.mock.calls.flat().join('\n')).not.toContain(`orca ${forbidden}`)
+    expect(runtimeClientConstructorMock).not.toHaveBeenCalled()
+    expect(callMock).not.toHaveBeenCalled()
+  })
+
   it('reports a mistyped pre-command flag without swallowing the command', async () => {
     await main(['--jso', 'worktree', 'list'], '/tmp/repo')
 
@@ -534,10 +567,7 @@ describe('hive root help', () => {
     )
     expect(logSpy.mock.calls[0][0]).toContain('Agent Sessions And Worktrees:')
     expect(logSpy.mock.calls[0][0]).toContain(
-      '`worktree create --agent` creates a new checkout with an agent.'
-    )
-    expect(logSpy.mock.calls[0][0]).toContain(
-      'hive terminal create --worktree active --command "codex"'
+      'hive agent launch --agent codex --model gpt-6-astra --effort high'
     )
     expect(logSpy.mock.calls[0][0]).toContain(
       'orchestration worker-start Start a supervised worker locally or on a connected HiveCode server'
@@ -728,7 +758,7 @@ describe('hive root help', () => {
     expect(callMock).not.toHaveBeenCalled()
   })
 
-  it('distinguishes new worktrees from fresh agent terminals in command help', async () => {
+  it('points both create commands at the agent launch for starting agents', async () => {
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
     logSpy.mockClear()
 
@@ -736,17 +766,14 @@ describe('hive root help', () => {
 
     expect(String(logSpy.mock.calls[0][0])).toContain('This creates a new checkout.')
     expect(String(logSpy.mock.calls[0][0])).toContain(
-      'hive terminal create --worktree active --command "codex"'
+      'For a fresh agent in an existing worktree, use `hive agent launch`'
     )
 
     logSpy.mockClear()
     await main(['terminal', 'create', '--help'], '/tmp/repo')
 
     const terminalHelp = String(logSpy.mock.calls[0][0])
-    expect(terminalHelp).toContain('Use this, not worktree create')
-    expect(terminalHelp).toContain(
-      'hive terminal create --worktree active --command "codex" --json'
-    )
+    expect(terminalHelp).toContain('To start an agent, use `hive agent launch`')
     expect(callMock).not.toHaveBeenCalled()
   })
 })

@@ -78,13 +78,13 @@ export async function callRuntimeEnvironment(
         if (revisionFailure) {
           return revisionFailure
         }
-        const pairing = getPreferredPairingOffer(currentEnvironment)
-        endpoint = pairing.endpoint
+        const pairedConnection = getPreferredPairingOffer(currentEnvironment)
+        endpoint = pairedConnection.endpoint
         const effectiveTimeoutMs = timeoutMs ?? DEFAULT_REMOTE_RUNTIME_TIMEOUT_MS
         const sharedControlEnvelope = shouldUseSharedControlEnvelope(method, params, envelope)
         if (envelope && !sharedControlEnvelope) {
           const response = await sendRemoteRuntimeRequestAbortable(
-            pairing,
+            pairedConnection,
             method,
             params,
             effectiveTimeoutMs,
@@ -98,7 +98,7 @@ export async function callRuntimeEnvironment(
         if (shouldUseCachedRequestConnection(method)) {
           const response = await sendRemoteRuntimeConnectionRequestAbortable(
             currentEnvironment.id,
-            pairing,
+            pairedConnection,
             method,
             params,
             effectiveTimeoutMs,
@@ -122,7 +122,7 @@ export async function callRuntimeEnvironment(
         // Why: startup/control-plane RPCs use the proven one-shot path so repo
         // hydration cannot be coupled to a stale terminal-control connection.
         const response = await sendRemoteRuntimeRequestAbortable(
-          pairing,
+          pairedConnection,
           method,
           params,
           effectiveTimeoutMs,
@@ -163,7 +163,7 @@ export async function subscribeRuntimeEnvironment(
   signal?: AbortSignal
 ): Promise<RemoteRuntimeSubscription> {
   const environment = await resolveManagedRuntimeEnvironment(userDataPath, selector)
-  const pairing = getPreferredPairingOffer(environment)
+  const pairedConnection = getPreferredPairingOffer(environment)
   const effectiveTimeoutMs = timeoutMs ?? DEFAULT_REMOTE_RUNTIME_TIMEOUT_MS
   let markedUsed = false
   const markUsedOnce = (runtimeId: string): void => {
@@ -186,7 +186,7 @@ export async function subscribeRuntimeEnvironment(
       callbacks.onEvent({
         type: 'error' as const,
         code: error.code,
-        message: withRemoteRuntimeTailscaleHint(error.message, pairing.endpoint)
+        message: withRemoteRuntimeTailscaleHint(error.message, pairedConnection.endpoint)
       }),
     onClose: () => {
       callbacks.onEvent({ type: 'close' as const })
@@ -209,7 +209,7 @@ export async function subscribeRuntimeEnvironment(
       })
     }
     return await subscribeRemoteRuntimeRequest(
-      pairing,
+      pairedConnection,
       method,
       params,
       effectiveTimeoutMs,
@@ -218,7 +218,7 @@ export async function subscribeRuntimeEnvironment(
     )
   } catch (error) {
     if (error instanceof Error) {
-      error.message = withRemoteRuntimeTailscaleHint(error.message, pairing.endpoint)
+      error.message = withRemoteRuntimeTailscaleHint(error.message, pairedConnection.endpoint)
     }
     throw error
   }

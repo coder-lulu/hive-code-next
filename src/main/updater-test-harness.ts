@@ -163,7 +163,8 @@ export function createUpdaterMocks(): UpdaterMocks {
     getAllWindows: vi.fn(() => [])
   }
   const nativeUpdaterMock = {
-    on: vi.fn()
+    on: vi.fn(),
+    checkForUpdates: vi.fn()
   }
   const isMock = { dev: false }
   const killAllPtyMock = vi.fn()
@@ -211,7 +212,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     // updater first loads its dependency, just as the production lazy loader does.
     electronUpdaterLoader: () => ({ loadElectronAutoUpdater: loadGenerationScopedAutoUpdater }),
     electronToolkitUtils: () => ({ is: isMock }),
-    ipcPty: () => ({ killAllPty: killAllPtyMock }),
+    ptyKillAll: () => ({ killAllPty: killAllPtyMock }),
     // Why: only the marker resolver is faked so the real artifact capture/redaction path stays under test.
     linuxUpdatePackageType: () => ({
       getLinuxPackageType: getLinuxPackageTypeMock,
@@ -269,6 +270,7 @@ export function createUpdaterMocks(): UpdaterMocks {
     autoUpdaterMock.reset()
     productUpdaterSessionFetchMock.mockReset().mockImplementation(respondToProductUpdaterRequest)
     nativeUpdaterMock.on.mockReset()
+    nativeUpdaterMock.checkForUpdates.mockReset()
     browserWindowMock.getAllWindows.mockReset()
     browserWindowMock.getAllWindows.mockReturnValue([])
     appMock.getVersion.mockReset()

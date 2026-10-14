@@ -1,4 +1,4 @@
-import { stat } from 'node:fs/promises'
+import { realpath, stat } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { withTimeout } from '../../shared/promise-timeout-fallback'
 import type { Repo } from '../../shared/repo-types'
@@ -34,14 +34,19 @@ export async function listWorktreeRootsWithConcurrency(
           const index = nextIndex++
           const repo = repos[index]
           const wslDistro = getWorktreeMirrorDistroForRuntime(runtimes.get(repo.id))
-          const roots = new Set([resolve(repo.path)])
+          const registeredPath = resolve(repo.path)
+          const roots = new Set([registeredPath])
           let listingFailed = false
           try {
-            for (const worktree of await listRepoWorktreeGraph(
-              repo,
-              wslDistro ? { wslDistro } : {}
-            )) {
-              roots.add(resolve(worktree.path))
+            const graph = await listRepoWorktreeGraph(repo, wslDistro ? { wslDistro } : {})
+            // Git searches ancestors when a nested repository loses its metadata. Only a
+            // registered graph root may authorize the other worktrees that Git reports.
+            if (await graphContainsRegisteredRoot(registeredPath, graph)) {
+              for (const worktree of graph) {
+                roots.add(resolve(worktree.path))
+              }
+            } else {
+              listingFailed = true
             }
           } catch (error) {
             console.warn(
@@ -82,4 +87,29 @@ async function isRootGoneFromDisk(targetPath: string): Promise<boolean> {
     (error: unknown) => getErrorCode(error) === 'ENOENT'
   )
   return withTimeout(probe, CREATED_WORKTREE_ROOT_PROBE_TIMEOUT_MS, false)
+}
+
+async function graphContainsRegisteredRoot(
+  registeredPath: string,
+  graph: readonly { path: string }[]
+): Promise<boolean> {
+  if (graph.length === 0) {
+    return false
+  }
+  const registered = resolve(registeredPath)
+  if (graph.some((worktree) => resolve(worktree.path) === registered)) {
+    return true
+  }
+  // Prove aliases through the filesystem, never Unicode or case folding alone.
+  const canonicalRegistered = await realpath(registered)
+  for (const worktree of graph) {
+    try {
+      if ((await realpath(resolve(worktree.path))) === canonicalRegistered) {
+        return true
+      }
+    } catch {
+      // An unavailable graph entry cannot prove the registered root's identity.
+    }
+  }
+  return false
 }

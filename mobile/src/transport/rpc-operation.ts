@@ -10,7 +10,7 @@ import type { UnvalidatedRpcRequestPort, SendRequestOptions } from './unvalidate
 import type { RpcMethodName, RpcSendParams } from './rpc-params-contract'
 import { classifyRpcReply } from './rpc-operation-reply'
 import { sendSingleFlightRequest } from './request-single-flight'
-import type { RpcClient } from './rpc-client'
+import type { RpcClient } from './rpc-client-contract'
 import type { RpcResponse } from './types'
 import type {
   AnyRpcOperation,

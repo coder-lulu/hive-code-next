@@ -4,6 +4,7 @@ import {
   PAIRING_ENDPOINT_MAX_CHARACTERS,
   PAIRING_PUBLIC_KEY_MAX_CHARACTERS
 } from './mobile-pairing-protocol-limits'
+import { RuntimeHostDescriptorSchema } from './runtime-host-descriptor'
 
 export const PAIRING_OFFER_VERSION = 2
 export const CANONICAL_RUNTIME_RECORD_ID_PATTERN =
@@ -17,7 +18,9 @@ export const PairingOfferSchema = z
     publicKeyB64: z.string().min(1).max(PAIRING_PUBLIC_KEY_MAX_CHARACTERS),
     pairedDeviceId: z.string().min(1).max(128).optional(),
     runtimeRecordId: z.string().regex(CANONICAL_RUNTIME_RECORD_ID_PATTERN).optional(),
-    scope: z.enum(['mobile', 'runtime']).optional()
+    scope: z.enum(['mobile', 'runtime']).optional(),
+    // Advisory identity metadata; the pinned public key remains the trust root.
+    hostDescriptor: RuntimeHostDescriptorSchema.optional().catch(undefined)
   })
   .strict()
 export type PairingOffer = z.infer<typeof PairingOfferSchema>

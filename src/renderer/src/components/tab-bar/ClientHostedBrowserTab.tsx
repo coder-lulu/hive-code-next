@@ -1,6 +1,6 @@
 import { Laptop, Loader2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { TabHoverCard } from './TabHoverCard'
 import { translate } from '@/i18n/i18n'
 import type { ClientHostedBrowserRow } from '../../../../shared/client-hosted-browser-rows'
 import { ACTIVE_TAB_SURFACE_CLASSES, getTabRootStateClasses } from './drop-indicator'
@@ -38,75 +38,70 @@ export default function ClientHostedBrowserTab({
 
   return (
     <div {...slotProps}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <div
-            data-client-hosted-browser-row-id={row.browserPageId}
-            data-active={isActive ? 'true' : 'false'}
-            role="button"
-            tabIndex={0}
-            aria-pressed={isActive}
-            className={`${getTabRootStateClasses(isActive)}`}
-            onPointerDown={onActivate}
-            onKeyDown={(event) => {
-              if (
-                event.target === event.currentTarget &&
-                (event.key === 'Enter' || event.key === ' ')
-              ) {
-                event.preventDefault()
-                onActivate()
-              }
-            }}
-            onMouseDown={(event) => {
-              if (event.button === 1) {
-                event.preventDefault()
-              }
-            }}
-            onMouseUp={preventMiddleButtonDefault}
-            onAuxClick={(event) => {
-              if (event.button === 1) {
-                event.preventDefault()
-                event.stopPropagation()
-                onClose()
-              }
+      <TabHoverCard
+        title={label}
+        programName={translate('tabHoverCard.browser', 'Browser')}
+        icon={<Laptop className="size-4" />}
+        description={hostDescription}
+      >
+        <div
+          data-client-hosted-browser-row-id={row.browserPageId}
+          data-active={isActive ? 'true' : 'false'}
+          role="button"
+          tabIndex={0}
+          aria-pressed={isActive}
+          className={`${getTabRootStateClasses(isActive)}`}
+          onPointerDown={onActivate}
+          onKeyDown={(event) => {
+            if (
+              event.target === event.currentTarget &&
+              (event.key === 'Enter' || event.key === ' ')
+            ) {
+              event.preventDefault()
+              onActivate()
+            }
+          }}
+          onMouseDown={(event) => {
+            if (event.button === 1) {
+              event.preventDefault()
+            }
+          }}
+          onMouseUp={preventMiddleButtonDefault}
+          onAuxClick={(event) => {
+            if (event.button === 1) {
+              event.preventDefault()
+              event.stopPropagation()
+              onClose()
+            }
+          }}
+        >
+          {isActive && <span className={ACTIVE_TAB_SURFACE_CLASSES} aria-hidden />}
+          <PageIcon
+            className={`mr-1 size-4 shrink-0 ${loading ? 'motion-safe:animate-spin' : ''} ${row.hostAbsent ? 'text-muted-foreground' : 'text-blue-500'}`}
+            aria-hidden
+          />
+          <span
+            className={`${TAB_LABEL_WIDTH_CLASSES} mr-1 ${row.hostAbsent ? 'text-muted-foreground' : ''}`}
+          >
+            {label}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            type="button"
+            data-tab-close-button="true"
+            aria-label={translate('browser.clientHosted.hostRowClose', 'Close hosted page')}
+            className="tab-close-button motion-reduce:transition-none"
+            onPointerDown={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation()
+              onClose()
             }}
           >
-            {isActive && <span className={ACTIVE_TAB_SURFACE_CLASSES} aria-hidden />}
-            <PageIcon
-              className={`mr-1 size-4 shrink-0 ${loading ? 'motion-safe:animate-spin' : ''} ${row.hostAbsent ? 'text-muted-foreground' : 'text-blue-500'}`}
-              aria-hidden
-            />
-            <span
-              className={`${TAB_LABEL_WIDTH_CLASSES} mr-1 ${row.hostAbsent ? 'text-muted-foreground' : ''}`}
-            >
-              {label}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              type="button"
-              data-tab-close-button="true"
-              aria-label={translate('browser.clientHosted.hostRowClose', 'Close hosted page')}
-              className="tab-close-button motion-reduce:transition-none"
-              onPointerDown={(event) => event.stopPropagation()}
-              onClick={(event) => {
-                event.stopPropagation()
-                onClose()
-              }}
-            >
-              <X className="h-3 w-3" />
-            </Button>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent
-          side="bottom"
-          sideOffset={6}
-          className="max-w-80 whitespace-normal break-words text-left"
-        >
-          <div>{label}</div>
-          <div className="text-muted-foreground">{hostDescription}</div>
-        </TooltipContent>
-      </Tooltip>
+            <X className="h-3 w-3" />
+          </Button>
+        </div>
+      </TabHoverCard>
     </div>
   )
 }

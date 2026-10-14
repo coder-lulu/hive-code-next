@@ -1,3 +1,4 @@
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { useCallback, useEffect, useState } from 'react'
@@ -5,9 +6,11 @@ import { useSortable } from '@dnd-kit/sortable'
 import { X, Minimize2, Pin } from 'lucide-react'
 import { stripLeadingAgentTitleDecoration } from '../../../../shared/agent-title-decoration'
 import { useTabAgent } from '@/lib/use-tab-agent'
+import { getAgentLabel } from '@/lib/agent-catalog'
+import { basename } from '@/lib/path'
 import { isImeCompositionKeyDown } from '@/lib/ime-composition-keyboard-event'
 import { Input } from '@/components/ui/input'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { TabHoverCard } from './TabHoverCard'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import type { TabDragItemData } from '../tab-group/useTabDragSplit'
 import { useAppStore } from '../../store'
@@ -60,6 +63,8 @@ type SortableTabProps = {
   /** Toggle the tab between terminal and native chat view. */
   onToggleViewMode?: () => void
   canSplitTerminal?: boolean
+  /** Set only for a native chat tab: the chat session it shows. */
+  structuredSessionId?: string
 }
 
 export default function SortableTab({
@@ -86,7 +91,8 @@ export default function SortableTab({
   canToggleViewMode = false,
   isChatView = false,
   onToggleViewMode,
-  canSplitTerminal = true
+  canSplitTerminal = true,
+  structuredSessionId
 }: SortableTabProps): React.JSX.Element {
   // Why: agent-completion unread exists even with terminal-attention off; collapse both sources to one primitive so unrelated tabs don't re-render.
   const hasUnreadActivity = useAppStore((s) =>
@@ -273,27 +279,14 @@ export default function SortableTab({
           className="mr-1 h-5 min-w-[72px] flex-1 px-1 py-0 text-xs"
           spellCheck={false}
         />
-      ) : isEditing || menuOpen ? (
-        <span className={`${TAB_LABEL_WIDTH_CLASSES} mr-1`}>{displayTitle}</span>
       ) : (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className={`${TAB_LABEL_WIDTH_CLASSES} mr-1`}>{displayTitle}</span>
-          </TooltipTrigger>
-          <TooltipContent
-            side="bottom"
-            sideOffset={6}
-            className="max-w-80 whitespace-normal break-words text-left"
-          >
-            {displayTitle}
-          </TooltipContent>
-        </Tooltip>
+        <span className={`${TAB_LABEL_WIDTH_CLASSES} mr-1`}>{displayTitle}</span>
       )}
       {!isEditing && (
         <span className="mr-1 inline-flex size-4 shrink-0 items-center justify-center">
           <TerminalTabActivityIndicator
-            activityStatus={activityStatus}
             showUnreadActivity={showUnreadActivity}
+            activityStatus={activityStatus}
           />
         </span>
       )}
@@ -383,7 +376,30 @@ export default function SortableTab({
           setMenuOpen(true)
         }}
       >
-        {tabRoot}
+        {isEditing || menuOpen ? (
+          tabRoot
+        ) : (
+          <TabHoverCard
+            title={displayTitle}
+            programName={
+              tabAgent
+                ? getAgentLabel(tabAgent)
+                : shellForIcon
+                  ? basename(shellForIcon)
+                  : translate('tabHoverCard.terminal', 'Terminal')
+            }
+            icon={
+              <TerminalTabLeadingIcon
+                agent={tabAgent}
+                activityStatus={activityStatus}
+                shell={shellForIcon}
+                isActive
+              />
+            }
+          >
+            {tabRoot}
+          </TabHoverCard>
+        )}
       </div>
 
       <SortableTabContextMenu
@@ -410,6 +426,7 @@ export default function SortableTab({
         isChatView={isChatView}
         onToggleViewMode={onToggleViewMode}
         canSplitTerminal={canSplitTerminal}
+        structuredSessionId={structuredSessionId}
       />
     </>
   )

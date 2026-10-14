@@ -22,7 +22,7 @@ test('account switch actions return keyboard input to the terminal', async ({
     const ptyId = await waitForActivePanePtyId(orcaPage)
     await orcaPage.evaluate(
       ({ ptyId, action }) => {
-        window.__store.getState().markCodexRestartNotices([
+        window.__store!.getState().markCodexRestartNotices([
           {
             ptyId,
             previousAccountLabel: 'Previous account',

@@ -1,3 +1,4 @@
+import { setTimeout } from 'node:timers'
 import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import {

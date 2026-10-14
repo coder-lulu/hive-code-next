@@ -1,7 +1,7 @@
 import { realpathSync } from 'node:fs'
 import path from 'node:path'
 import type { TuiAgent } from '../../shared/tui-agent'
-import { runProcess } from '../../shared/child-process/run-process'
+import { runProcess } from '@orca/process-host'
 import { versionFromOutput } from './agent-version-output'
 
 const PACKAGES: Partial<Record<TuiAgent, string>> = {

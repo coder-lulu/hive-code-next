@@ -1,11 +1,11 @@
 import { useMemo, useRef, useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { Check } from 'lucide-react-native'
 import type { AskAnswerSelection, AskPrompt } from '../../../src/shared/native-chat-ask'
-import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
-import { TEXT_INPUT_FONT_SIZE } from '../platform/text-input-font-size'
+import { createMobileNativeChatAskStyles } from './mobile-native-chat-ask-styles'
 import { MobileNativeChatCardHeaderAction } from './MobileNativeChatCardHeaderAction'
+import { useMobileNativeChatAskAutoAdvance } from './use-mobile-native-chat-ask-auto-advance'
 
 type Props = {
   prompt: AskPrompt
@@ -23,7 +23,8 @@ const OTHER = -1
 
 /** Native renderer for an agent's AskUserQuestion prompt as a wizard: one
  *  question per step with tabs across the top, a Next button that advances (Send
- *  on the last step), and a Cancel that dismisses the prompt. Neutral styling
+ *  on the last step), and a Cancel that dismisses the prompt. A single-select pick
+ *  moves on by itself, as on desktop. Neutral styling
  *  with a subtle green accent on the active choice to match the rest of the app. */
 export function MobileNativeChatAsk({
   prompt,
@@ -32,24 +33,34 @@ export function MobileNativeChatAsk({
   onCollapse
 }: Props): React.JSX.Element {
   const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  const styles = useMobileThemeStyles(createMobileNativeChatAskStyles)
   const [index, setIndex] = useState(0)
   const [selections, setSelections] = useState<number[][]>(() => prompt.questions.map(() => []))
   const [otherText, setOtherText] = useState<string[]>(() => prompt.questions.map(() => ''))
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+  const autoAdvance = useMobileNativeChatAskAutoAdvance()
 
+  // A single-select option answers the question, so the card moves on after a beat that shows
+  // it chosen; "Other…" still needs its text.
   const toggle = (qi: number, optIndex: number, multi: boolean): void => {
-    setSelections((prev) => {
-      const next = prev.map((s) => [...s])
-      const cur = next[qi] ?? []
-      if (multi) {
-        next[qi] = cur.includes(optIndex) ? cur.filter((i) => i !== optIndex) : [...cur, optIndex]
-      } else {
-        next[qi] = cur.includes(optIndex) ? [] : [optIndex]
-      }
-      return next
-    })
+    // The ref, not `submitting`: a tap can land before the render that disables the rows.
+    if (submittingRef.current) {
+      return
+    }
+    const cur = selections[qi] ?? []
+    const picked = !cur.includes(optIndex)
+    const chosen = !picked
+      ? cur.filter((i) => i !== optIndex)
+      : multi
+        ? [...cur, optIndex]
+        : [optIndex]
+    const next = selections.map((s, i) => (i === qi ? chosen : s))
+    setSelections(next)
+    autoAdvance.cancel()
+    if (picked && !multi && optIndex !== OTHER) {
+      autoAdvance.schedule(() => void advance(next))
+    }
   }
 
   const setOther = (qi: number, value: string): void => {
@@ -60,15 +71,16 @@ export function MobileNativeChatAsk({
     })
   }
 
-  const selectionFor = (qi: number): AskAnswerSelection => {
-    const picked = (selections[qi] ?? []).filter((i) => i !== OTHER)
-    const other = (selections[qi] ?? []).includes(OTHER) ? (otherText[qi] ?? '').trim() : ''
+  // `sel` is an explicit snapshot so a just-made pick isn't lost to the async setState.
+  const selectionFor = (qi: number, sel = selections): AskAnswerSelection => {
+    const picked = (sel[qi] ?? []).filter((i) => i !== OTHER)
+    const other = (sel[qi] ?? []).includes(OTHER) ? (otherText[qi] ?? '').trim() : ''
     return other ? { indices: picked, other } : { indices: picked }
   }
 
-  const isAnswered = (qi: number): boolean => {
-    const sel = selectionFor(qi)
-    return sel.indices.length > 0 || (sel.other ?? '').length > 0
+  const isAnswered = (qi: number, sel = selections): boolean => {
+    const answer = selectionFor(qi, sel)
+    return answer.indices.length > 0 || (answer.other ?? '').length > 0
   }
 
   const total = prompt.questions.length
@@ -85,23 +97,24 @@ export function MobileNativeChatAsk({
   )
   const canAdvance = !submitting && (isLast ? allAnswered : currentAnswered)
 
-  const submit = async (): Promise<void> => {
-    if (!allAnswered || submittingRef.current) {
+  const submit = async (sel: number[][]): Promise<void> => {
+    if (!prompt.questions.every((_, i) => isAnswered(i, sel)) || submittingRef.current) {
       return
     }
     submittingRef.current = true
     setSubmitting(true)
     try {
-      await onAnswer(prompt.questions.map((_, i) => selectionFor(i)))
+      await onAnswer(prompt.questions.map((_, i) => selectionFor(i, sel)))
     } finally {
       submittingRef.current = false
       setSubmitting(false)
     }
   }
 
-  const advance = async (): Promise<void> => {
+  const advance = async (sel = selections): Promise<void> => {
+    autoAdvance.cancel()
     if (isLast) {
-      await submit()
+      await submit(sel)
     } else {
       setIndex((i) => Math.min(i + 1, total - 1))
     }
@@ -124,7 +137,11 @@ export function MobileNativeChatAsk({
             <Pressable
               key={i}
               style={[styles.tab, i === index && styles.tabActive]}
-              onPress={() => setIndex(i)}
+              disabled={submitting}
+              onPress={() => {
+                autoAdvance.cancel()
+                setIndex(i)
+              }}
             >
               <Text style={[styles.tabText, i === index && styles.tabTextActive]} numberOfLines={1}>
                 {qq.header || `第 ${i + 1} 步`}
@@ -140,7 +157,16 @@ export function MobileNativeChatAsk({
       <ScrollView style={styles.scroll} keyboardShouldPersistTaps="always">
         <View style={styles.questionRow}>
           <Text style={styles.questionText}>{q.question}</Text>
-          <MobileNativeChatCardHeaderAction onCollapse={onCollapse} disabled={submitting} />
+          <MobileNativeChatCardHeaderAction
+            onCollapse={
+              onCollapse &&
+              (() => {
+                autoAdvance.cancel()
+                onCollapse()
+              })
+            }
+            disabled={submitting}
+          />
         </View>
         {q.options.map((opt, optIndex) => (
           <OptionRow
@@ -149,6 +175,7 @@ export function MobileNativeChatAsk({
             description={opt.description}
             selected={(selections[index] ?? []).includes(optIndex)}
             multi={q.multiSelect}
+            disabled={submitting}
             onPress={() => toggle(index, optIndex, q.multiSelect)}
           />
         ))}
@@ -156,6 +183,7 @@ export function MobileNativeChatAsk({
           label="其他…"
           selected={otherSelected}
           multi={q.multiSelect}
+          disabled={submitting}
           onPress={() => toggle(index, OTHER, q.multiSelect)}
         />
         {otherSelected ? (
@@ -175,6 +203,7 @@ export function MobileNativeChatAsk({
         <Pressable
           style={styles.cancel}
           onPress={async () => {
+            autoAdvance.cancel()
             if (!submittingRef.current && onCancel) {
               submittingRef.current = true
               setSubmitting(true)
@@ -200,7 +229,7 @@ export function MobileNativeChatAsk({
         ) : null}
         <Pressable
           style={[styles.next, !canAdvance && styles.nextDisabled]}
-          onPress={advance}
+          onPress={() => void advance()}
           disabled={!canAdvance}
           accessibilityRole="button"
           accessibilityLabel={isLast ? '提交回答' : '下一步'}
@@ -219,16 +248,18 @@ function OptionRow({
   description,
   selected,
   multi,
+  disabled,
   onPress
 }: {
   label: string
   description?: string
   selected: boolean
   multi?: boolean
+  disabled: boolean
   onPress: () => void
 }): React.JSX.Element {
   const theme = useMobileTheme()
-  const styles = useMobileThemeStyles(createStyles)
+  const styles = useMobileThemeStyles(createMobileNativeChatAskStyles)
   return (
     <Pressable
       style={({ pressed }) => [
@@ -236,9 +267,10 @@ function OptionRow({
         selected && styles.optionSelected,
         pressed && styles.pressed
       ]}
+      disabled={disabled}
       onPress={onPress}
       accessibilityRole={multi ? 'checkbox' : 'radio'}
-      accessibilityState={{ checked: selected }}
+      accessibilityState={{ checked: selected, disabled }}
     >
       {/* Multi-select reads as a checkbox (square); single-select as a radio (circle). */}
       <View
@@ -260,159 +292,4 @@ function OptionRow({
       </View>
     </Pressable>
   )
-}
-
-function createStyles(theme: MobileTheme) {
-  return StyleSheet.create({
-    questionRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.space8 },
-    card: {
-      maxHeight: 380,
-      backgroundColor: theme.color.bg.surface,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.color.border.subtle
-    },
-    tabs: {
-      flexGrow: 0,
-      paddingTop: theme.spacing.space8,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      borderBottomColor: theme.color.border.subtle
-    },
-    tabsContent: {
-      paddingHorizontal: theme.spacing.space8,
-      gap: theme.spacing.space4,
-      alignItems: 'center'
-    },
-    tab: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space4,
-      minHeight: theme.size.minimumTouchTarget,
-      paddingHorizontal: theme.spacing.space8,
-      paddingVertical: theme.spacing.space4,
-      borderBottomWidth: 2,
-      borderBottomColor: 'transparent'
-    },
-    tabActive: {
-      borderBottomColor: theme.color.brand.primary
-    },
-    tabText: {
-      ...theme.typography.meta,
-      color: theme.color.text.secondary,
-      fontWeight: '600'
-    },
-    tabTextActive: {
-      color: theme.color.text.primary
-    },
-    scroll: {
-      paddingHorizontal: theme.spacing.space12
-    },
-    questionText: {
-      ...theme.typography.sectionTitle,
-      color: theme.color.text.primary,
-      fontWeight: '600',
-      marginVertical: theme.spacing.space8
-    },
-    option: {
-      minHeight: theme.size.minimumTouchTarget,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: theme.spacing.space8,
-      padding: theme.spacing.space8,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.elevated,
-      borderWidth: 1,
-      borderColor: theme.color.border.default,
-      marginBottom: theme.spacing.space4
-    },
-    optionSelected: {
-      borderColor: theme.color.brand.primary
-    },
-    pressed: {
-      opacity: 0.72
-    },
-    check: {
-      width: theme.spacing.space20,
-      height: theme.spacing.space20,
-      borderWidth: 1.5,
-      borderColor: theme.color.text.tertiary,
-      alignItems: 'center',
-      justifyContent: 'center'
-    },
-    checkCircle: {
-      borderRadius: theme.radii.circle
-    },
-    checkSquare: {
-      borderRadius: theme.radii.small
-    },
-    checkOn: {
-      backgroundColor: theme.color.brand.primary,
-      borderColor: theme.color.brand.primary
-    },
-    optionBody: {
-      flex: 1,
-      gap: theme.spacing.space4
-    },
-    optionLabel: {
-      ...theme.typography.label,
-      color: theme.color.text.primary,
-      fontWeight: '600'
-    },
-    optionDescription: {
-      ...theme.typography.meta,
-      color: theme.color.text.secondary
-    },
-    input: {
-      ...theme.typography.body,
-      fontSize: TEXT_INPUT_FONT_SIZE,
-      backgroundColor: theme.color.bg.elevated,
-      borderWidth: 1,
-      borderColor: theme.color.border.default,
-      borderRadius: theme.radii.control,
-      color: theme.color.text.primary,
-      padding: theme.spacing.space12,
-      minHeight: theme.size.minimumTouchTarget,
-      marginBottom: theme.spacing.space4
-    },
-    footer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      padding: theme.spacing.space12,
-      gap: theme.spacing.space8,
-      borderTopWidth: StyleSheet.hairlineWidth,
-      borderTopColor: theme.color.border.subtle
-    },
-    cancel: {
-      minHeight: theme.size.minimumTouchTarget,
-      justifyContent: 'center',
-      paddingHorizontal: theme.spacing.space8
-    },
-    cancelText: {
-      ...theme.typography.label,
-      color: theme.color.text.secondary,
-      fontWeight: '600'
-    },
-    progress: {
-      ...theme.typography.meta,
-      color: theme.color.text.tertiary
-    },
-    next: {
-      minHeight: theme.size.minimumTouchTarget,
-      justifyContent: 'center',
-      paddingHorizontal: theme.spacing.space16,
-      borderRadius: theme.radii.control,
-      backgroundColor: theme.color.bg.selected
-    },
-    nextDisabled: {
-      backgroundColor: theme.color.bg.subtle
-    },
-    nextText: {
-      ...theme.typography.label,
-      color: theme.color.text.inverse,
-      fontWeight: '600'
-    },
-    nextTextDisabled: {
-      color: theme.color.text.tertiary
-    }
-  })
 }

@@ -17,8 +17,7 @@ function build(permissionMode: 'default' | 'manual' | 'yolo', agentDefaultArgs: 
     draftPrompt: null,
     settings: settings({ codex: agentDefaultArgs }),
     agentPermissionMode: permissionMode,
-    repoConnectionId: null,
-    platform: 'linux',
+    launchHost: { kind: 'known', platform: 'linux', hostKind: 'local' },
     shell: 'posix',
     isRemote: false,
     telemetrySource: 'unknown'
@@ -72,8 +71,7 @@ describe('buildQuickComposerStartup permission mode', () => {
       draftPrompt: null,
       settings: settings({}),
       agentPermissionMode: 'yolo',
-      repoConnectionId: 'runtime-host',
-      platform: 'linux',
+      launchHost: { kind: 'known', platform: 'linux', hostKind: 'runtime' },
       shell: 'posix',
       isRemote: true,
       telemetrySource: 'unknown'
@@ -95,8 +93,7 @@ describe('buildQuickComposerStartup permission mode', () => {
       draftPrompt: null,
       settings: settings({}),
       agentPermissionMode: 'default',
-      repoConnectionId: 'runtime-host',
-      platform: 'linux',
+      launchHost: { kind: 'known', platform: 'linux', hostKind: 'runtime' },
       shell: 'posix',
       isRemote: true,
       telemetrySource: 'unknown'

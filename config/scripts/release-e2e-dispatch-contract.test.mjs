@@ -49,12 +49,11 @@ describe('release E2E dispatch contract', () => {
     expect(refInput.required).toBe(false)
   })
 
-  it('overlaps the relay bundle with the Electron build', () => {
+  it('builds current Electron output without a retired relay bundle', () => {
     const buildStep = e2eWorkflow.jobs.build.steps.find((step) => step.name === 'Build E2E outputs')
 
-    expect(buildStep.run).toContain('pnpm run build:relay &')
-    expect(buildStep.run).toContain('relay_pid=$!')
-    expect(buildStep.run).toContain('wait "$relay_pid"')
+    expect(buildStep.run).toBe('pnpm run build:electron-vite:parallel --mode e2e')
+    expect(buildStep.run).not.toContain('build:relay')
   })
 
   it('primes the Electron native cache before every E2E consumer', () => {
@@ -65,7 +64,7 @@ describe('release E2E dispatch contract', () => {
     ).toEqual({
       'native-runtime': 'electron'
     })
-    for (const jobName of ['e2e', 'changed-e2e', 'ssh-docker-watcher-isolation']) {
+    for (const jobName of ['e2e', 'changed-e2e', 'orcad-serve-mode-switch', 'orcad-ssh-docker']) {
       expect(e2eWorkflow.jobs[jobName].needs, jobName).toEqual(['build', 'prepare-native-cache'])
     }
   })
@@ -75,7 +74,9 @@ describe('release E2E dispatch contract', () => {
 
     expect(buildStep.run).toContain('pnpm run build:electron-vite:parallel --mode e2e')
     expect(buildStep.env.VITE_EXPOSE_STORE).toBe('true')
-    expect(buildStep.run).toContain('pnpm run build:relay')
+    expect(
+      e2eWorkflow.jobs.build.steps.find((step) => step.name === 'Project shared E2E web client').run
+    ).toBe('pnpm run build:web-from-renderer')
   })
 
   it('joins the shared CLI and web builds before uploading complete E2E output', () => {
@@ -96,12 +97,12 @@ describe('release E2E dispatch contract', () => {
     expect(steps[upload].with.path).toBe('out/')
   })
 
-  it('hands the built relay artifact to every E2E run command', () => {
+  it('hands the isolated current build artifact to every E2E run command', () => {
     const uploadStep = e2eWorkflow.jobs.build.steps.find(
       (step) => step.name === 'Upload E2E build output'
     )
 
-    expect(uploadStep.with.name).toBe('e2e-build-out')
+    expect(uploadStep.with.name).toBe('e2e-build-out${{ inputs.artifact_suffix }}')
     expect(uploadStep.with.path).toBe('out/')
 
     for (const [jobName, runStepName] of [
@@ -113,9 +114,11 @@ describe('release E2E dispatch contract', () => {
       const runStep = job.steps.find((step) => step.name === runStepName)
 
       expect(job.needs).toEqual(['build', 'prepare-native-cache'])
-      expect(downloadStep.with.name).toBe('e2e-build-out')
+      expect(downloadStep.with.name).toBe('e2e-build-out${{ inputs.artifact_suffix }}')
       expect(downloadStep.with.path).toBe('out/')
-      expect(runStep.run).toContain('ORCA_RELAY_PATH="$GITHUB_WORKSPACE/out/relay"')
+      expect(runStep.run).toContain('SKIP_BUILD=1')
+      expect(runStep.run).toContain('ORCA_E2E_WEB_CLIENT=1')
+      expect(runStep.run).not.toContain('ORCA_RELAY_PATH')
     }
   })
 })

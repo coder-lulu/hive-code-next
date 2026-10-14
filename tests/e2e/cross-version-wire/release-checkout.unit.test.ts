@@ -14,8 +14,8 @@ import { tmpdir } from 'node:os'
 import { join, relative } from 'node:path'
 import { lock } from 'proper-lockfile'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { forceTerminateProcessTree } from '../../../src/shared/child-process/process-tree-termination'
-import { spawnProcess } from '../../../src/shared/child-process/run-process'
+import { forceTerminateProcessTree } from '@orca/process-host/process-tree-termination'
+import { spawnProcess } from '@orca/process-host'
 import {
   importReleaseCheckoutModule,
   materializeReleaseCheckout,
@@ -326,8 +326,11 @@ describe('release checkout materialization', () => {
         testHooks: {
           // The loader needs the actual shared subtree, not unrelated main and
           // renderer files. Its disposable cache never enters the default cache.
-          populateStaging: ({ staging }) =>
-            extractReleaseCheckoutTree(REPO_ROOT, staging, CHECKOUT_REF, ['src/shared'])
+          populateStaging: async ({ staging }) => {
+            await extractReleaseCheckoutTree(REPO_ROOT, staging, CHECKOUT_REF, true, {
+              archivePaths: ['src/shared']
+            })
+          }
         }
       })
     })

@@ -10,7 +10,8 @@ import {
   restoreReleaseJavascript
 } from './release-javascript-artifact.mjs'
 import { releaseJavascriptSupport } from './release-javascript-support.mjs'
-import { runProcessSync, describeProcessFailure } from './script-child-process.mjs'
+import { runProcessSync } from '@orca/process-host'
+import { describeProcessFailure } from './process-failure-message.mjs'
 import { getTarProgram } from './zip-extractor-command.mjs'
 
 const directories = []

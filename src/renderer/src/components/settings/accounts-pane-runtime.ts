@@ -110,3 +110,19 @@ export function formatAccountTimestamp(timestamp: number): string {
     minute: '2-digit'
   })
 }
+
+export function getRemoteAccountRuntimeLabel(name: string | null): string {
+  return (
+    name ??
+    translate('auto.components.settings.AccountsPane.remoteServerFallback', 'the remote server')
+  )
+}
+
+export function getAccountRuntimeSentenceLabel(runtime: {
+  runtime: string
+  label: string
+}): string {
+  return runtime.runtime === 'host' && !navigator.userAgent.includes('Windows')
+    ? runtime.label.charAt(0).toLocaleLowerCase() + runtime.label.slice(1)
+    : runtime.label
+}

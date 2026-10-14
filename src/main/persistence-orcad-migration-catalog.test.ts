@@ -18,6 +18,7 @@ import {
   manifest
 } from './persistence-orcad-migration-catalog-fixture'
 import {
+  closeTestStores,
   createStore,
   makeRepo,
   readDataFile,
@@ -57,7 +58,8 @@ describe('orcad migration catalog persistence', () => {
     testState.dir = mkdtempSync(join(tmpdir(), 'orca-migration-catalog-'))
   })
 
-  afterEach(() => {
+  afterEach(async () => {
+    await closeTestStores()
     rmSync(testState.dir, { recursive: true, force: true })
   })
 
@@ -487,7 +489,7 @@ describe('orcad migration catalog persistence', () => {
     const store = createStore()
     const input = manifest()
     commitCatalog(store, input)
-    store.removeProject(REPOSITORY.id)
+    store.removeProjectForHost(REPOSITORY.id, 'local')
 
     expect(store.getOrcadMigrationCatalogState(input).state).toBe('committed')
     expect(store.getRepos()).toEqual([])

@@ -27,8 +27,8 @@ import {
   sealMobileE2EEV2Frame,
   openMobileE2EEV2Frame
 } from '../../../src/shared/mobile-e2ee-v2-framing'
-import { deriveSharedKey } from '../../../src/main/runtime/rpc/e2ee-crypto'
-import { deriveMobileE2EEV2KeySchedule } from '../../../src/main/runtime/rpc/mobile-e2ee-v2-key-schedule'
+import { deriveSharedKey } from '../../../src/shared/e2ee-crypto'
+import { deriveMobileE2EEV2KeySchedule } from '../../../src/shared/mobile-e2ee-v2-node-key-schedule'
 
 const origin = process.env.HIVE_RUNTIME_HOST_HTTP_FIXTURE
 it.skipIf(!origin)(

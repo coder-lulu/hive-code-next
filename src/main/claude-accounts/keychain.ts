@@ -26,12 +26,12 @@ export async function readActiveClaudeKeychainCredentialsStrict(
   configDir?: string
 ): Promise<string | null> {
   if (!configDir) {
-    return readKeychainPassword(getActiveClaudeService(), getKeychainUser())
+    return readKeychainPassword(claudeKeychainService(), getKeychainUser())
   }
   // Why: macOS tmp is /var → /private/var. Claude hashes the realpath; a
   // mkdtemp login dir would miss the Keychain item if we only hashed the raw path.
   for (const dir of claudeConfigDirKeychainAliases(configDir)) {
-    const credentials = await readKeychainPassword(getActiveClaudeService(dir), getKeychainUser())
+    const credentials = await readKeychainPassword(claudeKeychainService(dir), getKeychainUser())
     if (credentials) {
       return credentials
     }
@@ -43,7 +43,7 @@ export async function writeActiveClaudeKeychainCredentials(
   contents: string,
   configDir?: string
 ): Promise<void> {
-  await writeKeychainPassword(getActiveClaudeService(configDir), getKeychainUser(), contents)
+  await writeKeychainPassword(claudeKeychainService(configDir), getKeychainUser(), contents)
 }
 
 export async function writeActiveClaudeKeychainCredentialsForRuntime(
@@ -51,7 +51,7 @@ export async function writeActiveClaudeKeychainCredentialsForRuntime(
   configDir: string
 ): Promise<void> {
   const user = getKeychainUser()
-  const scopedService = getActiveClaudeService(configDir)
+  const scopedService = claudeKeychainService(configDir)
   await writeKeychainPassword(scopedService, user, contents)
   if (scopedService !== ACTIVE_CLAUDE_SERVICE) {
     await writeKeychainPassword(ACTIVE_CLAUDE_SERVICE, user, contents)
@@ -72,7 +72,7 @@ export async function deleteActiveClaudeKeychainCredentialsStrict(
   const dirs = configDir ? claudeConfigDirKeychainAliases(configDir) : [undefined]
   for (const dir of dirs) {
     for (const account of getKeychainUsersForCleanup()) {
-      await deleteKeychainPassword(getActiveClaudeService(dir), account, {
+      await deleteKeychainPassword(claudeKeychainService(dir), account, {
         failOnAccessError: true
       })
     }
@@ -117,7 +117,7 @@ function getKeychainUsersForCleanup(): string[] {
   return raw && raw !== derived ? [derived, raw] : [derived]
 }
 
-function getActiveClaudeService(configDir?: string): string {
+export function claudeKeychainService(configDir?: string): string {
   if (!configDir) {
     return ACTIVE_CLAUDE_SERVICE
   }
@@ -181,6 +181,20 @@ function getActiveClaudeServices(configDir?: string): string[] {
   if (!configDir) {
     return [ACTIVE_CLAUDE_SERVICE]
   }
-  const scoped = claudeConfigDirKeychainAliases(configDir).map((dir) => getActiveClaudeService(dir))
+  const scoped = claudeConfigDirKeychainAliases(configDir).map((dir) => claudeKeychainService(dir))
   return [...new Set([...scoped, ACTIVE_CLAUDE_SERVICE])]
+}
+
+/** Every spelling of a folder Claude may have hashed into its Keychain item name (superset U/profiles.ts). */
+export function claudeConfigDirSpellings(configDir: string, userHome: string): string[] {
+  const spellings = new Set<string>()
+  for (const dir of claudeConfigDirKeychainAliases(configDir)) {
+    const trimmed = dir.replace(/[\\/]+$/, '')
+    const rest = trimmed.startsWith(`${userHome}/`) ? trimmed.slice(userHome.length) : null
+    for (const spelling of [trimmed, ...(rest ? [`~${rest}`, `$HOME${rest}`] : [])]) {
+      spellings.add(spelling)
+      spellings.add(`${spelling}/`)
+    }
+  }
+  return [...spellings]
 }

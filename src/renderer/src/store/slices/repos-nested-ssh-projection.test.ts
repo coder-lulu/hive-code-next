@@ -1,10 +1,15 @@
-import { expect, it, vi } from 'vitest'
+import { beforeEach, expect, it, vi } from 'vitest'
 import type { Project, ProjectHostSetup } from '../../../../shared/project-types'
+import {
+  createCompatibleRuntimeStatusResponseIfNeeded,
+  type RuntimeEnvironmentCallRequest
+} from '../../runtime/runtime-compatibility-test-fixture'
 import { createTestStore } from './store-test-helpers'
 import {
   installReposRuntimeRoutingHarness,
   remoteRepo,
-  runtimeEnvironmentCall
+  runtimeEnvironmentCall,
+  runtimeEnvironmentTransportCall
 } from './repos-runtime-routing-fixture'
 
 vi.mock('sonner', () => ({
@@ -17,6 +22,13 @@ vi.mock('sonner', () => ({
 }))
 
 installReposRuntimeRoutingHarness()
+
+beforeEach(() => {
+  runtimeEnvironmentTransportCall.mockImplementation(
+    (args: RuntimeEnvironmentCallRequest) =>
+      createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
+  )
+})
 
 it('preserves distinct SSH execution setups behind the same runtime owner', async () => {
   const project: Project = {
@@ -72,7 +84,7 @@ it('preserves distinct SSH execution setups behind the same runtime owner', asyn
   const store = createTestStore()
   store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
 
-  await store.getState().fetchRepos()
+  await store.getState().fetchRepos(catalogOwner(store))
 
   const setups = store.getState().projectHostSetups
   expect(setups).toHaveLength(2)
@@ -145,7 +157,7 @@ it('prefers an authoritative paired-runtime setup over its repo-derived fallback
   const store = createTestStore()
   store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
 
-  await store.getState().fetchRepos()
+  await store.getState().fetchRepos(catalogOwner(store))
 
   expect(store.getState().projectHostSetups).toEqual([
     {
@@ -157,3 +169,10 @@ it('prefers an authoritative paired-runtime setup over its repo-derived fallback
     }
   ])
 })
+
+// The catalog these tests read is the one the focused host would have shown.
+function catalogOwner(store: {
+  getState: () => { settings: { activeRuntimeEnvironmentId?: string | null } | null }
+}): { runtimeEnvironmentId: string | null } {
+  return { runtimeEnvironmentId: store.getState().settings?.activeRuntimeEnvironmentId ?? null }
+}

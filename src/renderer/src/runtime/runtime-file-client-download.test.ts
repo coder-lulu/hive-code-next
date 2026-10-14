@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { APP_DISPLAY_NAME } from '@/product-brand'
-import { downloadRuntimeFile } from './runtime-file-client'
+import { downloadRuntimeFile } from './runtime-file-read-client'
 import {
   fsSaveDownloadedFile,
   fsStartDownloadedFile,
@@ -48,7 +48,7 @@ describe('runtime file client', () => {
     await expect(
       downloadRuntimeFile(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -102,7 +102,7 @@ describe('runtime file client', () => {
     await expect(
       downloadRuntimeFile(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -140,7 +140,7 @@ describe('runtime file client', () => {
     await expect(
       downloadRuntimeFile(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -189,7 +189,7 @@ describe('runtime file client', () => {
     await expect(
       downloadRuntimeFile(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -227,7 +227,7 @@ describe('runtime file client', () => {
     await expect(
       downloadRuntimeFile(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -265,7 +265,7 @@ describe('runtime file client', () => {
     await expect(
       downloadRuntimeFile(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },

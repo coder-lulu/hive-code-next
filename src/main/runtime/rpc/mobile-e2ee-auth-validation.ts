@@ -27,10 +27,10 @@ export function isValidMobileE2EEAuthVersion(
 export function authenticateMobileE2EE<TDevice extends { deviceToken: string }>(args: {
   plaintext: string
   v2Session: DesktopMobileE2EEV2Session | null
-  resolveDevice: (token: string) => TDevice | null
+  resolveDevice: (token: string) => TDevice | { refused: 'insecure_origin' } | null
 }):
   | { ok: true; device: TDevice; auth: MobileE2EEAuth }
-  | { ok: false; code: 'bad_auth' | 'unauthorized' } {
+  | { ok: false; code: 'bad_auth' | 'unauthorized' | 'insecure_origin' } {
   let auth: MobileE2EEAuth
   try {
     auth = parseRemoteRuntimeJsonText(args.plaintext) as MobileE2EEAuth
@@ -42,12 +42,16 @@ export function authenticateMobileE2EE<TDevice extends { deviceToken: string }>(
     auth === null ||
     Array.isArray(auth) ||
     auth.type !== 'e2ee_auth' ||
+    typeof auth.deviceToken !== 'string' ||
     !auth.deviceToken ||
     !isValidMobileE2EEAuthVersion(auth, args.v2Session)
   ) {
     return { ok: false, code: 'bad_auth' }
   }
   const device = args.resolveDevice(auth.deviceToken)
+  if (device && 'refused' in device) {
+    return { ok: false, code: device.refused }
+  }
   return device?.deviceToken === auth.deviceToken
     ? { ok: true, device, auth }
     : { ok: false, code: 'unauthorized' }

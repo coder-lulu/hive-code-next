@@ -46,18 +46,16 @@ describe('HiveCloud release publishing contract', () => {
       const steps = build.steps
       const compile = findStep(linux, 'build', 'Build application')
       const runtime = findStep(linux, 'build', 'Gate runtime file-watcher process isolation')
-      const relay = findStep(linux, 'build', 'Gate SSH relay watcher process isolation')
       const pack = findStep(linux, 'build', 'Package AppImage without external publishing')
 
       expect(target.builder_arch).toBe(architecture)
       expect(target.runner).toMatch(/^ubuntu-/)
       expect(steps.indexOf(compile)).toBeLessThan(steps.indexOf(runtime))
-      expect(steps.indexOf(runtime)).toBeLessThan(steps.indexOf(relay))
-      expect(steps.indexOf(relay)).toBeLessThan(steps.indexOf(pack))
+      expect(steps.indexOf(runtime)).toBeLessThan(steps.indexOf(pack))
       expect(linux.jobs.publish.needs).toContain('build')
       expect(linux.jobs.publish.if).toBeUndefined()
       expect(build['continue-on-error']).toBeUndefined()
-      for (const gate of [runtime, relay]) {
+      for (const gate of [runtime]) {
         expect(gate.if).toBeUndefined()
         expect(gate['continue-on-error']).toBeUndefined()
         expect(gate.shell).toBe('bash')
@@ -74,8 +72,11 @@ describe('HiveCloud release publishing contract', () => {
       expect(runtime.run).toContain(
         'ELECTRON_RUN_AS_NODE=1 pnpm exec electron config/scripts/runtime-file-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../electron.log"'
       )
-      expect(relay.run).toContain(
-        'node config/scripts/relay-watcher-fault-harness.mjs 2>&1 | tee "$TMPDIR/../node.log"'
+      expect(steps.some((step) => step.name === 'Gate SSH relay watcher process isolation')).toBe(
+        false
+      )
+      expect(steps.some((step) => step.run?.includes('relay-watcher-fault-harness.mjs'))).toBe(
+        false
       )
     }
   )

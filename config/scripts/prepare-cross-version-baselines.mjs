@@ -5,6 +5,9 @@ export const BASELINE_RELEASE = 'v1.4.186'
 const UPSTREAM_URL = 'https://github.com/stablyai/orca.git'
 // Published release labels resolve to verified upstream objects without creating local tags.
 export const UPSTREAM_BASELINE_PINS = Object.freeze({
+  'v1.4.190': '6e4f817101daa18d82824b69243d9079baa9c416',
+  'v1.4.224': '2bb20586ebc39d605e16d95f57420e20a16e7485',
+  'v1.4.222': '4bb6f2072b07c1f0664b809551f77754700570e4',
   'v1.4.186': 'd802fdc7429f5f9d959b99a73656545bd760eace',
   'v1.4.184': '2307f2ebbe1c1e737c0b12d920bb0a208332db2c',
   'v1.4.205': '11aba8bdc5e492d3ba01fc7fe333495ace74128f',

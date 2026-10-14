@@ -43,9 +43,8 @@ import {
   decideAgentLaunchMode,
   readAgentLaunchModeSettings
 } from '../../../agent-launch/agent-launch-mode'
-import { deriveAgentLaunchTerminalViewMode } from '../../../agent-launch/agent-launch-view-mode'
 import type { RpcContext } from '../core'
-import type { AgentLaunchParams } from './agent-launch-schemas'
+import type { AgentLaunchParams } from '../../../../shared/rpc-contract/agent-launch-params'
 import { agentLaunchOperationCallerKey } from './agent-launch-replay'
 
 /** Whether a launch may move the host window at all: a paired device's launch moves only its own
@@ -101,8 +100,8 @@ export type EarlyAgentLaunchTab = {
   executing(): void
   /** The surface exists; an agent in this pane lets the pane's waiting spawn attach to it now. */
   surfacePublished(result: AgentLaunchResult): void
-  /** The window has said it shows the tab, so the spawn must bind it without a second reveal. */
-  windowShowsTab(): boolean
+  /** Pending or completed publication owns selection; a failed publication leaves it to spawn. */
+  windowOwnsPresentation(): boolean
   /** The user closed the tab or pane: the launch must not start its agent, or must stop it. */
   closedByUser(): boolean
   /** The launch is over, however it ended. A tab this request made goes when nothing will ever run
@@ -202,12 +201,7 @@ export async function publishAgentLaunchTabEarly(
       tabId: pane.tabId,
       leafId: pane.leafId,
       launchAgent: params.agent,
-      viewMode: deriveAgentLaunchTerminalViewMode({
-        settings,
-        agent: params.agent,
-        ...(params.prompt ? { prompt: params.prompt } : {}),
-        connectionId: workspace.connectionId
-      }),
+      viewMode: 'terminal',
       ...(params.placement ? { placement: params.placement } : {}),
       viewer: agentLaunchTabViewerRule(context, params.presentation),
       ...(params.prompt?.text ? { prompt: params.prompt.text } : {}),
@@ -261,6 +255,7 @@ function trackEarlyAgentLaunchTab(args: {
   unspawnedVerdict: () => AgentLaunchPaneVerdict
 }): EarlyAgentLaunchTab {
   let reply: AgentLaunchTabPublished | null = null
+  let publicationFailed = false
   let executing = false
   let ranHere: boolean | null = null
   const published = args.publishing.then(
@@ -269,6 +264,7 @@ function trackEarlyAgentLaunchTab(args: {
       return answer
     },
     (error: unknown) => {
+      publicationFailed = true
       // The tab did not appear; the launch still runs and its tab appears when it spawns.
       console.warn('[agent-launch] the window did not show the launch tab early', error)
       return null
@@ -287,7 +283,7 @@ function trackEarlyAgentLaunchTab(args: {
         args.agentBound()
       }
     },
-    windowShowsTab: () => reply !== null,
+    windowOwnsPresentation: () => !publicationFailed,
     closedByUser: args.closedByUser,
     finish: () => {
       if (ranHere === true) {

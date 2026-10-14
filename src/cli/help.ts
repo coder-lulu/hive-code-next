@@ -312,7 +312,7 @@ Behavior:
 Agent Sessions And Worktrees:
   \`worktree create --agent\` creates a new checkout with an agent.
   To start a fresh agent in the current worktree, use:
-    hive terminal create --worktree active --command "codex"
+    hive agent launch --agent codex --model gpt-6-astra --effort high
 
 Browser Workflow:
   1. Create or navigate:  hive tab create --url https://example.com

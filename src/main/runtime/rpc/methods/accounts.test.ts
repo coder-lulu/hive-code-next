@@ -17,20 +17,6 @@ function method(name: string) {
 describe('account RPC methods', () => {
   it.each([
     {
-      methodName: 'accounts.addClaudeFromConfigDir',
-      params: {
-        configDir: join(tmpdir(), 'claude-login'),
-        previousLegacyCredentialsSha256: 'a'.repeat(64)
-      },
-      runtimeMethod: 'addClaudeAccountFromConfigDir',
-      expectedSource: join(tmpdir(), 'claude-login'),
-      expectedOptions: {
-        runtime: undefined,
-        wslDistro: null,
-        previousLegacyCredentialsSha256: 'a'.repeat(64)
-      }
-    },
-    {
       methodName: 'accounts.addCodexFromHome',
       params: { sourceHome: join(tmpdir(), 'codex-login') },
       runtimeMethod: 'addCodexAccountFromHome',
@@ -51,29 +37,45 @@ describe('account RPC methods', () => {
   })
 
   it.each([
-    ['accounts.addClaudeFromConfigDir', { configDir: join(tmpdir(), 'claude-login') }],
-    ['accounts.addCodexFromHome', { sourceHome: join(tmpdir(), 'codex-login') }],
+    ['accounts.addCodexFromHome', { sourceHome: join(tmpdir(), 'codex-login') }, /only available/],
     [
       'accounts.addDataFromHome',
-      { provider: 'opencode', sourceDataHome: join(tmpdir(), 'login'), label: 'Work' }
+      { provider: 'opencode', sourceDataHome: join(tmpdir(), 'login'), label: 'Work' },
+      /only available/
+    ],
+    [
+      'accounts.beginClaudeSignIn',
+      {},
+      new RegExp(`Sign in on the ${APP_DISPLAY_NAME} execution host`)
+    ],
+    [
+      'accounts.finishClaudeSignIn',
+      { accountId: 'a' },
+      new RegExp(`Sign in on the ${APP_DISPLAY_NAME} execution host`)
     ]
-  ])('rejects paired-device calls to %s', async (methodName, params) => {
+  ] as const)('rejects paired-device calls to %s', async (methodName, params, refusal) => {
     const runtime = {
-      addClaudeAccountFromConfigDir: vi.fn(),
-      addCodexAccountFromHome: vi.fn()
-    } as unknown as OrcaRuntimeService
+      addCodexAccountFromHome: vi.fn(),
+      addDataAccountFromHome: vi.fn(),
+      beginClaudeSignIn: vi.fn(),
+      finishClaudeSignIn: vi.fn()
+    }
+    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: refused calls never reach the runtime; only these stubs are asserted.
+    const runtimeService = runtime as unknown as OrcaRuntimeService
     const addMethod = method(methodName)
     if (isStreamingMethod(addMethod)) {
       throw new Error(`${methodName} must be a request method`)
     }
 
     for (const clientKind of ['mobile', 'runtime'] as const) {
-      await expect(addMethod.handler(params, { runtime, clientKind })).rejects.toThrow(
-        `only available on the ${APP_DISPLAY_NAME} host runtime`
-      )
+      await expect(
+        addMethod.handler(params, { runtime: runtimeService, clientKind })
+      ).rejects.toThrow(refusal)
     }
-    expect(runtime.addClaudeAccountFromConfigDir).not.toHaveBeenCalled()
     expect(runtime.addCodexAccountFromHome).not.toHaveBeenCalled()
+    expect(runtime.addDataAccountFromHome).not.toHaveBeenCalled()
+    expect(runtime.beginClaudeSignIn).not.toHaveBeenCalled()
+    expect(runtime.finishClaudeSignIn).not.toHaveBeenCalled()
   })
 
   it('keeps explicit account-list refreshes on the forced refresh lane', async () => {
@@ -227,4 +229,8 @@ describe('account RPC methods', () => {
     cleanup?.()
     await running
   })
+})
+
+it('does not expose caller-supplied Claude credential directory import', () => {
+  expect(ACCOUNT_METHODS.some((entry) => String(entry.name) === 'accounts.addClaudeFromConfigDir')).toBe(false)
 })

@@ -52,11 +52,11 @@ export function classifyOrcadTunnelIdentityFailure(error: unknown): OrcadTunnelI
 }
 
 export async function verifyOrcadPairingIdentity(
-  pairing: PairingOffer,
+  connection: PairingOffer,
   expected: Pick<KnownRuntimeEnvironment, 'runtimeId' | 'pairedDeviceId'>
 ): Promise<OrcadTunnelIdentity> {
   try {
-    await verifyRuntimePairingIdentity(pairing, expected)
+    await verifyRuntimePairingIdentity(connection, expected)
     return { verdict: 'verified' }
   } catch (error) {
     return classifyOrcadTunnelIdentityFailure(error)
@@ -74,7 +74,9 @@ export function verifyManagedOrcadTunnelIdentity(
   // was away, changes it. The E2EE handshake with our pinned host key and our token being accepted
   // prove the server; the first authenticated status reply records the new id. Why no device id:
   // one left stale by a racing reply must not block it either.
-  return verifyOrcadPairingIdentity(getPreferredPairingOffer(environment), { runtimeId: null })
+  return verifyOrcadPairingIdentity(getPreferredPairingOffer(environment), {
+    runtimeId: null
+  })
 }
 
 /**

@@ -30,7 +30,6 @@ const shellContractFiles = [
   'src/main/zsh-deferred-startup-line-init.live-shell.test.ts',
   'src/main/zsh-scoped-histfile.live-shell.test.ts',
   'src/main/zsh-startup-hook-user-config-equivalence.live-shell.test.ts',
-  'src/main/zsh-wrapper-version-mismatch.live-shell.test.ts',
   'src/main/runtime/structured-session-cli-login-shell.live-shell.test.ts',
   'src/shared/posix-command-path-lookup.test.ts'
 ]
@@ -250,7 +249,7 @@ describe('PR workflow parallelism', () => {
       (step) => step.name === 'Build package inputs'
     )
 
-    expect(buildStep.run).toContain('scripts=(build:relay build:electron-vite:parallel)')
+    expect(buildStep.run).toContain('scripts=(build:wsl-guest build:electron-vite:parallel)')
     expect(buildStep.run).toContain('pnpm run "$script" &')
     expect(
       workflow.jobs.package.steps.find(
@@ -261,21 +260,20 @@ describe('PR workflow parallelism', () => {
     expect(packageJson.scripts['build:release']).toContain('pnpm run build:web-from-renderer')
   })
 
-  it('smokes managed-hook companions under their supported Node 18 runtime', () => {
+  it('smokes the extracted process-host package under its supported Node 18 runtime', () => {
     const steps = workflow.jobs.managed_hook_node18.steps
     const installIndex = steps.findIndex(
       (step) => step.uses === './.github/actions/install-node-dependencies'
     )
-    const buildIndex = steps.findIndex((step) => step.run === 'pnpm run build:relay')
     const node18Index = steps.findIndex(
       (step) => step.uses === 'actions/setup-node@v6' && step.with['node-version'] === '18'
     )
     const smokeIndex = steps.findIndex(
-      (step) => step.run === 'node config/scripts/smoke-managed-hook-runtime-node18.mjs'
+      (step) => step.run === 'node config/scripts/smoke-process-host-node18.mjs'
     )
 
-    expect(installIndex).toBeLessThan(buildIndex)
-    expect(buildIndex).toBeLessThan(node18Index)
+    expect(installIndex).toBeGreaterThanOrEqual(0)
+    expect(installIndex).toBeLessThan(node18Index)
     expect(node18Index).toBeLessThan(smokeIndex)
   })
 
@@ -477,7 +475,7 @@ describe('PR workflow parallelism', () => {
   it('reuses TypeScript incremental state across typecheck runs', () => {
     const steps = workflow.jobs.preflight.steps
     const cacheIndex = steps.findIndex((step) => step.name === 'Cache TypeScript incremental state')
-    const checkIndex = steps.findIndex((step) => step.run === 'pnpm run typecheck')
+    const checkIndex = steps.findIndex((step) => step.id === 'typecheck')
 
     expect(cacheIndex).toBeGreaterThanOrEqual(0)
     expect(cacheIndex).toBeLessThan(checkIndex)
@@ -555,12 +553,12 @@ describe('PR workflow parallelism', () => {
       'xterm_patch_sync',
       'shell_contracts',
       'test',
-      'orcad_browser',
       'mobile_web_app',
       'cross-version-wire',
       'managed_hook_node18',
       'package',
-      'package_windows'
+      'package_windows',
+      'layout_oracle'
     ])
     const verifyStep = workflow.jobs.verify.steps.find(
       (step) => step.name === 'Require successful checks'
@@ -569,8 +567,13 @@ describe('PR workflow parallelism', () => {
     expect(verifyStep.run).toContain('"$MANAGED_HOOK_NODE18"')
     // Why assert this one too: the browser provider test skips itself without
     // ORCA_BROWSER_EXECUTABLE, so it only guards anything if verify actually reads it.
-    expect(verifyStep.env.ORCAD_BROWSER).toBe('${{ needs.orcad_browser.result }}')
-    expect(verifyStep.run).toContain('"$ORCAD_BROWSER"')
+    expect(verifyStep.env.TEST).toBe('${{ needs.test.result }}')
+    expect(verifyStep.run).toContain('"$TEST"')
+    expect(workflow.jobs.test.with.browser_contract).toBe(
+      "${{ needs.code_paths.outputs.orcad_browser == 'true' }}"
+    )
+    expect(unitTestWorkflow.jobs.browser_integration.if).toBe('inputs.browser_contract')
+    expect(unitTestWorkflow.jobs.browser_integration['continue-on-error']).toBeUndefined()
     expect(verifyStep.env.CROSS_VERSION_WIRE).toBe('${{ needs.cross-version-wire.result }}')
     expect(verifyStep.run).toContain('"$CROSS_VERSION_WIRE"')
     // Same reason as the browser provider: the render check fails loudly on a runner with no
@@ -589,5 +592,55 @@ describe('PR workflow parallelism', () => {
     expect(step.run).toContain('node config/scripts/run-mobile-web-app-checks.mjs')
     expect(step.run).not.toContain('--prepare-route-snapshot')
     expect(step.env[MOBILE_WEB_APP_DEPENDENCIES_REQUIRED_ENV]).toBe('1')
+  })
+})
+
+describe('current process-host and advisory evidence CI boundaries', () => {
+  it('enforces process-host boundaries in the required static-analysis checks', () => {
+    const guard = workflow.jobs.preflight.steps.find((step) =>
+      step.run?.includes('bun --bun run check:process-host-imports')
+    )
+    expect(guard?.if).toBe('!cancelled()')
+    expect(guard?.env.PREFLIGHT_PHASE_SELECTED).toBe(
+      "${{ needs.code_paths.outputs.static_analysis == 'true' }}"
+    )
+    expect(guard?.background).toBe(true)
+    const typecheckIndex = workflow.jobs.preflight.steps.findIndex(
+      (step) => step.wait === 'typecheck'
+    )
+    const waitIndex = workflow.jobs.preflight.steps.findIndex((step) => step.wait === guard.id)
+    expect(waitIndex).toBeGreaterThan(typecheckIndex)
+    expect(guard?.['continue-on-error']).toBeUndefined()
+  })
+
+  it('keeps advisory unit-selection evidence off the gate', () => {
+    // It is continue-on-error, so it can never fail a PR. Living inside unit-tests.yml made a
+    // caller's `needs: test` wait for it anyway, holding verify ~36s past the last shard. Pinned
+    // here so it cannot drift back onto the critical path.
+    const evidence = workflow.jobs.unit_selection_evidence
+    expect(evidence.uses).toBe('./.github/workflows/unit-selection-evidence.yml')
+    expect(evidence.needs).toEqual(['test'])
+    for (const [result, cancelled, expected] of [
+      ['success', false, true],
+      ['failure', false, true],
+      ['skipped', false, false],
+      ['cancelled', false, false],
+      ['success', true, false],
+      ['failure', true, false]
+    ]) {
+      expect(
+        runInNewContext(evidence.if.slice(3, -2), {
+          cancelled: () => cancelled,
+          needs: { test: { result } }
+        })
+      ).toBe(expected)
+    }
+    expect(workflow.jobs.verify.needs).not.toContain('unit_selection_evidence')
+    expect(unitTestWorkflow.jobs.selection_evidence).toBeUndefined()
+    const evidenceWorkflow = parse(
+      readFileSync('.github/workflows/unit-selection-evidence.yml', 'utf8')
+    )
+    const job = evidenceWorkflow.jobs.selection_evidence
+    expect(job['continue-on-error']).toBe(true)
   })
 })

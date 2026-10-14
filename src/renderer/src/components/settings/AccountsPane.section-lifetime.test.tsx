@@ -4,6 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type * as I18nModule from '@/i18n/i18n'
 import { getDefaultSettings } from '../../../../shared/constants'
 import { AccountsPane } from './AccountsPane'
+import { LOCAL_SETTINGS_HOST_SCOPE } from './settings-host-scope'
 
 const fake = vi.hoisted(() => ({
   query: '',
@@ -69,8 +70,8 @@ vi.mock('@/runtime/runtime-provider-accounts-client', () => ({
     activeAccountId: null,
     activeAccountIdsByRuntime: { host: null, wsl: {} }
   }),
-  hasRemoteProviderAccountOwner: (settings: { activeRuntimeEnvironmentId?: string }) =>
-    Boolean(settings.activeRuntimeEnvironmentId),
+  getProviderAccountsOwnerKey: (target: { kind: string; environmentId?: string }) =>
+    target.environmentId ?? 'local',
   watchProviderAccounts: fake.watcher,
   selectClaudeProviderAccount: fake.write,
   selectCodexProviderAccount: fake.write,
@@ -127,6 +128,7 @@ it.each([false, true])(
     const props = {
       settings: getDefaultSettings('/synthetic'),
       updateSettings: fake.write,
+      hostScope: LOCAL_SETTINGS_HOST_SCOPE,
       wslSupportedPlatform
     }
     const view = render(<AccountsPane {...props} />)
@@ -159,7 +161,11 @@ it.each([false, true])(
 )
 
 it('preserves explicit Grok refresh and rereads after the pane genuinely reopens', async () => {
-  const props = { settings: getDefaultSettings('/synthetic'), updateSettings: fake.write }
+  const props = {
+    settings: getDefaultSettings('/synthetic'),
+    updateSettings: fake.write,
+    hostScope: LOCAL_SETTINGS_HOST_SCOPE
+  }
   const view = render(<AccountsPane {...props} />)
   await act(async () => {})
   const row = document.getElementById('accounts-grok')!
@@ -177,7 +183,11 @@ it('preserves explicit Grok refresh and rereads after the pane genuinely reopens
 })
 
 it('keeps usage-driven Grok status refreshes while its overview row stays mounted', async () => {
-  const props = { settings: getDefaultSettings('/synthetic'), updateSettings: fake.write }
+  const props = {
+    settings: getDefaultSettings('/synthetic'),
+    updateSettings: fake.write,
+    hostScope: LOCAL_SETTINGS_HOST_SCOPE
+  }
   const view = render(<AccountsPane {...props} />)
   await act(async () => {})
   fake.grokUsage = { updatedAt: 10 }
@@ -192,7 +202,11 @@ it('keeps usage-driven Grok status refreshes while its overview row stays mounte
 })
 
 it('keeps the owner subscription across search and closes it when the pane unmounts', async () => {
-  const props = { settings: getDefaultSettings('/synthetic'), updateSettings: fake.write }
+  const props = {
+    settings: getDefaultSettings('/synthetic'),
+    updateSettings: fake.write,
+    hostScope: LOCAL_SETTINGS_HOST_SCOPE
+  }
   const view = render(<AccountsPane {...props} />)
   await act(async () => {})
   const watcher = fake.watcher.mock.results[0].value
@@ -210,7 +224,11 @@ it('keeps the owner subscription across search and closes it when the pane unmou
 })
 
 it('keeps Cursor refresh driven by usage updates and genuine pane reopen', async () => {
-  const props = { settings: getDefaultSettings('/synthetic'), updateSettings: fake.write }
+  const props = {
+    settings: getDefaultSettings('/synthetic'),
+    updateSettings: fake.write,
+    hostScope: LOCAL_SETTINGS_HOST_SCOPE
+  }
   const view = render(<AccountsPane {...props} />)
   await act(async () => {})
   const row = document.getElementById('accounts-cursor')!

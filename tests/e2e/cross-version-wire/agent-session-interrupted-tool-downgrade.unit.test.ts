@@ -1,3 +1,4 @@
+import { codexProviderHandle } from '../../../src/shared/agent-session-provider-handle-encoding'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -49,7 +50,7 @@ test('an older host and client read a call a stop cut short as the failure they 
         workspaceId: 'ws-1',
         hostId: 'host-1',
         agent: 'codex',
-        providerHandle: { kind: 'codex', threadId: 'thread-1' }
+        providerHandle: codexProviderHandle('thread-1')
       },
       stateDirectory: directory,
       now: () => 1_000

@@ -1,12 +1,16 @@
-import { isAgentSessionAccountHome } from './agent-session-account-home'
+import {
+  isAgentSessionAccountHome,
+  MAX_PATH_LENGTH,
+  type AgentSessionAccountHome
+} from './agent-session-account-home'
 import { isAgentSessionRewindRecord, type AgentSessionRewindRecord } from './agent-session-rewind'
 import { isAgentSessionLaunchArgs } from './agent-session-launch-args'
 import { isAgentSessionConversationName } from './agent-session-conversation-name'
-import { isAgentSessionDeathEvidence } from './agent-session-death-evidence'
-import type { AgentSessionDeathEvidence } from './agent-session-death-evidence'
-export type { AgentSessionDeathEvidence } from './agent-session-death-evidence'
-import type { AgentSessionAccountHome } from './agent-session-account-home'
-export type { AgentSessionAccountHome } from './agent-session-account-home'
+import {
+  isAgentSessionDeathEvidence,
+  type AgentSessionDeathEvidence
+} from './agent-session-death-evidence'
+export type { AgentSessionDeathEvidence, AgentSessionAccountHome }
 import {
   isPersistedAgentSessionHandoffStage,
   isPersistedAgentSessionRuntimeKind,
@@ -31,9 +35,10 @@ import {
   type AgentSessionProviderHandleLink
 } from './agent-session-provider-handle'
 import {
-  isAgentSessionProviderHandleInNamespace,
-  isStructuredAgentId
-} from './agent-session-provider-handle-encoding'
+  isAgentSessionProviderContextBoundary,
+  type AgentSessionProviderContextBoundary
+} from './agent-session-provider-context'
+import { isStructuredAgentId } from './agent-session-provider-handle-encoding'
 
 export const AGENT_SESSION_RECORD_SCHEMA_VERSION = 2 as const
 
@@ -74,6 +79,9 @@ export type AgentSessionProcessIdentity = {
   pid: number
   processStartTimeMs: number | null
   spawnToken: string
+  /** The Orca runtime that started this process and holds its transport, stamped when the owner is
+   *  recorded; absent on owners older builds recorded. */
+  runtime?: string
 }
 
 export type AgentSessionJournalCheckpoint = { epoch: number; sequence: number }
@@ -130,6 +138,7 @@ export type AgentSessionRecord = {
   /** The agent this session names, whether this build can run it or not. */
   provider: string
   providerHandleChain: AgentSessionProviderHandleLink[]
+  providerContextBoundary?: AgentSessionProviderContextBoundary
   accountHome: AgentSessionAccountHome
   /** The directory the provider first launched in, in the execution host's path syntax. Floating
    *  sessions resume here; worktree and folder ids still resolve by id to their durable place. */
@@ -156,7 +165,6 @@ export type AgentSessionOptionsReplacement = {
 const MAX_ID_LENGTH = 512
 /** A death evidence's `detail` past this fails a load, so whoever writes one cuts it here. */
 export const MAX_AGENT_SESSION_DEATH_DETAIL_CHARS = MAX_ID_LENGTH
-const MAX_PATH_LENGTH = 4096
 const MAX_LAUNCH_ENV_ENTRIES = 256
 const MAX_LAUNCH_ENV_VALUE_LENGTH = 65_536
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/
@@ -220,7 +228,8 @@ export function isAgentSessionProcessIdentity(
     (identity.processStartTimeMs === null ||
       (Number.isSafeInteger(identity.processStartTimeMs) &&
         (identity.processStartTimeMs as number) >= 0)) &&
-    isBoundedString(identity.spawnToken, MAX_ID_LENGTH)
+    isBoundedString(identity.spawnToken, MAX_ID_LENGTH) &&
+    (identity.runtime === undefined || isBoundedString(identity.runtime, MAX_ID_LENGTH))
   )
 }
 
@@ -324,6 +333,8 @@ export function isPersistedAgentSessionRecord(
       isBoundedString(record.launchDirectory, MAX_PATH_LENGTH)) &&
     (record.options === undefined || isAgentSessionOptions(record.options)) &&
     (record.rewind === undefined || isAgentSessionRewindRecord(record.rewind)) &&
+    (record.providerContextBoundary === undefined ||
+      isAgentSessionProviderContextBoundary(record.providerContextBoundary)) &&
     (record.conversationCommand === undefined ||
       isAgentSessionConversationCommandRecord(record.conversationCommand)) &&
     (record.conversationName === undefined ||
@@ -341,15 +352,12 @@ export function isPersistedAgentSessionRecord(
   // The row holds stored handles; validate the chain they decode to.
   const chain = decodePersistedAgentSessionProviderHandleChain(validated.providerHandleChain)
   const head = chain?.at(-1)
-  // One namespace, owned by the record's own agent; which transport is the chain's own fact.
-  const transport = chain?.[0]?.handle.transport
-  const namespace = transport === undefined ? null : { transport, agent: validated.provider }
   return (
     chain !== null &&
-    chain.every(
-      (link) =>
-        namespace !== null && isAgentSessionProviderHandleInNamespace(link.handle, namespace)
-    ) &&
+    // Chain validation already enforces one namespace.
+    (!head || head.handle.agent === validated.provider) &&
+    (validated.providerContextBoundary === undefined ||
+      validated.providerContextBoundary.afterFence <= validated.lease.runtimeFence) &&
     (validated.lease.claimStatus !== 'live' ||
       (validated.lease.ownerProcess !== null &&
         head?.linkId === validated.lease.provenHandleLinkId &&

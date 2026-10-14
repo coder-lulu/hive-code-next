@@ -1,9 +1,10 @@
+import type { PairingOffer } from '../../../shared/pairing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { WebSocketServer } from 'ws'
 import { generateKeyPair, publicKeyToBase64 } from '../../../shared/e2ee-crypto'
 import { DesktopMobileE2EEV2Session } from '../../../shared/runtime-e2ee-server-session'
 import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../../shared/electron-remote-runtime-client-capabilities'
-import { encodePairingOffer, parsePairingCode, type PairingOffer } from '../../../shared/pairing'
+import { encodePairingOffer, parsePairingCode } from '../../../shared/pairing'
 import { sendRemoteRuntimeRequest } from '../../../shared/remote-runtime-client'
 
 const mocks = vi.hoisted(() => ({ isWebClient: false }))
@@ -32,7 +33,10 @@ afterEach(async () => {
 })
 
 /** A paired host that records the capabilities a client authenticates with, then answers. */
-async function recordingHost(): Promise<{ pairing: PairingOffer; auth: Promise<unknown> }> {
+async function recordingHost(): Promise<{
+  pairing: PairingOffer
+  auth: Promise<unknown>
+}> {
   const keys = generateKeyPair()
   const wss = new WebSocketServer({ host: '127.0.0.1', port: 0 })
   servers.push(wss)

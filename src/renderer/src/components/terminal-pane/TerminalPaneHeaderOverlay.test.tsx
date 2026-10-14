@@ -7,11 +7,14 @@ import path from 'node:path'
 import { isTerminalLeafId } from '../../../../shared/stable-pane-id'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ManagedPane, PaneManager } from '@/lib/pane-manager/pane-manager'
-import type { PtyTransport } from './pty-transport'
+import type { PtyTransport } from './pty-transport-types'
 import TerminalPaneHeaderOverlay from './TerminalPaneHeaderOverlay'
-import { handleTerminalFileDrop } from './terminal-drop-handler'
-import { resolveNativeFileDropPath } from '../../../../shared/native-file-drop'
-import { encodeWorkspaceFilePaths, WORKSPACE_FILE_PATHS_MIME } from '@/lib/workspace-file-drag'
+import {
+  encodeWorkspaceFilePaths,
+  WORKSPACE_FILE_PATHS_MIME,
+  WORKSPACE_FILE_DRAG_SOURCE_MIME,
+  writeWorkspaceFileDragSource
+} from '@/lib/workspace-file-drag'
 
 vi.mock('@/components/ui/tooltip', () => ({
   Tooltip: ({ children }: { children?: ReactNode }) => children,
@@ -39,6 +42,9 @@ vi.mock('@/store', () => ({
   }
 }))
 vi.mock('./terminal-input-activity', () => ({ recordTerminalUserInputForLeaf: vi.fn() }))
+vi.mock('./TerminalPaneResumeInChatButton', () => ({
+  TerminalPaneResumeInChatButton: () => <button type="button">Resume in New Native Chat</button>
+}))
 
 const mounted: { container: HTMLDivElement; root: Root }[] = []
 
@@ -72,6 +78,8 @@ function renderOverlay({
   onRenameSubmit = vi.fn(),
   canContinueAgentSessionInNewSession = false,
   onContinueAgentSessionInNewSession = vi.fn(),
+  canShowTerminal = false,
+  canResumeInNewNativeChat = false,
   renameValue = '',
   renamingPaneId = null,
   dropSetup
@@ -86,6 +94,8 @@ function renderOverlay({
   onRenameSubmit?: ReturnType<typeof vi.fn>
   canContinueAgentSessionInNewSession?: boolean
   onContinueAgentSessionInNewSession?: ReturnType<typeof vi.fn>
+  canShowTerminal?: boolean
+  canResumeInNewNativeChat?: boolean
   renameValue?: string
   renamingPaneId?: number | null
   dropSetup?: {
@@ -134,6 +144,9 @@ function renderOverlay({
         onContinueAgentSessionInNewSession={
           onContinueAgentSessionInNewSession as (pane: ManagedPane) => void
         }
+        canShowTerminal={canShowTerminal}
+        onShowTerminal={vi.fn()}
+        canResumeInNewNativeChat={canResumeInNewNativeChat}
         onSplitPane={vi.fn()}
         onBeginPaneDrag={vi.fn()}
         onActivatePaneTitleInteraction={dropSetup?.activate ?? vi.fn()}
@@ -170,6 +183,7 @@ function pressInputKey(
 }
 
 afterEach(() => {
+  vi.unstubAllGlobals()
   for (const { container, root } of mounted.splice(0)) {
     act(() => root.unmount())
     container.remove()
@@ -177,6 +191,30 @@ afterEach(() => {
 })
 
 describe('TerminalPaneHeaderOverlay', () => {
+  it('offers Resume in New Native Chat instead of a chat view switch, on the active pane only', () => {
+    const { container } = renderOverlay({ paneTitles: {}, canResumeInNewNativeChat: true })
+
+    const resumeButtons = [...container.querySelectorAll('button')].filter(
+      (button) => button.textContent === 'Resume in New Native Chat'
+    )
+    expect(resumeButtons).toHaveLength(1)
+    expect(resumeButtons[0]?.closest('.pane-title-bar')?.hasAttribute('data-active-pane')).toBe(
+      true
+    )
+    expect(container.querySelector('button[aria-label="Show chat view"]')).toBeNull()
+  })
+
+  it('keeps Show terminal as the way back from chat view', () => {
+    const { container } = renderOverlay({
+      paneTitles: {},
+      canShowTerminal: true,
+      canResumeInNewNativeChat: true
+    })
+
+    expect(container.querySelector('button[aria-label="Show terminal"]')).not.toBeNull()
+    expect(container.textContent).not.toContain('Resume in New Native Chat')
+  })
+
   it('keeps the titled split-pane X as remove-title only', () => {
     const { container, onClosePane, onRemoveTitle } = renderOverlay({
       paneTitles: { 1: 'server', 2: '' }
@@ -290,7 +328,7 @@ describe('TerminalPaneHeaderOverlay', () => {
       onContinueAgentSessionInNewSession
     })
     const handoff = container.querySelector<HTMLButtonElement>(
-      'button[aria-label="Continue in New Session…"]'
+      'button[aria-label="Hand Off to Another Agent"]'
     )
 
     expect(handoff).not.toBeNull()
@@ -303,11 +341,20 @@ describe('TerminalPaneHeaderOverlay', () => {
 })
 
 function dispatchFileDrag(target: Element, type: 'dragover' | 'drop', internal: boolean): void {
+  const payload = new Map([
+    [WORKSPACE_FILE_PATHS_MIME, encodeWorkspaceFilePaths(['/repo/file.txt'])]
+  ])
+  writeWorkspaceFileDragSource(
+    { setData: (mime, value) => payload.set(mime, value) },
+    { executionHostId: 'local', workspaceId: 'wt-1' }
+  )
   const event = new Event(type, { bubbles: true, cancelable: true })
+  Object.defineProperty(event, 'isTrusted', { value: true })
   Object.defineProperty(event, 'dataTransfer', {
     value: {
-      types: internal ? [WORKSPACE_FILE_PATHS_MIME] : ['Files'],
-      getData: () => encodeWorkspaceFilePaths(['/repo/file.txt']),
+      types: internal ? [WORKSPACE_FILE_PATHS_MIME, WORKSPACE_FILE_DRAG_SOURCE_MIME] : ['Files'],
+      files: [new File([], 'file.txt')],
+      getData: (mime: string) => (internal ? (payload.get(mime) ?? '') : ''),
       dropEffect: 'none'
     }
   })
@@ -350,47 +397,18 @@ describe('terminal title drop ownership', () => {
       if (!title) {
         throw new Error('Title A did not render')
       }
-      const deliveries: Promise<void>[] = []
-      const legacyCapture = (event: Event): void => {
-        if (internal) {
-          return
+      vi.stubGlobal('api', {
+        fs: {
+          getPathForFile: () => '/repo/file.txt',
+          prepareDroppedPaths: async ({ paths }: { paths: string[] }) => ({ paths, failures: [] })
         }
-        event.preventDefault()
-        event.stopPropagation()
-        const entries = event
-          .composedPath()
-          .filter((entry): entry is HTMLElement => entry instanceof HTMLElement)
-          .map((entry) => ({
-            nativeFileDropTarget: entry.dataset.nativeFileDropTarget,
-            terminalTabId: entry.dataset.terminalTabId,
-            terminalPaneLeafId: entry.dataset.terminalPaneLeafId
-          }))
-        const resolution = resolveNativeFileDropPath(entries)
-        if (resolution?.target === 'terminal') {
-          deliveries.push(
-            handleTerminalFileDrop({
-              manager,
-              paneTransports: transports,
-              worktreeId: 'wt-1',
-              tabId: 'tab-1',
-              cwd: '/repo',
-              data: { paths: ['/repo/file.txt'], ...resolution }
-            })
-          )
+      })
+      await act(async () => {
+        if (dragover) {
+          dispatchFileDrag(title, 'dragover', internal)
         }
-      }
-      document.addEventListener('drop', legacyCapture, true)
-      try {
-        await act(async () => {
-          if (dragover) {
-            dispatchFileDrag(title, 'dragover', internal)
-          }
-          dispatchFileDrag(title, 'drop', internal)
-          await Promise.all(deliveries)
-        })
-      } finally {
-        document.removeEventListener('drop', legacyCapture, true)
-      }
+        dispatchFileDrag(title, 'drop', internal)
+      })
       expect(sends[0]).toHaveBeenCalledExactlyOnceWith('/repo/file.txt ', 'driving')
       expect(sends[1]).not.toHaveBeenCalled()
       expect(activate).not.toHaveBeenCalled()

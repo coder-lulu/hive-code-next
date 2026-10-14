@@ -3,6 +3,9 @@ import { RuntimeClientError } from './types'
 
 export const MAC_CRASH_REPORT_GLOB = '~/Library/Logs/DiagnosticReports/HiveCode-*.ips'
 
+/** A darwin SIGABRT of the serve child: the startup-registration abort a retry cannot fix. */
+export class MacServeStartupAbortError extends RuntimeClientError {}
+
 export function serveSignalExitError(
   signal: NodeJS.Signals | null,
   platform: NodeJS.Platform = process.platform
@@ -22,13 +25,14 @@ export function serveSignalExitError(
   // Why: the startup abort happens inside +[NSApplication sharedApplication], before any of our JS
   // runs, so the parent CLI is the only place it can be explained. We only see the signal, never the
   // phase, so the cause is offered as the likely one rather than asserted.
-  return new RuntimeClientError(
+  return new MacServeStartupAbortError(
     'runtime_serve_failed',
-    `${APP_DISPLAY_NAME} serve aborted with SIGABRT on macOS. This most often happens at application startup, when the process cannot register with the macOS window server, which is common in restricted or sandboxed environments, SSH sessions without a GUI login, and CI.`,
+    `${APP_DISPLAY_NAME} serve aborted with SIGABRT on macOS. This most often happens at application startup, when the process cannot register with Launch Services (_RegisterApplication / +[NSApplication sharedApplication]) before any ${APP_DISPLAY_NAME} JavaScript runs. That is common in sandboxed agent environments, SSH sessions without a GUI login, and CI. Confirm the crashing frame in the crash report; this is not the Electron UTF-8 write abort (electron/electron#51871).`,
     {
       nextSteps: [
-        `Re-run \`${PRIMARY_CLI_COMMAND} serve\` outside a sandboxed or restricted environment, with a macOS desktop login active.`,
-        `Look for a crash report at ${MAC_CRASH_REPORT_GLOB}.`
+        `If a desktop ${APP_DISPLAY_NAME} is already running, use \`${PRIMARY_CLI_COMMAND} status\` / \`${PRIMARY_CLI_COMMAND}\` against that instance instead of \`${PRIMARY_CLI_COMMAND} serve\`.`,
+        `Re-run \`${PRIMARY_CLI_COMMAND} serve\` outside a sandboxed or restricted environment, with a macOS desktop login active. Later \`${PRIMARY_CLI_COMMAND} serve\` runs from this same environment refuse for 30 minutes; pass --force to try anyway.`,
+        `Look for a crash report at ${MAC_CRASH_REPORT_GLOB}. If the crashing frame is _RegisterApplication, this is the startup-registration abort.`
       ]
     }
   )

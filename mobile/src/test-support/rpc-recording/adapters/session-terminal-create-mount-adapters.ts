@@ -83,6 +83,7 @@ export function sessionTerminalCreateMountAdapters(
       let creating = false
       let createError = ''
       const terminalsRef = { current: terminals }
+      const sessionTabsRef = { current: sessionTabs }
       const activeHandleRef = { current: activeHandle }
       const activeSessionTabIdRef: { current: string | null } = { current: null }
       const activeSessionTabTypeRef: { current: MobileSessionTabType | null } = {
@@ -107,7 +108,9 @@ export function sessionTerminalCreateMountAdapters(
             terminalsRef,
             setSessionTabs: (update) => {
               sessionTabs = typeof update === 'function' ? update(sessionTabs) : update
+              sessionTabsRef.current = sessionTabs
             },
+            sessionTabsRef,
             defaultTerminalHandlesToLiveInput: (handles: readonly string[]) =>
               effect('default-live-input', { handles: [...handles] }),
             setActiveHandle: (update) => {
@@ -139,7 +142,11 @@ export function sessionTerminalCreateMountAdapters(
             },
             showToast: (message: string, durationMs?: number) =>
               effect('toast', { message, durationMs: durationMs ?? null }),
-            unsubscribeTerminal: (handle: string) => effect('unsubscribe-terminal', { handle }),
+            unsubscribeTerminal: (handle: string) => {
+              // The real unsubscribe drops the handle's drawn-snapshot mark with its stream.
+              initializedHandlesRef.current.delete(handle)
+              effect('unsubscribe-terminal', { handle })
+            },
             subscribeToTerminal: (handle: string) => effect('subscribe-terminal', { handle }),
             fetchSessionTabs: async () => {
               effect('fetch-session-tabs', {})

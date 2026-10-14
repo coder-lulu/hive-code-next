@@ -22,6 +22,7 @@ import {
 import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip'
 
 type AgentRunPreferencesProps = {
+  permissions?: React.ReactNode
   settings: GlobalSettings
   updateSettings: (updates: Partial<GlobalSettings>) => void | Promise<void>
 }
@@ -47,12 +48,14 @@ export function AgentRunPreferences(props: AgentRunPreferencesProps) {
         <AgentCacheTimerSection {...props} />
       </section>
       <section id="agent-permissions">
-        <AgentPermissionsSetting
-          mode={resolveAgentPermissionModeSummary({ agentDefaultArgs, agentDefaultEnv })}
-          onChange={(mode) =>
-            updateSettings(applyAgentPermissionMode({ mode, agentDefaultArgs, agentDefaultEnv }))
-          }
-        />
+        {props.permissions ?? (
+          <AgentPermissionsSetting
+            mode={resolveAgentPermissionModeSummary({ agentDefaultArgs, agentDefaultEnv })}
+            onChange={(mode) =>
+              updateSettings(applyAgentPermissionMode({ mode, agentDefaultArgs, agentDefaultEnv }))
+            }
+          />
+        )}
       </section>
     </div>
   )

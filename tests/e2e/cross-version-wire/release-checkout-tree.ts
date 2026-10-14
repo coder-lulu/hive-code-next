@@ -1,8 +1,9 @@
 import { readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { createHash } from 'node:crypto'
 import { dirname, join, relative } from 'node:path'
-import { list as listTar } from 'tar'
-import type * as ProcessRunner from '../../../src/shared/child-process/run-process'
+import { extractReleaseArchive } from './release-checkout-archive.ts'
+import type * as ProcessRunner from '@orca/process-host'
+import { parse } from 'yaml'
+import { createWorkspaceSourceResolver } from '../../../config/scripts/workspace-source-exports.mjs'
 import {
   collectPackageImports,
   installMissingPackageStandIns,
@@ -15,14 +16,14 @@ const CHECKOUT_SOURCE_WORKERS = 8
 let processRunner: Promise<typeof ProcessRunner> | undefined
 
 // Why: the wire endpoints only need the runtime RPC host, the renderer client, and
-// the shared codec, plus the relay an app update leaves running. Skipping cli keeps a cold CI
+// the shared codec, plus a release's relay that an app update leaves running. Skipping cli keeps a cold CI
 // extraction a few seconds.
 // The phone's `worktree ps` row reader is one self-contained file, so it rides along alone.
+// Workspace packages the release declares are added per release (releaseWorkspaceArchivePaths).
 const ARCHIVE_PATHS = [
   'src/main',
   'src/shared',
   'src/preload',
-  'src/relay',
   'src/renderer',
   'src/types',
   'mobile/src/worktree/agent-row-display.ts'
@@ -33,16 +34,27 @@ const TEST_SOURCE_SUFFIXES = ['test', 'bench', 'spec'].flatMap((kind) =>
 )
 const ARCHIVE_TEST_EXCLUDES = TEST_SOURCE_SUFFIXES.map((suffix) => `:(glob,exclude)**/*${suffix}`)
 const TAR_TEST_EXCLUDES = TEST_SOURCE_SUFFIXES.map((suffix) => `--exclude=*${suffix}`)
+// Why optional: a release may have either or both, and `git archive` refuses a missing pathspec.
+const OPTIONAL_ARCHIVE_PATHS = ['src/relay', 'src/wsl-guest']
+
+const WORKSPACE_POLICY = 'pnpm-workspace.yaml'
 
 const ALIAS_SPECIFIER =
   /(\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*)(['"])@(renderer)?\/([^'"]+)\2/g
 
+// Static, side-effect, lazy and CommonJS loads of a bare specifier.
+const BARE_SPECIFIER =
+  /(\bfrom\s*|^\s*import\s*|(?<![.\w$])import\s*\(\s*|(?<![.\w$])require\s*\(\s*)(['"])([^'"\s./][^'"\s]*)\2/gm
+
+type WorkspaceSourceResolver = ReturnType<typeof createWorkspaceSourceResolver>
+
+// Every module extension an orca-source export may target, so package JS is rewritten too.
 function isRewritableSource(name: string): boolean {
-  return name.endsWith('.ts') || name.endsWith('.tsx')
+  return /\.(ts|tsx|mts|cts|js|mjs|cjs)$/.test(name)
 }
 
 function isTestSource(name: string): boolean {
-  return /\.(test|bench|spec)\.(ts|tsx)$/.test(name)
+  return /\.(test|bench|spec)\.(ts|tsx|mts|cts|js|mjs|cjs)$/.test(name)
 }
 
 /** Keep renderer aliases inside the extracted release rather than the working tree. */
@@ -56,13 +68,40 @@ async function rewriteRendererAliases(
   }
   const rewritten = source.replace(
     ALIAS_SPECIFIER,
-    (_match, keyword: string, quote: string, _renderer: string | undefined, target: string) => {
-      const absolute = join(rendererRoot, target)
-      let relativePath = relative(dirname(file), absolute).split('\\').join('/')
-      if (!relativePath.startsWith('.')) {
-        relativePath = `./${relativePath}`
+    (_match, keyword: string, quote: string, _renderer: string | undefined, target: string) =>
+      `${keyword}${quote}${relativeSpecifier(file, join(rendererRoot, target))}${quote}`
+  )
+  if (rewritten !== source) {
+    await writeFile(file, rewritten)
+  }
+  return rewritten
+}
+
+function relativeSpecifier(file: string, absolute: string): string {
+  const relativePath = relative(dirname(file), absolute).split('\\').join('/')
+  return relativePath.startsWith('.') ? relativePath : `./${relativePath}`
+}
+
+/** Why: the install link and vitest's workspace aliases would otherwise load current packages. */
+async function rewriteWorkspaceImports(
+  root: string,
+  file: string,
+  source: string,
+  resolver: WorkspaceSourceResolver
+): Promise<string> {
+  const rewritten = source.replace(
+    BARE_SPECIFIER,
+    (match, keyword: string, quote: string, specifier: string) => {
+      let target: ReturnType<WorkspaceSourceResolver['resolve']>
+      try {
+        target = resolver.resolve(specifier)
+      } catch (error) {
+        throw new Error(`${relative(root, file)}: ${String(error)}`)
       }
-      return `${keyword}${quote}${relativePath}${quote}`
+      // Native packages can't be built from the release, so they keep the current install.
+      return target
+        ? `${keyword}${quote}${relativeSpecifier(file, join(root, target.file))}${quote}`
+        : match
     }
   )
   if (rewritten !== source) {
@@ -71,7 +110,12 @@ async function rewriteRendererAliases(
   return rewritten
 }
 
-async function prepareExtractedTree(root: string, packageImports: PackageImports): Promise<void> {
+async function prepareExtractedTree(
+  root: string,
+  workspacePaths: string[],
+  packageImports: PackageImports
+): Promise<void> {
+  const resolver = workspacePaths.length > 0 ? createWorkspaceSourceResolver(root) : null
   const rendererRoot = join(root, 'src', 'renderer', 'src')
   const files: string[] = []
   const walk = async (directory: string): Promise<void> => {
@@ -88,12 +132,16 @@ async function prepareExtractedTree(root: string, packageImports: PackageImports
         await rm(full)
         continue
       }
-      if (entry.isFile()) {
-        files.push(full)
-      }
+      files.push(full)
     }
   }
   await walk(join(root, 'src'))
+  // Source packages outside src/ load from here too; native ones keep the current install.
+  for (const path of workspacePaths) {
+    if (path !== WORKSPACE_POLICY && !path.startsWith('src/') && !path.startsWith('native/')) {
+      await walk(join(root, path))
+    }
+  }
   let nextFile = 0
   let failed = false
   let failure: unknown
@@ -104,12 +152,13 @@ async function prepareExtractedTree(root: string, packageImports: PackageImports
         return
       }
       try {
-        // Why: stale specs must not enter repo-wide tool walks through the cache.
-        if (isTestSource(full)) {
-          await rm(full)
-        } else if (isRewritableSource(full)) {
+        // The walk already removed stale test sources before queuing files.
+        if (isRewritableSource(full)) {
           const source = await readFile(full, 'utf8')
-          const rewritten = await rewriteRendererAliases(full, source, rendererRoot)
+          let rewritten = await rewriteRendererAliases(full, source, rendererRoot)
+          if (resolver) {
+            rewritten = await rewriteWorkspaceImports(root, full, rewritten, resolver)
+          }
           collectPackageImports(rewritten, packageImports)
         }
       } catch (error) {
@@ -127,14 +176,6 @@ async function prepareExtractedTree(root: string, packageImports: PackageImports
   }
 }
 
-function checkoutTarProgram(): string {
-  if (process.platform !== 'win32') {
-    return 'tar'
-  }
-  const systemRoot = process.env.SystemRoot ?? process.env.SYSTEMROOT ?? 'C:\\Windows'
-  return join(systemRoot, 'System32', 'tar.exe')
-}
-
 async function runCheckoutProcess(
   repoRoot: string,
   program: string,
@@ -142,8 +183,7 @@ async function runCheckoutProcess(
   deadline: number
 ): Promise<string> {
   // Kept lazy so plain Node 24 contention children never load Vite's TS graph.
-  const { runProcess } = await (processRunner ??=
-    import('../../../src/shared/child-process/run-process'))
+  const { runProcess } = await (processRunner ??= import('@orca/process-host'))
   const result = await runProcess({
     program,
     args,
@@ -161,65 +201,89 @@ async function runCheckoutProcess(
   throw new Error(`${program} ${args[0] ?? ''} ${detail}`)
 }
 
-async function extractWindowsCheckout(
-  repoRoot: string,
-  staging: string,
-  archive: string,
-  deadline: number
-): Promise<void> {
-  const paths: string[][] = Array.from({ length: CHECKOUT_SOURCE_WORKERS }, () => [])
-  await listTar({
-    file: archive,
-    strict: true,
-    onReadEntry: (entry) => {
-      if (['File', 'SymbolicLink', 'Link'].includes(entry.type)) {
-        const bucket = createHash('sha1').update(entry.path).digest()[0] % paths.length
-        paths[bucket].push(entry.path)
-      }
+/** Static directory prefix of a workspace glob, e.g. `src/packages` for `src/packages/*`. */
+function workspacePatternRoot(pattern: string): string {
+  const segments: string[] = []
+  for (const segment of pattern.replace(/\/$/, '').split('/')) {
+    if (/[*?[\]{}!]/.test(segment)) {
+      break
     }
-  })
-  const manifests = paths.map((_, index) => join(staging, `.checkout-paths-${index}.txt`))
-  try {
-    const writes = await Promise.allSettled(
-      paths.map((part, index) => writeFile(manifests[index], part.join('\n')))
-    )
-    for (const result of writes) {
-      if (result.status === 'rejected') {
-        throw result.reason
-      }
-    }
-    // Windows metadata writes dominate a serial extraction; each member has one owner.
-    const results = await Promise.allSettled(
-      paths.map((part, index) =>
-        part.length === 0
-          ? Promise.resolve()
-          : runCheckoutProcess(
-              repoRoot,
-              checkoutTarProgram(),
-              [...TAR_TEST_EXCLUDES, '-xf', archive, '-C', staging, '-T', manifests[index]],
-              deadline
-            )
-      )
-    )
-    for (const result of results) {
-      if (result.status === 'rejected') {
-        throw result.reason
-      }
-    }
-  } finally {
-    await Promise.all(manifests.map((manifest) => rm(manifest, { force: true })))
+    segments.push(segment)
   }
+  if (segments.length === 0 || segments.some((segment) => segment === '..' || segment === '.')) {
+    throw new Error(`Unsupported release workspace package pattern: ${pattern}`)
+  }
+  return segments.join('/')
+}
+
+async function listReleasePaths(
+  repoRoot: string,
+  commit: string,
+  paths: string[],
+  deadline: number
+): Promise<string[]> {
+  return (
+    await runCheckoutProcess(
+      repoRoot,
+      'git',
+      ['ls-tree', '-z', '--name-only', commit, '--', ...paths],
+      deadline
+    )
+  )
+    .split('\0')
+    .filter(Boolean)
+}
+
+/** The release's workspace policy and declared package directories; none before workspaces. */
+async function releaseWorkspaceArchivePaths(
+  repoRoot: string,
+  commit: string,
+  deadline: number
+): Promise<string[]> {
+  const listed = (paths: string[]): Promise<string[]> =>
+    listReleasePaths(repoRoot, commit, paths, deadline)
+  if ((await listed([WORKSPACE_POLICY])).length === 0) {
+    return []
+  }
+  const policy = await runCheckoutProcess(
+    repoRoot,
+    'git',
+    ['cat-file', 'blob', `${commit}:${WORKSPACE_POLICY}`],
+    deadline
+  )
+  const { packages = [] } = parse(policy) ?? {}
+  if (!Array.isArray(packages) || packages.some((pattern) => typeof pattern !== 'string')) {
+    throw new Error(`Release ${commit} has unreadable workspace package patterns`)
+  }
+  const roots = [
+    ...new Set(
+      packages
+        .filter((pattern: string) => !pattern.startsWith('!'))
+        .map((pattern: string) => workspacePatternRoot(pattern))
+    )
+  ]
+  return [WORKSPACE_POLICY, ...(roots.length > 0 ? await listed(roots) : [])]
 }
 
 export async function extractReleaseCheckoutTree(
   repoRoot: string,
   staging: string,
   commit: string,
-  archivePaths: readonly string[] = ARCHIVE_PATHS,
-  platform: NodeJS.Platform = process.platform
-): Promise<void> {
+  sourceOnly = false,
+  options: { archivePaths?: readonly string[]; platform?: NodeJS.Platform } = {}
+): Promise<PackageImports> {
   const archive = join(staging, '.release-checkout.tar')
   const deadline = Date.now() + CHECKOUT_PROCESS_TIMEOUT_MS
+  const platform = options.platform ?? process.platform
+  // Explicit source-only fixtures request an exact subtree. Adding all release workspaces
+  // or optional relay sources defeats isolation and can exhaust the loader's setup budget.
+  const exactSourceSubset = sourceOnly && options.archivePaths !== undefined
+  const workspacePaths = exactSourceSubset
+    ? []
+    : await releaseWorkspaceArchivePaths(repoRoot, commit, deadline)
+  const optionalPaths = exactSourceSubset
+    ? []
+    : await listReleasePaths(repoRoot, commit, OPTIONAL_ARCHIVE_PATHS, deadline)
   try {
     await runCheckoutProcess(
       repoRoot,
@@ -230,25 +294,27 @@ export async function extractReleaseCheckoutTree(
         `--output=${archive}`,
         commit,
         '--',
-        ...archivePaths,
+        ...(options.archivePaths ?? ARCHIVE_PATHS),
+        ...optionalPaths,
+        ...workspacePaths,
         ...ARCHIVE_TEST_EXCLUDES
       ],
       deadline
     )
-    await (platform === 'win32'
-      ? extractWindowsCheckout(repoRoot, staging, archive, deadline)
-      : runCheckoutProcess(
-          repoRoot,
-          checkoutTarProgram(),
-          [...TAR_TEST_EXCLUDES, '-xf', archive, '-C', staging],
-          deadline
-        ))
+    await extractReleaseArchive(
+      staging,
+      archive,
+      platform,
+      TAR_TEST_EXCLUDES,
+      CHECKOUT_SOURCE_WORKERS,
+      (program, args) => runCheckoutProcess(repoRoot, program, args, deadline)
+    )
   } finally {
     await rm(archive, { force: true })
   }
   const packageImports: PackageImports = new Map()
-  await prepareExtractedTree(staging, packageImports)
-  if (packageImports.size > 0) {
+  await prepareExtractedTree(staging, workspacePaths, packageImports)
+  if (!sourceOnly && packageImports.size > 0) {
     await installMissingPackageStandIns(
       staging,
       commit,
@@ -256,6 +322,7 @@ export async function extractReleaseCheckoutTree(
       JSON.parse(await readFile(join(repoRoot, 'package.json'), 'utf8'))
     )
   }
+  return packageImports
 }
 
 export async function scavengeReleaseCheckoutStaging(

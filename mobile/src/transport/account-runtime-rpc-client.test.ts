@@ -116,6 +116,23 @@ describe('account Runtime independent stream recovery', () => {
     vi.useRealTimers()
   })
 
+  it('rejects unsupported envelope fields before sending requests or registering streams', async () => {
+    const pool = fixture.pools[0]!
+    const count = pool.subscriptions.length
+    await expect(
+      client.sendRequest('status.get', {}, { envelope: { executionHost: 'runtime:other' } })
+    ).rejects.toThrow('does not support transport envelope')
+    expect(() =>
+      client.subscribe('notifications.subscribe', {}, vi.fn(), {
+        envelope: { executionHost: 'runtime:other' }
+      })
+    ).toThrow('does not support transport envelope')
+    expect(pool.subscriptions).toHaveLength(count)
+    await expect(client.sendRequest('status.get', {}, { envelope: {} })).resolves.toMatchObject({
+      ok: true
+    })
+  })
+
   it('recovers only the failed session while healthy subscriptions and RPC stay connected', async () => {
     const healthy = vi.fn()
     client.subscribe('notifications.subscribe', {}, healthy)

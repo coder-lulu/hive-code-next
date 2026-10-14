@@ -43,6 +43,7 @@ import { createPreflightApi } from './preload-api/web-preflight-api'
 import { createRateLimitsApi } from './preload-api/web-rate-limits-api'
 import { createReposApi } from './preload-api/web-repositories-api'
 import { createHooksApi, createRuntimeNamespaceApi } from './preload-api/web-review-api'
+import { createWebJiraApi } from './preload-api/web-jira-api'
 import { callRuntimeResult } from './preload-api/web-runtime-calls'
 import { createWebRuntimeApi } from './preload-api/web-runtime-api'
 import { createRuntimeEnvironmentsApi } from './preload-api/web-runtime-environments-api'
@@ -126,6 +127,7 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     gl: createGitLabApi(),
     hostedReview: createRuntimeNamespaceApi('hostedReview'),
     linear: createRuntimeNamespaceApi('linear'),
+    jira: createWebJiraApi(),
     hooks: createHooksApi(),
     stats: {
       getSummary: async () =>

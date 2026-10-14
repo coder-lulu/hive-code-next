@@ -15,6 +15,10 @@ import {
 
 const CLAUDE_SERVICE_TEST_ROOT = join(tmpdir(), 'orca-claude-service-add-test')
 
+vi.mock('../../shared/app-environment', () => ({
+  getAppEnvironment: () => ({ getPath: () => CLAUDE_SERVICE_TEST_ROOT })
+}))
+
 vi.mock('electron', () => ({
   app: {
     getPath: () => CLAUDE_SERVICE_TEST_ROOT

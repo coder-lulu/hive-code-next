@@ -252,8 +252,8 @@ describe('registerSkillsHandlers', () => {
     await handler(null)
 
     expect(inventorySkillFreshnessMock).toHaveBeenCalledWith({
-      currentAppVersion: '9.9.9-test',
-      repos
+      repos,
+      currentAppVersion: '9.9.9-test'
     })
     expect(getWslHomeMock).not.toHaveBeenCalled()
   })

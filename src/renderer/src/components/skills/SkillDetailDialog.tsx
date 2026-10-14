@@ -63,7 +63,8 @@ export function SkillDetailDialog({
   deleteDisabledReason,
   onOpenChange,
   onShare,
-  onDelete
+  onDelete,
+  onReveal
 }: {
   skill: DiscoveredSkill | null
   agentByRootPath: ReadonlyMap<string, string>
@@ -75,6 +76,7 @@ export function SkillDetailDialog({
   onOpenChange: (open: boolean) => void
   onShare: () => void
   onDelete: () => void
+  onReveal: () => void
 }): React.JSX.Element | null {
   if (!skill) {
     return null
@@ -83,15 +85,6 @@ export function SkillDetailDialog({
   const copyPath = async (): Promise<void> => {
     await window.api.ui.writeClipboardText(skill.skillFilePath)
     toast.success(translate('auto.components.skills.SkillRow.pathCopied', 'Path copied'))
-  }
-
-  const revealSkill = async (): Promise<void> => {
-    const result = await window.api.shell.openInFileManager(skill.skillFilePath)
-    if (!result.ok) {
-      toast.error(
-        translate('auto.components.skills.SkillsPage.995fde8337', 'Could not reveal skill file')
-      )
-    }
   }
 
   const agents = agentNames(skill, agentByRootPath)
@@ -157,7 +150,7 @@ export function SkillDetailDialog({
         </div>
 
         <DialogFooter className="border-t border-border px-5 py-3">
-          <Button type="button" variant="ghost" size="sm" onClick={() => void revealSkill()}>
+          <Button type="button" variant="ghost" size="sm" onClick={onReveal}>
             <FolderOpen className="size-3.5" />
             {translate('auto.components.skills.SkillsPage.dc4c3328ee', 'Reveal file')}
           </Button>

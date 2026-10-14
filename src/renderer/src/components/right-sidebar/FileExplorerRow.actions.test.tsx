@@ -9,7 +9,7 @@ import {
   shouldShowViewFileAction
 } from './file-explorer-row-action-visibility'
 import { directoryNode, fileNode } from './file-explorer-tree-node-test-fixtures'
-import type * as RuntimeFileClient from '@/runtime/runtime-file-client'
+import type * as RuntimeFileReadClient from '@/runtime/runtime-file-read-client'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 
 const { downloadRuntimeFileMock, toastErrorMock, toastSuccessMock } = vi.hoisted(() => ({
@@ -25,8 +25,8 @@ vi.mock('sonner', () => ({
   }
 }))
 
-vi.mock('@/runtime/runtime-file-client', async (importOriginal) => {
-  const actual = await importOriginal<typeof RuntimeFileClient>()
+vi.mock('@/runtime/runtime-file-read-client', async (importOriginal) => {
+  const actual = await importOriginal<typeof RuntimeFileReadClient>()
   return {
     ...actual,
     downloadRuntimeFile: downloadRuntimeFileMock
@@ -90,7 +90,7 @@ describe('FileExplorerRow collapse folder action', () => {
 
   it('shows remote download only for desktop SSH rows and file-like Remote Host rows', () => {
     const runtimeContext = {
-      settings: { activeRuntimeEnvironmentId: 'runtime-1' },
+      target: { kind: 'environment' as const, environmentId: 'runtime-1' },
       worktreeId: 'wt-1',
       worktreePath: '/repo'
     }
@@ -232,7 +232,7 @@ describe('FileExplorerRow collapse folder action', () => {
       | { onClick: () => void }
       | undefined
     action?.onClick()
-    expect(openPath).toHaveBeenCalledWith('/downloads/renamed\\entry.ts')
+    expect(openPath).toHaveBeenCalledWith('/downloads/renamed\\entry.ts', 'local')
     expect(toastErrorMock).not.toHaveBeenCalled()
   })
 
@@ -291,7 +291,7 @@ describe('FileExplorerRow collapse folder action', () => {
 
   it('downloads Remote Host rows through the runtime download path', async () => {
     const runtimeContext = {
-      settings: { activeRuntimeEnvironmentId: 'runtime-1' },
+      target: { kind: 'environment' as const, environmentId: 'runtime-1' },
       worktreeId: 'wt-1',
       worktreePath: '/repo'
     }

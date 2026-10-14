@@ -23,6 +23,7 @@ import {
 } from '../account-runtime-relay/web-account-relay-client'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
+  isSameWebRuntimePairing,
   cloudEnvironmentId,
   createVolatileCloudEnvironment,
   manuallyDisconnectedResponse
@@ -186,6 +187,10 @@ export function getClientForEnvironment(
   if (manuallyDisconnectedEnvironmentIds.has(environment.id)) {
     throw new Error('runtime_manually_disconnected')
   }
+  // Why: a request captured before a re-pair must not reopen a client with the replaced token.
+  if (!isSameWebRuntimePairing(webRuntimeState.activeEnvironment, environment)) {
+    throw new Error(PAIRING_CHANGED_MESSAGE)
+  }
   if (
     !webRuntimeState.activeClient ||
     webRuntimeState.activeClientEnvironmentId !== environment.id
@@ -259,11 +264,11 @@ export function requireActiveEnvironmentOrNull(): StoredWebRuntimeEnvironment | 
   return webRuntimeState.activeEnvironment
 }
 
+const PAIRING_CHANGED_MESSAGE = `The paired ${APP_DISPLAY_NAME} server changed while the request was in progress.`
+
 export function assertActiveEnvironment(environmentId: string): void {
   if (requireActiveEnvironment().id !== environmentId) {
-    throw new Error(
-      `The paired ${APP_DISPLAY_NAME} server changed while the request was in progress.`
-    )
+    throw new Error(PAIRING_CHANGED_MESSAGE)
   }
 }
 
@@ -272,7 +277,11 @@ export function updateEnvironmentFromResponse(
   response: RuntimeRpcResponse<unknown>
 ): void {
   const current = webRuntimeState.activeEnvironment
-  if (!current || !displayProjection.currentEnvironment(environment)) {
+  if (
+    !current ||
+    !isSameWebRuntimePairing(webRuntimeState.activeEnvironment, environment) ||
+    !displayProjection.currentEnvironment(environment)
+  ) {
     return
   }
   const runtimeId = response.ok ? response._meta.runtimeId : (response._meta?.runtimeId ?? null)

@@ -77,6 +77,7 @@ describe('Session Graphite presentation', () => {
   it('keeps fixed Session and Quick Command chrome localized', () => {
     const sources = [
       'MobileMarkdownReader.tsx',
+      '../components/MobileLoadErrorState.tsx',
       'MobileNativeChatAsk.tsx',
       'MobileNativeChatComposer.tsx',
       'MobileNativeChatQuestion.tsx',

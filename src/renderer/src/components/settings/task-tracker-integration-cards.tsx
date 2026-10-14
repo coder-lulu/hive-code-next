@@ -14,7 +14,7 @@ import {
   useIntegrationSubordinateRowClass
 } from './integration-card-presentation'
 import { LinearAgentSkillInstallCta } from './linear-agent-skill-install-cta'
-import { getProviderAccountScope } from './provider-account-scope'
+import { getProviderAccountScope, type ProviderHostScope } from './provider-account-scope'
 import { ProviderHostScopeControl } from './ProviderHostScopeControl'
 import { LINEAR_INTEGRATION_SECTION_ID } from './task-provider-integration-section-ids'
 import { translate } from '@/i18n/i18n'
@@ -250,7 +250,7 @@ function LinearIntegrationDetailsCard(): React.JSX.Element {
   )
 }
 
-function ProviderAccountScopeRow({ scope }: { scope: ReturnType<typeof getProviderAccountScope> }) {
+function ProviderAccountScopeRow({ scope }: { scope: ProviderHostScope }) {
   const subordinateRowClass = useIntegrationSubordinateRowClass('text-xs')
 
   return (

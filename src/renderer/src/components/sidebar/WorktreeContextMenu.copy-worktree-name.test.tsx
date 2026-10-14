@@ -55,11 +55,15 @@ vi.mock('@/i18n/i18n', async () => ({
 vi.mock('./ProjectGroupNameDialog', () => ({ ProjectGroupNameDialog: () => null }))
 vi.mock('./WorktreeParentPickerPopover', () => ({ WorktreeParentPickerPopover: () => null }))
 
+const openInMenu = vi.hoisted(() => vi.fn(() => null))
+vi.mock('./WorktreeOpenInMenu', () => ({ WorktreeOpenInSubMenu: openInMenu }))
+
 const writeClipboardText = vi.fn()
 const mounted: { container: HTMLDivElement; root: Root }[] = []
 
 beforeEach(() => {
   writeClipboardText.mockReset()
+  openInMenu.mockClear()
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: { ui: { writeClipboardText } }
@@ -122,6 +126,15 @@ function clickMenuItem(label: string): void {
 }
 
 describe('WorktreeContextMenu Copy Worktree Name', () => {
+  it('passes an inactive row owner even before that row reaches the catalog', () => {
+    openMenu(worktreeFixture({ hostId: 'runtime:remote-owner' }))
+
+    expect(openInMenu).toHaveBeenCalledWith(
+      expect.objectContaining({ runtimeEnvironmentId: 'remote-owner' }),
+      undefined
+    )
+  })
+
   it('copies the workspace display name', () => {
     openMenu(worktreeFixture())
 

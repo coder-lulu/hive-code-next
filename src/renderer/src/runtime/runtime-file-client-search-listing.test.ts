@@ -2,12 +2,14 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   cancelRuntimeFileList,
   listRuntimeFiles,
+  searchRuntimeFilePaths,
+  searchRuntimeFiles
+} from './runtime-file-search-client'
+import {
   listRuntimeMarkdownDocuments,
   runtimePathExists,
-  searchRuntimeFilePaths,
-  searchRuntimeFiles,
   statRuntimePath
-} from './runtime-file-client'
+} from './runtime-file-metadata-client'
 import {
   fsStat,
   fsPathExists,
@@ -35,7 +37,7 @@ describe('runtime file client', () => {
     await expect(
       searchRuntimeFiles(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -62,7 +64,7 @@ describe('runtime file client', () => {
     await expect(
       searchRuntimeFiles(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -77,7 +79,7 @@ describe('runtime file client', () => {
     await expect(
       searchRuntimeFiles(
         {
-          settings: { activeRuntimeEnvironmentId: null },
+          target: { kind: 'local' as const },
           worktreeId: 'wt-1',
           worktreePath: '/repo',
           connectionId: 'ssh-1'
@@ -106,7 +108,7 @@ describe('runtime file client', () => {
     await expect(
       listRuntimeFiles(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -146,7 +148,7 @@ describe('runtime file client', () => {
     await expect(
       searchRuntimeFilePaths(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -178,7 +180,7 @@ describe('runtime file client', () => {
     await expect(
       searchRuntimeFilePaths(
         {
-          settings: { activeRuntimeEnvironmentId: null },
+          target: { kind: 'local' as const },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo',
           connectionId: 'ssh-1'
@@ -238,7 +240,7 @@ describe('runtime file client', () => {
     await expect(
       searchRuntimeFilePaths(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -253,7 +255,7 @@ describe('runtime file client', () => {
     await expect(
       searchRuntimeFilePaths(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -269,7 +271,7 @@ describe('runtime file client', () => {
     replaceRuntimeEnvironmentRevisions([{ id: 'env-1', createdAt: 2 }])
     await searchRuntimeFilePaths(
       {
-        settings: { activeRuntimeEnvironmentId: 'env-1' },
+        target: { kind: 'environment' as const, environmentId: 'env-1' },
         worktreeId: 'wt-1',
         worktreePath: '/remote/repo'
       },
@@ -300,7 +302,7 @@ describe('runtime file client', () => {
     await expect(
       searchRuntimeFilePaths(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-legacy' },
+          target: { kind: 'environment' as const, environmentId: 'env-legacy' },
           worktreeId: 'wt-legacy',
           worktreePath: '/remote/repo'
         },
@@ -353,7 +355,7 @@ describe('runtime file client', () => {
     await expect(
       searchRuntimeFilePaths(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -393,7 +395,7 @@ describe('runtime file client', () => {
 
     const pending = searchRuntimeFilePaths(
       {
-        settings: { activeRuntimeEnvironmentId: 'env-1' },
+        target: { kind: 'environment' as const, environmentId: 'env-1' },
         worktreeId: 'wt-1',
         worktreePath: '/remote/repo'
       },
@@ -413,7 +415,7 @@ describe('runtime file client', () => {
     const retryController = new AbortController()
     const retry = searchRuntimeFilePaths(
       {
-        settings: { activeRuntimeEnvironmentId: 'env-1' },
+        target: { kind: 'environment' as const, environmentId: 'env-1' },
         worktreeId: 'wt-1',
         worktreePath: '/remote/repo'
       },
@@ -465,7 +467,7 @@ describe('runtime file client', () => {
     })
 
     const context = {
-      settings: { activeRuntimeEnvironmentId: 'env-1' },
+      target: { kind: 'environment' as const, environmentId: 'env-1' },
       worktreeId: 'folder-1'
     }
     await expect(
@@ -489,7 +491,7 @@ describe('runtime file client', () => {
     await expect(
       listRuntimeFiles(
         {
-          settings: {},
+          target: { kind: 'local' as const },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo',
           connectionId: 'ssh-1'
@@ -511,7 +513,7 @@ describe('runtime file client', () => {
 
   it('sends the Explorer name filter to local listings only', async () => {
     fsListFiles.mockResolvedValue([])
-    const local = { settings: {}, worktreeId: 'wt-1', worktreePath: '/repo' }
+    const local = { target: { kind: 'local' as const }, worktreeId: 'wt-1', worktreePath: '/repo' }
 
     await listRuntimeFiles(local, { rootPath: '/repo', nameFilter: 'AppDelegate' })
     await listRuntimeFiles(
@@ -526,7 +528,7 @@ describe('runtime file client', () => {
   it('cancelRuntimeFileList aborts the IPC listing but not environment listings (#7721)', () => {
     cancelRuntimeFileList(
       {
-        settings: {},
+        target: { kind: 'local' as const },
         worktreeId: 'wt-1',
         worktreePath: '/remote/repo',
         connectionId: 'ssh-1'
@@ -538,7 +540,7 @@ describe('runtime file client', () => {
     fsCancelListFiles.mockClear()
     cancelRuntimeFileList(
       {
-        settings: { activeRuntimeEnvironmentId: 'env-1' },
+        target: { kind: 'environment' as const, environmentId: 'env-1' },
         worktreeId: 'wt-1',
         worktreePath: '/remote/repo'
       },
@@ -555,7 +557,7 @@ describe('runtime file client', () => {
       _meta: { runtimeId: 'remote-runtime' }
     })
     const context = {
-      settings: { activeRuntimeEnvironmentId: 'env-1' },
+      target: { kind: 'environment' as const, environmentId: 'env-1' },
       worktreeId: 'wt-1',
       worktreePath: '/remote/repo'
     }
@@ -583,7 +585,7 @@ describe('runtime file client', () => {
     await expect(
       runtimePathExists(
         {
-          settings: { activeRuntimeEnvironmentId: null },
+          target: { kind: 'local' as const },
           worktreeId: 'wt-1',
           worktreePath: '/repo',
           connectionId: 'ssh-1'
@@ -603,7 +605,7 @@ describe('runtime file client', () => {
     await expect(
       statRuntimePath(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: '/remote/repo'
         },
@@ -614,7 +616,7 @@ describe('runtime file client', () => {
     await expect(
       statRuntimePath(
         {
-          settings: { activeRuntimeEnvironmentId: 'env-1' },
+          target: { kind: 'environment' as const, environmentId: 'env-1' },
           worktreeId: 'wt-1',
           worktreePath: 'C:\\repo'
         },
@@ -637,7 +639,7 @@ it.each([{ includeIgnored: false }, { followSymlinks: true }])(
       _meta: { runtimeId: 'remote-runtime' }
     })
     const context = {
-      settings: { activeRuntimeEnvironmentId: 'env-1' },
+      target: { kind: 'environment' as const, environmentId: 'env-1' },
       worktreeId: 'options-workspace',
       worktreePath: '/remote/repo'
     }
@@ -668,7 +670,7 @@ it('forwards both listing options only to the selected current host', async () =
   await expect(
     searchRuntimeFilePaths(
       {
-        settings: { activeRuntimeEnvironmentId: 'env-1' },
+        target: { kind: 'environment' as const, environmentId: 'env-1' },
         worktreeId: 'options-current',
         worktreePath: '/remote/repo'
       },

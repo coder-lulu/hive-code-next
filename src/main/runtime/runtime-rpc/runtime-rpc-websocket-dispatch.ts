@@ -1,5 +1,5 @@
 import type { WebSocket } from 'ws'
-import { fingerprintAuthenticatedPairingCredential } from '../rpc/orchestration-mutation-executor'
+import { callerScopeOf, devicePrincipalOf } from '../device-principal'
 import type {
   AuthenticatedMobileSocket,
   AuthenticatedCloudManagedSocket
@@ -10,7 +10,10 @@ import type { DeviceScope } from '../device-registry'
 import { LOCAL_ONLY_RPC_METHODS } from './runtime-rpc-cloud-dispatch'
 import { RuntimeRpcAccountDispatch } from './runtime-rpc-account-dispatch'
 import { classifyRuntimeLongPoll } from './runtime-rpc-long-poll'
+import type { RpcBinarySender } from '../rpc/rpc-binary-sender'
+import { limitRuntimeRpcReplySize } from './runtime-rpc-reply-size-limit'
 import { MOBILE_RPC_METHOD_ALLOWLIST } from './runtime-rpc-mobile-method-allowlist'
+import { parseExecutionHostId } from '../../../shared/execution-host'
 
 // Why: status.get has no per-connection context in the dispatcher, so stamp the scope here at the transport boundary.
 function injectDeviceScope(response: string, scope: DeviceScope): string {
@@ -31,7 +34,7 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
   protected async handleWebSocketMessage(
     rawMessage: string,
     reply: (response: string) => void,
-    sendBinary: (response: Uint8Array<ArrayBufferLike>) => boolean | void,
+    sendBinary: RpcBinarySender,
     wsTransport?: WebSocketTransport,
     ws?: WebSocket,
     authenticatedDeviceToken?: string | null,
@@ -75,17 +78,25 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
       typeof (request as Record<string, unknown>).deviceToken === 'string'
         ? ((request as Record<string, unknown>).deviceToken as string)
         : null
-    if (authenticatedDeviceToken && requestToken && requestToken !== authenticatedDeviceToken) {
+    // Requests must match the current token proved by this socket.
+    const boundToken = authenticatedSocket
+      ? (authenticatedSocket.device.deviceToken ?? null)
+      : authenticatedDeviceToken
+    if (requestToken && (authenticatedSocket || boundToken) && requestToken !== boundToken) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Device token mismatch')))
       return
     }
     // Why: E2EE already authenticated the channel; authorize by that bound identity, not a repeated request field.
-    const token = authenticatedDeviceToken ?? requestToken
-    if (!token) {
+    const token = boundToken ?? requestToken
+    if (!token && !authenticatedSocket) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Missing device token')))
       return
     }
-    const device = this.deviceRegistry?.validateToken(token)
+    // Why: an authenticated socket stays bound to the device and credential revision it proved;
+    // a revoke or credential change refuses its next request even before the socket closes.
+    const device = authenticatedSocket
+      ? this.deviceRegistry?.resolveAuthenticatedPrincipal(authenticatedSocket.device)
+      : this.deviceRegistry?.validateToken(token ?? '')
     if (!device) {
       reply(JSON.stringify(this.buildError(request.id, 'unauthorized', 'Invalid device token')))
       return
@@ -103,21 +114,23 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
       return
     }
     if (device.scope === 'mobile' && !MOBILE_RPC_METHOD_ALLOWLIST.has(request.method)) {
-      reply(
-        JSON.stringify(
-          this.buildError(
-            request.id,
-            'forbidden',
-            `Method '${request.method}' is not available to mobile clients`
-          )
-        )
-      )
+      reply(JSON.stringify(this.buildError(request.id, 'forbidden', `Method '${request.method}' is not available to mobile clients`)))
       return
     }
+    if (request.executionHost !== undefined) {
+      const target = parseExecutionHostId(typeof request.executionHost === 'string' ? request.executionHost : null)
+      if (!target || target.kind === 'runtime') {
+        reply(JSON.stringify(this.buildError(request.id, target ? 'remote_runtime_unavailable' : 'invalid_argument',
+          target ? 'This Runtime does not delegate requests to other paired hosts' : 'Invalid executionHost')))
+        return
+      }
+    }
+    const principal = devicePrincipalOf(device)
+    const callerScope = callerScopeOf(device)
 
-    // Why: bind deviceToken to this socket so ws.on('close') knows which mobile client disconnected.
+    // Why: bind the device to this socket so ws.on('close') knows which client disconnected.
     if (wsTransport && ws) {
-      wsTransport.setClientId(ws, token)
+      wsTransport.setClientId(ws, principal.deviceId)
     }
 
     const longPoll = classifyRuntimeLongPoll(request)
@@ -130,21 +143,25 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
     const abortRegistration = ws ? this.registerWebSocketDispatchAbort(ws) : null
 
     // Why: older pairings may lack scope metadata, so stamp the authenticated scope onto status.get.
+    const boundedReply = limitRuntimeRpcReplySize(request.id, reply, (id, code, message) =>
+      this.buildError(id, code, message)
+    )
     const replyForRequest =
       request.method === 'status.get'
-        ? (response: string): void => reply(injectDeviceScope(response, device.scope))
-        : reply
+        ? (response: string): void => boundedReply(injectDeviceScope(response, device.scope))
+        : boundedReply
 
     const connectionId = ws ? this.mobileSocketWiring?.getConnectionId(ws) : undefined
     try {
       await this.dispatcher.dispatchStreaming(request, replyForRequest, {
         // Why: the validated credential preserves existing federation ownership without trusting request fields.
-        authenticatedCallerFingerprint: fingerprintAuthenticatedPairingCredential(token),
+        authenticatedCallerFingerprint: principal.callerFingerprint,
         connectionId,
-        clientId: token,
+        clientId: principal.clientId,
         pairedDeviceId: device.deviceId,
         // Why: gates the mobile-only payload diet so full-screen web/desktop clients aren't truncated.
         clientKind: device.scope,
+        callerScope,
         clientCapabilities: authenticatedSocket?.clientCapabilities,
         updateClientCapabilities:
           authenticatedSocket && device.scope === 'mobile'

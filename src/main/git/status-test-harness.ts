@@ -10,6 +10,7 @@ export type GitRunnerMocks = {
 }
 
 export type FsPromisesMocks = {
+  readdirMock?: MockFn
   lstatMock: MockFn
   realpathMock: MockFn
   readFileMock: MockFn
@@ -47,6 +48,7 @@ export function createGitRunnerModuleMock(mocks: GitRunnerMocks): Record<string,
 
 export function createFsPromisesModuleMock(mocks: FsPromisesMocks): Record<string, unknown> {
   return {
+    ...(mocks.readdirMock ? { readdir: mocks.readdirMock } : {}),
     lstat: mocks.lstatMock,
     realpath: mocks.realpathMock,
     readFile: mocks.readFileMock,

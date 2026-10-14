@@ -1,4 +1,4 @@
-import { AlertCircle, Paperclip, X } from 'lucide-react'
+import { AlertCircle, Paperclip, ServerOff, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
@@ -55,7 +55,8 @@ export function NativeChatPromptSlotNotices({
 
 function NoticeRow({ notice }: { notice: NativeChatComposerNotice }): React.JSX.Element {
   const isError = notice.kind === 'error'
-  const Icon = isError ? AlertCircle : Paperclip
+  const isHostWarning = notice.kind === 'host' && notice.tone === 'warning'
+  const Icon = notice.kind === 'host' ? ServerOff : isError ? AlertCircle : Paperclip
   const dismissLabel = translate('components.native-chat.notices.dismiss', 'Dismiss')
   return (
     <li data-notice-kind={notice.kind} className={cn(isError && 'bg-destructive/5')}>
@@ -64,19 +65,30 @@ function NoticeRow({ notice }: { notice: NativeChatComposerNotice }): React.JSX.
           aria-hidden
           className={cn(
             'mt-0.5 size-3.5 shrink-0',
-            isError ? 'text-destructive' : 'text-muted-foreground'
+            'text-muted-foreground',
+            isError && 'text-destructive',
+            isHostWarning && 'text-destructive'
           )}
         />
         <p
           className={cn(
-            'min-w-0 flex-1 select-text py-px leading-5 [overflow-wrap:anywhere]',
-            isError ? 'text-foreground' : 'text-muted-foreground'
+            'min-w-0 flex-1 select-text py-px leading-5',
+            notice.kind === 'host' ? 'truncate' : '[overflow-wrap:anywhere]',
+            'text-muted-foreground',
+            isError && 'text-foreground',
+            isHostWarning && 'text-destructive'
           )}
         >
           {notice.text}
         </p>
         {notice.action ? (
-          <Button type="button" variant="outline" size="xs" onClick={notice.action.onClick}>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            disabled={notice.action.disabled}
+            onClick={notice.action.onClick}
+          >
             {notice.action.label}
           </Button>
         ) : null}
@@ -95,7 +107,7 @@ function NoticeRow({ notice }: { notice: NativeChatComposerNotice }): React.JSX.
       </div>
       {notice.errorText ? (
         <div className="relative mb-2 ml-8 mr-2.5 rounded-md border border-border bg-muted">
-          <pre className="scrollbar-sleek max-h-28 select-text overflow-auto whitespace-pre-wrap break-words py-1.5 pl-2 pr-8 font-mono text-[11px] text-foreground">
+          <pre className="scrollbar-sleek max-h-28 select-text overflow-auto whitespace-pre-wrap break-words py-1.5 pl-2 pr-8 font-mono text-2xs text-foreground">
             {notice.errorText}
           </pre>
           <NativeChatCopyButton

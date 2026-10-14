@@ -2,7 +2,7 @@ import type { useAppStore } from '@/store'
 import {
   isWebTerminalSurfaceTabId,
   toWebTerminalSurfaceTabId
-} from '@/runtime/web-terminal-surface-id'
+} from '../../../shared/terminal-surface-id'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
 import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'
 

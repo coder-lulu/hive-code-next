@@ -33,8 +33,8 @@ export function createRuntimeEnvironmentStatusOwner(
     pause: () => void
   }
 ): RuntimeHostStatusOwner {
-  const pairing = getPreferredPairingOffer(environment)
-  let evidence = captureRuntimeEnvironmentCapabilityEvidence(environment.id, pairing)
+  const connection = getPreferredPairingOffer(environment)
+  let evidence = captureRuntimeEnvironmentCapabilityEvidence(environment.id, connection)
   return new RuntimeHostStatusOwner({
     environmentId: environment.id,
     pairingRevision: environment.pairingRevision ?? environment.createdAt,
@@ -49,13 +49,13 @@ export function createRuntimeEnvironmentStatusOwner(
         }
         signal.throwIfAborted()
       }
-      evidence = captureRuntimeEnvironmentCapabilityEvidence(environment.id, pairing)
+      evidence = captureRuntimeEnvironmentCapabilityEvidence(environment.id, connection)
       const response = await (transport.isReady() &&
-      getAcceptedRuntimeEnvironmentCapabilityOutcome(environment.id, pairing, null)?.kind ===
+      getAcceptedRuntimeEnvironmentCapabilityOutcome(environment.id, connection, null)?.kind ===
         'supported'
         ? transport.request(signal)
         : sendRemoteRuntimeRequest<RuntimeStatus>(
-            pairing,
+            connection,
             'status.get',
             undefined,
             15_000,
@@ -78,7 +78,7 @@ export function createRuntimeEnvironmentStatusOwner(
           runtimeId: response._meta.runtimeId,
           runtimeRecordId: response.result.runtimeRecordId ?? null,
           pairedDeviceId: response.result.pairedDeviceId,
-          pairingDeviceToken: pairing.deviceToken
+          pairingDeviceToken: connection.deviceToken
         })
         if (capable) {
           transport.establish()

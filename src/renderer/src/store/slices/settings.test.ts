@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import {
   MIN_COMPATIBLE_RUNTIME_SERVER_VERSION,
   MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
-  RUNTIME_PROTOCOL_VERSION
+  RUNTIME_PROTOCOL_VERSION,
+  PROJECT_HOST_SETUP_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
 import {
@@ -89,64 +90,69 @@ beforeEach(() => {
       const detectedRepoId = params?.repo ?? 'repo-env-2'
       const detectedPath = detectedRepoId === 'repo-env-1' ? '/env-1/repo' : '/env-2/repo'
       const result =
-        method === 'status.get'
-          ? {
-              runtimeId: 'runtime-2',
-              graphStatus: 'ready',
-              runtimeProtocolVersion: RUNTIME_PROTOCOL_VERSION,
-              minCompatibleRuntimeClientVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION
-            }
-          : method === 'repo.list'
-            ? {
-                repos: [
-                  {
-                    id: 'repo-env-2',
-                    path: '/env-2/repo',
-                    displayName: 'Env 2',
-                    badgeColor: 'blue',
-                    addedAt: 1
-                  }
-                ]
-              }
-            : method === 'worktree.list'
+        method === 'project.list'
+          ? { projects: [] }
+          : method === 'projectHostSetup.list'
+            ? { setups: [] }
+            : method === 'status.get'
               ? {
-                  worktrees: [
-                    makeWorktree({
-                      id: 'repo-env-2::/env-2/repo',
-                      repoId: 'repo-env-2',
-                      path: '/env-2/repo'
-                    })
-                  ],
-                  totalCount: 1,
-                  truncated: false
+                  runtimeId: 'runtime-2',
+                  graphStatus: 'ready',
+                  capabilities: [PROJECT_HOST_SETUP_RUNTIME_CAPABILITY],
+                  runtimeProtocolVersion: RUNTIME_PROTOCOL_VERSION,
+                  minCompatibleRuntimeClientVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION
                 }
-              : method === 'worktree.detectedList'
+              : method === 'repo.list'
                 ? {
-                    repoId: detectedRepoId,
-                    authoritative: true,
-                    source: 'git',
-                    worktrees: [
+                    repos: [
                       {
-                        ...makeWorktree({
-                          id: `${detectedRepoId}::${detectedPath}`,
-                          repoId: detectedRepoId,
-                          path: detectedPath
-                        }),
-                        ownership: 'orca-managed',
-                        selectedCheckout: true,
-                        visible: true
+                        id: 'repo-env-2',
+                        path: '/env-2/repo',
+                        displayName: 'Env 2',
+                        badgeColor: 'blue',
+                        addedAt: 1
                       }
                     ]
                   }
-                : method === 'browser.profileList'
-                  ? { profiles: [] }
-                  : method === 'projectGroup.list'
-                    ? { groups: [] }
-                    : method === 'worktree.lineageList'
-                      ? { lineage: { [env2Lineage.worktreeId]: env2Lineage } }
-                      : method === 'settings.get'
-                        ? { settings: {} }
-                        : {}
+                : method === 'worktree.list'
+                  ? {
+                      worktrees: [
+                        makeWorktree({
+                          id: 'repo-env-2::/env-2/repo',
+                          repoId: 'repo-env-2',
+                          path: '/env-2/repo'
+                        })
+                      ],
+                      totalCount: 1,
+                      truncated: false
+                    }
+                  : method === 'worktree.detectedList'
+                    ? {
+                        repoId: detectedRepoId,
+                        authoritative: true,
+                        source: 'git',
+                        worktrees: [
+                          {
+                            ...makeWorktree({
+                              id: `${detectedRepoId}::${detectedPath}`,
+                              repoId: detectedRepoId,
+                              path: detectedPath
+                            }),
+                            ownership: 'orca-managed',
+                            selectedCheckout: true,
+                            visible: true
+                          }
+                        ]
+                      }
+                    : method === 'browser.profileList'
+                      ? { profiles: [] }
+                      : method === 'projectGroup.list'
+                        ? { groups: [] }
+                        : method === 'worktree.lineageList'
+                          ? { lineage: { [env2Lineage.worktreeId]: env2Lineage } }
+                          : method === 'settings.get'
+                            ? { settings: {} }
+                            : {}
       return Promise.resolve({ id: 'rpc-1', ok: true, result, _meta: { runtimeId: 'runtime-2' } })
     }
   )

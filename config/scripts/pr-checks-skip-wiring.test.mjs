@@ -100,13 +100,20 @@ describe('PR Checks skip wiring', () => {
 
   it('gates each expensive job on its classifier and cache prerequisite', () => {
     for (const jobName of expensiveJobs.filter(
-      (jobName) => !['test', 'static_analysis', 'typecheck', 'mobile_web_app'].includes(jobName)
+      (jobName) =>
+        !['test', 'static_analysis', 'typecheck', 'mobile_web_app', 'orcad_browser'].includes(
+          jobName
+        )
     )) {
       expect(prWorkflow.jobs[jobName].needs, jobName).toEqual(['code_paths', 'preflight'])
       expect(prWorkflow.jobs[jobName].if, jobName).toContain(
         `needs.code_paths.outputs.${jobName} == 'true'`
       )
     }
+    expect(prWorkflow.jobs.orcad_browser).toBeUndefined()
+    expect(prWorkflow.jobs.test.with.browser_contract).toBe(
+      "${{ needs.code_paths.outputs.orcad_browser == 'true' }}"
+    )
     expect(prWorkflow.jobs.test.if).toContain("needs.preflight.result == 'success'")
     expect(prWorkflow.jobs.test.if).toContain("needs.code_paths.outputs.test == 'true'")
     expect(prWorkflow.jobs.test.with.shards).toBe('${{ needs.preflight.outputs.shards }}')

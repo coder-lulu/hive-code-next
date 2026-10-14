@@ -6,9 +6,9 @@ import type { AppState } from '@/store/types'
 import type { TerminalTab } from '../../../shared/terminal-tab-types'
 import {
   getExplicitRuntimeEnvironmentIdForWorktree,
-  getRuntimeEnvironmentIdForWorktree,
-  type WorktreeRuntimeOwnerState
+  getRuntimeEnvironmentIdForWorktree
 } from './worktree-runtime-owner'
+import type { WorktreeRuntimeOwnerState } from './worktree-runtime-owner-state'
 import { resolveWorktreeOperationRouteResult } from './worktree-operation-route'
 import { getSingleFocusedRuntimeEnvironmentId } from './single-runtime-legacy-owner'
 

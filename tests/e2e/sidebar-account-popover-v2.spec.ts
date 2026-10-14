@@ -6,6 +6,7 @@ test.use({ seedTestRepo: false, dismissOnboarding: true })
 
 const ownership = (relation: 'UNREGISTERED' | 'CLAIMED_BY_CURRENT') => ({
   stateRevision: 2,
+  ownershipEpoch: relation === 'CLAIMED_BY_CURRENT' ? 1 : null,
   relation,
   accountId: 'account-1',
   sessionGeneration: 1,
@@ -125,6 +126,7 @@ test('matches the v2 account popover hierarchy for unclaimed and claimed devices
         await new Promise((resolve) => window.setTimeout(resolve, 5_000))
         const claimed = {
           stateRevision: 3,
+          ownershipEpoch: 1,
           relation: 'CLAIMED_BY_CURRENT' as const,
           accountId: 'account-1',
           sessionGeneration: 1,
@@ -175,6 +177,7 @@ test('matches the v2 account popover hierarchy for unclaimed and claimed devices
       claimLocalRuntimeForAccount: async () => {
         const claimed = {
           stateRevision: 4,
+          ownershipEpoch: 1,
           relation: 'CLAIMED_BY_CURRENT' as const,
           accountId: 'account-1',
           sessionGeneration: 1,

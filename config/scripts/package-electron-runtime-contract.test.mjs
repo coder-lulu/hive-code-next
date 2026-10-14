@@ -3,7 +3,10 @@ import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
-import { relayArtifactFilenames } from '../../src/shared/relay-artifacts.ts'
+import {
+  OPENCODE_SQLITE_READER_FILENAME,
+  WSL_CLAUDE_PROFILE_HELPER_FILENAME
+} from '../../src/shared/remote-bundle-artifacts.ts'
 import { APP_DISPLAY_NAME } from '../../src/shared/brand.ts'
 import { selectTargets, targets } from './client-build-contract.mjs'
 
@@ -26,54 +29,33 @@ describe('Electron runtime package contract', () => {
     linux: createPackagedRuntimeNodeModuleResources('linux')
   }
 
-  it('keeps the native Windows registry addon optional and platform-gated', () => {
-    expect(packageJson.optionalDependencies['@orca/windows-registry']).toBe('workspace:*')
-    // Why: allowBuilds stops pnpm running node-gyp at install time -- the root
-    // Windows-only rebuild owns this addon so it is built against the right runtime ABI.
-    expect(pnpmWorkspace.allowBuilds['@orca/windows-registry']).toBe(false)
+  function expectWindowsAddon(name, version, resources = [name]) {
+    expect(packageJson.optionalDependencies[name]).toBe(version)
+    // The root Windows rebuild owns these addons and their runtime ABI.
+    expect(pnpmWorkspace.allowBuilds[name]).toBe(false)
+    const resource = (moduleName) =>
+      expect.objectContaining({ to: join('node_modules', moduleName) })
     if (windowsAddonsInstalled) {
-      expect(packageTargets.win32).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@orca', 'windows-registry') }),
-          expect.objectContaining({ to: join('node_modules', 'node-addon-api') })
-        ])
-      )
+      expect(packageTargets.win32).toEqual(expect.arrayContaining(resources.map(resource)))
     }
     for (const platform of ['darwin', 'linux']) {
-      expect(packageTargets[platform]).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@orca', 'windows-registry') })
-        ])
-      )
+      expect(packageTargets[platform]).not.toEqual(expect.arrayContaining([resource(name)]))
     }
+  }
+
+  it('keeps the native Windows registry addon optional and platform-gated', () => {
+    expectWindowsAddon('@orca/windows-registry', 'workspace:*', [
+      '@orca/windows-registry',
+      'node-addon-api'
+    ])
   })
 
   it('keeps the native Windows process-table addon optional and platform-gated', () => {
-    expect(packageJson.optionalDependencies['@vscode/windows-process-tree']).toBe('0.8.0')
-    // Why: same rule as the registry addon -- allowBuilds stops pnpm running node-gyp at
-    // install time so the Windows-only rebuild owns it with the right runtime ABI.
-    expect(pnpmWorkspace.allowBuilds['@vscode/windows-process-tree']).toBe(false)
-    // Why pin the patch: the upstream binding.gyp requires Spectre-mitigated
-    // libraries our build agents do not carry, and the enumeration stops after
-    // 1024 processes -- on a busy host that silently hides the very descendants
-    // teardown is looking for.
+    expectWindowsAddon('@vscode/windows-process-tree', '0.8.0')
+    // The patch removes unavailable Spectre libraries and the 1024-process enumeration cap.
     expect(pnpmWorkspace.patchedDependencies['@vscode/windows-process-tree@0.8.0']).toBe(
       'config/patches/@vscode__windows-process-tree@0.8.0.patch'
     )
-    if (windowsAddonsInstalled) {
-      expect(packageTargets.win32).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@vscode', 'windows-process-tree') })
-        ])
-      )
-    }
-    for (const platform of ['darwin', 'linux']) {
-      expect(packageTargets[platform]).not.toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({ to: join('node_modules', '@vscode', 'windows-process-tree') })
-        ])
-      )
-    }
   })
 
   it('guards package scripts that launch Electron tooling', () => {
@@ -110,7 +92,16 @@ describe('Electron runtime package contract', () => {
       'node --use-env-proxy config/scripts/client-build.mjs build'
     )
     const driver = readProject('config/scripts/client-build.mjs')
-    expect(driver).toContain("import { buildDesktop } from './client-build-desktop.mjs'")
+    const desktopImport = driver.match(
+      /const buildDesktop = \['android', 'ios'\]\.includes\(name\)\s*\? undefined\s*: \(await import\('\.\/client-build-desktop\.mjs'\)\)\.buildDesktop/
+    )
+    expect(desktopImport).not.toBeNull()
+    const dependencies = driver.indexOf('await prepareTargetDependencies(context, name)')
+    expect(dependencies).toBeGreaterThanOrEqual(0)
+    expect(desktopImport.index).toBeGreaterThan(dependencies)
+    expect(
+      driver.indexOf("await buildDesktop(context, name, command === 'prepare')")
+    ).toBeGreaterThan(desktopImport.index)
     expect(driver).toContain("await buildDesktop(context, name, command === 'prepare')")
     const desktop = readProject('config/scripts/client-build-desktop.mjs')
     const preparation = desktop.match(
@@ -237,54 +228,63 @@ describe('Electron runtime package contract', () => {
     )
   })
 
-  it('packages and release-gates the SSH relay watcher child', () => {
-    const relayBuild = readProject('config/scripts/build-relay.mjs')
-    const releaseWorkflow = parse(readProject('.github/workflows/release-cut.yml'))
-    const macWorkflow = parse(readProject('.github/workflows/release-mac-build.yml'))
+  it('packages the current WSL guest producers under the relay resource directory', () => {
+    const guestBuild = readProject('config/scripts/build-wsl-guest.mjs')
+    const builder = readProject('config/electron-builder.config.cjs')
 
-    expect(relayBuild).toContain("'parcel-watcher-process-entry.ts'")
-    expect(relayBuild).toContain("outfile: join(outDir, 'relay-watcher.js')")
-    expect(relayBuild).toContain("outfile: join(outDir, 'relay-ai-vault-service.js')")
-    expect(readProject('config/electron-builder.config.cjs')).toContain("from: 'out/relay'")
-
-    // Hashing and remote install probing are manifest-driven, so the contract
-    // is that both companions are declared once and that both sites read it.
-    expect(relayArtifactFilenames(true)).toContain('relay-watcher.js')
-    expect(relayArtifactFilenames(true)).toContain('relay-ai-vault-service.js')
-    expect(relayBuild).toContain('relayArtifactFilenames(')
-    expect(readProject('src/main/ssh/ssh-remote-commands.ts')).toContain('relayArtifactFilenames(')
-
-    const assertRelayGate = (steps, publishStepName) => {
-      const names = steps.map((step) => step.name)
-      const gate = steps.find((step) => step.name === 'Gate SSH relay watcher process isolation')
-      expect(gate['continue-on-error']).toBeUndefined()
-      expect(gate.run).toContain('node config/scripts/relay-watcher-fault-harness.mjs')
-      expect(names.indexOf('Build app')).toBeLessThan(names.indexOf(gate.name))
-      expect(names.indexOf(gate.name)).toBeLessThan(names.indexOf(publishStepName))
+    expect(packageJson.scripts['build:wsl-guest']).toContain('config/scripts/build-wsl-guest.mjs')
+    for (const script of [
+      'build:desktop',
+      'build:release',
+      'build:release:host',
+      'build:release:parallel'
+    ]) {
+      expect(packageJson.scripts[script]).toContain('pnpm run build:wsl-guest')
     }
-
-    assertRelayGate(releaseWorkflow.jobs.build.steps, 'Publish release artifacts (Linux)')
-    assertRelayGate(macWorkflow.jobs['build-mac'].steps, 'Build release artifacts (macOS)')
-    const releaseNames = releaseWorkflow.jobs.build.steps.map((step) => step.name)
-    expect(releaseNames.indexOf('Gate SSH relay watcher process isolation')).toBeLessThan(
-      releaseNames.indexOf('Build Windows release artifacts')
+    expect(guestBuild).toContain("join(ROOT, 'out', 'relay')")
+    expect(guestBuild).toContain("const outDir = join(OUT_ROOT, 'wsl')")
+    expect(guestBuild).toContain('rmSync(OUT_ROOT, { recursive: true, force: true })')
+    expect(guestBuild).toContain("from '../../src/shared/remote-bundle-artifacts.ts'")
+    expect(guestBuild).toContain(
+      "bundle('src/wsl-guest/wsl-agent-hook-relay.ts', 'wsl-agent-hook-relay.js'"
     )
+    expect(guestBuild).toContain(
+      "bundle('src/wsl-guest/wsl-browser-network-relay.ts', 'wsl-browser-network-relay.js')"
+    )
+    expect(guestBuild).toMatch(
+      /bundle\(\s*'src\/main\/claude-accounts\/claude-profile-wsl-entry.ts',\s*WSL_CLAUDE_PROFILE_HELPER_FILENAME/
+    )
+    expect(guestBuild).toMatch(
+      /bundle\(\s*'src\/main\/ai-vault\/session-scanner-opencode-sqlite-process-entry.ts',\s*OPENCODE_SQLITE_READER_FILENAME/
+    )
+    expect(WSL_CLAUDE_PROFILE_HELPER_FILENAME).toBe('claude-profile-wsl.cjs')
+    expect(OPENCODE_SQLITE_READER_FILENAME).toBe('opencode-sqlite-reader.cjs')
+    expect(guestBuild).toContain("stampVersion('wsl-agent-hook-relay.js', '.version')")
+    expect(guestBuild).toContain(
+      "stampVersion('wsl-browser-network-relay.js', '.browser-network-version')"
+    )
+    expect(guestBuild).toContain("createHash('sha256')")
+    expect(guestBuild).toContain('.update(readFileSync(join(outDir, bundleFile)))')
+    expect(builder).toMatch(/from: 'out\/relay',\s*to: 'relay'/)
+    for (const retired of [
+      'config/scripts/build-relay.mjs',
+      'config/scripts/relay-watcher-fault-harness.mjs',
+      'src/main/ssh/ssh-relay-deploy.ts'
+    ]) {
+      expect(existsSync(join(projectDir, retired)), retired).toBe(false)
+    }
   })
 
-  it('packages and verifies the Windows SSH node-pty console-list fallback', () => {
-    const relayBuild = readProject('config/scripts/build-relay.mjs')
-    const relayDeploy = readProject('src/main/ssh/ssh-relay-deploy.ts')
-    const patchAsset = readProject(
-      'config/relay-assets/node-pty-1.1.0-console-list-agent-patch.cjs'
-    )
-
-    expect(relayBuild).toContain('copyFileSync(')
-    expect(relayBuild).toContain('hash.update(readFileSync')
-    expect(relayBuild).toContain('node-pty-1.1.0-console-list-agent-patch.cjs')
-    expect(relayDeploy).toContain('assertPatchedNodePtyConsoleListAgent')
-    expect(relayDeploy.match(/\$\{windowsNodePtyPatchCommand\(nodePath\)\}/g)).toHaveLength(2)
-    expect(patchAsset).toContain('consoleProcessList = [shellPid];')
-    expect(patchAsset).toContain('packageJson.version !== EXPECTED_NODE_PTY_VERSION')
+  it('binds the Windows node-pty console-list fallback to the current pnpm patch', () => {
+    const patchPath = pnpmWorkspace.patchedDependencies['node-pty@1.1.0']
+    expect(patchPath).toBe('config/patches/node-pty@1.1.0.patch')
+    expect(packageJson.dependencies['node-pty']).toBe('^1.1.0')
+    const patch = readProject(patchPath)
+    for (const file of ['lib/conpty_console_list_agent.js', 'src/conpty_console_list_agent.ts']) {
+      const section = patch.split(`diff --git a/${file} b/${file}`)[1]?.split('diff --git ')[0]
+      expect(section, file).toBeDefined()
+      expect(section, file).toContain('consoleProcessList = [shellPid];')
+    }
   })
 
   it('pins the Windows release builder to the VS 2022 runner image', () => {
@@ -386,7 +386,7 @@ describe('Electron runtime package contract', () => {
     expect(afterInstallScript).not.toContain('[ ! -e "$link" ] || [ -L "$link" ]')
   })
 
-  it('advances only the skill release ledger in a taggable release-cut commit', () => {
+  it('verifies skill artifacts without changing their ledger in a version-only release-cut commit', () => {
     const parsedWorkflow = parse(readProject('.github/workflows/release-cut.yml'))
     const checkoutStep = parsedWorkflow.jobs.cut.steps.find((step) => step.name === 'Checkout ref')
     const bumpStep = parsedWorkflow.jobs.cut.steps.find(
@@ -396,8 +396,8 @@ describe('Electron runtime package contract', () => {
     const bumpIndex = bumpStep.run.indexOf(
       'npm version "$VERSION" --no-git-tag-version --allow-same-version'
     )
-    const generateIndex = bumpStep.run.indexOf(
-      'node config/scripts/generate-skill-bundle-manifest.mjs --release "$VERSION"'
+    const verifyIndex = bumpStep.run.indexOf(
+      'if ! node config/scripts/generate-skill-bundle-manifest.mjs; then'
     )
     const commands = bumpStep.run.replace(/^\s*#.*$/gm, '')
     // Unanchored: a `git add` chained after `&&` stages just as effectively.
@@ -408,11 +408,13 @@ describe('Electron runtime package contract', () => {
     const mentioned = new Set(commands.match(/resources[/\\]skills[^\s'"]*/g))
     expect(checkoutStep.with['fetch-depth']).toBe(0)
     expect(bumpIndex).toBeGreaterThanOrEqual(0)
-    // Why: the cut is the only point that advances the release ledger, so this
-    // tag's revision is never rebuilt later — it appends that row, nothing else.
-    expect(generateIndex).toBeGreaterThan(bumpIndex)
-    expect(bumpStep.run.indexOf('git add package.json')).toBeGreaterThan(generateIndex)
-    expect(stagedPaths).toEqual(['package.json', 'resources/skills/release-mapping.json'])
+    expect(verifyIndex).toBeGreaterThan(bumpIndex)
+    expect(bumpStep.run.indexOf('git add package.json')).toBeGreaterThan(verifyIndex)
+    expect(commands).toMatch(
+      /if ! node config\/scripts\/generate-skill-bundle-manifest\.mjs; then(?:(?!\bfi\b)[\s\S])*exit 1\s*fi/
+    )
+    expect(commands).not.toMatch(/--release|--write|generate:skill-bundle-manifest/)
+    expect(stagedPaths).toEqual(['package.json'])
     // Every distinct mention must be staged, so a copy, a redirect, or a path
     // held in a variable cannot reach the content-addressed artifacts. Matched
     // without a trailing slash so `dir="resources/skills"` still counts.
@@ -422,6 +424,14 @@ describe('Electron runtime package contract', () => {
     expect(commands).not.toMatch(/\bcommit\b[^\n]*(?:\s-[a-z]*a[a-z]*\b|\s--all\b)/)
     expect(bumpStep.run).toContain('git diff --cached --quiet')
     expect(bumpStep.run).toContain('git commit --allow-empty -m "$commit_message"')
+    // The actual commit guard also catches paths staged elsewhere or committed outside the index.
+    expect(commands).toMatch(
+      /git diff-tree --no-commit-id --name-only -r -m --first-parent HEAD\s*\|\s*grep -vxF -e 'package\.json'\s*\|\| true\)/
+    )
+    expect(commands).toMatch(/if \[\[ -n "\$committed" \]\]; then(?:(?!\bfi\b)[\s\S])*exit 1\s*fi/)
+    const commitGuard = commands.indexOf('git diff-tree --no-commit-id')
+    expect(commitGuard).toBeGreaterThan(commands.indexOf('git commit -m "$commit_message"'))
+    expect(commands.indexOf('git tag -a "v$VERSION"')).toBeGreaterThan(commitGuard)
   })
 
   it('keeps release-cut RC retries monotonic across stale attempts', () => {
@@ -498,37 +508,17 @@ describe('Electron runtime package contract', () => {
     expect(runStep.run).toContain('pnpm run test:e2e:terminal-perf:scale:report')
     expect(runStep.run).toContain('xvfb-run --auto-servernum')
     const manualProfileKnobs = [
-      ['ORCA_TERMINAL_PERF_FRAME_COUNT', 'frame_count', 'ORCA_E2E_OPENCODE_FRAME_COUNT'],
-      [
-        'ORCA_TERMINAL_PERF_FRAME_INTERVAL_MS',
-        'frame_interval_ms',
-        'ORCA_E2E_OPENCODE_FRAME_INTERVAL_MS'
-      ],
-      [
-        'ORCA_TERMINAL_PERF_PRESSURE_OUTPUT_CHARS',
-        'pressure_output_chars',
-        'ORCA_E2E_OPENCODE_PRESSURE_OUTPUT_CHARS'
-      ],
-      ['ORCA_TERMINAL_PERF_SCALE_PANES', 'scale_panes', 'ORCA_E2E_OPENCODE_SCALE_PANES'],
-      [
-        'ORCA_TERMINAL_PERF_SCALE_CROSS_WORKSPACE_PANES',
-        'scale_cross_workspace_panes',
-        'ORCA_E2E_OPENCODE_SCALE_CROSS_WORKSPACE_PANES'
-      ],
-      [
-        'ORCA_TERMINAL_PERF_SCALE_PRESSURE_PANES',
-        'scale_pressure_panes',
-        'ORCA_E2E_OPENCODE_SCALE_PRESSURE_PANES'
-      ],
-      [
-        'ORCA_TERMINAL_PERF_SCALE_HIDDEN_PRESSURE_PANES',
-        'scale_hidden_pressure_panes',
-        'ORCA_E2E_OPENCODE_SCALE_HIDDEN_PRESSURE_PANES'
-      ]
+      ['FRAME_COUNT', 'frame_count'],
+      ['FRAME_INTERVAL_MS', 'frame_interval_ms'],
+      ['PRESSURE_OUTPUT_CHARS', 'pressure_output_chars'],
+      ['SCALE_PANES', 'scale_panes'],
+      ['SCALE_CROSS_WORKSPACE_PANES', 'scale_cross_workspace_panes'],
+      ['SCALE_PRESSURE_PANES', 'scale_pressure_panes'],
+      ['SCALE_HIDDEN_PRESSURE_PANES', 'scale_hidden_pressure_panes']
     ]
-    for (const [workflowEnv, inputName, runnerEnv] of manualProfileKnobs) {
-      expect(runStep.env[workflowEnv]).toBe(`\${{ inputs.${inputName} }}`)
-      expect(runStep.run).toContain(runnerEnv)
+    for (const [suffix, inputName] of manualProfileKnobs) {
+      expect(runStep.env[`ORCA_TERMINAL_PERF_${suffix}`]).toBe(`\${{ inputs.${inputName} }}`)
+      expect(runStep.run).toContain(`ORCA_E2E_OPENCODE_${suffix}`)
     }
     expect(uploadStep.uses).toBe('actions/upload-artifact@v7')
     expect(uploadStep.with.path).toBe('${{ env.ORCA_E2E_TERMINAL_PERF_REPORT_PATH }}')

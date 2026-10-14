@@ -81,13 +81,13 @@ beforeEach(() => {
 describe('repo catalog refresh identity', () => {
   it('keeps the projects and host setups arrays and entries across a no-op refetch', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const projects = store.getState().projects
     const setups = store.getState().projectHostSetups
     expect(projects).toHaveLength(1)
     expect(setups).toHaveLength(1)
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projects).toBe(projects)
     expect(store.getState().projects[0]).toBe(projects[0])
@@ -97,11 +97,11 @@ describe('repo catalog refresh identity', () => {
 
   it('lets a nested hookSettings change through', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const setups = store.getState().projectHostSetups
 
     mockRepos({ ...repo, hookSettings: { mode: 'override', scripts: { setup: '', archive: '' } } })
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projectHostSetups).not.toBe(setups)
     expect(store.getState().projectHostSetups[0]?.hookSettings?.mode).toBe('override')
@@ -109,11 +109,11 @@ describe('repo catalog refresh identity', () => {
 
   it('lets a displayName change through on projects', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const projects = store.getState().projects
 
     mockRepos({ ...repo, displayName: 'Renamed' })
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projects).not.toBe(projects)
     expect(store.getState().projects[0]?.displayName).toBe('Renamed')
@@ -121,11 +121,11 @@ describe('repo catalog refresh identity', () => {
 
   it('lets an array-field change through', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const repos = store.getState().repos
 
     mockRepos({ ...repo, symlinkPaths: ['.env'] })
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().repos).not.toBe(repos)
     expect(store.getState().repos[0]?.symlinkPaths).toEqual(['.env'])
@@ -133,14 +133,14 @@ describe('repo catalog refresh identity', () => {
 
   it('lets a nested gitRemoteIdentity change through', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const projects = store.getState().projects
 
     mockRepos({
       ...repo,
       gitRemoteIdentity: { ...repo.gitRemoteIdentity!, remoteName: 'upstream' }
     })
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projects).not.toBe(projects)
     expect(store.getState().projects[0]?.gitRemoteIdentity?.remoteName).toBe('upstream')
@@ -148,7 +148,7 @@ describe('repo catalog refresh identity', () => {
 
   it('treats clearing localWindowsRuntimePreference as a change', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const projectId = store.getState().projects[0]!.id
     const withPreference: Project = {
       ...store.getState().projects[0]!,
@@ -156,7 +156,7 @@ describe('repo catalog refresh identity', () => {
     }
     store.setState({ projects: [withPreference] })
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     // Why: a local-host refresh is authoritative; an absent key must not read as unchanged.
     expect(store.getState().projects[0]).not.toBe(withPreference)
@@ -167,12 +167,12 @@ describe('repo catalog refresh identity', () => {
   it('reuses an unchanged setup element while a sibling changes', async () => {
     mockRepos(repo, secondRepo)
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const setups = store.getState().projectHostSetups
     expect(setups).toHaveLength(2)
 
     mockRepos(repo, { ...secondRepo, displayName: 'Repo 2 renamed' })
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     const next = store.getState().projectHostSetups
     expect(next).not.toBe(setups)
@@ -182,14 +182,14 @@ describe('repo catalog refresh identity', () => {
 
   it('does not reuse a setup that moved to a different execution host', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const setups = store.getState().projectHostSetups
     expect(setups[0]?.hostId).toBe('local')
 
     // Why: the repo-derived fallback sets setup.id = repo.id, so the same id on a second host is
     // the case that would silently splice the wrong host's routing metadata into the row.
     mockRepos({ ...repo, executionHostId: 'ssh:host-a', connectionId: 'host-a' })
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     const next = store.getState().projectHostSetups
     expect(next[0]).not.toBe(setups[0])
@@ -203,12 +203,12 @@ describe('repo catalog refresh identity', () => {
     const sshRepo: Repo = { ...repo, executionHostId: 'ssh:host-a', connectionId: 'host-a' }
     mockRepos(repo, sshRepo)
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const setups = store.getState().projectHostSetups
     expect(setups).toHaveLength(2)
     expect(new Set(setups.map((setup) => setup.id)).size).toBe(1)
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projectHostSetups).toBe(setups)
     expect(store.getState().projectHostSetups[0]).toBe(setups[0])
@@ -218,11 +218,11 @@ describe('repo catalog refresh identity', () => {
   it('drops a project and its setup when its repo disappears', async () => {
     mockRepos(repo, secondRepo)
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const projects = store.getState().projects
 
     mockRepos(repo)
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projects).not.toBe(projects)
     expect(store.getState().projects).toHaveLength(1)
@@ -236,7 +236,7 @@ describe('repo catalog refresh identity', () => {
     const sshRepo: Repo = { ...secondRepo, executionHostId: 'ssh:host-a', connectionId: 'host-a' }
     mockRepos(repo, sshRepo)
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const sshOwned: Project = {
       id: 'ssh-owned',
       displayName: 'SSH Owned',
@@ -250,7 +250,7 @@ describe('repo catalog refresh identity', () => {
       projectHostSetups: []
     })
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projects.map((project) => project.id)).toContain('ssh-owned')
   })
@@ -261,7 +261,7 @@ describe('repo catalog refresh identity', () => {
     const sshRepo: Repo = { ...repo, executionHostId: 'ssh:host-a', connectionId: 'host-a' }
     mockRepos(repo, sshRepo)
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const dualHostOwned: Project = {
       id: 'dual-host-owned',
       displayName: 'Dual Host Owned',
@@ -275,18 +275,18 @@ describe('repo catalog refresh identity', () => {
       projectHostSetups: []
     })
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projects.map((project) => project.id)).toContain('dual-host-owned')
   })
 
   it('adds a project and its setup when a repo appears', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const projects = store.getState().projects
 
     mockRepos(repo, secondRepo)
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projects).not.toBe(projects)
     expect(store.getState().projects).toHaveLength(2)
@@ -296,7 +296,7 @@ describe('repo catalog refresh identity', () => {
   it('keeps catalog identity when repo.addedAt is 0', async () => {
     mockRepos({ ...repo, addedAt: 0 })
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const projects = store.getState().projects
     const setups = store.getState().projectHostSetups
     expect(projects).toHaveLength(1)
@@ -304,7 +304,7 @@ describe('repo catalog refresh identity', () => {
     expect(projects[0]?.createdAt).toBe(0)
     expect(setups[0]?.createdAt).toBe(0)
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projects).toBe(projects)
     expect(store.getState().projects[0]).toBe(projects[0])
@@ -315,7 +315,7 @@ describe('repo catalog refresh identity', () => {
   it('keeps catalog identity when repo.addedAt is omitted', async () => {
     mockRepos(omitAddedAt(repo))
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const projects = store.getState().projects
     const setups = store.getState().projectHostSetups
     expect(projects).toHaveLength(1)
@@ -323,7 +323,7 @@ describe('repo catalog refresh identity', () => {
     expect(projects[0]?.createdAt).toBe(0)
     expect(setups[0]?.createdAt).toBe(0)
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projects).toBe(projects)
     expect(store.getState().projects[0]).toBe(projects[0])
@@ -334,7 +334,7 @@ describe('repo catalog refresh identity', () => {
   it('lets a nested hookSettings change through when repo.addedAt is 0', async () => {
     mockRepos({ ...repo, addedAt: 0 })
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const setups = store.getState().projectHostSetups
 
     mockRepos({
@@ -342,7 +342,7 @@ describe('repo catalog refresh identity', () => {
       addedAt: 0,
       hookSettings: { mode: 'override', scripts: { setup: '', archive: '' } }
     })
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().projectHostSetups).not.toBe(setups)
     expect(store.getState().projectHostSetups[0]).not.toBe(setups[0])
@@ -356,7 +356,7 @@ describe('repo filter identity across catalog refreshes', () => {
     store.setState({ filterRepoIds: [repo.id] })
     const first = store.getState().filterRepoIds
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     // Why: App.tsx at the root and five sidebar consumers select this array by identity.
     expect(store.getState().filterRepoIds).toBe(first)
@@ -366,7 +366,7 @@ describe('repo filter identity across catalog refreshes', () => {
     const store = createTestStore()
     store.setState({ filterRepoIds: [repo.id, 'gone'] })
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().filterRepoIds).toEqual([repo.id])
   })
@@ -377,7 +377,7 @@ describe('repo filter identity across catalog refreshes', () => {
     store.setState({ filterRepoIds: [repo.id, secondRepo.id] })
     const first = store.getState().filterRepoIds
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().filterRepoIds).toEqual([repo.id])
     expect(store.getState().filterRepoIds).not.toBe(first)
@@ -390,7 +390,7 @@ describe('repo filter identity across catalog refreshes', () => {
 
     // Why: the filter is keyed on repo id, not host identity — a rehomed repo is not pruned.
     mockRepos({ ...repo, executionHostId: 'ssh:host-a', connectionId: 'host-a' })
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     expect(store.getState().filterRepoIds).toBe(first)
   })
@@ -405,7 +405,7 @@ describe('setup-script dismissal identity across catalog refreshes', () => {
     })
     const first = store.getState().setupScriptPromptDismissedRepoIds
 
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
 
     // Why: SetupScriptPromptCard Object.is-subscribes to this array. A no-op
     // catalog refresh must not allocate just because the helper rebuilt next.
@@ -416,7 +416,7 @@ describe('setup-script dismissal identity across catalog refreshes', () => {
 describe('SSH readoption catalog identity', () => {
   it('keeps projects and host setups across a no-op recordSshRepoReadoptions([])', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const before = store.getState()
     const projects = before.projects
     const setups = before.projectHostSetups
@@ -437,7 +437,7 @@ describe('SSH readoption catalog identity', () => {
 
   it('keeps catalog identity for a pending-only readoption while pending updates', async () => {
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const projects = store.getState().projects
     const setups = store.getState().projectHostSetups
     const readoption = { oldTargetId: 'ssh-old', newTargetId: 'ssh-new', repoIds: [repo.id] }
@@ -464,7 +464,7 @@ describe('SSH readoption catalog identity', () => {
     }
     mockRepos(oldHostRepo, newHostRepo)
     const store = createTestStore()
-    await store.getState().fetchRepos()
+    await store.getState().fetchRepos(catalogOwner(store))
     const setups = store.getState().projectHostSetups
     expect(setups).toHaveLength(2)
     const oldSetup = setups.find((setup) => setup.hostId === 'ssh:ssh-old')
@@ -488,3 +488,10 @@ describe('SSH readoption catalog identity', () => {
     expect(store.getState().pendingSshRepoReadoptions).toEqual([])
   })
 })
+
+// The catalog these tests read is the one the focused host would have shown.
+function catalogOwner(store: {
+  getState: () => { settings: { activeRuntimeEnvironmentId?: string | null } | null }
+}): { runtimeEnvironmentId: string | null } {
+  return { runtimeEnvironmentId: store.getState().settings?.activeRuntimeEnvironmentId ?? null }
+}

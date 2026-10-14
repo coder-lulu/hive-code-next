@@ -67,6 +67,7 @@ async function gitPullWithArgs(
   options: GitRuntimeOptions = {}
 ): Promise<void> {
   const runPull = async (effectiveArgs: string[]): Promise<void> => {
+    options.signal?.throwIfAborted()
     if (pushTarget) {
       const target = await validateGitPushTarget(worktreePath, pushTarget, options)
       await gitExecFileAsync(

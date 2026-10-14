@@ -3,7 +3,7 @@ import { agentInstallationRealPath, assertReviewedAgentTarget } from './agent-in
 
 const mocks = vi.hoisted(() => ({ real: vi.fn(), shim: vi.fn() }))
 vi.mock('node:fs', () => ({ realpathSync: mocks.real }))
-vi.mock('../../shared/child-process/windows-cmd-shim-resolution', () => ({
+vi.mock('@orca/process-host/windows-cmd-shim-resolution', () => ({
   resolveWindowsCmdShim: mocks.shim
 }))
 beforeEach(() => {

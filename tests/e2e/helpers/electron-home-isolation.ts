@@ -9,10 +9,13 @@ const RESTRICTED_ENV_KEYS = new Set([
   'HOMEPATH',
   'CODEX_HOME',
   'ORCA_CODEX_HOME',
+  'ZCODE_DATA_BASE_DIR',
+  'ZCODE_PERSONAL_PROVIDER_CONFIG_FILE',
   // Why: Orca's spawn hook writes Claude folder trust into the config this names.
   'CLAUDE_CONFIG_DIR',
   'ORCA_E2E_USER_DATA_DIR',
   'ORCA_E2E_HOME_DIR',
+  'ORCA_DISABLE_MACOS_LOGIN_SHELL',
   'ZDOTDIR',
   'ORCA_ORIG_ZDOTDIR',
   'BASH_ENV',
@@ -20,15 +23,15 @@ const RESTRICTED_ENV_KEYS = new Set([
 ])
 
 type ElectronHomeIsolationOptions = {
-  inheritedEnv: NodeJS.ProcessEnv
-  launchEnv: NodeJS.ProcessEnv
+  inheritedEnv: Record<string, string | undefined>
+  launchEnv: Record<string, string | undefined>
   extraEnv: Record<string, string>
   userDataDir: string
   realHome?: string
 }
 
 export type ElectronHomeIsolation = {
-  env: NodeJS.ProcessEnv
+  env: Record<string, string | undefined>
   isolatedHome: string
   realHome: string
 }
@@ -43,7 +46,7 @@ export function areSameHomePath(left: string, right: string, platform = process.
 }
 
 function assertOverlayDoesNotReplaceIsolation(
-  overlay: NodeJS.ProcessEnv | Record<string, string>,
+  overlay: Record<string, string | undefined> | Record<string, string>,
   overlayName: string
 ): void {
   const restrictedKey = Object.keys(overlay).find((key) =>
@@ -54,7 +57,9 @@ function assertOverlayDoesNotReplaceIsolation(
   }
 }
 
-function stripAmbientHomeAndCodexEnv(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+function stripAmbientHomeAndCodexEnv(
+  env: Record<string, string | undefined>
+): Record<string, string | undefined> {
   return Object.fromEntries(
     Object.entries(env).filter(([key]) => !RESTRICTED_ENV_KEYS.has(key.toUpperCase()))
   )
@@ -98,7 +103,9 @@ export function createElectronHomeIsolation({
       HOME: isolatedHome,
       USERPROFILE: isolatedHome,
       ORCA_E2E_USER_DATA_DIR: userDataDir,
-      ORCA_E2E_HOME_DIR: isolatedHome
+      ORCA_E2E_HOME_DIR: isolatedHome,
+      // macOS login resets HOME to the native account before the shell starts.
+      ...(process.platform === 'darwin' ? { ORCA_DISABLE_MACOS_LOGIN_SHELL: '1' } : {})
     }
   }
 }

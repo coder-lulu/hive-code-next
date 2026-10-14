@@ -2,6 +2,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
+import { LOCAL_SETTINGS_HOST_SCOPE } from './settings-host-scope'
 import { AiServicesPane } from './AiServicesPane'
 
 vi.mock('../stats/StatsPane', () => ({
@@ -18,6 +19,7 @@ afterEach(cleanup)
 it('opens usage when the settings scroll target is the accounts section itself', () => {
   render(
     <AiServicesPane
+      hostScope={LOCAL_SETTINGS_HOST_SCOPE}
       settings={getDefaultSettings('/tmp')}
       updateSettings={vi.fn()}
       navigationTargetSectionId="accounts"
@@ -27,7 +29,13 @@ it('opens usage when the settings scroll target is the accounts section itself',
 })
 
 it('defaults to usage and retains filters and provider drafts across tabs', () => {
-  render(<AiServicesPane settings={getDefaultSettings('/tmp')} updateSettings={vi.fn()} />)
+  render(
+    <AiServicesPane
+      hostScope={LOCAL_SETTINGS_HOST_SCOPE}
+      settings={getDefaultSettings('/tmp')}
+      updateSettings={vi.fn()}
+    />
+  )
   expect(screen.getByRole('tab', { name: 'Usage' }).getAttribute('aria-selected')).toBe('true')
   fireEvent.change(screen.getByLabelText('Usage filter'), { target: { value: '7d' } })
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'AI Providers' }), {
@@ -47,11 +55,21 @@ it('defaults to usage and retains filters and provider drafts across tabs', () =
 it('routes account deep links to providers and usage links back to usage', () => {
   const props = { settings: getDefaultSettings('/tmp'), updateSettings: vi.fn() }
   const { rerender } = render(
-    <AiServicesPane {...props} navigationTargetSectionId="accounts-codex" />
+    <AiServicesPane
+      hostScope={LOCAL_SETTINGS_HOST_SCOPE}
+      {...props}
+      navigationTargetSectionId="accounts-codex"
+    />
   )
   expect(screen.getByRole('tab', { name: 'AI Providers' }).getAttribute('aria-selected')).toBe(
     'true'
   )
-  rerender(<AiServicesPane {...props} navigationTargetSectionId="usage" />)
+  rerender(
+    <AiServicesPane
+      hostScope={LOCAL_SETTINGS_HOST_SCOPE}
+      {...props}
+      navigationTargetSectionId="usage"
+    />
+  )
   expect(screen.getByRole('tab', { name: 'Usage' }).getAttribute('aria-selected')).toBe('true')
 })

@@ -12,11 +12,8 @@ import { OrchestrationPane } from './OrchestrationPane'
 import { getOrchestrationPaneSearchEntries } from './orchestration-search'
 import { matchesSettingsSearch } from './settings-search'
 
-const INSTALL_COMMAND =
-  'npx skills add https://github.com/stablyai/orca --skill orchestration --global'
-const UPDATE_COMMAND = INSTALL_COMMAND
-const WINDOWS_INSTALL_COMMAND =
-  'cmd.exe /d /s /c "where.exe npx >nul 2>nul & if errorlevel 1 (echo ERROR: npx was not found. Install Node.js LTS from https://nodejs.org/ to get npx. & echo Then close this terminal and start skill setup again - a new terminal picks up the updated PATH. & exit /b 1) else (npx skills add https://github.com/stablyai/orca --skill orchestration --global)"'
+const INSTALL_COMMAND = `npx skills add https://github.com/stablyai/orca --skill orchestration --global`
+const WINDOWS_INSTALL_COMMAND = `cmd.exe /d /s /c "where.exe npx >nul 2>nul & if errorlevel 1 (echo ERROR: npx was not found. Install Node.js LTS from https://nodejs.org/ to get npx. & echo Then close this terminal and start skill setup again - a new terminal picks up the updated PATH. & exit /b 1) else (npx skills add https://github.com/stablyai/orca --skill orchestration --global)"`
 
 const mocks = vi.hoisted(() => ({
   dialogProps: [] as Record<string, unknown>[],
@@ -295,14 +292,14 @@ describe('OrchestrationPane', () => {
     ).toBe(false)
   })
 
-  it('passes update commands to the main panel without an installed manual-copy path', async () => {
+  it('passes owned install and update commands without a manual-copy path', async () => {
     const rendered = await renderPane()
 
     expect(mocks.panelProps.at(-1)).toEqual(
-      expect.objectContaining({
-        command: WINDOWS_INSTALL_COMMAND,
-        installedCommand: WINDOWS_INSTALL_COMMAND
-      })
+      expect.objectContaining({ command: WINDOWS_INSTALL_COMMAND })
+    )
+    expect(mocks.panelProps.at(-1)?.installedCommand).toBe(
+      'npx skills update orchestration --global'
     )
 
     expect(rendered.textContent).not.toContain('Prefer your own terminal?')
@@ -311,7 +308,7 @@ describe('OrchestrationPane', () => {
     expect(mocks.dialogProps).not.toContainEqual(expect.objectContaining({ mode: 'update' }))
     expect(mocks.dialogProps).not.toContainEqual(
       expect.objectContaining({
-        command: UPDATE_COMMAND,
+        command: INSTALL_COMMAND,
         open: true
       })
     )

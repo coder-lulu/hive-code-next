@@ -1,16 +1,29 @@
 import { RefreshCw } from 'lucide-react'
 import { useMemo } from 'react'
-import type { GlobalSettings } from '../../../../shared/global-settings-types'
+import type { SettingsHostScope } from './settings-host-scope'
+import { useAppStore } from '@/store'
+import {
+  getLocalAgentPreflightContext,
+  localPreflightContextKey
+} from '@/lib/local-preflight-context'
 import { useDetectedAgents, type AgentDetectionTarget } from '@/hooks/useDetectedAgents'
 import { translate } from '@/i18n/i18n'
 import { cn } from '@/lib/utils'
 import { Button } from '../ui/button'
 
-export function AgentDetectionRefreshButton({ settings }: { settings: GlobalSettings }) {
-  const environmentId = settings.activeRuntimeEnvironmentId?.trim() || null
-  const target = useMemo<AgentDetectionTarget>(
-    () => (environmentId ? { kind: 'runtime', environmentId } : { kind: 'local' }),
-    [environmentId]
+export function AgentDetectionRefreshButton({ hostScope }: { hostScope: SettingsHostScope }) {
+  const environmentId =
+    hostScope.target.kind === 'environment' ? hostScope.target.environmentId : null
+  const localContext = useAppStore((state) => getLocalAgentPreflightContext(state))
+  const contextKey = localPreflightContextKey(localContext)
+  const target = useMemo<AgentDetectionTarget | undefined>(
+    () =>
+      !hostScope.available
+        ? undefined
+        : environmentId
+          ? { kind: 'runtime', environmentId }
+          : { kind: 'local', contextKey },
+    [hostScope.available, environmentId, contextKey]
   )
   const { refresh, isRefreshing } = useDetectedAgents(target)
   return (
@@ -19,8 +32,12 @@ export function AgentDetectionRefreshButton({ settings }: { settings: GlobalSett
       variant="outline"
       size="sm"
       className="gap-2 shadow-none"
-      disabled={isRefreshing}
-      onClick={() => void refresh()}
+      disabled={!hostScope.available || isRefreshing}
+      onClick={() => {
+        if (hostScope.available) {
+          void refresh()
+        }
+      }}
     >
       <RefreshCw className={cn('size-4', isRefreshing && 'animate-spin')} />
       {translate(

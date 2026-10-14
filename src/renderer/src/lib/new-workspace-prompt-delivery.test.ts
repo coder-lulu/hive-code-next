@@ -165,7 +165,6 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
     })
 
     expect(mockSendRuntimePtyInputVerified).toHaveBeenCalledWith(
-      {},
       'pty-1',
       'fix the spinner\r',
       'launch'
@@ -282,7 +281,6 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
     })
 
     expect(mockPasteDraftToAgentPtyWhenReady).toHaveBeenCalledWith({
-      tabId: 'tab-1',
       ptyId: 'pty-1',
       content: 'review this before sending',
       agent: 'claude',
@@ -326,7 +324,6 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
     })
 
     expect(mockPasteDraftToAgentPtyWhenReady).toHaveBeenCalledWith({
-      tabId: 'agent-tab',
       ptyId: 'agent-pty',
       content: 'Linear context draft',
       agent: 'codex',
@@ -383,7 +380,6 @@ describe('ensureAgentStartupInTerminal prompt delivery', () => {
 
     expect(mockPasteDraftToAgentPtyWhenReady).toHaveBeenCalledTimes(1)
     expect(mockPasteDraftToAgentPtyWhenReady).toHaveBeenCalledWith({
-      tabId: 'tab-1',
       ptyId: 'pty-delayed',
       content: 'https://github.com/stablyai/orca/pull/2051',
       agent: 'codex',

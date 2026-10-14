@@ -18,13 +18,13 @@ import {
   type AgentSessionWriteFailure
 } from '../../../../shared/agent-session-write-failure'
 import { structuredAgentSessionPayloadFingerprint } from '../../../../shared/structured-agent-session-mutation'
-import type { RuntimeClientTarget } from '@/runtime/runtime-rpc-client'
+import { structuredSessionOperationId } from './structured-agent-session-operation-id'
+import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
 import {
   callStructuredAgentSession,
   supportsStructuredAgentSessionQuietRepeatedStop
 } from '@/runtime/structured-agent-session-client'
-import { structuredSessionOperationId } from './use-structured-agent-session-outbox'
 import { agentSessionWriteFailureText } from './agent-session-write-notice-text'
 
 export type StructuredAgentSessionWriteOutcome<T> =

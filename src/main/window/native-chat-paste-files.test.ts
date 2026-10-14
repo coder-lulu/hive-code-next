@@ -1,5 +1,6 @@
 import {
   existsSync,
+  lstatSync,
   lutimesSync,
   mkdirSync,
   mkdtempSync,
@@ -24,6 +25,30 @@ import {
   restoreNativeChatPastes,
   sweepExpiredNativeChatPastes
 } from './native-chat-paste-files'
+
+function fileSymlinksAvailable(): boolean {
+  if (process.platform !== 'win32') {
+    return true
+  }
+  const root = mkdtempSync(path.join(tmpdir(), 'orca-paste-symlink-probe-'))
+  try {
+    const target = path.join(root, 'target')
+    writeFileSync(target, 'probe')
+    symlinkSync(target, path.join(root, 'link'), 'file')
+    return true
+  } catch (error) {
+    if (!(error instanceof Error) || !('code' in error) || error.code !== 'EPERM') {
+      throw error
+    }
+    console.warn('[native-chat-pastes] File symlink checks unavailable: Windows symlink privilege')
+    return false
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}
+
+const hasFileSymlinks = fileSymlinksAvailable()
+const directoryLinkType = process.platform === 'win32' ? 'junction' : 'dir'
 
 // A store with no projects: nothing but an access kind decides what a read may reach.
 const NO_PROJECTS: Store = Object.assign(Object.create(null), {
@@ -106,13 +131,10 @@ describe('native-chat paste folder on disk', () => {
     writeFileSync(kept, 'png')
     const outside = path.join(root, 'outside.png')
     writeFileSync(outside, 'png')
-    const linkOut = path.join(folder, 'orca-paste-2.png')
-    symlinkSync(outside, linkOut)
     mkdirSync(path.join(folder, 'orca-paste-dir.png'))
 
     const results = await restoreNativeChatPastes([
       kept,
-      linkOut,
       path.join(folder, '..', 'outside.png'),
       path.join(folder, 'orca-paste-dir.png'),
       path.join(folder, 'orca-paste-missing.png'),
@@ -123,7 +145,6 @@ describe('native-chat paste folder on disk', () => {
 
     expect(results).toEqual([
       { path: kept, kept: true, exists: true },
-      { path: linkOut, kept: false, exists: false },
       { path: path.join(folder, '..', 'outside.png'), kept: false, exists: false },
       { path: path.join(folder, 'orca-paste-dir.png'), kept: false, exists: false },
       { path: path.join(folder, 'orca-paste-missing.png'), kept: false, exists: false },
@@ -132,6 +153,22 @@ describe('native-chat paste folder on disk', () => {
     ])
     await expect(restoreNativeChatPastes('not a list')).resolves.toEqual([])
   })
+
+  it.skipIf(!hasFileSymlinks)(
+    'refuses a paste symlink to an outside file without granting access',
+    async () => {
+      const outside = path.join(root, 'outside.png')
+      writeFileSync(outside, 'png')
+      const linkOut = path.join(folder, 'orca-paste-2.png')
+      symlinkSync(outside, linkOut, 'file')
+      expect(lstatSync(linkOut).isSymbolicLink()).toBe(true)
+      await expect(restoreNativeChatPastes([linkOut])).resolves.toEqual([
+        { path: linkOut, kept: false, exists: false }
+      ])
+      expect(await chatImageReadable(linkOut)).toBe(false)
+      expect(await chatImageReadable(outside)).toBe(false)
+    }
+  )
 
   it('leaves a kept paste readable by the composer preview, with no grant', async () => {
     const kept = path.join(folder, 'orca-paste-1.png')
@@ -146,9 +183,9 @@ describe('native-chat paste folder on disk', () => {
   it('keeps a paste reached through a symlinked alias of the folder, as /var is of /private/var', async () => {
     const kept = path.join(folder, 'orca-paste-1.png')
     writeFileSync(kept, 'png')
-    const alias = path.join(tmpdir(), `orca-native-chat-pastes-alias-${process.pid}`)
-    rmSync(alias, { force: true })
-    symlinkSync(root, alias)
+    const alias = path.join(root, 'alias')
+    symlinkSync(root, alias, directoryLinkType)
+    expect(lstatSync(alias).isSymbolicLink()).toBe(true)
     try {
       installFakeAppEnvironment({ getPath: () => alias })
       const viaAlias = path.join(alias, 'native-chat-pastes', 'orca-paste-1.png')
@@ -160,57 +197,64 @@ describe('native-chat paste folder on disk', () => {
       // The preview reads by the stored spelling, through chat-image access.
       expect(await chatImageReadable(viaAlias)).toBe(true)
     } finally {
-      rmSync(alias, { force: true })
+      rmSync(alias, { recursive: true, force: true })
     }
   })
 
-  it('refuses a path that names an outside file as text while its real path is inside', async () => {
-    const secret = path.join(root, 'outside', 'id_rsa')
-    mkdirSync(path.dirname(secret), { recursive: true })
-    writeFileSync(secret, 'PRIVATE KEY')
-    const paste = path.join(folder, 'orca-paste-1.png')
-    writeFileSync(paste, 'png')
-    // `s/..` resolves through a link for real, but by text it climbs to the secret.
-    const workspace = path.join(root, 'ws')
-    const depth = workspace.split(path.sep).filter(Boolean).length + 1
-    const deep = path.join(workspace, ...Array.from({ length: depth }, (_, i) => `d${i}`))
-    mkdirSync(deep, { recursive: true })
-    symlinkSync(deep, path.join(workspace, 's'))
-    const tail = secret.slice(1)
-    mkdirSync(path.dirname(path.join(workspace, tail)), { recursive: true })
-    symlinkSync(paste, path.join(workspace, tail))
-    const crafted = `${workspace}/s/${'../'.repeat(depth)}${tail}`
-    expect(path.resolve(crafted)).toBe(secret)
+  // These spellings depend on POSIX symlink/.. traversal, which Windows normalizes first.
+  it.skipIf(process.platform === 'win32')(
+    'refuses a path that names an outside file as text while its real path is inside',
+    async () => {
+      const secret = path.join(root, 'outside', 'id_rsa')
+      mkdirSync(path.dirname(secret), { recursive: true })
+      writeFileSync(secret, 'PRIVATE KEY')
+      const paste = path.join(folder, 'orca-paste-1.png')
+      writeFileSync(paste, 'png')
+      // `s/..` resolves through a link for real, but by text it climbs to the secret.
+      const workspace = path.join(root, 'ws')
+      const depth = workspace.split(path.sep).filter(Boolean).length + 1
+      const deep = path.join(workspace, ...Array.from({ length: depth }, (_, i) => `d${i}`))
+      mkdirSync(deep, { recursive: true })
+      symlinkSync(deep, path.join(workspace, 's'))
+      const tail = secret.slice(1)
+      mkdirSync(path.dirname(path.join(workspace, tail)), { recursive: true })
+      symlinkSync(paste, path.join(workspace, tail))
+      const crafted = `${workspace}/s/${'../'.repeat(depth)}${tail}`
+      expect(path.resolve(crafted)).toBe(secret)
 
-    await expect(restoreNativeChatPastes([crafted])).resolves.toEqual([
-      { path: crafted, kept: false, exists: false }
-    ])
-    // An outside file never becomes readable: nothing is granted, and chat-image reads only images.
-    expect(await chatImageReadable(secret)).toBe(false)
-    expect(await chatImageReadable(crafted)).toBe(false)
-  })
+      await expect(restoreNativeChatPastes([crafted])).resolves.toEqual([
+        { path: crafted, kept: false, exists: false }
+      ])
+      // An outside file never becomes readable: nothing is granted, and chat-image reads only images.
+      expect(await chatImageReadable(secret)).toBe(false)
+      expect(await chatImageReadable(crafted)).toBe(false)
+    }
+  )
 
-  it('keeps a paste by its real path, and never makes the file its stored spelling names readable', async () => {
-    const secret = path.join(root, 'outside', 'id_rsa')
-    mkdirSync(path.dirname(secret), { recursive: true })
-    writeFileSync(secret, 'PRIVATE KEY')
-    // `folder/link/../y` reaches a real paste through `link`, while `folder/y` by text is a link out.
-    const sub = path.join(folder, 'sub')
-    mkdirSync(sub)
-    mkdirSync(path.join(sub, 'deeper'))
-    writeFileSync(path.join(sub, 'orca-paste-y.png'), 'png')
-    symlinkSync(path.join(sub, 'deeper'), path.join(folder, 'link'))
-    symlinkSync(secret, path.join(folder, 'orca-paste-y.png'))
-    const restored = `${folder}/link/../orca-paste-y.png`
-    expect(realpathSync.native(restored)).toBe(realpathSync(path.join(sub, 'orca-paste-y.png')))
+  it.skipIf(process.platform === 'win32')(
+    'keeps a paste by its real path, and never makes the file its stored spelling names readable',
+    async () => {
+      const secret = path.join(root, 'outside', 'id_rsa')
+      mkdirSync(path.dirname(secret), { recursive: true })
+      writeFileSync(secret, 'PRIVATE KEY')
+      // `folder/link/../y` reaches a real paste through `link`, while `folder/y` by text is a link out.
+      const sub = path.join(folder, 'sub')
+      mkdirSync(sub)
+      mkdirSync(path.join(sub, 'deeper'))
+      writeFileSync(path.join(sub, 'orca-paste-y.png'), 'png')
+      symlinkSync(path.join(sub, 'deeper'), path.join(folder, 'link'))
+      symlinkSync(secret, path.join(folder, 'orca-paste-y.png'))
+      const restored = `${folder}/link/../orca-paste-y.png`
+      expect(realpathSync.native(restored)).toBe(realpathSync(path.join(sub, 'orca-paste-y.png')))
 
-    await expect(restoreNativeChatPastes([restored])).resolves.toEqual([
-      { path: restored, kept: true, exists: true }
-    ])
-    expect(await chatImageReadable(secret)).toBe(false)
-    expect(await chatImageReadable(realpathSync(secret))).toBe(false)
-    expect(await chatImageReadable(path.join(folder, 'orca-paste-y.png'))).toBe(false)
-  })
+      await expect(restoreNativeChatPastes([restored])).resolves.toEqual([
+        { path: restored, kept: true, exists: true }
+      ])
+      expect(await chatImageReadable(secret)).toBe(false)
+      expect(await chatImageReadable(realpathSync(secret))).toBe(false)
+      expect(await chatImageReadable(path.join(folder, 'orca-paste-y.png'))).toBe(false)
+    }
+  )
 
   it('neither restores from nor sweeps a paste folder that is itself a link', async () => {
     const outside = path.join(root, 'Documents')
@@ -221,7 +265,8 @@ describe('native-chat paste folder on disk', () => {
       utimesSync(path.join(outside, name), old, old)
     }
     rmSync(folder, { recursive: true })
-    symlinkSync(outside, folder)
+    symlinkSync(outside, folder, directoryLinkType)
+    expect(lstatSync(folder).isSymbolicLink()).toBe(true)
 
     await expect(restoreNativeChatPastes([path.join(folder, 'orca-paste-1.png')])).resolves.toEqual(
       [{ path: path.join(folder, 'orca-paste-1.png'), kept: false, exists: false }]
@@ -251,7 +296,7 @@ describe('native-chat paste folder on disk', () => {
     )
   })
 
-  it('expires old pastes only, and never follows a symlink or enters a folder', async () => {
+  it('expires old pastes only and never enters a folder', async () => {
     const now = Date.now()
     const old = (now - NATIVE_CHAT_PASTE_TTL_MS - 60_000) / 1000
     const oldPaste = path.join(folder, 'orca-paste-old.png')
@@ -259,11 +304,6 @@ describe('native-chat paste folder on disk', () => {
     writeFileSync(oldPaste, 'png')
     writeFileSync(newPaste, 'png')
     utimesSync(oldPaste, old, old)
-    const outsideOld = path.join(root, 'outside-old.png')
-    writeFileSync(outsideOld, 'png')
-    utimesSync(outsideOld, old, old)
-    symlinkSync(outsideOld, path.join(folder, 'orca-paste-link.png'))
-    lutimesSync(path.join(folder, 'orca-paste-link.png'), old, old)
     const nested = path.join(folder, 'nested')
     mkdirSync(nested)
     const nestedOld = path.join(nested, 'orca-paste-nested.png')
@@ -274,10 +314,26 @@ describe('native-chat paste folder on disk', () => {
 
     expect(existsSync(oldPaste)).toBe(false)
     expect(existsSync(newPaste)).toBe(true)
-    expect(existsSync(outsideOld)).toBe(true)
-    expect(existsSync(path.join(folder, 'orca-paste-link.png'))).toBe(true)
     expect(existsSync(nestedOld)).toBe(true)
   })
+
+  it.skipIf(!hasFileSymlinks)(
+    'never sweeps an old paste symlink or its outside target',
+    async () => {
+      const now = Date.now()
+      const old = (now - NATIVE_CHAT_PASTE_TTL_MS - 60_000) / 1000
+      const outsideOld = path.join(root, 'outside-old.png')
+      writeFileSync(outsideOld, 'png')
+      utimesSync(outsideOld, old, old)
+      const link = path.join(folder, 'orca-paste-link.png')
+      symlinkSync(outsideOld, link, 'file')
+      lutimesSync(link, old, old)
+      expect(lstatSync(link).isSymbolicLink()).toBe(true)
+      await sweepExpiredNativeChatPastes(now)
+      expect(existsSync(outsideOld)).toBe(true)
+      expect(existsSync(link)).toBe(true)
+    }
+  )
 
   it('does nothing, and does not throw, when the folder is missing', async () => {
     rmSync(folder, { recursive: true })

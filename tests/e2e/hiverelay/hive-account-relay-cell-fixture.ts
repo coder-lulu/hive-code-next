@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { isAbsolute, join, resolve } from 'node:path'
-import { runProcess, spawnProcess } from '../../../src/shared/child-process/run-process'
-import { forceTerminateProcessTree } from '../../../src/shared/child-process/process-tree-termination'
+import { runProcess, spawnProcess } from '@orca/process-host'
+import { forceTerminateProcessTree } from '@orca/process-host/process-tree-termination'
 import { expect } from 'vitest'
 import { createCellObservationReader } from './hive-account-relay-observation'
 import { createCellPrivatePki } from './hive-account-relay-private-pki'
@@ -102,9 +102,9 @@ export async function startAccountRelayCell(
     exitError ??= childError ?? new Error(`Cell exited (${signal ?? code}): ${diagnostic}`)
     failed.resolve(exitError)
   }
-  child.on('error', (error) => {
+  child.on('error', (error: Error) => {
     childError ??= error
-    failed.resolve(childError)
+    failed.resolve(error)
   })
   child.once('exit', exited)
   child.once('close', (code, signal) => {

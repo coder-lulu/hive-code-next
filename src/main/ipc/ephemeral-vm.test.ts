@@ -1,12 +1,15 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type * as ChildProcess from 'node:child_process'
+import { drainNativeFixture, restoreNativeFixture } from './ephemeral-vm-native-test-fixture'
 import { encodePairingOffer, PAIRING_OFFER_VERSION } from '../../shared/pairing'
 import { listEnvironments } from '../../shared/runtime-environment-store'
 import { upsertEphemeralVmRuntime } from '../../shared/ephemeral-vm-runtime-store'
 
 const handlers = new Map<string, (_event: unknown, args: never) => unknown>()
+const { pendingChildren } = vi.hoisted(() => ({ pendingChildren: new Set<Promise<void>>() }))
 const {
   handleMock,
   removeHandlerMock,
@@ -24,6 +27,18 @@ const {
   removeRuntimeOwnedSshTargetMock: vi.fn(),
   invalidateRuntimeEnvironmentTransportMock: vi.fn()
 }))
+
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof ChildProcess>()
+  return {
+    ...actual,
+    spawn: (...args: Parameters<typeof actual.spawn>) => {
+      const child = actual.spawn(...args)
+      pendingChildren.add(new Promise<void>((resolve) => child.once('close', () => resolve())))
+      return child
+    }
+  }
+})
 
 vi.mock('electron', () => ({
   app: {
@@ -48,8 +63,10 @@ vi.mock('./runtime-environments', () => ({
 import { registerEphemeralVmHandlers } from './ephemeral-vm'
 
 const tempDirs: string[] = []
+afterAll(restoreNativeFixture)
 
-afterEach(() => {
+afterEach(async () => {
+  await drainNativeFixture(pendingChildren)
   for (const dir of tempDirs.splice(0)) {
     rmSync(dir, { recursive: true, force: true })
   }

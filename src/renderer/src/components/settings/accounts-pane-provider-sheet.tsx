@@ -8,6 +8,11 @@ import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../ui/sheet'
 import { ClaudeIcon, OpenAIIcon } from '../status-bar/icons'
+import {
+  canOfferClaudeSignInLink,
+  ClaudeSignInLinkMenu,
+  withCopiedClaudeLink
+} from './claude-sign-in-link-menu'
 import { getCodexSystemDefaultSubtitle } from './accounts-pane-runtime'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 import { ClaudeAccountsSheetList } from './accounts-pane-claude-section'
@@ -35,11 +40,11 @@ function SystemAccountRow({
     }
     if (isCodex) {
       void model.runCodexAccountAction('select:system', () =>
-        selectCodexProviderAccount(model.settings, selection)
+        selectCodexProviderAccount(model.accountOwner, selection)
       )
     } else {
       void model.runClaudeAccountAction('select:system', () =>
-        selectClaudeProviderAccount(model.settings, selection)
+        selectClaudeProviderAccount(model.accountOwner, selection)
       )
     }
   }
@@ -106,7 +111,7 @@ export function AccountsProviderSheet({
   const accountCount = isCodex
     ? model.visibleCodexAccounts.length
     : model.visibleClaudeAccounts.length
-  const add = (): void => {
+  const add = (copyLink = false): void => {
     const input = {
       runtime: model.accountRuntime.runtime,
       wslDistro: model.accountRuntime.wslDistro
@@ -114,7 +119,9 @@ export function AccountsProviderSheet({
     if (isCodex) {
       void model.runCodexAccountAction('adding', () => window.api.codexAccounts.add(input))
     } else {
-      void model.runClaudeAccountAction('adding', () => window.api.claudeAccounts.add(input))
+      void model.runClaudeAccountAction('adding', () =>
+        withCopiedClaudeLink(copyLink, window.api.claudeAccounts.add({ ...input, copyLink }))
+      )
     }
   }
   return (
@@ -174,10 +181,23 @@ export function AccountsProviderSheet({
                 {translate('auto.components.settings.AccountsPane.dbb9626ed1', 'Cancel')}
               </Button>
             ) : (
-              <Button variant="outline" size="sm" onClick={add} disabled={addDisabled}>
-                {adding ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
-                {translate('auto.components.settings.AccountsPane.b0e948a4f9', 'Add Account')}
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" onClick={() => add()} disabled={addDisabled}>
+                  {adding ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Plus className="size-4" />
+                  )}
+                  {translate('auto.components.settings.AccountsPane.b0e948a4f9', 'Add Account')}
+                </Button>
+                {!isCodex && canOfferClaudeSignInLink(model.accountRuntime.runtime) ? (
+                  <ClaudeSignInLinkMenu
+                    variant="outline"
+                    disabled={addDisabled}
+                    onCopyLink={() => add(true)}
+                  />
+                ) : null}
+              </div>
             )}
           </div>
           {model.isRemoteAccountScope ? (

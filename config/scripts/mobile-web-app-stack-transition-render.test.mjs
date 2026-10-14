@@ -375,7 +375,9 @@ describeRender('the host stack transition on the page', () => {
           const { errors, page } = await open(options)
           const pushed = await sampleFrames(page, 'push')
           expect(pushed.filter((frame) => between(frame.session))).toEqual([])
-          expect(pushed.at(-1)).toEqual(SESSION_SETTLED)
+          expect(pushed.at(-1), JSON.stringify({ options, errors, frames: pushed })).toEqual(
+            SESSION_SETTLED
+          )
           const popped = await sampleFrames(page, 'back')
           expect(popped.filter((frame) => between(frame.session))).toEqual([])
           expect(popped.at(-1)).toEqual(LIST_SETTLED)

@@ -14,6 +14,7 @@ import {
 } from './macos-native-provider-paths'
 import { RuntimeClientError } from './runtime-client-error'
 import { applyProductBranding } from '../../shared/brand'
+import { stopMacOSPermissionStatusHelper } from './macos-computer-use-permission-status-cleanup'
 
 const PERMISSION_STATUS_HELPER_LAUNCH_TIMEOUT_MS = 5_000
 
@@ -99,6 +100,8 @@ async function readPermissionStatusFromHelperApp(
     }
     throw new RuntimeClientError('accessibility_error', 'Timed out checking permissions')
   } finally {
+    // Do not wait for helper cleanup before returning its permission status.
+    void stopMacOSPermissionStatusHelper(statusPath)
     await rm(tempDir, { recursive: true, force: true })
   }
 }

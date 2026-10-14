@@ -24,7 +24,7 @@ export function AgentDetectionCatalog({
   environmentUnavailable?: boolean
   isRefreshing: boolean
   onRefresh: () => void
-  onCheckUpdates: () => void
+  onCheckUpdates?: () => void
   isCheckingUpdates: boolean
   getRowProps: (agent: AgentCatalogEntry, isDetected: boolean) => AgentCatalogRowProps
 }) {
@@ -80,22 +80,24 @@ export function AgentDetectionCatalog({
                 {detectedAgents.length}
               </span>
             </h3>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              disabled={isCheckingUpdates || detectionFailed || detectedAgents.length === 0}
-              onClick={onCheckUpdates}
-              className="gap-2 px-0 text-muted-foreground"
-            >
-              <RefreshCw className={cn('size-4', isCheckingUpdates && 'animate-spin')} />
-              {translate(
-                isCheckingUpdates
-                  ? 'agentsSettings.checkingUpdates'
-                  : 'agentsSettings.checkUpdates',
-                isCheckingUpdates ? 'Checking…' : 'Check for updates'
-              )}
-            </Button>
+            {onCheckUpdates ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={isCheckingUpdates || detectionFailed || detectedAgents.length === 0}
+                onClick={onCheckUpdates}
+                className="gap-2 px-0 text-muted-foreground"
+              >
+                <RefreshCw className={cn('size-4', isCheckingUpdates && 'animate-spin')} />
+                {translate(
+                  isCheckingUpdates
+                    ? 'agentsSettings.checkingUpdates'
+                    : 'agentsSettings.checkUpdates',
+                  isCheckingUpdates ? 'Checking…' : 'Check for updates'
+                )}
+              </Button>
+            ) : null}
           </div>
           {detectedAgents.length > 0 ? (
             <div className="agents-installed-grid">

@@ -6,6 +6,7 @@ import { encodePairingOffer, parsePairingCode, type PairingOffer } from './pairi
 
 export type SharedControlTestServer = {
   pairing: PairingOffer
+  offer: PairingOffer
   requests: { id: string; method: string; params?: unknown }[]
   auths: unknown[]
   connectionCount: () => number
@@ -142,7 +143,8 @@ export async function createSharedControlTestServer(
     throw new Error('Failed to create test pairing')
   }
   return {
-    pairing,
+    pairing: (pairing),
+    offer: pairing,
     requests,
     auths,
     connectionCount: () => connectionCount,

@@ -4,15 +4,28 @@ import {
   isPerAccountManagedCodexHome
 } from '../../../shared/ai-vault-resume-preparation'
 import {
+  parseExecutionHostId,
   getSshTargetIdForExecutionHost,
   LOCAL_EXECUTION_HOST_ID
 } from '../../../shared/execution-host'
 import type { AiVaultResumeCommandSession } from './ai-vault-resume-command'
 
-export async function prepareAiVaultSessionForResume(
-  session: AiVaultSession
+export function prepareAiVaultSessionForResume(session: AiVaultSession): Promise<AiVaultSession> {
+  return session.structuredSession
+    ? Promise.resolve(session)
+    : prepareAiVaultSessionHome(session, false)
+}
+
+/** Picks the Codex home a fork of `session` runs under, the same way a resume picks it. */
+export function prepareAiVaultSessionForFork(session: AiVaultSession): Promise<AiVaultSession> {
+  return prepareAiVaultSessionHome(session, true)
+}
+
+async function prepareAiVaultSessionHome(
+  session: AiVaultSession,
+  fork: boolean
 ): Promise<AiVaultSession> {
-  if (session.structuredSession || !aiVaultSessionNeedsResumePreparation(session)) {
+  if (!aiVaultSessionNeedsResumePreparation(session)) {
     return session
   }
   const result = await window.api.aiVault.prepareSessionResume({
@@ -20,7 +33,8 @@ export async function prepareAiVaultSessionForResume(
     sessionId: session.sessionId,
     filePath: session.filePath,
     codexHome: session.codexHome,
-    executionHostId: session.executionHostId
+    executionHostId: session.executionHostId,
+    ...(fork ? { fork: true } : {})
   })
   if (result.useRealCodexHome) {
     return { ...session, codexHome: null }
@@ -60,6 +74,31 @@ const RESUMES_ONLY_IN_RECORDED_CWD: ReadonlySet<AiVaultSession['agent']> = new S
 export async function dropDeletedSshResumeCwd(
   session: AiVaultResumeCommandSession
 ): Promise<AiVaultResumeCommandSession> {
+  const owner = parseExecutionHostId(session.executionHostId)
+  if (
+    owner?.kind === 'runtime' &&
+    session.filePath &&
+    session.cwd &&
+    !RESUMES_ONLY_IN_RECORDED_CWD.has(session.agent)
+  ) {
+    try {
+      const verdict = await window.api.aiVault.prepareSessionResume({
+        agent: session.agent,
+        sessionId: session.sessionId,
+        filePath: session.filePath,
+        codexHome: session.codexHome,
+        executionHostId: owner.id,
+        checkRecordedCwd: true
+      })
+      if (verdict.recordedCwdMissing === true) {
+        const { resumeCommand: _scannerCommand, ...rest } = session
+        return { ...rest, cwd: null }
+      }
+    } catch {
+      // An unavailable owner or unknown filesystem error proves no absence.
+    }
+    return session
+  }
   const connectionId = getSshTargetIdForExecutionHost(session.executionHostId)
   if (!connectionId || !session.cwd || RESUMES_ONLY_IN_RECORDED_CWD.has(session.agent)) {
     return session

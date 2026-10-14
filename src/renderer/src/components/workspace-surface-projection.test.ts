@@ -1,3 +1,5 @@
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 /**
  * STA-4846: the terminal workbench is bare-workspace-id keyed end to end
  * (`activeWorktreeId`, `tabsByWorktree`, `mountedWorktreeIdsRef`, React keys),
@@ -7,8 +9,6 @@
  * SSH/paired-runtime host therefore reached the mount loops twice, mounting the
  * same tabIds under duplicate React keys with both trees marked visible.
  */
-import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { projectWorkspaceSurfaces } from './workspace-surface-projection'
 import { getIndexedAllWorktrees, getIndexedWorktreeMap } from '../store/worktree-repo-index'

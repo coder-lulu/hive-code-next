@@ -87,8 +87,11 @@ describe('reopening a managed tunnel after orcad restarted elsewhere', () => {
     const hostProfile = mkdtempSync(join(tmpdir(), 'orcad-host-'))
     const first = await startOrcad(hostProfile)
     const paired = pairingOffer(first)
-    const recorded = (await verifyRuntimePairingIdentity(paired, { runtimeId: null }))
-      .verifiedRuntimeId
+    const recorded = (
+      await verifyRuntimePairingIdentity((paired), {
+        runtimeId: null
+      })
+    ).verifiedRuntimeId
     await first.stop()
 
     // Another desktop updated or woke the host while this one was away.
@@ -99,7 +102,9 @@ describe('reopening a managed tunnel after orcad restarted elsewhere', () => {
       verifyManagedOrcadTunnelIdentity(managedEnvironment(pairing, recorded))
     ).resolves.toEqual({ verdict: 'verified' })
     // The first authenticated status reply over the reopened tunnel records the new id.
-    const status = await verifyRuntimePairingIdentity(pairing, { runtimeId: null })
+    const status = await verifyRuntimePairingIdentity((pairing), {
+      runtimeId: null
+    })
     expect(status.verifiedRuntimeId).not.toBe(recorded)
     const desktopProfile = mkdtempSync(join(tmpdir(), 'desktop-a-'))
     const saved = addEnvironmentFromPairingCode(desktopProfile, {

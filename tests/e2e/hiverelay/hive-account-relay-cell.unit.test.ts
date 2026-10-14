@@ -176,6 +176,7 @@ it.skipIf(!origin)(
       userDataPath: storage,
       methods: [
         defineMethod({
+          permission: 'workspace',
           name: 'fixture.read',
           params: null,
           handler: (_params, ctx) => ({
@@ -184,6 +185,7 @@ it.skipIf(!origin)(
           })
         }),
         defineStreamingMethod({
+          permission: 'workspace',
           name: 'fixture.stream',
           params: null,
           handler: async (_params, ctx, emit) => {

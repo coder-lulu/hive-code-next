@@ -27,7 +27,6 @@ const EMPTY_AGENT_STATUS_BY_PANE_KEY: Record<string, AgentStatusEntry> = Object.
 const EMPTY_TERMINAL_LAYOUTS_BY_TAB_ID: Record<string, TerminalLayoutSnapshot> = Object.freeze({})
 const EMPTY_TAB_AGENT_TYPES_BY_TAB_ID: Record<string, AgentType> = Object.freeze({})
 const EMPTY_UNSAFE_TABS_BY_ID: Record<string, true> = Object.freeze({})
-
 function reuseRecordIfEqual<T>(
   previous: Record<string, T> | undefined,
   next: Record<string, T>
@@ -137,7 +136,6 @@ export function createTabBarAgentProjectionSelector(
   let cachedEnabledResult: TabBarAgentProjections | null = null
 
   return (state) => {
-    // Built-in HiveCode chat needs live identity and split-pane safety even with experiments off.
     const nativeChatEnabled = state.settings?.experimentalNativeChat === true
     const statuses = state.agentStatusByPaneKey ?? EMPTY_AGENT_STATUS_BY_PANE_KEY
     const layouts = state.terminalLayoutsByTabId ?? EMPTY_TERMINAL_LAYOUTS_BY_TAB_ID

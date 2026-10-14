@@ -1,7 +1,6 @@
 import type { RuntimeE2EEClientSession } from './runtime-e2ee-client-session'
 import { handleSharedControlTextFrame } from './remote-runtime-shared-control-frame-handler'
 import type { RemoteRuntimeClientError } from './remote-runtime-client-error'
-import type { RuntimeCapability } from './protocol-version'
 import type {
   SharedControlConnectionState,
   SharedControlLogicalSubscription,
@@ -18,7 +17,6 @@ export function handleRuntimeControlTextFrame(args: {
   getSession: () => RuntimeE2EEClientSession | null
   environmentId?: string
   deviceToken: string
-  clientCapabilities: readonly RuntimeCapability[]
   pendingRequests: Map<string, SharedControlPendingRequest<unknown>>
   subscriptions: Map<string, SharedControlLogicalSubscription<unknown>>
   retiredRequestIds: SharedControlRetiredRequestIds
@@ -26,6 +24,7 @@ export function handleRuntimeControlTextFrame(args: {
   setState: (state: SharedControlConnectionState) => void
   handleSocketClosed: (error: RemoteRuntimeClientError) => void
   sendEncrypted: (payload: unknown) => boolean
+  clientCapabilities: readonly string[]
   markReady: () => void
   replaySubscriptions: () => void
   publishDiagnostics: () => void
@@ -39,7 +38,6 @@ export function handleRuntimeControlTextFrame(args: {
     session: args.getSession(),
     environmentId: args.environmentId,
     deviceToken: args.deviceToken,
-    clientCapabilities: args.clientCapabilities,
     pendingRequests: args.pendingRequests,
     subscriptions: args.subscriptions,
     retiredRequestIds: args.retiredRequestIds,
@@ -50,6 +48,7 @@ export function handleRuntimeControlTextFrame(args: {
     },
     handleSocketClosed: args.handleSocketClosed,
     sendEncrypted: args.sendEncrypted,
+    clientCapabilities: args.clientCapabilities,
     markReady: args.markReady,
     replaySubscriptions: args.replaySubscriptions
   })

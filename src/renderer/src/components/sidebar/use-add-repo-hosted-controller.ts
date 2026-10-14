@@ -18,17 +18,17 @@ export type AddRepoDialogHostedController = {
 
 export function useAddRepoHostedController(hosted: AddRepoDialogHostedController | undefined): {
   closeModal: () => void
+  handleOpenSshSettings: () => void
   /** Close for folder/non-git outcomes, which end in folder-workspace
    *  activation (or the confirm-non-git-folder store modal) instead of a
    *  composer selection. Hosted mode must close the composer too — leaving it
    *  open would hide the navigation behind a stale project selection. */
   closeForFolderHandoff: () => void
   finishProjectAdd: ((repoId: string) => Promise<void>) | undefined
-  handleOpenSshSettings: () => void
 } {
-  const storeCloseModal = useAppStore((s) => s.closeModal)
-  const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
+  const openSettingsPage = useAppStore((s) => s.openSettingsPage)
+  const storeCloseModal = useAppStore((s) => s.closeModal)
   const hostedOnOpenChange = hosted?.onOpenChange
   const hostedOnProjectAdded = hosted?.onProjectAdded
   // Why: hosted mode (nested inside the workspace composer) must close only
@@ -67,6 +67,6 @@ export function useAddRepoHostedController(hosted: AddRepoDialogHostedController
     }
     openSettingsTarget({ pane: 'servers', repoId: null, sectionId: 'devices-ssh' })
     openSettingsPage()
-  }, [closeModal, hostedOnOpenChange, openSettingsPage, openSettingsTarget, storeCloseModal])
+  }, [closeModal, hostedOnOpenChange, storeCloseModal, openSettingsTarget, openSettingsPage])
   return { closeModal, closeForFolderHandoff, finishProjectAdd, handleOpenSshSettings }
 }

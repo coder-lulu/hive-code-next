@@ -1,3 +1,4 @@
+import { isAdmissibleAgentJournalRenderItem } from '../../../src/shared/agent-session-journal-schemas'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,6 +19,7 @@ import { agentSessionFailureWords } from '../../../src/shared/agent-session-fail
 import {
   AGENT_JOURNAL_THREAD_SCOPE,
   type AgentJournalItemBody,
+  type AgentJournalRenderItem,
   type AgentJournalTurnLifecycle
 } from '../../../src/shared/agent-session-journal-types'
 import type {
@@ -129,6 +131,18 @@ export function createReleasedStopNoteRig(port: ScenarioPort, ref: string) {
       port.runtimeStub()
     )
   }
+  function parseReleasedItem(value: unknown): AgentJournalRenderItem {
+    const item = client.AgentJournalRenderItemSchema.parse(value)
+    if (
+      !isAdmissibleAgentJournalRenderItem(item) ||
+      (item.producerKind !== undefined &&
+        item.producerKind !== 'agent' &&
+        item.producerKind !== 'background')
+    ) {
+      throw new Error('Released render item is not admissible to the current reducer')
+    }
+    return item
+  }
   async function page(params: Record<string, unknown>): Promise<AgentSessionHistoryPage> {
     const reply = (await call('agentSession.history', { sessionId: SESSION, ...params }))[0]
     expect(reply?.ok).toBe(true)
@@ -139,7 +153,7 @@ export function createReleasedStopNoteRig(port: ScenarioPort, ref: string) {
     }
     return {
       ...result.page,
-      items: result.page.items.map((item) => client.AgentJournalRenderItemSchema.parse(item))
+      items: result.page.items.map((item) => parseReleasedItem(item))
     }
   }
   async function subscribe(cursor = journal.cursor()): Promise<RpcReply[]> {
@@ -155,9 +169,7 @@ export function createReleasedStopNoteRig(port: ScenarioPort, ref: string) {
             ...event,
             batch: {
               ...event.batch,
-              items: event.batch.items.map((item) =>
-                client.AgentJournalRenderItemSchema.parse(item)
-              )
+              items: event.batch.items.map(parseReleasedItem)
             }
           }
         : event
@@ -199,6 +211,7 @@ export function createReleasedStopNoteRig(port: ScenarioPort, ref: string) {
   }
 
   return {
+    parseReleasedItem,
     page,
     subscribe,
     events,

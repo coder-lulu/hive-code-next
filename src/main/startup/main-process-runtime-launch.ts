@@ -1,12 +1,12 @@
 import { installRuntimeRpc } from './main-process-runtime-rpc'
 import { app, type BrowserWindow } from 'electron'
-import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   completePendingUserDataMigration,
   showUserDataMigrationWarning
 } from './main-process-user-data-migration'
 import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
-import { getLocalPtyProvider, registerHeadlessPtyRuntime } from '../ipc/pty'
+import { getLocalPtyProvider } from '../ipc/pty/provider/registry'
+import { registerHeadlessPtyRuntime } from '../ipc/pty/register-headless-runtime'
 import { LocalPtyProvider } from '../providers/local-pty-provider'
 import { publishHeadlessRuntimeGraph } from '../runtime/headless-runtime-graph'
 import { OffscreenBrowserBackend } from '../browser/offscreen-browser-backend'
@@ -22,18 +22,21 @@ import { prepareCodexRuntimeHomeForLaunch } from './codex-launch-preparation'
 import { prepareCodexSessionResumeForLaunch } from './codex-session-resume-launch'
 import { startWindowsDesktopBeforeShellPathReady } from './windows-desktop-shell-path-startup'
 import { repairKnownPoisonedInstallDirBeforeWindow } from './windows-install-dir-acl-recovery'
-import { registerServeSignalHandlers } from './serve-signal-handlers'
+import { installServeQuitHandling } from './serve-quit-handling'
+import { registerHeadlessServeSshHandlers } from './headless-serve-ssh-registration'
 import { settleServeDesktopActivation } from './serve-desktop-activation'
 import {
   recordRuntimeRpcStartFailure,
   showRuntimeRpcStartupFailureDialog
 } from '../runtime/runtime-rpc-startup-failure'
-import { CliInstaller } from '../cli/cli-installer'
-import { installLinuxBareOrcaDispatcher } from '../cli/linux-bare-orca-dispatcher'
+import { registerCliForHeadlessServe } from './serve-cli-registration'
 import { scheduleAllPendingHistoryTreeRemovals } from '../terminal-history-deletion'
 import { triggerStartupNotificationRegistration } from '../ipc/startup-notification-registration'
 import { mainProcessState as state } from './main-process-state'
 import { logStartupMilestone } from './startup-diagnostics'
+import { setupHeadlessServeAutoUpdater } from '../window/main-window-updater'
+import { preserveStateBeforeUpdateRestart } from '../update-restart-preservation'
+import { resolveUpdateInstallMode } from '../updater'
 import { scheduleAgentLaunchRecordWarmup } from './agent-launch-record-warmup'
 import { emitServeBrowserIdentityActionLine } from '../server/serve-stdout-boundary'
 import { getBrowserIdentityModeStatus } from '../browser/browser-identity-mode-store'
@@ -92,6 +95,8 @@ async function launchServeMode(
     )
   }
   publishHeadlessRuntimeGraph(runtime)
+  // Why before RPC binds: the first paired client must already see this host's SSH targets.
+  registerHeadlessServeSshHandlers(state.store!, runtime)
   await runtimeRpc.start().catch((error) => {
     console.error('[runtime] Failed to start headless RPC transport:', error)
     throw error
@@ -99,44 +104,8 @@ async function launchServeMode(
   state.runtimeCloudPresence?.setRuntimeReady(true)
   scheduleAgentLaunchRecordWarmup(null)
   settleDesktopActivation()
-  // Why: every attempt must reach app.quit(); a page beforeunload can veto an earlier signal.
-  registerServeSignalHandlers(process, () => app.quit())
-  // Why: headless serve has no renderer to run the normal cli:install flow; do it here for macOS/Linux only (Windows-excluded: install() only mutates registry PATH, not child terminals).
-  if (process.platform === 'darwin' || process.platform === 'linux') {
-    try {
-      // Why: serve is headless — a fallback osascript admin prompt would hang it; skip elevation since ~/.local/bin needs none.
-      const cliStatus = await new CliInstaller({
-        privilegedRunner: async () => {
-          throw new Error('serve CLI auto-install must not request administrator privileges')
-        }
-      }).install()
-      console.log(
-        `[serve] ${APP_DISPLAY_NAME} CLI install: ${cliStatus.state}${cliStatus.commandPath ? ` (${cliStatus.commandPath})` : ''}`
-      )
-    } catch (error) {
-      console.warn(
-        `[serve] ${APP_DISPLAY_NAME} CLI install skipped:`,
-        error instanceof Error ? error.message : String(error)
-      )
-    }
-  }
-  // Why: Linux CLI installs as `orca-ide`, but the Claude Team launcher invokes bare `orca`; drop a ~/.local/bin dispatcher (ahead of /usr/bin) so it resolves. Best-effort.
-  if (process.platform === 'linux' && app.isPackaged && process.resourcesPath) {
-    try {
-      const dispatcher = await installLinuxBareOrcaDispatcher({
-        resourcesPath: process.resourcesPath
-      })
-      console.log(
-        `[serve] legacy CLI dispatcher ${dispatcher.state}: ${dispatcher.dispatcherPath}` +
-          `${dispatcher.target ? ` -> ${dispatcher.target}` : ''}`
-      )
-    } catch (error) {
-      console.warn(
-        '[serve] legacy CLI dispatcher install skipped:',
-        error instanceof Error ? error.message : String(error)
-      )
-    }
-  }
+  installServeQuitHandling()
+  await registerCliForHeadlessServe()
   // Why: headless serve never opens a renderer, so arm scheduled automation dispatch here.
   state.automations?.start()
   // Why: serve deletes worktrees too, and the history GC that normally drains delete tombstones is
@@ -145,6 +114,13 @@ async function launchServeMode(
   emitServeBrowserIdentityActionLine(getBrowserIdentityModeStatus())
   await printServeReady(serveOptions)
   completePendingUserDataMigration()
+  const store = state.store!
+  setupHeadlessServeAutoUpdater(store, {
+    onBeforeUpdateQuit: () =>
+      preserveStateBeforeUpdateRestart({ codexRuntimeHome: state.codexRuntimeHome, store }),
+    onBeforeUpdateQuitFailure: 'abort',
+    updateInstallMode: resolveUpdateInstallMode(true)
+  })
 }
 
 async function launchDesktopMode(

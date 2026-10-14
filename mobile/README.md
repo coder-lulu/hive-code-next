@@ -31,6 +31,8 @@ update signed by the existing key; do not uninstall or clear data to resolve a
 debug/release signing mismatch. The initial signed development client was built
 locally using the existing protected signing configuration.
 
+The Node commands `pnpm rpc:diff` and `pnpm rpc:record` use a development dependency linked to `../src/packages/process-host`. Mobile's install supplies the link, and `tsx` runs its source with the `orca-source` condition, so these command wrappers do not require a desktop install or package build. Keep that source directory in sparse checkouts. The recording suites still need root dependencies when they exercise desktop modules. The React Native app does not import this host package.
+
 ## Prerequisites
 
 - Node.js 24+

@@ -38,3 +38,7 @@ export const PreflightInstallAgent = z
     wslDistro: z.string().trim().min(1).max(256).nullable().optional()
   })
   .strict()
+/** Why optional: a client that predates it sends nothing and keeps the host-default probe. */
+export const PreflightAgentDetection = z.object({
+  worktreeId: z.string().min(1).optional()
+})

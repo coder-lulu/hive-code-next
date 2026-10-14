@@ -3,18 +3,8 @@ import { openExternalLink } from '../platform/external-link'
 import { createMarkdownInlineMatcher, type MarkdownInlineMatch } from './markdown-inline-matcher'
 import { INLINE_TEXT_SELECTION } from './inline-text-selection'
 import { MobileSelectableText } from './MobileSelectableText'
-import {
-  Fragment,
-  createElement,
-  createContext,
-  memo,
-  useContext,
-  useMemo,
-  type ComponentType,
-  type ReactNode
-} from 'react'
+import { Fragment, createElement, createContext, memo, useContext, useMemo } from 'react'
 import { Pressable, ScrollView, Text as NativeText, View, type TextProps } from 'react-native'
-import { normalizeMobileMarkdownPreviewHtml } from './mobile-markdown-preview-html'
 import { createMobileMarkdownStyles, type MobileMarkdownStyles } from './mobile-markdown-styles'
 import {
   detectFilePathSegments,
@@ -27,7 +17,8 @@ import {
   trimAutolinkTrailingPunctuation
 } from './markdown-inline-token-rules'
 import { isMobileMermaidLanguage } from './mobile-mermaid-language'
-import { parseMobileMarkdown } from './mobile-markdown-parser'
+import { useMobileMarkdownBlocks } from './use-mobile-markdown-blocks'
+import type { NativeChatVisualDirective } from '../../../src/shared/native-chat-visual-directive'
 import { MermaidDiagram } from './pr-sidebar/MermaidDiagram'
 
 type Props = {
@@ -45,6 +36,9 @@ type Props = {
    *  optional :line(:col) suffix). Omitted on screens with no file viewer, where
    *  paths render as plain text (no behavior change). */
   onOpenFile?: (pathText: string) => void
+  /** Native-chat assistant prose only: renders `::orca-visual{...}` directive lines. Without it,
+   *  a directive line is ordinary text. Must be referentially stable (this component is memoized). */
+  renderVisual?: (directive: NativeChatVisualDirective, index: number) => React.ReactNode
 }
 
 const MAX_TABLE_ROWS = 40
@@ -52,7 +46,7 @@ const MAX_TABLE_COLUMNS = 8
 /** Prose base size — passed to MermaidDiagram fallback mono text. */
 const MERMAID_BASE = 13
 type MarkdownTextSetup = {
-  TextComponent: ComponentType<TextProps>
+  TextComponent: React.ComponentType<TextProps>
   /** Disable native selection only within the Android transcript. */
   androidTranscript: boolean
   onLongPress?: () => void
@@ -97,7 +91,7 @@ function renderTextRun(
   keyPrefix: string,
   styles: MobileMarkdownStyles,
   onOpenFile?: (pathText: string) => void
-): ReactNode {
+): React.ReactNode {
   if (!onOpenFile) {
     return text
   }
@@ -125,8 +119,8 @@ function renderInline(
   text: string,
   styles: MobileMarkdownStyles,
   onOpenFile?: (pathText: string) => void
-): ReactNode[] {
-  const parts: ReactNode[] = []
+): React.ReactNode[] {
+  const parts: React.ReactNode[] = []
   const pattern = createMarkdownInlineMatcher(
     text,
     /(`[^`]+`|~~[^~]+~~|\*\*[^*]+\*\*|__[^_]+__|\*[^*\n]+\*|_[^_\n]+_|https?:\/\/[^\s<]+)/g,
@@ -239,15 +233,15 @@ function MobileMarkdownContent({
   fallback = '',
   rangeSelectable = false,
   textScale = 1,
-  onOpenFile
+  onOpenFile,
+  renderVisual
 }: Props) {
   const styles = useMobileThemeStyles(createMobileMarkdownStyles)
   // Interactive children own their touches and must forward the row action.
   const setup = useContext(MarkdownTextContext)
   const rowLongPress = setup.androidTranscript ? setup.onLongPress : undefined
   const text = content?.trim() ?? ''
-  const previewText = useMemo(() => normalizeMobileMarkdownPreviewHtml(text), [text])
-  const blocks = useMemo(() => parseMobileMarkdown(previewText), [previewText])
+  const { blocks, directives } = useMobileMarkdownBlocks(text, renderVisual !== undefined)
   // Scale prose sizes; inline spans inherit fontSize from the wrapping Text.
   const scaled = (size: number): { fontSize: number; lineHeight: number } | null =>
     textScale !== 1 ? { fontSize: size * textScale, lineHeight: (size + 6) * textScale } : null
@@ -266,6 +260,14 @@ function MobileMarkdownContent({
   return (
     <View style={styles.root}>
       {blocks.map((block, index) => {
+        if (block.type === 'visual') {
+          const directive = directives[block.index]
+          return directive && renderVisual ? (
+            <Fragment key={`visual:${block.index}:${directive.file}`}>
+              {renderVisual(directive, block.index)}
+            </Fragment>
+          ) : null
+        }
         if (block.type === 'heading') {
           return (
             <MarkdownText

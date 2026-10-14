@@ -1,6 +1,9 @@
 import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'
 import { useAppStore } from '@/store'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
+import { runtimeTargetForOwnerEnvironment } from '@/runtime/runtime-client-target'
+import { executionHostIdForStructuredTarget } from '@/runtime/structured-agent-session-owner'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 import {
   LOCAL_EXECUTION_HOST_ID,
@@ -105,25 +108,33 @@ function findStructuredAgentTab(
   return matches[0]
 }
 
-
 /** Find a live structured session without crossing a workspace or an ambiguous host owner. */
 export function findStructuredAgentSessionTab(
   unifiedTabsByWorktree: Readonly<Record<string, readonly Tab[]>>,
-  args: { workspaceId: string; sessionId: string }
+  args: { workspaceId: string; sessionId: string; target?: RuntimeClientTarget }
 ): Tab | null {
-  return findStructuredAgentTab(unifiedTabsByWorktree, {
-    worktreeId: args.workspaceId,
-    sessionId: args.sessionId
-  })?.tab ?? null
+  return (
+    findStructuredAgentTab(unifiedTabsByWorktree, {
+      worktreeId: args.workspaceId,
+      sessionId: args.sessionId,
+      executionHostId: args.target ? executionHostIdForStructuredTarget(args.target) : undefined
+    })?.tab ?? null
+  )
 }
 
 export function activateStructuredAgentSessionTab(args: {
   worktreeId: string
   tabId: string
   executionHostId?: ExecutionHostId | null
+  target?: RuntimeClientTarget
 }): boolean {
   const state = useAppStore.getState()
-  const owner = findStructuredAgentTab(state.unifiedTabsByWorktree, args)
+  const owner = findStructuredAgentTab(state.unifiedTabsByWorktree, {
+    ...args,
+    executionHostId: args.target
+      ? executionHostIdForStructuredTarget(args.target)
+      : args.executionHostId
+  })
   if (!owner) {
     return false
   }
@@ -142,7 +153,7 @@ export function activateStructuredAgentSessionTab(args: {
       ? ownerHost.environmentId
       : getRuntimeEnvironmentIdForWorktree(state, runtimeWorktreeId)
   void callRuntimeRpc(
-    getActiveRuntimeTarget({ activeRuntimeEnvironmentId: environmentId }),
+    args.target ?? runtimeTargetForOwnerEnvironment(environmentId),
     'session.tabs.activate',
     {
       worktree: toRuntimeWorktreeSelector(runtimeWorktreeId),
@@ -156,14 +167,21 @@ export function activateStructuredAgentSessionById(args: {
   worktreeId: string
   sessionId: string
   executionHostId?: ExecutionHostId | null
+  target?: RuntimeClientTarget
 }): boolean {
   const state = useAppStore.getState()
-  const owner = findStructuredAgentTab(state.unifiedTabsByWorktree, args)
+  const owner = findStructuredAgentTab(state.unifiedTabsByWorktree, {
+    ...args,
+    executionHostId: args.target
+      ? executionHostIdForStructuredTarget(args.target)
+      : args.executionHostId
+  })
   return owner
     ? activateStructuredAgentSessionTab({
         worktreeId: args.worktreeId,
         tabId: owner.tab.id,
-        executionHostId: args.executionHostId
+        executionHostId: args.executionHostId,
+        target: args.target
       })
     : false
 }

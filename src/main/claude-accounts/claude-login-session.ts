@@ -8,11 +8,14 @@ import type { ClaudeCommandConfig, ClaudeCommandOptions } from './claude-command
 import type { ClaudeManagedAuthLocation } from './claude-managed-auth-storage'
 import {
   deleteActiveClaudeKeychainCredentialsStrict,
-  readActiveClaudeKeychainCredentials,
+  readActiveClaudeKeychainCredentialsStrict,
   writeActiveClaudeKeychainCredentials
 } from './keychain'
 
-const LOGIN_TIMEOUT_MS = 180_000
+import { prepareClaudeSignInBrowser, type ClaudeSignInBrowser } from './claude-sign-in-browser'
+import { CLAUDE_SIGN_IN_FAILED_MESSAGE } from '../../shared/claude-sign-in-link'
+
+const LOGIN_TIMEOUT_MS = 600_000
 const STATUS_TIMEOUT_MS = 20_000
 
 type ClaudeLoginSessionDependencies = {
@@ -32,10 +35,14 @@ type ClaudeLoginSessionDependencies = {
 
 export async function runClaudeLoginSession(
   location: ClaudeManagedAuthLocation,
-  dependencies: ClaudeLoginSessionDependencies
+  dependencies: ClaudeLoginSessionDependencies,
+  onLink?: (link: string) => void
 ): Promise<CapturedClaudeAuth> {
   const tempConfig = await createTemporaryClaudeConfigDir(location)
   const controller = new AbortController()
+  const watch = new AbortController()
+  let browser: ClaudeSignInBrowser | null = null
+  let linkMissing = false
   let previousLegacyKeychain: string | null = null
   let acquiredLegacySnapshot = false
   let captured: CapturedClaudeAuth | null = null
@@ -49,14 +56,31 @@ export async function runClaudeLoginSession(
       controller.abort()
       return true
     })
-    previousLegacyKeychain = await readActiveClaudeKeychainCredentials()
+    previousLegacyKeychain = await readActiveClaudeKeychainCredentialsStrict()
     acquiredLegacySnapshot = true
     if (controller.signal.aborted) {
       throw new Error('Claude sign-in was cancelled.')
     }
+    browser = onLink ? await prepareClaudeSignInBrowser(tempConfig) : null
+    void browser
+      ?.nextLink(watch.signal)
+      .then((link) => {
+        if (link && !watch.signal.aborted) {onLink?.(link)}
+        else if (!watch.signal.aborted) {
+          linkMissing = true
+          controller.abort()
+        }
+      })
+      .catch(() => {
+        if (!watch.signal.aborted) {
+          linkMissing = true
+          controller.abort()
+        }
+      })
     await dependencies.runCommand(['auth', 'login', '--claudeai'], tempConfig, LOGIN_TIMEOUT_MS, {
       signal: controller.signal,
-      keepStdinOpen: true
+      keepStdinOpen: true,
+      browser: browser?.path
     })
     dependencies.setCancel(null)
     const status = await dependencies.runCommand(
@@ -67,8 +91,10 @@ export async function runClaudeLoginSession(
     )
     captured = await dependencies.capture(tempConfig.windowsPath, status, previousLegacyKeychain)
   } catch (error) {
-    captureFailure = { error }
+    captureFailure = { error: linkMissing ? new Error(CLAUDE_SIGN_IN_FAILED_MESSAGE) : error }
   } finally {
+    watch.abort()
+    await browser?.dispose().catch(() => {})
     if (process.platform === 'darwin' && acquiredLegacySnapshot) {
       try {
         await deleteActiveClaudeKeychainCredentialsStrict(tempConfig.windowsPath)
@@ -100,7 +126,7 @@ export async function runClaudeLoginSession(
   return captured!
 }
 
-async function createTemporaryClaudeConfigDir(
+export async function createTemporaryClaudeConfigDir(
   location: ClaudeManagedAuthLocation
 ): Promise<ClaudeCommandConfig> {
   if (location.managedAuthRuntime !== 'wsl') {
@@ -138,7 +164,7 @@ async function createTemporaryClaudeConfigDir(
   }
 }
 
-async function removeTemporaryClaudeConfigDir(config: ClaudeCommandConfig): Promise<void> {
+export async function removeTemporaryClaudeConfigDir(config: ClaudeCommandConfig): Promise<void> {
   if (config.linuxPath && config.wslDistro) {
     try {
       await runWslProcess({
