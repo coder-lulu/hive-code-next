@@ -515,9 +515,9 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "1f658ceada0ff97286bd3d3dec21ad5df620dcaf"
+        "sha": "c87c3f5663545c4be99e639447458093ca2f60e2"
       },
-      "reason": "Reuse current node-server-tests build_template owner and mandatory orcad-windows-process-tree artifact; preserve selected architecture, source ref, permissions, publication fences and template hash checks. Remove duplicate dangling Relay producer and dead ORCA_REQUIRE_RELAY_NATIVE_ADDONS env (no current production reader). Tests trace current producer/staging/release provenance.",
+      "reason": "Reuse current node-server-tests build_template owner and mandatory orcad-windows-process-tree artifact; preserve selected architecture, source ref, permissions, publication fences and template hash checks. Remove duplicate dangling Relay producer and dead ORCA_REQUIRE_RELAY_NATIVE_ADDONS env (no current production reader). Tests trace current producer/staging/release provenance. Remove only the deleted SSH relay watcher harness step; preserve Node and Electron runtime watcher commands, pipefail, compile/gate/package order, signing, permissions and publication behavior.",
       "regressionTests": [
         "config/scripts/relay-windows-process-tree-workflow-contract.test.mjs",
         "config/scripts/orcad-windows-process-tree.test.mjs",
@@ -525,7 +525,9 @@
         "config/scripts/build-orcad-template.test.mjs",
         "config/scripts/packaged-orcad-template.test.mjs",
         "config/scripts/verify-packaged-orcad-template.test.mjs",
-        "config/scripts/hivecode-windows-hardware-signing-workflow.test.mjs"
+        "config/scripts/hivecode-windows-hardware-signing-workflow.test.mjs",
+        "config/scripts/package-electron-runtime-contract.test.mjs",
+        "config/scripts/hivecloud-release-workflow-contract.test.mjs"
       ]
     },
     {
@@ -11288,7 +11290,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "13d3de43d3b37198a627c1c7d127a044cb3e9079"
+        "sha": "5de69c57158407b7f8ba0b0a8ff9395a9e9a25ba"
       },
       "upstream": {
         "mode": "100644",
@@ -11296,9 +11298,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "13d3de43d3b37198a627c1c7d127a044cb3e9079"
+        "sha": "5de69c57158407b7f8ba0b0a8ff9395a9e9a25ba"
       },
-      "reason": "Route exactly 12 real SQLite runtime consumers to Node for Bun orchestration; current AST import-contract test proves classification, no mocked DB replacement or pool weakening. Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime. Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes. Assign the nine independently reviewed native resource suites and 25 exact real Playwright browser/launcher owners to their Node host; preserve pure/mock neighboring Bun ownership. This runtime policy does not resolve the observed Windows WebKit SDK failures.",
+      "reason": "Route exactly 12 real SQLite runtime consumers to Node for Bun orchestration; current AST import-contract test proves classification, no mocked DB replacement or pool weakening. Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime. Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes. Assign the nine independently reviewed native resource suites and 25 exact real Playwright browser/launcher owners to their Node host; preserve pure/mock neighboring Bun ownership. This runtime policy does not resolve the observed Windows WebKit SDK failures. Add only the three exact real secure-persistence owners artifact-share-record-store, runtime-environment-store-unreadable-records and ephemeral-vm-runtime-ssh-cleanup to existing Node host ownership. Preserve all other entries, pure/mock neighbors, budgets and skips; host comparison is bounded evidence, not proof of the low-level timeout cause.",
       "regressionTests": [
         "cli-tooling-final-tests.log: 22 suites, 479 passed, 33 explicit platform skips",
         "cli-tooling-lint.log: 22 changed source/test files passed",
@@ -11308,7 +11310,10 @@
         "src/main/orca-profiles/other-profile-workspace-catalog.test.ts",
         "config/scripts/vitest-node-native-runtime-boundary.test.ts",
         "config/scripts/vitest-node-runtime-pool.test.ts",
-        "config/scripts/vitest-playwright-runtime-boundary.test.ts"
+        "config/scripts/vitest-playwright-runtime-boundary.test.ts",
+        "src/main/artifacts/artifact-share-record-store.test.ts",
+        "src/shared/runtime-environment-store-unreadable-records.test.ts",
+        "src/main/ephemeral-vm-runtime-ssh-cleanup.test.ts"
       ]
     },
     {
@@ -44121,18 +44126,21 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "8d3df20e4060f1bdc28826cf8095dffbde9f8ba3"
+        "sha": "fc9c11446bfac7ffe51fd07e4b99e37937c58277"
       },
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "8d3df20e4060f1bdc28826cf8095dffbde9f8ba3"
+        "sha": "fc9c11446bfac7ffe51fd07e4b99e37937c58277"
       },
-      "reason": "Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes. Append precise real native-resource owner AST regressions for nine reviewed Node-host suites; existing native boundary prefix and pure/mock neighboring Bun ownership remain unchanged. Root owns selector integration.",
+      "reason": "Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes. Append precise real native-resource owner AST regressions for nine reviewed Node-host suites; existing native boundary prefix and pure/mock neighboring Bun ownership remain unchanged. Root owns selector integration. Extend the existing native guard with real value-import/call checks for the exact three owners and secure persistence/Windows ACL producer chains; strengthen mock exclusions while retaining all prior owner assertions and pure-neighbor exclusions.",
       "regressionTests": [
         "config/scripts/vitest-node-runtime-boundary.test.ts",
         "config/scripts/vitest-node-native-runtime-boundary.test.ts",
-        "config/scripts/vitest-node-runtime-pool.test.ts"
+        "config/scripts/vitest-node-runtime-pool.test.ts",
+        "src/main/artifacts/artifact-share-record-store.test.ts",
+        "src/shared/runtime-environment-store-unreadable-records.test.ts",
+        "src/main/ephemeral-vm-runtime-ssh-cleanup.test.ts"
       ]
     },
     {
@@ -45856,6 +45864,137 @@
       "regressionTests": [
         "config/scripts/vitest-playwright-runtime-boundary.test.ts",
         "config/scripts/vitest-node-runtime-boundary.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/hivecloud-release-workflow-contract.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "a61bd5c68bb6f73a6bc0f73486e8d1a891946e4b"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "19e54dc47ee5cb13e5290c74a6abec30627c63c3"
+      },
+      "reason": "Adapt only obsolete relay gate expectations to compile < current runtime gate < package and retired-step absence; retain both Node/Electron commands, hard-failure properties and all other release assertions. Apply only the normal formatter to the two adapted assertions; five cases and all non-whitespace source remain unchanged.",
+      "regressionTests": [
+        "config/scripts/package-electron-runtime-contract.test.mjs",
+        "config/scripts/hivecloud-release-workflow-contract.test.mjs",
+        "config/scripts/relay-windows-process-tree-workflow-contract.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/package-electron-runtime-contract.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "b93094901a07da6ccf9aeaaa35cfaa617ac41ded"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "0ccfa3c8aa7f52319db914314a204ed9ca2206e1"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "b93094901a07da6ccf9aeaaa35cfaa617ac41ded"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2a4d0bdb588a9a62e4d828ec095bd7065eca56bd"
+      },
+      "reason": "Replace the missing retired relay import and two obsolete SSH cases with current WSL producer/constants, version hashes, retained out/relay resource mapping and both console fallback sections of the bound pnpm node-pty@1.1.0 patch. Preserve unrelated packaging/runtime/signing assertions; do not restore retired modules or substitute host-census APIs. Supplemental actual regression revealed two stale assertions: verify the current conditional desktop dynamic import after dependency preparation, and current package.json-only release cut with non-writing manifest validation and fail-closed actual commit-path guard before tagging. Keep native/compile/package ordering, immutable skill artifacts and the original failure record. Preserve all 21 cases and assertion semantics while sharing the two Windows-addon platform/resource checks and seven existing performance environment prefixes; normal formatter applied, effective lines584 without relaxing the600line ratchet.",
+      "regressionTests": [
+        "config/scripts/package-electron-runtime-contract.test.mjs",
+        "config/scripts/hivecloud-release-workflow-contract.test.mjs",
+        "config/scripts/relay-windows-process-tree-workflow-contract.test.mjs",
+        "config/scripts/generate-skill-bundle-manifest.test.mjs"
+      ]
+    },
+    {
+      "path": "src/main/git/status-symlink-probe-budget.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "b312048078be7c844a7298136a616a544d9867db"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "b312048078be7c844a7298136a616a544d9867db"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "b312048078be7c844a7298136a616a544d9867db"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "aa8c1482055b5bc497474157adcfff70fa15d11a"
+      },
+      "reason": "Export readdir and supply the explicit link, Japanese-name and unrelated.txt directory census. Preserve all six cases, duplicate ordering, zero unrelated probes, repeated filesystem checks, exact-case/descendant exclusions and unchanged production BigInt/actual-name checks.",
+      "regressionTests": [
+        "src/main/git/status-symlink-probe-budget.test.ts",
+        "src/main/git/status.test.ts",
+        "src/main/git/worktree-symlink-detection.test.ts",
+        "src/main/git/status-shared-symlinks.test.ts",
+        "src/main/git/source-control/stage-worktree-changes.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/git/status-test-harness.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "99925f903639bc8a3319b6804ebd5adf05c1e4b2"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "99925f903639bc8a3319b6804ebd5adf05c1e4b2"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "99925f903639bc8a3319b6804ebd5adf05c1e4b2"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "5cf9e2630a52f3c13119e3968e61adb8f15be60a"
+      },
+      "reason": "Accept and export an explicitly supplied optional readdir mock only; no empty directory or host filesystem fallback. Existing callers retain their mocks, while status supplies its required concrete directory census.",
+      "regressionTests": [
+        "src/main/git/status.test.ts",
+        "src/main/git/status-branch-compare.test.ts",
+        "src/main/git/status-conflict-operations.test.ts",
+        "src/main/git/status-diff.test.ts",
+        "src/main/git/status-discard-and-bulk-staging.test.ts",
+        "src/main/git/status-read-coalescing.test.ts",
+        "src/main/git/status-submodule.test.ts",
+        "src/main/git/worktree-symlink-detection.test.ts",
+        "src/main/git/status-shared-symlinks.test.ts",
+        "src/main/git/source-control/stage-worktree-changes.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/git/status.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "f0c841ea4c5238a0de5cb25b691c70eae19e3967"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "f0c841ea4c5238a0de5cb25b691c70eae19e3967"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "f0c841ea4c5238a0de5cb25b691c70eae19e3967"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4cc079b24ac1deb0f2a7873465280c9c5884a210"
+      },
+      "reason": "Supply and reset the shared readdir mock, setting node_modules only for the Windows distro-spelling symlink case. Preserve original probe and empty-entry assertions and all other status cases; production canonicalization remains unchanged.",
+      "regressionTests": [
+        "src/main/git/status-symlink-probe-budget.test.ts",
+        "src/main/git/status.test.ts",
+        "src/main/git/worktree-symlink-detection.test.ts",
+        "src/main/git/status-shared-symlinks.test.ts",
+        "src/main/git/source-control/stage-worktree-changes.test.ts"
       ]
     }
   ],

@@ -155,6 +155,9 @@ export const NODE_RUNTIME_INCLUDE = [
   // Real profile persistence enforces Windows SID and ACL protection through Node.
   'src/main/artifacts/artifact-cloud-service.test.ts',
   'src/main/artifacts/artifact-cloud-service-races.test.ts',
+  'src/main/artifacts/artifact-share-record-store.test.ts',
+  'src/shared/runtime-environment-store-unreadable-records.test.ts',
+  'src/main/ephemeral-vm-runtime-ssh-cleanup.test.ts',
   // Actual Node-host secure persistence, native hook and supervised child contracts.
   'src/shared/runtime-environment-ssh-access-store.test.ts',
   'src/shared/runtime-environment-sidecar.test.ts',

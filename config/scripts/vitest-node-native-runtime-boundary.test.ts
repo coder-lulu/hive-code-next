@@ -255,6 +255,21 @@ it('runs catalog real-child cancellation and exit observation in Node', () => {
 it('keeps real durable runtime stores and lifecycle listeners on their Node host', () => {
   for (const [owner, module, name] of [
     [
+      'src/main/artifacts/artifact-share-record-store.test.ts',
+      '/artifact-share-record-store',
+      'saveArtifactShareRecord'
+    ],
+    [
+      'src/shared/runtime-environment-store-unreadable-records.test.ts',
+      '/runtime-environment-store',
+      'addEnvironmentFromPairingCode'
+    ],
+    [
+      'src/main/ephemeral-vm-runtime-ssh-cleanup.test.ts',
+      '/ephemeral-vm-runtime-store',
+      'upsertEphemeralVmRuntime'
+    ],
+    [
       'src/main/ephemeral-vm-runtime-service.test.ts',
       '/ephemeral-vm-runtime-service',
       'provisionEphemeralVmRuntime'
@@ -284,11 +299,23 @@ it('keeps real durable runtime stores and lifecycle listeners on their Node host
     const fixture = source(owner)
     expect(callsImportedRuntime(fixture, module, name), owner).toBe(true)
     expect(fixture.text).not.toMatch(
-      /vi\.mock\(['"][^'"]*(?:secure-file|bounded-secure-json-file|secure-path-windows-acl|ephemeral-vm-recipe-process)/
+      /vi\.mock\(['"][^'"]*(?:secure-file|bounded-secure-json-file|secure-path-windows-acl|ephemeral-vm-recipe-process|artifact-share-record-store|runtime-environment-store|ephemeral-vm-runtime-store)/
     )
     expect(NODE_RUNTIME_INCLUDE, owner).toContain(owner)
   }
   for (const [file, module, name] of [
+    ['src/main/artifacts/artifact-share-record-store.ts', '/secure-file', 'writeSecureJsonFile'],
+    [
+      'src/shared/runtime-environment-store.ts',
+      '/runtime-environment-store-file',
+      'writeEnvironmentStore'
+    ],
+    [
+      'src/shared/runtime-environment-store-file.ts',
+      '/bounded-secure-json-file',
+      'writeSecureJsonFileWithinLimit'
+    ],
+    ['src/shared/secure-file.ts', '/secure-path-windows-acl', 'restrictWindowsPathSync'],
     [
       'src/main/ephemeral-vm-runtime-service.ts',
       '/ephemeral-vm-recipe-runner',
