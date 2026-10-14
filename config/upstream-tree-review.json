@@ -9784,14 +9784,14 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "06168a5271372fbf86ab9da0fcf12e03cafbc9bb"
+        "sha": "6c449bba8b8595279d67cbc0b6eb4d1ac5016fd1"
       },
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "06168a5271372fbf86ab9da0fcf12e03cafbc9bb"
+        "sha": "6c449bba8b8595279d67cbc0b6eb4d1ac5016fd1"
       },
-      "reason": "Explicit product-boundary policy maintenance: preserve private Gitlink isolation and current patch normalization, remove only retired Relay asset scope, and update exact reviewed literal paths/hashes without weakening the global scan. Authorized policy maintenance is frozen in the product parent before source absorption; the product entry therefore binds that parent policy blob. Synchronize only .gitattributes protected normalized SHA256 after the independently approved five LF rules; preserve 776 paths, .gitignore and all other policy data. Register exactly 39 independently approved C6 HiveCode copy paths. Preserve all 776 existing entries, schema/literal and both E6 protected hashes; no scanner changes, patterns or exceptions. DIAG old attributes hash replaced only by immutable E6 preimage before drafting.",
+      "reason": "Explicit product-boundary policy maintenance: preserve private Gitlink isolation and current patch normalization, remove only retired Relay asset scope, and update exact reviewed literal paths/hashes without weakening the global scan. Authorized policy maintenance is frozen in the product parent before source absorption; the product entry therefore binds that parent policy blob. Synchronize only .gitattributes protected normalized SHA256 after the independently approved five LF rules; preserve 776 paths, .gitignore and all other policy data. Register exactly 39 independently approved C6 HiveCode copy paths. Preserve all 776 existing entries, schema/literal and both E6 protected hashes; no scanner changes, patterns or exceptions. DIAG old attributes hash replaced only by immutable E6 preimage before drafting. Register exactly the two independently reviewed HiveCode CLI fixture expectation paths; preserve all existing 815 entries, schema, literal, protected hashes and scanner.",
       "regressionTests": [
         "config/scripts/check-hivecode-brand-boundary.test.mjs",
         "config/scripts/verify-documentation-governance.test.mjs",
