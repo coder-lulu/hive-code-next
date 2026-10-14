@@ -251,3 +251,233 @@ it('runs catalog real-child cancellation and exit observation in Node', () => {
   ).toBe(true)
   expect(NODE_RUNTIME_INCLUDE).not.toContain(mockOwner)
 })
+
+it('keeps real durable runtime stores and lifecycle listeners on their Node host', () => {
+  for (const [owner, module, name] of [
+    [
+      'src/main/ephemeral-vm-runtime-service.test.ts',
+      '/ephemeral-vm-runtime-service',
+      'provisionEphemeralVmRuntime'
+    ],
+    [
+      'src/main/orcad/orcad-stop-request-listener.test.ts',
+      '/orcad-stop-request-listener',
+      'installOrcadStopRequestListeners'
+    ],
+    [
+      'src/shared/ephemeral-vm-runtime-store-rollback.test.ts',
+      '/ephemeral-vm-runtime-store',
+      'upsertEphemeralVmRuntime'
+    ],
+    ['src/main/runtime/runtime-metadata.test.ts', '/runtime-metadata', 'writeRuntimeMetadata'],
+    [
+      'src/main/ssh/orcad-migration-cutover-journal.test.ts',
+      '/orcad-migration-cutover-journal',
+      'writeOrcadMigrationSourceCutover'
+    ],
+    [
+      'src/shared/runtime-environment-managed-orcad-store.test.ts',
+      '/runtime-environment-managed-orcad-store',
+      'addManagedOrcadEnvironment'
+    ]
+  ]) {
+    const fixture = source(owner)
+    expect(callsImportedRuntime(fixture, module, name), owner).toBe(true)
+    expect(fixture.text).not.toMatch(
+      /vi\.mock\(['"][^'"]*(?:secure-file|bounded-secure-json-file|secure-path-windows-acl|ephemeral-vm-recipe-process)/
+    )
+    expect(NODE_RUNTIME_INCLUDE, owner).toContain(owner)
+  }
+  for (const [file, module, name] of [
+    [
+      'src/main/ephemeral-vm-runtime-service.ts',
+      '/ephemeral-vm-recipe-runner',
+      'runEphemeralVmRecipeStart'
+    ],
+    ['src/shared/ephemeral-vm-recipe-process.ts', 'node:child_process', 'spawn'],
+    [
+      'src/shared/ephemeral-vm-runtime-store.ts',
+      '/bounded-secure-json-file',
+      'writeSecureJsonFileWithinLimit'
+    ],
+    [
+      'src/main/orcad/orcad-stop-request-listener.ts',
+      '/orcad-managed-stop-decision',
+      'claimOrcadManagedStopDecision'
+    ],
+    ['src/main/orcad/orcad-managed-stop-decision.ts', '/secure-file', 'writeDurableSecureJsonFile'],
+    ['src/main/runtime/runtime-metadata.ts', '/secure-file', 'writeSecureJsonFile'],
+    [
+      'src/main/ssh/orcad-migration-cutover-journal.ts',
+      '/bounded-secure-json-file',
+      'writeSecureJsonFileWithinLimit'
+    ],
+    [
+      'src/shared/runtime-environment-managed-orcad-store.ts',
+      '/runtime-environment-sidecar',
+      'writeRuntimeEnvironmentSidecarEntry'
+    ],
+    [
+      'src/shared/runtime-environment-sidecar.ts',
+      '/bounded-secure-json-file',
+      'writeSecureJsonFileWithinLimit'
+    ],
+    ['src/shared/bounded-secure-json-file.ts', '/secure-file', 'writeSecureFile']
+  ]) {
+    expect(callsImportedRuntime(source(file), module, name), file).toBe(true)
+  }
+  for (const pure of [
+    'src/shared/ephemeral-vm-recipes.test.ts',
+    'src/shared/orcad-stop-request.test.ts',
+    'src/shared/artifact-sharing-gate.test.ts',
+    'src/shared/runtime-environments.test.ts'
+  ]) {
+    expect(NODE_RUNTIME_INCLUDE).not.toContain(pure)
+  }
+})
+
+function callsImportedObject(
+  fixture: ts.SourceFile,
+  moduleSuffix: string,
+  importedName: string,
+  member?: string
+): boolean {
+  const bindings = new Set<string>()
+  for (const node of fixture.statements) {
+    if (
+      !ts.isImportDeclaration(node) ||
+      !ts.isStringLiteral(node.moduleSpecifier) ||
+      !node.moduleSpecifier.text.endsWith(moduleSuffix) ||
+      node.importClause?.isTypeOnly
+    ) {
+      continue
+    }
+    const named = node.importClause?.namedBindings
+    if (named && ts.isNamedImports(named)) {
+      for (const binding of named.elements) {
+        if (!binding.isTypeOnly && (binding.propertyName ?? binding.name).text === importedName) {
+          bindings.add(binding.name.text)
+        }
+      }
+    }
+  }
+  let found = false
+  const visit = (node: ts.Node): void => {
+    if (member && ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      const receiver = node.expression.expression
+      found ||=
+        ts.isIdentifier(receiver) &&
+        bindings.has(receiver.text) &&
+        node.expression.name.text === member
+    } else if (!member && ts.isNewExpression(node) && ts.isIdentifier(node.expression)) {
+      found ||= bindings.has(node.expression.text)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(fixture)
+  return found
+}
+
+it('keeps artifact response-loss recovery on real profile and secure-file persistence', () => {
+  const owner = 'src/main/artifacts/artifact-cloud-recovery.test.ts'
+  const fixture = source(owner)
+  expect(callsImportedObject(fixture, '/artifact-cloud-service', 'ArtifactCloudService')).toBe(true)
+  expect(fixture.text).toContain(
+    'const restrictWindowsPath = windowsAcl.bestEffortRestrictWindowsPath'
+  )
+  expect(fixture.text).toContain('restrictWindowsPath(targetPath, isDirectory, (restricted) =>')
+  expect(fixture.text).toContain('await Promise.all(pendingWindowsHardening)')
+  expect(fixture.text).not.toMatch(
+    /vi\.mock\(['"][^'"]*(?:secure-file|artifact-share-record-store)/
+  )
+  expect(
+    callsImportedRuntime(
+      source('src/main/artifacts/artifact-cloud-service.ts'),
+      '/profile-index-store',
+      'ensureActiveOrcaProfile'
+    )
+  ).toBe(true)
+  expect(
+    callsImportedRuntime(
+      source('src/main/artifacts/artifact-share-record-store.ts'),
+      '/secure-file',
+      'writeSecureJsonFile'
+    )
+  ).toBe(true)
+  expect(NODE_RUNTIME_INCLUDE).toContain(owner)
+})
+
+it('keeps WSL managed hook installation and its real grant host in Node', () => {
+  const owner = 'src/main/codex/hook-service-wsl-runtime.test.ts'
+  const fixture = source(owner)
+  expect(
+    callsImportedObject(fixture, '/hook-service', '_internals', 'installManagedHooksIntoWslRuntime')
+  ).toBe(true)
+  expect(
+    callsImportedRuntime(
+      source('src/main/codex/codex-hook-wsl-runtime.ts'),
+      '/codex-hook-trust-grant',
+      'grantManagedCodexHookTrust'
+    )
+  ).toBe(true)
+  expect(fixture.text).toContain('trustGrantInternals.setGrantSessionRunner(runner)')
+  expect(fixture.text).toContain('trustGrantInternals.setGrantSessionRunner(null)')
+  expect(fixture.text).not.toMatch(
+    /vi\.mock\(['"][^'"]*(?:codex-hook-trust-grant|codex-hook-wsl-runtime|secure-file)/
+  )
+  expect(NODE_RUNTIME_INCLUDE).toContain(owner)
+})
+
+it('keeps real ephemeral VM IPC recipe cancellation and secure persistence on Node', () => {
+  const owner = 'src/main/ipc/ephemeral-vm.test.ts'
+  const fixture = source(owner)
+  expect(callsImportedRuntime(fixture, '/ephemeral-vm', 'registerEphemeralVmHandlers')).toBe(true)
+  expect(
+    callsImportedRuntime(fixture, '/ephemeral-vm-runtime-store', 'upsertEphemeralVmRuntime')
+  ).toBe(true)
+  expect(
+    callsImportedRuntime(fixture, '/ephemeral-vm-native-test-fixture', 'drainNativeFixture')
+  ).toBe(true)
+  const memberCalls = new Set<string>()
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      ts.isIdentifier(node.expression.expression)
+    ) {
+      memberCalls.add(`${node.expression.expression.text}.${node.expression.name.text}`)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(fixture)
+  for (const name of ['actual.spawn', 'child.once', 'pendingChildren.add']) {
+    expect(memberCalls).toContain(name)
+  }
+  expect(fixture.text).toContain('await importOriginal<typeof ChildProcess>()')
+  expect(fixture.text).toContain("child.once('close', () => resolve())")
+  expect(fixture.text).toContain('return child')
+  expect(fixture.text.indexOf('await drainNativeFixture(pendingChildren)')).toBeLessThan(
+    fixture.text.indexOf('rmSync(dir, { recursive: true, force: true })')
+  )
+  const drain = source('src/main/ipc/ephemeral-vm-native-test-fixture.ts')
+  expect(drain.text).toContain(
+    'const restrictWindowsPath = windowsAcl.bestEffortRestrictWindowsPath'
+  )
+  expect(drain.text).toContain('restrictWindowsPath(targetPath, isDirectory, (restricted) =>')
+  expect(drain.text).toContain('onSettled?.(restricted)')
+  expect(drain.text).toContain('await Promise.all(pendingChildren)')
+  expect(drain.text).toContain('await Promise.all(pendingWindowsHardening)')
+  const processOwner = source('src/shared/ephemeral-vm-recipe-process.ts')
+  expect(callsImportedRuntime(processOwner, 'node:child_process', 'spawn')).toBe(true)
+  expect(
+    callsImportedRuntime(
+      processOwner,
+      '@orca/process-host/process-tree-kill-gate',
+      'admitProcessTreeKill'
+    )
+  ).toBe(true)
+  expect(processOwner.text).toContain('const spawnCommand = args.spawnCommand ?? spawn')
+  expect(NODE_RUNTIME_INCLUDE).toContain(owner)
+  expect(NODE_RUNTIME_INCLUDE).not.toContain('src/shared/ephemeral-vm-recipes.test.ts')
+  expect(NODE_RUNTIME_INCLUDE).not.toContain('src/shared/ephemeral-vm-recipe-checkout-mode.test.ts')
+})

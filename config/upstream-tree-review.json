@@ -9784,17 +9784,18 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "c754734cbce08aa0ef3efe9a11cc16e452a200dc"
+        "sha": "06168a5271372fbf86ab9da0fcf12e03cafbc9bb"
       },
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "c754734cbce08aa0ef3efe9a11cc16e452a200dc"
+        "sha": "06168a5271372fbf86ab9da0fcf12e03cafbc9bb"
       },
-      "reason": "Explicit product-boundary policy maintenance: preserve private Gitlink isolation and current patch normalization, remove only retired Relay asset scope, and update exact reviewed literal paths/hashes without weakening the global scan. Authorized policy maintenance is frozen in the product parent before source absorption; the product entry therefore binds that parent policy blob. Synchronize only .gitattributes protected normalized SHA256 after the independently approved five LF rules; preserve 776 paths, .gitignore and all other policy data.",
+      "reason": "Explicit product-boundary policy maintenance: preserve private Gitlink isolation and current patch normalization, remove only retired Relay asset scope, and update exact reviewed literal paths/hashes without weakening the global scan. Authorized policy maintenance is frozen in the product parent before source absorption; the product entry therefore binds that parent policy blob. Synchronize only .gitattributes protected normalized SHA256 after the independently approved five LF rules; preserve 776 paths, .gitignore and all other policy data. Register exactly 39 independently approved C6 HiveCode copy paths. Preserve all 776 existing entries, schema/literal and both E6 protected hashes; no scanner changes, patterns or exceptions. DIAG old attributes hash replaced only by immutable E6 preimage before drafting.",
       "regressionTests": [
         "config/scripts/check-hivecode-brand-boundary.test.mjs",
-        "config/scripts/verify-documentation-governance.test.mjs"
+        "config/scripts/verify-documentation-governance.test.mjs",
+        "pnpm run check:brand-boundary"
       ]
     },
     {
@@ -11287,7 +11288,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "f5b4b9d8770ad063ebf6a1e6c5babe8234dc8f41"
+        "sha": "13d3de43d3b37198a627c1c7d127a044cb3e9079"
       },
       "upstream": {
         "mode": "100644",
@@ -11295,9 +11296,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "f5b4b9d8770ad063ebf6a1e6c5babe8234dc8f41"
+        "sha": "13d3de43d3b37198a627c1c7d127a044cb3e9079"
       },
-      "reason": "Route exactly 12 real SQLite runtime consumers to Node for Bun orchestration; current AST import-contract test proves classification, no mocked DB replacement or pool weakening. Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime. Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes.",
+      "reason": "Route exactly 12 real SQLite runtime consumers to Node for Bun orchestration; current AST import-contract test proves classification, no mocked DB replacement or pool weakening. Follow the upstream 79% test-owner relocation to the actual SQLite other-profile workspace catalog and relocated pure process-host quoting test; retain literal include plus glob existence assertions and real Node runtime. Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes. Assign the nine independently reviewed native resource suites and 25 exact real Playwright browser/launcher owners to their Node host; preserve pure/mock neighboring Bun ownership. This runtime policy does not resolve the observed Windows WebKit SDK failures.",
       "regressionTests": [
         "cli-tooling-final-tests.log: 22 suites, 479 passed, 33 explicit platform skips",
         "cli-tooling-lint.log: 22 changed source/test files passed",
@@ -11306,7 +11307,8 @@
         "config/scripts/vitest-node-runtime-boundary.test.ts",
         "src/main/orca-profiles/other-profile-workspace-catalog.test.ts",
         "config/scripts/vitest-node-native-runtime-boundary.test.ts",
-        "config/scripts/vitest-node-runtime-pool.test.ts"
+        "config/scripts/vitest-node-runtime-pool.test.ts",
+        "config/scripts/vitest-playwright-runtime-boundary.test.ts"
       ]
     },
     {
@@ -14912,12 +14914,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "b0ca7f28a0fe0713e8486e8db28ddbba5b410a71"
+        "sha": "f360ade23141ecb1c3a4e035c705bbd32d0f34cb"
       },
-      "reason": "Adapt mocked process boundary to @orca/process-host and assert ProcessSpec directly; no actual app/login execution. Preserve argument, environment, permission, cleanup/signal, handoff and stdout redaction regressions; adapt product visible identity. Windows shim encoding belongs to existing package tests, CLI verifies unshelled spec delegation.",
+      "reason": "Adapt mocked process boundary to @orca/process-host and assert ProcessSpec directly; no actual app/login execution. Preserve argument, environment, permission, cleanup/signal, handoff and stdout redaction regressions; adapt product visible identity. Windows shim encoding belongs to existing package tests, CLI verifies unshelled spec delegation. Exact current HiveCode brand copy in saved-account reauthentication advice; all behavioral expectations remain.",
       "regressionTests": [
         "cli-spawn-tests-final.log: 2 suites / 54 passed / 4 existing platform skips",
-        "cli-spawn-lint-final.log: exit 0"
+        "cli-spawn-lint-final.log: exit 0",
+        "src/cli/handlers/account.test.ts"
       ]
     },
     {
@@ -33179,11 +33182,14 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "ed65bbf8fdac0254dc87195d3762622ff5e159d3"
+        "sha": "50821f1af9df4317245e649782eacee8faff22aa"
       },
-      "reason": "Test actual preserved product community skill command, without new upstream pinned installer algorithm; retain interaction/owner assertions.",
+      "reason": "Test actual preserved product community skill command, without new upstream pinned installer algorithm; retain interaction/owner assertions. Two stale installed-state add command expectations now require current owned update command for canonical orca-linear and legacy-only linear-tickets. Initial add/copy commands and all six cases retained; no production/setup/security/deadline edits or reference-only installer intake.",
       "regressionTests": [
-        "focused skill UI tests"
+        "focused skill UI tests",
+        "src/renderer/src/components/settings/linear-agent-skill-install-cta.test.tsx",
+        "src/renderer/src/lib/linear-agent-skill-update-command.test.ts",
+        "src/renderer/src/components/sidebar/LinearAgentSkillSetupPrompt.update-command.test.tsx"
       ]
     },
     {
@@ -44115,14 +44121,14 @@
       "base": null,
       "product": {
         "mode": "100644",
-        "sha": "52127bf37188b9c8c9dd6f99751193b77210ee3a"
+        "sha": "8d3df20e4060f1bdc28826cf8095dffbde9f8ba3"
       },
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "52127bf37188b9c8c9dd6f99751193b77210ee3a"
+        "sha": "8d3df20e4060f1bdc28826cf8095dffbde9f8ba3"
       },
-      "reason": "Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes.",
+      "reason": "Real application Node-host OS ACL/persistence/hook/managed-child integration fixtures belong to Node. OriginalfullBun RED and all52Node PASS plus actualclosure proof support exactowner selection; no assertion/deadline/safety/timeout changes. Append precise real native-resource owner AST regressions for nine reviewed Node-host suites; existing native boundary prefix and pure/mock neighboring Bun ownership remain unchanged. Root owns selector integration.",
       "regressionTests": [
         "config/scripts/vitest-node-runtime-boundary.test.ts",
         "config/scripts/vitest-node-native-runtime-boundary.test.ts",
@@ -45528,6 +45534,328 @@
         "mobile/src/terminal/terminal-webview-html/document-style.test.ts",
         "mobile/src/terminal/document/native-document-bundle.test.ts",
         "mobile/src/terminal/terminal-web-document-mount.test.ts"
+      ]
+    },
+    {
+      "path": "mobile/src/mobile-web-shell/bridge-terminal-output-backlog.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "72e03c21949d21e3bed842b5d5a77d054587fd0c"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "72e03c21949d21e3bed842b5d5a77d054587fd0c"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "f0eeea67341f077f9bfe898ba8418001ca6fa96a"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4127b85e542cd6e26f90cc0d8ddac2288437ffea"
+      },
+      "reason": "Replay decoded the complete cumulative 5 MiB transcript at every readOne call (quadratic payload parsing). Cache only already decoded immutable posted strings within this replay; decode newly posted strings lazily at the same page-read boundary with actual readBridgeHostMessage and the same refusal. Preserve real bridge/ACK timeline, all fifteen original cases, all original assertions, 5 MiB and original 5 second limit. No production or runtime-selector changes.",
+      "regressionTests": [
+        "mobile/src/mobile-web-shell/bridge-terminal-output-backlog.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/filesystem-test-harness.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "069f4c10d839450d0028a68f416c59158c6e53d2"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "069f4c10d839450d0028a68f416c59158c6e53d2"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e326ac21b065220c58d912a7820193ca9c892a49"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "1143a0a3ff800135202ee8eba8e86ac7f3d8b410"
+      },
+      "reason": "Unify normal registered main+feature fixture; remove redundant per-suite setup while retaining explicit missing-main refusal negatives. Branch stale-cache snapshot includes registered main without altering reject/invalidate/recover assertions.",
+      "regressionTests": [
+        "src/main/ipc/filesystem-branch-compare-diff.test.ts",
+        "src/main/ipc/filesystem-commit-message-generation.test.ts",
+        "src/main/ipc/filesystem-commit-message-model-discovery.test.ts",
+        "src/main/ipc/filesystem-conflict-operation-routing.test.ts",
+        "src/main/ipc/filesystem-download-transfers.test.ts",
+        "src/main/ipc/filesystem-git-commit-dispatch.test.ts",
+        "src/main/ipc/filesystem-git-status-staging.test.ts",
+        "src/main/ipc/filesystem-list-files-handler-name-filter.test.ts",
+        "src/main/ipc/filesystem-markdown-document-listing.test.ts",
+        "src/main/ipc/filesystem-pull-request-linked-issue-lifetime.test.ts",
+        "src/main/ipc/filesystem.test.ts",
+        "src/main/ipc/registered-worktree-root-graph-authority.test.ts",
+        "src/main/ipc/source-control-ai-linked-issue.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/filesystem-branch-compare-diff.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "bb0669ec6970ec99c5718e93acb4917d603d51c6"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "bb0669ec6970ec99c5718e93acb4917d603d51c6"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "86be671848bc87ed87cbb5c609f0251a190cc95a"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6b28a86d28c3696ca77d29c214b47b50a61572ca"
+      },
+      "reason": "Unify normal registered main+feature fixture; remove redundant per-suite setup while retaining explicit missing-main refusal negatives. Branch stale-cache snapshot includes registered main without altering reject/invalidate/recover assertions.",
+      "regressionTests": [
+        "src/main/ipc/filesystem-branch-compare-diff.test.ts",
+        "src/main/ipc/filesystem-commit-message-generation.test.ts",
+        "src/main/ipc/filesystem-commit-message-model-discovery.test.ts",
+        "src/main/ipc/filesystem-conflict-operation-routing.test.ts",
+        "src/main/ipc/filesystem-download-transfers.test.ts",
+        "src/main/ipc/filesystem-git-commit-dispatch.test.ts",
+        "src/main/ipc/filesystem-git-status-staging.test.ts",
+        "src/main/ipc/filesystem-list-files-handler-name-filter.test.ts",
+        "src/main/ipc/filesystem-markdown-document-listing.test.ts",
+        "src/main/ipc/filesystem-pull-request-linked-issue-lifetime.test.ts",
+        "src/main/ipc/filesystem.test.ts",
+        "src/main/ipc/registered-worktree-root-graph-authority.test.ts",
+        "src/main/ipc/source-control-ai-linked-issue.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/filesystem-pull-request-linked-issue-lifetime.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "6d62844dc0a57e5c4201b4cb35aef4c2f2c34208"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "6d62844dc0a57e5c4201b4cb35aef4c2f2c34208"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "0d36c3da18272d0d754390fdbb62cb42cff91589"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "057365fa07c955807a9a7325dfbb1755414f02ad"
+      },
+      "reason": "Unify normal registered main+feature fixture; remove redundant per-suite setup while retaining explicit missing-main refusal negatives. Branch stale-cache snapshot includes registered main without altering reject/invalidate/recover assertions.",
+      "regressionTests": [
+        "src/main/ipc/filesystem-branch-compare-diff.test.ts",
+        "src/main/ipc/filesystem-commit-message-generation.test.ts",
+        "src/main/ipc/filesystem-commit-message-model-discovery.test.ts",
+        "src/main/ipc/filesystem-conflict-operation-routing.test.ts",
+        "src/main/ipc/filesystem-download-transfers.test.ts",
+        "src/main/ipc/filesystem-git-commit-dispatch.test.ts",
+        "src/main/ipc/filesystem-git-status-staging.test.ts",
+        "src/main/ipc/filesystem-list-files-handler-name-filter.test.ts",
+        "src/main/ipc/filesystem-markdown-document-listing.test.ts",
+        "src/main/ipc/filesystem-pull-request-linked-issue-lifetime.test.ts",
+        "src/main/ipc/filesystem.test.ts",
+        "src/main/ipc/registered-worktree-root-graph-authority.test.ts",
+        "src/main/ipc/source-control-ai-linked-issue.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/filesystem-git-commit-dispatch.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "371a182c5060ab3f0a9a1b2c7576a52da2c80eb2"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "371a182c5060ab3f0a9a1b2c7576a52da2c80eb2"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "d09d8d96e006427f82b4209275f9c1037c9d395a"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "0ae5f53a13718e9ee04d214712e8373d9705c499"
+      },
+      "reason": "Unify normal registered main+feature fixture; remove redundant per-suite setup while retaining explicit missing-main refusal negatives. Branch stale-cache snapshot includes registered main without altering reject/invalidate/recover assertions.",
+      "regressionTests": [
+        "src/main/ipc/filesystem-branch-compare-diff.test.ts",
+        "src/main/ipc/filesystem-commit-message-generation.test.ts",
+        "src/main/ipc/filesystem-commit-message-model-discovery.test.ts",
+        "src/main/ipc/filesystem-conflict-operation-routing.test.ts",
+        "src/main/ipc/filesystem-download-transfers.test.ts",
+        "src/main/ipc/filesystem-git-commit-dispatch.test.ts",
+        "src/main/ipc/filesystem-git-status-staging.test.ts",
+        "src/main/ipc/filesystem-list-files-handler-name-filter.test.ts",
+        "src/main/ipc/filesystem-markdown-document-listing.test.ts",
+        "src/main/ipc/filesystem-pull-request-linked-issue-lifetime.test.ts",
+        "src/main/ipc/filesystem.test.ts",
+        "src/main/ipc/registered-worktree-root-graph-authority.test.ts",
+        "src/main/ipc/source-control-ai-linked-issue.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/filesystem-git-status-staging.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "b86a75b2314a105699873395ac55cbc0faa0daab"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "b86a75b2314a105699873395ac55cbc0faa0daab"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "dea7d29d00a389573d60ec9f688168596c956a3d"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3a8efb491aeb5c3e0f69066b431457b175128bd1"
+      },
+      "reason": "Unify normal registered main+feature fixture; remove redundant per-suite setup while retaining explicit missing-main refusal negatives. Branch stale-cache snapshot includes registered main without altering reject/invalidate/recover assertions.",
+      "regressionTests": [
+        "src/main/ipc/filesystem-branch-compare-diff.test.ts",
+        "src/main/ipc/filesystem-commit-message-generation.test.ts",
+        "src/main/ipc/filesystem-commit-message-model-discovery.test.ts",
+        "src/main/ipc/filesystem-conflict-operation-routing.test.ts",
+        "src/main/ipc/filesystem-download-transfers.test.ts",
+        "src/main/ipc/filesystem-git-commit-dispatch.test.ts",
+        "src/main/ipc/filesystem-git-status-staging.test.ts",
+        "src/main/ipc/filesystem-list-files-handler-name-filter.test.ts",
+        "src/main/ipc/filesystem-markdown-document-listing.test.ts",
+        "src/main/ipc/filesystem-pull-request-linked-issue-lifetime.test.ts",
+        "src/main/ipc/filesystem.test.ts",
+        "src/main/ipc/registered-worktree-root-graph-authority.test.ts",
+        "src/main/ipc/source-control-ai-linked-issue.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/created-worktree-root-prune.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "30808d7d79e63857ad09126a7a9306bbb6d4691b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "30808d7d79e63857ad09126a7a9306bbb6d4691b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "30808d7d79e63857ad09126a7a9306bbb6d4691b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "9ed61bdf4a6a69bd67caa6d2e20e1ce7d05a357b"
+      },
+      "reason": "Valid main-only graph makes original ENOENT/error/hung disk probes execute under current authority; added empty-graph refusal-to-prune without stat side effects.",
+      "regressionTests": [
+        "src/main/ipc/created-worktree-root-prune.test.ts"
+      ]
+    },
+    {
+      "path": "src/cli/runtime/launch-serve-runtime.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "9d1fc96802a314b31af4cfa0d818e931cb49fb5b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "9d1fc96802a314b31af4cfa0d818e931cb49fb5b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "a523b55d71332a6b1a8571688386564eb440ea8a"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "465c73f3fd8d3d567e3b92b6dac3d0b42cbc958c"
+      },
+      "reason": "Exact current HiveCode brand copy in supervised peer refusal; suppression and exit assertions unchanged.",
+      "regressionTests": [
+        "src/cli/runtime/launch-serve-runtime.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/pty/host-env/opencode-hook-installation.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "fe42ca5735c47439ae35c7dda7fdc0ddb2ec02aa"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "fe42ca5735c47439ae35c7dda7fdc0ddb2ec02aa"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "fe42ca5735c47439ae35c7dda7fdc0ddb2ec02aa"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "80bd920a2db433080401cb8f095ec1079c3ce3e9"
+      },
+      "reason": "Existing mock-based hook-env unit omitted WSL health monitor boundary and started real asynchronous WSL discovery. Both Bun EBUSY and Node EPERM occurred in fixture teardown, while first Bun run passed. Mock only monitor notification and assert both null-distro calls; retain all native plugin/overlay assertions. Exact underlying Windows lock handle not identified.",
+      "regressionTests": [
+        "src/main/ipc/pty/host-env/opencode-hook-installation.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/ephemeral-vm.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "4f71dde0f9f281e5970bb98d0a5ab1b47dba3637"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "dd917255d45ca5e29d137ecbacf3ea19e93ca09e"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "4f71dde0f9f281e5970bb98d0a5ab1b47dba3637"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2bcd29e97a320598408c78bf41c70e16df544bdd"
+      },
+      "reason": "Test fixture drains actual recipe/taskkill close and Windows ACL completion before existing directory removal; production bounded cancellation can precede child closure. No replacement process behavior, permission alteration, sleeps, retries or budget change.",
+      "regressionTests": [
+        "src/main/ipc/ephemeral-vm.test.ts"
+      ]
+    },
+    {
+      "path": "src/main/ipc/ephemeral-vm-native-test-fixture.ts",
+      "base": null,
+      "product": null,
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "350dfd3801f213321f1a59959acfd4369af89253"
+      },
+      "reason": "Test fixture drains actual recipe/taskkill close and Windows ACL completion before existing directory removal; production bounded cancellation can precede child closure. No replacement process behavior, permission alteration, sleeps, retries or budget change.",
+      "regressionTests": [
+        "src/main/ipc/ephemeral-vm.test.ts"
+      ]
+    },
+    {
+      "path": "config/scripts/vitest-playwright-runtime-boundary.test.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "99cd666151389b09cd066712ecde0e3f1ea6aadb"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "99cd666151389b09cd066712ecde0e3f1ea6aadb"
+      },
+      "reason": "Lock exact real Playwright browser/launcher Node ownership and exclusion of pure neighboring contracts without widening a whole directory, changing browser expectations, or relaxing budgets.",
+      "regressionTests": [
+        "config/scripts/vitest-playwright-runtime-boundary.test.ts",
+        "config/scripts/vitest-node-runtime-boundary.test.ts"
       ]
     }
   ],
