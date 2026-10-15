@@ -64,7 +64,9 @@ afterEach(async () => {
 
 describe.skipIf(skip)('packaged orcad stop request', () => {
   it(`stops cleanly within ${ORCAD_SHUTDOWN_DEADLINE_MS} ms of its slot's stop-request file`, async () => {
-    root = realpathSync(mkdtempSync(join(tmpdir(), 'orcad-stop-request-')))
+    root = realpathSync(
+      mkdtempSync(join(process.platform === 'win32' ? tmpdir() : '/tmp', 'orcad-stop-request-'))
+    )
     const { slotDir, runtime } = installPackagedOrcadSlotForTests(root, pinnedNode!)
     const userData = join(root, 'data')
     const launchedAt = Date.now()
