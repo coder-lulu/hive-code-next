@@ -314,6 +314,20 @@ jobs:
       - name: Install separate mobile workspace dependencies
         run: pnpm --dir mobile install --frozen-lockfile --ignore-scripts
 
+      - name: Generate mobile test and typecheck assets
+        working-directory: mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/build-terminal-webview-engine.mjs
+          node scripts/build-mermaid-webview-engine.mjs
+          node scripts/build-mermaid-page-engine.mjs
+          node scripts/build-terminal-document-script.mjs
+          node scripts/build-rich-markdown-editor-script.mjs
+
+      - name: Prepare pinned cross-version baseline objects
+        run: node config/scripts/prepare-cross-version-baselines.mjs
+
       - name: Resolve Chrome for actual mobile render checks
         shell: bash
         run: |

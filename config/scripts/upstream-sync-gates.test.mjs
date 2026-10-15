@@ -397,6 +397,43 @@ describe('verification runtime prerequisites', () => {
     expect(job.steps.indexOf(dependency)).toBeLessThan(execute)
     expect(job.steps.indexOf(bun)).toBeLessThan(execute)
   })
+  it('prepares mobile assets and pinned baseline objects before common verification', () => {
+    const steps = jobs.gates.steps
+    const install = steps.findIndex(
+      (step) => step.run === 'pnpm --dir mobile install --frozen-lockfile --ignore-scripts'
+    )
+    const generate = steps.findIndex(
+      (step) => step.name === 'Generate mobile test and typecheck assets'
+    )
+    const baseline = steps.findIndex(
+      (step) => step.run === 'node config/scripts/prepare-cross-version-baselines.mjs'
+    )
+    const execute = steps.findIndex((step) => step.name === 'Run common product verification once')
+    expect(install).toBeGreaterThan(-1)
+    expect(generate).toBeGreaterThan(install)
+    expect(baseline).toBeGreaterThan(generate)
+    expect(baseline).toBeLessThan(execute)
+    expect(steps[generate]['working-directory']).toBe('mobile')
+    expect(steps[generate].shell).toBe('bash')
+    const postinstall = JSON.parse(readFileSync(join(projectDir, 'mobile/package.json'), 'utf8'))
+      .scripts.postinstall
+    expect(steps[generate].run.trim().split('\n')).toEqual([
+      'set -euo pipefail',
+      ...postinstall.split(' && ')
+    ])
+    for (const index of [generate, baseline]) {
+      expect(steps[index].if).toBeUndefined()
+      expect(steps[index]['continue-on-error']).toBeUndefined()
+      expect(steps[index].background).toBeUndefined()
+    }
+    expect(
+      jobs.publish.steps.some(
+        (step) =>
+          step.run?.includes('prepare-cross-version-baselines') ||
+          step.run?.includes('build-terminal-webview-engine')
+      )
+    ).toBe(false)
+  })
   it('requires actual browser resources before the common product checks', () => {
     const steps = jobs.gates.steps
     const execute = steps.findIndex((step) => step.name === 'Run common product verification once')
