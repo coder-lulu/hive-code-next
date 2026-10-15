@@ -10,7 +10,7 @@ import { buildWorktreeCardPresentation } from './worktree-card-presentation'
 import type { WorktreeCardController } from './use-worktree-card-controller'
 import { useProjectTree, ProjectWorkspaceDisclosureContext } from './project-tree-context'
 import { useWorktreeAgentExpansionState } from './worktree-card-agents-expansion-state'
-import { useWorktreeAgentRows } from './useWorktreeAgentRows'
+import { useWorktreeSessionRows } from './useWorktreeSessionRows'
 import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 
 export function WorktreeCardSurface({ card }: { card: WorktreeCardController }): React.JSX.Element {
@@ -19,7 +19,7 @@ export function WorktreeCardSurface({ card }: { card: WorktreeCardController }):
     projectTree ? getWorktreeHostIdentity(card.worktree) : card.worktree.id,
     projectTree && card.isActive
   )
-  const agents = useWorktreeAgentRows(card.worktree.id, projectTree)
+  const agents = useWorktreeSessionRows(card.worktree.id, projectTree)
   const disclosure = React.useMemo(
     () => (projectTree ? { agents, expansion } : null),
     [projectTree, agents, expansion]
