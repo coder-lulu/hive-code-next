@@ -141,7 +141,7 @@ import {
   projectMobileTaskSearchView,
   type MobileTaskExecutionGroupFilter as ExecutionGroupFilter
 } from '../../../src/tasks/mobile-task-execution-view'
-import { resolveMobileTaskRuntimeState } from '../../../src/tasks/mobile-task-runtime-state'
+import { useMobileTaskRuntimeState } from '../../../src/tasks/use-mobile-task-runtime-state'
 import {
   groupRows,
   isIterationCurrent,
@@ -2407,7 +2407,7 @@ function MobileTasksScreen() {
   const activeTaskUiReady = isRuntimeTaskView
     ? client != null && connState === 'connected'
     : taskUiReady
-  const taskRuntimeState = resolveMobileTaskRuntimeState({
+  const taskRuntimeState = useMobileTaskRuntimeState(hostId, {
     connectionState: connState,
     tasksSupported,
     tasksUnsupported

@@ -32,19 +32,34 @@ export function MobileTaskRuntimeGate(props: {
     )
   }
 
-  const authenticationFailed = props.state === 'auth-failed'
+  const messages = {
+    'auth-failed': {
+      title: 'Runtime 连接验证失败',
+      description: '任务状态不可验证。请先重试连接，若仍失败，请检查登录状态或重新配对这台电脑。'
+    },
+    offline: {
+      title: 'Runtime 当前离线',
+      description: '任务状态不可验证。请确认电脑上的 HiveCode 正在运行，再重试连接。'
+    },
+    disconnected: {
+      title: '尚未连接 Runtime',
+      description: '任务状态不可验证。请重试连接，连接成功后即可继续。'
+    },
+    unavailable: {
+      title: 'Runtime 连接暂不可用',
+      description: '任务状态不可验证。请检查电脑上的 HiveCode 连接状态，稍后重试。'
+    }
+  }[props.state]
   return (
     <View style={styles.centered}>
       <View style={styles.emptyIcon}>
         <ListTodo color={theme.color.text.secondary} size={32} strokeWidth={1.7} />
       </View>
       <Text maxFontSizeMultiplier={1.3} style={styles.emptyTitle}>
-        {authenticationFailed ? 'Runtime 配对已失效' : 'Runtime 当前离线'}
+        {messages.title}
       </Text>
       <Text maxFontSizeMultiplier={1.3} style={styles.emptyDescription}>
-        {authenticationFailed
-          ? '任务状态不可验证。请先重试连接，若仍失败，请重新配对这台电脑。'
-          : '任务状态不可验证。Runtime 恢复在线后即可继续。'}
+        {messages.description}
       </Text>
       {props.onRetry ? (
         <Pressable
