@@ -1,3 +1,4 @@
+import { blobBytes } from './upstream-recording-raw.mjs'
 import { verifyRecordingCorpus } from './upstream-recording-corpus.mjs'
 import { recordingInputEvidence } from './upstream-recording-inputs.mjs'
 import assert from 'node:assert/strict'
@@ -78,6 +79,24 @@ test('projection uses Git raw identity; a CRLF checkout cannot change it', () =>
   assert.deepEqual(recordingProjection(f.root, f.tree), before)
   assert.throws(() => assertRecordingFixture(f.root, before), /bytes/)
 })
+test('raw Git projections preserve repository paths from nested recording fixtures', () => {
+  const f = fixture()
+  const nested = join(f.root, 'logs/raw-fixture')
+  mkdirSync(nested, { recursive: true })
+  assert.deepEqual(recordingProjection(nested, f.tree), recordingProjection(f.root, f.tree))
+})
+
+test('empty blob batches do not invoke Git or authorize missing recording inputs', () => {
+  assert.deepEqual(blobBytes(join(scratch, 'does-not-exist'), []), new Map())
+  const f = fixture()
+  const empty = f.git('hash-object', '-t', 'tree', '--stdin')
+  assert.throws(() => recordingProjection(f.root, empty), /Empty guarded/)
+  assert.throws(
+    () => recordingControlProjection(f.root, empty),
+    /Missing or non-regular recording control/
+  )
+})
+
 test('raw fixture rejects binary normalization, extra and deleted guarded paths', () => {
   const f = fixture()
   const projection = recordingProjection(f.root, f.tree)
@@ -493,6 +512,7 @@ test('published raw controls reject self-hashed projections, missing modules and
   const projection = recordingControlProjection(f.root, control)
   const output = join(f.root, 'logs/raw-controls')
   exportRecordingControls(f.root, control, projection, output)
+  assert.deepEqual(recordingControlProjection(output, control), projection)
   assertRecordingControls(output, control, projection, f.root)
   const forged = structuredClone(projection)
   forged.entries[0].blob = 'a'.repeat(40)

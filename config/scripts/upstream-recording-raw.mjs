@@ -57,7 +57,7 @@ export function guardedPath(path) {
 }
 export function treeEntries(cwd, tree) {
   requireValue(SHA.test(tree), 'Projection requires an exact Git object SHA')
-  const raw = git(cwd, ['ls-tree', '-r', '-z', tree])
+  const raw = git(cwd, ['ls-tree', '--full-tree', '-r', '-z', tree])
   const entries = []
   let offset = 0
   while (offset < raw.length) {
@@ -110,6 +110,9 @@ function projectionDigest(entries) {
 }
 export function blobBytes(cwd, identities) {
   const blobs = [...new Set(identities)]
+  if (blobs.length === 0) {
+    return new Map()
+  }
   const raw = git(cwd, ['cat-file', '--batch'], `${blobs.join('\n')}\n`)
   const bytes = new Map()
   let offset = 0
