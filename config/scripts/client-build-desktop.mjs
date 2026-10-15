@@ -193,15 +193,7 @@ export async function buildDesktop(context, name, online) {
     '--runtime=electron'
   ])
   await pnpmStep(context, 'desktop-compile', ['run', 'build:desktop'])
-  if (target.host === 'darwin') {
-    for (const script of [
-      'build:computer-macos',
-      'build:keyboard-layout-macos',
-      'build:notification-status-macos'
-    ]) {
-      await pnpmStep(context, script.replaceAll(':', '-'), ['run', script])
-    }
-  }
+  await pnpmStep(context, 'desktop-native-tools', ['run', 'build:native'])
   const source = join(context.root, 'node_modules/electron/dist')
   if (readFileSync(join(source, 'version'), 'utf8').trim() !== context.toolchain.electron) {
     throw new Error('Installed Electron binary version differs')

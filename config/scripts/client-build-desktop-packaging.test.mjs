@@ -103,6 +103,7 @@ beforeEach(() => {
   failDirectory = false
   changeMarker = undefined
   vi.clearAllMocks()
+  execution.pnpmStep.mockResolvedValue(undefined)
   execution.nodeStep.mockImplementation(async (receivedContext, label, script, args) => {
     calls.push({ context: receivedContext, label, script, args, env: { ...receivedContext.env } })
     if (script === builder && args.includes('--linux') && !args.includes('--prepackaged')) {
@@ -234,15 +235,45 @@ describe('formal desktop packaging execution', () => {
       expect(calls.map(({ label }) => label)).toEqual(['desktop-native', 'desktop-package'])
       expect(execution.pnpmStep.mock.calls.map(([, label]) => label)).toEqual([
         'desktop-compile',
-        ...(name.startsWith('macos')
-          ? [
-              'build-computer-macos',
-              'build-keyboard-layout-macos',
-              'build-notification-status-macos'
-            ]
-          : [])
+        'desktop-native-tools'
       ])
       expect(execution.step).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each([true, false])('prepares native tools before packaging (online=%s)', async (online) => {
+    if (online) {
+      delete context.env.npm_config_offline
+    }
+    await buildDesktop(context, 'windows-x64', online)
+    expect(execution.pnpmStep.mock.calls).toEqual([
+      [context, 'desktop-compile', ['run', 'build:desktop']],
+      [context, 'desktop-native-tools', ['run', 'build:native']]
+    ])
+    const [compileOrder, nativeOrder] = execution.pnpmStep.mock.invocationCallOrder
+    const packageIndex = execution.nodeStep.mock.calls.findIndex(
+      ([, label]) => label === 'desktop-package'
+    )
+    expect(packageIndex).toBeGreaterThanOrEqual(0)
+    expect(nativeOrder).toBeGreaterThan(compileOrder)
+    expect(execution.nodeStep.mock.invocationCallOrder[packageIndex]).toBeGreaterThan(nativeOrder)
+    expect(context.env.NODE_OPTIONS).toBe('--require=owned-offline-guard.cjs')
+    expect(context.env.npm_config_offline).toBe(online ? undefined : 'true')
+  })
+
+  it.each([true, false])(
+    'stops before packaging when native tools fail (online=%s)',
+    async (online) => {
+      const failure = new Error('native agent hook compilation failed')
+      execution.pnpmStep.mockImplementation(async (_context, label) => {
+        if (label === 'desktop-native-tools') {
+          throw failure
+        }
+      })
+      await expect(buildDesktop(context, 'windows-x64', online)).rejects.toBe(failure)
+      expect(calls.map(({ label }) => label)).toEqual(['desktop-native'])
+      expect(execution.step).not.toHaveBeenCalled()
+      expect(existsSync(join(context.work, 'windows-x64', 'electron'))).toBe(false)
     }
   )
 
