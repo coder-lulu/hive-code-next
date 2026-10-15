@@ -1,28 +1,50 @@
 import { useAppStore } from '@/store'
 import type { AppState } from '@/store/types'
 import { isTerminalLeafId, makePaneKey } from '../../../../shared/stable-pane-id'
+import { structuredAgentSessionPaneKey } from '../../../../shared/structured-agent-session-projection'
+import {
+  getWorktreeIdFromHostIdentity,
+  isWorktreeHostIdentity
+} from '../../../../shared/worktree/host-qualified-identity'
+import { getSidebarActiveSessionTarget } from './sidebar-session-active-target'
 
 export type FocusedAgentRowHighlightState = Pick<
   AppState,
+  | 'activeView'
   | 'activeWorktreeId'
   | 'activeTabType'
   | 'activeTabId'
   | 'tabsByWorktree'
   | 'terminalLayoutsByTabId'
-  | 'agentStatusByPaneKey'
-  | 'retainedAgentsByPaneKey'
-  | 'migrationUnsupportedByPtyId'
+  | 'activeGroupIdByWorktree'
+  | 'groupsByWorktree'
+  | 'unifiedTabsByWorktree'
 >
 
 export function getFocusedAgentPaneKeyForWorktree(
   state: FocusedAgentRowHighlightState,
   worktreeId: string
 ): string | null {
-  if (state.activeWorktreeId !== worktreeId || state.activeTabType !== 'terminal') {
+  const target = getSidebarActiveSessionTarget(state)
+  if (!target || target.ownerBucketKey !== worktreeId) {
     return null
   }
 
-  const activeTabId = state.activeTabId
+  if (state.activeTabType === 'agent-session') {
+    const rawWorktreeId = isWorktreeHostIdentity(worktreeId)
+      ? getWorktreeIdFromHostIdentity(worktreeId)
+      : worktreeId
+    const tab = (state.unifiedTabsByWorktree[worktreeId] ?? []).find(
+      (candidate) =>
+        candidate.id === target.unifiedTabId &&
+        candidate.contentType === 'agent-session' &&
+        (candidate.worktreeId === worktreeId || candidate.worktreeId === rawWorktreeId) &&
+        candidate.groupId === state.activeGroupIdByWorktree[worktreeId]
+    )
+    return tab ? structuredAgentSessionPaneKey(tab.id, tab.entityId) : null
+  }
+
+  const activeTabId = target.terminalTabId
   if (!activeTabId) {
     return null
   }
@@ -39,23 +61,7 @@ export function getFocusedAgentPaneKeyForWorktree(
     return null
   }
 
-  const activePaneKey = makePaneKey(activeTabId, activeLeafId)
-  // Why: the inline card lists every agent attributed to this worktree, even
-  // after its status decays to idle. Highlight whichever displayed row matches
-  // the focused pane — gating on freshness left clicked-into stale rows with no
-  // selection coloring.
-  if (state.agentStatusByPaneKey[activePaneKey]) {
-    return activePaneKey
-  }
-
-  if (state.retainedAgentsByPaneKey[activePaneKey]?.worktreeId === worktreeId) {
-    return activePaneKey
-  }
-
-  const hasMigrationUnsupportedRow = Object.values(state.migrationUnsupportedByPtyId).some(
-    (entry) => entry.paneKey === activePaneKey
-  )
-  return hasMigrationUnsupportedRow ? activePaneKey : null
+  return makePaneKey(activeTabId, activeLeafId)
 }
 
 export function useFocusedAgentPaneKey(worktreeId: string): string | null {
