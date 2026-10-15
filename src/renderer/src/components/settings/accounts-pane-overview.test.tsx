@@ -7,9 +7,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import type { AccountsPaneSectionModel } from './accounts-pane-types'
 
-vi.mock('./accounts-pane-official-service', () => ({
-  AccountsOfficialService: () => <section>Official service</section>
-}))
 vi.mock('./GrokAccountsSection', () => ({
   GrokAccountsSection: () => <div>Grok</div>
 }))

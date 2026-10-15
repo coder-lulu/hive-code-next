@@ -59,10 +59,11 @@ describe('AccountsPane', () => {
     expect(markup).toContain('role="radio" aria-checked="true" aria-disabled="true"')
   })
 
-  it('renders the designed official, CLI, and credential groups', () => {
+  it('renders CLI and credential groups without an official service', () => {
     const markup = renderPane(getDefaultSettings('/tmp'))
 
-    expect(markup).toContain('Official service')
+    expect(markup).not.toContain('accounts-official-service-title')
+    expect(markup).not.toContain('Official service')
     expect(markup).toContain('CLI accounts')
     expect(markup).toContain('Credentials &amp; usage')
     expect(markup).toContain('Claude')

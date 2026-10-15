@@ -118,10 +118,6 @@ afterEach(() => {
   Reflect.deleteProperty(window, 'api')
 })
 
-vi.mock('./accounts-pane-official-service', () => ({
-  AccountsOfficialService: () => <div>Hive account</div>
-}))
-
 it.each([false, true])(
   'preserves overview nodes and provider reads across search with Windows support %s',
   async (wslSupportedPlatform) => {

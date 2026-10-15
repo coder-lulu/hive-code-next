@@ -11,7 +11,6 @@ import {
   WSL_DEFAULT_DISTRO_KEY
 } from './provider-account-visibility'
 import type { AccountsPaneSectionModel, ProviderRosterLoadState } from './accounts-pane-types'
-import { AccountsOfficialService } from './accounts-pane-official-service'
 import { AccountsHostOwnedSections } from './accounts-host-owned-sections'
 import {
   AccountsProviderSheet,
@@ -295,7 +294,6 @@ export function AccountsPaneOverview({
 }): React.JSX.Element {
   return (
     <div className="mx-auto max-w-[1040px] space-y-7">
-      <AccountsOfficialService />
       <section aria-labelledby="accounts-cli-title" className="space-y-3">
         <div className="accounts-cli-heading flex flex-wrap items-end justify-between gap-4">
           <div>
