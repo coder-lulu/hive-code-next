@@ -6,7 +6,7 @@
  * server notices the file, shuts down cleanly (exit 0, lock released) before the 15 s
  * deadline, and published an instance lock carrying a real process start time.
  */
-import { existsSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -64,7 +64,7 @@ afterEach(async () => {
 
 describe.skipIf(skip)('packaged orcad stop request', () => {
   it(`stops cleanly within ${ORCAD_SHUTDOWN_DEADLINE_MS} ms of its slot's stop-request file`, async () => {
-    root = mkdtempSync(join(tmpdir(), 'orcad-stop-request-'))
+    root = realpathSync(mkdtempSync(join(tmpdir(), 'orcad-stop-request-')))
     const { slotDir, runtime } = installPackagedOrcadSlotForTests(root, pinnedNode!)
     const userData = join(root, 'data')
     const launchedAt = Date.now()

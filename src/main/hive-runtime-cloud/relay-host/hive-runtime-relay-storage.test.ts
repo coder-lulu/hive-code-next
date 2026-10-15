@@ -1,4 +1,12 @@
-import { mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import {
+  mkdtempSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
@@ -13,7 +21,7 @@ afterEach(() => {
   }
 })
 function directory() {
-  const root = mkdtempSync(join(tmpdir(), 'hive-relay-storage-'))
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'hive-relay-storage-')))
   roots.push(root)
   return root
 }

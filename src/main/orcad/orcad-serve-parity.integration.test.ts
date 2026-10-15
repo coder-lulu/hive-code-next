@@ -52,7 +52,7 @@ function serveEnv(userData: string): NodeJS.ProcessEnv {
 }
 
 function profile(): string {
-  const root = mkdtempSync(join(tmpdir(), 'orcad-serve-parity-'))
+  const root = realpathSync(mkdtempSync(join(tmpdir(), 'orcad-serve-parity-')))
   roots.push(root)
   return root
 }
