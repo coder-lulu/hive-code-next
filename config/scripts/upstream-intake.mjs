@@ -172,7 +172,7 @@ function disposition(commit, entry, context) {
   }
 }
 
-function dependencyClosure(commits, headCommits, reviewedShas) {
+function dependencyClosure(commits, headCommits, reviewedShas, treeAbsorbed) {
   const accepted = new Set([...headCommits, ...reviewedShas])
   for (const row of commits) {
     if (row.disposition === 'absorbed' || row.disposition === 'equivalent') {
@@ -183,7 +183,10 @@ function dependencyClosure(commits, headCommits, reviewedShas) {
   }
   const missing = (row) => [
     ...new Set([
-      ...row.parents.filter((sha) => !headCommits.has(sha) && !accepted.has(sha)),
+      // Verified snapshot parents prove content presence, not semantic acceptance.
+      ...row.parents.filter(
+        (sha) => !headCommits.has(sha) && !treeAbsorbed.has(sha) && !accepted.has(sha)
+      ),
       ...row.declaredDependencies.filter((sha) => !accepted.has(sha))
     ])
   ]
@@ -191,7 +194,7 @@ function dependencyClosure(commits, headCommits, reviewedShas) {
   const rejected = new Set()
   for (const row of commits) {
     for (const dependency of [
-      ...row.parents.filter((sha) => !headCommits.has(sha)),
+      ...row.parents.filter((sha) => !headCommits.has(sha) && !treeAbsorbed.has(sha)),
       ...row.declaredDependencies
     ]) {
       if (!dependants.has(dependency)) {
@@ -319,7 +322,7 @@ export async function collectIntakeReport({
           })
     return { ...row, ...decision }
   })
-  dependencyClosure(commits, headCommits, range.reviewedShas)
+  dependencyClosure(commits, headCommits, range.reviewedShas, treeAbsorbed)
   const blockers = []
   for (const row of commits) {
     if (row.disposition === 'unresolved') {

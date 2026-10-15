@@ -4,6 +4,11 @@ import os from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { collectIntakeReport } from './upstream-intake.mjs'
+import {
+  prepareUpstreamTreeSync,
+  verifyUpstreamTreeSync,
+  TREE_SYNC_RECEIPT_PATH
+} from './upstream-tree-sync.mjs'
 import { collectUpstreamChanges } from './track-upstream-changes.mjs'
 import {
   createGit,
@@ -385,3 +390,161 @@ describe('upstream inclusion and product-owned audit cursor', { timeout: 60000 }
     expect(readFileSync(path.join(f.cwd, STATE_PATH), 'utf8')).toBe(before)
   })
 })
+
+// A public snapshot has no upstream ancestry: only the original tree verifier can prove content.
+function treeIntakeFixture(dependency = 'none') {
+  const directory = path.resolve('logs/upstream-intake/tree-dependency-fixtures')
+  mkdirSync(directory, { recursive: true })
+  const cwd = mkdtempSync(path.join(directory, 'case-'))
+  repos.push(cwd)
+  const raw = createGit(cwd)
+  const git = (args) => raw(args).trim()
+  const write = (file, value) => {
+    mkdirSync(path.dirname(path.join(cwd, file)), { recursive: true })
+    writeFileSync(path.join(cwd, file), typeof value === 'string' ? value : JSON.stringify(value))
+  }
+  const commit = (message) => {
+    git(['add', '.'])
+    git(['commit', '-m', message])
+    return git(['rev-parse', 'HEAD'])
+  }
+  git(['init', '-b', 'upstream'])
+  git(['config', 'user.name', 'Intake Tree Test'])
+  git(['config', 'user.email', 'intake-tree@example.test'])
+  git(['config', 'commit.gpgSign', 'false'])
+  git(['config', 'core.autocrlf', 'false'])
+  write('.gitignore', 'logs/\n')
+  write('engine.txt', 'base\n')
+  const base = commit('Base upstream')
+  write('optional.txt', 'optional content\n')
+  const feature = commit('Add optional server feature')
+  write('engine.txt', 'corrected\n')
+  const fix = commit('Fix unrelated engine behavior')
+  write('later.txt', 'corrected independently\n')
+  const upstream = commit('Fix later independent behavior')
+  git(['checkout', '-b', 'hivecode/main-next', base])
+  const missing = 'f'.repeat(40)
+  const entry = {
+    upstreamSha: feature,
+    type: '新功能',
+    applied: '暂缓',
+    boundaryConflict: 'wire-contract',
+    dependencies: [],
+    reviewReason: 'Optional server delegation requires a separate authenticated product route',
+    regressionTests: ['server-delegation-refusal.test.ts']
+  }
+  write('config/upstream-change-ledger.json', {
+    schemaVersion: 1,
+    entries: [
+      entry,
+      {
+        upstreamSha: fix,
+        type: 'BUG',
+        applied: '已移植',
+        dependencies:
+          dependency === 'feature' ? [feature] : dependency === 'missing' ? [missing] : [],
+        reviewReason: 'Preserve the independent engine correction',
+        regressionTests: ['engine.test.ts']
+      }
+    ]
+  })
+  write(STATE_PATH, {
+    schemaVersion: 1,
+    upstream: 'stablyai/orca',
+    targetBranch: 'hivecode/main-next',
+    initialAuditCompleted: true,
+    lastReviewedUpstreamSha: base,
+    pendingShas: []
+  })
+  const source = commit('Archived product preparation')
+  write('config/open-source-baseline.json', {
+    schemaVersion: 1,
+    kind: 'public-tree-baseline',
+    archiveRepository: 'https://github.com/coder-lulu/hive-code-next-history',
+    sourceCommit: source,
+    sourceTree: git(['rev-parse', `${source}^{tree}`]),
+    ledgerBlob: git(['rev-parse', `${source}:config/upstream-change-ledger.json`]),
+    reviewedUpstreamSha: base,
+    pendingShas: [],
+    preservedProductCommits: [source]
+  })
+  write(
+    '.gitmodules',
+    '[submodule "docs"]\n\tpath = docs\n\turl = https://example.test/private-docs.git\n'
+  )
+  git(['add', '.'])
+  mkdirSync(path.join(cwd, 'docs'), { recursive: true })
+  git(['update-index', '--add', '--cacheinfo', `160000,${source},docs`])
+  const target = git(['commit-tree', git(['write-tree']), '-m', 'Independent public baseline'])
+  git(['update-ref', 'refs/heads/hivecode/main-next', target])
+  const options = { cwd, target, upstream }
+  const audit = () => collectIntakeReport({ cwd, upstream, stateRef: target })
+  const prepare = () => {
+    prepareUpstreamTreeSync(options)
+    const head = commit('Exact original content absorption')
+    expect(verifyUpstreamTreeSync({ ...options, head }).absorbedUpstreamShas).toEqual([
+      feature,
+      fix,
+      upstream
+    ])
+    return head
+  }
+  return { cwd, git, write, commit, target, upstream, feature, fix, missing, audit, prepare }
+}
+
+describe(
+  'verified snapshot content parents versus declared semantic dependencies',
+  { timeout: 60000 },
+  () => {
+    it('accepts unrelated fixes after a deferred feature and carries its pending decision in the checkpoint', async () => {
+      const f = treeIntakeFixture()
+      f.prepare()
+      const report = await f.audit()
+      expect(report).toMatchObject({ passed: true, pendingShas: [f.feature] })
+      expect(report.commits.find((row) => row.sha === f.feature).disposition).toBe('deferred')
+      for (const sha of [f.fix, f.upstream]) {
+        expect(report.commits.find((row) => row.sha === sha)).toMatchObject({
+          disposition: 'absorbed',
+          unresolvedDependencies: [],
+          evidence: { kind: 'verified-tree-absorption' }
+        })
+      }
+      writeCheckpoint(report, f.cwd)
+      expect(JSON.parse(readFileSync(path.join(f.cwd, STATE_PATH), 'utf8'))).toMatchObject({
+        lastReviewedUpstreamSha: f.upstream,
+        pendingShas: [f.feature]
+      })
+    })
+    it.each(['feature', 'missing'])(
+      'rejects an explicit %s dependency despite verified tree content',
+      async (dependency) => {
+        const f = treeIntakeFixture(dependency)
+        f.prepare()
+        const before = readFileSync(path.join(f.cwd, STATE_PATH), 'utf8')
+        const report = await f.audit()
+        expect(report.passed).toBe(false)
+        expect(report.blockers).toContainEqual(
+          expect.objectContaining({
+            sha: f.fix,
+            code: 'dependency-closure',
+            dependencies: [dependency === 'feature' ? f.feature : f.missing]
+          })
+        )
+        expect(report.commits.find((row) => row.sha === f.upstream).unresolvedDependencies).toEqual(
+          []
+        )
+        expect(() => writeCheckpoint(report, f.cwd)).toThrow('Refusing to advance')
+        expect(readFileSync(path.join(f.cwd, STATE_PATH), 'utf8')).toBe(before)
+      }
+    )
+    it('does not infer snapshot content from a missing or forged receipt', async () => {
+      const f = treeIntakeFixture()
+      await expect(f.audit()).rejects.toThrow('Candidate is missing the content absorption commit')
+      f.prepare()
+      const receipt = JSON.parse(readFileSync(path.join(f.cwd, TREE_SYNC_RECEIPT_PATH), 'utf8'))
+      f.write(TREE_SYNC_RECEIPT_PATH, { ...receipt, targetSha: f.upstream })
+      f.commit('Tamper with content receipt')
+      await expect(f.audit()).rejects.toThrow()
+    })
+  }
+)
