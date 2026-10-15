@@ -33,6 +33,7 @@ import type { OrcaRuntimeRpcServer } from '../runtime/runtime-rpc'
 import { mainProcessState as state } from './main-process-state'
 import {
   getHiveRuntimeRelayStatus,
+  getHiveRuntimeRelayError,
   installHiveRuntimeRelay,
   stopHiveRuntimeRelay
 } from './main-process-hive-runtime-relay'
@@ -99,6 +100,7 @@ export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): 
     getBootId: () => processRuntimeCloudPresence.getBootId(),
     getCurrentLeaseContext: () => processRuntimeCloudPresence.getCurrentLeaseContext(),
     getRelayStatus: getHiveRuntimeRelayStatus,
+    getRelayError: getHiveRuntimeRelayError,
     onRegistrationChanged: () => processRuntimeCloudPresence.notifyRegistrationChanged(),
     dependencies: serviceOwnedRuntimeCloudStorage
       ? { ...defaultLocalRuntimeOwnershipDependencies, ...serviceOwnedRuntimeCloudStorage }

@@ -51,6 +51,26 @@ describe('runtime CLI handlers', () => {
     expect(log).toHaveBeenCalledWith(expect.stringContaining(runtimeRecordId))
   })
 
+  it('prints the safe Relay rejection reason alongside truthful presence', async () => {
+    call.mockResolvedValue(
+      success({
+        ownership: 'CLAIMED',
+        presence: 'ONLINE',
+        runtimeRecordId,
+        relay: 'connecting',
+        relayError: { code: 'STALE_BINDING', httpStatus: 409 }
+      })
+    )
+
+    await RUNTIME_HANDLERS['runtime status'](context())
+
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('presence: ONLINE'))
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('relay: connecting'))
+    expect(log).toHaveBeenCalledWith(
+      expect.stringContaining('relayError: STALE_BINDING (HTTP 409)')
+    )
+  })
+
   it('shows the device code and waits for a claimed result by default', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(1_000)

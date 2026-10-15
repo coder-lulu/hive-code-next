@@ -15,6 +15,7 @@ type BrokerMock = Pick<
   'start' | 'stop' | 'isCurrent' | 'notifyContextChanged' | 'reconnect'
 > & {
   activeAssignment: HiveRuntimeRelayAssignment | null
+  lastError: HiveRuntimeRelayBroker['lastError']
   options: BrokerOptions
 }
 type ConnectionsMock = Pick<
@@ -36,6 +37,7 @@ const mock = vi.hoisted(() => ({
 vi.mock('./hive-runtime-relay-broker', () => ({
   HiveRuntimeRelayBroker: class {
     activeAssignment: HiveRuntimeRelayAssignment | null = null
+    lastError: HiveRuntimeRelayBroker['lastError'] = null
     constructor(readonly options: BrokerOptions) {
       mock.broker = this
     }
@@ -133,6 +135,20 @@ function response(): HiveRuntimeRelayHeartbeatResponseControl & { observedAt: nu
     nextControlSequence: 1
   }
 }
+
+it('exposes the Relay failure only for a current connecting host', async () => {
+  const f = fixture()
+  f.presence.getCurrentLeaseContext.mockReturnValue(f.assignment.context)
+  mock.broker.lastError = { code: 'STALE_BINDING', httpStatus: 409 }
+  expect(f.host.getLastError()).toEqual({ code: 'STALE_BINDING', httpStatus: 409 })
+  mock.broker.activeAssignment = f.assignment
+  expect(f.host.getLastError()).toBeNull()
+  mock.broker.activeAssignment = null
+  f.presence.getCurrentLeaseContext.mockReturnValue(null)
+  expect(f.host.getLastError()).toBeNull()
+  await f.host.stop()
+  expect(f.host.getLastError()).toBeNull()
+})
 
 it('advertises only after control ACK and closes resources through shared stop', async () => {
   const f = fixture()

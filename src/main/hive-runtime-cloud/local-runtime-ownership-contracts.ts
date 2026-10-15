@@ -57,6 +57,7 @@ export type LocalRuntimeOwnershipServiceOptions = Readonly<{
   getBootId: () => string
   getCurrentLeaseContext: () => CurrentHiveRuntimeCloudLeaseContext | null
   getRelayStatus?: () => HiveLocalRuntimeCloudStatus['relay']
+  getRelayError?: () => HiveLocalRuntimeCloudStatus['relayError']
   onRegistrationChanged?: () => void
   dependencies?: LocalRuntimeOwnershipDependencies
 }>

@@ -91,6 +91,7 @@ export class HiveRuntimeRelayHostService {
       getKeypair: options.getKeypair,
       createSocket: options.createSocket,
       onAssigned: (assignment) => this.assigned(assignment),
+      onError: (error) => console.warn('[hive-runtime-relay] Connection attempt failed', error),
       onConnection: (assignment, connection) => this.connections.open(assignment, connection),
       onUnavailable: () => {
         this.authorityUntil = null
@@ -108,6 +109,10 @@ export class HiveRuntimeRelayHostService {
       return 'offline'
     }
     return this.broker.activeAssignment ? 'registered' : 'connecting'
+  }
+
+  getLastError() {
+    return this.getStatus() === 'connecting' ? this.broker.lastError : null
   }
 
   start(): void {

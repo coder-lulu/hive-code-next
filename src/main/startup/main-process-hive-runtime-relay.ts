@@ -11,6 +11,10 @@ export function getHiveRuntimeRelayStatus() {
   return host?.getStatus() ?? 'offline'
 }
 
+export function getHiveRuntimeRelayError() {
+  return host?.getLastError() ?? null
+}
+
 export function installHiveRuntimeRelay(
   config: HiveRuntimeCloudConfig,
   presence: HiveRuntimeCloudPresenceService,

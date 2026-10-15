@@ -1,10 +1,12 @@
 import type { E2EEKeypair } from '../../runtime/e2ee-keypair'
 import limits from '../../../../config/hiverelay-contract/registries/limits.json'
+import type { HiveRuntimeRelayError } from '../../../shared/hive-runtime-cloud'
 import type { CurrentHiveRuntimeCloudLeaseContext } from '../hive-runtime-cloud-lease-context'
 import { HiveRuntimeCloudRequestError } from '../hive-runtime-cloud-http-client'
 import { HiveRuntimeRelayControlClient } from './hive-runtime-relay-control-client'
 import type { HiveRuntimeRelayAuthorizationProvider } from './hive-runtime-relay-authorization-provider'
 import type { ConnectionOpen } from './hive-runtime-relay-protocol'
+import { hiveRuntimeRelayError } from './hive-runtime-relay-error'
 import {
   hiveRuntimeRelaySameOwner,
   type HiveRuntimeRelaySocketFactory
@@ -21,6 +23,7 @@ type Options = {
   onAssigned: (assignment: HiveRuntimeRelayAssignment) => void
   onConnection: (assignment: HiveRuntimeRelayAssignment, connection: ConnectionOpen) => void
   onUnavailable: () => void
+  onError?: (error: HiveRuntimeRelayError) => void
   createSocket?: HiveRuntimeRelaySocketFactory
   random?: () => number
   now?: () => number
@@ -38,8 +41,13 @@ export class HiveRuntimeRelayBroker {
   private assignment: HiveRuntimeRelayAssignment | null = null
   private failures = 0
   private context: CurrentHiveRuntimeCloudLeaseContext | null = null
+  private error: HiveRuntimeRelayError | null = null
 
   constructor(private readonly options: Options) {}
+
+  get lastError(): HiveRuntimeRelayError | null {
+    return this.error
+  }
 
   get activeAssignment(): HiveRuntimeRelayAssignment | null {
     return this.control?.active && this.assignment && this.isCurrent(this.assignment)
@@ -107,6 +115,7 @@ export class HiveRuntimeRelayBroker {
 
   private invalidate(): void {
     this.generation++
+    this.error = null
     this.abort?.abort()
     if (this.timer) {
       clearTimeout(this.timer)
@@ -146,6 +155,14 @@ export class HiveRuntimeRelayBroker {
       const retryAfter =
         error instanceof HiveRuntimeCloudRequestError ? (error.retryAfterMs ?? 0) : 0
       this.schedule(Math.max(jitter, retryAfter))
+    }
+  }
+
+  private recordError(error: unknown): void {
+    const failure = hiveRuntimeRelayError(error)
+    if (failure.code !== this.error?.code || failure.httpStatus !== this.error?.httpStatus) {
+      this.error = failure
+      this.options.onError?.(failure)
     }
   }
 
@@ -197,6 +214,7 @@ export class HiveRuntimeRelayBroker {
             this.options.onUnavailable()
             // A pending connect/refresh rejection owns its retry in resolve's catch.
             if (this.pendingControl !== control) {
+              this.recordError(undefined)
               this.retry()
             }
           }
@@ -214,6 +232,7 @@ export class HiveRuntimeRelayBroker {
       this.pendingControl = null
       this.assignment = assignment
       this.failures = 0
+      this.error = null
       this.options.onAssigned(assignment)
       // The Cell retires control at signed expiry minus its maximum clock error.
       // Refresh halfway through that usable window, not halfway to the signed expiry.
@@ -224,6 +243,7 @@ export class HiveRuntimeRelayBroker {
       this.schedule(Math.max(1_000, Math.floor(remaining / 2)))
     } catch (error) {
       if (generation === this.generation) {
+        this.recordError(error)
         const control = this.control
         this.control = null
         this.assignment = null

@@ -21,32 +21,27 @@ function request(method: string, params?: unknown): RpcRequest {
 
 function fixture() {
   const control: HiveRuntimeCloudControl = {
-    getLocalRuntimeStatus: vi.fn(
-      (): HiveLocalRuntimeCloudStatus => ({
-        ownership: 'CLAIMED',
-        presence: 'ONLINE',
-        runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
-        relay: 'registered'
-      })
-    ),
-    beginHeadlessClaim: vi.fn(
-      async (): Promise<HiveLocalRuntimeClaimStartResult> => ({
-        status: 'PENDING',
-        runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
-        challengeId: '823e4567-e89b-42d3-a456-426614174000',
-        userCode: 'ABCD-EFGH',
-        verificationUri: 'https://code.hivekernel.com/runtime/claim',
-        expiresAt: 2_000,
-        pollIntervalSeconds: 5
-      })
-    ),
-    pollHeadlessClaim: vi.fn(
-      async (): Promise<HiveLocalRuntimeClaimPollResult> => ({
-        status: 'PENDING',
-        challengeId: '823e4567-e89b-42d3-a456-426614174000',
-        nextPollAt: 1_500
-      })
-    ),
+    getLocalRuntimeStatus: vi.fn((): HiveLocalRuntimeCloudStatus => ({
+      ownership: 'CLAIMED',
+      presence: 'ONLINE',
+      runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
+      relay: 'registered',
+      relayError: null
+    })),
+    beginHeadlessClaim: vi.fn(async (): Promise<HiveLocalRuntimeClaimStartResult> => ({
+      status: 'PENDING',
+      runtimeRecordId: '723e4567-e89b-42d3-a456-426614174000',
+      challengeId: '823e4567-e89b-42d3-a456-426614174000',
+      userCode: 'ABCD-EFGH',
+      verificationUri: 'https://code.hivekernel.com/runtime/claim',
+      expiresAt: 2_000,
+      pollIntervalSeconds: 5
+    })),
+    pollHeadlessClaim: vi.fn(async (): Promise<HiveLocalRuntimeClaimPollResult> => ({
+      status: 'PENDING',
+      challengeId: '823e4567-e89b-42d3-a456-426614174000',
+      nextPollAt: 1_500
+    })),
     resetCloudIdentity: vi.fn((): HiveLocalRuntimeIdentityResetResult => ({ reset: true }))
   }
   return {

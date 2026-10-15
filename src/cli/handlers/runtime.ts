@@ -27,7 +27,12 @@ function formatRuntimeCloudStatus(status: HiveLocalRuntimeCloudStatus): string {
     `ownership: ${status.ownership}`,
     `presence: ${status.presence}`,
     `runtimeRecordId: ${status.runtimeRecordId ?? 'none'}`,
-    `relay: ${status.relay}`
+    `relay: ${status.relay}`,
+    ...(status.relayError
+      ? [
+          `relayError: ${status.relayError.code}${status.relayError.httpStatus === null ? '' : ` (HTTP ${status.relayError.httpStatus})`}`
+        ]
+      : [])
   ].join('\n')
 }
 

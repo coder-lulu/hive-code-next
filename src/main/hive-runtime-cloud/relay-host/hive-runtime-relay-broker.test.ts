@@ -1,6 +1,7 @@
 import nacl from 'tweetnacl'
 import { afterEach, expect, it, vi } from 'vitest'
 import { HiveRuntimeRelayBroker } from './hive-runtime-relay-broker'
+import { HiveRuntimeCloudRequestError } from '../hive-runtime-cloud-http-client'
 import type { CurrentHiveRuntimeCloudLeaseContext } from '../hive-runtime-cloud-lease-context'
 import type { HiveRuntimeRelayAssignment } from './hive-runtime-relay-types'
 import type { HiveRuntimeRelayControlClient } from './hive-runtime-relay-control-client'
@@ -49,6 +50,58 @@ const contextFixture: CurrentHiveRuntimeCloudLeaseContext = {
 }
 
 afterEach(() => vi.useRealTimers())
+
+it.each(['lease', 'stop'])(
+  'ignores a late rejection after %s invalidates its request',
+  async (change) => {
+    vi.useFakeTimers()
+    const raw = nacl.box.keyPair()
+    let context = structuredClone(contextFixture)
+    let rejectOldRequest!: (reason: unknown) => void
+    const oldRequest = new Promise<HiveRuntimeRelayAssignment>((_resolve, reject) => {
+      rejectOldRequest = reject
+    })
+    const resolve = vi
+      .fn<() => Promise<HiveRuntimeRelayAssignment>>()
+      .mockReturnValueOnce(oldRequest)
+      .mockRejectedValue(new HiveRuntimeCloudRequestError(503, 'NO_ELIGIBLE_CELL'))
+    const onError = vi.fn()
+    const broker = new HiveRuntimeRelayBroker({
+      provider: { resolve, refresh: vi.fn() },
+      getContext: () => context,
+      getKeypair: () => ({ ...raw, publicKeyB64: Buffer.from(raw.publicKey).toString('base64') }),
+      onAssigned: vi.fn(),
+      onConnection: vi.fn(),
+      onUnavailable: vi.fn(),
+      onError,
+      random: () => 0.5
+    })
+    broker.start()
+    await vi.advanceTimersByTimeAsync(0)
+    if (change === 'stop') {
+      const stopping = broker.stop()
+      rejectOldRequest(new HiveRuntimeCloudRequestError(409, 'STALE_BINDING'))
+      await stopping
+      expect(onError).not.toHaveBeenCalled()
+      expect(broker.lastError).toBeNull()
+      return
+    }
+    context = {
+      ...context,
+      tuple: { ...context.tuple, leaseEpoch: 2, heartbeatLeaseId: 'lease-2' }
+    }
+    broker.notifyContextChanged()
+    rejectOldRequest(new HiveRuntimeCloudRequestError(409, 'STALE_BINDING'))
+    try {
+      await vi.advanceTimersByTimeAsync(100)
+      expect(onError).toHaveBeenCalledExactlyOnceWith({ code: 'NO_ELIGIBLE_CELL', httpStatus: 503 })
+      expect(broker.lastError).toEqual({ code: 'NO_ELIGIBLE_CELL', httpStatus: 503 })
+    } finally {
+      await broker.stop()
+    }
+  }
+)
+
 it.each([0, 0.5])(
   'bounds retry amplification with random=%s and cancels the retry timer on shutdown',
   async (random) => {
@@ -206,6 +259,7 @@ it('preserves pending resolution and retry delay across repeated heartbeat publi
     })
   })
   const onUnavailable = vi.fn()
+  const onError = vi.fn()
   const broker = new HiveRuntimeRelayBroker({
     provider: { resolve, refresh: vi.fn() },
     getContext: () => structuredClone(contextFixture),
@@ -213,6 +267,7 @@ it('preserves pending resolution and retry delay across repeated heartbeat publi
     onAssigned: vi.fn(),
     onConnection: vi.fn(),
     onUnavailable,
+    onError,
     random: () => 0.5
   })
   broker.start()
@@ -223,8 +278,10 @@ it('preserves pending resolution and retry delay across repeated heartbeat publi
   expect(signal.aborted).toBe(false)
   expect(onUnavailable).toHaveBeenCalledOnce()
   expect(resolve).toHaveBeenCalledOnce()
-  rejectResolve(new Error('unavailable'))
+  rejectResolve(new HiveRuntimeCloudRequestError(409, 'STALE_BINDING'))
   await vi.advanceTimersByTimeAsync(0)
+  expect(broker.lastError).toEqual({ code: 'STALE_BINDING', httpStatus: 409 })
+  expect(onError).toHaveBeenCalledOnce()
   for (let publication = 0; publication < 100; publication++) {
     broker.notifyContextChanged()
   }
@@ -233,8 +290,10 @@ it('preserves pending resolution and retry delay across repeated heartbeat publi
   await vi.advanceTimersByTimeAsync(1)
   expect(resolve).toHaveBeenCalledTimes(2)
   expect(onUnavailable).toHaveBeenCalledOnce()
-  rejectResolve(new Error('unavailable'))
+  rejectResolve(new HiveRuntimeCloudRequestError(409, 'STALE_BINDING'))
   await vi.advanceTimersByTimeAsync(0)
+  expect(onError).toHaveBeenCalledOnce()
   await broker.stop()
+  expect(broker.lastError).toBeNull()
   expect(vi.getTimerCount()).toBe(0)
 })

@@ -39,6 +39,24 @@ class Socket extends EventEmitter {
 
 afterEach(() => vi.useRealTimers())
 
+it('retains a safe rejection during backoff and clears it only after control is acknowledged', async () => {
+  const { broker, assignment, resolve, sockets } = fixture()
+  resolve.mockRejectedValueOnce(new HiveRuntimeCloudRequestError(409, 'STALE_BINDING'))
+  try {
+    broker.start()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(broker.lastError).toEqual({ code: 'STALE_BINDING', httpStatus: 409 })
+    expect(broker.activeAssignment).toBeNull()
+    await vi.advanceTimersByTimeAsync(750)
+    expect(broker.lastError).toEqual({ code: 'STALE_BINDING', httpStatus: 409 })
+    await finishHandshake(sockets[0], assignment)
+    expect(broker.activeAssignment).not.toBeNull()
+    expect(broker.lastError).toBeNull()
+  } finally {
+    await broker.stop()
+  }
+})
+
 it.each([
   new HiveRuntimeCloudRequestError(403, 'forbidden'),
   new HiveRuntimeCloudRequestError(503, 'relay_unavailable', 2_000),

@@ -6,6 +6,7 @@ import type { HiveRuntimeCloudIdentity } from './hive-runtime-cloud-identity-sto
 import type { HiveRuntimeCloudReport } from './hive-runtime-cloud-proof'
 import { LocalRuntimeOwnershipService } from './local-runtime-ownership-service'
 import type { HiveRuntimeCloudRegistrationState } from './hive-runtime-cloud-state-store'
+import type { HiveRuntimeRelayError } from '../../shared/hive-runtime-cloud'
 
 const { privateKey, publicKey } = generateKeyPairSync('ed25519')
 const identity: HiveRuntimeCloudIdentity = {
@@ -55,6 +56,7 @@ function fixture(
     undefined
 ) {
   let stored: HiveRuntimeCloudRegistrationState | null = null
+  let relayError: HiveRuntimeRelayError | null = null
   const onRegistrationChanged = vi.fn()
   const clearIdentity = vi.fn()
   const clearState = vi.fn(() => {
@@ -132,6 +134,7 @@ function fixture(
     getReport: () => report,
     getBootId: () => '323e4567-e89b-42d3-a456-426614174000',
     getCurrentLeaseContext: () => null,
+    getRelayError: () => relayError,
     onRegistrationChanged,
     dependencies: {
       createClient: () => client,
@@ -157,11 +160,25 @@ function fixture(
     },
     clearIdentity,
     clearState,
-    onRegistrationChanged
+    onRegistrationChanged,
+    setRelayError: (error: HiveRuntimeRelayError | null) => {
+      relayError = error
+    }
   }
 }
 
 describe('LocalRuntimeOwnershipService', () => {
+  it('includes the sanitized Relay failure in local runtime diagnostics', () => {
+    const { service, setRelayError } = fixture()
+    setRelayError({ code: 'STALE_BINDING', httpStatus: 409 })
+    expect(service.getLocalRuntimeStatus().relayError).toEqual({
+      code: 'STALE_BINDING',
+      httpStatus: 409
+    })
+    setRelayError(null)
+    expect(service.getLocalRuntimeStatus().relayError).toBeNull()
+    service.stop()
+  })
   it.each([true, false])(
     'retries fenced presence only after an explicit authorized refresh (%s)',
     async (owned) => {

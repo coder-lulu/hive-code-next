@@ -48,7 +48,8 @@ export class LocalRuntimeOwnershipService {
   getLocalRuntimeStatus(): HiveLocalRuntimeCloudStatus {
     const base = {
       presence: this.session.getState().presence,
-      relay: this.options.getRelayStatus?.() ?? 'offline'
+      relay: this.options.getRelayStatus?.() ?? 'offline',
+      relayError: this.options.getRelayError?.() ?? null
     } as const
     if (!this.registration.isAvailable()) {
       return { ...base, ownership: 'DISABLED', runtimeRecordId: null }

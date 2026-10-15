@@ -187,6 +187,12 @@ export type HiveLocalRuntimeCloudStatus = Readonly<{
   presence: HiveLocalRuntimeOwnershipState['presence']
   runtimeRecordId: string | null
   relay: 'connecting' | 'registered' | 'standby' | 'draining' | 'offline'
+  relayError: HiveRuntimeRelayError | null
+}>
+
+export type HiveRuntimeRelayError = Readonly<{
+  code: string
+  httpStatus: number | null
 }>
 
 export type HiveLocalRuntimeClaimStartResult =
