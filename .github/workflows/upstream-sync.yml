@@ -12,6 +12,22 @@ on:
         required: true
         type: string
         default: hivecode/main-next
+      bundle_blob_sha:
+        description: Short-lived Git blob handoff SHA; supply all four SHAs or leave all empty
+        required: false
+        type: string
+      target_sha:
+        description: Expected current product target SHA for the supplied bundle
+        required: false
+        type: string
+      upstream_sha:
+        description: Frozen upstream SHA reachable from fetched upstream main
+        required: false
+        type: string
+      candidate_sha:
+        description: Exact locally reviewed candidate SHA; never regenerated
+        required: false
+        type: string
 
 concurrency:
   group: hivecode-upstream-sync
@@ -34,9 +50,9 @@ jobs:
     outputs:
       upstream_sha: ${{ steps.sync.outputs.upstream_sha }}
       target_sha: ${{ steps.sync.outputs.target_sha }}
-      candidate_sha: ${{ steps.bundle.outputs.candidate_sha }}
+      candidate_sha: ${{ steps.bundle_input.outputs.candidate_sha || steps.bundle.outputs.candidate_sha }}
       node_version: ${{ steps.sync.outputs.node_version }}
-      has_changes: ${{ steps.checkpoint.outputs.has_changes }}
+      has_changes: ${{ steps.bundle_input.outputs.has_changes || steps.checkpoint.outputs.has_changes }}
     steps:
       - name: Checkout repository without publication credentials
         uses: actions/checkout@v6
@@ -51,8 +67,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           UPSTREAM_URL: https://github.com/${{ env.UPSTREAM_REPOSITORY }}.git
+          BUNDLE_BLOB_SHA: ${{ inputs.bundle_blob_sha }}
+          EXPECTED_TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_UPSTREAM_SHA: ${{ inputs.upstream_sha }}
+          EXPECTED_CANDIDATE_SHA: ${{ inputs.candidate_sha }}
         run: |
           set -euo pipefail
+          # Validate untrusted dispatch values before using any as Git arguments.
+          supplied=0
+          for sha in "$BUNDLE_BLOB_SHA" "$EXPECTED_TARGET_SHA" "$EXPECTED_UPSTREAM_SHA" "$EXPECTED_CANDIDATE_SHA"; do
+            if [ -n "$sha" ]; then
+              [[ "$sha" =~ ^[a-f0-9]{40}$ ]]
+              supplied=$((supplied + 1))
+            fi
+          done
+          test "$supplied" = 0 || test "$supplied" = 4
           gh auth setup-git --hostname github.com
           for branch in "$TARGET_BRANCH" "$UPSTREAM_BRANCH"; do
             git check-ref-format --branch "$branch"
@@ -81,6 +110,11 @@ jobs:
           git fetch --no-tags --prune origin \
             "+refs/heads/$TARGET_BRANCH:refs/remotes/origin/$TARGET_BRANCH"
           target_sha="$(git rev-parse "refs/remotes/origin/$TARGET_BRANCH")"
+          if [ "$supplied" = 4 ]; then
+            test "$target_sha" = "$EXPECTED_TARGET_SHA"
+            git --no-replace-objects merge-base --is-ancestor "$EXPECTED_UPSTREAM_SHA" "$upstream_sha"
+            upstream_sha="$EXPECTED_UPSTREAM_SHA"
+          fi
           {
             echo "upstream_sha=$upstream_sha"
             echo "target_sha=$target_sha"
@@ -97,6 +131,7 @@ jobs:
           node-version: ${{ steps.sync.outputs.node_version }}
 
       - name: Absorb upstream content without adding upstream commit ancestry
+        if: inputs.bundle_blob_sha == ''
         shell: bash
         env:
           UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
@@ -117,6 +152,7 @@ jobs:
 
       - name: Close intake before proposing a checkpoint
         id: checkpoint
+        if: inputs.bundle_blob_sha == ''
         shell: bash
         env:
           UPSTREAM_SHA: ${{ steps.sync.outputs.upstream_sha }}
@@ -145,6 +181,23 @@ jobs:
             echo 'has_changes=true' >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Import and verify the exact local candidate from a short-lived blob handoff
+        id: bundle_input
+        if: inputs.bundle_blob_sha != ''
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          BUNDLE_BLOB_SHA: ${{ inputs.bundle_blob_sha }}
+          EXPECTED_TARGET_SHA: ${{ inputs.target_sha }}
+          EXPECTED_UPSTREAM_SHA: ${{ inputs.upstream_sha }}
+          EXPECTED_CANDIDATE_SHA: ${{ inputs.candidate_sha }}
+          TARGET_SHA: ${{ steps.sync.outputs.target_sha }}
+        run: |
+          set -euo pipefail
+          git -c core.hooksPath=/dev/null switch --force-create "$TARGET_BRANCH" "$TARGET_SHA"
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-sync-bundle-input.mjs"
+
       - name: Bundle the final immutable candidate without publishing a branch
         id: bundle
         if: steps.checkpoint.outputs.has_changes == 'true'
@@ -157,7 +210,7 @@ jobs:
           git bundle create logs/upstream-sync/candidate/candidate.bundle "refs/heads/$TARGET_BRANCH"
 
       - name: Upload the immutable candidate
-        if: steps.checkpoint.outputs.has_changes == 'true'
+        if: steps.checkpoint.outputs.has_changes == 'true' || steps.bundle_input.outputs.has_changes == 'true'
         uses: actions/upload-artifact@v7
         with:
           name: upstream-sync-candidate
