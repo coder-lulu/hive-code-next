@@ -1,6 +1,7 @@
+import { assertRecordingOutput } from '../../config/scripts/upstream-recording-source.mjs'
 /** Record current Hive behavior from a frozen source commit into reviewable scratch evidence. */
 import { createRequire } from 'node:module'
-import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { runProcess } from '@orca/process-host'
 import { derivedGoldens } from '../src/test-support/rpc-recording/derived-goldens.ts'
@@ -10,17 +11,20 @@ import { adapterSha256 } from '../src/test-support/rpc-recording/adapter-digest.
 import { recorderSha256 } from '../src/test-support/rpc-recording/recorder-digest.ts'
 import { scenarioSha256 } from '../src/test-support/rpc-recording/scenario-digest.ts'
 import { writeHiveRecordingOverlay } from '../rpc-foundation/write-hive-recording-overlay.ts'
-import { assertRecordingSources } from '../rpc-foundation/recording-source-fence.ts'
+import {
+  assertRecordingSources,
+  readRecordingSourceInput
+} from '../rpc-foundation/recording-source-fence.ts'
 
-const [mode, sourceBaseline, upstreamBaseline, ...options] = process.argv.slice(2)
+const [mode, sourceInput, outputArgument, ...options] = process.argv.slice(2)
 if (
   !['--record-hive', '--publish-hive'].includes(mode ?? '') ||
   process.env.RPC_FOUNDATION_RECORD !== '1' ||
-  !/^[a-f0-9]{40}$/.test(sourceBaseline ?? '') ||
-  !/^[a-f0-9]{40}$/.test(upstreamBaseline ?? '')
+  !sourceInput ||
+  !outputArgument
 ) {
   throw new Error(
-    'Use --record-hive|--publish-hive <source-sha> <upstream-sha> with RPC_FOUNDATION_RECORD=1'
+    'Use --record-hive|--publish-hive <source-input.json> <logs-output-directory> with RPC_FOUNDATION_RECORD=1'
   )
 }
 const evidenceOnly = options.includes('--evidence-only')
@@ -29,21 +33,25 @@ if (ids.some((arg) => arg.startsWith('-')) || (mode === '--publish-hive' && opti
   throw new Error('Recording accepts golden ids and --evidence-only; publication accepts neither')
 }
 const root = resolve(import.meta.dirname, '../..')
-assertRecordingSources(root, sourceBaseline, true)
+const { source, projection, controlProjection } = readRecordingSourceInput(resolve(sourceInput))
+assertRecordingSources(root, source, projection, controlProjection)
 const input = readScenarios(resolve(root, 'mobile/rpc-foundation/pilot-scenarios.json'))
 const derived = new Set(derivedGoldens(input.scenarios).map((golden) => golden.id))
 const unknownIds = ids.filter((id) => !derived.has(id))
 if (unknownIds.length) {
   throw new Error(`The product manifest derives no golden named ${unknownIds.join(', ')}`)
 }
-const output = resolve(root, 'logs/upstream-sync/hive-rpc-recording', sourceBaseline)
+const output = resolve(outputArgument)
+assertRecordingOutput(root, output, ['provenance.json', 'goldens', 'hive'])
 const goldens = resolve(output, 'goldens')
+if (existsSync(goldens)) {
+  assertRecordingOutput(root, goldens, readdirSync(goldens))
+}
 const adapterSha256ByOperation = Object.fromEntries(
   input.scenarios.map((scenario) => [scenario.operation, adapterSha256(root, [scenario])])
 )
 const provenance = {
-  baseline: sourceBaseline,
-  upstreamBaseline,
+  source,
   recorderSha256: recorderSha256(root),
   scenariosSha256: scenarioSha256(input.scenarios),
   adapterSha256ByOperation
@@ -56,7 +64,7 @@ function publishCompleteRecording() {
   if (JSON.stringify(recordedIds) !== JSON.stringify([...derived].sort())) {
     throw new Error('Publication requires the complete current product-supported recording domain')
   }
-  writeHiveRecordingOverlay(root, sourceBaseline, goldens)
+  writeHiveRecordingOverlay(root, resolve(sourceInput), goldens, resolve(output, 'hive'))
 }
 if (mode === '--publish-hive') {
   const recorded = JSON.parse(readFileSync(resolve(output, 'provenance.json'), 'utf8'))
@@ -96,7 +104,7 @@ if (mode === '--publish-hive') {
   if (result.code !== 0) {
     process.exitCode = 1
   } else {
-    assertRecordingSources(root, sourceBaseline, true)
+    assertRecordingSources(root, source, projection, controlProjection)
     // A partial run remains evidence only; publishing it would shrink the supported domain.
     if (!evidenceOnly && ids.length === 0) {
       publishCompleteRecording()

@@ -1,9 +1,6 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import {
-  upstreamGoldenSha256,
-  type HiveRecordingManifest
-} from '../../rpc-foundation/hive-recording-reference'
+import { manifestFor, upstreamGoldenSha256 } from '../../rpc-foundation/hive-recording-reference'
 
 export type HiveGoldenDomain = {
   kind: 'hive-overlay' | 'standalone'
@@ -36,11 +33,12 @@ export function readHiveGoldenDomain(directory: string): HiveGoldenDomain {
     }
   }
 
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- The fields used below are validated before use.
-  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as HiveRecordingManifest
+  const manifest = manifestFor(directory)
+  if (!manifest) {
+    throw new Error('Missing Hive manifest')
+  }
   const adapters = manifest.adapterSha256ByOperation
   if (
-    manifest.version !== 2 ||
     typeof adapters !== 'object' ||
     adapters === null ||
     Array.isArray(adapters) ||

@@ -266,26 +266,19 @@ mobile/
 
 ## RPC recording provenance
 
-The original upstream goldens use format v6 and remain immutable. Hive records its supported scenario domain into scratch evidence, then publishes only individually reviewed trace differences as sparse overlays. The external Hive manifest pins the full upstream reference hash, the source/upstream commits and recorder/scenario/operation-adapter digests. Old v1 metadata remains intentionally invalid until the actual frozen source has been recorded and reviewed.
+RPC recordings use format v6. Hive differences are reviewed sparse overlays over the upstream
+corpus. New provenance manifests use v3 and bind a canonical raw Git source projection to
+published maintenance controls; historical v2 manifests are read-only.
 
-Commit all mobile, shared protocol, recorder and lockfile changes before recording. Use a full source commit SHA and the frozen upstream SHA; the recorder checks actual Git source identity before and after the run. It uses only scripted RPC transports and native mounting substitutes, without contacting production services.
+Record from an isolated raw source fixture under `logs/`, with independent dependencies and
+an explicit source input JSON. The recorder checks source bytes and modes before and after
+execution. Review trace differences before generating the manifest and overlays:
 
-```powershell
-$sourceCommit = git rev-parse HEAD
-$upstreamCommit = 'a781a602a8729439d7a3eebf0c3b9e5817362e77'
-$env:ORCA_BACKGROUND_LAUNCH = '1'
-$env:RPC_FOUNDATION_RECORD = '1'
-pnpm --dir mobile exec tsx scripts/rpc-recording.mts --record-hive $sourceCommit $upstreamCommit --evidence-only
+```text
+RPC_FOUNDATION_RECORD=1 pnpm --dir mobile rpc:record --record-hive <source-input.json> <logs-output-directory> --evidence-only
+RPC_FOUNDATION_RECORD=1 pnpm --dir mobile rpc:record --publish-hive <source-input.json> <logs-output-directory>
 ```
 
-Evidence is written to `logs/upstream-sync/hive-rpc-recording/<sourceCommit>/provenance.json` and `goldens/`. Optional golden IDs can follow the two SHAs for a targeted diagnostic run. A targeted run never publishes. A full run with `--evidence-only` records every supported golden without changing the actual Hive manifest or overlays.
-
-Review every measured trace difference against the immutable upstream originals. Update `mobile/rpc-foundation/hive/reviewed-deltas.json` with the current upstream aggregate hash, exact before/after trace hashes and a concrete product reason for each difference. This review data is publication input rather than recording source; the recorder, scenarios, product sources and lockfile must continue to match the frozen source commit.
-
-```powershell
-pnpm --dir mobile exec tsx scripts/rpc-recording.mts --publish-hive $sourceCommit $upstreamCommit
-```
-
-Publication verifies the recorded provenance against the same frozen source and rejects unknown scenarios, changed identities, missing adapter provenance, unreviewed trace changes and disappeared reviewed deltas. It writes the external v2 manifest and actual sparse overlays while keeping every upstream original unchanged. Run the golden/domain/bridge replay suites against the published references before committing the metadata candidate.
-
-`rpc:record <id>` from the older README no longer describes a valid invocation; the new workflow requires explicit `--record-hive` or `--publish-hive` and both commit SHAs.
+See [Hive RPC recording overlay](rpc-foundation/hive/README.md) for the source input contract,
+review requirements and frozen tree verification. Generated evidence stays under `logs/`
+until reviewed result blobs are frozen for synchronization.

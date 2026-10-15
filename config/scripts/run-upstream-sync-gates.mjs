@@ -22,7 +22,7 @@ const MATRIX_PATH = path.join(REPO_ROOT, 'config', 'upstream-regression-matrix.j
 
 function loadManifest() {
   const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8'))
-  if (!manifest || manifest.schemaVersion !== 1 || !manifest.suites) {
+  if (manifest?.schemaVersion !== 1 || !manifest.suites) {
     throw new Error('upstream-sync-gates.json must use schemaVersion 1 and define suites')
   }
   return manifest
@@ -161,7 +161,7 @@ function validateCheck(check, suiteName, index, repoRoot) {
   if (!check || typeof check !== 'object' || typeof check.id !== 'string') {
     throw new Error(`Invalid check at ${suiteName}[${index}]`)
   }
-  if (!['command', 'vitest'].includes(check.kind)) {
+  if (!['command', 'vitest', 'recording-source'].includes(check.kind)) {
     throw new Error(`Unsupported check kind for ${check.id}: ${check.kind}`)
   }
   if (!Array.isArray(check.argv) || check.argv.length === 0) {
@@ -221,6 +221,9 @@ export function gateInvocation(command, args) {
 }
 
 export function resolveGateInvocation(check, repoRoot) {
+  if (check.kind === 'recording-source') {
+    return recordingSourceInvocation(check, repoRoot)
+  }
   if (check.kind !== 'vitest' || check.argv.slice(0, 3).join(' ') !== 'pnpm exec vitest') {
     return gateInvocation(check.argv[0], check.argv.slice(1))
   }
@@ -240,6 +243,55 @@ export function resolveGateInvocation(check, repoRoot) {
     return { command: process.execPath, args: [entry, ...check.argv.slice(3)] }
   } catch (error) {
     throw new Error(`${check.id}: Vitest unavailable in ${packageDirectory}: ${error.message}`)
+  }
+}
+
+export function recordingSourceInvocation(
+  check,
+  repoRoot,
+  env = process.env,
+  platform = process.platform
+) {
+  if (
+    !['recording-source-common', 'recording-source-platform'].includes(check.id) ||
+    check.cwd !== '.' ||
+    JSON.stringify(check.argv) !== JSON.stringify(['verify'])
+  ) {
+    throw new Error('Recording source gate must use the fixed verifier invocation')
+  }
+  for (const name of ['TARGET_SHA', 'UPSTREAM_SHA', 'CANDIDATE_SHA']) {
+    if (!/^[a-f0-9]{40}$/.test(env[name] ?? '') || env[name].length !== 40) {
+      throw new Error(`Recording source gate requires frozen ${name}`)
+    }
+  }
+  if (!['main', 'hivecode/main-next'].includes(env.TARGET_BRANCH)) {
+    throw new Error('Recording source gate requires the frozen product branch')
+  }
+  if (!['linux', 'darwin', 'win32'].includes(platform)) {
+    throw new Error('Recording source gate requires a supported actual platform')
+  }
+  const report =
+    check.id === 'recording-source-common'
+      ? path.join(repoRoot, 'logs/upstream-sync/evidence/recording-source-common.json')
+      : path.join(repoRoot, `logs/upstream-sync/recording-source-${platform}.json`)
+  return {
+    command: process.execPath,
+    args: [
+      path.join(SCRIPT_DIR, 'upstream-recording-source.mjs'),
+      'verify',
+      '--cwd',
+      repoRoot,
+      '--target',
+      env.TARGET_SHA,
+      '--upstream',
+      env.UPSTREAM_SHA,
+      '--head',
+      env.CANDIDATE_SHA,
+      '--target-branch',
+      env.TARGET_BRANCH,
+      '--report',
+      report
+    ]
   }
 }
 

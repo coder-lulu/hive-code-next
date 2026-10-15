@@ -1,43 +1,52 @@
 # Hive RPC recording overlay
 
-`../pilot-scenarios.json` and `../goldens/` are the frozen upstream scenario and recording
-references. Hive keeps product-specific trace differences in `goldens/`; all other supported
-recordings use the upstream trace directly. `reviewed-deltas.json` pins the upstream corpus digest,
-both trace hashes, and a reason for every product difference. `manifest.json` pins the source
-commit, recorder, adapters, upstream corpus, and sparse overlay files.
+The reference `goldens/` corpus follows verified three-way ownership: unchanged upstream
+paths retain the product reference, upstream-only changes follow upstream, and conflicts
+require exact frozen review rows. Recording never rewrites this reference corpus. Product differences are sparse overlays,
+reviewed using exact before/after trace hashes and concrete reasons in `reviewed-deltas.json`.
+New recordings use manifest v3. Historical v2 evidence is read-only.
 
-Review a changed upstream corpus before updating either digest. Compare the supported upstream
-traces with the previous corpus, then verify each existing Hive delta and any newly differing
-recording against the product boundary. Commit mobile product sources, shared protocol, recorder,
-and mobile lockfile changes before recording. From the repository root, use a full source commit SHA
-and the frozen upstream SHA to record the complete supported corpus into evidence:
+Publish maintenance controls M first. Then calculate the canonical guarded Git-tree projection
+of the complete reviewed incoming source. The source input JSON has exactly `source`, `projection` and
+`controlProjection`; use `recordingProjection` and `exportRecordingSources` from
+`config/scripts/upstream-recording-source.mjs` to produce source evidence from Git object bytes.
+Derive `controlProjection` with `recordingControlProjection(repository, M)` and export the
+transitive config ESM module closure with `exportRecordingControls`. Its raw bytes and modes
+are independently checked against M Git objects before and after recording; copying modules
+without this check does not prove their provenance. The fixture must have access to M Git objects.
+A trusted external M helper must perform both fixture checks around the recording process,
+so a modified fixture cannot authorize itself by changing its own validator. Use
+`assertRecordingControls(fixture, M, controlProjection, objectRepository)` with the main
+repository as `objectRepository` when M objects are not in the fixture; the supplied projection
+is always compared with independently read M objects, never accepted on its own hash.
+The `source` fields are `kind: tree-sync-content`, `controlSha: M`, `upstreamSha: U`,
+`guardVersion: 1`, `guardedSourcesSha256`, and `guardedFileCount`.
 
-```powershell
-$sourceCommit = git rev-parse HEAD
-$upstreamCommit = 'a781a602a8729439d7a3eebf0c3b9e5817362e77'
-$env:ORCA_BACKGROUND_LAUNCH = '1'
-$env:RPC_FOUNDATION_RECORD = '1'
-pnpm --dir mobile exec tsx scripts/rpc-recording.mts --record-hive $sourceCommit $upstreamCommit --evidence-only
+Export into an isolated directory under repository `logs/`, preserve exact modes and raw bytes,
+and supply its independent dependencies. Guarded source symlinks are refused on every platform. A Windows runner refuses executable
+exports whose mode it cannot reproduce; use a POSIX runner for executable sources. Source inputs belong
+outside the guarded paths. The recorder verifies all guarded paths and bytes before and after
+running. LF/CRLF working checkouts are not raw recording fixtures.
+
+From that raw fixture root, record the complete supported domain:
+
+```text
+RPC_FOUNDATION_RECORD=1 pnpm --dir mobile rpc:record --record-hive <source-input.json> <logs-output-directory> --evidence-only
 ```
 
-The recorder checks source identity before and after the run. It writes `provenance.json` and
-`goldens/` into `logs/upstream-sync/hive-rpc-recording/<sourceSHA>/` at the repository root, without
-changing the Hive manifest or overlays. Optional golden IDs after the two SHAs select a targeted
-diagnostic run; targeted recordings never publish.
+Optional golden IDs produce diagnostic evidence only. Review every changed trace independently
+and write `hive/reviewed-deltas.json` below that output directory. Then generate reviewed v3
+manifest and overlays in the same explicit logs output:
 
-Review every measured trace difference against the immutable upstream originals, then update
-`reviewed-deltas.json` with the current upstream aggregate hash, exact before/after trace hashes,
-and a concrete product reason for each difference. This review data is publication input; the
-recording sources must continue to match the frozen source commit. Publish the reviewed complete
-evidence using the same two SHAs:
-
-```powershell
-pnpm --dir mobile exec tsx scripts/rpc-recording.mts --publish-hive $sourceCommit $upstreamCommit
+```text
+RPC_FOUNDATION_RECORD=1 pnpm --dir mobile rpc:record --publish-hive <source-input.json> <logs-output-directory>
 ```
 
-Publication verifies the recorded provenance and complete supported domain, rejects changed
-scenario contracts, missing adapter provenance, unreviewed trace differences, and disappeared
-reviewed deltas, then writes the v2 manifest and sparse overlays. Every upstream original remains
-unchanged. Run the golden/domain/bridge replay suites against the published references before
-committing the generated metadata separately. Do not copy diagnostic recordings into this
-directory manually.
+The writer checks current recorder/scenario/adapter digests, the complete derived domain,
+scenario contracts, unreviewed differences and disappeared deltas. It never creates ordinary
+commit-source recordings or writes generated evidence directly into the source checkout.
+Freeze reviewed result blobs in review target R. The existing tree synchronizer produces F
+with parent R, followed only by checkpoint changes. The trusted source verifier independently
+recomputes that whole merge and checks F against the manifest projection, M control closure,
+upstream corpus and reviewed overlay bytes. Any guarded source repair requires re-recording.
+Common, Linux, macOS, Windows and the isolated publisher must all verify the same candidate.

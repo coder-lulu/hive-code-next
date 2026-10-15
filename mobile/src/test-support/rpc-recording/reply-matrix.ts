@@ -79,54 +79,12 @@ function successEnvelope(reply: unknown): Record<string, unknown> | null {
     : null
 }
 
-/** One reply a base scenario scripts, as a site the matrix drives. */
-type MatrixSite = { id: string; index: number; reply: unknown }
-
-/**
- * Every reply the base scenario scripts, in order.
- *
- * Why all of them and not one: picking the request per family is what let ten families fall out of
- * the matrix without saying so, and there is no property of a scenario that identifies the "real"
- * request — the settings families answer prerequisites before their own read, the chains answer
- * their own steps in order. Driving every reply needs no such judgement and needs no edit when a
- * domain is added. A family that scripts no reply at all cannot be matrixed and throws.
- *
- * A completion is named by its request. A frame is named by the subscribe payload it arrives on
- * *and its occurrence*, because one subscription carries many frames — `ready`, then events, then
- * `end` — so the payload name alone repeats and would make the divergence ambiguous.
- */
-export function matrixSites(base: RecordingScenario): MatrixSite[] {
-  const frames = new Map<string, number>()
-  return base.steps.flatMap((step, index) => {
-    if ('complete' in step) {
-      return [{ id: step.complete, index, reply: step.reply }]
-    }
-    if ('frame' in step) {
-      const occurrence = (frames.get(step.frame) ?? 0) + 1
-      frames.set(step.frame, occurrence)
-      return [{ id: `${step.frame}@${occurrence}`, index, reply: step.reply }]
-    }
-    return []
-  })
-}
-
-export function replyMatrixSites(base: RecordingScenario): string[] {
-  const sites = matrixSites(base).map((site) => site.id)
-  if (!sites.length) {
-    throw new Error(`No scripted reply to drive a matrix over: ${base.id}`)
-  }
-  const repeated = sites.filter((name, index) => sites.indexOf(name) !== index)
-  if (repeated.length) {
-    // A repeated name would make the divergence ambiguous; the manifest binds concurrent requests.
-    throw new Error(`Matrix sites must be unique: ${base.id} repeats ${repeated.join(', ')}`)
-  }
-  return sites
-}
-
-/** Golden id for one family's matrix at one site, inside the charset `writeGolden` accepts. */
-export function replyMatrixGoldenId(family: string, request: string): string {
-  return `matrix-${family}-${request}`.toLowerCase().replaceAll('#', '-').replaceAll('@', '-')
-}
+import {
+  matrixSites,
+  replyMatrixSites,
+  replyMatrixGoldenId
+} from '../../../../config/scripts/upstream-recording-inputs.mjs'
+export { matrixSites, replyMatrixSites, replyMatrixGoldenId }
 
 export function driveReplyMatrix(
   base: RecordingScenario,

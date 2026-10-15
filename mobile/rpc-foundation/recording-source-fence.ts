@@ -1,42 +1,44 @@
-import { spawnSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import {
+  assertRecordingFixture,
+  assertRecordingControls,
+  type RecordingControlProjection,
+  decodeRecordingSource,
+  type RecordingProjection,
+  type RecordingSource
+} from '../../config/scripts/upstream-recording-source.mjs'
 
-/** Verify the actual Git/source state; record mode alone is never source provenance. */
-export function assertRecordingSources(root: string, baseline: string, hive: boolean): void {
-  if (!/^[a-f0-9]{40}$/.test(baseline)) {
-    throw new Error('Recording requires one full source commit SHA')
+/** Raw exported fixture checks at both ends; Git checkout filters are not evidence. */
+export function assertRecordingSources(
+  root: string,
+  source: RecordingSource,
+  projection: RecordingProjection,
+  controlProjection: RecordingControlProjection
+): void {
+  decodeRecordingSource(source)
+  if (
+    source.guardedSourcesSha256 !== projection.guardedSourcesSha256 ||
+    source.guardedFileCount !== projection.guardedFileCount ||
+    source.guardVersion !== projection.guardVersion
+  ) {
+    throw new Error('Recording source does not match its independently frozen projection')
   }
-  function git(args: string[]) {
-    const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', windowsHide: true })
-    if (result.error) {
-      throw result.error
-    }
-    return result
+  assertRecordingControls(root, source.controlSha, controlProjection)
+  assertRecordingFixture(root, projection)
+}
+
+export function readRecordingSourceInput(file: string): {
+  source: RecordingSource
+  projection: RecordingProjection
+  controlProjection: RecordingControlProjection
+} {
+  const input = JSON.parse(readFileSync(file, 'utf8'))
+  if (Object.keys(input).sort().join(',') !== 'controlProjection,projection,source') {
+    throw new Error('Recording input requires exactly source, projection and controlProjection')
   }
-  const commit = git(['cat-file', '-t', baseline])
-  if (commit.status !== 0 || commit.stdout.trim() !== 'commit') {
-    throw new Error('Recording baseline must name an existing commit')
-  }
-  const guardedSources = [
-    'mobile/src',
-    'src/shared',
-    'mobile/pnpm-lock.yaml',
-    ...(hive
-      ? [
-          'mobile/rpc-foundation/*.ts',
-          'mobile/rpc-foundation/pilot-scenarios.json',
-          'mobile/scripts/rpc-recording.mts'
-        ]
-      : [':!mobile/src/test-support/rpc-recording'])
-  ]
-  const diff = git(['diff', '--quiet', baseline, '--', ...guardedSources])
-  if (diff.status !== 0 && diff.status !== 1) {
-    throw new Error(`Could not diff pinned recording baseline ${baseline}: ${diff.stderr.trim()}`)
-  }
-  if (diff.status === 1) {
-    throw new Error('Product sources differ from the pinned recording baseline')
-  }
-  const untracked = git(['ls-files', '--others', '--exclude-standard', '--', ...guardedSources])
-  if (untracked.status !== 0 || untracked.stdout.trim()) {
-    throw new Error(`Untracked product sources are not pinned by the baseline: ${untracked.stdout}`)
+  return {
+    source: decodeRecordingSource(input.source),
+    projection: input.projection,
+    controlProjection: input.controlProjection
   }
 }

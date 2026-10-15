@@ -12,6 +12,52 @@ function readReport(directory, name) {
   return JSON.parse(readFileSync(path.join(directory, name), 'utf8'))
 }
 
+export function validateRecordingSourceReports({ evidence, target, upstream, candidate }) {
+  const names = ['common', 'linux', 'darwin', 'win32', 'publisher']
+  let reference
+  for (const name of names) {
+    const report = readReport(evidence, `recording-source-${name}.json`)
+    requireValue(
+      report.schemaVersion === 1 &&
+        report.check === 'recording-source' &&
+        report.passed === true &&
+        report.targetSha === target &&
+        report.upstreamSha === upstream &&
+        report.candidateSha === candidate &&
+        /^[a-f0-9]{40}$/.test(report.controlSha ?? '') &&
+        report.controlSha.length === 40 &&
+        /^[a-f0-9]{40}$/.test(report.contentCommitSha ?? '') &&
+        report.contentCommitSha.length === 40 &&
+        report.contentCommitSha !== target &&
+        /^[a-f0-9]{64}$/.test(report.guardedSourcesSha256 ?? '') &&
+        report.guardedSourcesSha256.length === 64 &&
+        Number.isSafeInteger(report.guardedFileCount) &&
+        report.guardedFileCount > 0 &&
+        /^[a-f0-9]{64}$/.test(report.controlSourcesSha256 ?? '') &&
+        report.controlSourcesSha256.length === 64 &&
+        Number.isSafeInteger(report.controlFileCount) &&
+        report.controlFileCount > 0,
+      `Missing, failed, stale or malformed recording source proof: ${name}`
+    )
+    if (reference) {
+      requireValue(
+        [
+          'controlSha',
+          'contentCommitSha',
+          'guardedSourcesSha256',
+          'guardedFileCount',
+          'controlSourcesSha256',
+          'controlFileCount'
+        ].every((field) => report[field] === reference[field]),
+        `Inconsistent recording source proof: ${name}`
+      )
+    } else {
+      reference = report
+    }
+  }
+  return reference
+}
+
 function text(value) {
   return String(value ?? '')
     .replace(/[\r\n]/g, ' ')
@@ -57,6 +103,7 @@ export function renderPublication(options) {
     product.baseSha === target && product.headSha === candidate,
     'Product delta SHA mismatch'
   )
+  validateRecordingSourceReports({ evidence, target, upstream, candidate })
   requireValue(['full', 'incremental'].includes(intake.audit?.mode), 'Missing audit mode')
   requireValue(
     intake.audit.mode === 'full' || /^[a-f0-9]{40}$/.test(intake.audit.baseSha ?? ''),

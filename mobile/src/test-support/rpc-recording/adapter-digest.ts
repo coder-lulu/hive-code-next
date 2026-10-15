@@ -1,9 +1,9 @@
-import { createHash } from 'node:crypto'
+import { RECORDING_ADAPTER_OWNERS } from '../../../../config/scripts/upstream-recording-adapters.mjs'
+import { adapterInputDigest } from '../../../../config/scripts/upstream-recording-inputs.mjs'
 import { readFileSync } from 'node:fs'
 import { join, posix } from 'node:path'
 import { MOUNTED_OPERATION_MODULES } from './adapters/mounted-operation-modules'
 import { operationModuleLoader } from './operation-module-loader'
-import { ADAPTER_DIRECTORY } from './recorder-digest'
 import type { MountedOperationModule } from './mounted-operation-module'
 import type { RecordingScenario } from './recording-scenario'
 
@@ -21,10 +21,22 @@ export function adapterSourceByOperation(
   const owners = new Map<string, string>()
   for (const module of registered) {
     for (const operation of Object.keys(module.mounts(modules, {}))) {
+      if (owners.has(operation)) {
+        throw new Error('Duplicate adapter operation: ' + operation)
+      }
       owners.set(operation, module.source)
     }
   }
-  return owners
+  const actual = [...owners].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+  const expected = Object.entries(RECORDING_ADAPTER_OWNERS).sort(([a], [b]) =>
+    a < b ? -1 : a > b ? 1 : 0
+  )
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+    throw new Error(
+      'Adapter factory operations differ from the complete frozen ownership declaration'
+    )
+  }
+  return new Map(expected)
 }
 
 /**
@@ -57,16 +69,9 @@ export function adapterSha256(
   if (cached !== undefined) {
     return cached
   }
-  const digest = createHash('sha256')
-    .update(
-      sources
-        .map(
-          (source) =>
-            `${source}:${readFileSync(join(root, ...ADAPTER_DIRECTORY.split(posix.sep), source), 'utf8').replace(/\r\n/g, '\n')}`
-        )
-        .join('\n')
-    )
-    .digest('hex')
+  const digest = adapterInputDigest(sources, (file) =>
+    readFileSync(join(root, ...file.split(posix.sep)))
+  )
   digests.set(key, digest)
   return digest
 }

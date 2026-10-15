@@ -1,5 +1,5 @@
 import { hoistPreludeCheckpoints } from './prelude-checkpoints'
-import { driveReplyMatrix, replyMatrixGoldenId, replyMatrixSites } from './reply-matrix'
+import { driveReplyMatrix } from './reply-matrix'
 import { replyMatrixNormalResult } from './reply-matrix-normal-result'
 import {
   bindCompletions,
@@ -27,31 +27,7 @@ export type DerivedGolden = {
   timeoutMs?: number
 }
 
-const SIBLING_SCHEDULE_BASES = [
-  'b3',
-  'settings-new-tab-ssh',
-  'settings-home-providers-fulfilled',
-  'settings-workspace-context-fulfilled',
-  'settings-resume-metadata-fulfilled',
-  'settings-task-hydration-fulfilled',
-  'settings-repo-metadata-fulfilled'
-]
-const INTERRUPTION_BASES = ['inventory-lifecycle', 'settings-bot-overrides-fulfilled']
-const LIFECYCLE_BASES = [
-  'inventory-lifecycle',
-  'b3',
-  'settings-bot-overrides-fulfilled',
-  'settings-workspace-context-fulfilled',
-  'settings-task-hydration-fulfilled'
-]
-
-function baseScenario(manifest: readonly RecordingScenario[], id: string): RecordingScenario {
-  const found = manifest.find((scenario) => scenario.id === id)
-  if (!found) {
-    throw new Error(`No scenario named ${id}`)
-  }
-  return found
-}
+import { recordingDomainPlan } from '../../../../config/scripts/upstream-recording-inputs.mjs'
 
 function omitRetiredInventoryAdmission(scenario: RecordingScenario): RecordingScenario {
   if (scenario.id !== 'inventory-lifecycle.unmount-before-1') {
@@ -87,85 +63,64 @@ export function pilotGoldens(manifest: readonly RecordingScenario[]): PilotGolde
 
 /** Every golden generated from a family's base scenario: reply matrices and owned schedules. */
 export function familyGoldens(manifest: readonly RecordingScenario[]): DerivedGolden[] {
-  const families = new Map<string, RecordingScenario[]>()
-  for (const scenario of manifest) {
-    families.set(scenario.family, [...(families.get(scenario.family) ?? []), scenario])
-  }
-  const goldens: DerivedGolden[] = []
-  const ids = new Set<string>()
-  for (const [family, scenarios] of families) {
-    const [base] = scenarios
-    if (!base) {
-      throw new Error(`Family has no scenario: ${family}`)
+  return recordingDomainPlan(manifest).flatMap((plan): DerivedGolden[] => {
+    const { id, family, base } = plan
+    switch (plan.kind) {
+      case 'pilot':
+        return []
+      case 'matrix':
+        return [
+          {
+            id,
+            family,
+            title: id + ': ' + family + ' reply partitions at ' + plan.site,
+            site: plan.site,
+            timeoutMs: 30_000,
+            scenarios: () =>
+              driveReplyMatrix(
+                base,
+                plan.site,
+                replyMatrixNormalResult(family, plan.scenarios, plan.site)
+              )
+          }
+        ]
+      case 'sibling':
+        return [
+          {
+            id,
+            family,
+            title: id + ': completion orders and correlated faults',
+            scenarios: () => siblingSchedules(base, plan.first, plan.second)
+          }
+        ]
+      case 'interruption':
+        return [
+          {
+            id,
+            family,
+            title: id + ': timeout, disconnect and stable-client cutover',
+            scenarios: () => interruptionSchedules(base)
+          }
+        ]
+      case 'lifecycle':
+        return [
+          {
+            id,
+            family,
+            title: id + ': lifecycle boundaries',
+            scenarios: () =>
+              hoistPreludeCheckpoints(
+                { ...base, steps: bindCompletions(base.steps) },
+                plan.actions
+                  .flatMap((action) => lifecycleSchedules(base, action))
+                  .filter(
+                    ({ scenario }) => !base.id.includes('hydration') || !scenario.id.endsWith('-1')
+                  )
+              ).map(omitRetiredInventoryAdmission)
+          }
+        ]
     }
-    for (const site of replyMatrixSites(base)) {
-      const id = replyMatrixGoldenId(family, site)
-      if (ids.has(id)) {
-        throw new Error(`Two matrix sites share a golden: ${id}`)
-      }
-      ids.add(id)
-      goldens.push({
-        id,
-        title: `${id}: ${family} reply partitions at ${site}`,
-        family,
-        site,
-        timeoutMs: 30_000,
-        scenarios: () =>
-          driveReplyMatrix(base, site, replyMatrixNormalResult(family, scenarios, site))
-      })
-    }
-  }
-  for (const id of SIBLING_SCHEDULE_BASES) {
-    const base = baseScenario(manifest, id)
-    const replies = base.steps.flatMap((step) => ('complete' in step ? [step] : []))
-    // Complete prerequisites before permuting the sibling barrier.
-    const first = replies.find((step) =>
-      step.complete.startsWith(id === 'b3' ? 'linear.getIssue' : 'settings.get')
-    )
-    if (!first) {
-      throw new Error(`No prerequisite completion to order siblings against: ${id}`)
-    }
-    const second = replies[replies.indexOf(first) + 1]
-    if (!second) {
-      continue
-    }
-    goldens.push({
-      id: `schedules-${id}`,
-      title: `schedules-${id}: completion orders and correlated faults`,
-      family: base.family,
-      scenarios: () => siblingSchedules(base, first, second)
-    })
-  }
-  for (const id of INTERRUPTION_BASES) {
-    const base = baseScenario(manifest, id)
-    goldens.push({
-      id: `interruptions-${id}`,
-      title: `interruptions-${id}: timeout, disconnect and stable-client cutover`,
-      family: base.family,
-      scenarios: () => interruptionSchedules(base)
-    })
-  }
-  for (const id of LIFECYCLE_BASES) {
-    const base = baseScenario(manifest, id)
-    const actions: readonly ('reset' | 'unmount' | 'blur')[] = id.includes('hydration')
-      ? ['unmount']
-      : id.includes('context')
-        ? ['unmount', 'blur']
-        : ['reset', 'unmount', 'blur']
-    goldens.push({
-      id: `lifecycle-${id}`,
-      title: `lifecycle-${id}: lifecycle boundaries`,
-      family: base.family,
-      scenarios: () =>
-        hoistPreludeCheckpoints(
-          { ...base, steps: bindCompletions(base.steps) },
-          actions
-            .flatMap((action) => lifecycleSchedules(base, action))
-            .filter(({ scenario }) => !id.includes('hydration') || !scenario.id.endsWith('-1'))
-        ).map(omitRetiredInventoryAdmission)
-    })
-  }
-  return goldens
+  })
 }
 
 /** Every golden the oracle freezes, pilot and family alike. */

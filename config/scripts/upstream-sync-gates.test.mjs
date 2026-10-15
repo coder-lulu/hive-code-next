@@ -37,6 +37,7 @@ describe('upstream synchronization fixed gates', () => {
         'updater',
         'mobile',
         'runtime-rpc',
+        'recording-source',
         'platform',
         'generated',
         'lockfile'
@@ -81,8 +82,16 @@ describe('upstream synchronization fixed gates', () => {
     expect(workflow).toContain("needs.platform-gates.result == 'success'")
   })
 
+  it('retains control ancestors in every checkout so thin bundles cannot hide source provenance', () => {
+    const depths = [...workflow.matchAll(/fetch-depth: (\d+)/g)].map((match) => Number(match[1]))
+    expect(depths).toHaveLength(4)
+    expect(depths).toEqual([0, 0, 0, 0])
+  })
+
   it('keeps the frozen product review position separate from the tested candidate', () => {
-    expect(workflow).toContain('candidate_sha: ${{ steps.bundle.outputs.candidate_sha }}')
+    expect(workflow).toContain(
+      'candidate_sha: ${{ steps.bundle_input.outputs.candidate_sha || steps.bundle.outputs.candidate_sha }}'
+    )
     expect(workflow).toContain('track-upstream-changes.mjs')
     expect(workflow).toContain('--state-ref "$TARGET_SHA"')
     expect(workflow).toContain('--head "$UPSTREAM_SHA"')
@@ -93,10 +102,14 @@ describe('upstream synchronization fixed gates', () => {
     for (const platform of ['win32', 'darwin', 'linux']) {
       const checks = selectChecks({ manifest, matrix, suite: 'regression', platform })
       expect(checks.map((check) => check.id)).toEqual(
-        platform === 'win32' ? ['pty-wsl-ssh', 'windows-cli-typecheck'] : ['pty-wsl-ssh']
+        platform === 'win32'
+          ? ['pty-wsl-ssh', 'recording-source-platform', 'windows-cli-typecheck']
+          : ['pty-wsl-ssh', 'recording-source-platform']
       )
       const all = selectChecks({ manifest, matrix, suite: 'all', platform })
       expect(all.filter((check) => check.id === 'pty-wsl-ssh')).toHaveLength(1)
+      expect(all.filter((check) => check.id === 'recording-source-platform')).toHaveLength(1)
+      expect(all.filter((check) => check.id === 'recording-source-common')).toHaveLength(1)
       for (const check of checks) {
         for (const testPath of check.paths ?? []) {
           expect(existsSync(join(projectDir, check.cwd, testPath))).toBe(true)

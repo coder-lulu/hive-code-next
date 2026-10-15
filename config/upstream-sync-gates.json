@@ -140,6 +140,13 @@
         "kind": "command",
         "cwd": "mobile",
         "argv": ["pnpm", "install", "--frozen-lockfile", "--ignore-scripts", "--lockfile-only"]
+      },
+      {
+        "id": "recording-source-common",
+        "category": "recording-source",
+        "kind": "recording-source",
+        "cwd": ".",
+        "argv": ["verify"]
       }
     ],
     "platform": [
@@ -162,6 +169,13 @@
           "src/main/ssh/orcad-runtime-conversion.test.ts",
           "src/main/ssh/orcad-migration-terminal-gate.test.ts"
         ]
+      },
+      {
+        "id": "recording-source-platform",
+        "category": "recording-source",
+        "kind": "recording-source",
+        "cwd": ".",
+        "argv": ["verify"]
       }
     ]
   }

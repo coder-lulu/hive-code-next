@@ -1,7 +1,7 @@
-import { createHash } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, posix } from 'node:path'
 import { RECORDING_DRIVERS } from './recording-drivers'
+import { recorderInputDigest } from '../../../../config/scripts/upstream-recording-inputs.mjs'
 
 export const RECORDER_DIRECTORY = 'mobile/src/test-support/rpc-recording'
 /** The mount adapters are attributed per operation in the external Hive manifest. */
@@ -46,16 +46,9 @@ export function recorderSha256(root: string): string {
   }
   const files: string[] = []
   collect(root, RECORDER_DIRECTORY, files)
-  const digest = createHash('sha256')
-    .update(
-      files
-        .map(
-          (file) =>
-            `${file}:${readFileSync(join(root, ...file.split(posix.sep)), 'utf8').replace(/\r\n/g, '\n')}`
-        )
-        .join('\n')
-    )
-    .digest('hex')
+  const digest = recorderInputDigest(files, (file) =>
+    readFileSync(join(root, ...file.split(posix.sep)))
+  )
   digests.set(root, digest)
   return digest
 }

@@ -65,6 +65,22 @@ function fixture() {
       commands: ['focused verification']
     })
   }
+  for (const name of ['common', 'linux', 'darwin', 'win32', 'publisher']) {
+    write(`recording-source-${name}`, {
+      schemaVersion: 1,
+      check: 'recording-source',
+      passed: true,
+      targetSha: options.target,
+      upstreamSha: options.upstream,
+      candidateSha: options.candidate,
+      controlSha: 'd'.repeat(40),
+      contentCommitSha: 'e'.repeat(40),
+      guardedSourcesSha256: 'f'.repeat(64),
+      guardedFileCount: 11,
+      controlSourcesSha256: 'e'.repeat(64),
+      controlFileCount: 7
+    })
+  }
   for (const name of [
     'fork-delta',
     'product-delta',

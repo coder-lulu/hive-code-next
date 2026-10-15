@@ -57,7 +57,7 @@ jobs:
       - name: Checkout repository without publication credentials
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0
           fetch-tags: false
           persist-credentials: false
 
@@ -248,7 +248,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ needs.sync.outputs.target_sha }}
-          fetch-depth: 1
+          fetch-depth: 0
           fetch-tags: false
           persist-credentials: false
 
@@ -327,6 +327,9 @@ jobs:
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           mkdir -p "$RUNNER_TEMP/upstream-sync-control" "$GITHUB_WORKSPACE/logs/upstream-sync/evidence"
           git --no-replace-objects archive "$TARGET_SHA" config | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-recording-source.mjs" verify \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
+            --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/evidence/recording-source-common.json"
           node --input-type=module <<'NODE'
           import { writeFileSync } from 'node:fs'
           import { pathToFileURL } from 'node:url'
@@ -417,7 +420,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ needs.sync.outputs.target_sha }}
-          fetch-depth: 1
+          fetch-depth: 0
           fetch-tags: false
           persist-credentials: false
 
@@ -474,6 +477,17 @@ jobs:
           node "$RUNNER_TEMP/upstream-sync-control/config/scripts/run-upstream-sync-gates.mjs" --suite=regression --phase=final --platform="$PLATFORM" --cwd "$GITHUB_WORKSPACE" \
             2>&1 | tee "$GITHUB_WORKSPACE/logs/upstream-sync/regression-$PLATFORM.log"
 
+      - name: Recompute source provenance using restored frozen controls
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
+          git --no-replace-objects archive "$TARGET_SHA" config | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-recording-source.mjs" verify \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
+            --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/recording-source-$PLATFORM.json"
+
       - name: Record platform verification outcome
         if: always()
         shell: bash
@@ -500,6 +514,7 @@ jobs:
             logs/upstream-sync/regression-${{ matrix.platform }}.json
             logs/upstream-sync/regression-${{ matrix.platform }}.log
             logs/upstream-sync/tree-sync-${{ matrix.platform }}.json
+            logs/upstream-sync/recording-source-${{ matrix.platform }}.json
           if-no-files-found: error
           retention-days: 30
 
@@ -519,7 +534,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           ref: ${{ needs.sync.outputs.target_sha }}
-          fetch-depth: 1
+          fetch-depth: 0
           fetch-tags: false
           persist-credentials: false
 
@@ -555,6 +570,9 @@ jobs:
           node config/scripts/upstream-tree-sync.mjs verify \
             --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
             --target-branch "$TARGET_BRANCH" --report logs/upstream-sync/publication/tree-sync-verify.json
+          node config/scripts/upstream-recording-source.mjs verify \
+            --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
+            --target-branch "$TARGET_BRANCH" --report logs/upstream-sync/publication/recording-source-publisher.json
           node config/scripts/upstream-intake.mjs \
             --cwd "$GITHUB_WORKSPACE" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
             --state-ref "$TARGET_SHA" --target-branch "$TARGET_BRANCH" --require-boundary-review \

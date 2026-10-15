@@ -1,25 +1,32 @@
+import { hiveRecordingInputs } from './hive-recording-inputs'
 import { createHash } from 'node:crypto'
-import { existsSync, readFileSync, readdirSync } from 'node:fs'
-import { join } from 'node:path'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import type { GoldenRecording } from '../src/test-support/rpc-recording/golden-recording'
-import { assertRecordingSources } from './recording-source-fence'
+import {
+  decodeRecordingManifest,
+  sha256,
+  type RecordingManifest
+} from '../../config/scripts/upstream-recording-source.mjs'
 
-export type HiveRecordingManifest = {
-  version: 2
-  baseline: string
-  upstreamBaseline: string
-  upstreamGoldensSha256: string
-  recorderSha256: string
-  scenariosSha256: string
-  adapterSha256ByOperation: Record<string, string>
-  overlays: Record<string, { sha256: string; reason: string }>
-}
+export type HiveRecordingManifest = RecordingManifest
+
+const textHashes = new Map<string, { stamp: string; digest: string }>()
+const validatedInputs = new Map<string, string>()
 
 /** Pin repository text independently of the checkout's CRLF setting. */
 export function recordingFileSha256(file: string): string {
-  return createHash('sha256')
+  const stat = statSync(file, { bigint: true })
+  const stamp = `${stat.size}:${stat.mtimeNs}:${stat.ctimeNs}`
+  const cached = textHashes.get(file)
+  if (cached?.stamp === stamp) {
+    return cached.digest
+  }
+  const digest = createHash('sha256')
     .update(readFileSync(file, 'utf8').replace(/\r\n/g, '\n'))
     .digest('hex')
+  textHashes.set(file, { stamp, digest })
+  return digest
 }
 
 export function upstreamGoldenSha256(directory: string): string {
@@ -34,48 +41,51 @@ export function upstreamGoldenSha256(directory: string): string {
     .digest('hex')
 }
 
-const manifests = new Map<string, HiveRecordingManifest>()
-const verifiedRecordings = new Map<string, string>()
-
-function manifestFor(directory: string): HiveRecordingManifest | null {
-  const cached = manifests.get(directory)
-  if (cached) {
-    return cached
-  }
+export function manifestFor(directory: string): HiveRecordingManifest | null {
   const path = join(directory, '../hive/manifest.json')
   if (!existsSync(path)) {
     return null
   }
-  const manifest: HiveRecordingManifest = JSON.parse(readFileSync(path, 'utf8'))
-  if (
-    manifest.version !== 2 ||
-    !/^[a-f0-9]{40}$/.test(manifest.baseline) ||
-    !/^[a-f0-9]{40}$/.test(manifest.upstreamBaseline) ||
-    !/^[a-f0-9]{64}$/.test(manifest.recorderSha256) ||
-    !/^[a-f0-9]{64}$/.test(manifest.scenariosSha256) ||
-    upstreamGoldenSha256(directory) !== manifest.upstreamGoldensSha256
-  ) {
+  const manifest = decodeRecordingManifest(JSON.parse(readFileSync(path, 'utf8')))
+  if (upstreamGoldenSha256(directory) !== manifest.upstreamGoldensSha256) {
     throw new Error('Hive recording provenance does not match its frozen upstream reference')
   }
-  manifests.set(directory, manifest)
-  return manifest
-}
-
-export function hiveRecordingBaseline(root: string, upstreamBaseline: string): string {
-  if (process.env.RPC_FOUNDATION_MODE === '--record') {
-    if (process.env.RPC_FOUNDATION_RECORD !== '1') {
-      throw new Error('Recording requires RPC_FOUNDATION_RECORD=1')
-    }
-    // Recording creates evidence for a new source commit, before its overlay can be reviewed.
-    // Callers using this helper fence the source; the recorder script also fences both ends.
-    if (verifiedRecordings.get(root) !== upstreamBaseline) {
-      assertRecordingSources(root, upstreamBaseline, true)
-      verifiedRecordings.set(root, upstreamBaseline)
-    }
-    return upstreamBaseline
+  if (
+    manifest.version === 3 &&
+    sha256(readFileSync(join(directory, '../hive/reviewed-deltas.json'))) !==
+      manifest.reviewedDeltasSha256
+  ) {
+    throw new Error('Hive reviewed deltas changed without review')
   }
-  const manifest = manifestFor(join(root, 'mobile/rpc-foundation/goldens'))
-  return manifest?.upstreamBaseline === upstreamBaseline ? manifest.baseline : upstreamBaseline
+  const validationKey = JSON.stringify(manifest)
+  if (manifest.version === 3 && validatedInputs.get(directory) !== validationKey) {
+    const inputs = hiveRecordingInputs(resolve(directory, '../../..'))
+    const actual = {
+      recorderSha256: manifest.recorderSha256,
+      scenariosSha256: manifest.scenariosSha256,
+      adapterSha256ByOperation: manifest.adapterSha256ByOperation
+    }
+    if (JSON.stringify(actual) !== JSON.stringify(inputs.digests)) {
+      throw new Error(
+        'Hive recording input digests differ from current recorder, scenarios or adapters'
+      )
+    }
+    const supported = readdirSync(directory)
+      .filter((file) => file.endsWith('.json'))
+      .filter((file) =>
+        Object.hasOwn(
+          manifest.adapterSha256ByOperation,
+          JSON.parse(readFileSync(join(directory, file), 'utf8')).operation
+        )
+      )
+      .map((file) => file.slice(0, -5))
+      .sort()
+    if (JSON.stringify(supported) !== JSON.stringify(inputs.supportedIds)) {
+      throw new Error('Hive recording supported domain differs from current scenario derivation')
+    }
+    validatedInputs.set(directory, validationKey)
+  }
+  return manifest
 }
 
 /** Materialize a product reference without changing any upstream golden bytes or provenance. */
@@ -96,7 +106,10 @@ export function hiveGoldenReference(
   const overlay = manifest.overlays[id]
   if (overlay) {
     const path = join(directory, '../hive/goldens', `${id}.json`)
-    if (recordingFileSha256(path) !== overlay.sha256) {
+    if (
+      (manifest.version === 3 ? sha256(readFileSync(path)) : recordingFileSha256(path)) !==
+      overlay.sha256
+    ) {
       throw new Error(`Hive recording overlay changed without review: ${id}`)
     }
     const golden = readRaw(join(directory, '../hive/goldens'), id)

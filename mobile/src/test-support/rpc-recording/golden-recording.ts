@@ -30,7 +30,7 @@ export type GoldenRecording = {
 }
 
 export function recordHint(id: string): string {
-  return `If the change is intended, record frozen source evidence: pnpm --dir mobile rpc:record --record-hive <source-sha> <upstream-sha> ${id} --evidence-only`
+  return `If the change is intended, record frozen source evidence: pnpm --dir mobile rpc:record --record-hive <source-input.json> <logs-output-directory> ${id} --evidence-only`
 }
 export function goldenRecording(
   scenarios: readonly RecordingScenario[],

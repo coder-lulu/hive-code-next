@@ -163,7 +163,7 @@ describe('recording boundaries', () => {
       const written = readFileSync(path, 'utf8')
       await expectGoldenFile(directory, 'exact', golden)
       const sameRecording =
-        /holds the same recording but is not the file rpc:record writes for it[\s\S]*pnpm --dir mobile rpc:record --record-hive <source-sha> <upstream-sha> exact --evidence-only/
+        /holds the same recording but is not the file rpc:record writes for it[\s\S]*pnpm --dir mobile rpc:record --record-hive <source-input.json> <logs-output-directory> exact --evidence-only/
       // Each edit below decodes to the same recording, so only the file text can catch it.
       writeFileSync(path, written.replace('{\n', '{\n  "baseline": "abc123",\n'))
       await expect(expectGoldenFile(directory, 'exact', golden)).rejects.toThrow(sameRecording)
@@ -181,15 +181,15 @@ describe('recording boundaries', () => {
         JSON.stringify({ ...file, values: { ...file.values, [valueHash('unread')]: 'unread' } })
       )
       await expect(expectGoldenFile(directory, 'exact', golden)).rejects.toThrow(
-        /Golden exact: Golden pool holds unreferenced values[\s\S]*pnpm --dir mobile rpc:record --record-hive <source-sha> <upstream-sha> exact --evidence-only/
+        /Golden exact: Golden pool holds unreferenced values[\s\S]*pnpm --dir mobile rpc:record --record-hive <source-input.json> <logs-output-directory> exact --evidence-only/
       )
       writeFileSync(path, written.replace('"idle"', '"edited"'))
       await expect(expectGoldenFile(directory, 'exact', golden)).rejects.toThrow(
-        /does not hash to its pool key[\s\S]*pnpm --dir mobile rpc:record --record-hive <source-sha> <upstream-sha> exact --evidence-only/
+        /does not hash to its pool key[\s\S]*pnpm --dir mobile rpc:record --record-hive <source-input.json> <logs-output-directory> exact --evidence-only/
       )
       writeFileSync(path, written.slice(0, -10))
       await expect(expectGoldenFile(directory, 'exact', golden)).rejects.toThrow(
-        /Golden exact: [\s\S]*pnpm --dir mobile rpc:record --record-hive <source-sha> <upstream-sha> exact --evidence-only/
+        /Golden exact: [\s\S]*pnpm --dir mobile rpc:record --record-hive <source-input.json> <logs-output-directory> exact --evidence-only/
       )
       writeFileSync(path, written)
       const moved = sampleGolden('exact')
@@ -276,7 +276,7 @@ describe('recording boundaries', () => {
     const actual = sampleGolden('diffable')
     actual.recording.checkpoints[0]!.observation.state = { phase: 'busy' }
     expect(() => compareGolden(expected, actual)).toThrow(
-      /Recording differs: diffable\n {2}checkpoint settled field state\.phase\n[\s\S]*"idle"[\s\S]*"busy"[\s\S]*pnpm --dir mobile rpc:record --record-hive <source-sha> <upstream-sha> diffable --evidence-only/
+      /Recording differs: diffable\n {2}checkpoint settled field state\.phase\n[\s\S]*"idle"[\s\S]*"busy"[\s\S]*pnpm --dir mobile rpc:record --record-hive <source-input.json> <logs-output-directory> diffable --evidence-only/
     )
   })
 

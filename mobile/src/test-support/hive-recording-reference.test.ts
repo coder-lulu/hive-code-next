@@ -7,10 +7,28 @@ import {
   recordingTraceSha256,
   writeHiveRecordingOverlay
 } from '../../rpc-foundation/write-hive-recording-overlay'
+import { upstreamGoldenSha256 } from '../../rpc-foundation/hive-recording-reference'
+
 import {
-  hiveRecordingBaseline,
-  upstreamGoldenSha256
-} from '../../rpc-foundation/hive-recording-reference'
+  CONTROL_PATHS,
+  recordingProjection,
+  recordingControlProjection
+} from '../../../config/scripts/upstream-recording-source.mjs'
+
+vi.mock('./rpc-recording/scenario-input', () => ({
+  readScenarios: () => ({
+    scenarios: [
+      { id: 'b1', operation: 'workspace.file-inventory' },
+      { id: 'b2', operation: 'project.update-metadata' }
+    ]
+  })
+}))
+vi.mock('./rpc-recording/derived-goldens', () => ({
+  derivedGoldens: () => [{ id: 'b1' }, { id: 'b2' }]
+}))
+vi.mock('./rpc-recording/recorder-digest', () => ({ recorderSha256: () => 'b'.repeat(64) }))
+vi.mock('./rpc-recording/scenario-digest', () => ({ scenarioSha256: () => 'c'.repeat(64) }))
+vi.mock('./rpc-recording/adapter-digest', () => ({ adapterSha256: () => 'd'.repeat(64) }))
 
 const project = resolve(import.meta.dirname, '../../..')
 const upstream = join(project, 'mobile/rpc-foundation/goldens')
@@ -59,7 +77,14 @@ function fixture(reviewed = true) {
       encoding: 'utf8',
       windowsHide: true
     }).trim()
+  mkdirSync(join(root, 'config/scripts'), { recursive: true })
+  for (const path of CONTROL_PATHS.filter(
+    (path) => path.startsWith('config/scripts/') && path.endsWith('.mjs')
+  )) {
+    writeFileSync(join(root, path), readFileSync(join(project, path)))
+  }
   git('init', '--quiet')
+  git('config', 'core.autocrlf', 'false')
   git('add', '.')
   git(
     '-c',
@@ -75,11 +100,28 @@ function fixture(reviewed = true) {
     'recording source'
   )
   const baseline = git('rev-parse', 'HEAD')
+  const projection = recordingProjection(root, baseline)
+  const sourcePin = {
+    kind: 'tree-sync-content',
+    controlSha: baseline,
+    upstreamSha: upstreamBaseline,
+    guardVersion: 1,
+    guardedSourcesSha256: projection.guardedSourcesSha256,
+    guardedFileCount: projection.guardedFileCount
+  }
+  const sourceInput = join(root, 'source-input.json')
+  writeFileSync(
+    sourceInput,
+    JSON.stringify({
+      source: sourcePin,
+      projection,
+      controlProjection: recordingControlProjection(root, baseline)
+    })
+  )
   writeFileSync(
     join(root, 'provenance.json'),
     JSON.stringify({
-      baseline,
-      upstreamBaseline,
+      source: sourcePin,
       recorderSha256: 'b'.repeat(64),
       scenariosSha256: 'c'.repeat(64),
       adapterSha256ByOperation: Object.fromEntries(
@@ -87,7 +129,7 @@ function fixture(reviewed = true) {
       )
     })
   )
-  return { root, reference, hive, recorded, originals, next, baseline, source }
+  return { root, reference, hive, recorded, originals, next, baseline, source, sourceInput }
 }
 
 describe('Hive recording provenance and sparse overlays', { timeout: 30_000 }, () => {
@@ -96,31 +138,28 @@ describe('Hive recording provenance and sparse overlays', { timeout: 30_000 }, (
     const upstreamBytes = readFileSync(join(f.reference, 'b2.json'), 'utf8')
     mkdirSync(join(f.hive, 'goldens'), { recursive: true })
     writeFileSync(join(f.hive, 'goldens/stale.json'), '{}')
-    writeHiveRecordingOverlay(f.root, f.baseline, f.recorded)
+    writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)
     expect(existsSync(join(f.hive, 'goldens/b1.json'))).toBe(false)
     expect(existsSync(join(f.hive, 'goldens/b2.json'))).toBe(true)
     expect(existsSync(join(f.hive, 'goldens/stale.json'))).toBe(false)
     expect(readFileSync(join(f.reference, 'b2.json'), 'utf8')).toBe(upstreamBytes)
     expect(readGolden(f.reference, 'b1')).toEqual(f.next[0])
     expect(readGolden(f.reference, 'b2')).toEqual(f.next[1])
-    expect(hiveRecordingBaseline(f.root, upstreamBaseline)).toBe(f.baseline)
+    expect(JSON.parse(readFileSync(join(f.hive, 'manifest.json'), 'utf8')).version).toBe(3)
   })
 
-  it('publishes the product-supported subset without changing the frozen upstream set', () => {
+  it('rejects a missing supported recording instead of silently shrinking the domain', () => {
     const f = fixture()
     rmSync(join(f.recorded, 'b1.json'))
 
-    writeHiveRecordingOverlay(f.root, f.baseline, f.recorded)
-
-    const manifest = JSON.parse(readFileSync(join(f.hive, 'manifest.json'), 'utf8'))
-    expect(Object.keys(manifest.adapterSha256ByOperation)).toEqual([f.next[1].operation])
-    expect(existsSync(join(f.hive, 'goldens/b2.json'))).toBe(true)
-    expect(readFileSync(join(f.reference, 'b1.json'), 'utf8')).toBeTruthy()
+    expect(() => writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)).toThrow(
+      'complete current product-supported recording domain'
+    )
   })
 
   it('rejects an unreviewed trace before publishing a provenance manifest', () => {
     const f = fixture(false)
-    expect(() => writeHiveRecordingOverlay(f.root, f.baseline, f.recorded)).toThrow(
+    expect(() => writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)).toThrow(
       'Unreviewed Hive recording difference'
     )
     expect(existsSync(join(f.hive, 'manifest.json'))).toBe(false)
@@ -128,63 +167,38 @@ describe('Hive recording provenance and sparse overlays', { timeout: 30_000 }, (
 
   it('rejects an altered upstream reference rather than silently accepting it as product output', () => {
     const f = fixture()
-    writeHiveRecordingOverlay(f.root, f.baseline, f.recorded)
+    writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)
     writeFileSync(join(f.reference, 'b1.json'), '{}')
-    expect(() => hiveRecordingBaseline(f.root, upstreamBaseline)).toThrow(
-      'frozen upstream reference'
-    )
+    expect(() => readGolden(f.reference, 'b2')).toThrow('frozen upstream reference')
   })
 
   it('rejects a changed product overlay even when its header still names the candidate', () => {
     const f = fixture()
-    writeHiveRecordingOverlay(f.root, f.baseline, f.recorded)
+    writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)
     writeFileSync(join(f.hive, 'goldens/b2.json'), goldenBytes(f.next[0]))
     expect(() => readGolden(f.reference, 'b2')).toThrow('overlay changed without review')
   })
 })
 
-describe('new Hive recording source proof', { timeout: 30_000 }, () => {
-  function sourceFixture() {
+describe('raw source projection fences the writer', { timeout: 30_000 }, () => {
+  it('rejects source drift before generating outputs', () => {
     const f = fixture()
-    writeHiveRecordingOverlay(f.root, f.baseline, f.recorded)
-    // A newly synchronized upstream must invalidate playback of the old manifest.
-    writeFileSync(join(f.reference, 'b1.json'), '{}')
-    return f
-  }
-
-  it('records a proven clean commit while stale manifest playback remains refused', () => {
-    const f = sourceFixture()
-    vi.stubEnv('RPC_FOUNDATION_RECORD', '1')
-    vi.stubEnv('RPC_FOUNDATION_MODE', '--record')
-    expect(hiveRecordingBaseline(f.root, f.baseline)).toBe(f.baseline)
-    vi.stubEnv('RPC_FOUNDATION_MODE', '--candidate')
-    expect(() => hiveRecordingBaseline(f.root, f.baseline)).toThrow('frozen upstream reference')
-    expect(() => readGolden(f.reference, 'b2')).toThrow('frozen upstream reference')
+    writeFileSync(join(f.source, 'product.ts'), 'changed')
+    expect(() => writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)).toThrow(
+      'bytes differ'
+    )
   })
-
-  it('rejects record mode without explicit write authorization or an existing full commit', () => {
-    const f = sourceFixture()
-    vi.stubEnv('RPC_FOUNDATION_MODE', '--record')
-    vi.stubEnv('RPC_FOUNDATION_RECORD', undefined)
-    expect(() => hiveRecordingBaseline(f.root, f.baseline)).toThrow('RPC_FOUNDATION_RECORD=1')
-    vi.stubEnv('RPC_FOUNDATION_RECORD', '1')
-    expect(() => hiveRecordingBaseline(f.root, 'HEAD')).toThrow('full source commit SHA')
-    expect(() => hiveRecordingBaseline(f.root, '0'.repeat(40))).toThrow('existing commit')
+  it('rejects extra guarded modules', () => {
+    const f = fixture()
+    writeFileSync(join(f.source, 'extra.ts'), 'changed')
+    expect(() => writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)).toThrow(
+      'paths differ'
+    )
   })
-
-  it('rejects tracked source drift even in explicit record mode', () => {
-    const f = sourceFixture()
-    vi.stubEnv('RPC_FOUNDATION_MODE', '--record')
-    vi.stubEnv('RPC_FOUNDATION_RECORD', '1')
-    writeFileSync(join(f.source, 'product.ts'), 'export const product = 2\n')
-    expect(() => hiveRecordingBaseline(f.root, f.baseline)).toThrow('sources differ')
-  })
-
-  it('rejects untracked source modules instead of accepting an unchanged Git diff', () => {
-    const f = sourceFixture()
-    vi.stubEnv('RPC_FOUNDATION_MODE', '--record')
-    vi.stubEnv('RPC_FOUNDATION_RECORD', '1')
-    writeFileSync(join(f.source, 'untracked.ts'), 'export const product = 2\n')
-    expect(() => hiveRecordingBaseline(f.root, f.baseline)).toThrow('Untracked product sources')
+  it('rejects altered reviewed deltas after writing', () => {
+    const f = fixture()
+    writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)
+    writeFileSync(join(f.hive, 'reviewed-deltas.json'), '{}')
+    expect(() => readGolden(f.reference, 'b2')).toThrow('reviewed deltas')
   })
 })
