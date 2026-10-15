@@ -55,7 +55,11 @@ export function buildWorktreeSessionRows(args: {
       continue
     }
     const paneKey = makePaneKey(tab.id, root.leafId)
-    if (args.paneForegroundAgentByPaneKey?.[paneKey]?.shellForeground) {
+    const foreground = args.paneForegroundAgentByPaneKey?.[paneKey]
+    if (
+      foreground?.shellForeground ||
+      (foreground?.agentEvidence === 'process-read' && foreground.agent === null)
+    ) {
       continue
     }
     if (!seen.has(paneKey)) {

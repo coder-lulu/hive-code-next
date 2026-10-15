@@ -90,6 +90,17 @@ describe('a stale entry on a pane Orca still holds', () => {
     expect(getCompactAgentSecondary(rows[0], NOW)).toBe('No update in 34m')
   })
 
+  it('shows an unconfirmed label for an inventory row with no observation clock', () => {
+    const rows = buildWorktreeAgentRows({
+      tabs: [makeTab({ id: TAB_ID, worktreeId: 'wt-1' })],
+      entries: [entry({ restoredUnconfirmed: true, updatedAt: 0, stateStartedAt: 0 })],
+      retained: [],
+      ptyIdsByTabId: LIVE,
+      now: NOW
+    })
+    expect(getCompactAgentSecondary({ ...rows[0], state: 'unverifiable' }, NOW)).toBe('unconfirmed')
+  })
+
   it('measures the gap from the observation clock, not the delivery clock', () => {
     // A relay replay restamps `updatedAt`; the reading must not reset with it.
     const replayed = entry({ updatedAt: NOW, evidenceObservedAt: NOW - SILENT_FOR_MS })

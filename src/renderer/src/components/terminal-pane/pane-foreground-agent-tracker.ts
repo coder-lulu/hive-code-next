@@ -372,7 +372,7 @@ export function createPaneForegroundAgentTracker(deps: PaneForegroundAgentTracke
       clearAgentEvidence()
       // Why not shellForeground: a pane without command marks gets no command start to lift that
       // latch, so it would block the Enter sample that identifies the next agent typed there.
-      deps.publish({ agent: null, shellForeground: false })
+      deps.publish({ agent: null, agentEvidence: 'process-read', shellForeground: false })
       if (hadVisibleRead) {
         deps.onVisibleForegroundSettled?.('shell')
       }

@@ -50,10 +50,14 @@ export function formatCompactDuration(deltaMs: number): string {
  * Orca does not have (a 40-minute build, a long download).
  */
 export function agentNoUpdateLabel(
-  entry: Pick<AgentStatusEntry, 'updatedAt' | 'evidenceObservedAt'>,
+  entry: Pick<AgentStatusEntry, 'updatedAt' | 'evidenceObservedAt' | 'restoredUnconfirmed'>,
   now: number
 ): string {
+  const observedAt = agentStatusEvidenceObservedAt(entry)
+  if (entry.restoredUnconfirmed || !Number.isFinite(observedAt) || observedAt <= 0) {
+    return translate('components.agentStatus.unconfirmed', 'unconfirmed')
+  }
   return translate('components.agentStatus.noUpdate', 'No update in {{duration}}', {
-    duration: formatCompactDuration(now - agentStatusEvidenceObservedAt(entry))
+    duration: formatCompactDuration(now - observedAt)
   })
 }

@@ -190,6 +190,43 @@ describe('buildWorktreeSessionRows', () => {
     expect(rows).toEqual([])
   })
 
+  it('does not restore a saved conversation after a process read confirmed its exit', () => {
+    const tab = terminal('exited', {
+      launchAgent: undefined,
+      aiVaultTitle: { agent: 'codex', sessionId: 'saved', title: 'Saved conversation' }
+    })
+    expect(
+      buildWorktreeSessionRows({
+        agents: [],
+        tabs: [tab],
+        unifiedTabs: [],
+        terminalLayoutsByTabId: { exited: layout },
+        paneForegroundAgentByPaneKey: {
+          [makePaneKey(tab.id, LEAF)]: {
+            agent: null,
+            agentEvidence: 'process-read',
+            shellForeground: false
+          }
+        }
+      })
+    ).toEqual([])
+  })
+
+  it('keeps a restored conversation when a foreground read is inconclusive', () => {
+    const tab = terminal('unconfirmed')
+    const rows = buildWorktreeSessionRows({
+      agents: [],
+      tabs: [tab],
+      unifiedTabs: [],
+      terminalLayoutsByTabId: { unconfirmed: layout },
+      paneForegroundAgentByPaneKey: {
+        [makePaneKey(tab.id, LEAF)]: { agent: null, shellForeground: false }
+      }
+    })
+    expect(rows).toHaveLength(1)
+    expect(rows[0].state).toBe('unverifiable')
+  })
+
   it('does not assign the old tab agent to a shell surviving a closed split pane', () => {
     const tab = terminal('surviving-shell')
     const survivorLeaf = '22222222-2222-4222-8222-222222222222'

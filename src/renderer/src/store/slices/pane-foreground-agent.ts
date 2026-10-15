@@ -8,7 +8,7 @@ export type PaneForegroundAgentEvidence = 'process-read' | 'launch-record'
 export type PaneForegroundAgentEntry = {
   /** Recognized agent process in the pane's foreground; null when unknown. */
   agent: TerminalAgent | null
-  /** Where `agent` came from. Only 'process-read' is a live read; absent counts as unconfirmed,
+  /** Where `agent` came from; a null 'process-read' records a confirmed exit. Absent is unconfirmed,
    *  so a writer that omits it cannot make a sidebar row look process-backed. */
   agentEvidence?: PaneForegroundAgentEvidence
   /** True only when fresh provider evidence is safe for input-byte routing. */

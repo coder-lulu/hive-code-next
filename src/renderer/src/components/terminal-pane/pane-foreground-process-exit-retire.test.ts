@@ -9,6 +9,8 @@ import {
   useAgentCompletionCoordinatorLifecycle
 } from './agent-completion-coordinator-test-harness'
 import { createPaneForegroundAgentTracker } from './pane-foreground-agent-tracker'
+import { buildWorktreeSessionRows } from '../sidebar/worktree-session-rows'
+import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 
 // Wires the pane's tracker and completion monitor the way pane-agent-identity.ts and
 // terminal-keydown-fit.ts do, for a pane whose shell emits no OSC 133 command marks.
@@ -81,10 +83,52 @@ describe('process monitor retires a latched foreground read', () => {
     pane.setForeground('zsh', false)
     await vi.advanceTimersByTimeAsync(5_000)
 
-    expect(pane.getEntry()).toEqual({ agent: null, shellForeground: false })
+    expect(pane.getEntry()).toEqual({
+      agent: null,
+      agentEvidence: 'process-read',
+      shellForeground: false
+    })
     expect(pane.onConfirmedShellForeground).toHaveBeenCalledWith('process-exit')
     expect(sidebarAgent('', pane.getEntry())).toBeNull()
     expect(sidebarAgent('user@host: ~/repo', pane.getEntry())).toBeNull()
+  })
+
+  it('retires saved inventory rows on exit and allows a newly observed agent to appear', async () => {
+    const pane = createUnmarkedPane({ visible: true })
+    const leafId = '11111111-1111-4111-8111-111111111111'
+    const tab: TerminalTab = {
+      id: 'saved-tab',
+      worktreeId: 'folder:workspace',
+      ptyId: 'pty-1',
+      title: 'repo',
+      customTitle: null,
+      color: null,
+      sortOrder: 0,
+      createdAt: 1,
+      aiVaultTitle: { agent: 'codex', sessionId: 'saved', title: 'Saved conversation' }
+    }
+    const inventory = () =>
+      buildWorktreeSessionRows({
+        agents: [],
+        tabs: [tab],
+        unifiedTabs: [],
+        terminalLayoutsByTabId: {
+          [tab.id]: { root: { type: 'leaf', leafId }, activeLeafId: leafId, expandedLeafId: null }
+        },
+        paneForegroundAgentByPaneKey: { [`${tab.id}:${leafId}`]: pane.getEntry()! }
+      })
+    pane.tracker.onVisiblePtyBound()
+    await vi.advanceTimersByTimeAsync(2_500)
+    expect(inventory()).toHaveLength(1)
+
+    pane.setForeground('zsh', false)
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(inventory()).toEqual([])
+
+    pane.setForeground('codex', true)
+    pane.tracker.onVisiblePtyBound()
+    await vi.advanceTimersByTimeAsync(400)
+    expect(inventory()).toHaveLength(1)
   })
 
   it('drops the row when a killed Codex leaves its last title behind', async () => {
