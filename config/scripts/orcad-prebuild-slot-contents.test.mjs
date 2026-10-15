@@ -71,8 +71,7 @@ describe('N-API pinning', () => {
         {
           xcode_settings: {
             CLANG_CXX_LANGUAGE_STANDARD: 'gnu++20',
-            CLANG_CXX_LIBRARY: 'libc++',
-            GCC_ENABLE_CPP_EXCEPTIONS: 'YES'
+            CLANG_CXX_LIBRARY: 'libc++'
           }
         }
       ]

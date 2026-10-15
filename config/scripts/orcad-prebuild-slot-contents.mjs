@@ -94,8 +94,7 @@ export function prebuildCompileGypi({ napi = SLOT_NAPI_VERSION, staticCxxRuntime
       {
         xcode_settings: {
           CLANG_CXX_LANGUAGE_STANDARD: 'gnu++20',
-          CLANG_CXX_LIBRARY: 'libc++',
-          GCC_ENABLE_CPP_EXCEPTIONS: 'YES'
+          CLANG_CXX_LIBRARY: 'libc++'
         }
       }
     ]
@@ -103,7 +102,14 @@ export function prebuildCompileGypi({ napi = SLOT_NAPI_VERSION, staticCxxRuntime
   if (staticCxxRuntime) {
     conditions.push(['OS=="linux"', { ldflags: ['-static-libstdc++', '-static-libgcc'] }])
   }
-  const gypi = { target_defaults: { defines: [`NAPI_VERSION=${napi}`], conditions } }
+  const gypi = {
+    target_defaults: {
+      defines: [`NAPI_VERSION=${napi}`],
+      conditions,
+      // Node common.gypi overrides early conditions; enable exceptions after target defaults.
+      target_conditions: [['OS=="mac"', { xcode_settings: { GCC_ENABLE_CPP_EXCEPTIONS: 'YES' } }]]
+    }
+  }
   return `${JSON.stringify(gypi, null, 2)}\n`
 }
 

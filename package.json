@@ -1,6 +1,6 @@
 {
   "name": "hivecode",
-  "version": "1.5.0-beta.25",
+  "version": "1.5.0-beta.26",
   "private": true,
   "description": "Next-gen IDE for parallel agentic development",
   "homepage": "https://github.com/coder-lulu/hive-code-next",
@@ -209,6 +209,7 @@
     "@electron-toolkit/utils": "^4.0.0",
     "@floating-ui/dom": "1.8.0",
     "@linear/sdk": "^97.0.0",
+    "@orca/process-host": "workspace:*",
     "@parcel/watcher": "^2.5.6",
     "@xterm/addon-serialize": "0.15.0-beta.301",
     "@xterm/headless": "6.1.0-beta.303",
@@ -231,8 +232,7 @@
     "tweetnacl": "^1.0.3",
     "ws": "^8.22.0",
     "yaml": "^2.9.1",
-    "zod": "~4.6.5",
-    "@orca/process-host": "workspace:*"
+    "zod": "~4.6.5"
   },
   "devDependencies": {
     "@dnd-kit/core": "^6.3.1",
