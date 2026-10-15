@@ -47,7 +47,7 @@ export type RecordingDomainPlan = BasePlan &
     | { kind: 'lifecycle'; actions: ('reset' | 'unmount' | 'blur')[] }
   )
 export function recordingDomainPlan(manifest: readonly RecordingScenario[]): RecordingDomainPlan[]
-export const FIELD_SHAPES: Readonly<{
+export const OBSERVATION_FIELD_KINDS: Readonly<{
   sender: 'list'
   payloads: 'list'
   settlements: 'map'

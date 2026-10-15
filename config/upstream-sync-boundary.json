@@ -121,7 +121,9 @@
       "boundaryPaths": [
         "src/main/runtime/runtime-git-command-target.ts",
         "src/main/providers/execution-host-provider-dispatch.ts",
-        "src/main/providers/local-git-provider.ts"
+        "src/main/providers/local-git-provider.ts",
+        "src/main/providers/ssh-git-provider.ts",
+        "src/main/providers/ssh-git-provider-"
       ],
       "expectedBoundary": "manualReview",
       "contractTests": [
@@ -129,7 +131,7 @@
         "src/main/providers/execution-host-provider-dispatch.test.ts",
         "src/main/providers/local-git-provider.test.ts"
       ],
-      "sensitivity": "Local Git semantics and runtime target authority; SSH targets must remain explicitly unserved"
+      "sensitivity": "Local Git semantics and runtime target authority; SSH targets must remain explicitly unserved; reintroduction of retired SSH Git providers requires manual review"
     },
     {
       "path": "src/main/runtime/orca-runtime.ts",

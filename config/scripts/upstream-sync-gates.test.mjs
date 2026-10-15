@@ -2,6 +2,7 @@ import { existsSync, readFileSync, mkdirSync, mkdtempSync, writeFileSync, rmSync
 import { join, resolve } from 'node:path'
 import { EventEmitter } from 'node:events'
 import { spawn } from 'node:child_process'
+import { parse } from 'yaml'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   selectChecks,
@@ -371,5 +372,65 @@ describe('Vitest graph-local direct Node launcher', () => {
       command: 'node',
       args: ['script.mjs']
     })
+  })
+})
+
+describe('verification runtime prerequisites', () => {
+  const jobs = parse(workflow).jobs
+  it.each(['gates', 'platform-gates'])('prepares pinned runtimes in the read-only %s job', (id) => {
+    const job = jobs[id]
+    expect(job.permissions).toEqual({ contents: 'read' })
+    const dependency = job.steps.find(
+      (step) => step.uses === './.github/actions/install-node-dependencies'
+    )
+    expect(dependency.with['native-runtime']).toBe('node')
+    const bun = job.steps.find((step) => step.uses?.startsWith('oven-sh/setup-bun@'))
+    expect(bun.uses).toBe('oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6')
+    expect(bun.with['bun-version-file']).toBe('config/.bun-version')
+    const execute = job.steps.findIndex(
+      (step) =>
+        step.name ===
+        (id === 'gates'
+          ? 'Run common product verification once'
+          : 'Execute the focused platform regression matrix')
+    )
+    expect(job.steps.indexOf(dependency)).toBeLessThan(execute)
+    expect(job.steps.indexOf(bun)).toBeLessThan(execute)
+  })
+  it('requires actual browser resources before the common product checks', () => {
+    const steps = jobs.gates.steps
+    const execute = steps.findIndex((step) => step.name === 'Run common product verification once')
+    const electron = steps.findIndex(
+      (step) => step.run === 'node config/scripts/install-electron-package-binary.mjs'
+    )
+    const chrome = steps.findIndex(
+      (step) => step.name === 'Resolve Chrome for actual mobile render checks'
+    )
+    expect(electron).toBeGreaterThan(-1)
+    expect(chrome).toBeGreaterThan(-1)
+    expect(electron).toBeLessThan(execute)
+    expect(chrome).toBeLessThan(execute)
+    expect(steps[chrome].run).toContain('command -v google-chrome')
+    expect(steps[chrome].run).toContain('exit 1')
+    expect(steps[chrome].run).toContain('ORCA_MOBILE_WEB_RENDER_BROWSER=$chrome')
+    const webkit = steps.findIndex(
+      (step) => step.name === 'Install WebKit for mobile render checks'
+    )
+    expect(webkit).toBeGreaterThan(-1)
+    expect(webkit).toBeLessThan(execute)
+    expect(steps[webkit].run).toBe('pnpm exec playwright-core install --with-deps webkit')
+    expect(steps[webkit].if).toBeUndefined()
+    expect(steps[webkit]['continue-on-error']).toBeUndefined()
+    expect(steps[webkit].background).toBeUndefined()
+    expect(jobs.publish.steps.some((step) => step.run?.includes('playwright-core install'))).toBe(
+      false
+    )
+    expect(
+      jobs.publish.steps.some(
+        (step) =>
+          step.uses?.startsWith('oven-sh/setup-bun@') ||
+          step.run?.includes('install-electron-package-binary')
+      )
+    ).toBe(false)
   })
 })

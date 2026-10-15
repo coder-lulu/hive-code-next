@@ -1,6 +1,10 @@
 import { blobBytes } from './upstream-recording-raw.mjs'
 import { verifyRecordingCorpus } from './upstream-recording-corpus.mjs'
-import { recordingInputEvidence } from './upstream-recording-inputs.mjs'
+import {
+  adapterInputDigest,
+  recorderInputDigest,
+  recordingInputEvidence
+} from './upstream-recording-inputs.mjs'
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
 import { execFileSync } from 'node:child_process'
@@ -52,6 +56,26 @@ function fixture() {
   const tree = git('write-tree')
   return { root, git, write, tree }
 }
+test('recording digests preserve UTF-16 order and directory traversal', () => {
+  const root = 'mobile/src/test-support/rpc-recording'
+  const recorderPaths = ['é.ts', 'a.ts', 'Z.ts', 'a/child.ts'].map((name) => `${root}/${name}`)
+  const expectedPaths = ['Z.ts', 'a/child.ts', 'a.ts', 'é.ts'].map((name) => `${root}/${name}`)
+  const read = (path) => Buffer.from(`body:${String(path)}\r\n`)
+  assert.equal(
+    recorderInputDigest(recorderPaths, read),
+    sha256(expectedPaths.map((path) => `${path}:body:${path}\n`).join('\n'))
+  )
+  assert.equal(
+    adapterInputDigest(['z.ts', 'aa.ts', 'a.ts', 'a-1.ts', 'aa.ts'], read),
+    sha256(
+      ['a-1.ts', 'a.ts', 'aa.ts', 'z.ts']
+        .map((name) => `${name}:body:${root}/adapters/${name}\n`)
+        .join('\n')
+    )
+  )
+  assert.throws(() => adapterInputDigest(['../a.ts'], read), /Invalid adapter source domain/)
+})
+
 test('guard is the entire current source fence, excluding generated outputs', () => {
   for (const path of [
     'mobile/src/a',
@@ -471,7 +495,7 @@ test(
       ['control', null, /control closure/]
     ]
     for (const [name, mutate, expected] of cases) {
-      f.git('branch', '-m', `preserved-${name}`)
+      f.git('branch', '-m', `preserved-${String(name)}`)
       f.git('checkout', '-qb', 'hivecode/main-next', f.options.target)
       const review = JSON.parse(
         readFileSync(join(f.root, 'config/upstream-tree-review.json'), 'utf8')
@@ -490,10 +514,10 @@ test(
         f.write('config/scripts/upstream-recording-controls.mjs', 'changed trusted closure')
       }
       f.git('add', '.')
-      f.git('commit', '-qm', `freeze malicious ${name} input`)
+      f.git('commit', '-qm', `freeze malicious ${String(name)} input`)
       const options = { ...f.options, target: f.git('rev-parse', 'HEAD') }
       prepareUpstreamTreeSync(options)
-      f.git('commit', '-qm', `content for ${name}`)
+      f.git('commit', '-qm', `content for ${String(name)}`)
       options.head = f.git('rev-parse', 'HEAD')
       assert.throws(() => verifyRecordingSource(options), expected)
     }

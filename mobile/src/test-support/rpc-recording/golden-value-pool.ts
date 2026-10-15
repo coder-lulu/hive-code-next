@@ -15,7 +15,7 @@ type FieldShape = 'list' | 'map' | 'whole'
  * `Record<keyof Observation, …>` makes a new observation field declare how it interns.
  */
 import {
-  FIELD_SHAPES,
+  OBSERVATION_FIELD_KINDS,
   OBSERVATION_FIELDS
 } from '../../../../config/scripts/upstream-recording-inputs.mjs'
 export { OBSERVATION_FIELDS }
@@ -27,7 +27,9 @@ type InternedField<Shape extends FieldShape> = Shape extends 'list'
     ? Record<string, string>
     : string
 export type InternedObservation = {
-  [Field in keyof typeof FIELD_SHAPES]: InternedField<(typeof FIELD_SHAPES)[Field]>
+  [Field in keyof typeof OBSERVATION_FIELD_KINDS]: InternedField<
+    (typeof OBSERVATION_FIELD_KINDS)[Field]
+  >
 }
 export type InternedRecording = {
   scenario: string
@@ -80,9 +82,9 @@ export function internRecording(recording: Recording): {
       const value = checkpoint.observation[field]
       const at = `${checkpoint.id}.${field}`
       observation[field] =
-        FIELD_SHAPES[field] === 'list'
+        OBSERVATION_FIELD_KINDS[field] === 'list'
           ? listEntries(at, value).map((entry, index) => intern(entry, `${at}[${index}]`))
-          : FIELD_SHAPES[field] === 'map'
+          : OBSERVATION_FIELD_KINDS[field] === 'map'
             ? Object.fromEntries(
                 mapEntries(at, value).map(([key, entry]) => [key, intern(entry, `${at}.${key}`)])
               )

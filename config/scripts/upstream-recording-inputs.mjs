@@ -99,7 +99,7 @@ export function recorderInputDigest(paths, read) {
           .filter((path) => path.startsWith(`${directory}/`))
           .map((path) => path.slice(directory.length + 1).split('/')[0])
       )
-    ].sort()
+    ].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
     for (const name of names) {
       const path = `${directory}/${name}`
       if (!selected.includes(path)) {
@@ -121,7 +121,9 @@ export function recorderInputDigest(paths, read) {
   )
 }
 export function adapterInputDigest(sources, read) {
-  const ordered = [...new Set(sources)].sort()
+  const ordered = [...new Set(sources)].sort((left, right) =>
+    left < right ? -1 : left > right ? 1 : 0
+  )
   if (!ordered.length || ordered.some((path) => !/^[a-z0-9-]+\.ts$/.test(path))) {
     throw new Error('Invalid adapter source domain')
   }
@@ -276,14 +278,14 @@ export function recordingDomainPlan(manifest) {
   return result
 }
 
-export const FIELD_SHAPES = Object.freeze({
+export const OBSERVATION_FIELD_KINDS = Object.freeze({
   sender: 'list',
   payloads: 'list',
   settlements: 'map',
   state: 'whole',
   effects: 'list'
 })
-export const OBSERVATION_FIELDS = Object.freeze(Object.keys(FIELD_SHAPES))
+export const OBSERVATION_FIELDS = Object.freeze(Object.keys(OBSERVATION_FIELD_KINDS))
 export function valueHash(value) {
   return hash(canonicalRecordingJson(value)).slice(0, 12)
 }
@@ -312,12 +314,12 @@ export function resolveRecording(values, recording) {
       for (const field of OBSERVATION_FIELDS) {
         const interned = checkpoint.observation[field]
         const at = `${checkpoint.id}.${field}`
-        if (FIELD_SHAPES[field] === 'list') {
+        if (OBSERVATION_FIELD_KINDS[field] === 'list') {
           if (!Array.isArray(interned)) {
             throw new Error(`Golden field ${at} is not a list of pool hashes`)
           }
           observation[field] = interned.map((hash, index) => resolve(hash, `${at}[${index}]`))
-        } else if (FIELD_SHAPES[field] === 'map') {
+        } else if (OBSERVATION_FIELD_KINDS[field] === 'map') {
           if (interned === null || typeof interned !== 'object' || Array.isArray(interned)) {
             throw new Error(`Golden field ${at} is not a map of pool hashes`)
           }
