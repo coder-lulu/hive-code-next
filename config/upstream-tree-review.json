@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "5d4119bdfd51651713a0d8d0a1d15516150f01e6",
+  "sourceProductSha": "0c755dfab0a6ab25a8c268c738699f0a003b24e6",
   "baseUpstreamSha": "26cd1c22daf6b1fc7da85a5f07dcc66d8ae84704",
   "upstreamSha": "8e350554480ac5b77d3050a2040541fd334dad7c",
   "resolutions": [
@@ -1583,9 +1583,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "395c370fb2a64ec9041da38df9271a6ace1d2e16"
+        "sha": "0258e3476877b77ff7025e9c0d21328f64135d69"
       },
-      "reason": "Keep product Windows-asar, ConPTY, runtime dependency pruning and Linux recovery assertions; add WSL/serve-entry unpacking and arch-aware packaging regressions. Union independent test blocks and fs imports instead of discarding either side.\n\nPost-prepare diagnostic repair: Keep builder resource checks with actual mobile bundle fixtures and move runtime dependency/pruning assertions intact to their dedicated suite to meet file-size limits.",
+      "reason": "Keep product Windows-asar, ConPTY, runtime dependency pruning and Linux recovery assertions; add WSL/serve-entry unpacking and arch-aware packaging regressions. Union independent test blocks and fs imports instead of discarding either side.\n\nPost-prepare diagnostic repair: Keep builder resource checks with actual mobile bundle fixtures and move runtime dependency/pruning assertions intact to their dedicated suite to meet file-size limits. F2 validation repair: Repair the retained layout-only Unix permission test with the same cross-arch layout used by upstream runtime-resource tests, after actual missing-Wayland-ELF reproduction. Exact executable permission assertion remains.",
       "regressionTests": ["config/scripts/electron-builder-config.test.mjs"]
     },
     {
@@ -1620,6 +1620,45 @@
       },
       "reason": "Own the extracted runtime closure and native-package pruning assertions, including required dependencies, platform architectures, ConPTY files, and unrelated package preservation.",
       "regressionTests": ["config/scripts/electron-builder-runtime-pruning.test.mjs"]
+    },
+    {
+      "path": "config/scripts/electron-builder-runtime-resources.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "7c774e4cd7d50983029f052b78d3404845b20339"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "e0319aa86be55071bc9f25f429e073e30c410d63"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "2d0c60099ca618e1ec56b8e55b662c9d8712cd92"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "ce52ef8199da7655d06a51f06d4a5da4e0d2faa5"
+      },
+      "reason": "F2 validation repair: Move existing ELF-header and objdump fixture functions without behavior changes into shared packaging fixture module.",
+      "regressionTests": ["config/scripts/electron-builder-runtime-resources.test.mjs"]
+    },
+    {
+      "path": "config/scripts/electron-builder-test-fixtures.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "86fb421eeba6e9878faca8e3e660a5ac960a2b28"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "ab5fb56b0bea79e89fac5bcafa3d5f9266d2d8af"
+      },
+      "reason": "F2 validation repair: Reuse the existing architecture/objdump layout fixture helpers; production runtime placement, pin hashes, glibc checks, and PTY probes unchanged.",
+      "regressionTests": [
+        "config/scripts/electron-builder-config.test.mjs",
+        "config/scripts/electron-builder-runtime-resources.test.mjs"
+      ]
     },
     {
       "path": "config/scripts/generate-bundled-skill-guides.mjs",
@@ -1780,6 +1819,27 @@
       },
       "reason": "Copy only the real recording input module and its sole non-builtin adapter dependency into the standalone source fixture, then require the current source-input.json/logs-output-directory usage and nonzero exit for the retired invocation; preserve absent root dependencies/dist and empty NODE_PATH/NODE_OPTIONS without fabricating recording provenance.",
       "regressionTests": ["config/scripts/mobile-process-host-tooling.test.mjs"]
+    },
+    {
+      "path": "config/scripts/mobile-release-check-scope.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "7a07b19af2fc2c3f0e2a11226501b29dcf386887"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "7a07b19af2fc2c3f0e2a11226501b29dcf386887"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "5325c1626c6ff05748bd58e184dfcb7c98606b45"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "28594cc12748896d6e91ecf22e93eb9b8abac265"
+      },
+      "reason": "F2 validation repair: Copy the existing pr-daemon-init-test-scope module into the isolated workflow fixture so the real detector imports resolve; preserve fail-closed policy and all route assertions.",
+      "regressionTests": ["config/scripts/mobile-release-check-scope.test.mjs"]
     },
     {
       "path": "config/scripts/mobile-test-change-scope.test.mjs",
@@ -2051,9 +2111,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "cc8af5abe89f99d12bc88bdc9a5b306f51c143e2"
+        "sha": "83aad37a688b99c18c0ce693bfeaa5e2955b7e20"
       },
-      "reason": "Preserve the corresponding current product workflow/packaging contract in overlapping blocks (current Node qualification, browser lane, fail-closed product publication or retired foreign channel workflows); retain cleanly merged fixes.",
+      "reason": "Preserve the corresponding current product workflow/packaging contract in overlapping blocks (current Node qualification, browser lane, fail-closed product publication or retired foreign channel workflows); retain cleanly merged fixes. F2 validation repair: Copy the existing pr-daemon-init-test-scope module into the isolated workflow fixture so the real detector imports resolve; preserve fail-closed policy and all route assertions.",
       "regressionTests": ["config/scripts/pr-auxiliary-preflight-admission.test.mjs"]
     },
     {
@@ -2072,10 +2132,14 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "dc75d5a2fff08b08dbb5790d4c9ba322afae88a3"
+        "sha": "ac99e83e9e790c1255b3b2208f088a3c78c0a38a"
       },
-      "reason": "Use extracted package-test lists while preserving Hive daemon-init test-support routing. New extracted list is augmented separately with product Windows test ownership.",
-      "regressionTests": ["config/scripts/pr-code-change-scope.test.mjs"]
+      "reason": "Use extracted package-test lists while preserving Hive daemon-init test-support routing. New extracted list is augmented separately with product Windows test ownership. F2 validation repair: Import the existing DAEMON_INIT_TEST_SUPPORT constant into the classifier lexical scope as well as re-exporting it; preserve the existing daemon-support route predicates and fail-closed classification.",
+      "regressionTests": [
+        "config/scripts/pr-code-change-scope.test.mjs",
+        "config/scripts/mobile-release-check-scope.test.mjs",
+        "config/scripts/pr-auxiliary-preflight-admission.test.mjs"
+      ]
     },
     {
       "path": "config/scripts/pr-code-change-scope.test.mjs",
@@ -2565,6 +2629,27 @@
       "regressionTests": ["pnpm run typecheck:node", "pnpm --dir mobile typecheck"]
     },
     {
+      "path": "config/tsconfig.tc.web.json",
+      "base": {
+        "mode": "100644",
+        "sha": "6dce8910ee8a45c219424363ea3d5f68ef971e89"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "025ad7419c92c2a564da138185f00cd2b049344f"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "a79e96077b6b3665dc49a847f76b86f77630d8d1"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "c698ee4ca9c933e5df63a139b6d1d1b1d0ceefa5"
+      },
+      "reason": "Include the existing ephemeral VM native test fixture explicitly in the web composite TypeScript project to resolve TS6307. Preserve every previous include, compiler option and type rule; the original full pnpm run typecheck must succeed on the recorded source with this exact configuration repair. This non-guarded configuration change is additional to, and not part of, the recorded source identity.",
+      "regressionTests": ["pnpm run typecheck"]
+    },
+    {
       "path": "config/upstream-change-ledger.json",
       "base": null,
       "product": {
@@ -2820,9 +2905,9 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "2262272360669183b613b43333c8c5d28be14b8f"
+        "sha": "158fa2def631e4f38db6f2d37fda6c316a0b0155"
       },
-      "reason": "Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source.\n\nFresh raw4 recording publication: Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source.\n\nFresh post-hook recording publication: Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source.",
+      "reason": "Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source.\n\nFresh raw4 recording publication: Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source.\n\nFresh post-hook recording publication: Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source. Fresh M5 recording: Generated by the existing v3 writer from all 757 scenarios of the frozen reviewed source under official M5 source/control guards. Preserve all 796 original reference bytes, all 47 independently approved unchanged delta identities and reasons, and the other 48 byte-identical writer files. Generated output does not authorize its own source.",
       "regressionTests": [
         "config/scripts/upstream-recording-source.test.mjs",
         "mobile/src/test-support/hive-recording-reference.test.ts",
@@ -6177,9 +6262,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "45dbf45b9f005d25fecdfe31eea120badddfd21e"
+        "sha": "991277b042814bb732645cfab210f841c99e46bf"
       },
-      "reason": "Align this regression expectation with the HiveCode message emitted by the exact F implementation. Preserve all status, data, authorization, no-write, no-extra-retry and cleanup assertions; this changes only the expected product name/message.",
+      "reason": "Align this regression expectation with the HiveCode message emitted by the exact F implementation. Preserve all status, data, authorization, no-write, no-extra-retry and cleanup assertions; this changes only the expected product name/message. F2 validation repair: Reuse the canonical APP_DISPLAY_NAME in the existing complete error expectation; preserve original message text, retry counts, RPC refusal and cleanup assertions.",
       "regressionTests": ["src/cli/index-reference-jira.test.ts"]
     },
     {
@@ -6967,6 +7052,27 @@
       "regressionTests": ["src/main/claude/claude-structured-launch-resolution.test.ts"]
     },
     {
+      "path": "src/main/claude/claude-structured-real-cli.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "7d2b564716b005ac499bf7bcb72a0b39adabce67"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "b96ff016b01b9020a31604011ded1aa8349663a8"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "7d2b564716b005ac499bf7bcb72a0b39adabce67"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "96ce77f4b369eea5507e98722bbe17b839963b91"
+      },
+      "reason": "F2 validation repair: Use the existing transient-lock-aware removeTree cleanup after real CLI adapter closure and signed-out temporary-config use; preserve real authentication and execution assertions.",
+      "regressionTests": ["src/main/claude/claude-structured-real-cli.test.ts"]
+    },
+    {
       "path": "src/main/claude/claude-subagent-journaled-roster.test.ts",
       "base": {
         "mode": "100644",
@@ -7018,6 +7124,21 @@
       "regressionTests": ["src/main/cli/appimage-extracted-root.test.ts"]
     },
     {
+      "path": "src/main/cli/appimage-generation-stable-launcher.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "9dc3d9051ce5aa5ab40147f7899d5819d691aadc"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "959b6336f0c948acf69bfb532a1678879b456900"
+      },
+      "reason": "F2 validation repair: Seed and assert the actual product primary launcher, matching existing AppImage extraction fixtures; retain installed state and exact command-path assertion.",
+      "regressionTests": ["src/main/cli/appimage-generation-stable-launcher.test.ts"]
+    },
+    {
       "path": "src/main/codex/codex-real-home-hook-install.ts",
       "base": {
         "mode": "100644",
@@ -7067,6 +7188,21 @@
       "result": null,
       "reason": "Old retention roster removed upstream; journal subagent rows own persistence and no obsolete roster fixture should reopen databases.",
       "regressionTests": ["src/main/codex/codex-structured-journal-translation-subagents.test.ts"]
+    },
+    {
+      "path": "src/main/daemon/daemon-appimage-copy-host.electron.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "b8ec1cca4b01a6b36e414c13fc82dc434ddff5f9"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3394ed1509dabdc2e2ecf19e8aba9432ae4c9e93"
+      },
+      "reason": "F2 validation repair: Seed the same primary payload launcher the extracted-root validator requires; preserve real daemon adoption, lease, Node/PTY, fallback and cleanup assertions.",
+      "regressionTests": ["src/main/daemon/daemon-appimage-copy-host.electron.test.ts"]
     },
     {
       "path": "src/main/daemon/daemon-appimage-generation-launch.test.ts",
@@ -8233,10 +8369,31 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "c77b36f66bfc998afdad5010dba17f5208fd5c71"
+        "sha": "4b3c43e5c492c67e2d7f78da1cca8ae896259941"
       },
-      "reason": "Preserve explicit durable signout failure on ENOSPC, prove fence bytes unchanged and generation/in-memory rejection prevent all ten subsequent broker token retries.",
+      "reason": "Preserve explicit durable signout failure on ENOSPC, prove fence bytes unchanged and generation/in-memory rejection prevent all ten subsequent broker token retries. F2 validation repair: Expose the existing secure Linux storage backend in the Electron safeStorage mock so encrypted refresh-token rotation follows the real secure-backend contract; preserve token rotation assertions.",
       "regressionTests": ["src/main/orca-profiles/profile-cloud-session-refresh-rotation.test.ts"]
+    },
+    {
+      "path": "src/main/orca-profiles/profile-cloud-session-refresh.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "2aa3dc0266ed538919214a4bb376047e0a5724a5"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "2aa3dc0266ed538919214a4bb376047e0a5724a5"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "d10f258b8871ecdbbdfa761e976cce8a5cf8b6bb"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "4b402b328ee5e6c32b58bcc6f0a90fcedad8022c"
+      },
+      "reason": "F2 validation repair: Give each refresh test a unique temporary user-data directory and clear its exact replay-guard key before transient-lock-aware cleanup, replacing the shared /data fixture while preserving refresh, sign-out and invalidation assertions.",
+      "regressionTests": ["src/main/orca-profiles/profile-cloud-session-refresh.test.ts"]
     },
     {
       "path": "src/main/orca-profiles/profile-cloud-session-store.test.ts",
@@ -9657,9 +9814,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "2274b8188b51e5bd35f00cc39a96fe9bb5f7c71e"
+        "sha": "0f4b3318ee83d1ef0d8e6df162cc2cf77e05577a"
       },
-      "reason": "Align this regression expectation with the HiveCode message emitted by the exact F implementation. Preserve all status, data, authorization, no-write, no-extra-retry and cleanup assertions; this changes only the expected product name/message.",
+      "reason": "Align this regression expectation with the HiveCode message emitted by the exact F implementation. Preserve all status, data, authorization, no-write, no-extra-retry and cleanup assertions; this changes only the expected product name/message. F2 validation repair: Reuse the canonical APP_DISPLAY_NAME in the existing complete error expectation; preserve original message text, retry counts, RPC refusal and cleanup assertions.",
       "regressionTests": [
         "src/main/runtime/orchestration/db/worker-dispatch/failed-start-circuit-breaker.test.ts"
       ]
@@ -9897,9 +10054,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "a651caa1b5df6e7134b33c535573c30f3239a4c8"
+        "sha": "d1cc831933f715c018d3c3c1b34fdae856c5b5b0"
       },
-      "reason": "Align this regression expectation with the HiveCode message emitted by the exact F implementation. Preserve all status, data, authorization, no-write, no-extra-retry and cleanup assertions; this changes only the expected product name/message.",
+      "reason": "Align this regression expectation with the HiveCode message emitted by the exact F implementation. Preserve all status, data, authorization, no-write, no-extra-retry and cleanup assertions; this changes only the expected product name/message. F2 validation repair: Reuse the canonical APP_DISPLAY_NAME in the existing complete error expectation; preserve original message text, retry counts, RPC refusal and cleanup assertions.",
       "regressionTests": [
         "src/main/runtime/rpc/methods/orchestration/worker/failed-start-retry-release.test.ts"
       ]
@@ -10678,6 +10835,31 @@
       "regressionTests": ["src/main/ssh/ssh-connection-manager-sign-in-reuse.test.ts"]
     },
     {
+      "path": "src/main/ssh/ssh-system-fallback.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "844f1dc847c62a69780547165dd97fd3135171d3"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "105dfa1a9defbdb85a8af216a31301fd09bf8741"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "452b66ff9a8d2f50f563cd7b06d3dea989af014e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "e7df5f8748dd2d5f9e5aff6e989198de388e15fa"
+      },
+      "reason": "F2 validation repair: SFTP was extracted to the existing process-host.runProcess facade; the old suite mocked only child_process.spawn and depended on a host-installed SFTP client. Make the fixture hermetic at the active facade and assert its real program/args/input. Retain atomic rename, exclusive write, ControlMaster and no-remote-stdin assertions; reset execution-host capability state per case.",
+      "regressionTests": [
+        "src/main/ssh/ssh-system-fallback.test.ts",
+        "src/main/ssh/system-ssh-windows-upload.test.ts",
+        "src/main/ssh/system-ssh-windows-write-capabilities.test.ts"
+      ]
+    },
+    {
       "path": "src/main/startup/cli-launch-redirect.test.ts",
       "base": {
         "mode": "100644",
@@ -10845,6 +11027,27 @@
       },
       "reason": "Retain product branding and upstream Jira image scheme fixture.",
       "regressionTests": ["src/main/startup/main-process-ready-identity-write.test.ts"]
+    },
+    {
+      "path": "src/main/startup/run-electron-vite-dev.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "73d1bb21cdcf8225ace7d71647f8641f53ffd5d5"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "23ac0f4924e39ab4405e357888dd46b914f18be7"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "1c0469f7664f3b99a80d2676a138a48a5471c699"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "7256ee9a75a1bca2590d221ddf2a23b833f44996"
+      },
+      "reason": "F2 validation repair: Copy the statically imported storage-reclaim module into the existing isolated runner fixture. Existing ORCA_SKIP_DEV_STORAGE_RECLAIM=1 remains effective only after module resolution.",
+      "regressionTests": ["src/main/startup/run-electron-vite-dev.test.ts"]
     },
     {
       "path": "src/main/startup/windows-install-dir-acl-repair.win32.test.ts",
@@ -11069,10 +11272,13 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "68fc6fc5a4b43ef241409d71463d7ecbb326700e"
+        "sha": "74e592ae33cb2711e5fb85b3231ae937f72db91d"
       },
-      "reason": "Resolve the fixture candidate with realpathSync.native so Windows short paths and junction aliases use the same physical spelling as production asynchronous realpath; retain real junction restoration, preview access and lexical/physical containment refusals. Keep the four existing Windows skips unchanged: two file-symlink capability cases and two POSIX traversal cases.",
-      "regressionTests": ["src/main/window/native-chat-paste-files.test.ts"]
+      "reason": "Resolve the fixture candidate with realpathSync.native so Windows short paths and junction aliases use the same physical spelling as production asynchronous realpath; retain real junction restoration, preview access and lexical/physical containment refusals. Keep the four existing Windows skips unchanged: two file-symlink capability cases and two POSIX traversal cases. F2 validation repair: Retained chat-image contract explicitly permits absolute local images typed by the real target. This restore security test asserted the unrelated chat-image access kind. Keep restore refusal and assert exact default/project authorization denial for both link and target; do not change production permissions or weaken sensitive-file checks.",
+      "regressionTests": [
+        "src/main/window/native-chat-paste-files.test.ts",
+        "src/main/ipc/local-file-access-resolution.test.ts"
+      ]
     },
     {
       "path": "src/main/window/runtime-window-lifecycle-file-open.test.ts",
@@ -11278,9 +11484,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "a7154a0db67ca83cf3bd695bea619da4f8c58c2b"
+        "sha": "a754297dc8ac17ebf5931ca8cbd93d7cc75b2c0d"
       },
-      "reason": "Use bounded transient-lock removal for WSL service fixtures without bypassing actual setup, dependency, or service lifecycle assertions.\n\nPost-hook diagnostic repair: Align this regression expectation with the HiveCode message emitted by the exact F implementation. Preserve all status, data, authorization, no-write, no-extra-retry and cleanup assertions; this changes only the expected product name/message.",
+      "reason": "Use bounded transient-lock removal for WSL service fixtures without bypassing actual setup, dependency, or service lifecycle assertions.\n\nPost-hook diagnostic repair: Align this regression expectation with the HiveCode message emitted by the exact F implementation. Preserve all status, data, authorization, no-write, no-extra-retry and cleanup assertions; this changes only the expected product name/message. F2 validation repair: Reuse the canonical APP_DISPLAY_NAME in the existing complete error expectation; preserve original message text, retry counts, RPC refusal and cleanup assertions.",
       "regressionTests": ["src/main/wsl/wsl-host-service.test.ts"]
     },
     {
@@ -14688,6 +14894,23 @@
       },
       "reason": "Restore product translated renderer adapter delegating branch/head interpretation to shared pure model\n\nPost-prepare diagnostic repair: Brace the non-detached early return without changing localized detached identity text or ordinary branch display.",
       "regressionTests": ["src/renderer/src/lib/worktree-git-identity-display.test.ts"]
+    },
+    {
+      "path": "src/renderer/src/runtime/runtime-jira-board-filter-compatibility.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "fb05c523356acd9a1c5b8b7246c5ee6e3c722f72"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "23ddac22c0b831d6660df4e02fe15d1a54f4fe7a"
+      },
+      "reason": "F2 validation repair: Use APP_DISPLAY_NAME escaped with existing escapeRegex in the original remote-server/Jira-host alternation; preserve supported-filter dispatch and unsupported-filter refusal assertions.",
+      "regressionTests": [
+        "src/renderer/src/runtime/runtime-jira-board-filter-compatibility.test.ts"
+      ]
     },
     {
       "path": "src/renderer/src/runtime/runtime-jira-client.test.ts",
