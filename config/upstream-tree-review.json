@@ -11868,9 +11868,9 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "24a8d5a0a4863e74befd0072ad6a8cd6ce5813b3"
+        "sha": "e003a57f2816a6329454e38aa4a91cf2489a8af5"
       },
-      "reason": "Capture whole-snapshot head/tail evidence from the parser reader and verify would-be cached reuse on one handle bound to the observed generation, with before/after handle and path checks, explicit errors and final closure. Sample at most 8192 bytes, cover null resume and counted partial tails, and do not claim arbitrary middle-byte integrity.",
+      "reason": "Capture whole-snapshot head/tail evidence from the parser reader and verify would-be cached reuse on one handle bound to the observed generation, with before/after handle and path checks, explicit errors and final closure. Sample at most 8192 bytes, cover null resume and counted partial tails, and do not claim arbitrary middle-byte integrity.\n\nRename only the local digest regular-expression binding and its two references from shape to digestPattern, satisfying the existing anti-slop symbol-name rule without changing fingerprint, cache, reader or persistence behavior. The unmodified complete pnpm run lint chain passed in the isolated Git fixture, with the existing affected Node and Bun regressions each passing 3 files and 44 tests. Retain all prior regression owners and the actual unchanged guarded recording/manifest evidence; the next candidate still requires fresh complete and platform acceptance.",
       "regressionTests": [
         "src/main/usage/jsonl-file-fingerprint.test.ts",
         "src/main/codex-usage/scanner-cache-fingerprint.test.ts",
