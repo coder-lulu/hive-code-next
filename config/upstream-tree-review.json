@@ -493,24 +493,6 @@
       ]
     },
     {
-      "path": ".github/workflows/upstream-sync.yml",
-      "base": null,
-      "product": {
-        "mode": "100644",
-        "sha": "ea0d9db42901e39ffd5349c9c5f062168a8d149f"
-      },
-      "upstream": null,
-      "result": {
-        "mode": "100644",
-        "sha": "ea0d9db42901e39ffd5349c9c5f062168a8d149f"
-      },
-      "reason": "Retain the reviewed native Windows frozen-control archive extraction and install zsh before the existing Ubuntu common verification so live-shell contracts run with their required shell. Preserve WebKit preparation, fail-closed execution, immutable candidate transfer and isolated publication authority.",
-      "regressionTests": [
-        "config/scripts/upstream-sync-boundary-contract.test.mjs",
-        "config/scripts/upstream-sync-gates.test.mjs"
-      ]
-    },
-    {
       "path": "README.md",
       "base": {
         "mode": "100644",
@@ -2505,42 +2487,6 @@
       "regressionTests": [
         "config/scripts/node-server-change-scope.test.mjs",
         "config/scripts/node-server-policy-self-tests.test.mjs"
-      ]
-    },
-    {
-      "path": "config/scripts/upstream-sync-boundary-contract.test.mjs",
-      "base": null,
-      "product": {
-        "mode": "100644",
-        "sha": "e330229d827d4540a033a66247df7ca854bfbb1f"
-      },
-      "upstream": null,
-      "result": {
-        "mode": "100644",
-        "sha": "e330229d827d4540a033a66247df7ca854bfbb1f"
-      },
-      "reason": "Exercise all five real workflow archive commands with native runner paths and native Node imports; isolate inherited Git repository/index/config state and verify frozen controls replace polluted candidate bytes.",
-      "regressionTests": [
-        "config/scripts/upstream-sync-boundary-contract.test.mjs",
-        "config/scripts/upstream-sync-gates.test.mjs"
-      ]
-    },
-    {
-      "path": "config/scripts/upstream-sync-gates.test.mjs",
-      "base": null,
-      "product": {
-        "mode": "100644",
-        "sha": "06e9dcf40e2ee54ac4fa29a1f039e06ab8c373e4"
-      },
-      "upstream": null,
-      "result": {
-        "mode": "100644",
-        "sha": "06e9dcf40e2ee54ac4fa29a1f039e06ab8c373e4"
-      },
-      "reason": "Require the existing Ubuntu common preparation to install zsh and WebKit synchronously before unchanged product verification, with explicit Bash fail-fast behavior and no skip or continue-on-error.",
-      "regressionTests": [
-        "config/scripts/upstream-sync-boundary-contract.test.mjs",
-        "config/scripts/upstream-sync-gates.test.mjs"
       ]
     },
     {
