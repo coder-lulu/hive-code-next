@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "ddc1c3e2a298a6434ef56722b819fe9db0a42de5",
+  "sourceProductSha": "b3d02beda64d6df526067e5f6b35751effc1c5e8",
   "baseUpstreamSha": "26cd1c22daf6b1fc7da85a5f07dcc66d8ae84704",
   "upstreamSha": "8e350554480ac5b77d3050a2040541fd334dad7c",
   "resolutions": [
@@ -490,6 +490,24 @@
       "regressionTests": [
         "config/scripts/pr-auxiliary-preflight-admission.test.mjs",
         "config/scripts/ci-unit-module-cache.test.mjs"
+      ]
+    },
+    {
+      "path": ".github/workflows/upstream-sync.yml",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "ea0d9db42901e39ffd5349c9c5f062168a8d149f"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "ea0d9db42901e39ffd5349c9c5f062168a8d149f"
+      },
+      "reason": "Retain the reviewed native Windows frozen-control archive extraction and install zsh before the existing Ubuntu common verification so live-shell contracts run with their required shell. Preserve WebKit preparation, fail-closed execution, immutable candidate transfer and isolated publication authority.",
+      "regressionTests": [
+        "config/scripts/upstream-sync-boundary-contract.test.mjs",
+        "config/scripts/upstream-sync-gates.test.mjs"
       ]
     },
     {
@@ -1695,6 +1713,56 @@
       ]
     },
     {
+      "path": "config/scripts/ensure-native-runtime.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "5f0e44998bc0fd81d0f840c1d8197f0b992113ed"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "5f0e44998bc0fd81d0f840c1d8197f0b992113ed"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "78251f8d6a4513fa4930187f58b2e982f089ab71"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "80397aa2cc4d388266527e2f4ce8004114629b24"
+      },
+      "reason": "Reuse the existing late macOS node-pty exception preparation before the Node runtime rebuild loop, matching the existing Electron path. Preserve the previously reviewed Windows security module, fresh child validation and original rebuild failure propagation; no dependency, lockfile, patch or global compiler flag changes.",
+      "regressionTests": [
+        "config/scripts/ensure-native-runtime.test.mjs",
+        "config/scripts/rebuild-native-deps-macos.test.mjs",
+        "config/scripts/orcad-prebuild-macos-gyp.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/ensure-native-runtime.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "c65706638c9c40b250063877477a7cdee46b7d88"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "34dddccab73e20ac1e47bb837d28506d912b0339"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "ab55fb8811c799773155f3428094bcf2d0cfc7c3"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "6d1747f127d4c937647f90761aba787abf879cdf"
+      },
+      "reason": "Capture binding.gyp at the fake node-gyp compilation boundary to verify macOS preparation occurs before rebuilding, non-macOS binding bytes stay unchanged, and successful ensure and check-only do not recompile or mutate the binding. Reuse the existing process host and retain original native fixtures.",
+      "regressionTests": [
+        "config/scripts/ensure-native-runtime.test.mjs",
+        "config/scripts/rebuild-native-deps-macos.test.mjs",
+        "config/scripts/orcad-prebuild-macos-gyp.test.mjs"
+      ]
+    },
+    {
       "path": "config/scripts/generate-bundled-skill-guides.mjs",
       "base": {
         "mode": "100644",
@@ -1735,6 +1803,27 @@
       },
       "reason": "Retain product branded guide/frontmatter and primary-command regression cases while absorbing non-overlapping Jira guide coverage.\n\nPost-prepare diagnostic repair: Apply the actual Hive branding transform before stub composition and read the per-workspace environment guide plus its declared reference corpus; retain executable and manifest contract assertions.",
       "regressionTests": ["config/scripts/generate-bundled-skill-guides.test.mjs"]
+    },
+    {
+      "path": "config/scripts/install-electron-package-binary.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "155668b534a165461712632d3303de0120810be6"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "6b08ecf8520a696063390ae319667e8046714ce5"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "155668b534a165461712632d3303de0120810be6"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3bbb551b243238e237f905152dc3e2a21f9cf927"
+      },
+      "reason": "Run only the ancestor-cache parent seed and standalone child with explicit local CI-empty mode, so the cache seed precondition and actual ancestor-isolation behavior are tested under CI. Preserve production CI cache disabling and every original assertion.",
+      "regressionTests": ["config/scripts/install-electron-package-binary.test.mjs"]
     },
     {
       "path": "config/scripts/locale-cross-locale-key-overrides.mjs",
@@ -2419,6 +2508,42 @@
       ]
     },
     {
+      "path": "config/scripts/upstream-sync-boundary-contract.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "e330229d827d4540a033a66247df7ca854bfbb1f"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "e330229d827d4540a033a66247df7ca854bfbb1f"
+      },
+      "reason": "Exercise all five real workflow archive commands with native runner paths and native Node imports; isolate inherited Git repository/index/config state and verify frozen controls replace polluted candidate bytes.",
+      "regressionTests": [
+        "config/scripts/upstream-sync-boundary-contract.test.mjs",
+        "config/scripts/upstream-sync-gates.test.mjs"
+      ]
+    },
+    {
+      "path": "config/scripts/upstream-sync-gates.test.mjs",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "06e9dcf40e2ee54ac4fa29a1f039e06ab8c373e4"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "06e9dcf40e2ee54ac4fa29a1f039e06ab8c373e4"
+      },
+      "reason": "Require the existing Ubuntu common preparation to install zsh and WebKit synchronously before unchanged product verification, with explicit Bash fail-fast behavior and no skip or continue-on-error.",
+      "regressionTests": [
+        "config/scripts/upstream-sync-boundary-contract.test.mjs",
+        "config/scripts/upstream-sync-gates.test.mjs"
+      ]
+    },
+    {
       "path": "config/scripts/user-visible-brand-boundary.test.mjs",
       "base": null,
       "product": {
@@ -2939,9 +3064,9 @@
       "upstream": null,
       "result": {
         "mode": "100644",
-        "sha": "de321c2cd3eac3140aa6d86492e35938dbf94f72"
+        "sha": "003da21d9100d6f5900afbe0fddd7471ce01da14"
       },
-      "reason": "Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source.\n\nFresh raw4 recording publication: Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source.\n\nFresh post-hook recording publication: Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source. Fresh M5 recording: Generated by the existing v3 writer from all 757 scenarios of the frozen reviewed source under official M5 source/control guards. Preserve all 796 original reference bytes, all 47 independently approved unchanged delta identities and reasons, and the other 48 byte-identical writer files. Generated output does not authorize its own source.\n\nGenerated by the existing v3 writer from all 757 scenarios of the frozen reviewed source under official bound control source/control guards. Preserve all 796 original reference bytes, all 47 independently approved unchanged delta identities and reasons, and the other 48 byte-identical writer files. Generated output does not authorize its own source.",
+      "reason": "Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source.\n\nFresh raw4 recording publication: Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source.\n\nFresh post-hook recording publication: Generated by the existing v3 writer from the complete 757-scenario recording of the frozen reviewed source. Preserve all 796 independently verified three-way original references and bind exact guard, recorder, scenario, adapter and reviewed-delta hashes; generated files do not authorize their own source. Fresh M5 recording: Generated by the existing v3 writer from all 757 scenarios of the frozen reviewed source under official M5 source/control guards. Preserve all 796 original reference bytes, all 47 independently approved unchanged delta identities and reasons, and the other 48 byte-identical writer files. Generated output does not authorize its own source.\n\nGenerated by the existing v3 writer from all 757 scenarios of the frozen reviewed source under official bound control source/control guards. Preserve all 796 original reference bytes, all 47 independently approved unchanged delta identities and reasons, and the other 48 byte-identical writer files. Generated output does not authorize its own source.\n\nGenerated by the existing v3 writer from all 757 scenarios of the frozen reviewed source under official bound control source/control guards. Preserve all 796 original reference bytes, all 47 independently approved unchanged delta identities and reasons, and the other 48 byte-identical writer files. Generated output does not authorize its own source.",
       "regressionTests": [
         "config/scripts/upstream-recording-source.test.mjs",
         "mobile/src/test-support/hive-recording-reference.test.ts",
@@ -6923,6 +7048,21 @@
         "config/scripts/user-visible-brand-boundary.test.mjs",
         "node config/scripts/check-hivecode-brand-boundary.mjs"
       ]
+    },
+    {
+      "path": "src/main/browser/browser-find-frame-traversal-electron-fixture.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "d95cabe1cf7d0cd52f575e9b2e884c32d38a98bb"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "8c469471159bb90d50341eea66152f72f61ac0aa"
+      },
+      "reason": "Wait for the guest did-finish-load event before the initial strict search assertion, closing the observed early-query event-order window. Preserve the original 24 query options, focus, stop and result assertions. Exact fixture and instrumented diagnostics pass; the root cause of prior sporadic numeric results remains unproven and full candidate acceptance remains required.",
+      "regressionTests": ["src/main/browser/browser-find-frame-traversal.electron.test.ts"]
     },
     {
       "path": "src/main/browser/browser-popup-background-cdp-probe.ts",
