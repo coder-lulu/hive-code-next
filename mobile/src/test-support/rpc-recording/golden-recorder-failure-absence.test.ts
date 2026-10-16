@@ -1,6 +1,7 @@
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { readGolden, readGoldenRaw, type GoldenRecording } from './golden-recording'
+import { readGoldenRaw, type GoldenRecording } from './golden-recording'
+import { hiveGoldenReferences } from '../../../rpc-foundation/hive-recording-reference'
 import { OBSERVATION_FIELDS } from './golden-value-pool'
 import { readHiveGoldenDomain } from '../hive-golden-domain'
 import type { Observation } from './recording-scenario'
@@ -81,16 +82,18 @@ describe('recorder failures never reach a golden', () => {
   it('keeps every raw reference free of recorder projection failures', () => {
     const result = scan(domain.upstreamIds, readGoldenRaw)
     if (domain.kind === 'hive-overlay') {
-      expect(domain.upstreamIds).toHaveLength(794)
+      expect(domain.upstreamIds).toHaveLength(796)
     }
     expect(result.found).toEqual([])
     expect(result.checkpoints).toBeGreaterThan(domain.upstreamIds.length)
   })
 
   it('keeps every product materialized reference free of projection failures', () => {
-    const result = scan(domain.supportedIds, readGolden)
+    const goldens = hiveGoldenReferences(directory, domain.supportedIds, readGoldenRaw)
+    const byId = new Map(domain.supportedIds.map((id, index) => [id, goldens[index]]))
+    const result = scan(domain.supportedIds, (_directory, id) => byId.get(id)!)
     if (domain.kind === 'hive-overlay') {
-      expect(domain.supportedIds).toHaveLength(755)
+      expect(domain.supportedIds).toHaveLength(757)
     }
     expect(result.found).toEqual([])
     expect(result.checkpoints).toBeGreaterThan(domain.supportedIds.length)

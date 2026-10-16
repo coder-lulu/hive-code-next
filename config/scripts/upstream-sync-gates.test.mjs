@@ -413,6 +413,8 @@ describe('verification runtime prerequisites', () => {
     expect(generate).toBeGreaterThan(install)
     expect(baseline).toBeGreaterThan(generate)
     expect(baseline).toBeLessThan(execute)
+    expect(jobs.gates.env.ORCA_CROSS_VERSION_BASELINE_REF).toBe('v1.4.186')
+    expect(jobs.publish.env.ORCA_CROSS_VERSION_BASELINE_REF).toBeUndefined()
     expect(steps[generate]['working-directory']).toBe('mobile')
     expect(steps[generate].shell).toBe('bash')
     const postinstall = JSON.parse(readFileSync(join(projectDir, 'mobile/package.json'), 'utf8'))

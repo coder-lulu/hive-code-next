@@ -96,6 +96,16 @@ export function hiveGoldenReference(
   readRaw: (directory: string, id: string) => GoldenRecording
 ): GoldenRecording {
   const manifest = manifestFor(directory)
+  return materializeGolden(directory, id, upstream, readRaw, manifest)
+}
+
+function materializeGolden(
+  directory: string,
+  id: string,
+  upstream: GoldenRecording,
+  readRaw: (directory: string, id: string) => GoldenRecording,
+  manifest: HiveRecordingManifest | null
+): GoldenRecording {
   if (!manifest) {
     return upstream
   }
@@ -129,4 +139,21 @@ export function hiveGoldenReference(
 export function hiveGoldenFilePath(directory: string, id: string): string {
   const manifest = manifestFor(directory)
   return join(manifest?.overlays[id] ? join(directory, '../hive/goldens') : directory, `${id}.json`)
+}
+
+/** Bound full-corpus validation to this synchronous batch; never retain a trusted manifest. */
+export function hiveGoldenReferences(
+  directory: string,
+  ids: readonly string[],
+  readRaw: (directory: string, id: string) => GoldenRecording
+): GoldenRecording[] {
+  const manifest = manifestFor(directory)
+  const identity = JSON.stringify(manifest)
+  const goldens = ids.map((id) =>
+    materializeGolden(directory, id, readRaw(directory, id), readRaw, manifest)
+  )
+  if (JSON.stringify(manifestFor(directory)) !== identity) {
+    throw new Error('Hive recording provenance changed during the batch')
+  }
+  return goldens
 }

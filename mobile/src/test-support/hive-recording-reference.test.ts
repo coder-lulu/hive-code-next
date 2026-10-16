@@ -1,3 +1,4 @@
+import * as filesystem from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -7,7 +8,11 @@ import {
   recordingTraceSha256,
   writeHiveRecordingOverlay
 } from '../../rpc-foundation/write-hive-recording-overlay'
-import { upstreamGoldenSha256 } from '../../rpc-foundation/hive-recording-reference'
+import {
+  hiveGoldenReferences,
+  manifestFor,
+  upstreamGoldenSha256
+} from '../../rpc-foundation/hive-recording-reference'
 
 import {
   CONTROL_PATHS,
@@ -36,7 +41,15 @@ const logs = join(project, 'logs/upstream-sync-20260915/overlay-tests')
 mkdirSync(logs, { recursive: true })
 const upstreamBaseline = 'a781a602a8729439d7a3eebf0c3b9e5817362e77'
 
-afterEach(() => vi.unstubAllEnvs())
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return { ...actual, readdirSync: vi.fn(actual.readdirSync) }
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+  vi.restoreAllMocks()
+})
 
 function fixture(reviewed = true) {
   const root = mkdtempSync(join(logs, 'case-'))
@@ -200,5 +213,67 @@ describe('raw source projection fences the writer', { timeout: 30_000 }, () => {
     writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)
     writeFileSync(join(f.hive, 'reviewed-deltas.json'), '{}')
     expect(() => readGolden(f.reference, 'b2')).toThrow('reviewed deltas')
+  })
+})
+
+describe('bounded Hive recording batch', { timeout: 30_000 }, () => {
+  it('validates the whole corpus twice rather than once per materialized reference', () => {
+    const f = fixture()
+    writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)
+    manifestFor(f.reference)
+    const reads = vi.mocked(filesystem.readdirSync)
+    reads.mockClear()
+    const ids = ['b1', 'b2', 'b1', 'b2']
+    expect(hiveGoldenReferences(f.reference, ids, readGoldenRaw)).toEqual([
+      f.next[0],
+      f.next[1],
+      f.next[0],
+      f.next[1]
+    ])
+    expect(reads.mock.calls.filter(([directory]) => directory === f.reference)).toHaveLength(2)
+  })
+
+  it.each(['upstream', 'manifest', 'reviewed-deltas'])(
+    'rejects %s drift during a batch',
+    (kind) => {
+      const f = fixture()
+      writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)
+      let changed = false
+      const read = (directory: string, id: string) => {
+        const golden = readGoldenRaw(directory, id)
+        if (!changed) {
+          changed = true
+          if (kind === 'manifest') {
+            const file = join(f.hive, 'manifest.json')
+            const manifest = JSON.parse(readFileSync(file, 'utf8'))
+            manifest.source.upstreamSha = 'f'.repeat(40)
+            writeFileSync(file, JSON.stringify(manifest))
+          } else {
+            const file =
+              kind === 'upstream'
+                ? join(f.reference, 'b1.json')
+                : join(f.hive, 'reviewed-deltas.json')
+            writeFileSync(file, readFileSync(file, 'utf8') + ' ')
+          }
+        }
+        return golden
+      }
+      expect(() => hiveGoldenReferences(f.reference, ['b1', 'b2'], read)).toThrow()
+    }
+  )
+
+  it('keeps the per-entry overlay hash and decoded value checks', () => {
+    const f = fixture()
+    writeHiveRecordingOverlay(f.root, f.sourceInput, f.recorded, f.hive)
+    const read = (directory: string, id: string) => {
+      const golden = readGoldenRaw(directory, id)
+      if (id === 'b1') {
+        writeFileSync(join(f.hive, 'goldens/b2.json'), goldenBytes(f.next[0]))
+      }
+      return golden
+    }
+    expect(() => hiveGoldenReferences(f.reference, ['b1', 'b2'], read)).toThrow(
+      'overlay changed without review'
+    )
   })
 })

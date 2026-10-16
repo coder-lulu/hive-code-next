@@ -240,6 +240,7 @@ jobs:
       contents: read
     runs-on: ubuntu-latest
     env:
+      ORCA_CROSS_VERSION_BASELINE_REF: v1.4.186
       UPSTREAM_SHA: ${{ needs.sync.outputs.upstream_sha }}
       TARGET_SHA: ${{ needs.sync.outputs.target_sha }}
       CANDIDATE_SHA: ${{ needs.sync.outputs.candidate_sha }}
