@@ -121,7 +121,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           # Run privileged intake code from the reviewed product, not the incoming tree.
           mkdir -p "$RUNNER_TEMP/upstream-sync-control"
-          git archive "$target_sha" config package.json | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          git archive "$target_sha" config package.json | (cd "$RUNNER_TEMP/upstream-sync-control" && tar -x)
           node_version="$(jq -er '.engines.node | select(type == "string" and length > 0)' "$RUNNER_TEMP/upstream-sync-control/package.json")"
           echo "node_version=$node_version" >> "$GITHUB_OUTPUT"
 
@@ -279,7 +279,7 @@ jobs:
           # Upstream objects are proof inputs, never parents of public product commits.
           git merge-base --is-ancestor "$TARGET_SHA" "$CANDIDATE_SHA"
           mkdir -p "$RUNNER_TEMP/upstream-sync-control" "$GITHUB_WORKSPACE/logs/upstream-sync/evidence"
-          git archive "$TARGET_SHA" config package.json | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          git archive "$TARGET_SHA" config package.json | (cd "$RUNNER_TEMP/upstream-sync-control" && tar -x)
 
       - name: Setup Node.js for reviewed audit code
         uses: actions/setup-node@v6
@@ -367,7 +367,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           mkdir -p "$RUNNER_TEMP/upstream-sync-control" "$GITHUB_WORKSPACE/logs/upstream-sync/evidence"
-          git --no-replace-objects archive "$TARGET_SHA" config | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          git --no-replace-objects archive "$TARGET_SHA" config | (cd "$RUNNER_TEMP/upstream-sync-control" && tar -x)
           node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-recording-source.mjs" verify \
             --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
             --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/evidence/recording-source-common.json"
@@ -489,7 +489,7 @@ jobs:
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
           mkdir -p "$RUNNER_TEMP/upstream-sync-control"
-          git archive "$TARGET_SHA" config package.json | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          git archive "$TARGET_SHA" config package.json | (cd "$RUNNER_TEMP/upstream-sync-control" && tar -x)
 
       - name: Setup Node.js for reviewed content verification
         uses: actions/setup-node@v6
@@ -531,7 +531,7 @@ jobs:
         run: |
           set -euo pipefail
           test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"
-          git --no-replace-objects archive "$TARGET_SHA" config | tar -x -C "$RUNNER_TEMP/upstream-sync-control"
+          git --no-replace-objects archive "$TARGET_SHA" config | (cd "$RUNNER_TEMP/upstream-sync-control" && tar -x)
           node "$RUNNER_TEMP/upstream-sync-control/config/scripts/upstream-recording-source.mjs" verify \
             --cwd "$GITHUB_WORKSPACE" --target "$TARGET_SHA" --upstream "$UPSTREAM_SHA" --head "$CANDIDATE_SHA" \
             --target-branch "$TARGET_BRANCH" --report "$GITHUB_WORKSPACE/logs/upstream-sync/recording-source-$PLATFORM.json"
