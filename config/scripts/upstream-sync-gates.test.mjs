@@ -436,7 +436,7 @@ describe('verification runtime prerequisites', () => {
       )
     ).toBe(false)
   })
-  it('requires actual browser resources before the common product checks', () => {
+  it('requires live-shell and browser resources before the common product checks', () => {
     const steps = jobs.gates.steps
     const execute = steps.findIndex((step) => step.name === 'Run common product verification once')
     const electron = steps.findIndex(
@@ -453,11 +453,18 @@ describe('verification runtime prerequisites', () => {
     expect(steps[chrome].run).toContain('exit 1')
     expect(steps[chrome].run).toContain('ORCA_MOBILE_WEB_RENDER_BROWSER=$chrome')
     const webkit = steps.findIndex(
-      (step) => step.name === 'Install WebKit for mobile render checks'
+      (step) => step.name === 'Install WebKit and live-shell prerequisites'
     )
     expect(webkit).toBeGreaterThan(-1)
     expect(webkit).toBeLessThan(execute)
-    expect(steps[webkit].run).toBe('pnpm exec playwright-core install --with-deps webkit')
+    expect(jobs.gates['runs-on']).toBe('ubuntu-latest')
+    expect(steps[webkit].shell).toBe('bash')
+    expect(steps[webkit].run.trim().split('\n')).toEqual([
+      'set -euo pipefail',
+      'sudo apt-get update',
+      'sudo apt-get install --yes zsh',
+      'pnpm exec playwright-core install --with-deps webkit'
+    ])
     expect(steps[webkit].if).toBeUndefined()
     expect(steps[webkit]['continue-on-error']).toBeUndefined()
     expect(steps[webkit].background).toBeUndefined()
