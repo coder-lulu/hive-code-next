@@ -80,6 +80,13 @@
         "anti-slop/no-module-mocking": "off"
       }
     },
+    // Shared render-test setup extracted from MobileNativeChatView.test.ts; only its two specs import it.
+    {
+      "files": ["**/mobile/src/session/mobile-native-chat-view-test-fixture.ts"],
+      "rules": {
+        "anti-slop/no-module-mocking": "off"
+      }
+    },
     // The exemptions below are file-scoped rather than inline `oxlint-disable` comments
     // because the root lint scan does not load this plugin, so an inline directive naming
     // an anti-slop rule always reads back as an unused directive there.
