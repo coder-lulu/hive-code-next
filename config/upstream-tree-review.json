@@ -2191,9 +2191,9 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "f40d610fa30b43eba09194c76cd8a69e9fe07dc5"
+        "sha": "671c9caf64d54e9994ad52a6d90dfd5aa8e9ae88"
       },
-      "reason": "Reuse the actual packaged runtime module plan and existing FileMatcher/copyFiles pipeline to stage a specifically named resource, throwing when it is absent; retain the process-host wrapper, dependency filter, return path and consumer termination behavior without inventing a dependency closure.",
+      "reason": "Reuse the actual packaged runtime module plan and existing FileMatcher/copyFiles pipeline to stage a specifically named resource, throwing when it is absent; retain the process-host wrapper, dependency filter, return path and consumer termination behavior without inventing a dependency closure. Fix the Linux packaging fixture by retaining directory traversal in its dependency filter and using DO_NOT_USE_HARD_LINKS for independent copy inodes, so packaged package.json rewriting cannot mutate the source workspace. Explicit Node regression total 41; original default route Bun 35 plus Node-runtime 6. Preserve the existing resource plan, process-host wrapper and termination assertions.",
       "regressionTests": [
         "config/scripts/managed-data-account-runtime.test.ts",
         "config/scripts/packaged-process-host.test.mjs",
@@ -17297,6 +17297,73 @@
       },
       "reason": "Preserve product default, branding or visible-interaction regression assertions; accept clean upstream edits outside overlapping test consolidation.",
       "regressionTests": ["tests/e2e/tabs.spec.ts"]
+    },
+    {
+      "path": "config/scripts/packaged-process-host.test.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "1b993fac2da36bc52ef32fd4d73147056875775b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "1b993fac2da36bc52ef32fd4d73147056875775b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "1b993fac2da36bc52ef32fd4d73147056875775b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "f741c97f4a95bd28d3925bd751598ab033eff6c6"
+      },
+      "reason": "Fix the Linux packaging fixture by retaining directory traversal in its dependency filter and using DO_NOT_USE_HARD_LINKS for independent copy inodes, so packaged package.json rewriting cannot mutate the source workspace. Explicit Node regression total 41; original default route Bun 35 plus Node-runtime 6. Preserve the existing resource plan, process-host wrapper and termination assertions.",
+      "regressionTests": [
+        "config/scripts/packaged-process-host.test.mjs",
+        "config/scripts/managed-data-account-runtime.test.ts",
+        "config/scripts/package-electron-runtime-contract.test.mjs"
+      ]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "22efc31bd3cc42bae348f6f5047f0e80d54ded8b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "76779a9aa9dd0e9e305ee3a0118821bcca3249c9"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "22efc31bd3cc42bae348f6f5047f0e80d54ded8b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "3acda62910af921a07d4cc0de23c15da9ff8b2ea"
+      },
+      "reason": "Validate legal timer-dependent output ACKs separately from the exact 16 mandatory journey frames: retain every observed frame and receiving-peer decoder check, require exact credit payload/stream/sequence/order/cardinality, and preserve all eight completed steps, snapshots and original ten cases. Deterministic ACK flush/dispose schedules and decoder-negative, malformed-credit and missing-core-evidence regressions pass the complete 17-case file under Node and Bun.",
+      "regressionTests": ["tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts"]
+    },
+    {
+      "path": "tests/e2e/cross-version-wire/terminal-skew-journey.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "136c8ee017971703621fac9fb05b323e08078348"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "136c8ee017971703621fac9fb05b323e08078348"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "136c8ee017971703621fac9fb05b323e08078348"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "5112c344a3fdb11456d26f657a23668452f38d2d"
+      },
+      "reason": "Validate legal timer-dependent output ACKs separately from the exact 16 mandatory journey frames: retain every observed frame and receiving-peer decoder check, require exact credit payload/stream/sequence/order/cardinality, and preserve all eight completed steps, snapshots and original ten cases. Deterministic ACK flush/dispose schedules and decoder-negative, malformed-credit and missing-core-evidence regressions pass the complete 17-case file under Node and Bun.",
+      "regressionTests": ["tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts"]
     }
   ],
   "documentation": {
