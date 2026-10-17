@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('expo-crypto', () => ({ randomUUID: () => globalThis.crypto.randomUUID() }))
 
 const asyncStorageMock = vi.hoisted(() => ({
   getItem: vi.fn(),
@@ -106,6 +107,7 @@ describe('host-store pairing save after an Android encryption rejection', () => 
     expect(JSON.parse(storedHostsRaw)).toEqual([
       {
         id: NEW_HOST.id,
+        pairingRevision: expect.any(String),
         name: NEW_HOST.name,
         endpoint: NEW_HOST.endpoint,
         publicKeyB64: NEW_HOST.publicKeyB64,

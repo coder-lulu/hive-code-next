@@ -1,4 +1,4 @@
-import { Activity, Edit3, PowerOff, RefreshCw, Users } from 'lucide-react-native'
+import { Activity, Edit3, PowerOff, RefreshCw, Trash2, Users } from 'lucide-react-native'
 import type { ActionSheetAction } from './components/ActionSheetModal'
 import { hostCatalogEntryHasLocalPairing } from './runtime-directory/account-runtime-catalog'
 import type { ConnectionState, HostCatalogEntry } from './transport/types'
@@ -17,6 +17,7 @@ export function getHostListActionSheetActions(args: {
   onDiagnostics: (hostId: string) => void
   onEdit: (hostId: string) => void
   onSessions?: (hostId: string) => void
+  onUnclaim?: (hostId: string, runtimeRecordId: string) => void
   onRemove: (host: HostCatalogEntry) => void
 }): ActionSheetAction[] {
   const { host } = args
@@ -81,6 +82,14 @@ export function getHostListActionSheetActions(args: {
             disabled: !args.onSessions,
             closeBeforePress: true,
             onPress: () => args.onSessions?.(host.id)
+          },
+          {
+            label: '删除 Runtime',
+            icon: Trash2,
+            destructive: true,
+            disabled: !args.onUnclaim,
+            closeBeforePress: true,
+            onPress: () => args.onUnclaim?.(host.id, host.runtimeRecordId!)
           }
         ]
       : []),

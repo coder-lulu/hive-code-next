@@ -149,6 +149,33 @@ export class AccountRuntimeDirectoryStore {
     }
   }
 
+  confirmRuntimeUnlinked(
+    runtimeRecordId: string,
+    expectedScope: AccountRuntimeDirectoryScope,
+    expectedResourceVersion: number
+  ): boolean {
+    if (
+      this.state.scope?.accountId !== expectedScope.accountId ||
+      this.state.scope.authorityId !== expectedScope.authorityId
+    ) {
+      throw new Error('mobile_session_required')
+    }
+    const current = this.state.entries.find((entry) => entry.runtimeRecordId === runtimeRecordId)
+    if (current && current.resourceVersion > expectedResourceVersion) {
+      return false
+    }
+    this.presenceLoadedAt.delete(runtimeRecordId)
+    this.latestPresenceSequence = 0
+    this.publish({
+      ...this.state,
+      generation: this.state.generation + 1,
+      status: 'ready',
+      error: null,
+      entries: this.state.entries.filter((entry) => entry.runtimeRecordId !== runtimeRecordId)
+    })
+    return true
+  }
+
   clear(): void {
     this.presenceLoadedAt.clear()
     this.latestPresenceSequence = 0

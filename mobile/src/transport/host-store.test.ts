@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('expo-crypto', () => ({ randomUUID: () => globalThis.crypto.randomUUID() }))
 
 const asyncStorageMock = vi.hoisted(() => ({
   getItem: vi.fn(),
@@ -114,6 +115,58 @@ describe('host-store list mutations', () => {
     expect(asyncStorageMock.getItem).toHaveBeenCalledOnce()
   })
 
+  it('preserves a newly paired incarnation when an older deletion resumes', async () => {
+    await savePairedHost({ ...HOST_ONE, deviceToken: 'first-token' })
+    const first = (await loadHosts()).find((host) => host.id === HOST_ONE.id)?.pairingRevision
+    expect(typeof first).toBe('string')
+    await updateLastConnected(HOST_ONE.id)
+    expect((await loadHosts()).find((host) => host.id === HOST_ONE.id)?.pairingRevision).toBe(first)
+    await savePairedHost({ ...HOST_ONE, deviceToken: 'replacement-token' })
+    const replacement = (await loadHosts()).find((host) => host.id === HOST_ONE.id)
+    expect(replacement?.pairingRevision).not.toBe(first)
+    if (!first || !replacement?.pairingRevision) {
+      throw new Error('missing pairing revision')
+    }
+    recordCleanupIntentMock.mockClear()
+    await expect(removeHost(HOST_ONE.id, first)).resolves.toBe(false)
+    expect(recordCleanupIntentMock).not.toHaveBeenCalled()
+    expect((await loadHosts()).find((host) => host.id === HOST_ONE.id)?.deviceToken).toBe(
+      'replacement-token'
+    )
+    await expect(removeHost(HOST_ONE.id, replacement.pairingRevision)).resolves.toBe(true)
+    // Cache cleanup may fail after the metadata commit; absence is still retryable.
+    await expect(removeHost(HOST_ONE.id, replacement.pairingRevision)).resolves.toBe(true)
+  })
+
+  it('conditionally removes pre-revision pairings and preserves unrelated hosts', async () => {
+    await expect(removeHost(HOST_ONE.id, null)).resolves.toBe(true)
+    expect((await loadHosts()).map((host) => host.id)).toEqual([HOST_TWO.id])
+  })
+
+  it('keeps later pairing publication behind the old deletion cleanup', async () => {
+    let startCleanup!: () => void
+    let finishCleanup!: () => void
+    const started = new Promise<void>((resolve) => {
+      startCleanup = resolve
+    })
+    const blocked = new Promise<void>((resolve) => {
+      finishCleanup = resolve
+    })
+    const removal = removeHost(HOST_ONE.id, null, async () => {
+      startCleanup()
+      await blocked
+    })
+    await started
+    const newPairing = savePairedHost({ ...HOST_ONE, deviceToken: 'new-token' })
+    await Promise.resolve()
+    expect(JSON.parse(storedHostsRaw)).toEqual([HOST_TWO])
+    finishCleanup()
+    await Promise.all([removal, newPairing])
+    expect((await loadHosts()).find((host) => host.id === HOST_ONE.id)?.deviceToken).toBe(
+      'new-token'
+    )
+  })
+
   it('names a new host from the same durable read used for identity lookup', async () => {
     await expect(resolvePairingHostIdentity('unpaired-key', 'host-new')).resolves.toEqual({
       id: 'host-new',
@@ -206,7 +259,9 @@ describe('host-store list mutations', () => {
       deviceToken: 'replacement-token'
     })
 
-    expect(JSON.parse(storedHostsRaw)).toEqual([{ ...HOST_ONE, endpoint: 'ws://127.0.0.1:3' }])
+    expect(JSON.parse(storedHostsRaw)).toEqual([
+      { ...HOST_ONE, endpoint: 'ws://127.0.0.1:3', pairingRevision: expect.any(String) }
+    ])
     expect(recordCleanupIntentMock.mock.invocationCallOrder[0]).toBeLessThan(
       asyncStorageMock.setItem.mock.invocationCallOrder[0]!
     )
@@ -291,7 +346,9 @@ describe('host-store list mutations', () => {
     await savePairedHost({ ...duplicate, deviceToken: 'token-b' })
     await staleCleanup(duplicate.id)
 
-    expect(JSON.parse(storedHostsRaw)).toEqual([duplicate])
+    expect(JSON.parse(storedHostsRaw)).toEqual([
+      { ...duplicate, pairingRevision: expect.any(String) }
+    ])
     expect(secureStoreMock.deleteItemAsync).not.toHaveBeenCalled()
   })
 

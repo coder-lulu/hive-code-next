@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('expo-crypto', () => ({ randomUUID: () => globalThis.crypto.randomUUID() }))
 import { updateHostNameAndEndpoint } from './host-store'
 
 vi.mock('@react-native-async-storage/async-storage', () => ({

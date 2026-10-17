@@ -18,6 +18,11 @@ export type AccountRuntimeDisplayNameQueueRequest = Readonly<{
 export type AccountRuntimeDirectoryContextValue = {
   readonly state: AccountRuntimeDirectoryState
   readonly mergeCatalog: (localCatalog: readonly HostCatalogEntry[]) => HostCatalogEntry[]
+  readonly confirmRuntimeUnlinked: (
+    runtimeRecordId: string,
+    expectedScope: AccountRuntimeDirectoryScope,
+    expectedResourceVersion: number
+  ) => boolean
   readonly refresh: () => Promise<void>
   readonly listSessions: (cursor?: string | null) => Promise<RuntimeSessionPage>
   readonly revokeSession: (session: RuntimeSession) => Promise<RuntimeSessionRevocation>

@@ -1,3 +1,4 @@
+vi.mock('./mobile-runtime-delete-recovery', () => ({ recoverRuntimeDeleteConnections: vi.fn() }))
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -207,4 +208,83 @@ describe('directory refresh on app resume', () => {
     })
     expect(fixture.directory).toHaveBeenCalledTimes(2)
   })
+})
+
+it('confirmed unlink fences pending refresh and immediately forgets the account client', async () => {
+  let resolve!: (entries: AccountRuntimeDirectoryEntry[]) => void
+  fixture.directory.mockReturnValueOnce(
+    new Promise<AccountRuntimeDirectoryEntry[]>((done) => {
+      resolve = done
+    })
+  )
+  let refresh!: Promise<void>
+  await act(async () => {
+    refresh = directory.refresh()
+  })
+  await act(async () => {
+    directory.confirmRuntimeUnlinked(
+      runtime.runtimeRecordId,
+      {
+        accountId: 'account-a',
+        authorityId: 'authority'
+      },
+      runtime.resourceVersion
+    )
+  })
+  expect(directory.state.entries).toEqual([])
+  expect(fixture.forget).toHaveBeenCalledWith(runtime.runtimeRecordId)
+  await act(async () => {
+    resolve([runtime])
+    await refresh
+  })
+  expect(directory.state.entries).toEqual([])
+  expect(() =>
+    directory.confirmRuntimeUnlinked(
+      runtime.runtimeRecordId,
+      {
+        accountId: 'other',
+        authorityId: 'authority'
+      },
+      runtime.resourceVersion
+    )
+  ).toThrow('mobile_session_required')
+})
+
+it('does not forget a newer claim or cancel its pending refresh for an old unlink', async () => {
+  const newer = { ...runtime, resourceVersion: 9 }
+  fixture.directory.mockResolvedValueOnce([newer])
+  await act(async () => {
+    await directory.refresh()
+  })
+  let resolve!: (entries: AccountRuntimeDirectoryEntry[]) => void
+  fixture.directory.mockReturnValueOnce(
+    new Promise<AccountRuntimeDirectoryEntry[]>((done) => {
+      resolve = done
+    })
+  )
+  let refresh!: Promise<void>
+  await act(async () => {
+    refresh = directory.refresh()
+  })
+  const signal = fixture.directory.mock.calls.at(-1)![2]
+  const snapshot = directory.state
+  expect(
+    directory.confirmRuntimeUnlinked(
+      runtime.runtimeRecordId,
+      {
+        accountId: 'account-a',
+        authorityId: 'authority'
+      },
+      3
+    )
+  ).toBe(false)
+  expect(directory.state).toBe(snapshot)
+  expect(fixture.forget).not.toHaveBeenCalled()
+  expect(signal.aborted).toBe(false)
+  await act(async () => {
+    resolve([newer])
+    await refresh
+  })
+  expect(directory.state.entries).toEqual([newer])
+  expect(directory.state.status).toBe('ready')
 })

@@ -44,6 +44,16 @@ export function createMobileRuntimeSelectorStyles(theme: MobileTheme) {
       paddingHorizontal: theme.spacing.space12,
       paddingVertical: theme.spacing.space12
     },
+    deleteButton: {
+      minHeight: theme.size.minimumTouchTarget,
+      minWidth: theme.size.minimumTouchTarget,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: theme.spacing.space8,
+      paddingHorizontal: theme.spacing.space16,
+      paddingVertical: theme.spacing.space8
+    },
+    deleteText: { ...theme.typography.label, color: theme.color.status.dangerText },
     rowSelected: { backgroundColor: theme.color.bg.subtle },
     runtimeIcon: {
       width: theme.size.minimumTouchTarget,

@@ -381,6 +381,12 @@ export function MobileHomeProvider({ children }: PropsWithChildren) {
                 data.router.push({ pathname: '/runtime-sessions', params: { runtimeRecordId } })
               }
             }),
+          onUnclaim: (hostId, runtimeRecordId) =>
+            performHostAction(hostId, () => {
+              if (sessionScope && actionTarget?.host.accessSources?.includes('account-claimed')) {
+                data.router.push({ pathname: '/runtime-delete', params: { runtimeRecordId } })
+              }
+            }),
           onRemove: () => {
             const host = resolveActionTarget(actionTarget)
             if (host && hostCatalogEntryHasLocalPairing(host)) {

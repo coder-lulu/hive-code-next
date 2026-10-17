@@ -124,6 +124,8 @@ export type HostProfile = {
   publicKeyB64: string
   lastConnected: number
   runtimeRecordId?: string
+  /** A new local pairing incarnation; retained across descriptor and recency updates. */
+  pairingRevision?: string
   endpoints?: MobileAccessEndpoint[]
   accountRuntime?: AccountRuntimeRoute
 }
@@ -173,6 +175,7 @@ export const HostProfileSchema = z.object({
   publicKeyB64: z.string().min(1),
   lastConnected: z.number().finite(),
   runtimeRecordId: RuntimeRecordIdSchema.optional(),
+  pairingRevision: z.uuid().optional(),
   endpoints: z.array(MobileAccessEndpointSchema).min(1).max(16).optional()
 })
 
@@ -186,7 +189,8 @@ export const StoredHostProfileSchema = z.object({
   endpoint: z.string().min(1),
   publicKeyB64: z.string().min(1),
   lastConnected: z.number().finite(),
-  runtimeRecordId: RuntimeRecordIdSchema.optional()
+  runtimeRecordId: RuntimeRecordIdSchema.optional(),
+  pairingRevision: z.uuid().optional()
 })
 
 export type StoredHostProfile = z.infer<typeof StoredHostProfileSchema>

@@ -28,3 +28,14 @@ export function listAccountRuntimeClients(): AccountRuntimeClientRegistration[] 
 export function resetAccountRuntimeClientRegistryForTests(): void {
   activeClients.clear()
 }
+
+export function retireAccountRuntimeClients(runtimeRecordId: string): string[] {
+  const ids: string[] = []
+  for (const [hostId, client] of activeClients) {
+    if (client.runtimeRecordId === runtimeRecordId) {
+      ids.push(hostId)
+      activeClients.delete(hostId)
+    }
+  }
+  return ids
+}

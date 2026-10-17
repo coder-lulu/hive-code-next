@@ -1,3 +1,4 @@
+import { randomUUID } from 'expo-crypto'
 import {
   HostProfileSchema,
   type HostCatalogEntry,
@@ -125,7 +126,8 @@ async function cancelCleanupForDurablyStoredHosts(hostIds: Iterable<string>): Pr
 // The page's host-store sibling keeps its own no-op, so only the native store reaches persistence.
 export { updateHostDescriptor } from './host-descriptor-persistence'
 
-export const savePairedHost = (host: HostProfile): Promise<void> => persistHost(host)
+export const savePairedHost = (host: HostProfile): Promise<void> =>
+  persistHost({ ...host, pairingRevision: randomUUID() })
 
 async function persistHost(host: HostProfile): Promise<void> {
   const validated = HostProfileSchema.parse(host)
@@ -193,31 +195,60 @@ async function persistHost(host: HostProfile): Promise<void> {
   }
 }
 
-export async function removeHost(hostId: string): Promise<void> {
+export function removeHost(hostId: string): Promise<void>
+export function removeHost(
+  hostId: string,
+  expectedPairingRevision: string | null,
+  afterCommit?: () => void | Promise<void>
+): Promise<boolean>
+export async function removeHost(
+  hostId: string,
+  expectedPairingRevision?: string | null,
+  afterCommit?: () => void | Promise<void>
+): Promise<void | boolean> {
   let cleanupIntentRecorded = false
+  let matched = true
   try {
-    await mutateStoredHosts(async (hosts) => {
-      try {
-        await recordHostCredentialCleanupIntent(hostId)
-        cleanupIntentRecorded = true
-      } catch {
-        // Removal remains authoritative when cleanup intent storage is unavailable.
+    await mutateStoredHosts(
+      async (hosts) => {
+        const profile = hosts.find((host) => host.id === hostId)
+        if (
+          expectedPairingRevision !== undefined &&
+          profile &&
+          (profile?.pairingRevision ?? null) !== expectedPairingRevision
+        ) {
+          matched = false
+          return hosts
+        }
+        try {
+          await recordHostCredentialCleanupIntent(hostId)
+          cleanupIntentRecorded = true
+        } catch {
+          // Removal remains authoritative when cleanup intent storage is unavailable.
+        }
+        return hosts.filter((h) => h.id !== hostId)
+      },
+      async () => {
+        tokenCache.delete(hostId)
+        await afterCommit?.()
       }
-      return hosts.filter((h) => h.id !== hostId)
-    })
+    )
   } catch (error) {
     if (cleanupIntentRecorded) {
       await cancelCleanupForDurablyStoredHosts([hostId])
     }
     throw error
   }
-  tokenCache.delete(hostId)
+  if (!matched) {
+    return false
+  }
   // Why: keychain delete can stall/reject; await only the durable cleanup intent so removeHost can't freeze the UI.
   try {
     await scheduleUnpairedHostCredentialCleanup(hostId)
   } catch {
     // Metadata is already committed; orphan-token recovery is best-effort.
   }
+  return expectedPairingRevision === undefined ? undefined : true
 }
 
 export async function retryPendingHostCredentialCleanup(): Promise<{

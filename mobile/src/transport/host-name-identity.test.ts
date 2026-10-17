@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+vi.mock('expo-crypto', () => ({ randomUUID: () => globalThis.crypto.randomUUID() }))
 
 const asyncStorageMock = vi.hoisted(() => ({
   getItem: vi.fn(),

@@ -7,6 +7,7 @@ vi.mock('lucide-react-native', () => ({
   Edit3: vi.fn(),
   PowerOff: vi.fn(),
   RefreshCw: vi.fn(),
+  Trash2: vi.fn(),
   Users: vi.fn()
 }))
 
@@ -30,6 +31,7 @@ function build(
     onDiagnostics: vi.fn(),
     onEdit: vi.fn(),
     onSessions: vi.fn(),
+    onUnclaim: vi.fn(),
     onRemove: vi.fn()
   }
   const actions = getHostListActionSheetActions({
@@ -55,15 +57,17 @@ describe('getHostListActionSheetActions', () => {
       '断开当前手机连接',
       '网络诊断',
       '修改云端别名',
-      '会话管理'
+      '会话管理',
+      '删除 Runtime'
     ])
-    for (const label of ['修改云端别名', '会话管理']) {
+    for (const label of ['修改云端别名', '会话管理', '删除 Runtime']) {
       const action = actions.find((entry) => entry.label === label)!
       expect(action.closeBeforePress).toBe(true)
       action.onPress()
     }
     expect(spies.onEdit).toHaveBeenCalledWith(HOST.id)
     expect(spies.onSessions).toHaveBeenCalledWith(HOST.id)
+    expect(spies.onUnclaim).toHaveBeenCalledWith(HOST.id, 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
     expect(spies.onRemove).not.toHaveBeenCalled()
   })
 
@@ -85,6 +89,11 @@ describe('getHostListActionSheetActions', () => {
     expect(actions.find((action) => action.label === '网络诊断')?.disabled).toBe(true)
     expect(actions.find((action) => action.label === '修改云端别名')?.disabled).not.toBe(true)
     expect(actions.find((action) => action.label === '会话管理')?.disabled).toBe(false)
+    expect(actions.find((action) => action.label === '删除 Runtime')).toMatchObject({
+      destructive: true,
+      disabled: false,
+      closeBeforePress: true
+    })
     expect(actions.some((action) => action.label === '断开当前手机连接')).toBe(false)
   })
   // Why: these navigate or open a second drawer. Presenting while this sheet's native

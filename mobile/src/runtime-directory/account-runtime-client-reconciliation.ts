@@ -1,3 +1,5 @@
+import { retireAccountRuntimeClients } from './account-runtime-client-registry'
+import { retireAccountRuntimeProfiles } from './account-runtime-profile-registry'
 import type { AccountRuntimeClientRegistration } from './account-runtime-client-registry'
 import { accountRuntimeCredentialsValid } from './account-runtime-connectability'
 import type { AccountRuntimeDirectoryEntry } from './account-runtime-directory-types'
@@ -38,5 +40,18 @@ function invalidateClient(
     refresh(client.hostId)
   } else {
     disconnect(client.hostId)
+  }
+}
+
+export function forgetUnlinkedAccountRuntime(
+  runtimeRecordId: string,
+  forget: (hostId: string) => void
+): void {
+  retireAccountRuntimeProfiles(runtimeRecordId)
+  for (const hostId of new Set([
+    runtimeRecordId,
+    ...retireAccountRuntimeClients(runtimeRecordId)
+  ])) {
+    forget(hostId)
   }
 }

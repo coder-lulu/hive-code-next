@@ -6,6 +6,7 @@ import type { HostCatalogEntry } from '../transport/types'
 import { MobileRuntimeSelector } from './MobileRuntimeSelector'
 
 const fixture = vi.hoisted(() => ({
+  push: vi.fn(),
   connect: vi.fn(),
   close: vi.fn(),
   select: vi.fn(),
@@ -14,6 +15,7 @@ const fixture = vi.hoisted(() => ({
   alert: vi.fn(),
   session: null as { authorityId: string; account: { accountId: string } } | null
 }))
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: fixture.push }) }))
 vi.mock('react-native', () => ({
   Alert: { alert: fixture.alert },
   ActivityIndicator: 'ActivityIndicator',
@@ -26,6 +28,7 @@ vi.mock('lucide-react-native', () => ({
   Check: 'Check',
   Monitor: 'Monitor',
   ScanLine: 'ScanLine',
+  Trash2: 'Trash2',
   X: 'X'
 }))
 vi.mock('../components/BottomDrawer', () => ({
@@ -43,6 +46,7 @@ function computer(id: string, account: boolean): HostCatalogEntry {
     endpoint: 'wss://test.invalid',
     credentialStatus: 'ready',
     lastConnected: 0,
+    runtimeRecordId: account ? 'runtime-account' : undefined,
     accessSources: account ? ['account-claimed'] : ['manual-pairing'],
     profile: {
       id,
@@ -360,4 +364,96 @@ it('cancels a deferred pairing action across an account switch, even when switch
   act(() => renderer!.update(createElement(MobileRuntimeSelector, props({ visible: false }))))
   act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
   expect(fixture.pair).not.toHaveBeenCalled()
+})
+
+const signedIn = { authorityId: 'cloud', account: { accountId: 'a' } }
+function deleteButton() {
+  return renderer!.root.findByProps({ accessibilityLabel: `删除 Runtime：${account.name}` })
+}
+it.each([false, true])('offers offline deletion for account and merged entries (%s)', (merged) => {
+  fixture.session = signedIn
+  const offline: HostCatalogEntry = {
+    ...account,
+    profile: null,
+    credentialStatus: 'cloud-offline' as const,
+    accessSources: merged ? ['account-claimed', 'manual-pairing'] : account.accessSources
+  }
+  mount({ accountOnly: false, catalog: [offline, local] })
+  expect(
+    renderer!.root
+      .findAllByProps({ accessibilityRole: 'button' })
+      .filter((node) => String(node.props.accessibilityLabel).startsWith('删除 Runtime'))
+  ).toHaveLength(1)
+  expect(deleteButton().parent?.props.accessibilityRole).not.toBe('radio')
+  act(() => deleteButton().props.onPress())
+  expect(fixture.close).toHaveBeenCalledOnce()
+  expect(fixture.push).not.toHaveBeenCalled()
+  expect(fixture.connect).not.toHaveBeenCalled()
+  act(() =>
+    renderer!.update(
+      createElement(MobileRuntimeSelector, props({ visible: false, catalog: [offline] }))
+    )
+  )
+  act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
+  expect(fixture.push).toHaveBeenCalledExactlyOnceWith({
+    pathname: '/runtime-delete',
+    params: { runtimeRecordId: 'runtime-account' }
+  })
+})
+it.each(['logout', 'account', 'removed', 'replaced'])(
+  'cancels pending deletion after %s',
+  (change) => {
+    fixture.session = signedIn
+    mount()
+    act(() => deleteButton().props.onPress())
+    if (change === 'logout') {
+      fixture.session = null
+    }
+    if (change === 'account') {
+      fixture.session = { ...signedIn, account: { accountId: 'b' } }
+    }
+    const catalog =
+      change === 'removed'
+        ? []
+        : change === 'replaced'
+          ? [{ ...account, runtimeRecordId: 'other-runtime' }]
+          : [account]
+    act(() =>
+      renderer!.update(createElement(MobileRuntimeSelector, props({ visible: false, catalog })))
+    )
+    act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
+    expect(fixture.push).not.toHaveBeenCalled()
+  }
+)
+it('hides account deletion without an authenticated account', () => {
+  mount()
+  expect(labels()).not.toContain('删除 Runtime')
+})
+
+it('rejects a stale delete handler when the displayed runtime identity has changed', () => {
+  fixture.session = signedIn
+  mount()
+  const staleDelete = deleteButton().props.onPress
+  act(() =>
+    renderer!.update(
+      createElement(
+        MobileRuntimeSelector,
+        props({ catalog: [{ ...account, runtimeRecordId: 'replacement' }] })
+      )
+    )
+  )
+  act(() => staleDelete())
+  expect(fixture.close).not.toHaveBeenCalled()
+  expect(fixture.push).not.toHaveBeenCalled()
+})
+it('does not restore cancelled deletion when a removed catalog target returns', () => {
+  fixture.session = signedIn
+  mount()
+  act(() => deleteButton().props.onPress())
+  act(() =>
+    renderer!.update(createElement(MobileRuntimeSelector, props({ visible: false, catalog: [] })))
+  )
+  act(() => renderer!.update(createElement(MobileRuntimeSelector, props({ visible: false }))))
+  act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
+  expect(fixture.push).not.toHaveBeenCalled()
 })

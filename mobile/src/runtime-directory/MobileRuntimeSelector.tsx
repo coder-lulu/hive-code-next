@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, Text, View } from 'react-native'
-import { Check, Monitor, ScanLine, X } from 'lucide-react-native'
+import { Alert, Pressable, Text, View } from 'react-native'
+import { useRouter } from 'expo-router'
+import { Monitor, ScanLine, X } from 'lucide-react-native'
+import { RuntimeGroup } from './MobileRuntimeSelectorGroup'
 import { BottomDrawer } from '../components/BottomDrawer'
 import { useMobileAuthSession } from '../auth/mobile-auth-session'
 import { hostCatalogTargetsMatch } from './host-catalog-target-match'
@@ -11,12 +13,12 @@ import type { HostCatalogEntry } from '../transport/types'
 import {
   projectRuntimeSelectorEntries,
   type RuntimeSelectorConnectionStates,
-  type RuntimeSelectorEntry,
-  type RuntimeSelectorTone
+  type RuntimeSelectorEntry
 } from './runtime-selector-presentation'
 
 type PendingAction =
   | { type: 'select'; host: HostCatalogEntry; selectedId: string | null }
+  | { type: 'delete'; host: HostCatalogEntry }
   | { type: 'pair' }
   | { type: 'claim' }
   | null
@@ -33,6 +35,7 @@ export function MobileRuntimeSelector(props: {
   readonly theme: MobileTheme
   readonly visible: boolean
 }) {
+  const router = useRouter()
   const styles = useMemo(() => createStyles(props.theme), [props.theme])
   const { session } = useMobileAuthSession()
   const sessionScope = session ? `${session.authorityId}:${session.account.accountId}` : null
@@ -81,12 +84,41 @@ export function MobileRuntimeSelector(props: {
     }
   }, [props.visible, sessionScope])
 
+  useEffect(() => {
+    const action = pendingActionRef.current?.action
+    if (
+      action?.type === 'delete' &&
+      !hostCatalogTargetsMatch(
+        action.host,
+        props.catalog.find((host) => host.id === action.host.id)
+      )
+    ) {
+      pendingActionRef.current = null
+    }
+  }, [props.catalog])
+
   function closeWithAction(action: Exclude<PendingAction, null>) {
     if (!active.current || current.current.scopeRevision !== scopeRevision) {
       return
     }
     pendingActionRef.current = { action, scopeRevision }
     current.current.props.onClose()
+  }
+
+  function deleteRuntime(entry: RuntimeSelectorEntry) {
+    const host = props.catalog.find((runtime) => runtime.id === entry.id)
+    const latest = current.current.props.catalog.find((runtime) => runtime.id === entry.id)
+    if (
+      !current.current.props.visible ||
+      !sessionScope ||
+      !host?.runtimeRecordId ||
+      !hostCatalogTargetsMatch(host, latest) ||
+      !host.accessSources?.includes('account-claimed')
+    ) {
+      return
+    }
+    selectionRequestRef.current += 1
+    closeWithAction({ type: 'delete', host })
   }
 
   function dismiss() {
@@ -175,6 +207,19 @@ export function MobileRuntimeSelector(props: {
         return
       }
       current.current.props.onSelect(action.host.id)
+    } else if (action?.type === 'delete') {
+      const host = current.current.props.catalog.find((runtime) => runtime.id === action.host.id)
+      if (
+        current.current.sessionScope &&
+        hostCatalogTargetsMatch(action.host, host) &&
+        host?.runtimeRecordId &&
+        host.accessSources?.includes('account-claimed')
+      ) {
+        router.push({
+          pathname: '/runtime-delete',
+          params: { runtimeRecordId: host.runtimeRecordId }
+        })
+      }
     } else if (action?.type === 'pair') {
       current.current.props.onPair()
     } else if (action?.type === 'claim') {
@@ -229,6 +274,17 @@ export function MobileRuntimeSelector(props: {
           <RuntimeGroup
             entries={accountEntries}
             label="账号电脑"
+            onDelete={deleteRuntime}
+            deletableIds={
+              sessionScope
+                ? props.catalog
+                    .filter(
+                      (host) =>
+                        host.runtimeRecordId && host.accessSources?.includes('account-claimed')
+                    )
+                    .map((host) => host.id)
+                : []
+            }
             onSelect={(entry) => void selectRuntime(entry)}
             pendingRuntimeId={pendingRuntimeId}
             styles={styles}
@@ -272,123 +328,4 @@ export function MobileRuntimeSelector(props: {
       ) : null}
     </BottomDrawer>
   )
-}
-
-function RuntimeGroup(props: {
-  readonly entries: readonly RuntimeSelectorEntry[]
-  readonly label: string
-  readonly onSelect: (entry: RuntimeSelectorEntry) => void
-  readonly pendingRuntimeId: string | null
-  readonly styles: ReturnType<typeof createStyles>
-  readonly theme: MobileTheme
-}) {
-  if (props.entries.length === 0) {
-    return null
-  }
-  return (
-    <View style={props.styles.section}>
-      <Text maxFontSizeMultiplier={1.3} style={props.styles.sectionTitle}>
-        {props.label}
-      </Text>
-      <View style={props.styles.group}>
-        {props.entries.map((entry, index) => (
-          <View key={entry.id}>
-            {index > 0 ? <View style={props.styles.separator} /> : null}
-            <RuntimeRow
-              entry={entry}
-              disabled={!entry.selectable || props.pendingRuntimeId != null}
-              pending={props.pendingRuntimeId === entry.id}
-              onPress={() => props.onSelect(entry)}
-              styles={props.styles}
-              theme={props.theme}
-            />
-          </View>
-        ))}
-      </View>
-    </View>
-  )
-}
-
-function RuntimeRow(props: {
-  readonly entry: RuntimeSelectorEntry
-  readonly disabled: boolean
-  readonly onPress: () => void
-  readonly pending: boolean
-  readonly styles: ReturnType<typeof createStyles>
-  readonly theme: MobileTheme
-}) {
-  const statusColor = runtimeToneColor(props.entry.tone, props.theme)
-  const statusTextColor = runtimeToneTextColor(props.entry.tone, props.theme)
-  const connecting =
-    props.pending || props.entry.statusLabel === '连接中' || props.entry.statusLabel === '正在重连'
-  return (
-    <Pressable
-      accessibilityLabel={`${props.entry.name}，${props.entry.detail}，${props.entry.statusLabel}`}
-      accessibilityRole="radio"
-      accessibilityState={{
-        busy: connecting,
-        disabled: props.disabled,
-        selected: props.entry.selected
-      }}
-      disabled={props.disabled}
-      onPress={props.onPress}
-      style={({ pressed }) => [
-        props.styles.row,
-        props.entry.selected && props.styles.rowSelected,
-        props.disabled && !props.pending && props.styles.disabled,
-        pressed && props.styles.pressed
-      ]}
-    >
-      <View style={props.styles.runtimeIcon}>
-        <Monitor color={props.theme.color.text.primary} size={22} strokeWidth={1.9} />
-      </View>
-      <View style={props.styles.rowCopy}>
-        <Text maxFontSizeMultiplier={1.3} numberOfLines={1} style={props.styles.rowTitle}>
-          {props.entry.name}
-        </Text>
-        <Text maxFontSizeMultiplier={1.3} numberOfLines={2} style={props.styles.rowDetail}>
-          {props.entry.detail}
-        </Text>
-      </View>
-      <View style={props.styles.status}>
-        {connecting ? (
-          <ActivityIndicator color={statusColor} size="small" />
-        ) : (
-          <View style={[props.styles.statusDot, { backgroundColor: statusColor }]} />
-        )}
-        <Text
-          maxFontSizeMultiplier={1.3}
-          numberOfLines={1}
-          style={[props.styles.statusText, { color: statusTextColor }]}
-        >
-          {props.entry.statusLabel}
-        </Text>
-      </View>
-      {props.entry.selected ? (
-        <View style={props.styles.selectedIcon}>
-          <Check color={props.theme.color.text.inverse} size={16} strokeWidth={2} />
-        </View>
-      ) : null}
-    </Pressable>
-  )
-}
-
-function runtimeToneColor(tone: RuntimeSelectorTone, theme: MobileTheme): string {
-  if (tone === 'success') {
-    return theme.color.status.success
-  }
-  if (tone === 'warning') {
-    return theme.color.status.warning
-  }
-  return theme.color.text.tertiary
-}
-
-function runtimeToneTextColor(tone: RuntimeSelectorTone, theme: MobileTheme): string {
-  if (tone === 'success') {
-    return theme.color.status.successText
-  }
-  if (tone === 'warning') {
-    return theme.color.status.warningText
-  }
-  return theme.color.text.secondary
 }

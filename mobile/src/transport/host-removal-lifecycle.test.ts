@@ -16,7 +16,7 @@ const forgetUpdateFailuresMock = vi.hoisted(() => vi.fn(async () => undefined))
 const deletePageCacheMock = vi.hoisted(() => vi.fn(async () => undefined))
 
 vi.mock('./host-store', () => ({
-  removeHost: (hostId: string) => removeHostMock(hostId)
+  removeHost: (...args: unknown[]) => removeHostMock(...args)
 }))
 
 vi.mock('./host-descriptor-store', () => ({
@@ -69,6 +69,111 @@ describe('host removal lifecycle', () => {
       'storage unavailable'
     )
     expect(closeHostClient).not.toHaveBeenCalled()
+  })
+
+  it('preserves client and caches when a later pairing replaced the deletion target', async () => {
+    removeHostMock.mockResolvedValue(false)
+    const closeHostClient = vi.fn()
+    await expect(removeHostAndCloseClient('host-1', closeHostClient, 'old-revision')).resolves.toBe(
+      false
+    )
+    expect(removeHostMock).toHaveBeenCalledWith('host-1', 'old-revision', expect.any(Function))
+    expect(closeHostClient).not.toHaveBeenCalled()
+    expect(deletePageCacheMock).not.toHaveBeenCalled()
+    expect(forgetHostDescriptorMock).not.toHaveBeenCalled()
+    expect(asyncStorage.removeItem).not.toHaveBeenCalled()
+  })
+
+  it('updates mounted catalogs after metadata commits even when page-cache cleanup fails', async () => {
+    removeHostMock.mockImplementation(async (_id, _revision, afterCommit: () => Promise<void>) => {
+      await afterCommit()
+      return true
+    })
+    deletePageCacheMock.mockRejectedValueOnce(new Error('page cache unavailable'))
+    const closeHostClient = vi.fn()
+    const afterRemoval = vi.fn()
+    await expect(
+      removeHostAndCloseClient('host-1', closeHostClient, 'revision', afterRemoval)
+    ).rejects.toThrow('page cache unavailable')
+    expect(afterRemoval).toHaveBeenCalledOnce()
+    expect(closeHostClient.mock.invocationCallOrder[0]).toBeLessThan(
+      afterRemoval.mock.invocationCallOrder[0]!
+    )
+  })
+
+  it('holds the metadata mutation until failed native cleanup and catalog cleanup both settle', async () => {
+    let rejectNative!: (error: Error) => void
+    let finishCatalog!: () => void
+    const nativeCleanup = new Promise<void>((_resolve, reject) => {
+      rejectNative = reject
+    })
+    const catalogCleanup = new Promise<void>((resolve) => {
+      finishCatalog = resolve
+    })
+    let queueReleased = false
+    removeHostMock.mockImplementation(async (_id, _revision, afterCommit: () => Promise<void>) => {
+      try {
+        await afterCommit()
+        return true
+      } finally {
+        queueReleased = true
+      }
+    })
+    deletePageCacheMock.mockReturnValueOnce(nativeCleanup)
+    const afterRemoval = vi.fn(() => catalogCleanup)
+    const removal = removeHostAndCloseClient('host-1', vi.fn(), 'revision', afterRemoval)
+    const result = removal.catch((failure: unknown) => failure)
+    await Promise.resolve()
+    expect(afterRemoval).toHaveBeenCalledOnce()
+    rejectNative(new Error('native cleanup failed'))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(queueReleased).toBe(false)
+    finishCatalog()
+    expect(await result).toEqual(new Error('native cleanup failed'))
+    expect(queueReleased).toBe(true)
+  })
+
+  it('waits for native cleanup when catalog cleanup throws synchronously', async () => {
+    let finishNative!: () => void
+    const nativeCleanup = new Promise<void>((resolve) => {
+      finishNative = resolve
+    })
+    let queueReleased = false
+    removeHostMock.mockImplementation(async (_id, _revision, afterCommit: () => Promise<void>) => {
+      try {
+        await afterCommit()
+        return true
+      } finally {
+        queueReleased = true
+      }
+    })
+    deletePageCacheMock.mockReturnValueOnce(nativeCleanup)
+    const afterRemoval = vi.fn(() => {
+      throw new Error('catalog failed')
+    })
+    const result = removeHostAndCloseClient('host-1', vi.fn(), 'revision', afterRemoval).catch(
+      (failure: unknown) => failure
+    )
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(afterRemoval).toHaveBeenCalledOnce()
+    expect(queueReleased).toBe(false)
+    finishNative()
+    expect(await result).toEqual(new Error('catalog failed'))
+    expect(queueReleased).toBe(true)
+  })
+
+  it('does not notify catalog cleanup when metadata fails or a newer pairing is preserved', async () => {
+    const afterRemoval = vi.fn()
+    removeHostMock.mockRejectedValueOnce(new Error('metadata failed')).mockResolvedValueOnce(false)
+    await expect(
+      removeHostAndCloseClient('host-1', vi.fn(), 'revision', afterRemoval)
+    ).rejects.toThrow('metadata failed')
+    await expect(
+      removeHostAndCloseClient('host-1', vi.fn(), 'revision', afterRemoval)
+    ).resolves.toBe(false)
+    expect(afterRemoval).not.toHaveBeenCalled()
   })
 
   it('retires the notification session so a removed host leaves nothing behind', async () => {

@@ -62,3 +62,7 @@ function readFreshEntry(hostId: string): CachedWorktrees | null {
   }
   return entry
 }
+
+export function clearCachedWorktrees(hostId: string): void {
+  cache.delete(hostId)
+}

@@ -34,7 +34,8 @@ export function toStoredHostProfile(host: HostProfile): StoredHostProfile {
     endpoint,
     publicKeyB64,
     lastConnected,
-    runtimeRecordId
+    runtimeRecordId,
+    pairingRevision
   } = host
   return {
     id,
@@ -45,7 +46,8 @@ export function toStoredHostProfile(host: HostProfile): StoredHostProfile {
     endpoint,
     publicKeyB64,
     lastConnected,
-    ...(runtimeRecordId !== undefined ? { runtimeRecordId } : {})
+    ...(runtimeRecordId !== undefined ? { runtimeRecordId } : {}),
+    ...(pairingRevision !== undefined ? { pairingRevision } : {})
   }
 }
 

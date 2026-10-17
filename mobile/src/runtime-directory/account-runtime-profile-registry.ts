@@ -39,3 +39,9 @@ export function mergeAccountRuntimeProfiles(localProfiles: HostProfile[]): HostP
 export function resetAccountRuntimeProfileRegistryForTests(): void {
   accountProfiles = []
 }
+
+export function retireAccountRuntimeProfiles(runtimeRecordId: string): void {
+  accountProfiles = accountProfiles.filter(
+    (profile) => profile.runtimeRecordId !== runtimeRecordId && profile.id !== runtimeRecordId
+  )
+}

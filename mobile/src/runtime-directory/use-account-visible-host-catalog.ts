@@ -3,6 +3,8 @@ import { loadHostCatalog } from '../transport/host-store'
 import type { HostCatalogEntry } from '../transport/types'
 import { useAccountRuntimeDirectory } from './account-runtime-directory-provider'
 
+import { subscribeLocalRuntimeConnectionsChanged } from './local-runtime-connections-changed'
+
 type AccountVisibleHostCatalogState = {
   catalog: HostCatalogEntry[]
   loaded: boolean
@@ -56,8 +58,16 @@ export function useAccountVisibleHostCatalog(): AccountVisibleHostCatalogState &
   }, [])
 
   useEffect(() => {
+    const unsubscribe = subscribeLocalRuntimeConnectionsChanged((hostIds) => {
+      setState((current) => ({
+        ...current,
+        localCatalog: current.localCatalog.filter((entry) => !hostIds.includes(entry.id))
+      }))
+      void reload().catch(() => undefined)
+    })
     void reload().catch(() => undefined)
     return () => {
+      unsubscribe()
       loadGenerationRef.current += 1
     }
   }, [reload])

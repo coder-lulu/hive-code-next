@@ -1,3 +1,5 @@
+import { createRuntimeUnlinkConfirmation } from './account-runtime-unlink-confirmation'
+import { recoverRuntimeDeleteConnections } from './mobile-runtime-delete-recovery'
 import {
   createContext,
   type PropsWithChildren,
@@ -158,6 +160,7 @@ export function AccountRuntimeDirectoryProvider(props: PropsWithChildren) {
         operationState,
         'refresh',
         async (isCurrent, signal) => {
+          const requestStartedAt = Date.now()
           const requestedScope = accountRuntimeScopeOf(current)
           const generation = store.activate(requestedScope)
           try {
@@ -171,6 +174,16 @@ export function AccountRuntimeDirectoryProvider(props: PropsWithChildren) {
             ) {
               store.complete(generation, entries, Date.now())
               await reconcileDirectory(requestedScope, entries)
+              await recoverRuntimeDeleteConnections(
+                current,
+                entries,
+                forgetHostClient,
+                () =>
+                  isCurrent() &&
+                  store.getSnapshot().generation === generation &&
+                  mobileSessionMatchesDirectoryScope(sessionRef.current, requestedScope),
+                requestStartedAt
+              )
             }
           } catch (failure) {
             if (
@@ -178,7 +191,7 @@ export function AccountRuntimeDirectoryProvider(props: PropsWithChildren) {
               AppState.currentState === 'active' &&
               mobileSessionMatchesDirectoryScope(sessionRef.current, requestedScope)
             ) {
-              store.fail(generation, errorMessage(failure))
+              store.fail(generation, failure instanceof Error ? failure.message : String(failure))
             }
           }
         }
@@ -362,9 +375,14 @@ export function AccountRuntimeDirectoryProvider(props: PropsWithChildren) {
       withCurrentSession((current) => revokeRuntimeSession(current, session)),
     [withCurrentSession]
   )
+  const confirmRuntimeUnlinked = useMemo(
+    () => createRuntimeUnlinkConfirmation(store, operationState, sessionRef, forgetHostClient),
+    [forgetHostClient, operationState, store]
+  )
   const value = useMemo(
     () => ({
       state: visibleState,
+      confirmRuntimeUnlinked,
       mergeCatalog,
       refresh,
       listSessions,
@@ -373,6 +391,7 @@ export function AccountRuntimeDirectoryProvider(props: PropsWithChildren) {
       queueDisplayNameUpdate
     }),
     [
+      confirmRuntimeUnlinked,
       listSessions,
       mergeCatalog,
       pendingDisplayNames,
@@ -396,8 +415,4 @@ export function useAccountRuntimeDirectory(): AccountRuntimeDirectoryContextValu
     throw new Error('useAccountRuntimeDirectory requires AccountRuntimeDirectoryProvider')
   }
   return context
-}
-
-function errorMessage(failure: unknown): string {
-  return failure instanceof Error ? failure.message : String(failure)
 }

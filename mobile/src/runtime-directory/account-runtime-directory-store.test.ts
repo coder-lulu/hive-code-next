@@ -144,3 +144,44 @@ describe('AccountRuntimeDirectoryStore', () => {
     })
   })
 })
+
+it('confirms unlink only for the current scope and fences old directory and presence replies', () => {
+  const store = new AccountRuntimeDirectoryStore()
+  const scope = { authorityId: 'authority', accountId: 'account-a' }
+  const generation = store.activate(scope)
+  const other = { ...runtime, runtimeRecordId: 'other' }
+  store.complete(generation, [runtime, other], 1)
+  expect(() =>
+    store.confirmRuntimeUnlinked(
+      runtime.runtimeRecordId,
+      { ...scope, accountId: 'b' },
+      runtime.resourceVersion
+    )
+  ).toThrow('mobile_session_required')
+  expect(store.getSnapshot().entries).toHaveLength(2)
+  expect(
+    store.confirmRuntimeUnlinked(runtime.runtimeRecordId, scope, runtime.resourceVersion)
+  ).toBe(true)
+  store.complete(generation, [runtime, other], 2)
+  store.updatePresence(generation, 50, [{ ...other, presence: 'ONLINE', observedAt: 'now' }], 2)
+  expect(store.getSnapshot().entries).toEqual([other])
+})
+
+it('preserves a newer claim without publishing or fencing ongoing responses', () => {
+  const store = new AccountRuntimeDirectoryStore()
+  const scope = { authorityId: 'authority', accountId: 'account-a' }
+  const generation = store.activate(scope)
+  const newer = { ...runtime, resourceVersion: 9 }
+  store.complete(generation, [newer], 1)
+  const snapshot = store.getSnapshot()
+  const listener = vi.fn()
+  store.subscribe(listener)
+  expect(store.confirmRuntimeUnlinked(runtime.runtimeRecordId, scope, 3)).toBe(false)
+  expect(store.getSnapshot()).toBe(snapshot)
+  expect(listener).not.toHaveBeenCalled()
+  expect(store.stalePresenceIds(2)).toEqual([])
+  store.updatePresence(generation, 1, [{ ...newer, presence: 'ONLINE', observedAt: 'now' }], 2)
+  expect(store.getSnapshot().entries[0]).toMatchObject({ resourceVersion: 9, presence: 'ONLINE' })
+  store.complete(generation, [newer], 3)
+  expect(store.getSnapshot().loadedAt).toBe(3)
+})

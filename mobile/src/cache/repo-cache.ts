@@ -34,3 +34,7 @@ export function getCachedRepos(hostId: string): unknown[] | null {
   }
   return entry.repos
 }
+
+export function clearCachedRepos(hostId: string): void {
+  cache.delete(hostId)
+}

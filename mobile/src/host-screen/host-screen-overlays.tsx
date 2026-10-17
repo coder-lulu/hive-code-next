@@ -301,8 +301,8 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
       {/* Host remove confirmation */}
       <ConfirmModal
         visible={state.confirmRemoveHost && controller.canRemoveHost}
-        title="移除 Runtime"
-        message={`确定移除“${state.hostName}”吗？之后仍可重新配对。`}
+        title="移除本地配对"
+        message={`从这台手机移除“${state.hostName}”的本地配对？此操作不会解除云端认领，之后仍可重新配对。`}
         confirmLabel="移除"
         destructive
         onConfirm={() => void actions.handleRemoveHost()}

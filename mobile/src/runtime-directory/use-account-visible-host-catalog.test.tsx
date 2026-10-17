@@ -2,6 +2,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HostCatalogEntry } from '../transport/types'
+import { notifyLocalRuntimeConnectionsChanged } from './local-runtime-connections-changed'
 import { useAccountVisibleHostCatalog } from './use-account-visible-host-catalog'
 
 let mergeCatalog: (local: readonly HostCatalogEntry[]) => HostCatalogEntry[]
@@ -45,6 +46,24 @@ describe('useAccountVisibleHostCatalog', () => {
     renderer = null
     latest = null
     mergeCatalog = (local) => [...local]
+  })
+
+  it('removes a deleted local snapshot immediately and reloads mounted catalogs', async () => {
+    loadHostCatalog.mockResolvedValueOnce([localEntry('removed'), localEntry('kept')])
+    await act(async () => {
+      renderer = create(createElement(Probe))
+    })
+    const pending = deferred<HostCatalogEntry[]>()
+    loadHostCatalog.mockReturnValueOnce(pending.promise)
+    await act(async () => {
+      notifyLocalRuntimeConnectionsChanged(['removed'])
+    })
+    expect(latest?.catalog.map(({ id }) => id)).toEqual(['kept'])
+    await act(async () => {
+      pending.resolve([localEntry('kept')])
+    })
+    expect(latest?.catalog.map(({ id }) => id)).toEqual(['kept'])
+    expect(loadHostCatalog).toHaveBeenCalledTimes(2)
   })
 
   it('reloads when a late account directory becomes visible', async () => {

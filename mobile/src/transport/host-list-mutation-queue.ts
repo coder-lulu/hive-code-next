@@ -20,7 +20,8 @@ export function enqueueHostListMutation<T>(operation: () => Promise<T>): Promise
 }
 
 export async function mutateStoredHosts(
-  update: (hosts: StoredHostProfile[]) => StoredHostProfile[] | Promise<StoredHostProfile[]>
+  update: (hosts: StoredHostProfile[]) => StoredHostProfile[] | Promise<StoredHostProfile[]>,
+  afterCommit?: () => void | Promise<void>
 ): Promise<void> {
   return enqueueHostListMutation(async () => {
     const current = await readStoredHostProfilesForMutation()
@@ -32,6 +33,9 @@ export async function mutateStoredHosts(
     }
     await writeStoredHostProfiles(next)
     hostListLoads.dropSharedHostListLoad()
+    // A conditional removal retires its clients/caches before another pairing
+    // can publish the same host ID. This callback must not enqueue host mutations.
+    await afterCommit?.()
   })
 }
 

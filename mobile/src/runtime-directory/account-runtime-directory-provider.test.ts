@@ -1,3 +1,4 @@
+vi.mock('./mobile-runtime-delete-recovery', () => ({ recoverRuntimeDeleteConnections: vi.fn() }))
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-native', () => ({

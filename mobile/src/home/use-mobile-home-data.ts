@@ -1,3 +1,4 @@
+import { subscribeLocalRuntimeConnectionsChanged } from '../runtime-directory/local-runtime-connections-changed'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -47,6 +48,37 @@ export function useMobileHomeData() {
   const [lastVisited, setLastVisited] = useState<{ hostId: string; worktreeId: string } | null>(
     null
   )
+  const removedHostIdsRef = useRef(new Set<string>())
+  const absentHostIdsRef = useRef(new Set<string>())
+  useEffect(
+    () =>
+      subscribeLocalRuntimeConnectionsChanged((hostIds) => {
+        for (const id of hostIds) {
+          removedHostIdsRef.current.add(id)
+        }
+        const prune = <T>(previous: Record<string, T>): Record<string, T> =>
+          Object.fromEntries(Object.entries(previous).filter(([id]) => !hostIds.includes(id)))
+        setStatsByHost(prune)
+        setWorktreeInfo(prune)
+        setAccountsByHost(prune)
+        setTaskProvidersByHost(prune)
+        setLastVisited((previous) =>
+          previous && hostIds.includes(previous.hostId) ? null : previous
+        )
+      }),
+    []
+  )
+  useEffect(() => {
+    const present = new Set(hostCatalog.map((entry) => entry.id))
+    for (const id of removedHostIdsRef.current) {
+      if (!present.has(id)) {
+        absentHostIdsRef.current.add(id)
+      } else if (absentHostIdsRef.current.has(id)) {
+        removedHostIdsRef.current.delete(id)
+        absentHostIdsRef.current.delete(id)
+      }
+    }
+  }, [hostCatalog])
   const onboardingCheckedRef = useRef(false)
   const hydratedRef = useRef(false)
   const hosts = useMemo(() => selectConnectableHostProfiles(hostCatalog), [hostCatalog])
@@ -67,14 +99,18 @@ export function useMobileHomeData() {
       if (cancelled || !snapshot) {
         return
       }
+      const retained = <T>(values: Record<string, T>): Record<string, T> =>
+        Object.fromEntries(
+          Object.entries(values).filter(([id]) => !removedHostIdsRef.current.has(id))
+        )
       setWorktreeInfo((previous) =>
-        Object.keys(previous).length > 0 ? previous : snapshot.worktreeInfo
+        Object.keys(previous).length > 0 ? previous : retained(snapshot.worktreeInfo)
       )
       setAccountsByHost((previous) =>
-        Object.keys(previous).length > 0 ? previous : snapshot.accountsByHost
+        Object.keys(previous).length > 0 ? previous : retained(snapshot.accountsByHost)
       )
       for (const [hostId, info] of Object.entries(snapshot.worktreeInfo)) {
-        if (info.lastActiveWorktree) {
+        if (info.lastActiveWorktree && !removedHostIdsRef.current.has(hostId)) {
           setCachedWorktrees(hostId, [info.lastActiveWorktree])
         }
       }
@@ -85,9 +121,17 @@ export function useMobileHomeData() {
   }, [])
 
   useEffect(() => {
-    if (Object.keys(worktreeInfo).length > 0 || Object.keys(accountsByHost).length > 0) {
-      saveHomeSnapshot({ worktreeInfo, accountsByHost, savedAt: Date.now() })
+    if (Object.keys(worktreeInfo).length === 0 && Object.keys(accountsByHost).length === 0) {
+      return
     }
+    const ids = removedHostIdsRef.current
+    saveHomeSnapshot({
+      worktreeInfo: Object.fromEntries(Object.entries(worktreeInfo).filter(([id]) => !ids.has(id))),
+      accountsByHost: Object.fromEntries(
+        Object.entries(accountsByHost).filter(([id]) => !ids.has(id))
+      ),
+      savedAt: Date.now()
+    })
   }, [worktreeInfo, accountsByHost])
 
   useEffect(() => {
@@ -114,7 +158,8 @@ export function useMobileHomeData() {
         .catch(() => undefined)
       void AsyncStorage.getItem(LAST_VISITED_WORKTREE_STORAGE_KEY).then((raw) => {
         if (!stale) {
-          setLastVisited(readLastVisitedWorktreeRecord(raw))
+          const record = readLastVisitedWorktreeRecord(raw)
+          setLastVisited(record && removedHostIdsRef.current.has(record.hostId) ? null : record)
         }
       })
       for (const entry of allClientsRef.current) {

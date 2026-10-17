@@ -26,7 +26,19 @@ export const loadHostCatalog = (): Promise<HostCatalogEntry[]> =>
 
 /** Pairing happened natively before this document existed, and the page never re-does it. */
 export const savePairedHost = (_host: HostProfile): Promise<void> => Promise.resolve()
-export const removeHost = (_hostId: string): Promise<void> => Promise.resolve()
+export function removeHost(_hostId: string): Promise<void>
+export function removeHost(
+  _hostId: string,
+  _expectedPairingRevision: string | null,
+  _afterCommit?: () => void | Promise<void>
+): Promise<boolean>
+export function removeHost(
+  _hostId: string,
+  expectedPairingRevision?: string | null,
+  _afterCommit?: () => void | Promise<void>
+): Promise<void | boolean> {
+  return Promise.resolve(expectedPairingRevision === undefined ? undefined : false)
+}
 
 /** A native write the page drops: recency orders the app's host list, which the page does not show. */
 export const updateLastConnected = (_hostId: string): Promise<void> => Promise.resolve()
