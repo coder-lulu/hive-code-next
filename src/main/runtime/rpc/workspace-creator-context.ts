@@ -9,6 +9,7 @@ export function resolveRpcWorkspaceCreatorProvenance(
     | 'clientId'
     | 'clientKind'
     | 'connectionId'
+    | 'pairedDeviceParentId'
   >
 ): WorkspaceCreatorProvenance {
   if (context.authenticatedAccountRuntimeSessionId?.trim()) {
@@ -18,7 +19,13 @@ export function resolveRpcWorkspaceCreatorProvenance(
     }
   }
   if (context.pairedDeviceId) {
-    return { kind: 'paired-device', deviceId: context.pairedDeviceId }
+    if (context.clientKind !== 'mobile') {
+      return { kind: 'paired-device', deviceId: context.pairedDeviceId }
+    }
+    // Why the owner, not the phone: a phone acts for whoever paired it, so its rows are theirs.
+    return context.pairedDeviceParentId
+      ? { kind: 'paired-device', deviceId: context.pairedDeviceParentId }
+      : { kind: 'host' }
   }
   if (context.clientId || context.clientKind || context.connectionId) {
     throw new Error('authenticated_device_identity_missing')

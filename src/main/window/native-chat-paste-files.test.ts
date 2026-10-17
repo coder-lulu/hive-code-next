@@ -18,6 +18,7 @@ import { AGENT_SESSION_MAX_NEW_OPERATION_AGE_MS } from '../../shared/agent-sessi
 
 import type { Store } from '../persistence'
 import { resolveLocalFileRequestPath } from '../ipc/local-file-access-resolution'
+import { PATH_ACCESS_DENIED_MESSAGE } from '../ipc/filesystem-auth'
 import { readLocalFileContent } from '../ipc/filesystem/filesystem-file-content-inspection'
 import {
   NATIVE_CHAT_PASTE_TTL_MS,
@@ -155,7 +156,7 @@ describe('native-chat paste folder on disk', () => {
   })
 
   it.skipIf(!hasFileSymlinks)(
-    'refuses a paste symlink to an outside file without granting access',
+    'refuses a paste symlink to an outside file without granting project access',
     async () => {
       const outside = path.join(root, 'outside.png')
       writeFileSync(outside, 'png')
@@ -165,8 +166,13 @@ describe('native-chat paste folder on disk', () => {
       await expect(restoreNativeChatPastes([linkOut])).resolves.toEqual([
         { path: linkOut, kept: false, exists: false }
       ])
-      expect(await chatImageReadable(linkOut)).toBe(false)
-      expect(await chatImageReadable(outside)).toBe(false)
+      // Chat-image reads deliberately allow local images; restoring a paste grants no project access.
+      await expect(resolveLocalFileRequestPath(linkOut, undefined, NO_PROJECTS)).rejects.toThrow(
+        PATH_ACCESS_DENIED_MESSAGE
+      )
+      await expect(resolveLocalFileRequestPath(outside, undefined, NO_PROJECTS)).rejects.toThrow(
+        PATH_ACCESS_DENIED_MESSAGE
+      )
     }
   )
 
@@ -190,9 +196,10 @@ describe('native-chat paste folder on disk', () => {
       installFakeAppEnvironment({ getPath: () => alias })
       const viaAlias = path.join(alias, 'native-chat-pastes', 'orca-paste-1.png')
 
-      await expect(restoreNativeChatPastes([viaAlias, realpathSync(kept)])).resolves.toEqual([
+      const canonical = realpathSync.native(kept)
+      await expect(restoreNativeChatPastes([viaAlias, canonical])).resolves.toEqual([
         { path: viaAlias, kept: true, exists: true },
-        { path: realpathSync(kept), kept: true, exists: true }
+        { path: canonical, kept: true, exists: true }
       ])
       // The preview reads by the stored spelling, through chat-image access.
       expect(await chatImageReadable(viaAlias)).toBe(true)

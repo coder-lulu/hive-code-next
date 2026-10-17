@@ -24,6 +24,8 @@ import { AccountRuntimeRpcRequests } from './account-runtime-rpc-requests'
 
 /** Mobile lifecycle and presentation adapter for the shared authenticated pool. */
 export class AccountRuntimeRpcClient implements RpcClient {
+  carriesRpcEnvelope = (): boolean => false
+
   private pool: HiveAccountRelayPool | null = null
   private state: ConnectionState = 'connecting'
   private closed = false
@@ -168,9 +170,7 @@ export class AccountRuntimeRpcClient implements RpcClient {
   }
 
   private suspend(): void {
-    if (this.retryTimer) {
-      clearTimeout(this.retryTimer)
-    }
+    clearTimeout(this.retryTimer ?? undefined)
     this.retryTimer = null
     this.generation += 1
     const previous = this.pool

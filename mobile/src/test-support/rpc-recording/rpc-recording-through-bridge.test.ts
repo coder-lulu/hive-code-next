@@ -40,7 +40,7 @@ import {
   withReplyMeta
 } from '../bridged-parity/divergence-evidence'
 import { familyGoldens, pilotGoldens } from './derived-goldens'
-import { compareGolden, readGolden } from './golden-recording'
+import { compareGolden, readGolden, readGoldenRaw } from './golden-recording'
 import {
   INVENTORY_UNMOUNT_REFERENCE_ID,
   inventoryUnmountExpectedReference
@@ -273,9 +273,11 @@ async function verdict(
   const record = (name: BridgedParityVerdict): void => {
     observed.set(id, { family, verdict: name })
   }
-  const frozen = readGolden(directory, id)
-  const expected =
-    id === INVENTORY_UNMOUNT_REFERENCE_ID ? inventoryUnmountExpectedReference(frozen) : frozen
+  const expected = readGolden(directory, id)
+  if (id === INVENTORY_UNMOUNT_REFERENCE_ID) {
+    const approved = inventoryUnmountExpectedReference(readGoldenRaw(directory, id))
+    compareGolden(approved, expected)
+  }
   const fields = run.recording === null ? [] : divergingFields(expected.recording, run.recording)
   if (run.recording !== null && fields.length === 0) {
     // Not redundant with the field walk: this one also pins the encoding.
@@ -369,10 +371,10 @@ describe.skipIf(process.env[BRIDGED_PARITY_FLAG] === BRIDGED_PARITY_OFF)(
       }
       expect(counts.unclassified).toBe(0)
       expect({ corpus, supported: domain.supportedIds.length }).toEqual({
-        corpus: 755,
-        supported: 755
+        corpus: 757,
+        supported: 757
       })
-      expect(domain.upstreamIds).toHaveLength(domain.kind === 'hive-overlay' ? 794 : corpus)
+      expect(domain.upstreamIds).toHaveLength(domain.kind === 'hive-overlay' ? 796 : corpus)
       // Not implied by the counts below. A class is named by a predicate that reads the scenario,
       // not the frame the page refused, so a golden that started refusing for real can walk into an
       // excluded class while another walks out and no number here moves.
@@ -390,7 +392,7 @@ describe.skipIf(process.env[BRIDGED_PARITY_FLAG] === BRIDGED_PARITY_OFF)(
     it('gives every golden the C1 page closure records the verdict it is pinned to', () => {
       process.stdout.write(readPageClosure('C1', C1_PAGE_CLOSURE, observed))
       // Each by id, because the counts above cannot see this domain: a closure golden that stopped
-      // replaying identically is paid for by any of the other 649 that started.
+      // replaying identically is paid for by any golden outside this closure that started.
       expect({ closure: pageClosureDrift(C1_PAGE_CLOSURE, observed) }).toEqual({ closure: [] })
       // And the run's own totals over this closure, as the two blocks below do. `c1-page-closure.ts`
       // pins no class counts of its own, so without this a verdict edited inside that file is green
@@ -416,7 +418,7 @@ describe.skipIf(process.env[BRIDGED_PARITY_FLAG] === BRIDGED_PARITY_OFF)(
 
     it('gives every golden the C2 page closure records the verdict it is pinned to', () => {
       process.stdout.write(readPageClosure('C2', C2_PAGE_CLOSURE, observed))
-      // 68 families and 257 goldens, C1's 20 among them and inherited rather than re-derived, so
+      // 68 families and 259 goldens, C1's 20 among them and inherited rather than re-derived, so
       // this repeats their check too. Five of the families it adds have no byte-identical golden at
       // all: there the pin holds the class, which is the whole of what it can hold.
       expect({ closure: pageClosureDrift(C2_PAGE_CLOSURE, observed) }).toEqual({ closure: [] })
@@ -444,7 +446,7 @@ describe.skipIf(process.env[BRIDGED_PARITY_FLAG] === BRIDGED_PARITY_OFF)(
 
     it('gives every golden the C3 page closure records the verdict it is pinned to', () => {
       process.stdout.write(readPageClosure('C3', C3_PAGE_CLOSURE, observed))
-      // 26 families and 116 goldens, C1's 20 among them and inherited rather than re-derived, so
+      // 26 families and 117 goldens, C1's 20 among them and inherited rather than re-derived, so
       // this repeats their check too. One family it inherits has no byte-identical golden at all;
       // all six it adds have at least one, so for those the pin holds bytes and not only a name.
       expect({ closure: pageClosureDrift(C3_PAGE_CLOSURE, observed) }).toEqual({ closure: [] })

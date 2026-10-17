@@ -76,7 +76,7 @@ import {
 import {
   ACCOUNT_IMPORT_RUNTIME_CAPABILITY,
   CLAUDE_SIGN_IN_RUNTIME_CAPABILITY
-} from '../../shared/protocol-version'
+} from '../../shared/account-runtime-capabilities'
 
 function successfulChild(): EventEmitter {
   const child = new EventEmitter()

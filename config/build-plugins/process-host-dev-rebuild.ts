@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -85,7 +85,8 @@ export function createProcessHostDevRebuildPlugin(root = process.cwd()): Plugin 
           throw new Error('The process-host source directory watcher is unavailable')
         }
         const watcher = ts.sys.watchDirectory(
-          directory,
+          // Windows native events use long paths even when the checkout uses an 8.3 alias.
+          process.platform === 'win32' ? realpathSync.native(directory) : directory,
           () => {
             if (signalFile) {
               writeFileSync(signalFile, String(++signalVersion))

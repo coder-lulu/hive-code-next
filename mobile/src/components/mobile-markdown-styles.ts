@@ -48,7 +48,8 @@ export function createMobileMarkdownStyles(theme: MobileTheme) {
     quote: {
       borderLeftWidth: 2,
       borderLeftColor: theme.color.border.default,
-      paddingLeft: theme.spacing.space8
+      paddingLeft: theme.spacing.space8,
+      gap: theme.spacing.space4
     },
     quoteText: {
       ...theme.typography.meta,
@@ -98,8 +99,6 @@ export function createMobileMarkdownStyles(theme: MobileTheme) {
     },
     tableCell: {
       ...theme.typography.caption,
-      minWidth: 112,
-      maxWidth: 220,
       borderRightWidth: StyleSheet.hairlineWidth,
       borderBottomWidth: StyleSheet.hairlineWidth,
       borderColor: theme.color.border.default,
@@ -126,14 +125,14 @@ export function createMobileMarkdownStyles(theme: MobileTheme) {
     },
     listMarker: {
       ...theme.typography.meta,
-      width: 22,
+      minWidth: 22,
       color: theme.color.text.secondary,
       fontFamily: theme.typography.code.fontFamily
     },
+    listItemBody: { flex: 1, minWidth: 0, gap: theme.spacing.space4 },
+    footnoteReference: { color: theme.color.text.secondary },
     listText: {
       ...theme.typography.meta,
-      flex: 1,
-      minWidth: 0,
       color: theme.color.text.primary
     },
     rule: {

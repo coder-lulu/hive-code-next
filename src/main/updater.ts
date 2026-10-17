@@ -1,4 +1,8 @@
 import { getMacUpdateRunningInstances } from './macos-update-running-instances'
+import {
+  recoverMacBrowserSidecars,
+  describeMacUpdateBlockers
+} from './updater/mac-browser-sidecar-recovery'
 import { homedir } from 'node:os'
 import { macCoordinationRoot } from '../shared/serve-bundle-coordination'
 import {
@@ -1020,11 +1024,13 @@ async function performQuitAndInstall(): Promise<void> {
   quittingForUpdate = true
 
   try {
+    sendStatus({ state: 'downloaded', version: pendingVersion, installing: true }, { force: true })
     if (process.platform === 'darwin') {
       setMacInstallPreflightInProgress(true)
       let blockers: number[]
       try {
         blockers = await getMacUpdateRunningInstances()
+        blockers = await recoverMacBrowserSidecars(process.execPath, blockers)
       } catch {
         resetQuitForUpdateState()
         mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
@@ -1047,13 +1053,18 @@ async function performQuitAndInstall(): Promise<void> {
             })
           : null
       if (park && park.kind === 'refused') {
+        const instances = await describeMacUpdateBlockers(process.execPath, park.pids)
         resetQuitForUpdateState()
         mainWindowRef?.webContents.send('updater:quitAndInstallAborted')
         sendInstallFailureStatus({
           state: 'error',
           version: pendingVersion,
           retryAction: 'install',
-          message: serveInstallRefusalMessage(park)
+          message: serveInstallRefusalMessage(park),
+          installBlock: {
+            reason: park.reason === 'unregistered' ? 'running-instances' : park.reason,
+            instances
+          }
         })
         recordUpdaterLifecycle('macos_install_blocked_by_running_instances', {
           pids: park.pids.slice(0, 10).join(', '),

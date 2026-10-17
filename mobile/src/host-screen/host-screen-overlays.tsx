@@ -3,6 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import { Check, ChevronRight, Moon } from 'lucide-react-native'
 import { openExternalLink } from '../platform/external-link'
 import { buildWorktreeNavigationActions } from '../agent-history/worktree-navigation-actions'
+import { workspaceRouteHref } from '../navigation/workspace-execution-host'
 import { ActionSheetContent } from '../components/ActionSheetModal'
 import { BottomDrawer } from '../components/BottomDrawer'
 import { ConfirmModal } from '../components/ConfirmModal'
@@ -15,7 +16,6 @@ import {
   hostRoute
 } from '../host-route-action-state'
 import { MobileRuntimeSelector } from '../runtime-directory/MobileRuntimeSelector'
-import { getWorktreeRowIdentity } from '../worktree/worktree-host-row-identity'
 import {
   WORKSPACE_GROUP_OPTIONS as GROUP_OPTIONS,
   WORKSPACE_SORT_OPTIONS as SORT_OPTIONS,
@@ -179,7 +179,7 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
             </Text>
             <View style={styles.filterGroup}>
               {controller.sectionsResult.uniqueRepos.map((repo, i) => (
-                <View key={repo.id}>
+                <View key={repo.key}>
                   {i > 0 && <View style={styles.filterSeparator} />}
                   <Pressable
                     style={styles.filterRow}
@@ -261,7 +261,7 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
             title={actionTarget ? actionTarget.displayName || actionTarget.repo : undefined}
             message={actionTarget?.branch}
             actions={
-              actionTarget
+              actionTarget && !actionTarget.hostId?.startsWith('runtime:')
                 ? [
                     ...buildWorktreeNavigationActions({
                       hostId,
@@ -270,31 +270,19 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
                       hostCapabilities,
                       navigate: actions.navigateFromHostList,
                       onDone: () => state.setActionTarget(null)
-                    }).map((action) => ({
-                      ...action,
-                      label: localizedActionLabel(action.label)
-                    })),
+                    }).map((action) => ({ ...action, label: localizedActionLabel(action.label) })),
                     {
                       label: '休眠',
                       icon: Moon,
                       onPress: () => {
-                        if (client) {
-                          state.setSleptIds((prev) =>
-                            new Set(prev).add(getWorktreeRowIdentity(actionTarget))
-                          )
-                          void client
-                            .sendRequest('worktree.sleep', {
-                              worktree: `id:${actionTarget.worktreeId}`
-                            })
-                            .catch(() => null)
-                        }
+                        actions.putWorktreeToSleep(actionTarget)
                         state.setActionTarget(null)
                       }
                     },
                     {
                       label: isWorktreePinned(actionTarget, state.pinnedIds) ? '取消置顶' : '置顶',
                       onPress: () => {
-                        actions.togglePin(actionTarget.worktreeId)
+                        actions.togglePin(actionTarget)
                         state.setActionTarget(null)
                       }
                     },
@@ -333,6 +321,7 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
         routeVisible={showNewWorktree}
         client={client}
         hostId={hostId}
+        hostLabelById={state.hostLabelById}
         existingWorktreePaths={existingWorktreePaths}
         existingWorktrees={state.worktrees}
         // The seam, not react-native's `Linking`: this screen is in the tasks page closure, and
@@ -341,10 +330,13 @@ export function HostScreenOverlays({ controller }: { controller: HostScreenContr
         onVisibleChange={(visible) => {
           state.newWorktreeModalVisibleRef.current = visible
         }}
-        onCreated={(worktreeId, worktreeName, warning) => {
+        onCreated={(worktreeId, worktreeName, warning, executionHost) => {
           void catalog.fetchWorktrees({ allowDuringModal: true })
           actions.navigateFromHostList(
-            hostNewWorktreeSessionRoute(hostId, worktreeId, worktreeName, warning)
+            workspaceRouteHref(
+              hostNewWorktreeSessionRoute(hostId, worktreeId, worktreeName, warning),
+              executionHost
+            )
           )
         }}
         onRouteVisibleChange={actions.setShowNewWorktreeVisible}

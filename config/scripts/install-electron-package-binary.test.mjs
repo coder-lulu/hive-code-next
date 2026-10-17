@@ -36,7 +36,7 @@ describe('install-electron-package-binary', () => {
       writeFakeElectronPackage(parent)
       writeFakeElectronGet(parent)
       writeFakeExtractor(parent, { createExecutable: true })
-      const parentResult = runInstallScript(parent)
+      const parentResult = runInstallScript(parent, { CI: '' })
       expect(parentResult.status, parentResult.stderr).toBe(0)
       expect(existsSync(join(sharedCacheRoot(parent), sharedEntryName))).toBe(true)
 
@@ -44,7 +44,7 @@ describe('install-electron-package-binary', () => {
       writeFakeElectronPackage(child)
       writeFakeElectronGet(child)
       writeFakeExtractor(child, { createExecutable: true })
-      const childResult = runInstallScript(child)
+      const childResult = runInstallScript(child, { CI: '' })
       expect(childResult.status, childResult.stderr).toBe(0)
       expect(existsSync(join(child, 'electron-get.log'))).toBe(true)
       expect(childResult.stdout).not.toContain(sharedCacheRoot(parent))

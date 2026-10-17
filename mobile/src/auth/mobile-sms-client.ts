@@ -3,7 +3,7 @@ import { getRandomBytes, randomUUID } from 'expo-crypto'
 import nacl from 'tweetnacl'
 import { hivecodeProductConfig } from '../generated/product-config'
 import { readApiJsonWithinLimit } from './mobile-api-response-body'
-import { parseRelayRetryAfterMs } from '../../../src/shared/relay-retry-after-header'
+import { parseRetryAfterHeaderMs } from '../../../src/shared/retry-after-header'
 
 const DEVICE_ID_KEY = 'hivecode.mobile.auth.device-id'
 const DEVICE_PUBLIC_KEY = 'hivecode.mobile.auth.device-public-key'
@@ -206,7 +206,7 @@ export async function requestWithMetadata<T>(
       response.status,
       category,
       isRetryableApiError(response.status, category),
-      parseRelayRetryAfterMs(response.headers.get('Retry-After'), 60_000)
+      parseRetryAfterHeaderMs(response.headers.get('Retry-After'), 60_000)
     )
   }
   if (isRecord(payload) && typeof payload.code === 'number') {
@@ -218,7 +218,7 @@ export async function requestWithMetadata<T>(
         response.status,
         category,
         isRetryableApiError(response.status, category),
-        parseRelayRetryAfterMs(response.headers.get('Retry-After'), 60_000)
+        parseRetryAfterHeaderMs(response.headers.get('Retry-After'), 60_000)
       )
     }
     if (envelope.data === null || envelope.data === undefined) {

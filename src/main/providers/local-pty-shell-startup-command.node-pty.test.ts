@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import * as pty from 'node-pty'
@@ -40,6 +40,9 @@ describe.skipIf(process.platform === 'win32')('local POSIX shell startup-command
     '%s runs the command once, forwards stdin, and keeps the shell',
     async (shell) => {
       testHome = mkdtempSync(join(tmpdir(), `orca-${shell}-startup-command-`))
+      if (shell === 'zsh') {
+        writeFileSync(join(testHome, '.zshenv'), 'unsetopt GLOBAL_RCS\n')
+      }
       setTestUserDataPath(testHome)
       const launch = getShellLaunchConfig(
         shell,

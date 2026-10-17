@@ -28,6 +28,7 @@ import { createBrowserSlice } from './browser'
 import { createRateLimitSlice } from './rate-limits'
 import { createSshSlice } from './ssh'
 import { createRuntimeEnvironmentSshSlice } from './runtime-environment-ssh'
+import { createWslHostsSlice } from './wsl-hosts'
 import { createAgentStatusSlice } from './agent-status'
 import { createPaneForegroundAgentSlice } from './pane-foreground-agent'
 import { createDiffCommentsSlice } from './diffComments'
@@ -50,6 +51,7 @@ import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 import { createTerminalQuickCommandHostsSlice } from './terminal-quick-command-hosts'
 import { createAccountRuntimeCloudSlice } from './account-runtime-cloud'
 import { createStructuredSessionLaunchDirectorySlice } from './structured-session-launch-directories'
+import { createWorkspaceAttentionSlice } from './workspace-attention/workspace-attention-slice'
 import '@/i18n/i18n'
 import { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
 export { makeWorktree, TEST_REPO } from './worktrees-slice-test-fixtures'
@@ -88,6 +90,7 @@ export function createTestStore() {
     ...createRateLimitSlice(...a),
     ...createSshSlice(...a),
     ...createRuntimeEnvironmentSshSlice(...a),
+    ...createWslHostsSlice(...a),
     ...createAgentStatusSlice(...a),
     ...createPaneForegroundAgentSlice(...a),
     ...createDiffCommentsSlice(...a),
@@ -109,7 +112,8 @@ export function createTestStore() {
     ...createRemoteServerUpdatesSlice(...a),
     ...createTerminalQuickCommandHostsSlice(...a),
     ...createAccountRuntimeCloudSlice(...a),
-    ...createStructuredSessionLaunchDirectorySlice(...a)
+    ...createStructuredSessionLaunchDirectorySlice(...a),
+    ...createWorkspaceAttentionSlice(...a)
   }))
 }
 

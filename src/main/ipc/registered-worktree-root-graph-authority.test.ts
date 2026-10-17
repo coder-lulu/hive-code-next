@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdir, mkdtemp, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
@@ -31,7 +31,7 @@ function storeFor(path: string): { store: Store; repo: Repo } {
   return { store, repo }
 }
 async function fixture() {
-  const root = await mkdtemp(join(tmpdir(), 'orca-graph-authority-'))
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'orca-graph-authority-')))
   scratch.push(root)
   const main = join(root, 'main')
   await mkdir(main)

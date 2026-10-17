@@ -13,8 +13,14 @@ import { readDeviceRegistryFile } from './device-registry-file-read'
 import type { RuntimePairingReach } from '../../shared/runtime-pairing-reach'
 import type { RuntimeDeviceGrant } from './rpc/rpc-method-permission'
 import { validGrants } from './device-registry-row-validation'
-import { isPendingTokenRow, isStillAuthenticated, sameGrants,
-  type AuthenticatedPrincipalBinding, type DeviceEntry, type TokenDeviceEntry } from './device-entry'
+import {
+  isPendingTokenRow,
+  isStillAuthenticated,
+  sameGrants,
+  type AuthenticatedPrincipalBinding,
+  type DeviceEntry,
+  type TokenDeviceEntry
+} from './device-entry'
 export type { DeviceScope }
 export type { DeviceEntry, TokenDeviceEntry }
 
@@ -33,7 +39,7 @@ export class DeviceRegistry {
 
   constructor(userDataPath: string) {
     this.registryPath = join(userDataPath, DEVICE_REGISTRY_FILENAME)
-    // Why: a write killed between writeFile and rename (e.g. a hung icacls, #20497) orphans its temp forever.
+    // Why: a write killed between writeFile and rename (e.g. a crash mid-write, #20497) orphans its temp forever.
     void removeStaleDurableWriteTempFiles(this.registryPath, {
       minimumAgeMs: STALE_WRITE_TEMP_AGE_MS
     })
@@ -155,10 +161,7 @@ export class DeviceRegistry {
   }
 
   validateToken(token: string): DeviceEntry | null {
-    return (
-      (token && this.devices.find((d) => d.token === token)) ||
-      null
-    )
+    return (token && this.devices.find((d) => d.token === token)) || null
   }
 
   /** The row an authenticated socket is still entitled to, or null once revoked or re-credentialed. */

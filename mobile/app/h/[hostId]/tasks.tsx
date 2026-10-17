@@ -163,7 +163,7 @@ import {
   normalizeVisibleTaskProviders,
   resolveVisibleTaskProvider,
   type TaskProvider
-} from '../../../src/tasks/mobile-task-providers'
+} from '../../../../src/shared/task-providers'
 import { hasSettledHostRepoList } from '../../../src/tasks/host-repo-list'
 import { useHostRepoList } from '../../../src/tasks/use-host-repo-list'
 import { isHostedTaskRepo, reconcileRepoSelection } from '../../../src/tasks/hosted-repo-selection'

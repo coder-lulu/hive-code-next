@@ -87,6 +87,7 @@ async function commitReservedPtyIpcSpawn(ctx: PtyIpcSpawnState): Promise<PtySpaw
       })
       ctx.deps.runtime?.cancelPendingPtyRegistration?.(ctx.result.id, ctx.result.incarnationId)
       ctx.pendingRegistrationPtyId = null
+      ctx.exitedBeforeRegistration = true
       // The renderer drains this incarnation's buffered output and exit without publishing it live.
       return resolvePaneSpawnReservation(
         ctx.paneSpawnReservationKey,
@@ -201,7 +202,9 @@ async function commitReservedPtyIpcSpawn(ctx: PtyIpcSpawnState): Promise<PtySpaw
       : {})
   }
   // Why: renderer tab state cannot reliably infer background and reattached PTYs in the daemon inventory.
-  if (ctx.isClaudeLaunch) {markClaudePtySpawned(ctx.result.id)}
+  if (ctx.isClaudeLaunch) {
+    markClaudePtySpawned(ctx.result.id)
+  }
   ctx.deps.sendPtySpawnedToRenderer(ctx.result.id)
   ctx.deps.options?.onCodexHomePtySpawned?.({
     id: ctx.result.id,

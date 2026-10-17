@@ -47,6 +47,7 @@ import { HOST_CAPABILITY_METHODS } from './host-capabilities'
 import { MOBILE_WEB_BUNDLE_METHODS } from './mobile-web-bundle'
 import { RUNTIME_CLIENT_CAPABILITY_METHODS } from './runtime-client-capabilities'
 import { EMULATOR_METHODS } from './emulator'
+import { MOBILE_PROJECT_SECTIONS_METHODS } from './mobile-project-sections'
 import { UPDATER_METHODS } from './updater'
 import { AUTOMATIC_WORK_METHODS } from './automatic-work'
 import { AGENT_SESSION_METHODS } from './agent-session'
@@ -123,6 +124,7 @@ export const ALL_RPC_METHODS = [
   ...CLIENT_EVENT_METHODS,
   ...CLIENT_UI_METHODS,
   ...EMULATOR_METHODS,
-    ...UPDATER_METHODS,
-    ...AUTOMATIC_WORK_METHODS
+  ...MOBILE_PROJECT_SECTIONS_METHODS,
+  ...UPDATER_METHODS,
+  ...AUTOMATIC_WORK_METHODS
 ]

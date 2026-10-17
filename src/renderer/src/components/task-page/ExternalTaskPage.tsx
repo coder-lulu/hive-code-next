@@ -32,6 +32,7 @@ import { useTaskPageGitHubIssueCreation } from '../use-task-page-github-issue-cr
 import { useTaskPageLinearProjectCreation } from '../use-task-page-linear-project-creation'
 import { useTaskPageLinearIssueCreation } from '../use-task-page-linear-issue-creation'
 import { useTaskPageJiraIssueCreation } from '../use-task-page-jira-issue-creation'
+import { useTaskPageJiraSummaryGeneration } from '../use-task-page-jira-summary-generation'
 import { useTaskPageGlobalEffects } from '../use-task-page-global-effects'
 import { useTaskPageLinearListEffects } from '../use-task-page-linear-list-effects'
 import { useTaskPageLinearInOrcaEffects } from '../use-task-page-linear-in-orca-effects'
@@ -74,7 +75,8 @@ export function ExternalTaskPage(): React.JSX.Element {
   const stage31 = useTaskPageLinearProjectCreation(stage30)
   const stage32 = useTaskPageLinearIssueCreation(stage31)
   const stage33 = useTaskPageJiraIssueCreation(stage32)
-  const stage34 = useTaskPageGlobalEffects(stage33)
+  const summaryModel = useTaskPageJiraSummaryGeneration(stage33)
+  const stage34 = useTaskPageGlobalEffects(summaryModel)
   const stage35 = useTaskPageLinearListEffects(stage34)
   const stage36 = useTaskPageLinearInOrcaEffects(stage35)
   const stage37 = useTaskPageLinearCollectionEffects(stage36)

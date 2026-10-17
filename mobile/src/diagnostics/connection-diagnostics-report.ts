@@ -29,6 +29,8 @@ export function buildConnectionDiagnosticsReport(args: {
   entries: readonly ConnectionLogEntry[]
   activePath?: MobileConnectionDiagnosticPath
   pendingPath?: MobileConnectionDiagnosticPath | null
+  /** Which shell this binary is and the page bridge version it speaks; omitted by older callers. */
+  shell?: { kind: 'ota' | 'native'; bridgeProtocolVersion: number }
   nowMs?: number
 }): string {
   const now = args.nowMs ?? Date.now()
@@ -44,6 +46,9 @@ export function buildConnectionDiagnosticsReport(args: {
   lines.push(`${APP_DISPLAY_NAME} Mobile connection diagnostics`)
   lines.push(`Generated: ${new Date(now).toISOString()}`)
   lines.push(`App: ${APP_DISPLAY_NAME} Mobile ${args.appVersion} · ${args.platform}`)
+  if (args.shell) {
+    lines.push(`Shell: ${args.shell.kind} · bridge protocol ${args.shell.bridgeProtocolVersion}`)
+  }
   const desktopAppVersion = normalizeHostAppVersion(args.desktopAppVersion)
   lines.push(`Host ${APP_DISPLAY_NAME} version: ${desktopAppVersion ?? 'unknown'}`)
   lines.push(`Host: ${redactConnectionLogText(args.hostName)}`)

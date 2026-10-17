@@ -1,3 +1,4 @@
+import type { MobileProjectSectionCatalog } from './mobile-project-sections-contract'
 import type { AgentStatusOrchestrationContext } from './agent-status-types'
 import { APP_DISPLAY_NAME } from './brand'
 import type { RemoteServerUpdateSupport } from './remote-server-update'
@@ -163,6 +164,13 @@ export type RuntimeSyncWindowGraph = {
   leaves: RuntimeSyncedLeaf[]
   mobileSessionTabs?: RuntimeMobileSessionTabsSnapshot[]
   unchangedMobileSessionWorktrees?: string[]
+  /** Terminal grid that fills each shown tab group, by group id, so main starts a new tab's
+   *  terminal at its group's size. Window-to-main only: never copied into session tabs. */
+  terminalGroupGridSizes?: Record<string, { cols: number; rows: number }>
+  /** The grid a workspace with a single tab group gets, for one the window is not showing. */
+  singleGroupWorkspaceGridSize?: { cols: number; rows: number }
+  /** The sidebar's Project grouping inputs for paired phones; sent only when they changed. */
+  projectSectionCatalog?: MobileProjectSectionCatalog
 }
 
 export type RuntimeRendererSyncWindowGraph = RuntimeSyncWindowGraph & {

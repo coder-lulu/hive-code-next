@@ -21,8 +21,8 @@ import { isWebClientLocation } from '@/lib/web-client-location'
 
 export function useAddRepoHostSelection({
   isOpen,
-  preferredHostId,
-  setStep
+  setStep,
+  preferredHostId = null
 }: {
   isOpen: boolean
   /** Host owned by the space row that opened Add Project, when known. */
@@ -84,7 +84,10 @@ export function useAddRepoHostSelection({
   const requestedHostPending =
     requestedHost !== undefined &&
     !requestedHostSelectable &&
-    (requestedHost.kind === 'ssh' || (requestedHost.aliasHostIds?.length ?? 0) > 0)
+    (requestedHost.kind === 'ssh' ||
+      requestedHost.kind === 'runtime' ||
+      requestedHost.wslDistro !== undefined ||
+      (requestedHost.aliasHostIds?.length ?? 0) > 0)
   const selectedHost = requestedHostSelectable
     ? requestedHost
     : requestedHostPending
@@ -101,24 +104,20 @@ export function useAddRepoHostSelection({
 
   useEffect(() => {
     if (isOpen && !previousOpenRef.current) {
-      const focusedHostId = getSettingsFocusedExecutionHostId(settings)
+      const hostsById = indexExecutionHostsById(hostOptions)
       const preferredHost = preferredHostId ? hostsById.get(preferredHostId) : undefined
-      const focusedHost = hostsById.get(focusedHostId)
-      const preferredHostSelectable = Boolean(
+      const focusedHost = hostsById.get(getSettingsFocusedExecutionHostId(settings))
+      // Why no selectability check: a dropped folder's WSL host may still be starting.
+      const nextHostId =
         preferredHost &&
-        selectableHostOptions.includes(preferredHost) &&
-        canSelectAddRepoHost(preferredHost)
-      )
-      const focusedHostSelectable = Boolean(
-        focusedHost &&
-        selectableHostOptions.includes(focusedHost) &&
-        canSelectAddRepoHost(focusedHost)
-      )
-      const nextHostId = preferredHostSelectable
-        ? preferredHost?.id
-        : focusedHostSelectable
-          ? focusedHost?.id
-          : (pairedWebRuntimeHost?.id ?? (isWebClient ? null : LOCAL_EXECUTION_HOST_ID))
+        preferredHost.kind !== 'ssh' &&
+        selectableHostOptions.includes(preferredHost)
+          ? preferredHost.id
+          : focusedHost &&
+              selectableHostOptions.includes(focusedHost) &&
+              canSelectAddRepoHost(focusedHost)
+            ? focusedHost.id
+            : (pairedWebRuntimeHost?.id ?? (isWebClient ? null : LOCAL_EXECUTION_HOST_ID))
       if (nextHostId) {
         setSelectedAddProjectHostId(nextHostId)
       }
@@ -128,6 +127,7 @@ export function useAddRepoHostSelection({
     }
     previousOpenRef.current = isOpen
   }, [
+    hostOptions,
     isOpen,
     isWebClient,
     pairedWebRuntimeHost?.id,
@@ -153,6 +153,23 @@ export function useAddRepoHostSelection({
     async (hostId: ExecutionHostId): Promise<void> => {
       const host = selectableHostOptions.find((candidate) => candidate.id === hostId)
       const parsed = parseExecutionHostId(hostId)
+      if (host?.wslDistro !== undefined && parsed?.kind === 'runtime') {
+        // Main publishes the WSL host's progress; the row turns selectable once its server answers.
+        try {
+          await window.api.runtimeEnvironments.connect({ selector: parsed.environmentId })
+          setSelectedAddProjectHostId(hostId)
+        } catch (err) {
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : translate(
+                  'auto.components.sidebar.useAddRepoHostSelection.wslConnectionFailed',
+                  'Couldn’t start the WSL host.'
+                )
+          )
+        }
+        return
+      }
       if (!host || parsed?.kind !== 'ssh') {
         return
       }

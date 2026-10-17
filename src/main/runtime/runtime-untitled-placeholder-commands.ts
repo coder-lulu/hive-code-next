@@ -4,10 +4,10 @@ import {
 } from '../../shared/untitled-placeholder-retention'
 import { resolveUntitledPlaceholderRetentionRoot } from '../../shared/untitled-placeholder-recovery-directory'
 import type { UntitledPlaceholderDiscardResult } from '../../shared/untitled-placeholder-retention-types'
-import type { RuntimeFileCommandHost } from './runtime-file-command-host'
-import type { RuntimeFileExplorerPath } from './runtime-file-command-target'
-import { assertRuntimeFileMutationExpectation } from './runtime-file-commands-mobile-file-list-limit'
-import { requireLocalRuntimeFileRoute } from './runtime-file-command-target'
+import type { RuntimeFileCommandHost } from './files/file-command-host'
+import type { RuntimeFileExplorerPath } from './files/file-target'
+import { assertRuntimeFileMutationExpectation } from './files/file-mutation-expectation'
+import { requireLocalRuntimeFileRoute } from './files/file-target'
 import { resolveAuthorizedPath } from '../ipc/filesystem-auth'
 
 type PlaceholderHost = Pick<RuntimeFileCommandHost, 'getRuntimeId' | 'requireStore'> & {

@@ -94,6 +94,8 @@ export async function runTerminalSkewJourney(args: {
   clientBuild: TerminalWireBuild
   /** Only lower this for a pairing whose stall is the expected outcome. */
   barrierTimeoutMs?: number
+  /** Test-only scheduling seam after delivered output, before reveal/disconnect. */
+  afterLiveOutput?: () => void
 }): Promise<JourneyRecord> {
   const { hostBuild, clientBuild } = args
   const barrierTimeoutMs = args.barrierTimeoutMs ?? BARRIER_TIMEOUT_MS
@@ -216,6 +218,7 @@ export async function runTerminalSkewJourney(args: {
       record.dataRendered.join('').includes(LIVE_OUTPUT.trim())
     )
     record.completed.push('live-output')
+    args.afterLiveOutput?.()
 
     // Hide/reveal: the pane drops xterm and asks the host to re-publish the buffer.
     const revealed = await terminal.serializeBuffer({ scrollbackRows: 200 })

@@ -84,7 +84,7 @@ function processHostExportsExist(packageDir: string): boolean {
   )
 }
 
-/** Hash code and its file list, without rereading the 260MB Electron image; unchanged files reuse cached hashes. */
+/** Revalidate code and its file list, without reading the 260MB Electron image. */
 export function collectDaemonHostBuildInventory(
   sources: DaemonHostSources
 ): DaemonHostBuildInventory | null {

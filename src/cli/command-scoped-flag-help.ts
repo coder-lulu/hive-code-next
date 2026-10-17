@@ -6,7 +6,8 @@ const FILE_OPEN_FOCUS_HELP = `--focus                Bring the user to the file 
 /** Per-command flag help, kept out of the shared help chain it would crowd. */
 const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
   'reference add': {
-    url: '--url <url>            Full review or issue URL; pass all URLs positionally or all as repeated --url'
+    url: '--url <url-or-jira-key> Full review/issue URL or Jira key; use positionals or repeated --url',
+    'reference-site': '--reference-site <id> Jira site for bare keys; see orca jira connection'
   },
   'reference remove': {
     url: '--url <url>            Full review or issue URL; pass all URLs positionally or all as repeated --url',
@@ -19,7 +20,9 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
     limit: '--limit <n>            Maximum matching workspaces (default 50)'
   },
   'worktree create': {
-    reference: '--reference <url>      Attach an issue or review URL; repeat for several',
+    reference:
+      '--reference <url-or-jira-key> Attach an issue/review URL or Jira key; repeat for several',
+    'reference-site': '--reference-site <id> Jira site for bare keys; see orca jira connection',
     pr: '--pr <number>          Linked GitHub pull request number',
     'gitlab-issue': '--gitlab-issue <number|url> Linked GitLab issue in the source project',
     'gitlab-mr': '--gitlab-mr <number|url> Linked GitLab merge request in the source project'
@@ -41,6 +44,8 @@ const COMMAND_SCOPED_FLAG_HELP: Record<string, Record<string, string>> = {
     yes: '--yes                  Confirm stopping the server and unlinking it from this machine'
   },
   'file open': {
+    line: '--line <n>             Cursor line (1-based)',
+    column: '--column <n>           Cursor column (1-based; requires --line)',
     focus: FILE_OPEN_FOCUS_HELP
   },
   'file diff': {

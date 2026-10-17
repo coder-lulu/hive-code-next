@@ -14,12 +14,11 @@ import type { RepoSlice } from './repo-state'
 import {
   filterSetupsForPrunedRepoRows,
   mergeFetchedRepoCatalog,
-  projectCompatibilityForReconciledRepos,
   reconcileReadoptedSshWorktreeState,
   reconcileSupersededSshRepos
 } from './repo-catalog-merge'
 import { getRuntimeTargetHostId } from '../../runtime/runtime-client-target'
-import { mergeFetchedProjectCompatibilityForHost } from '../projects/project-compatibility-host-merge'
+import { mergeFetchedHostProjectCatalog } from '../../../../shared/project-compatibility-host-merge'
 import { scheduleSafeAutoForkSync } from './safe-auto-fork-sync'
 import { loadRepoCatalog } from './repo-catalog-load'
 import {
@@ -61,11 +60,7 @@ export function createRuntimeRepoCatalogActions(
           const finalizedRepos = applyManualRepoOrder(reconciliation.repos, s.manualRepoOrder)
           const validRepoIds = new Set(finalizedRepos.map((repo) => repo.id))
           const validRepoHostIdentities = new Set(finalizedRepos.map(getRepoHostIdentity))
-          const projectCompatibility = projectCompatibilityForReconciledRepos(
-            finalizedRepos,
-            catalog.projectHostSetupCompatibility
-          )
-          const mergedProjectCompatibility = mergeFetchedProjectCompatibilityForHost({
+          const mergedProjectCompatibility = mergeFetchedHostProjectCatalog({
             previous: {
               projects: s.projects,
               projectHostSetups: filterSetupsForPrunedRepoRows(
@@ -74,7 +69,7 @@ export function createRuntimeRepoCatalogActions(
                 finalizedRepos
               )
             },
-            fetched: projectCompatibility,
+            fetched: catalog.projectHostSetupCompatibility,
             repos: finalizedRepos,
             hostId: result.hostId
           })

@@ -1,24 +1,20 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from 'react'
 
-import type { RpcClient } from '../transport/rpc-client'
-import type { WorkspaceRuntimeSelection } from './new-worktree-modal-types'
+import type { NewWorktreeModalProps, WorkspaceRuntimeSelection } from './new-worktree-modal-types'
+import type { ExecutionHostId } from '../../../src/shared/execution-host'
 import { NewWorktreeModal } from './NewWorktreeModal'
 
 export type NewWorktreeModalControllerHandle = {
   open: () => void
 }
 
-type Props = {
+type Props = Omit<NewWorktreeModalProps, 'visible' | 'onClose' | 'hostLabelById'> & {
+  /** Names for execution targets served by the selected host. */
+  hostLabelById: ReadonlyMap<ExecutionHostId, string>
   runtimeSelection?: WorkspaceRuntimeSelection
   routeVisible: boolean
-  client: RpcClient | null
-  hostId?: string
-  existingWorktreePaths?: readonly string[]
-  existingWorktrees?: readonly { repoId: string; branch: string }[]
-  openExternalUrl: (url: string) => void
   onVisibleChange?: (visible: boolean) => void
   onRouteVisibleChange: (visible: boolean) => void
-  onCreated: (worktreeId: string, name: string, warning?: string) => void
 }
 
 export const NewWorktreeModalController = forwardRef<NewWorktreeModalControllerHandle, Props>(
@@ -28,6 +24,7 @@ export const NewWorktreeModalController = forwardRef<NewWorktreeModalControllerH
       routeVisible,
       client,
       hostId,
+      hostLabelById,
       existingWorktreePaths,
       existingWorktrees,
       openExternalUrl,
@@ -39,7 +36,6 @@ export const NewWorktreeModalController = forwardRef<NewWorktreeModalControllerH
   ) {
     const [manualVisible, setManualVisible] = useState(false)
     const visible = routeVisible || manualVisible
-
     useImperativeHandle(
       ref,
       () => ({
@@ -65,6 +61,7 @@ export const NewWorktreeModalController = forwardRef<NewWorktreeModalControllerH
         visible={visible}
         client={client}
         hostId={hostId}
+        hostLabelById={hostLabelById}
         existingWorktreePaths={existingWorktreePaths}
         existingWorktrees={existingWorktrees}
         openExternalUrl={openExternalUrl}

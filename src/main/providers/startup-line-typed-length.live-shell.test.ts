@@ -53,6 +53,7 @@ let home = ''
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'orca-typed-line-home-'))
+  writeFileSync(join(home, '.zshenv'), 'unsetopt GLOBAL_RCS\n')
   setTestUserDataPath(mkdtempSync(join(tmpdir(), 'orca-typed-line-ud-')))
 })
 

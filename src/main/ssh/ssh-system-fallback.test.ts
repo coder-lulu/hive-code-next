@@ -3,11 +3,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { EventEmitter } from 'node:events'
 import { PassThrough } from 'node:stream'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { afterEach, describe, expect, it, vi, beforeEach } from 'vitest'
+import type * as ProcessHost from '@orca/process-host'
 
-const { existsSyncMock, spawnMock } = vi.hoisted(() => ({
+const { existsSyncMock, spawnMock, runProcessMock } = vi.hoisted(() => ({
   existsSyncMock: vi.fn(),
-  spawnMock: vi.fn()
+  spawnMock: vi.fn(),
+  runProcessMock: vi.fn()
 }))
 
 vi.mock('fs', async (importOriginal) => {
@@ -22,6 +24,11 @@ vi.mock('child_process', () => ({
   spawn: spawnMock
 }))
 
+vi.mock('@orca/process-host', async (importOriginal) => ({
+  ...(await importOriginal<typeof ProcessHost>()),
+  runProcess: runProcessMock
+}))
+
 import {
   buildSshArgs,
   downloadFileViaSystemSsh,
@@ -33,6 +40,7 @@ import {
   writeFileViaSystemSsh
 } from './ssh-system-fallback'
 import { getRemoteHostPlatform } from './ssh-remote-platform'
+import { clearWindowsRemoteWriteCapabilitiesForTests } from './system-ssh-windows-write-capabilities'
 import type { SshTarget } from '../../shared/ssh-types'
 import type { SystemSshResolvedConfig } from './ssh-control-socket'
 
@@ -40,6 +48,26 @@ const SYSTEM_SSH_PATH =
   process.platform === 'win32'
     ? join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'OpenSSH', 'ssh.exe')
     : '/usr/bin/ssh'
+
+// The SFTP facade is mocked; discovery must not depend on the host's OpenSSH installation.
+const SYSTEM_SFTP_PATH = join(tmpdir(), 'orca-mocked-sftp')
+
+beforeEach(() => {
+  clearWindowsRemoteWriteCapabilitiesForTests()
+  vi.stubEnv('ORCA_SYSTEM_SFTP_PATH', SYSTEM_SFTP_PATH)
+  runProcessMock.mockReset()
+  runProcessMock.mockResolvedValue({
+    code: 0,
+    signal: null,
+    stdout: '',
+    stderr: '',
+    timedOut: false
+  })
+})
+
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
 
 function decodePowerShellCommand(command: string): string {
   const encoded = command.match(/-EncodedCommand\s+(\S+)/)?.[1]
@@ -252,6 +280,12 @@ describe('spawnSystemSsh', () => {
     const args = spawnMock.mock.calls[0][1] as string[]
     expect(args).toContain('-o')
     expect(args).toContain('ProxyCommand=ssh -W %h:%p bastion')
+  })
+
+  it('pins LogLevel=INFO only where a caller reads channel failures from stderr', () => {
+    const quiet = buildSshArgs(createTarget(), { logChannelFailures: true })
+    expect(quiet.slice(0, quiet.indexOf('--'))).toContain('LogLevel=INFO')
+    expect(buildSshArgs(createTarget())).not.toContain('LogLevel=INFO')
   })
 
   it('uses configHost without resolved field overrides so OpenSSH sees the Host block', () => {
@@ -681,10 +715,8 @@ describe('spawnSystemSsh', () => {
   })
 
   it('sends Windows file writes over sftp, not through a remote PowerShell stdin', async () => {
-    const spawned: EventedProcess[] = []
     spawnMock.mockImplementation(() => {
       const proc = createEventedProcess()
-      spawned.push(proc)
       return closeOnceSpawned(proc)
     })
     const hostPlatform = getRemoteHostPlatform('win32-x64')
@@ -699,13 +731,15 @@ describe('spawnSystemSsh', () => {
     await expect(promise).resolves.toBeUndefined()
     // #16432, re-measured: Windows PowerShell 5.1 can lose a redirected stdin for good when a read
     // finds it momentarily empty, so the bytes must not travel that way at all.
-    const batch = String(spawned[0]!.stdin.end.mock.calls[0]?.[0] ?? '')
+    const sftp = runProcessMock.mock.calls[0]![0]
+    expect(sftp.program).toBe(SYSTEM_SFTP_PATH)
+    const batch = String(sftp.input)
     expect(batch).toContain('put ')
     expect(batch).toContain('/C:/Users/me/.orca-remote/relay/.version.orca-partial-')
-    const sftpArgs = spawnMock.mock.calls[0][1] as string[]
+    const sftpArgs = runProcessMock.mock.calls[0]![0].args as string[]
     expect(sftpArgs).toContain('-b')
     // The rename that publishes it reads the staged file, never a pipe.
-    const publish = (spawnMock.mock.calls[1][1] as string[]).at(-1) ?? ''
+    const publish = (spawnMock.mock.calls[0][1] as string[]).at(-1) ?? ''
     expect(publish).toContain('powershell.exe')
     expect(decodePowerShellCommand(publish)).toContain(
       '[System.IO.File]::Replace($staging, $path, [NullString]::Value)'
@@ -725,7 +759,7 @@ describe('spawnSystemSsh', () => {
     )
 
     await expect(promise).resolves.toBeUndefined()
-    const publish = decodePowerShellCommand((spawnMock.mock.calls[1][1] as string[]).at(-1) ?? '')
+    const publish = decodePowerShellCommand((spawnMock.mock.calls[0][1] as string[]).at(-1) ?? '')
     // `File::Move` raising on an existing destination is what carries the exclusive contract now;
     // a `CreateNew` on the staged file would only refuse a leftover of our own.
     expect(publish).toContain('[System.IO.File]::Move($staging, $path)')
@@ -772,11 +806,11 @@ describe('spawnSystemSsh', () => {
     )
 
     await expect(promise).resolves.toBeUndefined()
-    const sftpArgs = spawnMock.mock.calls[0][1] as string[]
+    const sftpArgs = runProcessMock.mock.calls[0]![0].args as string[]
     // sftp's own `-S` names a program to run, so the same request has to be spelled as an option.
     expect(sftpArgs).not.toContain('-S')
     expect(sftpArgs).toContain('ControlPath=none')
-    const publishArgs = spawnMock.mock.calls[1][1] as string[]
+    const publishArgs = spawnMock.mock.calls[0][1] as string[]
     const standaloneControlIdx = publishArgs.indexOf('-S')
     expect(standaloneControlIdx).toBeGreaterThan(-1)
     expect(publishArgs[standaloneControlIdx + 1]).toBe('none')
@@ -785,10 +819,8 @@ describe('spawnSystemSsh', () => {
   it('uploads a Windows directory as a mkdir batch plus per-file writes, never one blob', async () => {
     const localDir = mkdtempSync(join(tmpdir(), 'orca-system-ssh-upload-'))
     writeFileSync(join(localDir, 'relay.js'), 'console.log("relay")')
-    const spawned: EventedProcess[] = []
     spawnMock.mockImplementation(() => {
       const proc = createEventedProcess()
-      spawned.push(proc)
       queueMicrotask(() => proc.emit('close', 0, null))
       return proc
     })
@@ -806,9 +838,10 @@ describe('spawnSystemSsh', () => {
 
     // #16432: directories first, then the file — but both over sftp now, so the only PowerShell
     // left is the rename that publishes the staged file, which reads a file rather than a pipe.
-    const mkdirBatch = String(spawned[0]!.stdin.end.mock.calls[0]?.[0] ?? '')
+    expect(runProcessMock).toHaveBeenCalledTimes(2)
+    const mkdirBatch = String(runProcessMock.mock.calls[0]![0].input)
     expect(mkdirBatch).toBe('-mkdir "/C:/Users/me/.orca-remote/relay"\n')
-    const putBatch = String(spawned[1]!.stdin.end.mock.calls[0]?.[0] ?? '')
+    const putBatch = String(runProcessMock.mock.calls[1]![0].input)
     expect(putBatch).toContain('put ')
     expect(putBatch).toContain('/C:/Users/me/.orca-remote/relay/relay.js.orca-partial-')
     const commands = spawnMock.mock.calls.map((call) => (call[1] as string[]).at(-1) ?? '')
@@ -840,8 +873,8 @@ describe('spawnSystemSsh', () => {
       rmSync(localDir, { recursive: true, force: true })
     }
 
-    const args = spawnMock.mock.calls[0][1] as string[]
-    // The first spawn is the sftp client, whose own `-S` names a program to run.
+    const args = runProcessMock.mock.calls[0]![0].args as string[]
+    // SFTP's own `-S` names a program to run.
     expect(args).not.toContain('-S')
     expect(args).toContain('ControlPath=none')
   })

@@ -85,7 +85,7 @@ export function createRecentlyClosedEditorTabs(
           // One index per owner avoids repeatedly scanning tab order and group membership.
           const positionIndex = createRecentlyClosedTabPositionIndex(s, worktreeId)
           for (const file of files.toReversed()) {
-            if (file.mode === 'markdown-preview' || file.mode === 'chat-visual') {
+            if (file.mode === 'markdown-preview') {
               continue
             }
             const {

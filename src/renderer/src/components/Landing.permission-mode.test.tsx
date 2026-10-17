@@ -139,6 +139,23 @@ describe('Landing permission mode wiring', () => {
 
   afterEach(cleanup)
 
+  it.each([
+    { ctrlKey: true, keyCode: 13, isComposing: true },
+    { metaKey: true, keyCode: 13, isComposing: true },
+    { ctrlKey: true, keyCode: 229, isComposing: false }
+  ])('keeps IME confirmation from launching a task: %o', (composition) => {
+    render(<Landing />)
+    const composer = screen.getByRole('textbox')
+
+    fireEvent.keyDown(composer, { key: 'Enter', ...composition })
+    expect(mocks.launchAgentInNewTab).not.toHaveBeenCalled()
+    expect(mocks.newAgentLaunchRequestId).not.toHaveBeenCalled()
+    expect(mocks.state.setHomeTaskDraft).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(composer, { key: 'Enter', keyCode: 13, ctrlKey: true })
+    expect(mocks.launchAgentInNewTab).toHaveBeenCalledOnce()
+  })
+
   it('requires a Host workspace on Web and retains the draft for both submit paths', () => {
     mocks.isWebClient = true
     render(<Landing />)

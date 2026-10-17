@@ -92,6 +92,7 @@ export type WslResult = {
   stdout: string
   stderr: string
   timedOut: boolean
+  /** True when stdout or stderr hit `maxOutputBytes` and was clipped. */
   outputTruncated?: boolean
 }
 
@@ -262,6 +263,6 @@ export async function runWslProcess(spec: WslSpec): Promise<WslResult> {
     stdout: result.stdout,
     stderr: result.stderr,
     timedOut: result.timedOut,
-    ...(result.outputTruncated ? { outputTruncated: true } : {})
+    outputTruncated: result.outputTruncated ?? false
   }
 }

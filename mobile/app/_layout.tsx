@@ -28,6 +28,7 @@ import {
   useAccountRuntimeDirectory
 } from '../src/runtime-directory/account-runtime-directory-provider'
 import { useAccountVisibleHostCatalog } from '../src/runtime-directory/use-account-visible-host-catalog'
+import { SideSafeArea } from '../src/layout/side-safe-area'
 
 // Why: keeps the native splash screen visible until the React tree is mounted
 // and ready to render. Without this the user sees a blank white/black frame
@@ -152,62 +153,64 @@ function ThemedRootLayout() {
         <AccountAwareNotificationResponseObserver />
         <View style={styles.root} onLayout={onNavigatorLayout}>
           <StatusBar style={theme.scheme === 'dark' ? 'light' : 'dark'} />
-          <Stack
-            screenOptions={{
-              headerStyle: { backgroundColor: theme.color.bg.surface },
-              headerTintColor: theme.color.text.primary,
-              headerTitleStyle: { fontSize: 16, fontWeight: '600' },
-              contentStyle: { backgroundColor: theme.color.bg.canvas },
-              headerShadowVisible: false
-              // Why: deliberately no `orientation` screenOption. react-native-screens
-              // has no value that respects the device rotation lock — even 'default'
-              // calls setRequestedOrientation(UNSPECIFIED) at runtime, overriding the
-              // manifest. Leaving it unset lets the manifest's "fullUser" (set by the
-              // android-respect-rotation-lock config plugin) honor the auto-rotate lock.
-            }}
-          >
-            <Stack.Screen
-              name="(main)"
-              options={{
-                headerShown: false,
-                headerTitle: () => <OrcaLogo size={22} />
+          <SideSafeArea>
+            <Stack
+              screenOptions={{
+                headerStyle: { backgroundColor: theme.color.bg.surface },
+                headerTintColor: theme.color.text.primary,
+                headerTitleStyle: { fontSize: 16, fontWeight: '600' },
+                contentStyle: { backgroundColor: theme.color.bg.canvas },
+                headerShadowVisible: false
+                // Why: deliberately no `orientation` screenOption. react-native-screens
+                // has no value that respects the device rotation lock — even 'default'
+                // calls setRequestedOrientation(UNSPECIFIED) at runtime, overriding the
+                // manifest. Leaving it unset lets the manifest's "fullUser" (set by the
+                // android-respect-rotation-lock config plugin) honor the auto-rotate lock.
               }}
-            />
-            <Stack.Screen name="pair-scan" options={{ headerShown: false }} />
-            <Stack.Screen name="pair" options={{ headerShown: false }} />
-            <Stack.Screen name="pair-confirm" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="mobile-onboarding"
-              options={{ headerShown: false, presentation: 'modal', gestureEnabled: false }}
-            />
-            <Stack.Screen name="settings" options={{ headerShown: false }} />
-            <Stack.Screen name="account" options={{ headerShown: false }} />
-            <Stack.Screen name="account/delete" options={{ headerShown: false }} />
-            <Stack.Screen name="runtime-sessions" options={{ headerShown: false }} />
-            <Stack.Screen name="claim-computer" options={{ headerShown: false }} />
-            <Stack.Screen
-              name="login"
-              options={{
-                animation: 'fade',
-                contentStyle: { backgroundColor: 'transparent' },
-                headerShown: false,
-                presentation: 'transparentModal'
-              }}
-            />
-            <Stack.Screen name="privacy" options={{ headerShown: false }} />
-            <Stack.Screen name="legal" options={{ headerShown: false }} />
-            <Stack.Screen name="feedback" options={{ headerShown: false }} />
-            <Stack.Screen name="storage" options={{ headerShown: false }} />
-            <Stack.Screen name="terminal-settings" options={{ headerShown: false }} />
-            <Stack.Screen name="native-chat-settings" options={{ headerShown: false }} />
-            <Stack.Screen name="browser-settings" options={{ headerShown: false }} />
-            <Stack.Screen name="voice-settings" options={{ headerShown: false }} />
-            <Stack.Screen name="notifications" options={{ headerShown: false }} />
-            <Stack.Screen name="troubleshoot" options={{ headerShown: false }} />
-            <Stack.Screen name="connection-log" options={{ headerShown: false }} />
-            <Stack.Screen name="about" options={{ headerShown: false }} />
-            <Stack.Screen name="h" options={{ headerShown: false }} />
-          </Stack>
+            >
+              <Stack.Screen
+                name="(main)"
+                options={{
+                  headerShown: false,
+                  headerTitle: () => <OrcaLogo size={22} />
+                }}
+              />
+              <Stack.Screen name="pair-scan" options={{ headerShown: false }} />
+              <Stack.Screen name="pair" options={{ headerShown: false }} />
+              <Stack.Screen name="pair-confirm" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="mobile-onboarding"
+                options={{ headerShown: false, presentation: 'modal', gestureEnabled: false }}
+              />
+              <Stack.Screen name="settings" options={{ headerShown: false }} />
+              <Stack.Screen name="account" options={{ headerShown: false }} />
+              <Stack.Screen name="account/delete" options={{ headerShown: false }} />
+              <Stack.Screen name="runtime-sessions" options={{ headerShown: false }} />
+              <Stack.Screen name="claim-computer" options={{ headerShown: false }} />
+              <Stack.Screen
+                name="login"
+                options={{
+                  animation: 'fade',
+                  contentStyle: { backgroundColor: 'transparent' },
+                  headerShown: false,
+                  presentation: 'transparentModal'
+                }}
+              />
+              <Stack.Screen name="privacy" options={{ headerShown: false }} />
+              <Stack.Screen name="legal" options={{ headerShown: false }} />
+              <Stack.Screen name="feedback" options={{ headerShown: false }} />
+              <Stack.Screen name="storage" options={{ headerShown: false }} />
+              <Stack.Screen name="terminal-settings" options={{ headerShown: false }} />
+              <Stack.Screen name="native-chat-settings" options={{ headerShown: false }} />
+              <Stack.Screen name="browser-settings" options={{ headerShown: false }} />
+              <Stack.Screen name="voice-settings" options={{ headerShown: false }} />
+              <Stack.Screen name="notifications" options={{ headerShown: false }} />
+              <Stack.Screen name="troubleshoot" options={{ headerShown: false }} />
+              <Stack.Screen name="connection-log" options={{ headerShown: false }} />
+              <Stack.Screen name="about" options={{ headerShown: false }} />
+              <Stack.Screen name="h" options={{ headerShown: false }} />
+            </Stack>
+          </SideSafeArea>
         </View>
         <MobileUpdateObserver />
       </AccountRuntimeDirectoryProvider>

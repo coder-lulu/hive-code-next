@@ -85,6 +85,9 @@ export function createCloseFileAction(
                     preClose.readOnly !== true &&
                     file.readOnly !== true &&
                     isSameOwnedDocument(file, preClose) &&
+                    !get().unifiedTabsByWorktree[file.worktreeId]?.some(
+                      (tab) => tab.entityId === file.id && tab.isPinned
+                    ) &&
                     !file.isDirty &&
                     !(file.id in get().editorDrafts))
               )
@@ -231,12 +234,11 @@ export function createCloseFileAction(
         let nextRecentlyClosed = s.recentlyClosedEditorTabsByWorktree
         let nextRecentlyClosedKinds = s.recentlyClosedTabKindsByWorktree
         const wtRecent = closedFile?.worktreeId
-        // Preserved untitled files remain reopenable; previews and chat visuals are ephemeral.
+        // Preserved untitled files remain reopenable; previews are ephemeral.
         if (
           wtRecent &&
           closedFile &&
           closedFile.mode !== 'markdown-preview' &&
-          closedFile.mode !== 'chat-visual' &&
           !options?.excludeFromRecentlyClosed
         ) {
           const {

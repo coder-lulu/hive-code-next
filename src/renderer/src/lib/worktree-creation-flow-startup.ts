@@ -29,6 +29,7 @@ export function buildWorktreeCreationHostOptions(
 ): CreateWorktreeCallOptions {
   const startupLaunchPreferences = toAgentLaunchPreferences(request.startupPlan?.sessionOptions)
   return {
+    setupOnly: request.setupOnly,
     executionHostId: request.workspaceRunContext?.hostId ?? request.executionHostId,
     ...(request.nameWasGenerated ? { nameWasGenerated: true } : {}),
     ...(request.displayNameKind ? { displayNameKind: request.displayNameKind } : {}),

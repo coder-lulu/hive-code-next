@@ -16,6 +16,7 @@ vi.mock('react-native', async () => {
   const Text = ({ children, ...props }: { children?: unknown }): unknown =>
     React.createElement('Text', props, children)
   return {
+    Alert: { alert: vi.fn() },
     ActivityIndicator: 'ActivityIndicator',
     Animated: {
       Text,
@@ -43,6 +44,7 @@ vi.mock('lucide-react-native', () => ({
   Brain: 'Brain',
   ChevronDown: 'ChevronDown',
   Copy: 'Copy',
+  Check: 'Check',
   SquareChevronRight: 'SquareChevronRight',
   SquareTerminal: 'SquareTerminal',
   Wrench: 'Wrench',
@@ -70,6 +72,12 @@ function userMessage(blocks: NativeChatMessage['blocks']): NativeChatMessage {
 
 function toolMessage(blocks: NativeChatMessage['blocks']): NativeChatMessage {
   return { id: 'a1', role: 'assistant', blocks, timestamp: null, source: 'transcript' }
+}
+
+function messageCopyButton(tree: ReactTestRenderer) {
+  return tree.root.find(
+    (node) => String(node.type) === 'Pressable' && node.props.accessibilityLabel === 'Copy message'
+  )
 }
 
 describe('MobileNativeChatMessage', () => {
@@ -276,7 +284,7 @@ describe('MobileNativeChatMessage', () => {
     expect(markdown.props.rangeSelectable).toBe(true)
   })
 
-  it('copies assistant prose without its tool activity', () => {
+  it('copies assistant prose without its tool activity', async () => {
     const tree = render(
       toolMessage([
         { type: 'text', text: 'First paragraph' },
@@ -284,17 +292,17 @@ describe('MobileNativeChatMessage', () => {
         { type: 'text', text: 'Second paragraph' }
       ])
     )
-    act(() => tree.root.findByProps({ accessibilityLabel: '复制消息' }).props.onPress())
+    await act(async () => messageCopyButton(tree).props.onPress())
     expect(Clipboard.setStringAsync).toHaveBeenLastCalledWith('First paragraph\n\nSecond paragraph')
   })
 
   it('keeps a refused copy retryable without claiming success', async () => {
     vi.mocked(Clipboard.setStringAsync).mockResolvedValueOnce(false)
     const tree = render(toolMessage([{ type: 'text', text: 'Copy this prose' }]))
-    await act(async () => tree.root.findByProps({ accessibilityLabel: '复制消息' }).props.onPress())
+    await act(async () => messageCopyButton(tree).props.onPress())
     expect(Clipboard.setStringAsync).toHaveBeenLastCalledWith('Copy this prose')
-    expect(tree.root.findAllByProps({ accessibilityLabel: '已复制' })).toEqual([])
-    await act(async () => tree.root.findByProps({ accessibilityLabel: '复制消息' }).props.onPress())
+    expect(messageCopyButton(tree).props.accessibilityValue.text).toBeUndefined()
+    await act(async () => messageCopyButton(tree).props.onPress())
     expect(Clipboard.setStringAsync).toHaveBeenLastCalledWith('Copy this prose')
   })
 

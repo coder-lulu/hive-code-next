@@ -4,6 +4,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   watch,
   writeFileSync
@@ -28,6 +29,8 @@ import {
   resolveProfileStateBackupWorkerPath
 } from './profile-state-backup-worker'
 import * as backupWorker from './profile-state-backup-worker'
+
+import { ProfileStateDatabaseOpenError } from './profile-state-database-errors'
 
 const directories: string[] = []
 let workerDirectory: string
@@ -58,7 +61,7 @@ afterEach(() => {
 afterAll(() => rmSync(workerDirectory, { recursive: true, force: true }))
 
 function fixture() {
-  const directory = mkdtempSync(join(tmpdir(), 'orca-backup-worker-'))
+  const directory = mkdtempSync(join(realpathSync.native(tmpdir()), 'orca-backup-worker-'))
   directories.push(directory)
   const job = {
     databasePath: join(directory, 'profile-state.db'),
@@ -122,6 +125,26 @@ describe('profile state backup worker', () => {
     expect(existsSync(directory)).toBe(false)
   })
 
+  it.each(['unreadable', 'newer-schema'] as const)(
+    'retains %s from the real backup worker without changing source bytes',
+    async (code) => {
+      const { directory, job } = fixture()
+      if (code === 'unreadable') {
+        writeFileSync(job.databasePath, 'not a SQLite database')
+      } else {
+        const primary = openProfileStateDatabase(job.databasePath, job.profileId)
+        primary.db.exec('PRAGMA user_version = 999')
+        primary.db.close()
+      }
+      const before = readFileSync(job.databasePath)
+      const result = runProfileStateBackupWorker(job, { workerPath })
+      await expect(result).rejects.toBeInstanceOf(ProfileStateDatabaseOpenError)
+      await expect(result).rejects.toMatchObject({ code })
+      expect(readFileSync(job.databasePath)).toEqual(before)
+      expect(readdirSync(directory).filter((name) => name.startsWith('backup.db'))).toEqual([])
+    }
+  )
+
   it.each([
     [
       'a mismatched stored hash',
@@ -170,7 +193,9 @@ describe('profile state backup worker', () => {
       directory,
       `
       const { parentPort, workerData } = require('node:worker_threads')
-      parentPort.postMessage({ ok: ${ok}, error: 'backup failed' })
+      parentPort.postMessage({ ok: ${ok}, error: {
+        code: 'profile-state-write-failed', message: 'backup failed', outcome: 'known-failure'
+      } })
       setTimeout(() => {
         require('node:fs').writeFileSync(workerData.targetPath, 'handles released')
         parentPort.close()
@@ -186,12 +211,23 @@ describe('profile state backup worker', () => {
     ['throw new Error("worker boot failed")', 'worker boot failed'],
     ['process.exit(0)', 'without completion'],
     ['require("node:worker_threads").parentPort.postMessage({ wrong: true })', 'Invalid profile'],
+    [
+      'require("node:worker_threads").parentPort.postMessage({ ok: false, error: "unreadable" })',
+      'Invalid profile'
+    ],
+    [
+      'require("node:worker_threads").parentPort.postMessage({ ok: false, error: { code: "unreadable", message: "bad", outcome: "unknown" } })',
+      'Invalid profile'
+    ],
     ['setInterval(() => {}, 1000)', 'timed out']
   ])('fails closed for worker failure: %s', async (source, error) => {
     const { directory, job } = fixture()
     const failedWorker = script(directory, source)
     await expect(
-      runProfileStateBackupWorker(job, { workerPath: failedWorker, timeoutMs: 500 })
+      runProfileStateBackupWorker(job, {
+        workerPath: failedWorker,
+        timeoutMs: error === 'timed out' ? 500 : undefined
+      })
     ).rejects.toThrow(error)
     expect(existsSync(job.targetPath)).toBe(false)
     rmSync(directory, { recursive: true })

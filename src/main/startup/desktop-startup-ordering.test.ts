@@ -128,13 +128,13 @@ describe('startup ordering', () => {
     expect(authoritySelection).toBeGreaterThan(telemetryInit)
   })
 
-  it('requires daemon authority before restored-subagent liveness runs', () => {
+  it('requires daemon authority before restored-status liveness runs', () => {
     const source = readFileSync(
       join(process.cwd(), 'src/main/startup/main-process-pty-startup.ts'),
       'utf8'
     )
     const sweepStart = source.indexOf(
-      'export async function reapRestoredSubagentsWithoutLiveAgent()'
+      'async function sweepRestoredStatusesAgainstLocalPtys(): Promise<void>'
     )
     const sweepEnd = source.indexOf(
       'export function startTerminalRuntimeStartupServices()',
@@ -145,7 +145,7 @@ describe('startup ordering', () => {
     expect(sweepStart).toBeGreaterThanOrEqual(0)
     expect(sweepEnd).toBeGreaterThan(sweepStart)
     expect(sweep).toContain('const provider = getDaemonProvider()')
-    expect(sweep).toContain('if (!provider) {')
+    expect(sweep).toContain('if (!store || !provider) {')
     expect(sweep).toContain('provider.probePtyLiveness(ptyId)')
   })
 

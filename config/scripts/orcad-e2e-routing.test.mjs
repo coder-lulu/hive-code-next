@@ -90,7 +90,32 @@ it('builds the e2e app when only a build-dependent orcad spec is requested', () 
       e2e_needs_build: true
     })
   }
-  expect(jobs['orcad-ssh-docker'].needs).toEqual(['build', 'prepare-native-cache'])
+  expect(jobs['orcad-ssh-docker'].needs).toEqual(['build'])
+  const steps = jobs.build.steps
+  const native = steps.find((step) => step.id === 'electron-native-runtime')
+  expect(native.uses).toBe('./.github/actions/prepare-native-runtime')
+  expect(native.with['native-runtime']).toBe('electron')
+  expect(native.if).toBe(
+    "steps.native-runtime-action.outputs.available == 'true' && steps.deps.outputs.node-version != ''"
+  )
+  const fallback = steps.find((step) => step.name === 'Prepare Electron natives for older refs')
+  expect(fallback.uses).toBe('./.github/actions/install-node-dependencies')
+  expect(fallback.with['native-runtime']).toBe('electron')
+  expect(fallback.if).toBe(
+    "steps.native-runtime-action.outputs.available != 'true' || steps.deps.outputs.node-version == ''"
+  )
+  for (const step of [native, fallback]) {
+    expect(step['continue-on-error']).toBeUndefined()
+    expect(step.background).toBeUndefined()
+  }
+  expect(jobs.build['continue-on-error']).toBeUndefined()
+  const upload = steps.findIndex((step) => step.id === 'e2e-build-upload')
+  const join = steps.findIndex((step) => step.wait === 'e2e-build-upload')
+  expect(upload).toBeGreaterThanOrEqual(0)
+  expect(join).toBeGreaterThan(upload)
+  expect(join).toBeGreaterThan(steps.indexOf(native))
+  expect(join).toBeGreaterThan(steps.indexOf(fallback))
+  expect(steps[join]['continue-on-error']).toBeUndefined()
 })
 
 it('runs every managed-SSH spec in one sharded lane, only when one is routed', () => {

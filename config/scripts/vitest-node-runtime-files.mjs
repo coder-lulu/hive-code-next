@@ -2,6 +2,12 @@ import { SQLITE_RUNTIME_INCLUDE } from './vitest-sqlite-runtime-files.mjs'
 
 // SQLite publication, native bindings, worker IPC, socket liveness, and V8 retention use Node.
 export const NODE_RUNTIME_INCLUDE = [
+  'src/main/windows-live-tree-kill.win32.test.ts',
+  'src/main/orcad/orcad-idle-stop-record.test.ts',
+  'tests/e2e/hiverelay/hive-account-relay-cell-startup.unit.test.ts',
+  'src/main/runtime/runtime-created-worktree-terminal-target.test.ts',
+  'src/main/runtime/session-tabs/headless-browser-group-persistence.test.ts',
+  'src/main/ipc/wsl-host-gate-off.test.ts',
   'src/main/acp/acp-structured-background-task-stop.test.ts',
   'src/main/acp/acp-structured-compaction.test.ts',
   'src/main/acp/acp-structured-grok-subagent-recordings.test.ts',
@@ -43,6 +49,9 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/startup/profile-state-recovery-preflight.test.ts',
   'src/main/runtime/structured-worker-cleared-session.test.ts',
   'tests/e2e/cross-version-wire/structured-agent-baseline.unit.test.ts',
+  'tests/e2e/cross-version-wire/agent-session-interrupted-tool-downgrade.unit.test.ts',
+  'tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts',
+  'tests/e2e/cross-version-wire/orchestration-delivery-downgrade.unit.test.ts',
   'src/main/runtime/mobile-store-orphaned-temp-cleanup.test.ts',
   'src/main/pty/codex-shell-no-daemon.test.ts',
   'src/main/opencode/opencode-go-api-key-store.test.ts',
@@ -88,6 +97,7 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/runtime/claude-structured-startup-unanswered-control-request.test.ts',
   'src/main/runtime/orchestration-codex-completion-title.test.ts',
   'src/main/runtime/orchestration-live-agent-title-restore.test.ts',
+  'src/main/runtime/orchestration-mailbox-titles.test.ts',
   'src/main/runtime/orchestration-mailbox-cold-park-idle.test.ts',
   'src/main/runtime/orchestration-mailbox-detached-routing.test.ts',
   'src/main/runtime/orchestration-mailbox-filtered-waiters.test.ts',
@@ -170,6 +180,10 @@ export const NODE_RUNTIME_INCLUDE = [
   'tests/e2e/helpers/electron-process-shutdown.unit.test.ts',
   'src/main/ai-vault-search/session-search-index-writer.test.ts',
   'src/main/ai-vault/session-scanner-unlimited-dedup.test.ts',
+  // Disk checkpoints require Node's iterable writeFile semantics.
+  'src/main/ai-vault/session-parse-cache-checkpoint.test.ts',
+  'src/main/ai-vault/session-parse-cache-save-lane.test.ts',
+  'src/main/ai-vault/session-parse-cache-metadata-checkpoint.test.ts',
   // Electron main bridges streams with Node's implementation.
   'src/main/host/electron-http-client.test.ts',
   'src/main/daemon/daemon-init-provider-installation.test.ts',
@@ -209,6 +223,10 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/ai-vault-search/session-search-fts5-contract.test.ts',
   'src/main/foreign-sqlite-readers/**/*.test.ts',
   'src/main/browser/*cookie*.test.ts',
+  // Playwright's CDP transport needs Node's WebSocket implementation.
+  'src/main/browser/browser-popup-compatibility.electron.test.ts',
+  'src/main/browser/browser-popup-native-compatibility.electron.test.ts',
+  'src/main/browser/browser-popup-background-compatibility.electron.test.ts',
   'src/main/ai-vault/session-scanner-devin-db.test.ts',
   'src/shared/workspace-session-salvage.test.ts',
   'src/main/git/repo-detection.test.ts',
@@ -238,6 +256,7 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/runtime/structured-session-mail-redrive-wiring.test.ts',
   'src/main/runtime/rpc/ws-transport.test.ts',
   'src/main/runtime/rpc/dispatcher-transport-parity.test.ts',
+  'src/main/runtime/rpc/methods/structured-agent-session-visual.test.ts',
   // Bun resolves 'ws' to its built-in client, which bypasses the patched package.
   'src/main/runtime/rpc/ws-empty-payload-frame-write.test.ts',
   'src/shared/remote-runtime-client.test.ts',
@@ -252,6 +271,7 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/ipc/orca-profiles-switch-persistence.test.ts',
   'src/main/ipc/settings-delayed-response.test.ts',
   'src/main/runtime/structured-agent-session-startup-tab-restore.test.ts',
+  'src/main/runtime/structured-agent-session-windowless-layout-host.test.ts',
   'src/shared/remote-runtime-shared-control-connection.test.ts',
   'src/main/runtime/relay/relay-control-client.test.ts',
   'src/main/ipc/filesystem-watcher-ignore-real.test.ts',

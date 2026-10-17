@@ -353,7 +353,7 @@ describe('scanCodexUsageFiles incremental append', () => {
     expect(second.dailyAggregates).toEqual(fromScratch.dailyAggregates)
   })
 
-  it('still reuses an untouched rollout without reading it', async () => {
+  it('reuses an untouched rollout after bounded head/tail validation', async () => {
     const rolloutPath = join(sessionsDir, 'rollout-idle.jsonl')
     writeFileSync(rolloutPath, `${sessionMeta('session-idle')}${usageRecordRange(0, 50)}`, 'utf-8')
 
@@ -361,7 +361,9 @@ describe('scanCodexUsageFiles incremental append', () => {
     streamReads.length = 0
 
     const second = await scanCodexUsageFiles([], first.processedFiles)
-    expect(bytesReadFor(rolloutPath)).toBe(0)
+    expect(bytesReadFor(rolloutPath)).toBeGreaterThan(0)
+    expect(bytesReadFor(rolloutPath)).toBeLessThanOrEqual(2 * BOUNDARY_WINDOW_BYTES)
+    expect(second.processedFiles[0]).toBe(first.processedFiles[0])
     expect(totalTokens(second.dailyAggregates)).toBe(50)
   })
 

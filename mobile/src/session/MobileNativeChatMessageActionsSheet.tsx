@@ -1,6 +1,5 @@
 import { useRef, useState } from 'react'
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Copy, TextSelect, X } from 'lucide-react-native'
 import type { NativeChatMessage } from '../../../src/shared/native-chat-types'
 import { ActionSheetContent } from '../components/ActionSheetModal'
@@ -9,6 +8,7 @@ import { useClipboardWriter } from '../platform/clipboard'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { useReducedMotionEnabled } from '../hooks/use-reduced-motion-enabled'
+import { useWindowSafeAreaInsets } from '../layout/side-safe-area'
 import { nativeChatMessagePlainText } from './mobile-native-chat-message-plain-text'
 
 type Props = {
@@ -77,13 +77,23 @@ function SelectTextScreen({
   text: string
   onClose: () => void
 }): React.JSX.Element {
-  const insets = useSafeAreaInsets()
+  const insets = useWindowSafeAreaInsets()
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   const reducedMotion = useReducedMotionEnabled()
   return (
     <Modal visible animationType={reducedMotion ? 'none' : 'slide'} onRequestClose={onClose}>
-      <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom }]}>
+      <View
+        style={[
+          styles.screen,
+          {
+            paddingTop: insets.top,
+            paddingBottom: insets.bottom,
+            paddingLeft: insets.left,
+            paddingRight: insets.right
+          }
+        ]}
+      >
         <View style={styles.header}>
           <Text style={styles.title}>选择文本</Text>
           <Pressable

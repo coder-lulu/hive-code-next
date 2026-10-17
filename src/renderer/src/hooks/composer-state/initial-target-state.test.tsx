@@ -26,6 +26,7 @@ function input(): Parameters<typeof useComposerInitialTargetState>[0] {
     },
     eligibleRepos: [repo('other', 'alpha'), repo('chosen'), repo('chosen', 'alpha')],
     initialRepoId: 'chosen',
+    initialWorkspaceTarget: null,
     initialExecutionHostId: 'ssh:alpha',
     initialProjectGroupId: undefined,
     initialTaskSourceContext: null,

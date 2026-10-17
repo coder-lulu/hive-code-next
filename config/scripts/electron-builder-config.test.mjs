@@ -1,11 +1,30 @@
-import { chmod, cp, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import {
+  chmod,
+  cp,
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  stat,
+  writeFile
+} from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
-import { createAfterPackFixture, seedBundledRipgrep } from './electron-builder-test-fixtures.mjs'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import {
+  createAfterPackFixture,
+  seedBundledRipgrep,
+  seedClipboardPublisher,
+  stubObjdump
+} from './electron-builder-test-fixtures.mjs'
+
+import { writeMobileWebBundleFixtureTree } from './mobile-web-bundle-fixture-tree.mjs'
 
 const REPO_ROOT = join(import.meta.dirname, '..', '..')
+
 const SRC_MAIN_DIR = join(REPO_ROOT, 'src', 'main')
 const MAIN_BUILD_ENTRY_POINTS_PATH = join(
   REPO_ROOT,
@@ -15,6 +34,7 @@ const MAIN_BUILD_ENTRY_POINTS_PATH = join(
 )
 
 const require = createRequire(import.meta.url)
+const { copyFiles, FileMatcher } = require('app-builder-lib/out/fileMatcher')
 const electronBuilderConfig = require('../electron-builder.config.cjs')
 const FpmTarget = require('app-builder-lib/out/targets/FpmTarget').default
 const electronBuilderNativeRebuild = require('./electron-builder-native-rebuild.cjs')
@@ -24,17 +44,6 @@ const expectedPackagedMetadata = {
   description: 'HiveCode',
   author: { name: 'HiveCode' }
 }
-const {
-  createPackagedRuntimeNodeModuleResources,
-  findAsarEntry,
-  prunePackagedNodePty,
-  prunePackagedParcelWatcher,
-  prunePackagedSherpaOnnx,
-  prunePackagedRuntimeTypeAndSourceMapArtifacts,
-  prunePackagedZodSources,
-  verifyPackagedMainRuntimeDeps
-} = require('../packaged-runtime-node-modules.cjs')
-
 describe('electron-builder config', () => {
   it('keeps runtime resources available through extraResources', () => {
     const bundledPluginResources = expect.objectContaining({
@@ -84,6 +93,10 @@ describe('electron-builder config', () => {
         expect.objectContaining({
           from: 'native/windows-cli-launcher/.build/orca.exe',
           to: 'bin/orca.exe'
+        }),
+        expect.objectContaining({
+          from: 'native/windows-cli-launcher/.build/orca-administrator-restart.exe',
+          to: 'bin/orca-administrator-restart.exe'
         })
       ])
     )
@@ -98,6 +111,37 @@ describe('electron-builder config', () => {
       expect.objectContaining({ to: join('node_modules', 'serve-sim') })
     ])
   })
+
+  it.each(['mac', 'linux'])(
+    'loads Codex TOML parsing after %s runtime pruning',
+    async (platform) => {
+      const resourcesDir = await mkdtemp(join(tmpdir(), 'orca-packaged-codex-toml-'))
+      try {
+        const resource = electronBuilderConfig[platform].extraResources.find(
+          (entry) => entry.to === join('node_modules', 'smol-toml')
+        )
+        expect(resource).toBeDefined()
+        await copyFiles([
+          new FileMatcher(resource.from, join(resourcesDir, resource.to), (value) => value)
+        ])
+        require('../packaged-runtime-node-modules.cjs').prunePackagedRuntimeNodeModules(
+          resourcesDir,
+          platform === 'mac' ? 'darwin' : 'linux',
+          process.arch
+        )
+        const stagedRequire = createRequire(join(resourcesDir, 'out', 'main', 'codex', 'trust.cjs'))
+        expect(await realpath(stagedRequire.resolve('smol-toml'))).toBe(
+          await realpath(join(resourcesDir, resource.to, 'dist', 'index.cjs'))
+        )
+        const { parse } = stagedRequire('smol-toml')
+        expect(parse('[projects."/workspace"]\ntrust_level = "trusted"\n')).toEqual({
+          projects: { '/workspace': { trust_level: 'trusted' } }
+        })
+      } finally {
+        await rm(resourcesDir, { recursive: true, force: true })
+      }
+    }
+  )
 
   // Why: serve-sim's addon is a Mach-O, and Windows signing rejects every *.node that is not PE.
   it('keeps serve-sim out of the Windows and Linux runtime closures', () => {
@@ -185,7 +229,6 @@ describe('electron-builder config', () => {
     )
   })
 
-
   it('unpacks the foreign SQLite reader entry the scanner service runs OpenCode reads on', async () => {
     const entryPathSource = await readFile(
       join(SRC_MAIN_DIR, 'foreign-sqlite-readers', 'foreign-sqlite-reader-entry-path.ts'),
@@ -208,6 +251,33 @@ describe('electron-builder config', () => {
     expect(entryPoints).toMatch(
       new RegExp(`'${entryFilename.replace(/\.js$/, '')}':\\s*resolve\\(`)
     )
+  })
+
+  it('unpacks the replaceable WSL transcript filesystem process entry', async () => {
+    const entryFilename = 'wsl-transcript-fs-process-entry.js'
+    expect(electronBuilderConfig.asarUnpack).toContain(`out/main/${entryFilename}`)
+  })
+
+  // Why: the CLI runs this entry under ELECTRON_RUN_AS_NODE, which cannot read
+  // app.asar, so a packed copy sends every `orca serve` to Electron (#27307).
+  it('unpacks the orcad serve-selection entry the CLI runs', async () => {
+    const sharedSource = await readFile(
+      join(REPO_ROOT, 'src', 'shared', 'orcad-local-serve-selection.ts'),
+      'utf8'
+    )
+    const entryName = sharedSource.match(/ORCAD_LOCAL_SERVE_SELECTION_ENTRY = '([^']+)'/)?.[1]
+    expect(entryName).toBeDefined()
+
+    const matcher = new FileMatcher(
+      '/app',
+      '/dest',
+      (value) => value,
+      electronBuilderConfig.asarUnpack
+    )
+    const isUnpacked = matcher.createFilter()
+    expect(
+      isUnpacked(join('/app', 'out', 'main', `${entryName}.js`), { isDirectory: () => false })
+    ).toBe(true)
   })
 
   it('keeps the worker-thread hang watchdog inside app.asar', () => {
@@ -346,221 +416,6 @@ describe('electron-builder config', () => {
     expect(electronBuilderConfig.npmRebuild).toBe(true)
   })
 
-  it('verifies packaged main runtime deps from Windows-style asar entries', async () => {
-    const resourcesDir = await mkdtemp(join(tmpdir(), 'orca-runtime-deps-'))
-    try {
-      await writeFile(join(resourcesDir, 'app.asar'), '', 'utf8')
-      await mkdir(join(resourcesDir, 'node_modules', 'yaml'), { recursive: true })
-      await mkdir(join(resourcesDir, 'node_modules', 'zod'), { recursive: true })
-
-      const sources = new Map([
-        ['out\\main\\index.js', 'const z = require("zod")'],
-        ['out\\main\\agent-hooks\\managed-agent-hook-controls.js', 'const YAML = require("yaml")']
-      ])
-      const asar = {
-        listPackage: () => [...sources.keys()].map((entry) => `\\${entry}`),
-        extractFile: (_asarPath, internalPath) => Buffer.from(sources.get(internalPath), 'utf8')
-      }
-
-      expect(() => verifyPackagedMainRuntimeDeps(resourcesDir, asar)).not.toThrow()
-    } finally {
-      await rm(resourcesDir, { recursive: true, force: true })
-    }
-  })
-
-  it('normalizes host-specific asar entry separators', () => {
-    expect(findAsarEntry(['\\out\\main\\index.js'], 'out/main/index.js')).toBe(
-      '\\out\\main\\index.js'
-    )
-    expect(findAsarEntry(['/out/main/index.js'], 'out/main/index.js')).toBe('/out/main/index.js')
-  })
-
-  it('prunes non-target node-pty architecture outputs from packaged runtime resources', async () => {
-    const resourcesDir = await mkdtemp(join(tmpdir(), 'orca-node-pty-prune-'))
-    try {
-      const nodePtyDir = join(resourcesDir, 'node_modules', 'node-pty')
-      const prebuildsDir = join(nodePtyDir, 'prebuilds')
-      const binDir = join(nodePtyDir, 'bin')
-      await mkdir(join(prebuildsDir, 'darwin-arm64'), { recursive: true })
-      await mkdir(join(prebuildsDir, 'darwin-x64'), { recursive: true })
-      await mkdir(join(prebuildsDir, 'linux-x64'), { recursive: true })
-      await mkdir(join(prebuildsDir, 'win32-x64'), { recursive: true })
-      await mkdir(join(binDir, 'darwin-arm64-148'), { recursive: true })
-      await mkdir(join(binDir, 'darwin-x64-148'), { recursive: true })
-      await mkdir(join(nodePtyDir, 'third_party', 'conpty'), {
-        recursive: true
-      })
-      await mkdir(join(nodePtyDir, 'deps', 'winpty'), { recursive: true })
-
-      prunePackagedNodePty(resourcesDir, 'darwin', 3)
-
-      await expect(readdir(prebuildsDir)).resolves.toEqual(['darwin-arm64'])
-      await expect(readdir(binDir)).resolves.toEqual(['darwin-arm64-148'])
-      await expect(readdir(join(nodePtyDir, 'third_party'))).resolves.toEqual([])
-      await expect(readdir(join(nodePtyDir, 'deps'))).resolves.toEqual([])
-      expect(() => prunePackagedNodePty(resourcesDir, 'darwin', 4)).toThrow(
-        'Unsupported packaged runtime architecture: 4'
-      )
-    } finally {
-      await rm(resourcesDir, { recursive: true, force: true })
-    }
-  })
-
-  it('copies the Windows node-pty ConPTY runtime beside the rebuilt addon', async () => {
-    for (const [arch, electronArch] of [
-      ['x64', 1],
-      ['arm64', 3]
-    ]) {
-      const resourcesDir = await mkdtemp(join(tmpdir(), `orca-node-pty-conpty-${arch}-`))
-      try {
-        const nodePtyDir = join(resourcesDir, 'node_modules', 'node-pty')
-        const releaseDir = join(nodePtyDir, 'build', 'Release')
-        const conptyRoot = join(nodePtyDir, 'third_party', 'conpty', '0.1.0')
-        await mkdir(releaseDir, { recursive: true })
-        await writeFile(join(releaseDir, 'conpty.node'), 'native addon placeholder', 'utf8')
-        for (const sourceArch of ['x64', 'arm64']) {
-          const sourceDir = join(conptyRoot, `win10-${sourceArch}`)
-          await mkdir(sourceDir, { recursive: true })
-          await writeFile(join(sourceDir, 'conpty.dll'), `dll payload ${sourceArch}`, 'utf8')
-          await writeFile(
-            join(sourceDir, 'OpenConsole.exe'),
-            `console payload ${sourceArch}`,
-            'utf8'
-          )
-        }
-
-        prunePackagedNodePty(resourcesDir, 'win32', electronArch)
-
-        await expect(readFile(join(releaseDir, 'conpty', 'conpty.dll'), 'utf8')).resolves.toBe(
-          `dll payload ${arch}`
-        )
-        await expect(readFile(join(releaseDir, 'conpty', 'OpenConsole.exe'), 'utf8')).resolves.toBe(
-          `console payload ${arch}`
-        )
-      } finally {
-        await rm(resourcesDir, { recursive: true, force: true })
-      }
-    }
-  })
-
-  it('includes external main dependencies in the packaged runtime closure', () => {
-    // Why: the main process imports '@parcel/watcher' for filesystem change
-    // events; if it is absent from the packaged closure the serve host silently
-    // stops propagating file changes to clients (regression guard for #4851).
-    const packaged = createPackagedRuntimeNodeModuleResources()
-    const packagedTargets = packaged.map((resource) => resource.to)
-    expect(packagedTargets).toContain(join('node_modules', '@parcel', 'watcher'))
-    expect(
-      packagedTargets.some((target) =>
-        target.startsWith(join('node_modules', '@parcel', 'watcher-'))
-      )
-    ).toBe(true)
-    expect(packagedTargets).toContain(join('node_modules', 'proper-lockfile'))
-  })
-
-  it('prunes non-target @parcel/watcher architecture subpackages', async () => {
-    const resourcesDir = await mkdtemp(join(tmpdir(), 'orca-parcel-watcher-prune-'))
-    try {
-      const parcelDir = join(resourcesDir, 'node_modules', '@parcel')
-      await mkdir(join(parcelDir, 'watcher'), { recursive: true })
-      await mkdir(join(parcelDir, 'watcher-darwin-arm64'), { recursive: true })
-      await mkdir(join(parcelDir, 'watcher-darwin-x64'), { recursive: true })
-      await mkdir(join(parcelDir, 'watcher-linux-x64-glibc'), { recursive: true })
-      await mkdir(join(parcelDir, 'watcher-linux-arm64-glibc'), { recursive: true })
-      await mkdir(join(parcelDir, 'watcher-win32-x64'), { recursive: true })
-
-      prunePackagedParcelWatcher(resourcesDir, 'linux', 'arm64')
-
-      await expect(readdir(parcelDir).then((entries) => entries.sort())).resolves.toEqual([
-        'watcher',
-        'watcher-linux-arm64-glibc'
-      ])
-      expect(() => prunePackagedParcelWatcher(resourcesDir, 'linux', 'universal')).toThrow(
-        'Unsupported packaged runtime architecture: universal'
-      )
-    } finally {
-      await rm(resourcesDir, { recursive: true, force: true })
-    }
-  })
-
-  it('leaves unrelated @parcel/* runtime deps untouched when pruning the watcher', async () => {
-    const resourcesDir = await mkdtemp(join(tmpdir(), 'orca-parcel-watcher-prune-unrelated-'))
-    try {
-      const parcelDir = join(resourcesDir, 'node_modules', '@parcel')
-      await mkdir(join(parcelDir, 'watcher'), { recursive: true })
-      await mkdir(join(parcelDir, 'watcher-darwin-arm64'), { recursive: true })
-      await mkdir(join(parcelDir, 'watcher-linux-x64-glibc'), { recursive: true })
-      // A hypothetical future @parcel/* runtime dep that is NOT a watcher subpackage.
-      await mkdir(join(parcelDir, 'transformer-js'), { recursive: true })
-
-      prunePackagedParcelWatcher(resourcesDir, 'linux', 1)
-
-      await expect(readdir(parcelDir).then((entries) => entries.sort())).resolves.toEqual([
-        'transformer-js',
-        'watcher',
-        'watcher-linux-x64-glibc'
-      ])
-    } finally {
-      await rm(resourcesDir, { recursive: true, force: true })
-    }
-  })
-
-  it('prunes type declaration artifacts from packaged runtime node_modules', async () => {
-    const resourcesDir = await mkdtemp(join(tmpdir(), 'orca-runtime-type-prune-'))
-    try {
-      const packageDir = join(resourcesDir, 'node_modules', 'example-package')
-      await mkdir(join(packageDir, 'dist'), { recursive: true })
-      await writeFile(join(packageDir, 'dist', 'index.cjs'), 'module.exports = {}', 'utf8')
-      await writeFile(join(packageDir, 'dist', 'index.d.ts'), 'export type Value = string', 'utf8')
-      await writeFile(join(packageDir, 'dist', 'index.d.cts'), 'export type Value = string', 'utf8')
-      await writeFile(join(packageDir, 'dist', 'index.d.mts'), 'export type Value = string', 'utf8')
-      await writeFile(join(packageDir, 'dist', 'index.d.cts.map'), '{}', 'utf8')
-      await writeFile(join(packageDir, 'dist', 'index.d.mts.map'), '{}', 'utf8')
-
-      prunePackagedRuntimeTypeAndSourceMapArtifacts(resourcesDir)
-
-      await expect(readdir(join(packageDir, 'dist'))).resolves.toEqual(['index.cjs'])
-    } finally {
-      await rm(resourcesDir, { recursive: true, force: true })
-    }
-  })
-
-  it('prunes duplicate darwin sherpa-onnx runtime dylib aliases', async () => {
-    const resourcesDir = await mkdtemp(join(tmpdir(), 'orca-sherpa-prune-'))
-    try {
-      const packageDir = join(resourcesDir, 'node_modules', 'sherpa-onnx-darwin-arm64')
-      await mkdir(packageDir, { recursive: true })
-      await writeFile(join(packageDir, 'sherpa-onnx.node'), '', 'utf8')
-      await writeFile(join(packageDir, 'libonnxruntime.1.23.2.dylib'), '', 'utf8')
-      await writeFile(join(packageDir, 'libonnxruntime.dylib'), '', 'utf8')
-
-      prunePackagedSherpaOnnx(resourcesDir, 'darwin')
-
-      await expect(readdir(packageDir).then((entries) => entries.sort())).resolves.toEqual([
-        'libonnxruntime.1.23.2.dylib',
-        'sherpa-onnx.node'
-      ])
-    } finally {
-      await rm(resourcesDir, { recursive: true, force: true })
-    }
-  })
-
-  it('prunes zod TypeScript sources from packaged runtime resources', async () => {
-    const resourcesDir = await mkdtemp(join(tmpdir(), 'orca-zod-prune-'))
-    try {
-      const packageDir = join(resourcesDir, 'node_modules', 'zod')
-      await mkdir(join(packageDir, 'src'), { recursive: true })
-      await writeFile(join(packageDir, 'index.cjs'), 'module.exports = {}', 'utf8')
-      await writeFile(join(packageDir, 'src', 'index.ts'), 'export const value = true', 'utf8')
-
-      prunePackagedZodSources(resourcesDir)
-
-      await expect(readdir(packageDir)).resolves.toEqual(['index.cjs'])
-    } finally {
-      await rm(resourcesDir, { recursive: true, force: true })
-    }
-  })
-
   it('fails when the packaged resources directory is missing', async () => {
     const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-config-'))
     try {
@@ -580,9 +435,17 @@ describe('electron-builder config', () => {
     async () => {
       const root = await mkdtemp(join(tmpdir(), 'orca-electron-builder-config-'))
       const fixtureConfig = createAfterPackFixture()
+      const previousPath = process.env.PATH
       try {
         const resourcesDir = join(root, 'linux-unpacked', 'resources')
         await seedBundledRipgrep(resourcesDir)
+        // Layout-only fixtures use the same cross-arch slice as runtime-resource tests.
+        const target =
+          process.arch === 'x64'
+            ? { electronArch: 3, machine: 0xb7 }
+            : { electronArch: 1, machine: 0x3e }
+        await seedClipboardPublisher(resourcesDir, target.machine)
+        await stubObjdump(root)
         const launcherPath = join(resourcesDir, 'bin', 'orca-ide')
         await mkdir(join(resourcesDir, 'bin'), { recursive: true })
         await cp(
@@ -623,12 +486,13 @@ describe('electron-builder config', () => {
         await fixtureConfig.afterPack({
           appOutDir: join(root, 'linux-unpacked'),
           electronPlatformName: 'linux',
-          arch: 1,
+          arch: target.electronArch,
           packager: { appInfo: { version: '9.9.9' } }
         })
 
         expect((await stat(launcherPath)).mode & 0o111).not.toBe(0)
       } finally {
+        process.env.PATH = previousPath
         await rm(root, { recursive: true, force: true })
       }
     }
@@ -681,3 +545,78 @@ describe('electron-builder config', () => {
   })
 })
 
+describe('arch-aware packaging guard', () => {
+  // electron-builder Arch enum: ia32=0, x64=1, armv7l=2, arm64=3.
+  const HOST_ARCH = process.arch === 'arm64' ? 3 : 1
+  const OTHER_ARCH = process.arch === 'arm64' ? 1 : 3
+  const OTHER_ARCH_NAME = process.arch === 'arm64' ? 'x64' : 'arm64'
+  const SHERPA_PLATFORM = process.platform === 'win32' ? 'win' : process.platform
+  const otherSherpa = `sherpa-onnx-${SHERPA_PLATFORM}-${OTHER_ARCH_NAME}`
+
+  // beforePack also hash-verifies the mobile web bundle, which the unit-test job never builds.
+  // Point it at a real bundle built into a temp dir: these tests are about the native-variant
+  // guard, and the bundle guard has its own suite.
+  let scratch
+  let bundleDir
+  beforeAll(async () => {
+    scratch = await mkdtemp(join(tmpdir(), 'orca-electron-builder-guard-'))
+    bundleDir = join(scratch, 'mobile-web')
+    await writeMobileWebBundleFixtureTree({ outDir: bundleDir })
+  })
+  afterAll(async () => {
+    await rm(scratch, { recursive: true, force: true })
+  })
+
+  const packHost = (arch) =>
+    electronBuilderConfig.beforePack(
+      { electronPlatformName: process.platform, arch },
+      bundleDir,
+      () => undefined
+    )
+
+  it('allows packaging the host platform and architecture', () => {
+    expect(() => packHost(HOST_ARCH)).not.toThrow()
+  })
+
+  it('requires the other architecture natives to be installed', () => {
+    const otherSherpaInstalled = existsSync(
+      join(REPO_ROOT, 'node_modules', otherSherpa, 'package.json')
+    )
+    const otherSherpaExpected = Object.hasOwn(
+      require('../../package.json').optionalDependencies,
+      otherSherpa
+    )
+    if (otherSherpaExpected && !otherSherpaInstalled) {
+      expect(() => packHost(OTHER_ARCH)).toThrow(otherSherpa)
+      expect(() => packHost(OTHER_ARCH)).toThrow('pnpm install:release')
+    } else if (process.platform !== 'win32') {
+      expect(() => packHost(OTHER_ARCH)).not.toThrow()
+    }
+  })
+
+  // The host's own build is the foreign-arch case: a Windows checkout compiles these for its CPU only.
+  it.runIf(process.platform === 'win32')(
+    'refuses a Windows workspace addon built for another architecture',
+    () => {
+      for (const binary of ['orca_windows_registry.node', 'orca_windows_security.node']) {
+        expect(() => packHost(OTHER_ARCH)).toThrow(`${binary} for ${OTHER_ARCH_NAME}`)
+      }
+    }
+  )
+
+  it('requires installed Windows addons for Windows packaging', () => {
+    const windowsAddon = electronBuilderConfig.win.extraResources.some(
+      (resource) => resource.to === join('node_modules', '@vscode', 'windows-process-tree')
+    )
+    const packWindows = () =>
+      electronBuilderConfig.beforePack({ electronPlatformName: 'win32', arch: 1 }, bundleDir)
+    if (process.platform === 'win32' || windowsAddon) {
+      expect(packWindows).not.toThrow()
+    } else {
+      expect(packWindows).toThrow('@vscode/windows-process-tree')
+      expect(packWindows).toThrow('Windows packaging requires a Windows host')
+      // A workspace link exists everywhere; only its compiled binary proves the addon will load.
+      expect(packWindows).toThrow('@orca/windows-security')
+    }
+  })
+})

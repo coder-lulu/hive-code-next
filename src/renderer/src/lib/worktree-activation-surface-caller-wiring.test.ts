@@ -18,6 +18,7 @@ const SURFACE_PROVIDING_CALLERS = [
   'src/renderer/src/lib/fix-checks-agent-launch.ts',
   'src/renderer/src/lib/launch-work-item-direct.ts',
   'src/renderer/src/lib/session-navigation.ts',
+  'src/renderer/src/lib/worktree-creation-flow-execute.ts',
   'src/renderer/src/lib/worktree-creation-structured-session.ts',
   'src/renderer/src/lib/workspace-port-actions.ts',
   'src/renderer/src/lib/onboarding-folder-agent-launch.ts'
@@ -26,7 +27,8 @@ const SURFACE_PROVIDING_CALLERS = [
 // The activation seam itself: declares the option and forwards it into the tombstone gate.
 const SEAM_FILES = [
   'src/renderer/src/lib/worktree-activation-surface-selection.ts',
-  'src/renderer/src/lib/worktree-activation.ts'
+  'src/renderer/src/lib/worktree-activation.ts',
+  'src/renderer/src/lib/worktree-initial-terminal-seeding.ts'
 ]
 
 function listSourceFiles(dir: string): string[] {

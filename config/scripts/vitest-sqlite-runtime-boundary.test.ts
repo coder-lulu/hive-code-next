@@ -7,6 +7,7 @@ import { NODE_RUNTIME_INCLUDE } from './vitest-node-runtime-files.mjs'
 
 const sqliteHarnesses = new Set([
   'persistence-test-harness',
+  'terminal-topology-profile-fixture',
   'acknowledged-terminal-tab-retirement-fixture',
   'session-search-indexer-test-fixture',
   'agent-session-record-store-test-harness',
@@ -156,4 +157,39 @@ it('keeps real SQLite fixtures and database consumers in the Node runtime projec
     }
   }
   expect(missing).toEqual([])
+})
+
+it('keeps the mailbox title aggregate and its real SQLite specs in Node', () => {
+  const owner = 'src/main/runtime/orchestration-mailbox-titles.test.ts'
+  const specs = [
+    './orchestration-codex-completion-title.spec',
+    './orchestration-live-agent-title-restore.spec',
+    './stale-title-completion-recovery.spec'
+  ]
+  const module = ts.createSourceFile(owner, readFileSync(owner, 'utf8'), ts.ScriptTarget.Latest)
+  const importedSpecs = module.statements.flatMap((statement) =>
+    ts.isImportDeclaration(statement) &&
+    !statement.importClause &&
+    ts.isStringLiteral(statement.moduleSpecifier) &&
+    statement.moduleSpecifier.text.endsWith('.spec')
+      ? [statement.moduleSpecifier.text]
+      : []
+  )
+  expect(importedSpecs).toEqual(specs)
+  for (const spec of specs) {
+    const file = resolve(dirname(owner), `${spec}.ts`)
+    expect(importsSqliteRuntime(file, readFileSync(file, 'utf8')), spec).toBe(true)
+  }
+  const fixture = 'src/main/runtime/orchestration-mailbox-notification-test-harness.ts'
+  expect(importsSqliteRuntime(fixture, readFileSync(fixture, 'utf8'))).toBe(true)
+  expect(NODE_RUNTIME_INCLUDE).toContain(owner)
+})
+
+it.each([
+  'tests/e2e/cross-version-wire/agent-session-interrupted-tool-downgrade.unit.test.ts',
+  'tests/e2e/cross-version-wire/agent-session-unproven-release-downgrade.unit.test.ts',
+  'tests/e2e/cross-version-wire/orchestration-delivery-downgrade.unit.test.ts'
+])('keeps the real SQLite cross-version consumer %s in Node', (owner) => {
+  expect(importsSqliteRuntime(owner, readFileSync(owner, 'utf8'))).toBe(true)
+  expect(NODE_RUNTIME_INCLUDE).toContain(owner)
 })

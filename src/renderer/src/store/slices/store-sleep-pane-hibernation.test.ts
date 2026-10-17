@@ -153,7 +153,7 @@ describe('shutdownWorktreeTerminals (sleep) — agent status hygiene', () => {
     expect(state.unreadTerminalTabs['tab-1']).toBe(true)
     expect(state.unreadTerminalPanes[targetPaneKey]).toBeUndefined()
     expect(state.unreadTerminalPanes[siblingPaneKey]).toBe(true)
-    expect(state.unreadAgentCompletionPanes[targetPaneKey]).toBe(true)
+    expect(state.unreadAgentCompletionPanes[targetPaneKey]).toBeUndefined()
     expect(state.unreadAgentCompletionPanes[siblingPaneKey]).toBe(true)
     expect(state.lastTerminalInputAtByPaneKey[targetPaneKey]).toBeUndefined()
     expect(state.lastTerminalInputAtByPaneKey[siblingPaneKey]).toBe(1100)

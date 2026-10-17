@@ -232,5 +232,30 @@ describe('account RPC methods', () => {
 })
 
 it('does not expose caller-supplied Claude credential directory import', () => {
-  expect(ACCOUNT_METHODS.some((entry) => String(entry.name) === 'accounts.addClaudeFromConfigDir')).toBe(false)
+  expect(
+    ACCOUNT_METHODS.some((entry) => String(entry.name) === 'accounts.addClaudeFromConfigDir')
+  ).toBe(false)
+})
+
+it('takes a host launch env from the owning desktop and refuses a phone', async () => {
+  const set = vi.fn()
+  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the handler calls only this stub.
+  const runtime = {
+    setHostAccountLaunchEnv: set
+  } as unknown as OrcaRuntimeService
+  const setMethod = method('accounts.setHostLaunchEnv')
+  if (isStreamingMethod(setMethod)) {
+    throw new Error('accounts.setHostLaunchEnv must be a request method')
+  }
+  const params = {
+    wslDistro: 'Ubuntu',
+    claude: {},
+    terminal: { CODEX_HOME: '/home/u/.codex-b' }
+  }
+  await setMethod.handler(params, { runtime, clientKind: 'runtime' })
+  expect(set).toHaveBeenCalledWith(params)
+  await expect(setMethod.handler(params, { runtime, clientKind: 'mobile' })).rejects.toThrow(
+    new RegExp(`Only the ${APP_DISPLAY_NAME} desktop`)
+  )
+  expect(set).toHaveBeenCalledOnce()
 })

@@ -15,6 +15,7 @@ import {
 } from './windows-process-tree-gyp-rebuild.mjs'
 import { runProcessSync } from '@orca/process-host'
 import { describeProcessFailure } from './process-failure-message.mjs'
+import { prepareNodePtyMacosExceptions } from './node-pty-macos-gyp-rebuild.mjs'
 import { disableMsbuildFileTrackingOnWindows } from './msbuild-file-tracking.mjs'
 
 const require = createRequire(import.meta.url)
@@ -27,7 +28,7 @@ const runtime = readRuntimeArg()
 const NATIVE_MODULES = [
   'node-pty',
   ...(process.platform === 'win32'
-    ? ['@orca/windows-registry', '@vscode/windows-process-tree']
+    ? ['@orca/windows-registry', '@orca/windows-security', '@vscode/windows-process-tree']
     : [])
 ]
 const NODE_PTY_CONPTY_RUNTIME_FILES = ['conpty.dll', 'OpenConsole.exe']
@@ -286,6 +287,11 @@ function loadNativeModule(moduleName) {
     registry.getRegistryKey(registry.HK.CU, 'Environment')
     return
   }
+  if (moduleName === '@orca/windows-security') {
+    // Why: the package defers loading its .node addon until the first call.
+    require(moduleName).currentUserSid()
+    return
+  }
   if (moduleName === 'node-pty') {
     loadNodePtyNativeModule()
     return
@@ -390,6 +396,11 @@ function getWindowsBuildNumber() {
 }
 
 function rebuildNodeRuntimeModules(moduleNames) {
+  prepareNodePtyMacosExceptions({
+    projectDir,
+    rebuildPlatform: process.platform,
+    modulesToRebuild: moduleNames
+  })
   for (const moduleName of moduleNames) {
     let moduleDir = dirname(require.resolve(`${moduleName}/package.json`))
     if (moduleName === '@vscode/windows-process-tree') {

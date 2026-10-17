@@ -58,7 +58,7 @@ export const ROOT_HELP_TEXT_SECONDARY = [
   '  hive worktree set --worktree <selector> [--display-name <name>] [--issue <number|null>] [--pr <number|null>] [--linear-issue <identifier-or-url|null>] [--gitlab-issue <number-or-url|null>] [--gitlab-mr <number-or-url|null>] [--comment <text>] [--workspace-status <id>] [--unread|--read] [--parent-worktree <selector>|--no-parent] [--json]',
   '  hive worktree rm --worktree <selector> [--force] [--run-hooks] [--allow-failed-archive-hook] [--json]',
   '  hive worktree ps [--limit <n>] [--json]',
-  '  hive file open <path> [--worktree <selector>] [--focus] [--json]',
+  '  hive file open <path> [--line <n> [--column <n>]] [--worktree <selector>] [--focus] [--json]',
   '  hive file diff <path> [--staged] [--worktree <selector>] [--focus] [--json]',
   '  hive file open-changed [--mode edit|diff|both] [--worktree <selector>] [--focus] [--json]',
   '  hive terminal list [--worktree <selector>] [--limit <n>] [--include-visual-layouts] [--json]',

@@ -153,10 +153,6 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
       ? [true, !canSend]
       : [targetPtyId !== null, targetPtyId === null || !canSend || inputOwnedByCard]
 
-    const syncCaret = useCallback((el: NativeChatComposerInput) => {
-      setCaret(el.selectionStart ?? el.value.length)
-    }, [])
-
     const attachments = useNativeChatComposerAttachments({
       attachmentScopeKey: draftScopeKey,
       allowWithoutTarget: Boolean(structuredTransport),
@@ -338,12 +334,13 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
 
     const handleDraftChange = useCallback(
       (value: string, element: NativeChatComposerInput) => {
+        const nextCaret = element.selectionStart ?? value.length
         setDraft(value)
-        syncCaret(element)
-        handleDraftOrCaretChange(value, element.selectionStart ?? value.length)
+        setCaret(nextCaret)
+        handleDraftOrCaretChange(value, nextCaret)
         setActiveSuggestion(0)
       },
-      [handleDraftOrCaretChange, setDraft, syncCaret]
+      [handleDraftOrCaretChange, setDraft]
     )
 
     return (
@@ -372,8 +369,10 @@ const NativeChatComposerPane = forwardRef<NativeChatComposerHandle, NativeChatCo
         imeEnterGesture={imeEnterGesture}
         onDraftChange={handleDraftChange}
         onTextareaSelect={(element) => {
-          syncCaret(element)
-          handleDraftOrCaretChange(element.value, element.selectionStart ?? element.value.length)
+          const value = element.value
+          const nextCaret = element.selectionStart ?? value.length
+          setCaret(nextCaret)
+          handleDraftOrCaretChange(value, nextCaret)
           setActiveSuggestion(0)
         }}
         onKeyDown={handleKeyDown}

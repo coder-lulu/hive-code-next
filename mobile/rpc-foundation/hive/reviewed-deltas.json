@@ -1,5 +1,5 @@
 {
-  "upstreamGoldensSha256": "9d27c3df9c9b46abb3bdaae557ae2dc6c15312f2608a5cd3fb906c3b43e30221",
+  "upstreamGoldensSha256": "019308b4f76d27bd75e80028ce25a7f3e7d66e5fdd867e2e1cc09b6fc10dfb0a",
   "deltas": {
     "aivault-history-screen-listed": {
       "upstreamTraceSha256": "ebcaa9e4133a493b5f9118ff6eaf960af91be2659abb98f0fc1da3df0749a786",
@@ -25,6 +25,21 @@
       "upstreamTraceSha256": "26b916a37cd41581decdca327cf9f665366bb8c114cc13f7da616743b9fb5fad",
       "hiveTraceSha256": "8a95caea110dfe09f3ed621243261a207bf46afbc44b4123fa717583316e8f25",
       "reason": "Hive mobile Files keeps the product Chinese navigation and empty-state copy while retaining the upstream directory and legacy-list behavior."
+    },
+    "host-worktree-actions-pin-open-delete": {
+      "upstreamTraceSha256": "b37b36786e48346cb192a3b310e7924d0f45da9d536a94f48b2c89e53426aea1",
+      "hiveTraceSha256": "b63a509964d375b70e5ce4a970ebb11f8994ccf47cb6eddab9d46303e3b4bab8",
+      "reason": "Remove only the obsolete serverWorkspaces observer stub after retiring delegated desktop mobileRelay host discovery and forwarding. Actual HostScreenState no longer owns this field; current-host worktrees/lastKnownWorktrees, all action requests, payloads, outcomes and navigation observations remain exactly equal. Stale runtime: rows are refused rather than falling back to the current-host client."
+    },
+    "host-worktree-delete-refused": {
+      "upstreamTraceSha256": "f3bb36518b4475de02062e4c260f26f5c2b4ecbea35917134c668a1bbaa9530b",
+      "hiveTraceSha256": "7e08deed26f8dfbf5bfe6f5d552198e2ca380471c1a7cc5565c01ee4292c9bf0",
+      "reason": "Remove only the obsolete serverWorkspaces observer stub after retiring delegated desktop mobileRelay host discovery and forwarding. Actual HostScreenState no longer owns this field; current-host worktrees/lastKnownWorktrees, all action requests, payloads, outcomes and navigation observations remain exactly equal. Stale runtime: rows are refused rather than falling back to the current-host client."
+    },
+    "lifecycle-inventory-lifecycle": {
+      "upstreamTraceSha256": "10aaebb1d5aa49ac465736ac5b114ae8d84bceb92a154ed5fd2858645dbf2865",
+      "hiveTraceSha256": "6df45954c6e9f62dbc5e828ccadb85a21e1c774abc866cfb2e7cc9d5ed70d14f",
+      "reason": "The current inventory owner closes request admission after unmount (#24792). The strict original-reference witness permits only removal of the second files.list sender and payload at the settled and remounted unmount checkpoints; all other observations remain identical."
     },
     "matrix-aivault.history-screen-platform-status": {
       "upstreamTraceSha256": "e5c7573aa003fb258e37f854f15ad32b24d1bf7ba7e1efbacc326d6ee4cbc1a9",
@@ -70,6 +85,21 @@
       "upstreamTraceSha256": "e2ce3f9bc666c7ddd60657532580943242af284b13bfc5c78f3773b58bf573c5",
       "hiveTraceSha256": "49c16e59e615146572f6583c7177c1f83a25ef9e7caa243f20735bec3243f0b3",
       "reason": "Hive mobile Source Control keeps the product Chinese retry and empty-state copy while retaining the upstream history and commit-file behavior."
+    },
+    "matrix-host.worktree-actions-worktree.activate-1": {
+      "upstreamTraceSha256": "3a4618ca1b7d45233ed49462fe21dfabf74556c6a05198c019b1b46e8b96e24e",
+      "hiveTraceSha256": "03dd117cc2661a160fda48d487776e3a2890bbbc9784cc031f9e7ffe85081b0b",
+      "reason": "Remove only the obsolete serverWorkspaces observer stub after retiring delegated desktop mobileRelay host discovery and forwarding. Actual HostScreenState no longer owns this field; current-host worktrees/lastKnownWorktrees, all action requests, payloads, outcomes and navigation observations remain exactly equal. Stale runtime: rows are refused rather than falling back to the current-host client."
+    },
+    "matrix-host.worktree-actions-worktree.rm-1": {
+      "upstreamTraceSha256": "e1804cc501d774b7c67d8c2655e9c49d2da6ba33119d09001fbadebcda3e1ba7",
+      "hiveTraceSha256": "60498a5f267a512a38915a0091b397acd8bbdc1da75a6adc878b1aa72f53953b",
+      "reason": "Remove only the obsolete serverWorkspaces observer stub after retiring delegated desktop mobileRelay host discovery and forwarding. Actual HostScreenState no longer owns this field; current-host worktrees/lastKnownWorktrees, all action requests, payloads, outcomes and navigation observations remain exactly equal. Stale runtime: rows are refused rather than falling back to the current-host client."
+    },
+    "matrix-host.worktree-actions-worktree.set-1": {
+      "upstreamTraceSha256": "9a7aec77e4bbd27a6b480305cd967ec815b3466accedb6361e6dda7ef8033cc6",
+      "hiveTraceSha256": "799e365c2f6ec720d9ceeb668c17fe86aff59e5b6872ba1adc54a7117aa778bc",
+      "reason": "Remove only the obsolete serverWorkspaces observer stub after retiring delegated desktop mobileRelay host discovery and forwarding. Actual HostScreenState no longer owns this field; current-host worktrees/lastKnownWorktrees, all action requests, payloads, outcomes and navigation observations remain exactly equal. Stale runtime: rows are refused rather than falling back to the current-host client."
     },
     "matrix-hostedreview.create-intent-hostedreview.getcreationeligibility-1": {
       "upstreamTraceSha256": "57ed3aab7847de5e17a6a8cd981e912e7aa9a37c1c89502d1304fe072f1878fa",
@@ -141,9 +171,14 @@
       "hiveTraceSha256": "e274511c2215aea1a2fd8bc9492ababc168fb0eba7dbc94a37da4aee913f8650",
       "reason": "Hive treats unreadable optional worktree metadata as unavailable so session resume can continue without fabricating a workspace target."
     },
+    "matrix-settings.task-hydration-jira.status-1": {
+      "upstreamTraceSha256": "e0e9af7d90de99ed21ad088d6a9b3ee2e52897e1d578e585421dde92677a2e04",
+      "hiveTraceSha256": "090c7ed44eb3081c209bd2a90ebe4b8897faa1a9478e104aa41dc22a5480f6bf",
+      "reason": "Use current APP_DISPLAY_NAME in Jira unavailableReason after an incompatible or absent Jira status reply. Only the displayed Orca-to-HiveCode name changes; disconnected state, sites, selection, credential/error shape, request sequence, settlement and every other effect remain exactly equal."
+    },
     "matrix-settings.task-hydration-status.get-1": {
-      "upstreamTraceSha256": "212ffd263228449b6d3718f41bbe9f2310f6488f05de34e371707752b607a5b2",
-      "hiveTraceSha256": "123ccb8a224d1c70139682067f3089a2c93e4816108468af04cd107f98b21cf7",
+      "upstreamTraceSha256": "eafd3848ad95b59caaa5b1e8debb199451d2a746d5a5b65d767fb6cd4c6ec959",
+      "hiveTraceSha256": "1551042c37538db07edca50c2f70806adbc33297278ba8efd1aff7abfa7943d6",
       "reason": "Hive visible product name replaces Orca in existing compatibility, recovery or error text."
     },
     "notifications-display-test-accepted": {
@@ -170,6 +205,11 @@
       "upstreamTraceSha256": "194abb8188a1a9b612881cf0f1089d5c67b53d65be2dc53c9ab6b2ee6314d485",
       "hiveTraceSha256": "5b8d6b8e12d641500364d4fdcd1f879de5018ceadfabf1663262a0f0a3aade37",
       "reason": "Hive preserves the agent.launch update-required refusal and its RPC/state transitions while replacing the visible Orca product name with HiveCode."
+    },
+    "schedules-settings-task-hydration-fulfilled": {
+      "upstreamTraceSha256": "2afa1fdcff8f81db2847eb8b27c2bd0117a09c42cf5cbfc29730e44c721fff27",
+      "hiveTraceSha256": "b93a5ea5da931a66812bdeaa0617739fe3bc83166053325d28cb38e2cc2f16a1",
+      "reason": "Use current APP_DISPLAY_NAME in Jira unavailableReason after an incompatible or absent Jira status reply. Only the displayed Orca-to-HiveCode name changes; disconnected state, sites, selection, credential/error shape, request sequence, settlement and every other effect remain exactly equal."
     },
     "session-markdown-disk-read": {
       "upstreamTraceSha256": "d8e9ea7a8ab70e8514807c9c8b819815a02655ec2d428113331d9c2135f8f614",

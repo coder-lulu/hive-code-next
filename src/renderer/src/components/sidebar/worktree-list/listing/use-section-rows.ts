@@ -20,7 +20,7 @@ import { getOfflineRuntimeEnvironmentIds } from '@/lib/runtime-offline-directory
 import type { buildRows } from '../grouping/build-rows'
 import type { ProjectGroupingModel } from '../grouping/project-grouping'
 import type { PinnedWorktreeDisplayPolicy, WorktreeGroupBy } from '../grouping/row-types'
-import { getLogicalRepoOrderRankById } from '../../project-header-drop'
+import { getLogicalRepoOrderRankById } from '../../../../../../shared/project-section-order'
 import { getEmptyProjectPlaceholderRepoIds } from '../../empty-project-placeholder-repos'
 import { deferHostSectionCollapse, scopeHostSectionCollapse } from '../../host-section-collapse'
 import { addHostSectionRows } from '../../host-section-rows'
@@ -67,6 +67,8 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
   const sshConnectionStates = useAppStore((s) => s.sshConnectionStates)
   const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
   const runtimeStatusByEnvironmentId = useAppStore((s) => s.runtimeStatusByEnvironmentId)
+  const wslHostStatuses = useAppStore((s) => s.wslHostStatuses)
+  const wslHostServerFilesMissing = useAppStore((s) => s.wslHostServerFiles === 'missing')
   const workspaceHostOrder = useAppStore((s) => s.workspaceHostOrder)
   const setWorkspaceHostOrder = useAppStore((s) => s.setWorkspaceHostOrder)
 
@@ -114,7 +116,10 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
         runtimeEnvironments,
         runtimeStatusByEnvironmentId,
         hostLabelOverrides,
-        language: i18n.resolvedLanguage
+        language: i18n.resolvedLanguage,
+        wslHostStatuses,
+        wslHostsEnabled: true,
+        wslHostServerFilesMissing
       }),
     [
       repos,
@@ -124,7 +129,9 @@ export function useSidebarSectionRows(args: SectionRowsArgs) {
       runtimeEnvironments,
       runtimeStatusByEnvironmentId,
       hostLabelOverrides,
-      i18n.resolvedLanguage
+      i18n.resolvedLanguage,
+      wslHostStatuses,
+      wslHostServerFilesMissing
     ]
   )
   const hostLabelById = useMemo(

@@ -114,14 +114,33 @@ export class RuntimeRpcWebSocketDispatch extends RuntimeRpcAccountDispatch {
       return
     }
     if (device.scope === 'mobile' && !MOBILE_RPC_METHOD_ALLOWLIST.has(request.method)) {
-      reply(JSON.stringify(this.buildError(request.id, 'forbidden', `Method '${request.method}' is not available to mobile clients`)))
+      reply(
+        JSON.stringify(
+          this.buildError(
+            request.id,
+            'forbidden',
+            `Method '${request.method}' is not available to mobile clients`
+          )
+        )
+      )
       return
     }
     if (request.executionHost !== undefined) {
-      const target = parseExecutionHostId(typeof request.executionHost === 'string' ? request.executionHost : null)
+      const target = parseExecutionHostId(
+        typeof request.executionHost === 'string' ? request.executionHost : null
+      )
       if (!target || target.kind === 'runtime') {
-        reply(JSON.stringify(this.buildError(request.id, target ? 'remote_runtime_unavailable' : 'invalid_argument',
-          target ? 'This Runtime does not delegate requests to other paired hosts' : 'Invalid executionHost')))
+        reply(
+          JSON.stringify(
+            this.buildError(
+              request.id,
+              target ? 'remote_runtime_unavailable' : 'invalid_argument',
+              target
+                ? 'This Runtime does not delegate requests to other paired hosts'
+                : 'Invalid executionHost'
+            )
+          )
+        )
         return
       }
     }

@@ -1,10 +1,10 @@
 import { execFileSync } from 'node:child_process'
 import type * as childProcess from 'node:child_process'
-import { createGitTestRunner } from "./test-fixtures/git-test-runner"
-import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { createGitTestRunner } from './test-fixtures/git-test-runner'
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { join } from 'node:path'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { countLooseRefs } from '../../shared/loose-ref-count'
 import { RepoRefMaintenance } from '../../shared/repo-ref-maintenance'
 import { PACK_INDEX_MAINTENANCE_COOLDOWN_MS } from '../../shared/repo-pack-index-maintenance-policy'
@@ -53,6 +53,8 @@ vi.mock('node:child_process', async (importOriginal) => {
 // three real `pack-refs` runs before the deferral budget is spent.
 const QUIET_MS = 25
 const THRESHOLD = 20
+let packFixtureRoot = ''
+let packFixtureBlobs: string[] = []
 
 function git(cwd: string, args: string[], input?: string): string {
   return execFileSync('git', args, {
@@ -79,9 +81,34 @@ function hasWriteOption(option: string): boolean {
 
 type TestGit = (cwd: string, args: string[], input?: string) => string | Promise<string>
 
-async function createFragmentedPacks(repoPath: string, runGit: TestGit = git): Promise<string[]> {
+async function createFragmentedPacks(repoPath: string): Promise<string[]> {
+  await cp(
+    join(packFixtureRoot, '.git', 'objects', 'pack'),
+    join(repoPath, '.git', 'objects', 'pack'),
+    {
+      recursive: true
+    }
+  )
+  return packFixtureBlobs
+}
+
+beforeAll(async () => {
+  // Each test gets its own pack files; generating the same 64 packs only needs to happen once.
+  packFixtureRoot = await mkdtemp(join(tmpdir(), 'orca-fragmented-packs-'))
+  const runGit: TestGit = async (cwd, args, input) =>
+    (await fixtureGit.git(cwd, args, { input })).trim()
+  await runGit(packFixtureRoot, ['init', '--quiet'])
+  packFixtureBlobs = await buildFragmentedPacks(packFixtureRoot, runGit)
+})
+
+afterAll(async () => {
+  await fixtureGit.settle()
+  await rm(packFixtureRoot, { recursive: true, force: true })
+})
+
+async function buildFragmentedPacks(repoPath: string, runGit: TestGit = git): Promise<string[]> {
   const objects = join(repoPath, '.git', 'objects')
-  const inputsDirectory = join(dirname(repoPath), 'pack-inputs')
+  const inputsDirectory = join(repoPath, 'pack-inputs')
   await mkdir(inputsDirectory)
   const contents = Array.from({ length: PACK_INDEX_THRESHOLD }, (_, index) => `packed-${index}\n`)
   const inputs = await Promise.all(
@@ -215,7 +242,7 @@ beforeEach(async ({ signal, task }) => {
       await runGit(preparedRepoPath, ['config', 'gc.auto', '6700'])
     }
     preparedPacks = join(preparedRepoPath, '.git', 'objects', 'pack')
-    preparedBlobs = await createFragmentedPacks(preparedRepoPath, runGit)
+    preparedBlobs = await createFragmentedPacks(preparedRepoPath)
     if (indexesFragmentedPacks) {
       preparedOriginalPacks = (await readdir(preparedPacks)).sort()
     }

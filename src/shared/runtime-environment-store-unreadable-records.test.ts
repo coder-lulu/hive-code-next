@@ -1,7 +1,11 @@
+import {
+  drainNativeFixture,
+  restoreNativeFixture
+} from '../main/ipc/ephemeral-vm-native-test-fixture'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { encodePairingOffer } from './pairing'
 import { APP_DISPLAY_NAME } from './brand'
 import {
@@ -40,15 +44,24 @@ function readJson(path: string): { environments?: unknown[]; entries?: Record<st
   return JSON.parse(readFileSync(path, 'utf8'))
 }
 
+const pendingChildren = new Set<Promise<void>>()
+afterAll(restoreNativeFixture)
+
 describe('runtime environment store with records this build cannot read', () => {
   let userDataPath: string
+  let restoreConsoleWarn: () => void
   beforeEach(() => {
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-environment-unreadable-'))
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    restoreConsoleWarn = () => warning.mockRestore()
   })
-  afterEach(() => {
-    vi.restoreAllMocks()
-    rmSync(userDataPath, { recursive: true, force: true })
+  afterEach(async () => {
+    try {
+      await drainNativeFixture(pendingChildren)
+      rmSync(userDataPath, { recursive: true, force: true })
+    } finally {
+      restoreConsoleWarn()
+    }
   })
 
   function add(name: string) {

@@ -12,6 +12,7 @@ import {
   goldenBytes,
   goldenRecording,
   readGolden,
+  readGoldenRaw,
   writeGolden
 } from './golden-recording'
 import {
@@ -48,16 +49,18 @@ async function certify(id: string, scenarios: RecordingScenario[]) {
     const bytes = goldenBytes(golden)
     if (run) {
       expect(bytes).toBe(first)
-    }
-    first = bytes
-    if (process.env.RPC_FOUNDATION_MODE === '--record') {
+    } else if (process.env.RPC_FOUNDATION_MODE === '--record') {
       await writeGolden(directory, golden, '--record')
     } else if (id === INVENTORY_UNMOUNT_REFERENCE_ID) {
-      compareGolden(inventoryUnmountExpectedReference(readGolden(directory, id)), golden)
+      const approved = inventoryUnmountExpectedReference(readGoldenRaw(directory, id))
+      const product = readGolden(directory, id)
+      compareGolden(approved, product)
+      compareGolden(product, golden)
       sourceDeltas.add(id)
     } else {
       await expectGoldenFile(directory, id, golden)
     }
+    first = bytes
   }
 }
 

@@ -1,6 +1,6 @@
+import { getLogicalRepoOrderRankById } from '../../../../shared/project-section-order'
 import {
   applyAllRepoInsertAt,
-  getLogicalRepoOrderRankById,
   getProjectGroupOrderForSidebarDrop,
   getProjectGroupIdFromHeaderDragBucketKey,
   isProjectHeaderDropBucketHostCompatible,

@@ -1,13 +1,14 @@
 import type { Repo } from '../../../src/shared/repo-types'
 import {
-  getExecutionHostLabel,
   getRepoExecutionHostId,
-  parseExecutionHostId
+  parseExecutionHostId,
+  type ExecutionHostId
 } from '../../../src/shared/execution-host'
 import {
   getProjectIdentityKey,
   getProjectProviderIdentity
 } from '../../../src/shared/project-host-setup-projection'
+import { getHostContextLabel } from '../../../src/shared/worktree/host-context-labels'
 
 type WorkspaceRepo = Pick<Repo, 'id' | 'displayName' | 'path'> &
   Partial<
@@ -23,6 +24,7 @@ export type NewWorkspaceProjectOption<TRepo extends WorkspaceRepo> = {
 
 export type NewWorkspaceRunTargetOption<TRepo extends WorkspaceRepo> = {
   id: string
+  hostId: ExecutionHostId
   label: string
   detail: string
   repo: TRepo
@@ -57,25 +59,24 @@ export function buildNewWorkspaceProjectOptions<TRepo extends WorkspaceRepo>(
   })
 }
 
+/** Named like the host list's badge; the desktop's picker shows the bare host label too. */
 export function getNewWorkspaceRunTarget(
   repo: WorkspaceRepo,
   localPlatform: NodeJS.Platform | null = null,
+  hostLabelById?: ReadonlyMap<ExecutionHostId, string>,
   runtimeName?: string
 ): {
+  hostId: ExecutionHostId
   label: string
   detail: string
 } {
   const hostId = getRepoExecutionHostId(repo)
-  const host = parseExecutionHostId(hostId)
-  const hostLabel = getExecutionHostLabel(hostId)
-  if (host?.kind === 'ssh') {
-    return { label: `SSH · ${hostLabel}`, detail: repo.path }
-  }
-  if (host?.kind === 'runtime') {
-    return { label: `Remote · ${hostLabel}`, detail: repo.path }
-  }
   return {
-    label: runtimeName || (localPlatform ? '本机' : '当前 Runtime'),
+    hostId,
+    label:
+      parseExecutionHostId(hostId)?.kind === 'local'
+        ? runtimeName || hostLabelById?.get(hostId) || (localPlatform ? '本机' : '当前 Runtime')
+        : getHostContextLabel(hostId, { hostLabelById, hostPlatform: localPlatform }),
     detail: repo.path
   }
 }
@@ -84,6 +85,7 @@ export function buildNewWorkspaceRunTargetOptions<TRepo extends WorkspaceRepo>(
   repos: readonly TRepo[],
   projectId: string | null,
   localPlatform: NodeJS.Platform | null = null,
+  hostLabelById?: ReadonlyMap<ExecutionHostId, string>,
   runtimeName?: string
 ): NewWorkspaceRunTargetOption<TRepo>[] {
   if (!projectId) {
@@ -96,9 +98,10 @@ export function buildNewWorkspaceRunTargetOptions<TRepo extends WorkspaceRepo>(
     }
     const hostId = getRepoExecutionHostId(repo)
     if (!options.has(hostId)) {
+      // Keyed by host: a repo id names one repo per host, so two hosts can share one.
       options.set(hostId, {
-        id: repo.id,
-        ...getNewWorkspaceRunTarget(repo, localPlatform, runtimeName),
+        id: hostId,
+        ...getNewWorkspaceRunTarget(repo, localPlatform, hostLabelById, runtimeName),
         repo
       })
     }

@@ -10,7 +10,7 @@ import {
   UntitledPlaceholderRecoveryLocationUnavailableError
 } from '../../shared/untitled-placeholder-recovery-directory'
 import { RuntimeUntitledPlaceholderCommands } from './runtime-untitled-placeholder-commands'
-import type { RuntimeFileExplorerPath } from './runtime-file-command-target'
+import type { RuntimeFileExplorerPath } from './files/file-target'
 import type { Store } from '../persistence'
 import type * as GitCommonDirectory from '../../shared/git-common-directory'
 
@@ -257,11 +257,16 @@ describe('runtime ordinary untitled creation after proved unavailable retention 
 })
 
 describe('placeholder execution host authority', () => {
-  it.each(['ssh:other', 'runtime:other'] as const)('refuses %s before reading or creating local files', async (hostId) => {
-    executionHostId = hostId
-    await expect(service.createUntitledPlaceholder('workspace-a', 'untitled.md', CLIENT)).rejects.toThrow()
-    expect(ports.authorize).not.toHaveBeenCalled()
-    expect(ordinary).not.toHaveBeenCalled()
-    expect(existsSync(filePath)).toBe(false)
-  })
+  it.each(['ssh:other', 'runtime:other'] as const)(
+    'refuses %s before reading or creating local files',
+    async (hostId) => {
+      executionHostId = hostId
+      await expect(
+        service.createUntitledPlaceholder('workspace-a', 'untitled.md', CLIENT)
+      ).rejects.toThrow()
+      expect(ports.authorize).not.toHaveBeenCalled()
+      expect(ordinary).not.toHaveBeenCalled()
+      expect(existsSync(filePath)).toBe(false)
+    }
+  )
 })

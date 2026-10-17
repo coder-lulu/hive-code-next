@@ -12,6 +12,8 @@ import {
   resolveLaunchUserDataPath
 } from './launch-user-data-path'
 import { foregroundServeIsolatedProfileSwitches } from '../../shared/electron-isolated-profile-switches'
+import { ELECTRON_NO_SANDBOX_REQUEST_ENV } from '../../shared/electron-no-sandbox-request'
+import { needsElectronNoSandbox } from './electron-sandbox-switch'
 import { getMacAppBundlePath } from './mac-app-update-bundle'
 import { getPlatformUserDataPath } from './metadata'
 import { isSameUserDataPath } from '../../shared/serve-user-data-path'
@@ -36,13 +38,13 @@ import {
 } from './serve-electron-preflight'
 import { MacServeStartupAbortError } from './serve-signal-exit-diagnostic'
 import { superviseServeService } from './serve-supervised-service'
+import { supervisedAppImageUpdate } from './serve-appimage-update'
 import {
   relocateThisServeSupervisor,
   SERVE_SUPERVISOR_APP_ROOT_ENV
 } from './serve-supervisor-relocation'
 import { serverOnlyServeMessage } from './serve-app-launcher'
 import { isSupervisedSpawnHeld } from './serve-supervised-stop'
-import { shouldDisableExtractedAppImageSandbox } from './launch-appimage-sandbox'
 import { openServeBundlePark } from './serve-bundle-park'
 import {
   redactingSpawn,
@@ -157,6 +159,7 @@ export function serveOrcaApp(args: ServeOrcaAppArgs = {}): Promise<number> {
         appRoot: resolveAppRoot(),
         force: args.force === true,
         park: openServeBundlePark({ executable }),
+        appImageUpdate: supervisedAppImageUpdate(executable, userDataPath, args.force === true),
         // Why first only: --force overrides a remembered abort once; the brake owns later attempts.
         runOnce: () =>
           serveOnce(
@@ -299,7 +302,7 @@ function spawnElectronServe(
 
 export function getExecutableAppArgs(executable: string): string[] {
   const args = process.env.ORCA_APP_EXECUTABLE_NEEDS_APP_ROOT === '1' ? [resolveAppRoot()] : []
-  if (shouldDisableExtractedAppImageSandbox(executable)) {
+  if (needsElectronNoSandbox(executable)) {
     args.push('--no-sandbox')
   }
   return args
@@ -327,6 +330,8 @@ export function resolveForegroundOrcaExecutable(): string {
 export function stripElectronRunAsNode(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
   const next = { ...env }
   delete next.ELECTRON_RUN_AS_NODE
+  // Why: the request is applied as a switch; the server's terminals must not inherit it.
+  delete next[ELECTRON_NO_SANDBOX_REQUEST_ENV]
   // Why: only the relocated supervisor itself may resolve its app root this way.
   delete next[SERVE_SUPERVISOR_APP_ROOT_ENV]
   return next

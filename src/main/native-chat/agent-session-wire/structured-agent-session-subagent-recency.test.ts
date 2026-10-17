@@ -20,6 +20,10 @@ import { projectStructuredAgentSessionStatusSummary } from '../../../shared/stru
 import { AgentHookServer, _internals } from '../../agent-hooks/server'
 import { createClaudeJournalTranslator } from '../../claude/claude-structured-journal-translation'
 import { createCodexJournalTranslator } from '../../codex/codex-structured-journal-translation'
+import {
+  subagentJournalBody,
+  subagentJournalItemIdentity
+} from '../agent-session-journal/journal-subagent-item'
 import { createDeferredStructuredAgentSessionEventSink } from './structured-agent-session-event-sink'
 import { StructuredAgentSessionStatusFeed } from './structured-agent-session-status-feed'
 import { indexedStatusFeedSession } from './structured-agent-session-status-feed-test-session'
@@ -189,6 +193,20 @@ describe("a subagent's work and the recency of the session that spawned it", () 
     const translator = createClaudeJournalTranslator({ sink: session.sink })
     const handle = (event: ReturnType<typeof claudeFrame>): void =>
       translator.handle({ ...event, observedAt: session.tick() })
+    /** The child's row as the host's writer revises it from the child's record. */
+    const hostRow = (label: string, state: 'working' | 'completed') =>
+      session.journal.appendItem(
+        subagentJournalItemIdentity('task-1'),
+        subagentJournalBody({
+          type: 'subagent',
+          id: 'task-1',
+          label,
+          state,
+          groupId: 'thread',
+          run: 'toolu_1'
+        }),
+        { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
+      )
     await session.prompt('prompt-1', 'fan out')
     handle(claudeUserTurn('user-1', 'fan out'))
     handle(
@@ -234,10 +252,11 @@ describe("a subagent's work and the recency of the session that spawned it", () 
     const sequence = session.journal.cursor().sequence
 
     // The session's own agent has settled. Its backgrounded child renames itself and then
-    // finishes, and each edge revises the session's roster row.
+    // finishes, and the host revises the child's own saved row for each edge.
     handle(
       claudeTask('task_updated', { task_id: 'task-1', patch: { description: 'Build watched' } })
     )
+    await hostRow('Build watched', 'working')
     handle(
       claudeTask('task_notification', {
         task_id: 'task-1',
@@ -246,6 +265,7 @@ describe("a subagent's work and the recency of the session that spawned it", () 
         summary: 'green'
       })
     )
+    await hostRow('Build watched', 'completed')
     await session.drain()
 
     // Controls, so the holds below are not vacuous: the child's edges DID reach the journal,

@@ -1,4 +1,5 @@
-import { afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
+import { TERMINAL_MULTIPLEX_ACK_FLUSH_MS } from '../../../src/shared/terminal-multiplex-flow-control'
 import { UPSTREAM_BASELINE_PINS } from '../../../config/scripts/prepare-cross-version-baselines.mjs'
 import { comparePublishedFieldOccurrences, publishedFieldNames } from './published-field-shape'
 import {
@@ -27,9 +28,9 @@ const SUITE_TIMEOUT_MS = 180_000
 const TERMINAL_MODE_METADATA_LEGACY_REF = '6e4f817101daa18d82824b69243d9079baa9c416'
 
 /**
- * The frames one journey must produce, named rather than numbered so a diff reads
- * as a protocol change. Any deviation is a change in what a peer publishes or
- * accepts, and needs a human decision against docs/reference/remote-wire-compatibility.md.
+ * Mandatory journey frames, named rather than numbered. Flow-credit ACKs may
+ * flush before disconnect or be cancelled during disposal; validate them separately
+ * without removing them from the observed wire or bypassing peer decoding.
  */
 const EXPECTED_JOURNEY_FRAMES = [
   'C>H Subscribe',
@@ -83,10 +84,91 @@ function expectJourneyActuallyRan(record: JourneyRecord): void {
   // The anti-vacuous-pass oracle. A harness that connects and then does nothing
   // fails here, because "nothing threw" is never enough to call a pairing green.
   expect(record.completed).toEqual([...JOURNEY_STEPS])
-  expect(record.frameSequence).toEqual(EXPECTED_JOURNEY_FRAMES)
+  expectJourneyFrames(record)
   expect(record.subscribedEvents).toHaveLength(2)
   expect(record.snapshotStarts).toHaveLength(3)
   expect(record.missingRuntimeMethods).toEqual([])
+}
+
+function expectJourneyFrames(record: JourneyRecord): void {
+  expect(record.observed).toHaveLength(record.frameSequence.length)
+  const acknowledgements = record.frameSequence.flatMap((name, index) =>
+    name === 'C>H Ack' ? [index] : []
+  )
+  // This script delivers exactly one Output, so at most one credit return is valid.
+  expect(acknowledgements.length).toBeLessThanOrEqual(1)
+  const outputIndex = record.frameSequence.indexOf('H>C Output')
+  const reconnectIndex = record.frameSequence.indexOf('C>H Subscribe', 1)
+  for (const index of acknowledgements) {
+    const frame = record.observed[index]!
+    expect(index).toBeGreaterThan(outputIndex)
+    expect(index).toBeLessThan(reconnectIndex)
+    expect(frame).toMatchObject({
+      direction: 'client-to-host',
+      opcode: Number(current.codec.TerminalStreamOpcode.Ack),
+      streamId: record.observed[outputIndex]!.streamId,
+      seq: 0
+    })
+    expect(frame.json).toEqual({
+      bytes: new TextEncoder().encode(JOURNEY_INPUTS.output).byteLength
+    })
+  }
+  expect(record.frameSequence.filter((name) => name !== 'C>H Ack')).toEqual(EXPECTED_JOURNEY_FRAMES)
+}
+
+async function runWithAckSchedule(
+  hostBuild: TerminalWireBuild,
+  schedule: 'flush' | 'dispose'
+): Promise<JourneyRecord> {
+  const nativeSet = globalThis.setTimeout
+  const nativeClear = globalThis.clearTimeout
+  const timers: {
+    handle: ReturnType<typeof setTimeout>
+    fire: () => void
+    cancelled: boolean
+    fired: boolean
+  }[] = []
+  // Hold only the real ACK callback. All host batching, barriers and watchdogs keep
+  // their ordinary timers; the receiving codecs and recorded frames are unchanged.
+  const set = vi.spyOn(globalThis, 'setTimeout').mockImplementation((callback, delay, ...args) => {
+    if (delay !== TERMINAL_MULTIPLEX_ACK_FLUSH_MS) {
+      return nativeSet(callback, delay, ...args)
+    }
+    const handle = Symbol('held ACK timer') as unknown as ReturnType<typeof setTimeout>
+    timers.push({ handle, fire: () => callback(...args), cancelled: false, fired: false })
+    return handle
+  })
+  const clear = vi.spyOn(globalThis, 'clearTimeout').mockImplementation((handle) => {
+    const timer = timers.find((entry) => entry.handle === handle)
+    if (timer) {
+      timer.cancelled = true
+    } else {
+      nativeClear(handle)
+    }
+  })
+  try {
+    const record = await runTerminalSkewJourney({
+      hostBuild,
+      clientBuild: current,
+      afterLiveOutput: () => {
+        expect(timers).toHaveLength(1)
+        expect(timers[0]!.cancelled).toBe(false)
+        if (schedule === 'flush') {
+          timers[0]!.fired = true
+          timers[0]!.fire()
+        }
+      }
+    })
+    expect(timers).toHaveLength(1)
+    expect(timers[0]).toMatchObject({
+      fired: schedule === 'flush',
+      cancelled: schedule === 'dispose'
+    })
+    return record
+  } finally {
+    set.mockRestore()
+    clear.mockRestore()
+  }
 }
 
 function expectSnapshotStartFieldsRemainPublished(args: {
@@ -274,6 +356,92 @@ describe('cross-version remote terminal wire', () => {
       for (const start of record.snapshotStarts) {
         expect(start).not.toHaveProperty('terminalOwner')
         expect(start).not.toHaveProperty('alternateScreen')
+      }
+    },
+    SUITE_TIMEOUT_MS
+  )
+
+  for (const hostLabel of ['current', 'baseline'] as const) {
+    for (const schedule of ['flush', 'dispose'] as const) {
+      it(
+        `validates the complete journey when ${hostLabel} ACK credit uses the ${schedule} schedule`,
+        async () => {
+          const record = await runWithAckSchedule(
+            hostLabel === 'current' ? current : baseline,
+            schedule
+          )
+          expectJourneyActuallyRan(record)
+          expectWireCompatible(record)
+          expect(record.frameSequence.filter((name) => name === 'C>H Ack')).toHaveLength(
+            schedule === 'flush' ? 1 : 0
+          )
+        },
+        SUITE_TIMEOUT_MS
+      )
+    }
+    it(
+      `rejects a ${hostLabel} peer that cannot decode a scheduled ACK`,
+      async () => {
+        const host = hostLabel === 'current' ? current : baseline
+        const record = await runWithAckSchedule(withoutOpcodeSupport(host, 'Ack'), 'flush')
+        expectJourneyActuallyRan(record)
+        expect(record.rejected).toContainEqual(
+          expect.objectContaining({
+            direction: 'client-to-host',
+            rawOpcode: Number(current.codec.TerminalStreamOpcode.Ack)
+          })
+        )
+        expect(() => expectWireCompatible(record)).toThrow()
+      },
+      SUITE_TIMEOUT_MS
+    )
+  }
+
+  it(
+    'rejects malformed, duplicate, misplaced ACKs and missing mandatory journey evidence',
+    async () => {
+      const record = await runWithAckSchedule(baseline, 'flush')
+      expectJourneyActuallyRan(record)
+      expectWireCompatible(record)
+      const ackIndex = record.frameSequence.indexOf('C>H Ack')
+      for (const mutate of [
+        (r: JourneyRecord) => {
+          r.observed[ackIndex]!.json = { bytes: 0 }
+        },
+        (r: JourneyRecord) => {
+          r.observed[ackIndex]!.json = { bytes: 28 }
+        },
+        (r: JourneyRecord) => {
+          r.observed[ackIndex]!.json = { bytes: 27, unexpected: true }
+        },
+        (r: JourneyRecord) => {
+          r.observed[ackIndex]!.streamId += 1
+        },
+        (r: JourneyRecord) => {
+          r.observed[ackIndex]!.seq = 1
+        },
+        (r: JourneyRecord) => {
+          r.observed[ackIndex]!.direction = 'host-to-client'
+        },
+        (r: JourneyRecord) => {
+          r.observed.splice(0, 0, r.observed.splice(ackIndex, 1)[0]!)
+          r.frameSequence.splice(0, 0, r.frameSequence.splice(ackIndex, 1)[0]!)
+        },
+        (r: JourneyRecord) => {
+          r.observed.push(r.observed[ackIndex]!)
+          r.frameSequence.push('C>H Ack')
+        },
+        (r: JourneyRecord) => {
+          r.observed.splice(4, 1)
+          r.frameSequence.splice(4, 1)
+        },
+        (r: JourneyRecord) => {
+          r.completed = []
+        }
+      ]) {
+        const mutated = structuredClone(record)
+        mutate(mutated)
+        expect(() => expectJourneyActuallyRan(mutated)).toThrow()
       }
     },
     SUITE_TIMEOUT_MS

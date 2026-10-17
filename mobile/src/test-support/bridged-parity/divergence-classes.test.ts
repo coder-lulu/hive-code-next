@@ -152,7 +152,7 @@ describe('what the pin still admits', () => {
 
   it('accounts for every Hive-supported golden while preserving the frozen upstream corpus', () => {
     // What ties the numbers to the product domain they describe. The manifest operation map names
-    // the 755 supported references; its digest still pins all 794 immutable upstream files.
+    // the 757 supported references; its digest still pins all 796 immutable upstream files.
     const domain = readHiveGoldenDomain(GOLDENS)
     const counted = Object.values(BRIDGED_PARITY_BASELINE).reduce((sum, count) => sum + count, 0)
     expect({
@@ -160,9 +160,9 @@ describe('what the pin still admits', () => {
       supported: domain.supportedIds.length,
       upstream: domain.upstreamIds.length
     }).toEqual({
-      counted: 755,
-      supported: 755,
-      upstream: 794
+      counted: 757,
+      supported: 757,
+      upstream: 796
     })
   })
 
@@ -237,7 +237,7 @@ describe('what the pin still admits', () => {
   it('goes red on a golden that stopped diverging, which every other check lets through', () => {
     // The direction the rest of the suite cannot see. One `result-absent-settlement` golden
     // reported `identical` instead: nothing is unclassified, every diverging golden is still in an
-    // excluded class, and the product corpus is still 755. Only these two numbers moved.
+    // excluded class, and the product corpus is still 757. Only these two numbers moved.
     const tally = asCounted()
     const moved: BridgedParityTally = {
       identical: tally.identical + 1,
@@ -251,7 +251,7 @@ describe('what the pin still admits', () => {
     expect(drift.join('\n')).toContain(
       `identical: pinned ${tally.identical}, ran ${moved.identical}`
     )
-    expect(drift.join('\n')).toContain('result-absent-settlement: pinned 325, ran 324')
+    expect(drift.join('\n')).toContain('result-absent-settlement: pinned 327, ran 326')
   })
 
   it('goes red on a class that grew and on the corpus losing a golden', () => {

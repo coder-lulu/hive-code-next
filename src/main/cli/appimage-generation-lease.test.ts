@@ -1,8 +1,10 @@
 import { existsSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { mkdir, mkdtemp, readdir, rm, utimes, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { APPIMAGE_LINUX_GUI_EXECUTABLE_NAME } from '../../shared/appimage-cache-identity'
 import {
   inspectAppImageGenerationLeases,
   leaseAppImageGenerationForCurrentProcess,
@@ -39,6 +41,46 @@ function reader(
 }
 
 describe('AppImage generation leases', () => {
+  it('uses the executable name emitted by Linux packaging', () => {
+    const config = createRequire(import.meta.url)(
+      '../../../config/electron-builder.config.cjs'
+    ) as {
+      linux: { executableName: string }
+    }
+    expect(APPIMAGE_LINUX_GUI_EXECUTABLE_NAME).toBe(config.linux.executableName)
+  })
+
+  it('locates the packaged HiveCode GUI without accepting the public CLI wrapper', async () => {
+    const { cacheRootPath, rootPath } = await makeCache()
+    expect(resolveAppImageGenerationOfExecutable(join(rootPath, 'hivecode'))).toEqual({
+      cacheRootPath,
+      namespaceKey: NAMESPACE,
+      generationKey: GENERATION,
+      rootPath
+    })
+    expect(resolveAppImageGenerationOfExecutable(join(rootPath, 'hive'))).toBeNull()
+    expect(
+      resolveAppImageGenerationOfExecutable(join(rootPath, 'resources', 'bin', 'hive'))
+    ).toBeNull()
+    expect(resolveAppImageGenerationOfExecutable(join(rootPath, 'HiveCode'))).toBeNull()
+    expect(resolveAppImageGenerationOfExecutable('/usr/lib/hivecode/hivecode')).toBeNull()
+  })
+
+  it('leases the packaged HiveCode GUI with the supplied process identity reader', async () => {
+    const { cacheRootPath, rootPath } = await makeCache()
+    const live = reader({ 10: { status: 'present', startTicks: '500' } })
+    const leasePath = await leaseAppImageGenerationForCurrentProcess({
+      execPath: join(rootPath, APPIMAGE_LINUX_GUI_EXECUTABLE_NAME),
+      pid: 10,
+      platform: 'linux',
+      reader: live
+    })
+    expect(leasePath).not.toBeNull()
+    await expect(inspectAppImageGenerationLeases(cacheRootPath, rootPath, live)).resolves.toEqual({
+      status: 'live'
+    })
+  })
+
   it('locates the generation an executable runs from', async () => {
     const { cacheRootPath, rootPath, execPath } = await makeCache()
     expect(resolveAppImageGenerationOfExecutable(execPath)).toEqual({
@@ -49,6 +91,41 @@ describe('AppImage generation leases', () => {
     })
     expect(resolveAppImageGenerationOfExecutable('/usr/lib/orca-ide/orca-ide')).toBeNull()
     expect(resolveAppImageGenerationOfExecutable(join(rootPath, 'node'))).toBeNull()
+  })
+
+  it('locates the generation its bundled Node runs from, as a terminal daemon does', async () => {
+    const { cacheRootPath, rootPath } = await makeCache()
+    const node = join(rootPath, 'resources', 'node-runtime', 'bin', 'node')
+    expect(resolveAppImageGenerationOfExecutable(node)).toEqual({
+      cacheRootPath,
+      namespaceKey: NAMESPACE,
+      generationKey: GENERATION,
+      rootPath
+    })
+    expect(
+      resolveAppImageGenerationOfExecutable(join(rootPath, 'resources', 'bin', 'node'))
+    ).toBeNull()
+    expect(
+      resolveAppImageGenerationOfExecutable('/opt/x/resources/node-runtime/bin/node')
+    ).toBeNull()
+  })
+
+  it('leases the generation for a daemon on its bundled Node', async () => {
+    const { cacheRootPath, rootPath } = await makeCache()
+    const lease = await leaseAppImageGenerationForCurrentProcess({
+      execPath: join(rootPath, 'resources', 'node-runtime', 'bin', 'node'),
+      pid: 11,
+      platform: 'linux',
+      reader: reader({ 11: { status: 'present', startTicks: '700' } })
+    })
+    expect(lease).not.toBeNull()
+    await expect(
+      inspectAppImageGenerationLeases(
+        cacheRootPath,
+        rootPath,
+        reader({ 11: { status: 'present', startTicks: '700' } })
+      )
+    ).resolves.toEqual({ status: 'live' })
   })
 
   it('records nothing off Linux or outside an extracted generation', async () => {

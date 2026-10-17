@@ -1,3 +1,4 @@
+import { verifyJsonlFileFingerprint } from '../usage/jsonl-file-fingerprint'
 import { createUsageWorktreeResolver } from '../usage/usage-worktree-resolver'
 import {
   getLegacySourceSkipBytesByPath,
@@ -75,7 +76,8 @@ export async function scanCodexUsageFiles(
       previous.ctimeMs === fileInfo.ctimeMs &&
       previous.physicalFileId === fileInfo.physicalFileId &&
       Array.isArray(previous.ownedEventKeys) &&
-      typeof previous.hasDeferredClaims === 'boolean'
+      typeof previous.hasDeferredClaims === 'boolean' &&
+      (await verifyJsonlFileFingerprint(filePath, fileInfo, previous.contentFingerprint))
     if (canReuse) {
       reusedByPath.set(filePath, previous)
     } else {

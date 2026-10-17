@@ -55,7 +55,11 @@ async function agentLaunchIntent(
     ...(params.launchSource ? { launchSource: params.launchSource } : {}),
     ...(paneKey ? { paneKey } : {}),
     ...(params.sessionId ? { sessionId: params.sessionId } : {}),
-    ...(params.presentation ? { presentation: params.presentation } : {})
+    ...(params.presentation ? { presentation: params.presentation } : {}),
+    ...(params.accountEnv ? { accountEnv: params.accountEnv } : {}),
+    ...(params.nativeChatDefault !== undefined
+      ? { nativeChatDefault: params.nativeChatDefault }
+      : {})
   }
 }
 

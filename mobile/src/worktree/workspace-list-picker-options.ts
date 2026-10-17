@@ -20,6 +20,6 @@ export const WORKSPACE_SORT_OPTIONS: PickerOption<MobileSortMode>[] = [
 export const WORKSPACE_GROUP_OPTIONS: PickerOption<MobileGroupMode>[] = [
   { value: 'none', label: '不分组' },
   { value: 'workspaceStatus', label: '状态' },
-  { value: 'repo', label: '代码仓库' },
+  { value: 'repo', label: '项目' },
   { value: 'prStatus', label: 'PR 状态' }
 ]

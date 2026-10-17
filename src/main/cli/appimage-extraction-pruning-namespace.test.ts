@@ -1,4 +1,5 @@
 import { LINUX_CLI_COMMAND_NAME } from './bundled-cli-launcher-path'
+import { APPIMAGE_LINUX_GUI_EXECUTABLE_NAME } from '../../shared/appimage-cache-identity'
 import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -98,7 +99,7 @@ describe('AppImage generation namespace', () => {
       const installedLauncher = await writePayload(installed!)
       await Promise.all([writePayload(keep.rootPath), writePayload(idle!), writePayload(resident!)])
       publishAppImageLauncherEndpoint(options.cacheRootPath, 'installed', installedLauncher)
-      residentExecutables.paths = [join(resident!, LINUX_CLI_COMMAND_NAME)]
+      residentExecutables.paths = [join(resident!, APPIMAGE_LINUX_GUI_EXECUTABLE_NAME)]
 
       await pruneAppImageExtractedRoots(keep.rootPath, legacyNamespace)
 
@@ -113,7 +114,7 @@ describe('AppImage generation namespace', () => {
     const { keep } = await makeFixture()
     const older = join(dirname(keep.rootPath), 'c'.repeat(24))
     await Promise.all([writePayload(keep.rootPath), writePayload(older)])
-    residentExecutables.paths = [`${join(older, LINUX_CLI_COMMAND_NAME)} (deleted)`]
+    residentExecutables.paths = [`${join(older, APPIMAGE_LINUX_GUI_EXECUTABLE_NAME)} (deleted)`]
 
     await pruneAppImageExtractedRoots(keep.rootPath)
 
@@ -127,7 +128,7 @@ describe('AppImage generation namespace', () => {
       const older = join(dirname(keep.rootPath), 'c'.repeat(24))
       await Promise.all([writePayload(keep.rootPath), writePayload(older)])
       const leasePath = await leaseAppImageGenerationForCurrentProcess({
-        execPath: join(older, LINUX_CLI_COMMAND_NAME)
+        execPath: join(older, APPIMAGE_LINUX_GUI_EXECUTABLE_NAME)
       })
       expect(leasePath).not.toBeNull()
 

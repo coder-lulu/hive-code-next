@@ -10,7 +10,7 @@ import {
   type ReleaseChannel
 } from '../shared/release-channel'
 import { cancelUnreadResponseBody } from './lib/unread-response-body'
-import { parseRelayRetryAfterMs } from '../shared/relay-retry-after-header'
+import { parseRetryAfterHeaderMs } from '../shared/retry-after-header'
 import { isValidVersion } from './updater-fallback'
 import { fetchWithProductUpdaterSession } from './product/product-updater-session'
 import { readResponseTextWithLimit } from './updater-response-body'
@@ -40,7 +40,11 @@ function isRateLimited(res: Response): boolean {
  * Retry-After arrives as seconds or an HTTP date; the reset epoch is the fallback.
  */
 export function rateLimitResetAtMs(headers: Headers, nowMs: number): number | null {
-  const retryAfterMs = parseRelayRetryAfterMs(headers.get('retry-after'), RETRY_AFTER_MAX_MS, nowMs)
+  const retryAfterMs = parseRetryAfterHeaderMs(
+    headers.get('retry-after'),
+    RETRY_AFTER_MAX_MS,
+    nowMs
+  )
   if (retryAfterMs !== null) {
     return nowMs + retryAfterMs
   }

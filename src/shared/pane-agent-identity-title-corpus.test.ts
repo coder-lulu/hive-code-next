@@ -1,7 +1,7 @@
+import { createHash, randomBytes } from 'node:crypto'
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { createHash, randomBytes } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
 import { collectAgentTitleEvidence } from './agent-title-evidence'
 import { resolveCanonicalPaneAgentIdentity } from './pane-agent-identity-adapter'
@@ -117,9 +117,9 @@ describe('controlled title fixtures (always run)', () => {
   for (const fixture of FIXTURES) {
     it(fixture.name, () => {
       expect(collectAgentTitleEvidence(fixture.title).agent).toBe(fixture.expected)
-      // The adapter's title-only lane must give the very same answer — phase 1 changes no
-      // parser semantics, only provenance.
-      expect(canonicalTitleOnlyAgent(fixture.title)).toBe(fixture.expected)
+      expect(resolveCanonicalPaneAgentIdentity({ title: fixture.title }).agent).toBe(
+        fixture.expected
+      )
     })
   }
 })

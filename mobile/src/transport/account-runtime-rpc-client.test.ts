@@ -117,6 +117,7 @@ describe('account Runtime independent stream recovery', () => {
   })
 
   it('rejects unsupported envelope fields before sending requests or registering streams', async () => {
+    expect(client.carriesRpcEnvelope()).toBe(false)
     const pool = fixture.pools[0]!
     const count = pool.subscriptions.length
     await expect(

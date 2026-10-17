@@ -57,15 +57,45 @@ describe('release E2E dispatch contract', () => {
   })
 
   it('primes the Electron native cache before every E2E consumer', () => {
-    const primer = e2eWorkflow.jobs['prepare-native-cache']
-    expect(primer.steps).toBeDefined()
-    expect(
-      primer.steps.find((step) => step.uses === './.github/actions/install-node-dependencies').with
-    ).toEqual({
-      'native-runtime': 'electron'
+    const steps = e2eWorkflow.jobs.build.steps
+    const joinedBuild = steps.findIndex((step) => step.wait === 'e2e-cli')
+    const upload = steps.findIndex((step) => step.id === 'e2e-build-upload')
+    const native = steps.findIndex((step) => step.id === 'electron-native-runtime')
+    const fallback = steps.findIndex(
+      (step) => step.name === 'Prepare Electron natives for older refs'
+    )
+    const joinedUpload = steps.findIndex((step) => step.wait === 'e2e-build-upload')
+    expect(joinedBuild).toBeGreaterThanOrEqual(0)
+    expect(upload).toBeGreaterThan(joinedBuild)
+    expect(steps[upload].background).toBe(true)
+    expect(native).toBeGreaterThan(upload)
+    expect(steps[native].uses).toBe('./.github/actions/prepare-native-runtime')
+    expect(steps[native].with).toEqual({
+      'native-runtime': 'electron',
+      'node-version': '${{ steps.deps.outputs.node-version }}'
     })
+    expect(steps[native].if).toBe(
+      "steps.native-runtime-action.outputs.available == 'true' && steps.deps.outputs.node-version != ''"
+    )
+    expect(fallback).toBeGreaterThan(native)
+    expect(steps[fallback].uses).toBe('./.github/actions/install-node-dependencies')
+    expect(steps[fallback].with).toEqual({ 'native-runtime': 'electron' })
+    expect(steps[fallback].if).toBe(
+      "steps.native-runtime-action.outputs.available != 'true' || steps.deps.outputs.node-version == ''"
+    )
+    expect(joinedUpload).toBeGreaterThan(fallback)
+    expect(joinedUpload).toBe(steps.length - 1)
+    for (const step of [steps[native], steps[fallback], steps[joinedUpload]]) {
+      expect(step.background).toBeUndefined()
+      expect(step['continue-on-error']).toBeUndefined()
+    }
     for (const jobName of ['e2e', 'changed-e2e', 'orcad-serve-mode-switch', 'orcad-ssh-docker']) {
-      expect(e2eWorkflow.jobs[jobName].needs, jobName).toEqual(['build', 'prepare-native-cache'])
+      const consumer = e2eWorkflow.jobs[jobName]
+      expect(consumer.needs, jobName).toEqual(['build'])
+      expect(
+        consumer.steps.find((step) => step.uses === './.github/actions/install-node-dependencies')
+          .with['native-runtime']
+      ).toBe('electron')
     }
   })
 
@@ -113,7 +143,7 @@ describe('release E2E dispatch contract', () => {
       const downloadStep = job.steps.find((step) => step.name === 'Download E2E build output')
       const runStep = job.steps.find((step) => step.name === runStepName)
 
-      expect(job.needs).toEqual(['build', 'prepare-native-cache'])
+      expect(job.needs).toEqual(['build'])
       expect(downloadStep.with.name).toBe('e2e-build-out${{ inputs.artifact_suffix }}')
       expect(downloadStep.with.path).toBe('out/')
       expect(runStep.run).toContain('SKIP_BUILD=1')

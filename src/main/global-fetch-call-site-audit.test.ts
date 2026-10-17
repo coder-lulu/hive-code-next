@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 // goes through Node's bundled undici, which can crash the whole process when
 // an unread response body pauses the HTTP/1 parser and the peer closes the
 // socket (nodejs/undici#5360, orca#8695). This applies to every Node process
-// we ship: Electron main, the CLI, and the SSH relay.
+// we ship: Electron main and the CLI.
 //
 // Each entry below maps an audited file to its expected number of matching
 // lines. Real call sites must consume or cancel the body on every path,
@@ -14,6 +14,10 @@ import { describe, expect, it } from 'vitest'
 // change means a call site was added, removed, or moved: re-audit the file
 // and update the count.
 const AUDITED_GLOBAL_FETCH_LINES = new Map<string, number>([
+  // Popup fixture handshake cancels its body before creating browser hosts.
+  ['main/browser/browser-popup-compatibility-electron-fixture.ts', 1],
+  // Injected Jira test client returns Response to authenticated-request: JSON/error reader or null 204.
+  ['main/jira/auth-http-fixture.ts', 1],
   // HTTP call sites — body consumed or cancelled on every path, including !ok
   // Lease responses cancel or consume JSON; inference streams are consumed with abort cleanup.
   ['main/artifacts/artifact-cloud-request.ts', 1],
@@ -58,7 +62,7 @@ const AUDITED_GLOBAL_FETCH_LINES = new Map<string, number>([
 // globalThis.fetch`). `typeof globalThis.fetch` type annotations are exempt.
 const GLOBAL_FETCH_LINE = /(^|[^.\w])fetch\(|(?<!typeof )\bglobal(This)?\.fetch\b/
 
-const SCANNED_ROOTS = ['main', 'cli', 'relay']
+const SCANNED_ROOTS = ['main', 'cli']
 
 function globalFetchLineCounts(srcRoot: string): Map<string, number> {
   const counts = new Map<string, number>()
@@ -91,7 +95,7 @@ function globalFetchLineCounts(srcRoot: string): Map<string, number> {
   return counts
 }
 
-describe('global fetch call-site audit (main, cli, relay)', () => {
+describe('global fetch call-site audit (main, cli)', () => {
   it('keeps every global-fetch line audited with its expected count', () => {
     const found = globalFetchLineCounts(join(__dirname, '..'))
 

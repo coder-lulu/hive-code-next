@@ -17,12 +17,23 @@ const AUDITED_NON_NET_FETCH_CALLS = new Map<string, number>([
   ['main/rate-limits/opencode-go-usage-fetcher.ts', 3],
   // Isolated cookie-jar session that does NOT apply the proxy — a pre-existing gap, not a
   // regression: no proxy has ever reached this partition. Keep it listed so it stays visible.
-  ['main/rate-limits/minimax/minimax-request-context.ts', 2],
+  // Two cookie-session calls retain that gap; the third API-key call uses MainHttpClient.
+  // All three responses are consumed or cancelled by parseMiniMaxUsageResponse.
+  ['main/rate-limits/minimax/minimax-request-context.ts', 3],
   // Injected HttpClient, not a session: resolves to net.fetch on defaultSession
   // (main/host/electron-http-client.ts) or to the global-fetch-audited Node fallback.
   ['main/jira/authenticated-request.ts', 1],
   ['main/claude-accounts/oauth-refresh.ts', 1],
   ['main/rate-limits/codex-fetcher.ts', 1],
+  // MainHttpClient paths retain the host proxy fence; each response owner consumes or cancels.
+  ['main/rate-limits/claude-oauth-usage-request.ts', 1],
+  ['main/rate-limits/cursor-fetcher.ts', 1],
+  ['main/rate-limits/gemini-oauth-sources.ts', 2],
+  ['main/rate-limits/gemini-usage-fetcher.ts', 1],
+  ['main/rate-limits/grok-fetcher.ts', 1],
+  ['main/rate-limits/kimi-fetcher.ts', 1],
+  // The API-key response is read as text before either status or payload classification.
+  ['main/rate-limits/opencode-go-usage-api.ts', 1],
   // MainHttpClient delegates to guarded net.fetch on desktop or the audited Node host port.
   ['main/hive-runtime-cloud/hive-runtime-cloud-http-client.ts', 1],
   ['main/hive-runtime-cloud/relay-host/hive-runtime-relay-region-measurement.ts', 1],

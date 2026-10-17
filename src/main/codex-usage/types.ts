@@ -1,3 +1,4 @@
+import type { JsonlFileFingerprint } from '../usage/jsonl-file-fingerprint'
 import type { CodexUsageRawUsage } from './codex-usage-token-delta'
 
 /** Tokens from requests whose prompt exceeded LONG_CONTEXT_THRESHOLD_TOKENS — a subset of the
@@ -120,6 +121,7 @@ export type CodexUsageDailyAggregate = {
 } & CodexLongContextTokens
 
 export type CodexUsagePersistedFile = CodexUsageProcessedFile & {
+  contentFingerprint?: JsonlFileFingerprint | null
   sessions: CodexUsageSession[]
   dailyAggregates: CodexUsageDailyAggregate[]
   /** Event keys this file counted. Resumed/forked rollouts copy earlier

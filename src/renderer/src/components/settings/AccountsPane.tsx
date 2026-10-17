@@ -51,7 +51,8 @@ export function AccountsPane({
   wslDistros = EMPTY_WSL_DISTROS,
   wslCapabilitiesLoading = false,
   accountOwnerPlatform = null,
-  navigationTargetSectionId = null
+  navigationTargetSectionId = null,
+  wslHostDistro = null
 }: AccountsPaneProps): React.JSX.Element {
   const searchQuery = useAppStore((s) => s.settingsSearchQuery)
   const codexRateLimits = useAppStore((s) => s.rateLimits.codex)
@@ -77,7 +78,8 @@ export function AccountsPane({
     wslSupportedPlatform,
     wslAvailable,
     wslDistros,
-    wslCapabilitiesLoading
+    wslCapabilitiesLoading,
+    wslHostDistro
   )
   // The Settings Host is the account authority, independent of the default project host.
   const accountOwner = hostScope.target

@@ -6,7 +6,8 @@ import type { CodexUsageDailyAggregate, CodexUsageSession } from './types'
 // so forks that rewrite session_meta still match. Older caches used session-
 // scoped keys and can double-count after fork/resume (#8006).
 // v6 adds per-request long-context token counts, which older rows cannot be backfilled with.
-export const CODEX_USAGE_SCHEMA_VERSION = 6
+// v7 validates sampled whole-file bytes before reusing cached aggregates.
+export const CODEX_USAGE_SCHEMA_VERSION = 7
 
 export const codexUsageProvider = {
   id: 'codex',

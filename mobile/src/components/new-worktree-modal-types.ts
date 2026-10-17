@@ -1,3 +1,4 @@
+import type { ExecutionHostId } from '../../../src/shared/execution-host'
 import type { Repo as SharedRepo } from '../../../src/shared/repo-types'
 import type { HostCatalogEntry, ConnectionState } from '../transport/types'
 import type { RpcClient } from '../transport/rpc-client'
@@ -31,10 +32,18 @@ export type NewWorktreeModalProps = {
   visible: boolean
   client: RpcClient | null
   hostId?: string
+  /** The host list's badge labels, so a run target reads as its row does. */
+  hostLabelById?: ReadonlyMap<ExecutionHostId, string>
   existingWorktreePaths?: readonly string[]
   existingWorktrees?: readonly { repoId: string; branch: string }[]
   openExternalUrl: (url: string) => void
-  onCreated: (worktreeId: string, name: string, warning?: string) => void
+  /** `executionHost` names the server the workspace was created on; absent for the desktop's own. */
+  onCreated: (
+    worktreeId: string,
+    name: string,
+    warning?: string,
+    executionHost?: ExecutionHostId
+  ) => void
   onClose: () => void
 }
 

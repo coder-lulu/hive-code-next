@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module'
 import { mkdir, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { delimiter, join } from 'node:path'
 
 const require = createRequire(import.meta.url)
 
@@ -33,4 +33,24 @@ export async function seedBundledRipgrep(resourcesDir) {
     await mkdir(dir, { recursive: true })
     await writeFile(join(dir, platform.startsWith('win32-') ? 'rg.exe' : 'rg'), '', 'utf8')
   }
+}
+
+// Headers model architecture; objdump is stubbed for these packaging-layout tests.
+export async function seedClipboardPublisher(resourcesDir, machine) {
+  const binDir = join(resourcesDir, 'bin')
+  await mkdir(binDir, { recursive: true })
+  const elf = Buffer.alloc(64)
+  elf.set([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1])
+  elf.writeUInt16LE(2, 16)
+  elf.writeUInt16LE(machine, 18)
+  elf.writeUInt32LE(1, 20)
+  elf.writeUInt16LE(64, 52)
+  await writeFile(join(binDir, 'orca-wayland-clipboard'), elf)
+}
+
+export async function stubObjdump(root) {
+  const directory = join(root, 'bin')
+  await mkdir(directory)
+  await writeFile(join(directory, 'objdump'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
+  process.env.PATH = `${directory}${delimiter}${process.env.PATH ?? ''}`
 }

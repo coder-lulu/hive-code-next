@@ -11,6 +11,7 @@ const asyncStorage = vi.hoisted(() => ({
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: asyncStorage }))
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
+  AppState: { currentState: 'active' },
   FlatList: 'FlatList',
   Image: 'Image',
   Keyboard: { dismiss: vi.fn() },
@@ -97,6 +98,7 @@ describe('NewWorktreeModal project targets', () => {
 
   beforeEach(() => {
     setCachedRepos('host-1', repos)
+    asyncStorage.getItem.mockResolvedValue(null)
   })
 
   afterEach(() => {
@@ -132,7 +134,12 @@ describe('NewWorktreeModal project targets', () => {
     })
     await flushUpdates()
     expect(pickerItems(renderer, 'Run on')).toEqual([
-      expect.objectContaining({ label: 'DESKTOP-UL1DAG2', id: 'repo-1' }),
+      expect.objectContaining({
+        label: 'DESKTOP-UL1DAG2',
+        id: 'local',
+        hostId: 'local',
+        repo: expect.objectContaining({ id: 'repo-1' })
+      }),
       expect.objectContaining({ label: '切换 Runtime', repo: null })
     ])
     const selector = renderer.root.findByType('MobileRuntimeSelector')
@@ -144,6 +151,89 @@ describe('NewWorktreeModal project targets', () => {
     expect(
       sendRequest.mock.calls.some(([method]) => String(method).startsWith('worktree.create'))
     ).toBe(false)
+  })
+
+  it('ignores stale delegated repos while retaining account Runtime selection', async () => {
+    const sendRequest = vi.fn().mockImplementation((method: string) => {
+      if (method === 'repo.list') {
+        return Promise.resolve({
+          ok: true,
+          result: {
+            repos: [...repos, { ...repos[0], id: 'delegated', executionHostId: 'runtime:other' }]
+          }
+        })
+      }
+      return new Promise(() => {})
+    })
+    const onClose = vi.fn()
+    const onSelect = vi.fn()
+    await act(async () => {
+      renderer = create(
+        createElement(NewWorktreeModal, {
+          visible: true,
+          client: { sendRequest } as unknown as RpcClient,
+          hostId: 'host-1',
+          onCreated: vi.fn(),
+          onClose,
+          runtimeSelection: {
+            name: 'DESKTOP-UL1DAG2',
+            catalog: [],
+            connectionStates: {},
+            onSelect,
+            onPair: vi.fn()
+          }
+        })
+      )
+    })
+    await flushUpdates()
+    expect(pickerItems(renderer, 'Run on')).toEqual([
+      expect.objectContaining({
+        label: 'DESKTOP-UL1DAG2',
+        id: 'local',
+        hostId: 'local',
+        repo: expect.objectContaining({ id: 'repo-1' })
+      }),
+      expect.objectContaining({ label: '切换 Runtime', repo: null })
+    ])
+    const selector = renderer.root.findByType('MobileRuntimeSelector')
+    act(() => selector.props.onSelect('host-1'))
+    expect(onClose).not.toHaveBeenCalled()
+    act(() => selector.props.onSelect('host-2'))
+    expect(onClose).toHaveBeenCalledOnce()
+    expect(onSelect).toHaveBeenCalledWith('host-2')
+    expect(
+      sendRequest.mock.calls.some(([method]) => String(method).startsWith('worktree.create'))
+    ).toBe(false)
+  })
+
+  it('blocks creation for a cached retired selection even when local repositories are available', async () => {
+    const retired = { ...repos[0]!, id: 'retired', executionHostId: 'runtime:other' as const }
+    setCachedRepos('host-1', [...repos, retired])
+    asyncStorage.getItem.mockResolvedValue(
+      JSON.stringify({ hostId: 'host-1', worktreeId: 'retired::main' })
+    )
+    const sendRequest = vi.fn(async (method: string) => ({
+      ok: true,
+      result: method === 'repo.list' ? { repos } : {}
+    }))
+    await act(async () => {
+      renderer = create(
+        createElement(NewWorktreeModal, {
+          visible: true,
+          client: { sendRequest } as unknown as RpcClient,
+          hostId: 'host-1',
+          onCreated: vi.fn(),
+          onClose: vi.fn()
+        })
+      )
+    })
+    await flushUpdates()
+    const form = renderer.root.find((node) => typeof node.props.onCreate === 'function')
+    expect(form.props.error).toContain('Runtime')
+    await act(async () => form.props.onCreate())
+    expect(sendRequest.mock.calls.some(([method]) => method.startsWith('worktree.create'))).toBe(
+      false
+    )
   })
 
   it('keeps the cached repos when the in-flight repo.list rejects on a dropped connection', async () => {
@@ -226,7 +316,7 @@ describe('NewWorktreeModal project targets', () => {
     expect(pickerItems(renderer, 'Run on')).toEqual([
       expect.objectContaining({ label: LOCAL_HOST_LABEL, detail: '/src/orca' }),
       expect.objectContaining({
-        label: 'SSH · build-server',
+        label: 'build-server',
         detail: '/home/dev/orca'
       })
     ])

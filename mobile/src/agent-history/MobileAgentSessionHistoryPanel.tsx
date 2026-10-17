@@ -2,10 +2,10 @@ import { productNameText } from '@/product-brand'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native'
 import { SafeAreaView } from 'react-native-safe-area-context'
-import { useRouteHandoff } from '../navigation/route-handoff'
 import { ChevronLeft, RefreshCw } from 'lucide-react-native'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
-import { useHostClient } from '../transport/client-context'
+import { useWorkspaceClient } from '../transport/use-workspace-client'
+import { useWorkspaceRouteHandoff } from '../navigation/workspace-route-handoff'
 import { worktreeCatalogRead } from '../worktree/worktree-catalog-operations'
 import { getWorktreeLabel } from '../session/worktree-label'
 import {
@@ -52,10 +52,10 @@ export function MobileAgentSessionHistoryPanel({
   name = ''
 }: MobileAgentSessionHistoryPanelProps) {
   // The shell hands native-only routes back to the app; on a phone this is the Expo router.
-  const router = useRouteHandoff()
+  const router = useWorkspaceRouteHandoff()
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createAgentHistoryStyles)
-  const { client, state: connState } = useHostClient(hostId)
+  const { client, state: connState } = useWorkspaceClient(hostId)
   const claimResumeOwnership = useMobileResumeOperationOwnership(
     hostId,
     worktreeId,

@@ -160,6 +160,9 @@ export function registerRuntimeWindowLifecycle(
       send('ui:splitTerminal', {
         tabId,
         paneRuntimeId,
+        worktreeId: opts.worktreeId,
+        sourceLeafId: opts.sourceLeafId,
+        newLeafId: opts.newLeafId,
         direction: opts.direction,
         command: opts.command,
         telemetrySource: opts.telemetrySource
@@ -174,13 +177,14 @@ export function registerRuntimeWindowLifecycle(
       requestSessionTabCloseFromRenderer(mainWindow, tabId, worktreeId),
     moveSessionTab: (worktreeId: string, move: RuntimeMobileSessionTabMove) =>
       send('ui:moveSessionTab', { worktreeId, ...move }),
-    openFile: (worktreeId, filePath, relativePath, runtimeEnvironmentId?, navigation?) =>
+    openFile: (worktreeId, filePath, relativePath, runtimeEnvironmentId?, navigation?, position?) =>
       send('ui:openFileFromMobile', {
         worktreeId,
         filePath,
         relativePath,
         runtimeEnvironmentId,
-        ...(navigation ? { navigation } : {})
+        ...(navigation ? { navigation } : {}),
+        ...(position ? { position } : {})
       }),
     openDiff: (worktreeId, filePath, relativePath, staged, runtimeEnvironmentId?, navigation?) =>
       send('ui:openDiffFromMobile', {

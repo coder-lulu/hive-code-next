@@ -1,5 +1,5 @@
 import { existsSync, realpathSync } from 'node:fs'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -25,6 +25,15 @@ it('loads the copied process package from an unpacked CLI without checkout depen
     expect(resource).toBeDefined()
     expect(resource.filter).toEqual(['package.json', 'dist/**/*'])
     const packageDir = await stagePackagedProcessHost(resourcesDir)
+    const sourceManifestPath = join(resource.from, 'package.json')
+    const stagedManifestPath = join(packageDir, 'package.json')
+    const sourceManifest = await readFile(sourceManifestPath, 'utf8')
+    const [sourceStat, stagedStat] = await Promise.all([
+      stat(sourceManifestPath, { bigint: true }),
+      stat(stagedManifestPath, { bigint: true })
+    ])
+    expect([stagedStat.dev, stagedStat.ino]).not.toEqual([sourceStat.dev, sourceStat.ino])
+    expect(await readFile(stagedManifestPath, 'utf8')).toBe(sourceManifest)
     expect(existsSync(join(packageDir, 'src'))).toBe(false)
 
     const { outDir, entry } = await writePackagedProcessHostConsumer(resourcesDir)
@@ -33,6 +42,8 @@ it('loads the copied process package from an unpacked CLI without checkout depen
     const result = runPackagedProcessHostConsumer(nodeExecutable, resourcesDir, entry)
     expect(result.code, result.stderr).toBe(0)
     expect(result.stdout).toBe('copied-runtime')
+    await writeFile(stagedManifestPath, '{"name":"isolated-package-fixture"}\n')
+    expect(await readFile(sourceManifestPath, 'utf8')).toBe(sourceManifest)
   } finally {
     await removeTree(resourcesDir)
   }

@@ -102,7 +102,8 @@ it('gates Ruby independently and retains mobile static validation', () => {
   for (const file of [
     'config/scripts/mobile-release-check-scope.mjs',
     'config/scripts/mobile-release-check-scope.test.mjs',
-    'config/scripts/pr-code-change-scope.mjs'
+    'config/scripts/pr-code-change-scope.mjs',
+    'config/scripts/pr-package-test-paths.mjs'
   ]) {
     expect(workflow.on.pull_request.paths.some((pattern) => matchesGlob(file, pattern))).toBe(true)
   }
@@ -137,7 +138,9 @@ function fixture(detectorStep = detector) {
   for (const file of [
     'package.json',
     'config/scripts/pr-code-change-scope.mjs',
+    'config/scripts/pr-package-test-paths.mjs',
     'config/scripts/pr-layout-oracle-route.mjs',
+    'config/scripts/pr-daemon-init-test-scope.mjs',
     'config/scripts/mobile-release-check-scope.mjs',
     'config/scripts/mobile-test-change-scope.mjs'
   ]) {

@@ -219,7 +219,7 @@ describe('OnboardingFlow', () => {
     )
   })
 
-  it('renders onboarding inside a centered modal shell', () => {
+  it('exposes an accessible onboarding dialog', () => {
     const html = renderOnboardingFlow({
       onboarding: getDefaultOnboardingState(),
       onOnboardingChange: vi.fn()

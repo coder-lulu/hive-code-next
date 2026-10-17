@@ -1,10 +1,11 @@
 import { View } from 'react-native'
-import { Monitor } from 'lucide-react-native'
+import { getRepoExecutionHostId } from '../../../src/shared/execution-host'
 import type { SmartModeAvailabilityInput } from '../tasks/mobile-smart-source-modes'
 import type { PasteRepoCandidate } from '../tasks/smart-source-paste-intent'
 import type { useMobileComposerSource } from '../tasks/use-mobile-composer-source'
 import { MobileRuntimeSelector } from '../runtime-directory/MobileRuntimeSelector'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
+import { HostKindIcon } from './HostKindIcon'
 import { MobileAgentIcon } from './MobileAgentIcon'
 import type { NewWorktreeAgentOption } from './new-worktree-agent-selection'
 import { createNewWorktreeModalStyles } from './new-worktree-modal-styles'
@@ -17,6 +18,7 @@ import { getMobileWorkspaceRepoBadgeColor } from './new-worktree-modal-types'
 import { PickerListDrawer } from './PickerListDrawer'
 import { SetupHookTrustDrawer, type SetupTrustPrompt } from './SetupHookTrustDrawer'
 import { SmartWorkspaceSourceDrawer } from './SmartWorkspaceSourceDrawer'
+import type { JiraSite, JiraSiteSelection } from '../../../src/shared/jira-types'
 import type { NewWorktreeDrawerView } from './use-new-worktree-drawer-navigation'
 
 type Composer = ReturnType<typeof useMobileComposerSource>
@@ -33,8 +35,11 @@ export function NewWorktreeModalDrawers(props: {
   composer: Composer
   sourceAvailability: SmartModeAvailabilityInput
   selectedRepo: MobileWorkspaceRepo | null
+  /** The picked repo's host's repos: a source can switch repos only within that host. */
   repos: MobileWorkspaceRepo[]
   pasteRepos: PasteRepoCandidate[]
+  jiraSiteId: JiraSiteSelection | null
+  jiraSites: readonly JiraSite[]
   sshReady: boolean
   projectPickerItems: NewWorkspaceProjectOption<MobileWorkspaceRepo>[]
   selectedProjectId: string | null
@@ -59,6 +64,7 @@ export function NewWorktreeModalDrawers(props: {
       ? [
           {
             id: 'switch-runtime',
+            hostId: undefined,
             label: '切换 Runtime',
             detail: '选择账号中的电脑；切换后重新选择项目',
             repo: null
@@ -75,6 +81,8 @@ export function NewWorktreeModalDrawers(props: {
         availability={props.sourceAvailability}
         repoId={props.selectedRepo?.id ?? null}
         repos={props.pasteRepos}
+        jiraSiteId={props.jiraSiteId}
+        jiraSites={props.jiraSites}
         sshReady={props.sshReady}
         onRepoChange={(repoId) => {
           const nextRepo = props.repos.find((repo) => repo.id === repoId)
@@ -106,10 +114,10 @@ export function NewWorktreeModalDrawers(props: {
         visible={props.visible && props.drawerView === 'runTarget'}
         title="Run on"
         items={runTargets}
-        selectedId={props.selectedRepo?.id ?? ''}
+        selectedId={props.selectedRepo ? getRepoExecutionHostId(props.selectedRepo) : ''}
         onSelect={(item) => (item.repo ? props.onRepoChange(item.repo) : props.onOpenRuntime())}
         onClose={props.onTransitionToForm}
-        renderIcon={() => <Monitor size={16} color={theme.color.text.secondary} />}
+        renderIcon={(item) => <HostKindIcon hostId={item.hostId} size={16} />}
       />
 
       <PickerListDrawer

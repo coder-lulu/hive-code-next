@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { getAiVaultResumeWorkspaceExecutionHostId } from '@/lib/ai-vault-resume-target'
+import { useTranslation } from 'react-i18next'
+import { useAppStore } from '@/store'
 import {
   ALL_EXECUTION_HOSTS_SCOPE,
   LOCAL_EXECUTION_HOST_ID,
@@ -76,6 +78,41 @@ export function useAiVaultExecutionHostScope(args: {
     activeExecutionHostScope,
     onExecutionHostScopeChange: handleExecutionHostScopeChange
   }
+}
+
+/** The panel's host menu: every known host, defaulting to the workspace's own. */
+export function useAiVaultPanelHostScope(
+  workspaceId: string | null,
+  resumeTargetState: AiVaultSessionResumeTargetState
+): ReturnType<typeof useAiVaultExecutionHostScope> & {
+  hostScopeOptions: AiVaultHostScopeOption[]
+} {
+  const { i18n } = useTranslation()
+  const runtimeEnvironments = useAppStore((s) => s.runtimeEnvironments)
+  const runtimeHostOptions = useMemo(
+    () => buildRuntimeAiVaultHostScopeOptions(runtimeEnvironments),
+    [runtimeEnvironments]
+  )
+  const availableExecutionHostScopes = useMemo(
+    () => runtimeHostOptions.map((option) => option.id),
+    [runtimeHostOptions]
+  )
+  const hostScope = useAiVaultExecutionHostScope({
+    activeWorktreeId: workspaceId,
+    resumeTargetState,
+    availableExecutionHostScopes
+  })
+  const { activeExecutionHostScope } = hostScope
+  const hostScopeOptions = useMemo(
+    () =>
+      buildAiVaultHostScopeOptions({
+        activeExecutionHostScope,
+        runtimeHostOptions,
+        language: i18n.resolvedLanguage
+      }),
+    [activeExecutionHostScope, runtimeHostOptions, i18n.resolvedLanguage]
+  )
+  return { ...hostScope, hostScopeOptions }
 }
 
 export function resolveAiVaultHostScopeDefaults(

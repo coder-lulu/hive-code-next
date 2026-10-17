@@ -296,7 +296,7 @@ afterEach(async () => {
 })
 
 // Pointers are sent on asynchronous edges; the default 1s wait is too tight under a loaded parallel run.
-export const WAIT = { timeout: 10_000 }
+export const WAIT = { timeout: 10_000, interval: 10 }
 
 export const POINTER = new RegExp(
   `You have 1 orchestration message\\. Run \`${escapeRegex(PRIMARY_CLI_COMMAND)} orchestration check --run run_\\w+\`\\.`

@@ -29,6 +29,10 @@ jobs:
     permissions:
       contents: write
 
+    outputs:
+      publish_release: ${{ steps.release.outputs.publish_release }}
+      version: ${{ steps.release.outputs.version }}
+
     defaults:
       run:
         working-directory: mobile

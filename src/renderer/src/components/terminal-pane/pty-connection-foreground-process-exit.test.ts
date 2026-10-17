@@ -191,6 +191,7 @@ describe('connectPanePty process-exit retirement', () => {
 
     expect(mockStoreState.paneForegroundAgentByPaneKey[cacheKey]).toEqual({
       agent: null,
+      agentEvidence: 'process-read',
       shellForeground: false
     })
     expect(mockStoreState.clearAgentLaunchConfig).toHaveBeenCalledWith(cacheKey)

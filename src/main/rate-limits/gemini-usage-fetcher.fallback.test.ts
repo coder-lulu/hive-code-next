@@ -1,4 +1,6 @@
+import { loadProjectId, refreshAccessToken } from './gemini-oauth-sources'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { setMainHttpClient } from '../network/http-client'
 import {
   expiredCreds,
   makeResponse,
@@ -6,11 +8,11 @@ import {
   validCreds
 } from './gemini-usage-fetcher.test-fixtures'
 
-const { readFileMock, extractCredsMock, netFetchMock } = vi.hoisted(() => ({
+const { readFileMock, extractCredsMock } = vi.hoisted(() => ({
   readFileMock: vi.fn(),
-  extractCredsMock: vi.fn(),
-  netFetchMock: vi.fn()
+  extractCredsMock: vi.fn()
 }))
+const fetchMock = vi.fn()
 
 // Why: mock the CLI-credential extractor at the module boundary. The extractor
 // is a self-contained dependency with a simple async contract (returns a
@@ -31,11 +33,9 @@ vi.mock('node:fs/promises', () => ({
   rename: vi.fn().mockResolvedValue(undefined)
 }))
 
-vi.mock('electron', () => ({
-  net: { fetch: netFetchMock }
-}))
-
 import { fetchGeminiRateLimits } from './gemini-usage-fetcher'
+
+setMainHttpClient({ fetch: fetchMock, proxySession: () => null })
 
 describe('fetchGeminiRateLimits fallback oauth creds', () => {
   beforeEach(() => {
@@ -43,7 +43,7 @@ describe('fetchGeminiRateLimits fallback oauth creds', () => {
     vi.setSystemTime(new Date('2026-04-24T12:00:00.000Z'))
     readFileMock.mockReset()
     extractCredsMock.mockReset()
-    netFetchMock.mockReset()
+    fetchMock.mockReset()
     extractCredsMock.mockResolvedValue({
       clientId: 'client-id-123',
       clientSecret: 'client-secret-456'
@@ -60,7 +60,7 @@ describe('fetchGeminiRateLimits fallback oauth creds', () => {
       }
       throw { code: 'ENOENT' }
     })
-    netFetchMock
+    fetchMock
       .mockResolvedValueOnce(makeResponse({ cloudaicompanionProject: 'proj-123' }))
       .mockResolvedValueOnce(makeResponse(quotaResponse))
 
@@ -81,7 +81,7 @@ describe('fetchGeminiRateLimits fallback oauth creds', () => {
       }
       throw { code: 'ENOENT' }
     })
-    netFetchMock
+    fetchMock
       .mockResolvedValueOnce(makeResponse({ cloudaicompanionProject: 'cli-proj-456' }))
       .mockResolvedValueOnce(makeResponse(quotaResponse))
 
@@ -91,7 +91,7 @@ describe('fetchGeminiRateLimits fallback oauth creds', () => {
     expect(result.error).toBeNull()
     expect(result.session).not.toBeNull()
 
-    const quotaCall = netFetchMock.mock.calls.find(
+    const quotaCall = fetchMock.mock.calls.find(
       (call) => typeof call[0] === 'string' && call[0].includes('retrieveUserQuota')
     )
     expect(quotaCall).toBeDefined()
@@ -109,7 +109,7 @@ describe('fetchGeminiRateLimits fallback oauth creds', () => {
       }
       throw { code: 'ENOENT' }
     })
-    netFetchMock
+    fetchMock
       .mockResolvedValueOnce(
         makeResponse({ access_token: 'bundle-refreshed-token', expires_in: 3600 })
       )
@@ -122,7 +122,7 @@ describe('fetchGeminiRateLimits fallback oauth creds', () => {
     expect(result.error).toBeNull()
     expect(result.session).not.toBeNull()
 
-    const refreshCall = netFetchMock.mock.calls.find(
+    const refreshCall = fetchMock.mock.calls.find(
       (call) => typeof call[0] === 'string' && call[0].includes('oauth2.googleapis.com')
     )
     expect(refreshCall).toBeDefined()
@@ -167,7 +167,7 @@ describe('fetchGeminiRateLimits fallback oauth creds', () => {
       }
       throw { code: 'ENOENT' }
     })
-    netFetchMock.mockResolvedValueOnce(makeResponse('Internal Server Error', 500))
+    fetchMock.mockResolvedValueOnce(makeResponse('Internal Server Error', 500))
 
     const result = await fetchGeminiRateLimits(true)
 
@@ -182,6 +182,40 @@ describe('fetchGeminiRateLimits fallback oauth creds', () => {
     expect(result.error).toContain('disabled')
     expect(readFileMock).not.toHaveBeenCalled()
     // No network calls should have been made.
-    expect(netFetchMock).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
   })
+  it.each([401, 403, 429, 500, 200])(
+    'releases the real OAuth refresh failure body HTTP %s',
+    async (status) => {
+      const response = new Response('invalid JSON', { status })
+      if (!response.body) {
+        throw new Error('Expected response body')
+      }
+      const cancel = vi.spyOn(response.body, 'cancel')
+      fetchMock.mockResolvedValueOnce(response)
+      const request = refreshAccessToken('refresh', 'client', 'secret')
+      await (status === 200
+        ? expect(request).rejects.toThrow()
+        : expect(request).resolves.toEqual({ accessToken: null, newRefreshToken: null }))
+      expect(cancel).toHaveBeenCalledOnce()
+      expect(response.bodyUsed).toBe(true)
+    }
+  )
+
+  it.each([401, 403, 429, 500, 200])(
+    'releases the real project lookup failure body HTTP %s',
+    async (status) => {
+      const response = new Response('invalid JSON', { status })
+      if (!response.body) {
+        throw new Error('Expected response body')
+      }
+      const cancel = vi.spyOn(response.body, 'cancel')
+      fetchMock.mockResolvedValueOnce(response)
+      await expect(loadProjectId('access')).rejects.toThrow(
+        status === 200 ? undefined : `Failed to load Gemini project ID (HTTP ${status})`
+      )
+      expect(cancel).toHaveBeenCalledOnce()
+      expect(response.bodyUsed).toBe(true)
+    }
+  )
 })

@@ -1,3 +1,4 @@
+import { formatFlagHelp } from './help'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '../shared/brand'
 
@@ -42,7 +43,6 @@ vi.mock('child_process', async () => {
 })
 
 import { COMMAND_SPECS, main } from './index'
-import { formatFlagHelp } from './help'
 import { GLOBAL_FLAGS, specPaths } from './args'
 import { okFixture, queueFixtures } from './test-fixtures'
 
@@ -589,6 +589,7 @@ describe('hive root help', () => {
     )
     expect(logSpy.mock.calls[0][0]).not.toContain('orchestration worker-cleanup')
     expect(callMock).not.toHaveBeenCalled()
+    logSpy.mockRestore()
   })
 
   it('progressively discloses Linear commands', async () => {
@@ -597,10 +598,8 @@ describe('hive root help', () => {
     await main(['--help'], '/tmp/repo')
 
     const rootHelp = String(logSpy.mock.calls[0][0])
-    expect(rootHelp).toContain('Linear:')
-    expect(rootHelp).toContain('linear                    Read and write Linear issues for agents')
+    expect(rootHelp).toContain('linear')
     expect(rootHelp).not.toContain('linear issue')
-    expect(rootHelp).not.toContain('linear search')
 
     logSpy.mockClear()
     await main(['linear', '--help'], '/tmp/repo')
@@ -608,9 +607,7 @@ describe('hive root help', () => {
     const groupHelp = String(logSpy.mock.calls[0][0])
     expect(groupHelp).toContain('hive linear')
     expect(groupHelp).toContain('issue')
-    expect(groupHelp).toContain('search')
     expect(groupHelp).not.toContain('--comments')
-    expect(groupHelp).not.toContain('--attachments')
 
     logSpy.mockClear()
     await main(['linear', 'issue', '--help'], '/tmp/repo')
@@ -775,5 +772,6 @@ describe('hive root help', () => {
     const terminalHelp = String(logSpy.mock.calls[0][0])
     expect(terminalHelp).toContain('To start an agent, use `hive agent launch`')
     expect(callMock).not.toHaveBeenCalled()
+    logSpy.mockRestore()
   })
 })

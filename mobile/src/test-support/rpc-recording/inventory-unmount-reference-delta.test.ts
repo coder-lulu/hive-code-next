@@ -3,7 +3,13 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterAll, expect, it } from 'vitest'
 import { familyGoldens } from './derived-goldens'
-import { compareGolden, goldenBytes, goldenRecording, readGolden } from './golden-recording'
+import {
+  compareGolden,
+  goldenBytes,
+  goldenRecording,
+  readGolden,
+  readGoldenRaw
+} from './golden-recording'
 import {
   INVENTORY_UNMOUNT_REFERENCE_ID,
   inventoryUnmountExpectedReference
@@ -17,8 +23,14 @@ import type { Recording } from './recording-scenario'
 
 const root = resolve(import.meta.dirname, '../../../..')
 const directory = resolve(root, 'mobile/rpc-foundation/goldens')
-const reference = readGolden(directory, INVENTORY_UNMOUNT_REFERENCE_ID)
+const reference = readGoldenRaw(directory, INVENTORY_UNMOUNT_REFERENCE_ID)
 const expected = inventoryUnmountExpectedReference(reference)
+const product = readGolden(directory, INVENTORY_UNMOUNT_REFERENCE_ID)
+
+it('the verified product reference contains exactly the approved source delta', () => {
+  compareGolden(expected, product)
+})
+
 const prefix = 'inventory-lifecycle.unmount-before-1:'
 const guardPath = resolve(root, 'mobile/src/session/use-mobile-native-chat-file-search.ts')
 const guardSource = readFileSync(guardPath)
@@ -216,7 +228,7 @@ it('the current mounted owner matches the approved source delta before mutation'
     vitestRecordingScheduler()
   )
   compareGolden(
-    goldenRecording([unmounted], variant(expected.recording, unmounted.id)),
+    goldenRecording([unmounted], variant(product.recording, unmounted.id)),
     goldenRecording([unmounted], actual)
   )
   for (const item of actual.checkpoints.filter((item) =>

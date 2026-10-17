@@ -48,6 +48,11 @@ function standaloneMobile() {
     mkdirSync(dirname(destination), { recursive: true })
     cpSync(join(repository, 'mobile', file), destination, { recursive: true })
   }
+  for (const file of ['upstream-recording-inputs.mjs', 'upstream-recording-adapters.mjs']) {
+    const destination = join(root, 'config', 'scripts', file)
+    mkdirSync(dirname(destination), { recursive: true })
+    cpSync(join(repository, 'config', 'scripts', file), destination)
+  }
   writeFileSync(join(mobile, 'package.json'), JSON.stringify(manifest))
   mkdirSync(join(mobile, 'rpc-foundation', 'goldens'), { recursive: true })
   mkdirSync(join(mobile, 'node_modules', '@orca'), { recursive: true })
@@ -109,6 +114,6 @@ it('refuses the retired recording invocation without frozen source provenance', 
   const result = rpcCommand(join(repository, 'mobile'), 'rpc:record', ['unreviewed-scenario'])
   expect(result.code).not.toBe(0)
   expect(result.stderr).toContain(
-    'Use --record-hive|--publish-hive <source-sha> <upstream-sha> with RPC_FOUNDATION_RECORD=1'
+    'Use --record-hive|--publish-hive <source-input.json> <logs-output-directory> with RPC_FOUNDATION_RECORD=1'
   )
 })

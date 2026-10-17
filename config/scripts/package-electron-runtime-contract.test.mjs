@@ -50,6 +50,26 @@ describe('Electron runtime package contract', () => {
     ])
   })
 
+  // Without it the secure-file writes report unrestricted and orcad's privacy check fails closed.
+  it('ships the native Windows ACL addon on Windows only, built by the Windows rebuild', () => {
+    expect(packageJson.optionalDependencies['@orca/windows-security']).toBe('workspace:*')
+    expect(pnpmWorkspace.allowBuilds['@orca/windows-security']).toBe(false)
+    if (windowsAddonsInstalled) {
+      expect(packageTargets.win32).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ to: join('node_modules', '@orca', 'windows-security') })
+        ])
+      )
+    }
+    for (const platform of ['darwin', 'linux']) {
+      expect(packageTargets[platform]).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ to: join('node_modules', '@orca', 'windows-security') })
+        ])
+      )
+    }
+  })
+
   it('keeps the native Windows process-table addon optional and platform-gated', () => {
     expectWindowsAddon('@vscode/windows-process-tree', '0.8.0')
     // The patch removes unavailable Spectre libraries and the 1024-process enumeration cap.
@@ -133,8 +153,20 @@ describe('Electron runtime package contract', () => {
     expect(scripts['build:linux']).not.toContain('build:keyboard-layout-macos')
     expect(scripts['build:mac']).toBe('pnpm run clients:build -- --target macos')
     const desktop = readProject('config/scripts/client-build-desktop.mjs')
-    const nativeDispatch = desktop.match(
-      /if \(target\.host === 'darwin'\) \{\s*for \(const script of \[([\s\S]*?)\]\) \{\s*await pnpmStep\(context, script\.replaceAll\(':', '-'\), \['run', script\]\)\s*\}\s*\}/
+    expect(desktop).toContain(
+      "await pnpmStep(context, 'desktop-native-tools', ['run', 'build:native'])"
+    )
+    expect(scripts['build:native']).toBe('node config/scripts/build-native-for-platform.mjs')
+    const nativeBuild = readProject('config/scripts/build-native-for-platform.mjs')
+    const nativeDispatch = nativeBuild.match(
+      /const exitCodes = await Promise\.all\(\s*\[([\s\S]*?)\]\.map\(\s*\(scriptName\) => runPnpmScript\(scriptName\)\s*\)\s*\)/
+    )
+    const macHostGuard = nativeBuild.match(
+      /if \(process\.platform !== 'darwin'\) \{[^}]*\}[^}]*process\.exit\(0\)\s*\}/
+    )
+    expect(macHostGuard).not.toBeNull()
+    expect(nativeBuild.indexOf(macHostGuard[0])).toBeLessThan(
+      nativeBuild.indexOf('const exitCodes =')
     )
     const macHelpers = [
       'build:computer-macos',
@@ -146,7 +178,8 @@ describe('Electron runtime package contract', () => {
       macHelpers
     )
     for (const helper of macHelpers) {
-      expect(desktop.split(`'${helper}'`)).toHaveLength(2)
+      expect(nativeBuild.split(`'${helper}'`)).toHaveLength(2)
+      expect(desktop).not.toContain(`'${helper}'`)
     }
     for (const [name, host, arch] of [
       ['windows-x64', 'win32', 'x64'],
@@ -285,70 +318,6 @@ describe('Electron runtime package contract', () => {
       expect(section, file).toBeDefined()
       expect(section, file).toContain('consoleProcessList = [shellPid];')
     }
-  })
-
-  it('pins the Windows release builder to the VS 2022 runner image', () => {
-    const releaseWorkflow = parse(readProject('.github/workflows/release-cut.yml'))
-    const windowsReleaseEntry = releaseWorkflow.jobs.build.strategy.matrix.include.find(
-      ({ platform }) => platform === 'win'
-    )
-
-    expect(windowsReleaseEntry.os).toBe('windows-2022')
-  })
-
-  it('keeps release-cut signing provenance on GitHub-hosted runners', () => {
-    const releaseWorkflow = parse(readProject('.github/workflows/release-cut.yml'))
-    const buildMatrixRunners = releaseWorkflow.jobs.build.strategy.matrix.include.map(
-      ({ os }) => os
-    )
-    const releaseWorkflowText = readProject('.github/workflows/release-cut.yml')
-    const macDispatchStep = releaseWorkflow.jobs['build-mac'].steps.find(
-      (step) => step.name === 'Run isolated macOS release build'
-    )
-
-    expect(releaseWorkflowText).not.toContain('blacksmith-')
-    expect(releaseWorkflow.jobs['build-mac']['runs-on']).toBe('ubuntu-latest')
-    expect(releaseWorkflow.jobs['build-mac'].permissions.actions).toBe('write')
-    expect(macDispatchStep.run).toBe('node config/scripts/run-release-mac-build-workflow.mjs')
-    expect(macDispatchStep.env.RELEASE_MAC_BUILD_WORKFLOW).toBe('release-mac-build.yml')
-    expect(macDispatchStep.env.RELEASE_MAC_BUILD_TAG).toBe('${{ needs.cut.outputs.tag }}')
-    expect(buildMatrixRunners).not.toContain('blacksmith-6vcpu-macos-15')
-    expect(releaseWorkflow.jobs['publish-release'].needs).toContain('build')
-    expect(releaseWorkflow.jobs['publish-release'].needs).toContain('build-mac')
-  })
-
-  it('runs the macOS release build in an isolated Blacksmith workflow', () => {
-    const releaseMacWorkflowText = readProject('.github/workflows/release-mac-build.yml')
-    const releaseMacWorkflow = parse(releaseMacWorkflowText)
-    const buildMacJob = releaseMacWorkflow.jobs['build-mac']
-    const checkoutStep = buildMacJob.steps.find((step) => step.name === 'Checkout')
-    const publishStep = buildMacJob.steps.find(
-      (step) => step.name === 'Build release artifacts (macOS)'
-    )
-
-    expect(releaseMacWorkflow['run-name']).toBe(
-      'Mac release build ${{ inputs.tag }} (${{ inputs.release_run_id }})'
-    )
-    expect(releaseMacWorkflow.on.workflow_dispatch.inputs.tag.required).toBe(true)
-    expect(releaseMacWorkflow.on.workflow_dispatch.inputs.release_run_id.required).toBe(true)
-    expect(buildMacJob['runs-on']).toBe('blacksmith-6vcpu-macos-15')
-    expect(checkoutStep.with.ref).toBe('refs/tags/${{ inputs.tag }}')
-    expect(publishStep.with.command).toContain('ORCA_MAC_RELEASE=1')
-    expect(publishStep.with.command).toContain('electron-builder')
-    expect(publishStep.with.command).toContain('--mac --publish never')
-    expect(releaseMacWorkflowText).not.toContain('signpath/')
-    expect(releaseMacWorkflowText).not.toContain('SIGNPATH_')
-  })
-
-  it('publishes both Linux release matrix entries', () => {
-    const parsedWorkflow = parse(readProject('.github/workflows/release-cut.yml'))
-    const publishLinuxStep = parsedWorkflow.jobs.build.steps.find(
-      (step) => step.name === 'Publish release artifacts (Linux)'
-    )
-
-    expect(publishLinuxStep.if).toContain("matrix.platform == 'linux-x64'")
-    expect(publishLinuxStep.if).toContain("matrix.platform == 'linux-arm64'")
-    expect(publishLinuxStep.with.command).toBe('${{ matrix.release_command }}')
   })
 
   it('keeps Linux postinstall repairing Chromium sandbox permissions', () => {

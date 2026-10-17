@@ -670,8 +670,7 @@ describe('structured chat adoption guard on the launch path', () => {
 
     expect(result?.tabId).toBe('tab-1')
     expect(mockLaunchStructuredCodexSession).not.toHaveBeenCalled()
-    expect(store.queueTabStartupCommand).toHaveBeenCalledWith(
-      'tab-1',
+    expect(mockCreateTab.mock.calls.at(-1)?.[3]?.pendingStartup).toEqual(
       expect.objectContaining({
         agentPermissionMode: 'manual',
         command: "codex '--ask-for-approval' 'on-request' '--sandbox' 'workspace-write'",
@@ -680,6 +679,7 @@ describe('structured chat adoption guard on the launch path', () => {
         })
       })
     )
+    expect(store.queueTabStartupCommand).not.toHaveBeenCalled()
     expect(mockCreateTab.mock.calls.at(-1)?.[3]).not.toHaveProperty('agentPermissionMode')
   })
 

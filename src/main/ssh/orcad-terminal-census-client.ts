@@ -5,6 +5,7 @@ import { APP_DISPLAY_NAME } from '../../shared/brand'
  */
 import { ORCAD_TERMINAL_CENSUS_RUNTIME_CAPABILITY } from '../../shared/orcad-runtime-capabilities'
 import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/electron-remote-runtime-client-capabilities'
+import type { PairingOffer } from '../../shared/pairing'
 import {
   getPreferredPairingOffer,
   type KnownRuntimeEnvironment
@@ -47,8 +48,27 @@ export async function collectManagedTerminalCensus(
     await ensureOrcadManagedTunnel(userDataPath, environment.id)
     // A server that idled out behind a forward still up is started first, or it never answers.
     await verifyOrcadManagedServing(userDataPath, environment.id)
-    const response = await sendRemoteRuntimeRequestWithStatusPreflight<unknown>(
+    return await requestOrcadTerminalCensus(
       getPreferredPairingOffer(environment),
+      activatedAt,
+      timeoutMs,
+      options
+    )
+  } catch {
+    return UNVERIFIABLE
+  }
+}
+
+/** The census over an already-open connection; any failure is unverifiable, never zero. */
+export async function requestOrcadTerminalCensus(
+  connection: PairingOffer,
+  activatedAt: number,
+  timeoutMs = 15_000,
+  options: { releaseFinishedAutomationTerminals?: boolean } = {}
+): Promise<OrcadTerminalCensus> {
+  try {
+    const response = await sendRemoteRuntimeRequestWithStatusPreflight<unknown>(
+      connection,
       ORCAD_TERMINAL_CENSUS_METHOD,
       {
         activatedAt,

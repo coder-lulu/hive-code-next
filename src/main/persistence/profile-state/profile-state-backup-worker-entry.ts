@@ -1,5 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { writeProfileStateBackup } from './profile-state-backup-job'
+import { encodeProfileStateWriterError } from './profile-state-writer-errors'
 import { isRecord } from './profile-state-document-validation'
 
 if (!parentPort) {
@@ -25,6 +26,6 @@ void writeProfileStateBackup({
 })
   .then(
     () => port.postMessage({ ok: true }),
-    (error: unknown) => port.postMessage({ ok: false, error: String(error) })
+    (error: unknown) => port.postMessage({ ok: false, error: encodeProfileStateWriterError(error) })
   )
   .finally(() => port.close())

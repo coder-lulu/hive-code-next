@@ -26,6 +26,7 @@ import { browserSessionRegistry } from '../browser/browser-session-registry'
 import { applyBrowserSessionProxies } from '../browser/browser-session-proxy'
 import { setMainUiLanguage } from '../i18n/main-i18n'
 import { rebuildAppMenu } from '../menu/register-app-menu'
+import { rebuildSystemTrayMenu } from '../tray/system-tray'
 import { applyElectronProxySettings } from '../network/proxy-settings'
 import type { Store } from '../persistence'
 import { track } from '../telemetry/client'
@@ -178,6 +179,7 @@ export function registerSettingsMutationHandler(
     if ('uiLanguage' in sanitizedArgs && before.uiLanguage !== result.uiLanguage) {
       await setMainUiLanguage(result.uiLanguage)
       rebuildAppMenu()
+      rebuildSystemTrayMenu()
     }
     if (
       ('workspaceDir' in sanitizedArgs && before.workspaceDir !== result.workspaceDir) ||

@@ -6,6 +6,9 @@
     "managedData": {
       "description": "Add accounts by running this command in a terminal on the HiveCode host. Selection applies to new explicit agent launches on that host; direct SSH relay and Windows-hosted WSL launches use their own credentials.",
       "upgrade": "If accounts do not appear, update or restart the HiveCode host."
+    },
+    "wslAccountNotApplied": {
+      "description": "Agents there use the distro's default Claude and Codex accounts until HiveCode in WSL is updated."
     }
   },
   "agentsSettings": {
@@ -86,6 +89,7 @@
       },
       "JiraIssueWorkspace": {
         "2a829a2f00": "priority",
+        "54649eaeab": "+ Assignee",
         "693be070d0": "transition",
         "9ebee71962": "labels",
         "b8e2079d96": "assignee",
@@ -359,8 +363,7 @@
           "ff5db28639": "existing"
         },
         "AutomationEditorDialogHeader": {
-          "4c8e1a72b9": "A recurring agent task",
-          "6f309eef8d": "HiveCode"
+          "4c8e1a72b9": "A recurring agent task"
         },
         "AutomationMissedRunGraceField": {
           "3d70c185c8": "If HiveCode or the execution host was unavailable at the scheduled time, HiveCode runs one missed occurrence when it becomes available within this window. Older missed runs are skipped."
@@ -385,7 +388,6 @@
         "AutomationsPage": {
           "2695883141": "delete",
           "0329f9bef1": "Close · Esc",
-          "0ae52dd760": "hermes",
           "3e42a5cc1b": "SSH connection failed.",
           "53f06f0ad5": "Retry source",
           "587a4b205c": "Next",
@@ -397,7 +399,6 @@
           "82eb6cb933": "source",
           "8705757e27": "job",
           "8d1afa8269": "Add automation",
-          "97ff587ee3": "Connect this source to check for Hermes automations in the remote profile.",
           "9f2855677c": "SSH connected.",
           "a21f6c33ad": "Automation source refreshed.",
           "aaa007846f": "source unavailable",
@@ -406,6 +407,7 @@
           "d441032f7e": "pause",
           "dd0bc7a1ba": "new_per_run",
           "destinationProjectUnavailable": "Choose a project owned by the selected automation destination.",
+          "destinationUnavailable": "The selected automation destination is not ready. Reconnect it and try again.",
           "e059042585": "Read-only",
           "f93ed7a6f8": "Connecting...",
           "moveOriginalKept": "Created on {host}, but the original could not be deleted. Remove it on the old host.",
@@ -421,11 +423,7 @@
           "tableProject": "Project"
         },
         "ExternalAutomationManagers": {
-          "330b3c32e8": "available",
-          "bf5f67b590": "hermes"
-        },
-        "HermesCronOutputView": {
-          "88d48157fc": "default"
+          "330b3c32e8": "available"
         },
         "capturedOwner": {
           "unfenced": "HiveCode on this host needs an update before you can view run history or manage this automation. Scheduled runs may still continue on the host."
@@ -1778,7 +1776,6 @@
           "cea7d97be1": "Collapse command override",
           "codexSessionSourceTooltip": "HiveCode runs Codex in an isolated home. Point this at your existing Codex home to import that session history. Empty uses ~/.codex.",
           "d4d2a45d63": "Enabled",
-          "d7625cf8b2": "Default agent",
           "db9e9e5887": "Customize command",
           "dc4a2ffdc0": "Expand command override",
           "df123171d1": "Not installed",
@@ -1811,8 +1808,7 @@
         },
         "AutoRenameBranchFromWorkSetting": {
           "12ea4a408d": "When an agent starts working in a new workspace, HiveCode renames its auto-generated branch (e.g.",
-          "5d569f5199": ". HiveCode generates only the final segment, like",
-          "69bf4830c2": "to include HiveCode's",
+          "commandTemplateDescription": "Use <basePrompt>{basePrompt}</basePrompt> to include HiveCode's <promptLink>built-in branch-name prompt</promptLink>. You can also reference <firstPrompt>{firstPrompt}</firstPrompt> and <assistantMessage>{assistantMessage}</assistantMessage>. HiveCode generates only the final segment, like <example>fix-login-flow</example>; your branch prefix setting still applies.",
           "d9b65054ef": ") to a short name summarizing the task. Only branches HiveCode named itself are renamed, and never after they have been pushed.",
           "ef787db0e3": "Auto-Rename Branch"
         },
@@ -2010,9 +2006,9 @@
           "show": "Show"
         },
         "GitPane": {
-          "36e3de3619": "from comparing against stale history. HiveCode skips the update if that branch has uncommitted changes or local-only commits.",
-          "976afc6b3e": "When you create a workspace, HiveCode refreshes the remote base and safely fast-forwards your matching local branch, such as",
-          "f35007e6e8": "git-username"
+          "f35007e6e8": "git-username",
+          "jiraIssueKeyCasingDescription": "Casing of the Jira issue key in the workspace and branch names HiveCode suggests for new Jira-linked workspaces, such as PROJ-123-fix-login instead of proj-123-fix-login. Existing workspaces and names you type are never changed.",
+          "refreshLocalBaseDescription": "When you create a workspace, HiveCode refreshes the remote base and safely fast-forwards your matching local branch, such as <mainBranch>main</mainBranch> or <masterBranch>master</masterBranch>. This keeps commands like <diffCommand>git diff main...HEAD</diffCommand> from comparing against stale history. HiveCode skips the update if that branch has uncommitted changes or local-only commits."
         },
         "GrokAccountsSection": {
           "0bb18642b7": "Usage",
@@ -2304,8 +2300,11 @@
         "ProjectWindowsRuntimeSetting": {
           "activeTaskPlural": "{{count}} active tasks",
           "activeTaskSingular": "{{count}} active task",
+          "distroMissing": "{{value0}} is not installed in WSL. Choose an installed distro or switch this project to Windows.",
+          "distroRequired": "Choose a WSL distro or switch this project to Windows.",
           "liveTerminalPlural": "{{count}} live terminals",
-          "liveTerminalSingular": "{{count}} live terminal"
+          "liveTerminalSingular": "{{count}} live terminal",
+          "wslUnavailable": "WSL is not available. Switch this project to Windows or repair WSL."
         },
         "QuickCommandsPane": {
           "44923dd982": "destructive",
@@ -2506,7 +2505,9 @@
         },
         "SshPane": {
           "94c5284560": "Targets",
-          "a7d28dff81": "Add a remote host to connect to it in HiveCode."
+          "a7d28dff81": "Add a remote host to connect to it in HiveCode.",
+          "syncedServerPlural": "Synced {{count}} servers",
+          "syncedServerSingular": "Synced {{count}} server"
         },
         "SshTargetCard": {
           "47e94bd6ba": "connected",
@@ -2829,7 +2830,8 @@
         },
         "git": {
           "search": {
-            "0e993bf00f": "When you create a workspace, HiveCode refreshes the remote base and safely fast-forwards your matching local branch, such as main or master. This keeps commands like git diff main...HEAD from comparing against stale history. HiveCode skips the update if that branch has uncommitted changes or local-only commits."
+            "0e993bf00f": "When you create a workspace, HiveCode refreshes the remote base and safely fast-forwards your matching local branch, such as main or master. This keeps commands like git diff main...HEAD from comparing against stale history. HiveCode skips the update if that branch has uncommitted changes or local-only commits.",
+            "jiraIssueKeyCasingDescription": "Casing of the Jira issue key in the workspace and branch names HiveCode suggests for new Jira-linked workspaces, such as PROJ-123-fix-login instead of proj-123-fix-login. Existing workspaces and names you type are never changed."
           }
         },
         "integrations": {
@@ -3013,10 +3015,26 @@
           "converting": "Moving this host’s projects to its managed Orca server…",
           "deploying": "Setting up a managed Orca server…",
           "hostNewer": "Runs a managed Orca server from a newer Orca; it keeps that version.",
+          "linkedProjects": "This host’s HiveCode server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automations there were not moved, and worktrees it created there show as external worktrees.",
+          "linkedProjectsNoAutomations": "This host’s HiveCode server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs there were not moved, and worktrees it created there show as external worktrees.",
+          "linkedProjects_one": "This host’s HiveCode server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automation there were not moved, and worktrees it created there show as external worktrees.",
+          "linkedProjects_other": "This host’s HiveCode server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automations there were not moved, and worktrees it created there show as external worktrees.",
           "olderTerminals_one": "{{count}} terminal started by an older version of HiveCode is still running on this host, and it doesn’t stop on its own. Close it in that version of HiveCode or end it on the host, then reconnect.",
           "olderTerminals_other": "{{count}} terminals started by an older version of HiveCode are still running on this host, and they don’t stop on their own. Close them in that version of HiveCode or end them on the host, then reconnect.",
           "updateDeferredLater": "Runs a managed Orca server; it updates on a later connect.",
           "updateFailedPrevious": "Runs a managed Orca server on its previous version; updating it failed."
+        },
+        "task": {
+          "tracker": {
+            "integration": {
+              "cards": {
+                "connectedSitePlural": "{{count}} sites connected",
+                "connectedSiteSingular": "{{count}} site connected",
+                "connectedWorkspacePlural": "{{count}} workspaces connected",
+                "connectedWorkspaceSingular": "{{count}} workspace connected"
+              }
+            }
+          }
         },
         "terminal": {
           "search": {
@@ -3073,6 +3091,12 @@
           "imported_other": "Imported {{value0}} themes",
           "over_limit_one": "Importing these themes would exceed the {{value0}} custom terminal theme limit. Deselect 1 new theme and try again.",
           "over_limit_other": "Importing these themes would exceed the {{value0}} custom terminal theme limit. Deselect {{value1}} new themes and try again."
+        },
+        "wslHosts": {
+          "description": "HiveCode runs a server inside each distro. A stopped distro starts only when you open one of its projects or connect it here."
+        },
+        "wslHostsExperimental": {
+          "description": "Add a WSL 2 distro as a host. HiveCode runs its server inside the distro, so git, files and terminals in new projects there run natively in Linux."
         }
       },
       "setup": {
@@ -3132,8 +3156,10 @@
         },
         "AddRepoHostSelector": {
           "addRemoteHostDetail": "SSH host or HiveCode server",
+          "addRemoteHostDetailWithWsl": "SSH host, HiveCode server, or WSL distro",
           "addRemoteHostTooltip": "Choose SSH for a machine you can log into, or remote server for a HiveCode server.",
           "addRemoteServerDetail": "Pair with HiveCode running on another computer.",
+          "addWslHostDetail": "Run an HiveCode server inside a WSL 2 distro. Experimental.",
           "local": "Local",
           "runtime": "Server",
           "ssh": "SSH"
@@ -3151,6 +3177,10 @@
         },
         "AddRepoSteps": {
           "04a4c4e84a": "Clone location"
+        },
+        "AddWslHostFormPanel": {
+          "addingHint": "Installing and starting the HiveCode server in the distro. The first time can take a minute.",
+          "description": "HiveCode runs its server inside the distro, so git, files and terminals run natively in Linux. Use it for new projects; projects you opened through \\\\wsl.localhost keep working as they are."
         },
         "AutoRenameFailedDialog": {
           "ff62a18580": "HiveCode couldn't generate a branch name for"
@@ -3178,7 +3208,8 @@
           "4d5e6f7a8b": "This opens the HiveCode servers settings where you can remove this server.",
           "alsoForgetLocal": "Also remove these {{value0}} from HiveCode",
           "alsoForgetLocalHint": "Clears them from HiveCode only. Remote files, worktrees, and branches are left untouched.",
-          "hostHasWorkspacesDefault": "Removes {{value0}} and its credentials from this computer. Its {{value1}} stay in HiveCode — remote files are not touched."
+          "hostHasWorkspacesDefault": "Removes {{value0}} and its credentials from this computer. Its {{value1}} stay in HiveCode — remote files are not touched.",
+          "wslHostEndsTerminals": "Removes {{value0}} from HiveCode, ends its open terminals and stops HiveCode’s server in that distro. Files in the distro are untouched."
         },
         "HostSectionHeaderMenu": {
           "63f36455cc": "Reconnect"
@@ -3467,6 +3498,9 @@
         "worktreeIssueDisplacement": {
           "3f61c0a8d2": "Linear {{value}}",
           "9c4b7e1f60": "GitHub #{{value}}"
+        },
+        "wslHostRowStatus": {
+          "serverFilesMissing": "This build of HiveCode can’t run WSL hosts (server files missing)."
         }
       },
       "skills": {
@@ -3952,6 +3986,7 @@
           "AiVaultSessionDropLayer": {
             "localSessionSshWorkspaceUnsupported": "This session's history is stored on this machine, so it can't resume in an SSH workspace. Drop it onto a local workspace instead.",
             "localWorkspacesOnly": "Resume from history is only available in local workspaces.",
+            "oldPayload": "This session was dragged from an older HiveCode window. Resume it from Session History instead.",
             "openLocalWorkspace": "Open a local workspace before resuming a session."
           },
           "TabGroupPanel": {
@@ -4320,6 +4355,9 @@
           }
         }
       },
+      "aiVaultResumeRefusal": {
+        "ownershipUnknown": "HiveCode could not confirm who owns this {{value0}} conversation. Refresh Session History and try again."
+      },
       "blocked": {
         "notification": {
           "fallback": {
@@ -4622,7 +4660,11 @@
       "verificationFailed": "Verification failed",
       "verified": "Verified",
       "workspaceContext": "Create workspaces with task context",
+      "workspaceCount": "{{count}} workspaces connected",
       "workspaceNumber": "Workspaces"
+    },
+    "jiraIssueTitleField": {
+      "hostUpdateRequired": "Generating Jira titles requires a newer HiveCode server. Update the Jira connection’s host and try again."
     },
     "landingContext": {
       "activity": "Activity",
@@ -4732,6 +4774,8 @@
         "attachmentTotalTooLarge": "The images on this message are too large together, so the message was not sent.",
         "attachmentUnreadable": "An attachment on this message couldn't be read, so the message was not sent.",
         "attachmentUnsupportedType": "{{agent}} accepts only PNG, JPEG, GIF, and WebP images, so this message was not sent.",
+        "backgroundTaskNotStopped": "The background task wasn't stopped.",
+        "backgroundTasksNotStopped": "The background tasks weren't stopped.",
         "cancelUnconfirmed": "Cancellation was not confirmed.",
         "cancelled": "This message was withdrawn before the agent started it.",
         "chatClosed": "The chat closed before this message was sent.",
@@ -4754,6 +4798,8 @@
         "compactionUnconfirmed": "Compaction completion is unconfirmed.",
         "couldNotRestart": "{{agent}} couldn't restart.",
         "couldNotStart": "{{agent}} couldn't start.",
+        "couldNotStop": "Couldn't stop {{agent}}.",
+        "couldNotStopTheAgent": "Couldn't stop the agent.",
         "editSavedArguments": "Edit them in Settings > Agents > Arguments.",
         "emptyMessage": "This message is empty, so it was not sent.",
         "historyInOtherAccount": "This chat's history is in another Claude account. Switch back to that account to continue it.",
@@ -4771,6 +4817,7 @@
         "notDeliveredSendAgain": "This message was not delivered. Send it again to continue.",
         "notSignedIn": "{{agent}} is not signed in.",
         "previousExitUnverifiable": "Couldn't stop {{agent}} from before.",
+        "providerExitedAnswer": "{{agent}} has stopped, so your answer was not sent. Send a message to continue.",
         "providerExitedRejection": "{{agent}} stopped before this message was sent.",
         "providerExitedRow": "{{agent}} stopped while this response was in progress. You can continue in this conversation.",
         "providerRateLimited": "{{agent}} is rate-limited and retrying.",
@@ -4927,6 +4974,7 @@
         "answerFirst": "Answer the question or approval first.",
         "attachmentExpired": "This attachment expired.",
         "backgroundTasksRunning": "Background tasks are still running.",
+        "cancelNotSaved": "Couldn't cancel this question or approval.",
         "cannotRunHere": "Orca can't run this agent in a chat here.",
         "capacity": "HiveCode on the computer running this chat has hit a request limit. Update HiveCode there, then try again.",
         "chatNotFound": "HiveCode can't find this chat.",
@@ -5137,6 +5185,14 @@
       "viewing": "Viewing: {{path}}"
     }
   },
+  "jira": {
+    "transitions": {
+      "unsupported": "Jira requires fields HiveCode cannot collect yet: {{fields}}."
+    },
+    "workspace": {
+      "open": "Open workspace linked to {{key}}"
+    }
+  },
   "menu": {
     "exploreOrca": "Explore HiveCode",
     "gettingStarted": "Getting Started with HiveCode",
@@ -5198,6 +5254,7 @@
   },
   "settings": {
     "agents": {
+      "clearDefault": "Clear default agent",
       "codexTerminalServerIsolation": {
         "description": "Keeps HiveCode's status and closing tabs working correctly. Turn off to use Codex's shared server and its agents overview. Applies to new terminals."
       }
@@ -5226,6 +5283,18 @@
         "optionCleanTooltip": "Removes HiveCode and Electron tokens to match imported Chrome sessions.",
         "remoteUnsupported": "Manage browser identity on the remote host with the HiveCode CLI.",
         "resetRequiredCommand": "Reset it from the command line: hive browser identity set --mode <mode> --reset"
+      }
+    },
+    "terminal": {
+      "windows": {
+        "administratorDocumentation": "Read the guide",
+        "administratorPromptCancellation": "Canceling Windows’ prompt reopens HiveCode with its retained terminals. SSH and WSL permissions stay controlled on their hosts.",
+        "administratorRestartFailed": "HiveCode could not restart. Try again or use the manual instructions.",
+        "administratorScope": "Permissions for the HiveCode app. Existing terminals may differ.",
+        "administratorSearchDescription": "See HiveCode’s Windows permissions or restart with administrator approval.",
+        "closeLocalSessions": "Save your work, close all local terminal sessions, then exit HiveCode.",
+        "launchAdministrator": "In the Windows Start menu, right-click HiveCode and choose Run as administrator. Approve the Windows prompt using your usual account.",
+        "launchStandard": "Open HiveCode normally from the Windows Start menu."
       }
     }
   },
@@ -5278,6 +5347,23 @@
       "body": "HiveCode is still running in the system tray"
     },
     "openOrca": "Open HiveCode"
+  },
+  "updates": {
+    "installBlock": {
+      "busySummary": "An update is already being installed by another HiveCode instance.",
+      "busyTitle": "Another HiveCode is updating",
+      "instanceGuidance": "Quit other HiveCode instances, then retry. Your downloaded update will be kept ready.",
+      "instanceLabel": "Other HiveCode instance",
+      "instanceSummary": "Another HiveCode instance is still using this app.",
+      "instancesLabel": "Instances using HiveCode",
+      "mixedGuidance": "Close any other HiveCode windows and stop the server from the terminal or service that started it. Connected devices will disconnect. Then retry.",
+      "preparingSummary": "Checking running HiveCode instances before restarting.",
+      "retainedDownload": "HiveCode stays open. No need to download again.",
+      "serverSummary": "A background HiveCode server is still using this app.",
+      "unresponsiveSummary": "HiveCode could not finish pausing its background servers for the update.",
+      "waitingAriaLabel": "Update waiting for other HiveCode instances. Click to expand.",
+      "windowLabel": "Other HiveCode window"
+    }
   },
   "web": {
     "runtime": {

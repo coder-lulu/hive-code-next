@@ -1,3 +1,4 @@
+import './unused-default-rpc-methods.test-fixture'
 import { createHash } from 'node:crypto'
 import { PRIMARY_CLI_COMMAND } from '../../../shared/brand'
 import { afterEach, describe, expect, it, vi } from 'vitest'

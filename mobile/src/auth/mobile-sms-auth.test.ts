@@ -443,4 +443,42 @@ describe('mobile SMS authentication client', () => {
     )
     expect(JSON.parse(String(options.body))).toEqual({ expectedSecurityVersion: 7 })
   })
+
+  it.each([
+    ['2', 2_000],
+    ['Thu, 15 Oct 2026 00:00:05 GMT', 5_000],
+    ['120', 60_000],
+    ['invalid', null],
+    ['0', null]
+  ])('preserves SMS HTTP Retry-After %s', async (header, retryAfterMs) => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2026-10-15T00:00:00Z'))
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({ category: 'hive.sms_authentication.rate_limited' }, 429, {
+          'Retry-After': header
+        })
+      )
+    )
+    await expect(request('/hive/v1/auth/sms-challenges', {})).rejects.toMatchObject({
+      status: 429,
+      retryable: true,
+      retryAfterMs
+    })
+  })
+
+  it('preserves Retry-After on SMS error envelopes', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        response({ code: 429, category: 'hive.sms_authentication.rate_limited' }, 200, {
+          'Retry-After': '3'
+        })
+      )
+    )
+    await expect(request('/hive/v1/auth/sms-challenges', {})).rejects.toMatchObject({
+      status: 200,
+      retryAfterMs: 3_000
+    })
+  })
 })

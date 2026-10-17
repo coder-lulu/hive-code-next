@@ -11,6 +11,11 @@ import {
 } from './transcript-opencode'
 import { DESKTOP_READ_WINDOW } from './transcript-watch-contract'
 
+// Native filesystem fixtures own no WSL homes; WSL discovery has its own contract suite.
+vi.mock('../ai-vault/cached-session-list', () => ({
+  getAiVaultWslHomeDirs: vi.fn(async () => [])
+}))
+
 let tempDirs: string[] = []
 
 afterEach(() => {

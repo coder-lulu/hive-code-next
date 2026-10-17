@@ -1,5 +1,5 @@
 import { createContext, useContext } from 'react'
-import type { TaskProvider } from '../tasks/mobile-task-providers'
+import type { TaskProvider } from '../../../src/shared/task-providers'
 import type { RpcClient } from '../transport/rpc-client'
 import type { HostCatalogEntry, HostProfile } from '../transport/types'
 import type { HomeResumeCard } from '../worktree/home-resume-card'

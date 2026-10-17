@@ -34,6 +34,16 @@ export const UNIT_EXCLUDE = [
   'src/shared/startup-shell-portability.live-shell.test.ts',
   'src/shared/posix-command-path-lookup.test.ts',
   'tests/e2e/relay-region-compatibility.unit.test.ts',
+  // Electron probes with in-process deadlines; the package job runs them serially.
+  'src/main/browser/browser-client-page-renderer-lifecycle.electron.test.ts',
+  'src/main/browser/browser-route-tcp-egress.electron.test.ts',
+  'src/main/browser/browser-route-webrtc-egress.electron.test.ts',
+  'src/main/browser/browser-route-h3-egress.electron.test.ts',
+  'src/main/browser/browser-route-dns-prefetch.electron.test.ts',
+  'src/main/persistence/profile-state/profile-state-writer-stall.electron.test.ts',
+  'src/main/browser/browser-popup-compatibility.electron.test.ts',
+  'src/main/browser/browser-popup-native-compatibility.electron.test.ts',
+  'src/main/browser/browser-popup-background-compatibility.electron.test.ts',
   `${CROSS_VERSION_WIRE_DIR}**`
 ]
 

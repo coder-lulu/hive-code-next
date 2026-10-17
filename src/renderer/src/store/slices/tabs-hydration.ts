@@ -1,12 +1,12 @@
 import type { Tab, TabGroup, TabGroupLayoutNode } from '../../../../shared/tab-types'
 import type { WorkspaceSessionState } from '../../../../shared/workspace-session-state-types'
 import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'
-import { hydrateLegacyTabState, type HydratedTabState } from './tabs-hydration-legacy'
+import type { HydratedTabState } from './tabs-hydration-legacy'
+import { resolveTabGroupOwners } from '../../../../shared/workspace-layout/tab-group-owners'
 import {
   adoptGrouplessTabs,
   appendOwnedTabIdsToGroups,
-  layoutSpanningGroups,
-  resolveTabGroupOwners
+  layoutSpanningGroups
 } from './tab-group-reference-repair'
 import {
   dedupeEditorTabsWithinGroups,
@@ -56,7 +56,8 @@ function pruneLayoutNodeForGroups(
   return { ...root, first, second }
 }
 
-function hydrateUnifiedFormat(
+/** Tabs come from the tab bar alone; terminal rows it lacks are adopted later by reconciliation. */
+export function buildHydratedTabState(
   session: WorkspaceSessionState,
   validWorktreeIds: Set<string>
 ): HydratedTabState {
@@ -67,7 +68,7 @@ function hydrateUnifiedFormat(
   const tabIdAliasesByWorktree: Record<string, Map<string, Map<string, string>>> = {}
   const persistedEditFileIdsByWorktree = getPersistedEditFileIdsByWorktree(session)
 
-  for (const [worktreeId, tabs] of Object.entries(session.unifiedTabs!)) {
+  for (const [worktreeId, tabs] of Object.entries(session.unifiedTabs ?? {})) {
     if (!validWorktreeIds.has(worktreeId)) {
       continue
     }
@@ -149,7 +150,7 @@ function hydrateUnifiedFormat(
     tabIdAliasesByWorktree[worktreeId] = deduped.tabIdAliasesByGroup
   }
 
-  for (const [worktreeId, groups] of Object.entries(session.tabGroups!)) {
+  for (const [worktreeId, groups] of Object.entries(session.tabGroups ?? {})) {
     if (!validWorktreeIds.has(worktreeId)) {
       continue
     }
@@ -231,14 +232,4 @@ function hydrateUnifiedFormat(
     activeGroupIdByWorktree,
     layoutByWorktree
   }
-}
-
-export function buildHydratedTabState(
-  session: WorkspaceSessionState,
-  validWorktreeIds: Set<string>
-): HydratedTabState {
-  if (session.unifiedTabs && session.tabGroups) {
-    return hydrateUnifiedFormat(session, validWorktreeIds)
-  }
-  return hydrateLegacyTabState(session, validWorktreeIds)
 }

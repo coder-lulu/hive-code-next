@@ -293,7 +293,7 @@ it('confines filesystem persistence in accounts and usage to named profile surfa
   const main = join(src, 'main')
   const candidates = [
     ...files(__dirname),
-    ...files(join(main, 'rate-limits')).filter((file) => /\/claude[^/]*\.ts$/.test(file))
+    ...files(join(main, 'rate-limits')).filter((file) => /[\\/]claude[^\\/]*\.ts$/.test(file))
   ]
   const violations = candidates.flatMap((file) => {
     const name = relative(main, file).replaceAll('\\', '/')

@@ -247,4 +247,30 @@ describe('Orca cloud session store', () => {
       error: 'Unsafe session format.'
     })
   })
+  it('retains a pending rotation across capability saves while protected storage is unavailable', async () => {
+    safeStorageMock.isEncryptionAvailable.mockReturnValue(false)
+    const store = await loadSessionStore()
+    const rotated = { ...makeSession(), refreshToken: 'rotated-token' }
+    const canPersist = vi.fn(() => true)
+    store.saveOrcaCloudSession('profile-1', userDataPath, rotated, {
+      spentOnFailure: true,
+      canPersist
+    })
+    store.saveOrcaCloudSession('profile-1', userDataPath, {
+      ...rotated,
+      capabilities: { flags: { share: false }, refreshedAt: 456 }
+    })
+    safeStorageMock.isEncryptionAvailable.mockReturnValue(true)
+    store.flushUnsavedOrcaCloudSessions()
+    expect(canPersist).toHaveBeenCalledOnce()
+    const reloaded = await loadSessionStore()
+    expect(reloaded.readOrcaCloudSession('profile-1', userDataPath)).toMatchObject({
+      status: 'found',
+      persistence: 'encrypted',
+      session: {
+        refreshToken: 'rotated-token',
+        capabilities: { flags: { share: false }, refreshedAt: 456 }
+      }
+    })
+  })
 })

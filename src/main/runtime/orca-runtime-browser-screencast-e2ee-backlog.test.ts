@@ -76,7 +76,7 @@ function connectCurrentChannel() {
 }
 
 async function subscribe(sendBinary: RpcBinarySender) {
-  const { RuntimeBrowserCommands } = await import('./orca-runtime-browser')
+  const { RuntimeBrowserCommands } = await import('./browser/browser-commands')
   let resolveDone!: () => void
   const done = new Promise<void>((resolve) => {
     resolveDone = resolve

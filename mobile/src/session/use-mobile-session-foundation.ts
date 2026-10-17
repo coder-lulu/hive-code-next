@@ -3,9 +3,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { useLocalSearchParams } from 'expo-router'
 import { useRouteHandoff } from '../navigation/route-handoff'
 import { HOST_DOCK_MIN_WIDTH } from '../storage/preferences'
-import { useHostClient, useForceReconnect, useRefreshHostClient } from '../transport/client-context'
+import { useForceReconnect, useRefreshHostClient } from '../transport/client-context'
 import { useAccountVisibleHostCatalog } from '../runtime-directory/use-account-visible-host-catalog'
 import { selectConnectableHostProfiles } from '../transport/host-catalog-selection'
+import { useWorkspaceClient } from '../transport/use-workspace-client'
 import {
   useLastConnectedAt,
   useReconnectAttempt
@@ -17,7 +18,7 @@ import { isFloatingWorkspaceWorktreeId } from './floating-workspace'
 import { useLiveWorktreeName } from './use-live-worktree-name'
 import { useMissingWorktreeBounce } from './use-missing-worktree-bounce'
 import { hostRouteWithNotice } from '../host-route-notice'
-import { useHostProtocolGates } from '../components/HostProtocolGate'
+import { useHostProtocolGates } from '../components/host-protocol-gates-context'
 
 export function useMobileSessionFoundation() {
   const {
@@ -39,7 +40,7 @@ export function useMobileSessionFoundation() {
   const router = useRouteHandoff()
   const insets = useSafeAreaInsets()
   // Why: shared client per host owned by RpcClientProvider (docs/mobile-shared-client-per-host.md).
-  const { client, clientId, state: connState } = useHostClient(hostId)
+  const { client, clientId, state: connState } = useWorkspaceClient(hostId)
   const { catalog: accountVisibleHostCatalog } = useAccountVisibleHostCatalog()
   const accountVisibleHosts = useMemo(
     () => selectConnectableHostProfiles(accountVisibleHostCatalog),

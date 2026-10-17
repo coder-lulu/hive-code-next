@@ -15,7 +15,7 @@ const XVFB_POLL_INTERVAL_MS = 50
 const VIRTUAL_DISPLAY_NUMBER = 99
 const VIRTUAL_DISPLAY = `:${VIRTUAL_DISPLAY_NUMBER}`
 const XVFB_INSTALL_GUIDANCE =
-  'Install `xvfb` on Debian/Ubuntu or `xorg-x11-server-Xvfb` on RPM-based systems.'
+  'install an X virtual framebuffer: `xvfb` on Debian/Ubuntu, `xorg-x11-server-Xvfb` on RPM-based systems, or `xorg-server-xvfb` on Arch.'
 
 let xvfbProcess: ChildProcess | null = null
 
@@ -149,6 +149,16 @@ export const MISSING_LINUX_DISPLAY_MESSAGE = [
   'Check DISPLAY, WAYLAND_DISPLAY, XDG_RUNTIME_DIR, and any --ozone-platform override.',
   `Use \`${PRODUCT_CONFIG.cli.primary} serve\` to run headless. On a bare server, ${XVFB_INSTALL_GUIDANCE}`
 ].join('\n')
+
+export const MISSING_SERVE_DISPLAY_MESSAGE = [
+  `${APP_DISPLAY_NAME} serve needs an X display for its browser panes, and could not start its own.`,
+  `Wayland alone is not enough. To let ${APP_DISPLAY_NAME} start one, ${XVFB_INSTALL_GUIDANCE}`,
+  'Or set DISPLAY to a running X server.'
+].join('\n')
+
+export function missingLinuxDisplayMessage(isServeMode: boolean): string {
+  return isServeMode ? MISSING_SERVE_DISPLAY_MESSAGE : MISSING_LINUX_DISPLAY_MESSAGE
+}
 
 // Why: an X server may bind only the abstract namespace (`@/tmp/.X11-unix/X0`), which leaves no
 // filesystem socket to stat. Abstract addresses are kernel-owned and vanish the moment the owner

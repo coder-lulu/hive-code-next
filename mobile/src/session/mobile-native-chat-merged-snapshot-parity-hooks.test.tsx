@@ -39,6 +39,7 @@ vi.mock('react-native', async () => {
       React.useImperativeHandle(ref, () => ({ scrollToEnd: vi.fn(), scrollToOffset: vi.fn() }), [])
       return React.createElement('FlatList', props)
     }),
+    Platform: { OS: 'ios' },
     Pressable: 'Pressable',
     StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1, absoluteFillObject: {} },
     Text: 'Text',
@@ -92,7 +93,9 @@ const HOST_SUPPORT = {
   queuedMessages: true,
   queuedCommands: false,
   statusFeed: true,
-  quietRepeatedStop: true
+  quietRepeatedStop: true,
+  sendOptions: false,
+  conversationStop: false
 }
 
 type Phone = {

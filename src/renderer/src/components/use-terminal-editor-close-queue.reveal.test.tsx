@@ -28,6 +28,7 @@ vi.mock('../store', () => ({
     // "Don't Save" closes through the store, beside the controller's own projection.
     getState: () => ({
       ...store,
+      setActiveWorktree,
       repos: [],
       worktreesByRepo: {},
       detectedWorktreesByRepo: {},

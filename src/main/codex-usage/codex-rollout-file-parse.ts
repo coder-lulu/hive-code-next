@@ -1,3 +1,4 @@
+import { captureJsonlFileFingerprint } from '../usage/jsonl-file-fingerprint'
 import { basename } from 'node:path'
 import { readJsonlFileSnapshot, type JsonlFileSnapshot } from '../usage/jsonl-file-snapshot'
 import { readJsonlLinesFromOffset } from '../usage/jsonl-line-offsets'
@@ -162,7 +163,9 @@ export async function parseCodexUsageFile(
             reader
           )
 
+      const contentFingerprint = captureJsonlFileFingerprint(reader)
       if (
+        !contentFingerprint ||
         !(await validateJsonlFileReader(reader, parseOptions.resume?.state)) ||
         (parseOptions.resume && !resumeStateSuppressed && parseResumeState === null)
       ) {
@@ -191,7 +194,8 @@ export async function parseCodexUsageFile(
         ...(previous ? mergeRolloutProjections(previous, appended) : appended),
         ownedEventKeys: [...committedKeys],
         hasDeferredClaims: previous?.hasDeferredClaims || hasDeferredClaims,
-        parseResumeState
+        parseResumeState,
+        contentFingerprint
       }
     } finally {
       await reader.handle.close()

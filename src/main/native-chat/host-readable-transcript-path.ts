@@ -110,6 +110,11 @@ export function configureHostReadableTranscriptPathSources(options: {
   getAdditionalCodexHomePaths = options.getAdditionalCodexHomePaths
 }
 
+/** The extra Codex homes this host reads directly; WSL shares are the separate distro tier. */
+export function hostAdditionalCodexHomePaths(): string[] {
+  return (getAdditionalCodexHomePaths?.() ?? []).filter((home) => !isWslUncPath(home))
+}
+
 async function defaultListWslHomeDirs(): Promise<string[]> {
   return listRunningWslHomeDirsAsync()
 }
@@ -262,7 +267,14 @@ export async function wslAgentSessionsDirs(
   if (platform !== 'win32') {
     return []
   }
-  const additionalHomes = agent === 'codex' ? (getAdditionalCodexHomePaths?.() ?? []) : []
+  let additionalHomes: readonly string[] = []
+  if (agent === 'codex') {
+    try {
+      additionalHomes = getAdditionalCodexHomePaths?.() ?? []
+    } catch (error) {
+      console.warn('[host-readable-transcript-path] could not list Codex account homes:', error)
+    }
+  }
   const [homeDirs, runningAdditionalHomes] = await Promise.all([
     deps.wslSnapshot
       ? snapshotHomeDirs(deps.wslSnapshot)

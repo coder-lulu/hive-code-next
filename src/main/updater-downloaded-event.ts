@@ -1,3 +1,4 @@
+import { preExtractDownloadedAppImageUpdate } from './cli/appimage-copy-pre-extraction'
 import { app } from 'electron'
 import type { UpdaterHandlerContext } from './updater-events-context'
 import {
@@ -69,6 +70,9 @@ export function registerDownloadedUpdateHandler({
     }
     const macInstallerReady = process.platform === 'darwin' ? isMacInstallerReady() : true
     recordUpdaterLifecycle('update_downloaded', { version: info.version, macInstallerReady })
+    void preExtractDownloadedAppImageUpdate(info.downloadedFile, (filePath) =>
+      linuxPackageRecovery.isInUpdaterPendingCache(filePath)
+    )
     const linuxPackageStatus = resolveLinuxPackageDownloadedStatus(info)
     if (linuxPackageStatus) {
       sendStatus({ ...linuxPackageStatus, ...getUpdateMetadata() })

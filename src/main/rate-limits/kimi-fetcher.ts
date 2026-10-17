@@ -1,7 +1,8 @@
+import { cancelUnreadResponseBody } from '../lib/unread-response-body'
 import { readFile } from 'node:fs/promises'
 import { join, win32 as pathWin32 } from 'node:path'
-import { net } from 'electron'
 import { applyProductBranding } from '../../shared/brand'
+import { getMainHttpClient } from '../network/http-client'
 import type {
   ProviderRateLimits,
   RateLimitWindow,
@@ -13,6 +14,7 @@ import {
   createAuthFilesystemOperation,
   type SharedAuthFilesystemOperation
 } from './auth-filesystem-operation'
+import { classifyThrownUsageRequestError } from './usage-request-failure-kind'
 
 // Why: Kimi Code's managed coding plan exposes subscription usage at
 // `${base}/usages` (see packages/oauth/src/managed-usage.ts in the CLI bundle).
@@ -336,21 +338,27 @@ export async function fetchKimiRateLimits(options?: {
   }
 
   try {
-    const res = await net.fetch(`${KIMI_BASE_URL.replace(/\/$/, '')}/usages`, {
+    const res = await getMainHttpClient().fetch(`${KIMI_BASE_URL.replace(/\/$/, '')}/usages`, {
       // Why: identical to the CLI's fetchManagedUsage — bearer token + Accept.
       // No extra User-Agent: the usages endpoint authenticates by token only.
       headers: { Authorization: `Bearer ${creds.access_token}`, Accept: 'application/json' },
       signal: AbortSignal.timeout(API_TIMEOUT_MS)
     })
-    if (res.status === 401 || res.status === 403) {
-      return result('error', `Kimi usage request unauthorized (HTTP ${res.status})`)
+    try {
+      if (res.status === 401 || res.status === 403) {
+        return result('error', `Kimi usage request unauthorized (HTTP ${res.status})`)
+      }
+      if (!res.ok) {
+        return result('error', `Kimi usage request failed (HTTP ${res.status})`)
+      }
+      const data: unknown = await res.json()
+      return mapUsageResponse(typeof data === 'object' && data !== null ? data : {})
+    } finally {
+      await cancelUnreadResponseBody(res)
     }
-    if (!res.ok) {
-      return result('error', `Kimi usage request failed (HTTP ${res.status})`)
-    }
-    const data: unknown = await res.json()
-    return mapUsageResponse(typeof data === 'object' && data !== null ? data : {})
   } catch (err) {
-    return result('error', err instanceof Error ? err.message : 'Kimi usage request failed')
+    return result('error', err instanceof Error ? err.message : 'Kimi usage request failed', {
+      failureKind: classifyThrownUsageRequestError(err)
+    })
   }
 }

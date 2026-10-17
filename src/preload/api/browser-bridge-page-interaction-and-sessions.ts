@@ -15,6 +15,10 @@ export const browserPageInteractionAndSessionsApi = {
   onNavigationUpdate: (callback) => subscribe('browser:navigation-update', callback),
   onActivateView: (callback) => subscribe('browser:activateView', callback),
   onCapturePaintHold: (callback) => subscribe('browser:capturePaintHold', callback),
+  onAgentInputFocusGuard: (callback) => subscribe('browser:agentInputFocusGuard', callback),
+  agentInputFocusGuardReady: (token) => {
+    ipcRenderer.send('browser:agentInputFocusGuardReady', { token })
+  },
   onPaneFocus: (callback) => subscribe('browser:pane-focus', callback),
   onOpenLinkInOrcaTab: (callback) => subscribe('browser:open-link-in-orca-tab', callback),
   cancelDownload: (args) => ipcRenderer.invoke('browser:cancelDownload', args),

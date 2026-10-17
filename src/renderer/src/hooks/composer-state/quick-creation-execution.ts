@@ -8,7 +8,7 @@ import { settleComposerSubmit } from '@/lib/composer-submit-cancellation'
 import { runBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import { translate } from '@/i18n/i18n'
 import { buildQuickComposerStartup } from './quick-startup-plan'
-import { buildQuickCreationRequest } from './quick-creation-request'
+import { buildQuickCreationRequest, type QuickSubmitOptions } from './quick-creation-request'
 import { resolveQuickCreationLaunchPrompt } from './quick-creation-launch-prompt'
 import type { PendingSmartGitHubSubmitResolution } from './source-selection-decisions'
 import { resolveAgentSessionLaunchRoute } from '@/lib/agent-session-launch-plan'
@@ -53,7 +53,8 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
       requestedAgent: TuiAgent | null,
       workspaceNameSeed: string,
       workspaceRunContext: WorktreeCreationRequest['workspaceRunContext'],
-      repoId: string
+      repoId: string,
+      options?: QuickSubmitOptions
     ): Promise<void> => {
       const prepared = await prepareQuickSubmit(
         smartGitHubResolution,
@@ -213,7 +214,8 @@ export function useQuickCreationExecution(input: QuickCreationExecutionInput) {
         launchDraftPrompt: quickDraftPrompt,
         promptDelivery,
         quickTelemetry,
-        suppressTerminalFocusOnCompletion: createMultiple
+        suppressTerminalFocusOnCompletion: createMultiple,
+        setupOnly: options?.setupOnly === true
       })
 
       if (isSubmissionCancelled()) {

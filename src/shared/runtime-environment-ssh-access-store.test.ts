@@ -1,7 +1,11 @@
+import {
+  drainNativeFixture,
+  restoreNativeFixture
+} from '../main/ipc/ephemeral-vm-native-test-fixture'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { encodePairingOffer } from './pairing'
 import {
   addEnvironmentFromPairingCode,
@@ -32,11 +36,15 @@ const tunnel = { sshTargetId: 'target', sshTargetGeneration: 3, localPort: 41000
 const verifiedPairing = { ...pairing, endpoint: 'ws://127.0.0.1:41000/runtime' }
 
 describe('independent paired runtime SSH access persistence', () => {
+  const pendingChildren = new Set<Promise<void>>()
+  afterAll(restoreNativeFixture)
+
   let userDataPath: string
   beforeEach(() => {
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-ssh-access-store-'))
   })
-  afterEach(() => {
+  afterEach(async () => {
+    await drainNativeFixture(pendingChildren)
     rmSync(userDataPath, { recursive: true, force: true })
   })
 
@@ -62,7 +70,7 @@ describe('independent paired runtime SSH access persistence', () => {
       expectedEnvironment: prepare(expectedEnvironment),
       requestId: 'link-request',
       verifiedRuntimeId: 'host-runtime',
-      verifiedConnection: (verifiedPairing),
+      verifiedConnection: verifiedPairing,
       tunnel,
       now: 90
     })
@@ -153,7 +161,7 @@ describe('independent paired runtime SSH access persistence', () => {
         expectedEnvironment: prepared,
         requestId: 'link-request',
         verifiedRuntimeId: 'host-runtime',
-        verifiedConnection: (wrongPairing),
+        verifiedConnection: wrongPairing,
         tunnel
       })
     ).toThrow('did not verify')
@@ -236,7 +244,7 @@ describe('independent paired runtime SSH access persistence', () => {
       expectedEnvironment: prepared,
       requestId: 'link-request',
       verifiedRuntimeId: 'host-runtime',
-      verifiedConnection: (verifiedPairing),
+      verifiedConnection: verifiedPairing,
       tunnel
     }
     expect(() =>

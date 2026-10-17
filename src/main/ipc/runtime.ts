@@ -14,6 +14,7 @@ import { DESKTOP_RENDERER_RUNTIME_CLIENT_CAPABILITIES } from './desktop-renderer
 import { RpcDispatcher } from '../runtime/rpc/dispatcher'
 import { DESKTOP_RPC_CALLER } from '../runtime/rpc/rpc-caller-identity'
 import { DesktopRuntimeSenderLifecycle } from './desktop-runtime-sender-lifecycle'
+import { publishMobileProjectSections } from '../runtime/mobile-project-sections-snapshot'
 
 function boundTerminalFitRestore(pending: Promise<boolean>): Promise<boolean> {
   let timer: ReturnType<typeof setTimeout> | undefined
@@ -48,7 +49,12 @@ export function registerRuntimeHandlers(runtime: OrcaRuntimeService): void {
       if (typeof graph.rendererGeneration !== 'string' || graph.rendererGeneration.length === 0) {
         throw new Error('Runtime graph sync requires a renderer generation')
       }
-      return runtime.syncWindowGraph(window.id, graph)
+      const result = runtime.syncWindowGraph(window.id, graph)
+      // Why after the sync: only the authoritative window's graph is accepted, so only its catalog is.
+      if (graph.projectSectionCatalog) {
+        publishMobileProjectSections(graph.projectSectionCatalog)
+      }
+      return result
     }
   )
 

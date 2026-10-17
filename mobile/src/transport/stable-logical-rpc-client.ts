@@ -283,6 +283,7 @@ export function createStableLogicalRpcClient(
       connectionPath.setRelayHostReachability(reachability),
     getRelayHostReachability: () => connectionPath.getRelayHostReachability(),
     onConnectionPathChange: (listener) => connectionPath.subscribe(listener),
+    carriesRpcEnvelope: () => activeSession.carriesRpcEnvelope?.() ?? true,
     getGeneration: () => generation
   }
 

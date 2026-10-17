@@ -1,7 +1,8 @@
+import { drainNativeFixture, restoreNativeFixture } from '../ipc/ephemeral-vm-native-test-fixture'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
   consumeOrcadIdleStopRecord,
   orcadIdleStopRecordPath,
@@ -9,15 +10,18 @@ import {
 } from './orcad-idle-stop-record'
 import { createIdleStopRecordOwnership } from './orcad-managed-idle-exit-host'
 
+const pendingChildren = new Set<Promise<void>>()
+afterAll(restoreNativeFixture)
+
 let root: string
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'orcad-idle-stop-'))
 })
 
-afterEach(() => {
+afterEach(async () => {
+  await drainNativeFixture(pendingChildren)
   rmSync(root, { recursive: true, force: true })
-  vi.restoreAllMocks()
 })
 
 describe('orcad idle-stop record', () => {
@@ -49,11 +53,14 @@ describe('orcad idle-stop record', () => {
   })
 
   it('drops a corrupt record instead of trusting it', () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    writeFileSync(orcadIdleStopRecordPath(root), '{"kind":"orcad_idle_stop"')
-
-    expect(consumeOrcadIdleStopRecord(root)).toBeNull()
-    expect(existsSync(orcadIdleStopRecordPath(root))).toBe(false)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      writeFileSync(orcadIdleStopRecordPath(root), '{"kind":"orcad_idle_stop"')
+      expect(consumeOrcadIdleStopRecord(root)).toBeNull()
+      expect(existsSync(orcadIdleStopRecordPath(root))).toBe(false)
+    } finally {
+      consoleError.mockRestore()
+    }
   })
 
   it('drops the record when a signal stop already owned the shutdown', () => {

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { writeSecureJsonFile } from '../../shared/secure-file'
 import type { OrcaProfileCloudSummary } from '../../shared/orca-profiles'
@@ -50,17 +50,17 @@ function isState(value: unknown): value is CloudSessionMutationState {
 
 function readState(profileId: string, userDataPath: string): CloudSessionMutationState | null {
   const path = statePath(profileId, userDataPath)
-  if (!existsSync(path)) {
-    return null
-  }
   try {
     const parsed: unknown = JSON.parse(readFileSync(path, 'utf-8'))
     if (!isState(parsed)) {
       throw new Error('invalid_cloud_session_mutation_state')
     }
     return parsed
-  } catch {
-    throw new Error('invalid_cloud_session_mutation_state')
+  } catch (error) {
+    if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+      return null
+    }
+    throw new Error('invalid_cloud_session_mutation_state', { cause: error })
   }
 }
 
@@ -172,4 +172,28 @@ export function recordCloudSessionIdentityMutationIfCurrent(
     return null
   }
   return recordCloudSessionIdentityMutation(identity, userDataPath)
+}
+
+/** The current persisted login/logout fence, independent of the org link displayed by the UI. */
+export function readCloudSessionMutationSnapshot(
+  profileId: string,
+  userDataPath: string
+): CloudSessionMutationSnapshot | null {
+  const state = readState(profileId, userDataPath)
+  return state ? { epoch: state.epoch, identityKey: state.expectedIdentityKey } : null
+}
+
+/** Fence a session even after its profile link was removed or could not be read. */
+export function tombstoneCurrentCloudSession(profileId: string, userDataPath: string): void {
+  const state = readState(profileId, userDataPath)
+  if (!state) {
+    return
+  }
+  saveState(profileId, userDataPath, {
+    ...state,
+    epoch: state.epoch + 1,
+    tombstonedIdentityKeys: [
+      ...new Set([...state.tombstonedIdentityKeys, state.expectedIdentityKey])
+    ]
+  })
 }

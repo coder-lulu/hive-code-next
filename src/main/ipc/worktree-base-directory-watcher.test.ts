@@ -67,6 +67,8 @@ const absolutePath = (...parts: string[]): string =>
 const WORKTREE_ROOT = absolutePath('workspace', 'worktrees')
 const PROJECT_ROOT = absolutePath('workspace', 'projects', 'project')
 const PROJECT_GIT_COMMON_DIR = join(PROJECT_ROOT, '.git')
+// The test cache never resolves admin dirs, so status signals carry no attribution.
+const UNATTRIBUTED_STATUS = [expect.anything(), 'repo-1', null] as const
 
 const settings = {
   workspaceDir: WORKTREE_ROOT,
@@ -227,7 +229,7 @@ describe('worktree base directory watcher', () => {
 
     expect(notifyWorktreesChanged).not.toHaveBeenCalled()
     expect(notifyWorktreeGitStatusMetadataChanged).toHaveBeenCalledTimes(1)
-    expect(notifyWorktreeGitStatusMetadataChanged).toHaveBeenCalledWith(expect.anything(), 'repo-1')
+    expect(notifyWorktreeGitStatusMetadataChanged).toHaveBeenCalledWith(...UNATTRIBUTED_STATUS)
   })
 
   it('keeps one active-worktree upstream ref binding and ignores stale cleanup', async () => {
@@ -328,7 +330,7 @@ describe('worktree base directory watcher', () => {
       }
     ] as never[])
     await vi.advanceTimersByTimeAsync(300)
-    expect(notifyWorktreeGitStatusMetadataChanged).toHaveBeenCalledWith(expect.anything(), 'repo-1')
+    expect(notifyWorktreeGitStatusMetadataChanged).toHaveBeenCalledWith(...UNATTRIBUTED_STATUS)
   })
 
   it('invalidates exact resolution only when common config changes', async () => {

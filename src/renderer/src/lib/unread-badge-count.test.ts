@@ -168,3 +168,103 @@ describe('getUnreadBadgeCount', () => {
     ).toBe(0)
   })
 })
+
+describe('completion counts follow navigable sidebar owners', () => {
+  const counts = { 'completion-tab:leaf': 2 }
+  const terminalOwners = { 'wt-1': [makeTab({ id: 'completion-tab', worktreeId: 'wt-1' })] }
+
+  it('ignores orphan counters and missing rows without consuming data, then counts a restored owner', () => {
+    const data = { unreadAgentCompletionCountByPane: counts }
+    expect(count(data)).toBe(0)
+    expect(count({ ...data, tabsByWorktree: terminalOwners })).toBe(0)
+    expect(
+      count({ ...data, worktreesByRepo: { repo1: [worktree('wt-1', { isUnread: false })] } })
+    ).toBe(0)
+    expect(
+      count({
+        ...data,
+        tabsByWorktree: terminalOwners,
+        worktreesByRepo: { repo1: [worktree('wt-1', { isUnread: false })] }
+      })
+    ).toBe(2)
+    expect(counts).toEqual({ 'completion-tab:leaf': 2 })
+  })
+
+  it('hides archived, host-filtered and foreign worktree completions and restores visible ones', () => {
+    const data = { unreadAgentCompletionCountByPane: counts, tabsByWorktree: terminalOwners }
+    expect(
+      count({ ...data, worktreesByRepo: { repo1: [worktree('wt-1', { isArchived: true })] } })
+    ).toBe(0)
+    const remote = worktree('wt-1', { hostId: 'ssh:remote', isUnread: false })
+    expect(
+      count({ ...data, worktreesByRepo: { repo1: [remote] }, visibleHostIds: new Set(['local']) })
+    ).toBe(0)
+    expect(
+      count({
+        ...data,
+        worktreesByRepo: { repo1: [remote] },
+        visibleHostIds: new Set(['ssh:remote'])
+      })
+    ).toBe(2)
+    const foreign = worktree('wt-1', {
+      creatorProvenance: { kind: 'paired-device', deviceId: 'phone' }
+    })
+    expect(
+      count({
+        ...data,
+        worktreesByRepo: { repo1: [foreign] },
+        hiddenOtherDevicePairings: new Map()
+      })
+    ).toBe(0)
+    expect(count({ ...data, worktreesByRepo: { repo1: [foreign] } })).toBe(2)
+  })
+
+  it('keeps completion counts for sleeping terminals whose retained identifiers remain navigable', () => {
+    expect(
+      count({
+        unreadAgentCompletionCountByPane: counts,
+        tabsByWorktree: terminalOwners,
+        worktreesByRepo: { repo1: [worktree('wt-1', { isUnread: false })] }
+      })
+    ).toBe(2)
+  })
+
+  it('counts visible folder completions once instead of also counting the folder dot', () => {
+    const data = {
+      folderWorkspaces: [makeFolderWorkspace({ id: 'folder-1', isUnread: true })],
+      tabsByWorktree: {
+        'folder:folder-1': [makeTab({ id: 'completion-tab', worktreeId: 'folder:folder-1' })]
+      },
+      unreadTerminalTabs: { 'completion-tab': 'terminal-bell' as const },
+      unreadAgentCompletionCountByPane: counts
+    }
+    expect(count(data)).toBe(2)
+    expect(count({ ...data, unreadTerminalTabs: {} })).toBe(2)
+    expect(
+      count({ ...data, folderWorkspaces: [{ ...data.folderWorkspaces[0], isUnread: false }] })
+    ).toBe(2)
+    expect(count({ ...data, projectGroups: [] })).toBe(0)
+    expect(count({ ...data, projectGroups: [projectGroup({ parentPath: null })] })).toBe(0)
+    expect(count({ ...data, visibleHostIds: new Set(['ssh:remote']) })).toBe(0)
+    expect(
+      count({
+        ...data,
+        folderWorkspaces: [{ ...data.folderWorkspaces[0], executionHostId: 'ssh:remote' }]
+      })
+    ).toBe(0)
+    expect(
+      count({
+        ...data,
+        folderWorkspaces: [
+          {
+            ...data.folderWorkspaces[0],
+            creatorProvenance: { kind: 'paired-device', deviceId: 'phone' }
+          }
+        ],
+        hiddenOtherDevicePairings: new Map()
+      })
+    ).toBe(0)
+    expect(count(data)).toBe(2)
+    expect(counts).toEqual({ 'completion-tab:leaf': 2 })
+  })
+})

@@ -1,11 +1,15 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { removeTreeSync } from '../../shared/windows-transient-lock-removal'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { OrcaCloudAuthConfig } from './profile-cloud-auth-config'
 import type * as ProfileCloudClient from './profile-cloud-client'
 import type { ActiveOrcaProfileState } from './profile-index-store'
 
-const { readMock, saveIfCurrentMock, clearMock, refreshMock, linkMock } = vi.hoisted(() => ({
+const { readMock, saveMock, clearMock, refreshMock, linkMock } = vi.hoisted(() => ({
   readMock: vi.fn(),
-  saveIfCurrentMock: vi.fn((): string | null => 'memory-only'),
+  saveMock: vi.fn(() => 'memory-only'),
   clearMock: vi.fn(),
   refreshMock: vi.fn(),
   linkMock: vi.fn()
@@ -13,19 +17,9 @@ const { readMock, saveIfCurrentMock, clearMock, refreshMock, linkMock } = vi.hoi
 
 vi.mock('./profile-cloud-session-store', () => ({
   readOrcaCloudSession: readMock,
-  saveOrcaCloudSessionIfCurrent: saveIfCurrentMock,
+  saveOrcaCloudSession: saveMock,
+  orcaCloudSessionKey: (profileId: string, userDataPath: string) => `${userDataPath}\0${profileId}`,
   clearOrcaCloudSession: clearMock
-}))
-
-vi.mock('./profile-cloud-session-mutation', () => ({
-  captureCloudSessionMutation: vi.fn(() => ({ epoch: 1, identityKey: 'identity' })),
-  cloudSessionIdentity: vi.fn((localProfileId, cloud) => ({
-    localProfileId,
-    cloudUserId: cloud.userId,
-    cloudProfileId: cloud.cloudProfileId,
-    organizationId: cloud.activeOrgId ?? ''
-  })),
-  tombstoneCloudSession: vi.fn()
 }))
 
 vi.mock('./profile-cloud-client', async (importOriginal) => {
@@ -35,10 +29,43 @@ vi.mock('./profile-cloud-client', async (importOriginal) => {
 
 vi.mock('./profile-cloud-index', () => ({ linkOrcaProfileToCloud: linkMock }))
 
+vi.mock('./profile-index-store', () => ({
+  loadOrCreateProfileIndex: () => ({
+    profiles: [{ id: 'profile-1', cloud: { activeOrgId: 'org-1' } }]
+  }),
+  getOrcaProfileListState: vi.fn()
+}))
+
 import { readFreshOrcaCloudSession } from './profile-cloud-session-refresh'
 import { OrcaCloudRequestError } from './profile-cloud-client'
 import { onOrcaCloudSessionInvalidated } from './profile-cloud-session-invalidation'
 import { forgetAmbiguousRefreshAttempt } from './profile-cloud-refresh-replay-guard'
+import { signInCloudSession, signOutCloudSession } from './profile-cloud-session-owner'
+
+let userDataPath = ''
+
+beforeEach(() => {
+  userDataPath = mkdtempSync(join(tmpdir(), 'orca-session-refresh-'))
+})
+
+afterEach(() => {
+  forgetAmbiguousRefreshAttempt(`${userDataPath}\0profile-1`)
+  removeTreeSync(userDataPath)
+})
+
+// Give each test its own durable login state.
+function resetSessionOwner(): void {
+  signInCloudSession('profile-1', userDataPath, {
+    ...staleSession,
+    cloud: {
+      userId: 'user-1',
+      cloudProfileId: 'cloud-profile-1',
+      email: 'u@example.com',
+      linkedAt: 1
+    }
+  })
+  saveMock.mockClear()
+}
 
 const config = {} as OrcaCloudAuthConfig
 const active = {
@@ -63,16 +90,16 @@ describe('profile cloud session refresh', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.restoreAllMocks()
-    forgetAmbiguousRefreshAttempt('/data\0profile-1')
-    saveIfCurrentMock.mockReturnValue('memory-only')
+    forgetAmbiguousRefreshAttempt(`${userDataPath}\0profile-1`)
+    resetSessionOwner()
     readMock.mockReturnValue({ status: 'found', session: staleSession, persistence: 'memory-only' })
   })
 
-  it('does not publish a refresh whose persistent mutation snapshot became stale', async () => {
+  it('does not publish a refresh that lands after the session was signed out', async () => {
     let resolveRefresh!: (value: Record<string, unknown>) => void
     refreshMock.mockReturnValue(new Promise((resolve) => (resolveRefresh = resolve)))
-    const refreshing = readFreshOrcaCloudSession(config, active, '/data')
-    saveIfCurrentMock.mockReturnValue(null)
+    const refreshing = readFreshOrcaCloudSession(config, active, userDataPath)
+    signOutCloudSession('profile-1', userDataPath)
     resolveRefresh({
       accessToken: 'stale-access',
       refreshToken: 'stale-refresh',
@@ -93,8 +120,8 @@ describe('profile cloud session refresh', () => {
     let resolveRefresh!: (value: Record<string, unknown>) => void
     refreshMock.mockReturnValue(new Promise((resolve) => (resolveRefresh = resolve)))
 
-    const first = readFreshOrcaCloudSession(config, active, '/data')
-    const second = readFreshOrcaCloudSession(config, active, '/data')
+    const first = readFreshOrcaCloudSession(config, active, userDataPath)
+    const second = readFreshOrcaCloudSession(config, active, userDataPath)
     expect(refreshMock).toHaveBeenCalledTimes(1)
 
     resolveRefresh({
@@ -112,7 +139,7 @@ describe('profile cloud session refresh', () => {
 
     const [firstResult, secondResult] = await Promise.all([first, second])
     expect(firstResult).toEqual(secondResult)
-    expect(saveIfCurrentMock).toHaveBeenCalledTimes(1)
+    expect(saveMock).toHaveBeenCalledTimes(1)
     expect(linkMock).toHaveBeenCalledTimes(1)
   })
 
@@ -121,7 +148,7 @@ describe('profile cloud session refresh', () => {
     const unsubscribe = onOrcaCloudSessionInvalidated(invalidated)
     refreshMock.mockRejectedValue(new OrcaCloudRequestError(401))
 
-    await expect(readFreshOrcaCloudSession(config, active, '/data')).resolves.toEqual({
+    await expect(readFreshOrcaCloudSession(config, active, userDataPath)).resolves.toEqual({
       status: 'reconnect-required'
     })
 
@@ -150,7 +177,7 @@ describe('profile cloud session refresh', () => {
       persistence: 'memory-only'
     })
 
-    await expect(readFreshOrcaCloudSession(config, active, '/data')).resolves.toEqual({
+    await expect(readFreshOrcaCloudSession(config, active, userDataPath)).resolves.toEqual({
       status: 'reconnect-required'
     })
 
@@ -175,22 +202,22 @@ describe('refresh-token replay after an ambiguous attempt', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.restoreAllMocks()
-    forgetAmbiguousRefreshAttempt('/data\0profile-1')
-    saveIfCurrentMock.mockReturnValue('memory-only')
+    forgetAmbiguousRefreshAttempt(`${userDataPath}\0profile-1`)
+    resetSessionOwner()
     readMock.mockReturnValue({ status: 'found', session: staleSession, persistence: 'memory-only' })
   })
 
   it('never resends a refresh token whose attempt timed out', async () => {
     refreshMock.mockRejectedValue(timeout())
 
-    await expect(readFreshOrcaCloudSession(config, active, '/data')).rejects.toThrow(
+    await expect(readFreshOrcaCloudSession(config, active, userDataPath)).rejects.toThrow(
       'The operation timed out.'
     )
     expect(refreshMock).toHaveBeenCalledTimes(1)
 
     // The retry loop above this module re-enters immediately; it must not turn
     // one lost reply into a second POST of the same token.
-    await expect(readFreshOrcaCloudSession(config, active, '/data')).rejects.toThrow(
+    await expect(readFreshOrcaCloudSession(config, active, userDataPath)).rejects.toThrow(
       'orca_cloud_refresh_replay_blocked'
     )
     expect(refreshMock).toHaveBeenCalledTimes(1)
@@ -205,12 +232,12 @@ describe('refresh-token replay after an ambiguous attempt', () => {
       .mockReturnValueOnce({ status: 'found', session: staleSession, persistence: 'memory-only' })
       .mockReturnValue({ status: 'found', session: rotated, persistence: 'memory-only' })
 
-    await expect(readFreshOrcaCloudSession(config, active, '/data')).resolves.toEqual({
+    await expect(readFreshOrcaCloudSession(config, active, userDataPath)).resolves.toEqual({
       status: 'found',
       session: rotated
     })
     expect(refreshMock).toHaveBeenCalledTimes(1)
-    expect(saveIfCurrentMock).not.toHaveBeenCalled()
+    expect(saveMock).not.toHaveBeenCalled()
   })
 
   it('retries once after a definitive 5xx, which cannot have rotated the token', async () => {
@@ -218,7 +245,7 @@ describe('refresh-token replay after an ambiguous attempt', () => {
       .mockRejectedValueOnce(new OrcaCloudRequestError(503))
       .mockResolvedValueOnce(rotatedResponse)
 
-    const result = await readFreshOrcaCloudSession(config, active, '/data')
+    const result = await readFreshOrcaCloudSession(config, active, userDataPath)
 
     expect(refreshMock).toHaveBeenCalledTimes(2)
     expect(refreshMock).toHaveBeenNthCalledWith(2, config, staleSession)
@@ -234,7 +261,7 @@ describe('refresh-token replay after an ambiguous attempt', () => {
   it('gives a definitive 5xx exactly one retry', async () => {
     refreshMock.mockRejectedValue(new OrcaCloudRequestError(503))
 
-    await expect(readFreshOrcaCloudSession(config, active, '/data')).rejects.toThrow(
+    await expect(readFreshOrcaCloudSession(config, active, userDataPath)).rejects.toThrow(
       'orca_cloud_request_failed_503'
     )
     expect(refreshMock).toHaveBeenCalledTimes(2)
@@ -248,14 +275,14 @@ describe('refresh-token replay after an ambiguous attempt', () => {
     const unsubscribe = onOrcaCloudSessionInvalidated(invalidated)
     refreshMock.mockRejectedValueOnce(timeout())
 
-    await expect(readFreshOrcaCloudSession(config, active, '/data')).rejects.toThrow(
+    await expect(readFreshOrcaCloudSession(config, active, userDataPath)).rejects.toThrow(
       'The operation timed out.'
     )
 
     now.mockReturnValue(1_000_000 + 31_000)
     refreshMock.mockRejectedValueOnce(new OrcaCloudRequestError(401))
 
-    await expect(readFreshOrcaCloudSession(config, active, '/data')).resolves.toEqual({
+    await expect(readFreshOrcaCloudSession(config, active, userDataPath)).resolves.toEqual({
       status: 'reconnect-required'
     })
 
@@ -270,7 +297,7 @@ describe('refresh-token replay after an ambiguous attempt', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     refreshMock.mockRejectedValue(new OrcaCloudRequestError(401))
 
-    await expect(readFreshOrcaCloudSession(config, active, '/data')).resolves.toEqual({
+    await expect(readFreshOrcaCloudSession(config, active, userDataPath)).resolves.toEqual({
       status: 'reconnect-required'
     })
 

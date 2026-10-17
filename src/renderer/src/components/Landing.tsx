@@ -11,6 +11,7 @@ import {
 import { useAppStore } from '../store'
 import { APP_DISPLAY_NAME, PRODUCT_LOGO_URL } from '@/product-brand'
 import { cn } from '@/lib/utils'
+import { isImeOwnedKeyboardEvent } from '@/lib/ime-composition-keyboard-event'
 import { getAgentCatalog } from '@/lib/agent-catalog'
 import { useAgentDetectionTargetForWorktree } from '@/hooks/useAgentDetectionTarget'
 import { useDetectedAgents } from '@/hooks/useDetectedAgents'
@@ -468,6 +469,9 @@ export default function Landing(): React.JSX.Element {
               value={homeTaskDraft}
               onChange={(event) => setHomeTaskDraft(event.target.value)}
               onKeyDown={(event) => {
+                if (isImeOwnedKeyboardEvent(event)) {
+                  return
+                }
                 if (event.key === 'Escape' && homeNewTaskMode && homeReturnScope) {
                   event.preventDefault()
                   restoreHomeReturnScope()

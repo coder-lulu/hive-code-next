@@ -1,5 +1,6 @@
 import Database from '../../sqlite/sync-database'
 import { expect, it } from 'vitest'
+import { ProfileStateDatabaseOpenError } from './profile-state-database-errors'
 import {
   decodeProfileStateWriterError,
   encodeProfileStateWriterError
@@ -45,3 +46,18 @@ it('classifies a real SQLite capacity failure after worker serialization', () =>
     db.close()
   }
 })
+
+it.each(['unreadable', 'identity-mismatch', 'invalid-profile-id', 'newer-schema'] as const)(
+  'preserves database-open identity across serialization for %s',
+  (code) => {
+    const original = new ProfileStateDatabaseOpenError(code, 'Cannot open saved state')
+    const decoded = decodeProfileStateWriterError(
+      JSON.parse(JSON.stringify(encodeProfileStateWriterError(original)))
+    )
+    expect(decoded).toBeInstanceOf(ProfileStateDatabaseOpenError)
+    expect(decoded).toMatchObject({ code, message: original.message })
+    expect(
+      decodeProfileStateWriterError(encodeProfileStateWriterError(original, true))
+    ).not.toBeInstanceOf(ProfileStateDatabaseOpenError)
+  }
+)

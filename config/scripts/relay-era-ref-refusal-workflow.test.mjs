@@ -43,11 +43,11 @@ describe.each([['release-cut.yml', 'cut', 'Resolve ref SHA']])(
       expect(sparse?.split('\n').includes('/config/tsconfig.relay.json') ?? true).toBe(true)
       expect(index).toBeLessThan(jobSteps.findIndex((step) => step.name === laterStep))
     })
-
-    it('fails only when the checkout still has the relay', async () => {
-      const run = jobSteps[index].run
-      expect((await runAt(run, true)).code).toBe(1)
-      expect((await runAt(run, false)).code).toBe(0)
-    })
   }
 )
+
+it('fails only when the checkout still has the relay', async () => {
+  const run = steps('release-cut.yml', 'cut').find((step) => step.name === STEP).run
+  expect((await runAt(run, true)).code).toBe(1)
+  expect((await runAt(run, false)).code).toBe(0)
+})

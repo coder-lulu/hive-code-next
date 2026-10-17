@@ -1,9 +1,9 @@
-// @ts-nocheck -- mechanically split from OrcaRuntimeService; behavior is covered by AST equivalence and characterization tests.
 import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import type { RuntimeWorktreeScanResult } from './repo-worktree-resolution-scan'
 import type { TerminalWorkspaceLaunchScope } from './runtime-legacy-worker-terminal-recovery-types'
 import type { ResolvedWorktree } from './runtime-worktree-path-identity'
 import type { RuntimeLeafRecord } from './runtime-terminal-state-records'
+import type { RuntimeTerminalRowMetadata } from '../../shared/runtime-terminal-contracts'
 import { isCursorAgentTitle } from '../../shared/agent-detection'
 import { IMMEDIATE_KILL_REPLY_BUDGET_MS } from '../daemon/immediate-kill-reply-budget'
 import type {
@@ -96,7 +96,11 @@ export const PROVEN_ABSENT_LEAF_PTY_TTL_MS = 15_000
 
 export const TERMINAL_INTERACTIVE_WAIT_PROBE_TIMEOUT_MS = 2_000
 
-export type RuntimeTerminalProjection = { lines: string[]; draft?: string }
+export type RuntimeTerminalProjection = {
+  lines: string[]
+  draft?: string
+  tailRows?: RuntimeTerminalRowMetadata[]
+}
 
 export function assertAgentPromptRequestActive(signal?: AbortSignal): void {
   if (signal?.aborted) {

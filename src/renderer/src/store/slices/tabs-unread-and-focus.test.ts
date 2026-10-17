@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { resolveAutoAckTabTargets } from '@/hooks/agent-auto-ack-targets'
 import type * as AgentStatusModule from '@/lib/agent-status'
 import { createTabsSliceMockApi } from './tabs-slice-test-harness'
 import { createTestStore, makeOpenFile } from './store-test-helpers'
@@ -52,17 +53,16 @@ describe('TabsSlice', () => {
       expect(store.getState().unifiedTabsByWorktree[WT][0].isPreview).toBe(false)
     })
 
-    // Why (regression): activateTab gets a *unified* tabId but the bell is keyed by entityId, so it must resolve entityId or the bell won't clear on click.
-    it('clears unreadTerminalTabs for a terminal tab when its unified tab activates', () => {
+    // Why (regression): activateTab gets a *unified* tabId but the bell is keyed by entityId, so the on-screen read must name the entityId.
+    it('puts the terminal tab on screen by entityId and leaves its marker to the on-screen read', () => {
       const t1 = store.getState().createUnifiedTab(WT, 'terminal')
       const t2 = store.getState().createUnifiedTab(WT, 'terminal')
       // t2 is active after creation; move focus to t1 so we can mark t2 unread.
       store.getState().activateTab(t1.id)
 
-      // Mark WT active: activateTab's unread-clear is guarded on activeWorktreeId so hidden-worktree activations don't swallow the signal.
-      store.setState({ activeWorktreeId: WT })
+      store.setState({ activeWorktreeId: WT, activeView: 'terminal' })
 
-      // entityId is the terminal tabId that markTerminalTabUnread / TabBar read from.
+      // entityId is the terminal tabId that markTerminalBell / TabBar read from.
       const t2TerminalId = t2.entityId
       store.setState({
         unreadTerminalTabs: {
@@ -74,7 +74,10 @@ describe('TabsSlice', () => {
 
       store.getState().activateTab(t2.id)
 
-      expect(store.getState().unreadTerminalTabs[t2TerminalId]).toBeUndefined()
+      expect(store.getState().unreadTerminalTabs[t2TerminalId]).toBe(true)
+      expect(resolveAutoAckTabTargets(store.getState())).toEqual([
+        { tabId: t2TerminalId, worktreeId: WT, surfaceKind: 'terminal' }
+      ])
     })
 
     it('leaves completion consumption to explicit user acknowledgement', () => {
@@ -95,7 +98,7 @@ describe('TabsSlice', () => {
     })
   })
 
-  // Ghostty "show until interact": BEL always marks unread (even focused/visible tabs); only user interaction via clearTerminalTabUnread dismisses it.
+  // Ghostty "show until interact": BEL always marks unread (even focused/visible tabs); the on-screen read dismisses it.
   describe('lastFocusedAt', () => {
     it('stamps a newly created tab that activates', () => {
       const before = Date.now()
@@ -125,7 +128,7 @@ describe('TabsSlice', () => {
     })
   })
 
-  describe('markTerminalTabUnread', () => {
+  describe('markTerminalBell tab marker', () => {
     it('marks the tab even when it is active in a visible split group of the active worktree', () => {
       // Group A: the worktree's root group (implicit from createUnifiedTab), populated with tabA.
       const tabA = store.getState().createUnifiedTab(WT, 'terminal')
@@ -158,8 +161,10 @@ describe('TabsSlice', () => {
         }
       })
 
-      // Fire a bell on Group A's visible tab: under ghostty semantics the indicator still appears — only clearTerminalTabUnread dismisses it.
-      store.getState().markTerminalTabUnread(tabA.entityId, 'terminal-bell')
+      // Fire a bell on Group A's visible tab: under ghostty semantics the indicator still appears — only pane input dismisses it.
+      store
+        .getState()
+        .markTerminalBell({ worktreeId: WT, tabId: tabA.entityId, paneKey: `${tabA.entityId}:0` })
 
       expect(store.getState().unreadTerminalTabs[tabA.entityId]).toBe('terminal-bell')
     })
@@ -179,7 +184,7 @@ describe('TabsSlice', () => {
       store.getState().createUnifiedTab(WT, 'terminal', { targetGroupId: groupBId })
       store.getState().focusGroup(WT, groupBId)
       store.setState({ activeWorktreeId: WT })
-      // Why: markTerminalTabUnread skips tabs missing from tabsByWorktree, so seed the backing legacy tab that every terminal unified tab has in production.
+      // Why: the bell's tab marker skips tabs missing from tabsByWorktree, so seed the backing legacy tab that every terminal unified tab has in production.
       store.setState({
         tabsByWorktree: {
           [WT]: [
@@ -198,7 +203,9 @@ describe('TabsSlice', () => {
       })
 
       // tabA2 is NOT the active tab of any group — a bell on it is legitimate.
-      store.getState().markTerminalTabUnread(tabA2.entityId, 'terminal-bell')
+      store
+        .getState()
+        .markTerminalBell({ worktreeId: WT, tabId: tabA2.entityId, paneKey: `${tabA2.entityId}:0` })
 
       expect(store.getState().unreadTerminalTabs[tabA2.entityId]).toBe('terminal-bell')
     })
@@ -207,7 +214,7 @@ describe('TabsSlice', () => {
     it('still marks the tab when the active surface is not terminal', () => {
       const tab = store.getState().createUnifiedTab(WT, 'terminal')
       // Point active* at this tab but mark a different worktree active (skips the visible-groups check); only activeTabType='editor' remains as a guard.
-      // Why: seed tabsByWorktree — markTerminalTabUnread guards against a missing owner tab.
+      // Why: seed tabsByWorktree — the tab marker guards against a missing owner tab.
       store.setState({
         activeWorktreeId: 'other-wt::/path/x',
         activeTabId: tab.entityId,
@@ -228,7 +235,9 @@ describe('TabsSlice', () => {
         }
       })
 
-      store.getState().markTerminalTabUnread(tab.entityId, 'terminal-bell')
+      store
+        .getState()
+        .markTerminalBell({ worktreeId: WT, tabId: tab.entityId, paneKey: `${tab.entityId}:0` })
 
       expect(store.getState().unreadTerminalTabs[tab.entityId]).toBe('terminal-bell')
     })
@@ -258,13 +267,15 @@ describe('TabsSlice', () => {
       })
       const before = store.getState().unreadTerminalTabs
 
-      store.getState().markTerminalTabUnread(tab.entityId, 'terminal-bell')
+      store
+        .getState()
+        .markTerminalBell({ worktreeId: WT, tabId: tab.entityId, paneKey: `${tab.entityId}:0` })
 
       // Same object reference => no state mutation occurred.
       expect(store.getState().unreadTerminalTabs).toBe(before)
     })
 
-    // Why: markTerminalTabUnread is agent-agnostic — blocking the working→idle dot here would swallow the agent's completion signal.
+    // Why: the bell's tab marker is agent-agnostic — blocking the working→idle dot here would swallow the agent's completion signal.
     it('marks unread for an agent tab when it is not focused', () => {
       const agentTabId = 'agent-tab-1'
       store.setState({
@@ -287,21 +298,28 @@ describe('TabsSlice', () => {
         }
       })
 
-      store.getState().markTerminalTabUnread(agentTabId, 'terminal-bell')
+      store
+        .getState()
+        .markTerminalBell({ worktreeId: WT, tabId: agentTabId, paneKey: `${agentTabId}:0` })
 
       expect(store.getState().unreadTerminalTabs[agentTabId]).toBe('terminal-bell')
     })
   })
 
-  // Called on real user interaction (xterm onData keystroke or pointerdown) — the dismissal half of show-until-interact.
-  describe('clearTerminalTabUnread', () => {
+  // The on-screen scan's read of a visible tab.
+  describe('readOnScreenAttention tab marker', () => {
     it('removes the tab from unreadTerminalTabs', () => {
       const tabId = 'bell-tab-1'
       store.setState({
         unreadTerminalTabs: { [tabId]: true as const, 'other-tab': true as const }
       })
 
-      store.getState().clearTerminalTabUnread(tabId)
+      store
+        .getState()
+        .readOnScreenAttention(
+          { workspaceIds: [WT], targets: [{ worktreeId: WT, tabId }] },
+          { screenArrived: false }
+        )
 
       expect(store.getState().unreadTerminalTabs).toEqual({ 'other-tab': true })
     })
@@ -310,7 +328,12 @@ describe('TabsSlice', () => {
       const initial = { 'other-tab': true as const }
       store.setState({ unreadTerminalTabs: initial })
 
-      store.getState().clearTerminalTabUnread('bell-tab-1')
+      store
+        .getState()
+        .readOnScreenAttention(
+          { workspaceIds: [WT], targets: [{ worktreeId: WT, tabId: 'bell-tab-1' }] },
+          { screenArrived: false }
+        )
 
       // Same reference => no-op. Downstream selectors must not re-render.
       expect(store.getState().unreadTerminalTabs).toBe(initial)
@@ -321,27 +344,53 @@ describe('TabsSlice', () => {
     it('increments per completion and decrements one task when the pane is opened', () => {
       const paneKey = 'tab-complete:leaf-1'
 
-      store.getState().markAgentCompletionPaneUnread(paneKey, 'agent-completion')
-      store.getState().incrementAgentCompletionUnread(paneKey)
+      store.getState().markAgentAttentionUnread(
+        {
+          workspaceId: WT,
+          subjectKey: paneKey,
+          groupId: paneKey.split(':')[0],
+          reason: 'agent-completion'
+        },
+        { countCompletion: true }
+      )
       store.getState().incrementAgentCompletionUnread(paneKey)
 
       expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 2 })
 
-      store.getState().clearTerminalPaneUnread(paneKey)
+      store
+        .getState()
+        .readOnScreenAttention(
+          { workspaceIds: [WT], targets: [{ worktreeId: WT, tabId: paneKey.split(':')[0] }] },
+          { screenArrived: false }
+        )
+      store.getState().consumeAgentCompletionUnread(paneKey)
 
       expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 1 })
-      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBe(true)
+      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBeUndefined()
     })
 
     it('consumes one completion per explicit tab acknowledgement', () => {
       const paneKey = 'tab-complete:leaf-1'
-      store.getState().markAgentCompletionPaneUnread(paneKey, 'agent-completion')
-      store.getState().incrementAgentCompletionUnread(paneKey)
+      store.getState().markAgentAttentionUnread(
+        {
+          workspaceId: WT,
+          subjectKey: paneKey,
+          groupId: paneKey.split(':')[0],
+          reason: 'agent-completion'
+        },
+        { countCompletion: true }
+      )
       store.getState().incrementAgentCompletionUnread(paneKey)
 
+      store
+        .getState()
+        .readOnScreenAttention(
+          { workspaceIds: [WT], targets: [{ worktreeId: WT, tabId: 'tab-complete' }] },
+          { screenArrived: false }
+        )
       store.getState().consumeFirstAgentCompletionUnreadForTab('tab-complete')
       expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 1 })
-      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBe(true)
+      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBeUndefined()
 
       store.getState().consumeFirstAgentCompletionUnreadForTab('tab-complete')
       expect(store.getState().unreadAgentCompletionCountByPane).toEqual({})
@@ -354,21 +403,39 @@ describe('TabsSlice', () => {
       store.getState().incrementAgentCompletionUnread(paneKey)
       store.getState().incrementAgentCompletionUnread(otherPaneKey)
 
-      store.getState().clearTerminalPaneUnread(paneKey)
+      store
+        .getState()
+        .readOnScreenAttention(
+          { workspaceIds: [WT], targets: [{ worktreeId: WT, tabId: paneKey.split(':')[0] }] },
+          { screenArrived: false }
+        )
+      store.getState().consumeAgentCompletionUnread(paneKey)
 
       expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [otherPaneKey]: 1 })
     })
 
     it('does not consume a completion during automatic visibility acknowledgement', () => {
       const paneKey = 'tab-visible:leaf-1'
-      store.getState().markAgentCompletionPaneUnread(paneKey, 'agent-completion')
-      store.getState().incrementAgentCompletionUnread(paneKey)
+      store.getState().markAgentAttentionUnread(
+        {
+          workspaceId: WT,
+          subjectKey: paneKey,
+          groupId: paneKey.split(':')[0],
+          reason: 'agent-completion'
+        },
+        { countCompletion: true }
+      )
       store.getState().incrementAgentCompletionUnread(paneKey)
 
-      store.getState().clearTerminalPaneUnread(paneKey, { consumeCompletion: false })
+      store
+        .getState()
+        .readOnScreenAttention(
+          { workspaceIds: [WT], targets: [{ worktreeId: WT, tabId: 'tab-visible' }] },
+          { screenArrived: false }
+        )
 
       expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 2 })
-      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBe('agent-completion')
+      expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBeUndefined()
     })
   })
 
@@ -416,32 +483,8 @@ describe('TabsSlice', () => {
       expect(store.getState().activeTabTypeByWorktree).toBe(before.activeTabTypeByWorktree)
     })
 
-    // Why: focusGroup fires on every pointerdown in the group chrome, so clearing the tab-level bell here is safe — the user is now viewing it.
-    it("clears the tab-level bell on the focused group's active tab", () => {
-      const tabA = store.getState().createUnifiedTab(WT, 'terminal')
-      const groupAId = store.getState().groupsByWorktree[WT][0].id
-      const groupBId = store.getState().createEmptySplitGroup(WT, groupAId, 'right')
-      if (!groupBId) {
-        throw new Error('createEmptySplitGroup returned null')
-      }
-      store.getState().createUnifiedTab(WT, 'terminal', { targetGroupId: groupBId })
-      // Focus Group B first so the active group is not A.
-      store.getState().focusGroup(WT, groupBId)
-
-      // Mark WT active: focusGroup's unread-clear is guarded on activeWorktreeId to avoid swallowing bells in hidden worktrees.
-      store.setState({
-        unreadTerminalTabs: { [tabA.entityId]: true as const },
-        activeWorktreeId: WT
-      })
-
-      // Clicking Group A's chrome re-focuses it without calling activateTab (active tab unchanged).
-      store.getState().focusGroup(WT, groupAId)
-
-      // Tab-level bell cleared — the user is now viewing this tab.
-      expect(store.getState().unreadTerminalTabs[tabA.entityId]).toBeUndefined()
-    })
-
-    it('clears unread on every visible terminal tab across split groups', () => {
+    // Why: focusGroup fires on every pointerdown in the group chrome; it moves what is on screen and the scan reads it.
+    it("puts the focused group's active tab on screen", () => {
       const tabA = store.getState().createUnifiedTab(WT, 'terminal')
       const groupAId = store.getState().groupsByWorktree[WT][0].id
       const groupBId = store.getState().createEmptySplitGroup(WT, groupAId, 'right')
@@ -449,20 +492,46 @@ describe('TabsSlice', () => {
         throw new Error('createEmptySplitGroup returned null')
       }
       const tabB = store.getState().createUnifiedTab(WT, 'terminal', { targetGroupId: groupBId })
+      // Focus Group B first so the active group is not A.
+      store.getState().focusGroup(WT, groupBId)
 
       store.setState({
-        unreadTerminalTabs: {
-          [tabA.entityId]: true as const,
-          [tabB.entityId]: true as const
-        },
-        activeWorktreeId: WT
+        unreadTerminalTabs: { [tabA.entityId]: true as const },
+        activeWorktreeId: WT,
+        activeView: 'terminal'
       })
 
-      // Why: both groups' active tabs are visible in a split, so neither keeps a stale unread bell once focused.
+      // Clicking Group A's chrome re-focuses it without calling activateTab (active tab unchanged).
       store.getState().focusGroup(WT, groupAId)
 
-      expect(store.getState().unreadTerminalTabs[tabA.entityId]).toBeUndefined()
-      expect(store.getState().unreadTerminalTabs[tabB.entityId]).toBeUndefined()
+      expect(resolveAutoAckTabTargets(store.getState())[0]).toEqual({
+        tabId: tabA.entityId,
+        worktreeId: WT,
+        surfaceKind: 'terminal'
+      })
+      expect(resolveAutoAckTabTargets(store.getState())).toContainEqual({
+        tabId: tabB.entityId,
+        worktreeId: WT,
+        surfaceKind: 'terminal'
+      })
+    })
+
+    it('puts the active tab of every side-by-side group on screen', () => {
+      const tabA = store.getState().createUnifiedTab(WT, 'terminal')
+      const groupAId = store.getState().groupsByWorktree[WT][0].id
+      const groupBId = store.getState().createEmptySplitGroup(WT, groupAId, 'right')
+      if (!groupBId) {
+        throw new Error('createEmptySplitGroup returned null')
+      }
+      const tabB = store.getState().createUnifiedTab(WT, 'terminal', { targetGroupId: groupBId })
+      store.setState({ activeWorktreeId: WT, activeView: 'terminal' })
+
+      store.getState().focusGroup(WT, groupAId)
+
+      expect(resolveAutoAckTabTargets(store.getState())).toEqual([
+        { tabId: tabA.entityId, worktreeId: WT, surfaceKind: 'terminal' },
+        { tabId: tabB.entityId, worktreeId: WT, surfaceKind: 'terminal' }
+      ])
     })
   })
 })

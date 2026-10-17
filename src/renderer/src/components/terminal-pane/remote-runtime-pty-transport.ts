@@ -191,7 +191,6 @@ function isRemoteTerminalGoneMessage(message: string): boolean {
   return (
     message.includes('terminal_exited') ||
     message.includes('terminal_gone') ||
-    message.includes('no_connected_pty') ||
     message.toLocaleLowerCase('en-US').includes('explicitly killed')
   )
 }
@@ -2003,6 +2002,13 @@ export function createRemoteRuntimePtyTransport(
       retireRemoteTerminalId()
       return
     }
+    if (message.includes('no_connected_pty')) {
+      // Why: the host also sends this when its window has not mounted the pane yet, so it proves
+      // nothing about exit; back off and resubscribe, which asks the host to mount it again.
+      closeMultiplexedStream()
+      scheduleResubscribeAfterBackoff()
+      return
+    }
     if (isSshSessionGoneError(message)) {
       // Why: only the HUB may replace its expired SSH pane; a paired viewer must never fall back to
       // client-local SSH. The identity-mismatch suffix is excluded because it means the opposite —
@@ -2014,7 +2020,7 @@ export function createRemoteRuntimePtyTransport(
     }
     const clientError = toRemoteRuntimeClientErrorLike(error)
     if (isRuntimeRpcQueueOverloadError(clientError)) {
-      scheduleCapacityPressureRetry()
+      scheduleResubscribeAfterBackoff()
       return
     }
     if (isRecoverablePaneBindingError(error)) {
@@ -2248,7 +2254,7 @@ export function createRemoteRuntimePtyTransport(
       })
   }
 
-  function scheduleCapacityPressureRetry(): void {
+  function scheduleResubscribeAfterBackoff(): void {
     if (destroyed || !connected || !handle) {
       return
     }
@@ -2454,7 +2460,7 @@ export function createRemoteRuntimePtyTransport(
           resetSameHandleEndReuse()
           if (recoverable) {
             if (retryWithBackoff) {
-              scheduleCapacityPressureRetry()
+              scheduleResubscribeAfterBackoff()
             } else {
               scheduleResubscribeAfterTransportClose()
             }

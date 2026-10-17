@@ -134,7 +134,7 @@ describe('shutdownWorktreeTerminals ordering', () => {
     expect(store.getState().unreadAgentCompletionCountByPane).toEqual({
       'tab-1:leaf-1': 2
     })
-    expect(store.getState().unreadAgentCompletionPanes['tab-1:leaf-1']).toBe(true)
+    expect(store.getState().unreadAgentCompletionPanes['tab-1:leaf-1']).toBeUndefined()
     unsubscribe()
   })
 })

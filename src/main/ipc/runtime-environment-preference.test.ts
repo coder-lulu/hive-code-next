@@ -1,3 +1,4 @@
+import { drainNativeFixture, restoreNativeFixture } from './ephemeral-vm-native-test-fixture'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import {
   EMPTY_HIVE_ACCOUNT_RUNTIME_DIRECTORY,
@@ -7,7 +8,7 @@ import { installHiveAccountRuntimeAccess } from '../hive-runtime-cloud/hive-acco
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../shared/constants'
 import { encodePairingOffer } from '../../shared/pairing'
 import {
@@ -23,13 +24,17 @@ import {
   watchRuntimeEnvironmentPreference
 } from './runtime-environment-preference'
 
+const pendingChildren = new Set<Promise<void>>()
+afterAll(restoreNativeFixture)
+
 let userDataPath: string
 
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), 'orca-removed-preference-'))
 })
 
-afterEach(() => {
+afterEach(async () => {
+  await drainNativeFixture(pendingChildren)
   rmSync(userDataPath, { recursive: true, force: true })
 })
 
@@ -55,11 +60,12 @@ function saveEnvironment(name = 'server') {
 }
 
 describe('Active Server after a saved host is removed', () => {
-  it('survives a failed watch installation and repairs on the next settings read', () => {
+  it('survives a failed watch installation and repairs on the next settings read', async () => {
     const environment = saveEnvironment()
     const store = preferenceStore(environment.id)
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => {})
     let stopWatching: (() => void) | undefined
+    await drainNativeFixture(pendingChildren)
     rmSync(userDataPath, { recursive: true })
     try {
       expect(() => {

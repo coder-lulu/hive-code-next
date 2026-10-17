@@ -1,3 +1,14 @@
+import { JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY } from './jira-agent-capability'
+import { JIRA_STATUS_FILTER_RUNTIME_CAPABILITY } from './jira-quick-filters'
+import { JIRA_SAVED_FILTER_RUNTIME_CAPABILITY } from './jira-saved-filter-capability'
+import * as jiraDetailCapabilities from './jira-detail-capabilities'
+import { SESSION_TABS_RUNTIME_CAPABILITIES } from './session-tabs-runtime-capabilities'
+export {
+  JIRA_ISSUE_SUMMARY_RUNTIME_CAPABILITY,
+  JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY,
+  JIRA_CURRENT_SPRINT_RUNTIME_CAPABILITY
+} from './jira-detail-capabilities'
+export * from './agent-session-stop-capabilities'
 import * as capabilities from './runtime-capability-identifiers'
 export * from './runtime-capability-identifiers'
 import { WORKSPACE_ATTACHMENT_RUNTIME_CAPABILITIES } from './workspace-attachment-capabilities'
@@ -93,8 +104,6 @@ export const RUNTIME_PROTOCOL_VERSION = 3
 export const MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION = 2
 export const MIN_COMPATIBLE_RUNTIME_SERVER_VERSION = 2
 
-
-
 // Generic native clients include the CLI and must not claim Electron-only page
 // placement support.
 export const NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES = [
@@ -112,6 +121,9 @@ export const ANTIGRAVITY_CONFIGURED_MODEL_RUNTIME_CAPABILITY =
   'git.antigravity-configured-model.v1' as const
 
 export const RUNTIME_CAPABILITIES = [
+  jiraDetailCapabilities.JIRA_TRANSITION_FIELDS_RUNTIME_CAPABILITY,
+  JIRA_AGENT_ACCESS_RUNTIME_CAPABILITY,
+  jiraDetailCapabilities.JIRA_CURRENT_SPRINT_RUNTIME_CAPABILITY,
   ...ORCAD_RUNTIME_CAPABILITIES,
   ...DEVICE_KEY_RUNTIME_CAPABILITIES,
   QODER_OWNED_TERMINAL_CREATE_CAPABILITY,
@@ -146,7 +158,9 @@ export const RUNTIME_CAPABILITIES = [
   capabilities.REPO_SEARCH_QUALIFIED_REFS_RUNTIME_CAPABILITY,
   capabilities.FOLDER_WORKSPACE_PATH_STATUS_RUNTIME_CAPABILITY,
   capabilities.LINEAR_ISSUE_ATTRIBUTE_FILTER_RUNTIME_CAPABILITY,
-  capabilities.JIRA_USER_FIELDS_RUNTIME_CAPABILITY,
+  ...jiraDetailCapabilities.JIRA_DETAIL_RUNTIME_CAPABILITIES,
+  JIRA_SAVED_FILTER_RUNTIME_CAPABILITY,
+  JIRA_STATUS_FILTER_RUNTIME_CAPABILITY,
   capabilities.AI_VAULT_RUNTIME_CAPABILITY,
   capabilities.AI_VAULT_SESSION_TITLES_RUNTIME_CAPABILITY,
   capabilities.TERMINAL_QUERY_REPLY_INPUT_RUNTIME_CAPABILITY,
@@ -161,7 +175,7 @@ export const RUNTIME_CAPABILITIES = [
   capabilities.TERMINAL_CREATE_SHELL_SELECTION_RUNTIME_CAPABILITY,
   capabilities.SESSION_TAB_CLOSE_INTENT_RUNTIME_CAPABILITY,
   capabilities.SESSION_TABS_AUTHORITATIVE_INVENTORY_RUNTIME_CAPABILITY,
-  capabilities.SESSION_TABS_SPLIT_GROUP_PLACEMENT_RUNTIME_CAPABILITY,
+  ...SESSION_TABS_RUNTIME_CAPABILITIES,
   capabilities.AGENT_SESSION_BOUNDARY_RUNTIME_CAPABILITY,
   REMOTE_SERVER_UPDATE_CAPABILITY,
   capabilities.AGENT_SESSION_HOST_AUTHORITY_RUNTIME_CAPABILITY,

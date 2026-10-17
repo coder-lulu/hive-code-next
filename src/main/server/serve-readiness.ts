@@ -1,7 +1,7 @@
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { PairingOfferUnavailableReason } from '../runtime/runtime-rpc'
 import type { OrcadHealth } from '../orcad/orcad-health'
-import { describePtyProcessCeiling } from '../daemon/pty-process-ceiling-state'
+import { describePtyProcessCeiling } from '../../shared/pty-process-ceiling-state'
 
 export type ServePairingUnavailableReason = PairingOfferUnavailableReason | 'disabled_by_operator'
 

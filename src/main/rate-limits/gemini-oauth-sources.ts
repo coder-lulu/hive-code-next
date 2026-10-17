@@ -1,7 +1,8 @@
+import { cancelUnreadResponseBody } from '../lib/unread-response-body'
 import { readFile, writeFile, rename } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import path from 'node:path'
-import { net } from 'electron'
+import { getMainHttpClient } from '../network/http-client'
 import { extractOAuthClientCredentials } from './gemini-cli-oauth-extractor'
 
 const API_TIMEOUT_MS = 10_000
@@ -94,7 +95,7 @@ export async function refreshAccessToken(
   clientId: string,
   clientSecret: string
 ): Promise<RefreshTokenResult> {
-  const res = await net.fetch(GOOGLE_TOKEN_URL, {
+  const res = await getMainHttpClient().fetch(GOOGLE_TOKEN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -106,24 +107,28 @@ export async function refreshAccessToken(
     signal: AbortSignal.timeout(API_TIMEOUT_MS)
   })
 
-  if (!res.ok) {
-    return { accessToken: null, newRefreshToken: null }
-  }
+  try {
+    if (!res.ok) {
+      return { accessToken: null, newRefreshToken: null }
+    }
 
-  const data = (await res.json()) as {
-    access_token?: string
-    refresh_token?: string
-    expires_in?: number
-  }
-  return {
-    accessToken: typeof data.access_token === 'string' ? data.access_token : null,
-    newRefreshToken: typeof data.refresh_token === 'string' ? data.refresh_token : null,
-    expiresIn: typeof data.expires_in === 'number' ? data.expires_in : undefined
+    const data = (await res.json()) as {
+      access_token?: string
+      refresh_token?: string
+      expires_in?: number
+    }
+    return {
+      accessToken: typeof data.access_token === 'string' ? data.access_token : null,
+      newRefreshToken: typeof data.refresh_token === 'string' ? data.refresh_token : null,
+      expiresIn: typeof data.expires_in === 'number' ? data.expires_in : undefined
+    }
+  } finally {
+    await cancelUnreadResponseBody(res)
   }
 }
 
 export async function loadProjectId(accessToken: string): Promise<string> {
-  const res = await net.fetch(LOAD_CODE_ASSIST_URL, {
+  const res = await getMainHttpClient().fetch(LOAD_CODE_ASSIST_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -133,15 +138,19 @@ export async function loadProjectId(accessToken: string): Promise<string> {
     signal: AbortSignal.timeout(API_TIMEOUT_MS)
   })
 
-  if (!res.ok) {
-    throw new Error(`Failed to load Gemini project ID (HTTP ${res.status})`)
-  }
+  try {
+    if (!res.ok) {
+      throw new Error(`Failed to load Gemini project ID (HTTP ${res.status})`)
+    }
 
-  const data = (await res.json()) as { cloudaicompanionProject?: string }
-  if (typeof data.cloudaicompanionProject !== 'string') {
-    throw new Error('Gemini project ID not found in API response')
+    const data = (await res.json()) as { cloudaicompanionProject?: string }
+    if (typeof data.cloudaicompanionProject !== 'string') {
+      throw new Error('Gemini project ID not found in API response')
+    }
+    return data.cloudaicompanionProject
+  } finally {
+    await cancelUnreadResponseBody(res)
   }
-  return data.cloudaicompanionProject
 }
 
 // Why: accepts a plain refresh token string so both the oauth_creds.json path

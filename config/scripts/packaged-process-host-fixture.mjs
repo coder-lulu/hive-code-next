@@ -5,18 +5,33 @@ import { runProcessSync } from '@orca/process-host'
 
 const require = createRequire(import.meta.url)
 const requireFromBuilder = createRequire(require.resolve('electron-builder/package.json'))
-const { copyFiles, FileMatcher } = requireFromBuilder('app-builder-lib/out/fileMatcher')
+const { FileMatcher } = requireFromBuilder('app-builder-lib/out/fileMatcher')
+const requireFromAppBuilder = createRequire(
+  requireFromBuilder.resolve('app-builder-lib/out/fileMatcher')
+)
+const { copyDir, DO_NOT_USE_HARD_LINKS } = requireFromAppBuilder('builder-util')
 const { createPackagedRuntimeNodeModuleResources } = require('../packaged-runtime-node-modules.cjs')
 
 export async function stagePackagedProcessHost(resourcesDir) {
+  return stagePackagedRuntimeNodeModule(resourcesDir, '@orca/process-host')
+}
+
+export async function stagePackagedRuntimeNodeModule(resourcesDir, packageName) {
   const resource = createPackagedRuntimeNodeModuleResources().find(
-    (entry) => entry.to === join('node_modules', '@orca', 'process-host')
+    (entry) => entry.to === join('node_modules', ...packageName.split('/'))
   )
   if (!resource) {
-    throw new Error('Packaged process-host resource is missing')
+    throw new Error(`Packaged runtime resource is missing: ${packageName}`)
   }
   const packageDir = join(resourcesDir, resource.to)
-  await copyFiles([new FileMatcher(resource.from, packageDir, (value) => value, resource.filter)])
+  const matcher = new FileMatcher(resource.from, packageDir, (value) => value, resource.filter)
+  if (matcher.isEmpty() || matcher.containsOnlyIgnore()) {
+    matcher.prependPattern('**/*')
+  }
+  await copyDir(resource.from, packageDir, {
+    filter: matcher.createFilter(),
+    isUseHardLink: DO_NOT_USE_HARD_LINKS
+  })
   return packageDir
 }
 

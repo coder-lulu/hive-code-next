@@ -10,7 +10,7 @@ import { getHostListActionSheetActions } from '../host-list-action-sheet-actions
 import { hostRouteWithNotice } from '../host-route-notice'
 import { useOpenMobileSession } from '../session/use-open-mobile-session'
 import { hostStackHostRoute } from '../navigation/host-stack-navigation'
-import type { TaskProvider } from '../tasks/mobile-task-providers'
+import type { TaskProvider } from '../../../src/shared/task-providers'
 import { useOpenMobileTasks } from '../tasks/use-open-mobile-tasks'
 import { hostCatalogEntryHasLocalPairing } from '../runtime-directory/account-runtime-catalog'
 import { MobileRuntimeSelector } from '../runtime-directory/MobileRuntimeSelector'

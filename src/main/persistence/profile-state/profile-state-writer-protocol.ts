@@ -89,7 +89,9 @@ export function isProfileStateWriterRequest(value: unknown): value is ProfileSta
   }
 }
 
-function isErrorData(value: unknown): value is ProfileStateWriterErrorData {
+export function isProfileStateWriterErrorData(
+  value: unknown
+): value is ProfileStateWriterErrorData {
   return (
     isRecord(value) &&
     typeof value.code === 'string' &&
@@ -110,5 +112,5 @@ export function isProfileStateWriterResponse(value: unknown): value is ProfileSt
         (value.exportedRevision === undefined ||
           value.exportedRevision === null ||
           isProfileStateRevision(value.exportedRevision))
-    : value.ok === false && isErrorData(value.error)
+    : value.ok === false && isProfileStateWriterErrorData(value.error)
 }

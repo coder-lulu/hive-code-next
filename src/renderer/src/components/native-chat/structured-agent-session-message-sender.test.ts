@@ -135,6 +135,20 @@ describe('structured agent session message sender', () => {
     })
   })
 
+  it('carries the options read at the send on its request, and nothing without them', async () => {
+    const calls = deferredCalls()
+    const a = send('a', { options: { model: 'opus', effort: 'high' } })
+    await flush()
+    expect(mocks.call.mock.calls[0][2]).toMatchObject({
+      options: { model: 'opus', effort: 'high' }
+    })
+    calls[0].resolve(okSubmission(a.clientMessageId, 'accepted'))
+    await a.outcome
+    send('b')
+    await flush()
+    expect(mocks.call.mock.calls[1][2]).not.toHaveProperty('options')
+  })
+
   it.each([
     ['recorded', (calls: Deferred[], id: string) => calls[0].resolve(okSubmission(id, 'accepted'))],
     ['refused', (calls: Deferred[]) => calls[0].resolve(refusedSend)],
@@ -178,7 +192,9 @@ describe('structured agent session message sender', () => {
   // A failure before any request went out that trying again won't clear: not sent, at once.
   it('gives back at once, with its own words, a send this client and the server cannot talk on', async () => {
     const blocked = Object.assign(
-      new Error('The selected Orca server is too old for this client. Update HiveCode on the server.'),
+      new Error(
+        'The selected Orca server is too old for this client. Update HiveCode on the server.'
+      ),
       { code: 'runtime_compat_block' }
     )
     mocks.compatible.mockRejectedValue(blocked)

@@ -10,11 +10,12 @@ import { getProductCloudAuthConfig } from '../product/product-cloud-config'
 import { ensureActiveOrcaProfile } from './profile-index-store'
 import { isOrcaCloudDevAuthEnabled } from './profile-cloud-auth-config'
 import {
-  clearOrcaCloudSession,
-  readOrcaCloudSession,
-  saveOrcaCloudSessionExchange
-} from './profile-cloud-session-store'
-import { cloudSessionIdentity, tombstoneCloudSession } from './profile-cloud-session-mutation'
+  readCloudSession,
+  takeCloudSessionTicket,
+  isCloudSessionTicketCurrent,
+  signInCloudSession,
+  signOutCloudSession
+} from './profile-cloud-session-owner'
 import {
   createOrcaCloudProfile,
   exchangeOrcaCloudAuthCode,
@@ -33,7 +34,7 @@ import {
   selectDevOrcaCloudOrg
 } from './profile-cloud-dev-service'
 import { getOrcaProfileAuthStatusFromProfile } from './profile-cloud-auth-status'
-import { selectCloudOrgWithMutationFence } from './profile-cloud-org-selection'
+import { selectCloudOrg } from './profile-cloud-org-selection'
 
 export { refreshCurrentOrcaProfileAuth } from './profile-cloud-capability-refresh'
 
@@ -101,7 +102,7 @@ export async function connectCurrentOrcaProfile(
         auth: getCurrentOrcaProfileAuthStatus(userDataPath)
       }
     }
-    saveOrcaCloudSessionExchange(active.profile.id, userDataPath, exchange)
+    signInCloudSession(active.profile.id, userDataPath, exchange)
     const list = linkOrcaProfileToCloud(active.profile.id, exchange.cloud, userDataPath)
     linkedCloudConnectAttempt = attempt
     return {
@@ -135,15 +136,9 @@ export async function signOutCurrentOrcaProfile(
   const signOutEpoch = linkedCloudConnectAttempt
   const active = ensureActiveOrcaProfile(userDataPath)
   const configState = getProductCloudAuthConfig()
-  const session = readOrcaCloudSession(active.profile.id, userDataPath)
-  if (active.profile.cloud) {
-    // Why: persist the destructive fence before logout network I/O so a
-    // refresh already in flight cannot save after explicit sign-out.
-    tombstoneCloudSession(
-      cloudSessionIdentity(active.profile.id, active.profile.cloud),
-      userDataPath
-    )
-  }
+  const session = readCloudSession(active.profile.id, userDataPath)
+  // Persist the destructive fence before network revoke, even if deletion later fails.
+  signOutCloudSession(active.profile.id, userDataPath)
   if (!isOrcaCloudDevAuthEnabled() && configState.configured && session.status === 'found') {
     await revokeOrcaCloudSession(configState.config, session.session).catch(() => undefined)
   }
@@ -156,7 +151,7 @@ export async function signOutCurrentOrcaProfile(
       profiles: current.index.profiles
     }
   }
-  clearOrcaCloudSession(active.profile.id, userDataPath)
+  signOutCloudSession(active.profile.id, userDataPath)
   const list = unlinkOrcaProfileFromCloud(active.profile.id, userDataPath)
   return {
     status: 'signed-out',
@@ -190,6 +185,10 @@ export async function createCloudLinkedOrcaProfile(
     return { status: 'unconfigured', auth: activeAuth(active, userDataPath) }
   }
   try {
+    if (!active.profile.cloud) {
+      return { status: 'reconnect-required', auth: activeAuth(active, userDataPath) }
+    }
+    const ticket = takeCloudSessionTicket(active.profile.id, userDataPath)
     const operation = await runWithFreshOrcaCloudSession(
       configState.config,
       active,
@@ -199,13 +198,27 @@ export async function createCloudLinkedOrcaProfile(
     if (operation.status !== 'ok') {
       return { status: 'reconnect-required', auth: activeAuth(active, userDataPath) }
     }
+    const current = ensureActiveOrcaProfile(userDataPath)
+    if (
+      !isCloudSessionTicketCurrent(active.profile.id, userDataPath, ticket) ||
+      current.profile.id !== active.profile.id ||
+      current.profile.cloud?.userId !== active.profile.cloud.userId ||
+      current.profile.cloud?.cloudProfileId !== active.profile.cloud.cloudProfileId ||
+      current.profile.cloud?.activeOrgId !== active.profile.cloud.activeOrgId
+    ) {
+      return {
+        status: 'failed',
+        auth: getCurrentOrcaProfileAuthStatus(userDataPath),
+        error: 'stale_cloud_session_mutation'
+      }
+    }
     const created = operation.value
     const list = createCloudLinkedOrcaProfileRecord(
       created.cloud,
       { name: args.name },
       userDataPath
     )
-    saveOrcaCloudSessionExchange(list.profile.id, userDataPath, created)
+    signInCloudSession(list.profile.id, userDataPath, created)
     return {
       status: 'created',
       auth: getCurrentOrcaProfileAuthStatus(userDataPath),
@@ -245,7 +258,7 @@ export async function selectCurrentOrcaProfileOrg(
     return { status: 'unconfigured', auth: activeAuth(active, userDataPath) }
   }
   try {
-    const list = await selectCloudOrgWithMutationFence({
+    const list = await selectCloudOrg({
       config: configState.config,
       active,
       userDataPath,

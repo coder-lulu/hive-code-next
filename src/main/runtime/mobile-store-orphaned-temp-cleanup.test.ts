@@ -11,7 +11,7 @@ import { DEVICE_REGISTRY_FILENAME } from './mobile-pairing-files'
 const dirs: string[] = []
 let pendingJobs: Promise<unknown>[] = []
 const sweepTemps = durableFileWrite.removeStaleDurableWriteTempFiles
-const hardenPath = windowsAcl.bestEffortRestrictWindowsPath
+const hardenPath = windowsAcl.restrictWindowsDirectory
 beforeEach(() => {
   pendingJobs = []
   vi.spyOn(durableFileWrite, 'removeStaleDurableWriteTempFiles').mockImplementation((...args) => {
@@ -19,29 +19,11 @@ beforeEach(() => {
     pendingJobs.push(pending)
     return pending
   })
-  vi.spyOn(windowsAcl, 'bestEffortRestrictWindowsPath').mockImplementation(
-    (path, isDirectory, onSettled) => {
-      let settle!: (restricted: boolean) => void
-      let fail!: (error: unknown) => void
-      const pending = new Promise<boolean>((resolve, reject) => {
-        settle = resolve
-        fail = reject
-      })
-      pendingJobs.push(pending)
-      try {
-        hardenPath(path, isDirectory, (restricted) => {
-          try {
-            onSettled?.(restricted)
-          } finally {
-            settle(restricted)
-          }
-        })
-      } catch (error) {
-        fail(error)
-        throw error
-      }
-    }
-  )
+  vi.spyOn(windowsAcl, 'restrictWindowsDirectory').mockImplementation((targetPath) => {
+    const pending = hardenPath(targetPath)
+    pendingJobs.push(pending)
+    return pending
+  })
 })
 afterEach(async () => {
   try {

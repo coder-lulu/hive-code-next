@@ -1,4 +1,4 @@
-import { OrcaRuntimeWithAttachWindow } from './orca-runtime-attach-window'
+import { OrcaRuntimeWithAttachWindow } from './session-graph/session-graph-promotion'
 import type {
   RuntimeMobileSessionTabsSnapshot,
   RuntimeSyncedLeaf
@@ -11,7 +11,7 @@ import {
   repairPublishedRuntimeSurfaceProjection
 } from './pty-recorded-surface-topology'
 
-export class OrcaRuntimeWithRepairPublishedPtySurfaces extends OrcaRuntimeWithAttachWindow {
+export abstract class OrcaRuntimeWithRepairPublishedPtySurfaces extends OrcaRuntimeWithAttachWindow {
   protected repairPublishedPtySurfaces(
     leaves: readonly RuntimeSyncedLeaf[],
     previousLeaves: ReadonlyMap<string, RuntimeLeafRecord>,

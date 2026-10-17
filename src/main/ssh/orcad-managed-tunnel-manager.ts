@@ -23,6 +23,7 @@ import {
 import type { OrcadManagedServing } from './orcad-managed-serving'
 import {
   dropActiveOrcadTunnel,
+  forgetClosedOrcadTunnel,
   managedTunnelAccess,
   recordActiveOrcadTunnel,
   supersededTunnelError,
@@ -75,13 +76,7 @@ export class OrcadManagedTunnelManager {
       checkServing: (environment) => this.checkServing(environment)
     })
     this.forwards.setCallbacks({
-      onForwardClosed: (entry) => {
-        for (const [environmentId, active] of this.active) {
-          if (active.forwardId === entry.id) {
-            this.active.delete(environmentId)
-          }
-        }
-      }
+      onForwardClosed: (entry) => forgetClosedOrcadTunnel(this.active, entry.id)
     })
   }
 
@@ -181,6 +176,13 @@ export class OrcadManagedTunnelManager {
     }
     this.active.delete(environmentId)
     await this.forwards.removeForwardAndWait(active.forwardId)
+  }
+
+  /** Quit: supersedes every build in flight and waits for each forward process to exit. */
+  async shutdown(): Promise<void> {
+    this.managerGeneration += 1
+    this.active.clear()
+    await this.forwards.closeAll()
   }
 
   dispose(): void {

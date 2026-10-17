@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View } from 'react-native'
 import type { AccountsSnapshot } from '../components/AccountUsage'
 import { MobileHomeQuickActions } from '../components/MobileHomeQuickActions'
-import type { TaskProvider } from '../tasks/mobile-task-providers'
+import type { TaskProvider } from '../../../src/shared/task-providers'
 import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme } from '../theme/mobile-theme-provider'
 import type { HostProfile } from '../transport/types'

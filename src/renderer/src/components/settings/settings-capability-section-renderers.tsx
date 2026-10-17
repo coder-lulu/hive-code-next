@@ -6,6 +6,8 @@ import { LinearAgentSkillPane } from './LinearAgentSkillPane'
 import { VoicePane } from './VoicePane'
 import { SettingsSection } from './SettingsSection'
 import { SettingsHostScopeUnavailableNotice } from './SettingsHostScopePicker'
+import { LOCAL_SETTINGS_HOST_SCOPE } from './settings-host-scope'
+import { wslHostDistroForTarget } from '@/lib/wsl-host-account-owner'
 import { translate } from '@/i18n/i18n'
 import { APP_DISPLAY_NAME } from '@/product-brand'
 import type { SettingsRenderContext } from './settings-render-context'
@@ -46,6 +48,10 @@ export function renderAgentsSettingsSection(context: SettingsRenderContext): Rea
 
 export function renderAccountsSettingsSection(context: SettingsRenderContext): React.JSX.Element {
   const { interactions, model, navigation, terminal, view } = context
+  const wslHostDistro = wslHostDistroForTarget(
+    model.settingsHostScope.target,
+    model.runtimeEnvironments
+  )
   const pendingAccountsTarget =
     interactions.pendingNavSectionRef.current === 'accounts'
       ? interactions.pendingScrollTargetRef.current
@@ -62,16 +68,35 @@ export function renderAccountsSettingsSection(context: SettingsRenderContext): R
       headerClassName="border-0 pb-0"
       bodyClassName="rounded-none border-0 bg-transparent p-0 shadow-none"
     >
-      {!view.isSectionMounted('accounts') ? null : model.settingsHostScope.available ? (
+      {!view.isSectionMounted('accounts') ? null : !model.settingsHostScope.available ? (
+        <SettingsHostScopeUnavailableNotice />
+      ) : (
         <AiServicesPane
           navigationRequest={model.settingsNavigationTarget}
+          wslHostDistro={wslHostDistro}
           settings={model.settings}
           updateSettings={model.updateSettings}
-          hostScope={model.settingsHostScope}
-          wslSupportedPlatform={terminal.runtimeWslSupportedPlatform}
-          wslAvailable={terminal.windowsTerminalCapabilities.wslAvailable}
-          wslDistros={terminal.windowsTerminalCapabilities.wslDistros}
-          wslCapabilitiesLoading={terminal.windowsTerminalCapabilities.isLoading}
+          hostScope={wslHostDistro ? LOCAL_SETTINGS_HOST_SCOPE : model.settingsHostScope}
+          wslSupportedPlatform={
+            wslHostDistro
+              ? terminal.localWslSupportedPlatform
+              : terminal.runtimeWslSupportedPlatform
+          }
+          wslAvailable={
+            wslHostDistro
+              ? terminal.localWindowsRuntimeCapabilities.wslAvailable
+              : terminal.windowsTerminalCapabilities.wslAvailable
+          }
+          wslDistros={
+            wslHostDistro
+              ? terminal.localWindowsRuntimeCapabilities.wslDistros
+              : terminal.windowsTerminalCapabilities.wslDistros
+          }
+          wslCapabilitiesLoading={
+            wslHostDistro
+              ? terminal.localWindowsRuntimeCapabilities.isLoading
+              : terminal.windowsTerminalCapabilities.isLoading
+          }
           accountOwnerPlatform={terminal.windowsTerminalCapabilities.hostPlatform}
           navigationTargetSectionId={
             model.settingsNavigationTarget?.pane === 'accounts'
@@ -79,8 +104,6 @@ export function renderAccountsSettingsSection(context: SettingsRenderContext): R
               : pendingAccountsTarget
           }
         />
-      ) : (
-        <SettingsHostScopeUnavailableNotice />
       )}
     </SettingsSection>
   )

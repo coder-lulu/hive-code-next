@@ -73,7 +73,7 @@ describe('agent hook listener host dependency boundary', () => {
     ])
   })
 
-  it('keeps the transitive runtime graph inside Node builtins and shared modules', () => {
+  it('keeps the runtime graph shared-only except the two bundled Grok hash imports', () => {
     const sharedRoot = resolve(__dirname)
     const listenerPathPrefix = resolve(sharedRoot, 'agent-hook-listener')
     const hostRoot = resolve(sharedRoot, '../main/agent-hooks')
@@ -98,6 +98,7 @@ describe('agent hook listener host dependency boundary', () => {
     const seeded = new Set(pending)
     const visited = new Set<string>()
     const forbidden: string[] = []
+    const bundledHashImports: string[] = []
 
     while (pending.length > 0) {
       const file = pending.pop()!
@@ -111,6 +112,13 @@ describe('agent hook listener host dependency boundary', () => {
           continue
         }
         if (!specifier.startsWith('.')) {
+          if (
+            file === resolve(sharedRoot, 'grok-session-paths.ts') &&
+            (specifier === '@noble/hashes/blake3' || specifier === '@noble/hashes/utils')
+          ) {
+            bundledHashImports.push(`grok-session-paths.ts: ${specifier}`)
+            continue
+          }
           forbidden.push(`${file}: ${specifier}`)
           continue
         }
@@ -124,6 +132,10 @@ describe('agent hook listener host dependency boundary', () => {
     }
 
     expect(forbidden).toEqual([])
+    expect(bundledHashImports.sort()).toEqual([
+      'grok-session-paths.ts: @noble/hashes/blake3',
+      'grok-session-paths.ts: @noble/hashes/utils'
+    ])
     expect(
       [...seeded].map((file) => relative(sharedRoot, file).split(sep).join('/')).sort()
     ).toEqual([

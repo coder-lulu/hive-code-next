@@ -1,8 +1,22 @@
 import {
   reduceStructuredAgentSession,
-  type StructuredAgentSessionAction
+  type StructuredAgentSessionAction,
+  type StructuredAgentSessionState
 } from '../../../../shared/structured-agent-session-reducer'
-import type { StructuredAgentSessionReadSnapshot } from './structured-agent-session-read-owner'
+import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session-resume'
+
+export type StructuredAgentSessionReadSnapshot = {
+  state: StructuredAgentSessionState
+  loadingOlder: boolean
+  /** Receipt of current journal evidence; older-history reads do not renew it. */
+  receivedAt: number | null
+  /** Bumped whenever older-page reads are invalidated (open, snapshot, reset, dispose). */
+  olderHistoryGeneration: number
+  providerSession?: AgentProviderSessionMetadata
+  /** Whether `state` is the host's present: false from when reading stops or contact is lost
+   *  until the read has caught up again. */
+  current: boolean
+}
 
 export function reduceStructuredAgentSessionReadSnapshot(
   snapshot: StructuredAgentSessionReadSnapshot,

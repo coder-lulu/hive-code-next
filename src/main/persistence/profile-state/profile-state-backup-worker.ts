@@ -9,6 +9,8 @@ import {
   resolveWorkerThreadEntryPath
 } from '../../worker-thread-entry-path'
 import { type ProfileStateBackupJob, writeProfileStateBackup } from './profile-state-backup-job'
+import { decodeProfileStateWriterError } from './profile-state-writer-errors'
+import { isProfileStateWriterErrorData } from './profile-state-writer-protocol'
 import { isRecord } from './profile-state-document-validation'
 
 const WORKER_FILENAME = 'profile-state-backup-worker-entry.js'
@@ -60,7 +62,9 @@ export async function runProfileStateBackupWorker(
         if (!isRecord(response) || typeof response.ok !== 'boolean') {
           failure = new Error('Invalid profile state backup worker response')
         } else if (!response.ok) {
-          failure = new Error(String(response.error))
+          failure = isProfileStateWriterErrorData(response.error)
+            ? decodeProfileStateWriterError(response.error)
+            : new Error('Invalid profile state backup worker response')
         } else {
           completed = true
         }

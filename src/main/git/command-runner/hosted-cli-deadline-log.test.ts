@@ -1,26 +1,18 @@
-import { EventEmitter } from 'node:events'
-import type { ChildProcess } from 'node:child_process'
+import type { ProcessResult } from '@orca/process-host/process-spec'
+import type { runProcess } from '@orca/process-host'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
-const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }))
+const { runProcessMock } = vi.hoisted(() => ({
+  runProcessMock: vi.fn<typeof runProcess>()
+}))
 
-vi.mock('node:child_process', async (importOriginal) => ({
+vi.mock('@orca/process-host', async (importOriginal) => ({
   ...(await importOriginal()),
-  spawn: spawnMock
+  runProcess: runProcessMock
 }))
 
 import { ghExecFileAsync } from './gh-exec-file'
 import { logHostedCliDeadlineKill } from './hosted-cli-deadline-log'
-
-function mockChild(pid = 4321): ChildProcess {
-  const child = new EventEmitter() as EventEmitter & Record<string, unknown>
-  child.pid = pid
-  child.kill = vi.fn(() => true)
-  child.stdin = Object.assign(new EventEmitter(), { end: vi.fn() })
-  child.stdout = new EventEmitter()
-  child.stderr = new EventEmitter()
-  return child as unknown as ChildProcess
-}
 
 /**
  * #18234 took four rounds of strace/perf/proc spelunking from the reporter
@@ -32,9 +24,8 @@ describe('hosted CLI deadline logging', () => {
 
   beforeEach(() => {
     vi.useFakeTimers()
-    spawnMock.mockReset()
+    runProcessMock.mockReset()
     warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    vi.spyOn(process, 'kill').mockImplementation((() => true) as unknown as typeof process.kill)
   })
 
   afterEach(() => {
@@ -61,31 +52,51 @@ describe('hosted CLI deadline logging', () => {
   })
 
   it('logs once when gh is killed at its deadline', async () => {
-    spawnMock.mockReturnValue(mockChild())
+    // Process-host owns OS termination; this unit completes that boundary without a real PID.
+    const terminated = Promise.withResolvers<ProcessResult>()
+    runProcessMock.mockReturnValue(terminated.promise)
 
     const rejection = expect(
-      ghExecFileAsync(['api', '--include', 'user/starred/stablyai/orca'], { timeout: 15_000 })
+      ghExecFileAsync(['api', '-H', 'Authorization: token ghp_secret'], { timeout: 15_000 })
     ).rejects.toThrow('timed out')
+    expect(runProcessMock).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ timeoutMs: 15_000, terminationBarrier: true })
+    )
     await vi.advanceTimersByTimeAsync(15_000)
-    await vi.advanceTimersByTimeAsync(15_000)
+    expect(warn).not.toHaveBeenCalled()
+    terminated.resolve({ code: null, signal: 'SIGTERM', stdout: '', stderr: '', timedOut: true })
     await rejection
+    await vi.advanceTimersByTimeAsync(15_000)
 
     const deadlineLines = warn.mock.calls.filter((call) => String(call[0]).startsWith('[gh]'))
     expect(deadlineLines).toHaveLength(1)
     expect(String(deadlineLines[0][0])).toContain('wrapper script')
+    expect(String(deadlineLines[0][0])).toContain('15000ms')
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('ghp_secret')
+    expect(JSON.stringify(warn.mock.calls)).not.toContain('Authorization')
   })
 
   it('stays quiet when the caller aborted rather than the deadline firing', async () => {
     const controller = new AbortController()
-    spawnMock.mockReturnValue(mockChild())
+    const terminated = Promise.withResolvers<ProcessResult>()
+    runProcessMock.mockReturnValue(terminated.promise)
 
     const rejection = expect(
       ghExecFileAsync(['api', '--include', 'user/starred/stablyai/orca'], {
         timeout: 15_000,
         signal: controller.signal
       })
-    ).rejects.toThrow()
+    ).rejects.toMatchObject({ name: 'AbortError', message: 'The operation was aborted.' })
+    expect(runProcessMock).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({
+        timeoutMs: 15_000,
+        terminationBarrier: true,
+        signal: controller.signal
+      })
+    )
     controller.abort()
+    expect(warn).not.toHaveBeenCalled()
+    terminated.resolve({ code: null, signal: 'SIGTERM', stdout: '', stderr: '', timedOut: false })
     await vi.advanceTimersByTimeAsync(15_000)
     await rejection
 

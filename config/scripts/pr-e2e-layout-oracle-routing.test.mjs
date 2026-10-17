@@ -18,9 +18,10 @@ const LAYOUT_AUTHORITIES = [
   'src/main/persistence/restoring-sessions/session-owner-fields.ts',
   'src/main/persistence/loading-store/pty-binding-persistence.ts',
   'src/main/remote-layout-snapshot/index.ts',
-  'src/main/runtime/orca-runtime-split-pty-backed-terminal.ts',
-  'src/main/runtime/orca-runtime-move-headless-mobile-session-tab.ts',
-  'src/main/runtime/orca-runtime-create-terminal.ts',
+  'src/main/runtime/terminal/launch/terminal-split-surface.ts',
+  'src/main/runtime/session-tabs/headless-tab-group-moves.ts',
+  'src/main/runtime/terminal/launch/terminal-create.ts',
+  'src/main/runtime/terminal/stop/worktree-terminal-stop.ts',
   'src/renderer/src/runtime/mobile-session-tab-close.ts',
   'src/renderer/src/runtime/runtime-layout-client.ts',
   'src/renderer/src/store/slices/tabs.ts',
@@ -36,8 +37,13 @@ const STACK_WRITERS = [
   'src/renderer/src/components/terminal-pane/TerminalPane.tsx',
   'src/renderer/src/runtime/sync-runtime-graph.ts',
   'src/renderer/src/runtime/web-session-tabs-sync/store-patch.ts',
-  'src/main/runtime/orca-runtime-split-terminal.ts',
-  'src/main/runtime/orca-runtime-sync-window-graph.ts',
+  'src/main/runtime/terminal/launch/terminal-split.ts',
+  'src/main/runtime/workspaces/workspace-file-session-targets.ts',
+  'src/main/runtime/session-graph/session-window-graph.ts',
+  'src/main/runtime/session-tabs/mobile-session-hydration.ts',
+  'src/main/runtime/session-tabs/mobile-session-reconciliation.ts',
+  'src/main/runtime/session-tabs/mobile-session-preservation.ts',
+  'src/main/runtime/workspaces/session-hosts/get-runtime-id.ts',
   'src/main/runtime/mobile-session-layout-projection.ts',
   'src/main/runtime/headless-runtime-graph.ts',
   'src/main/persistence/loading-store/session-host-partitions.ts',
@@ -53,6 +59,8 @@ const STACK_WRITERS = [
   'src/main/persistence/closed-terminal-tab-write-fence.ts',
   'src/main/runtime/runtime-workspace-session-controller.ts',
   'src/main/runtime/terminal-surface-close.ts',
+  'src/main/runtime/terminal/output/terminal-derived-agent-facts.ts',
+  'src/main/runtime/terminal/output/terminal-output-generation.ts',
   'src/renderer/src/components/terminal/terminal-tab-actions.ts',
   'src/renderer/src/components/tab-bar/web-runtime-tab-move-mirror.ts',
   'src/shared/rpc-contract/workspace-layout-params.ts',
@@ -71,7 +79,10 @@ function oracleHarnessFiles() {
     seen.add(file)
     const source = readFileSync(join(projectDir, file), 'utf8')
     for (const [, specifier] of source.matchAll(/(?:from|import)\s*\(?\s*'(\.[^']+)'/g)) {
-      const base = relative(projectDir, join(projectDir, dirname(file), specifier)).replaceAll('\\', '/')
+      const base = relative(projectDir, join(projectDir, dirname(file), specifier)).replaceAll(
+        '\\',
+        '/'
+      )
       const resolved = [base, `${base}.ts`, `${base}.tsx`].find(
         (candidate) => /\.tsx?$/.test(candidate) && existsSync(join(projectDir, candidate))
       )

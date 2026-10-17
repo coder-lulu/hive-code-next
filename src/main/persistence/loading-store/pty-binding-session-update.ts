@@ -79,7 +79,9 @@ export function applyPtyBinding(
       [bindingWorktreeId]: session.activeTabIdByWorktree?.[bindingWorktreeId] ?? args.tabId
     }
   }
-  const boundTab = session.tabsByWorktree[bindingWorktreeId]?.find((value) => value.id === args.tabId)
+  const boundTab = session.tabsByWorktree[bindingWorktreeId]?.find(
+    (value) => value.id === args.tabId
+  )
   if (args.launchAgent && boundTab?.ptyId === args.ptyId && !args.expectedSourceBinding) {
     boundTab.launchAgent = args.launchAgent
   }
@@ -107,7 +109,7 @@ export function applyPtyBinding(
   if (layout) {
     if (!layout.root) {
       terminalMembershipChanged = true
-      // Why: createTab can persist an empty layout before TerminalPane mounts; the sync binding still needs a durable root.
+      // Why: load names every saved root, but the layout type still allows none; the binding needs a durable one.
       layout.root = { type: 'leaf', leafId: args.leafId }
       layout.activeLeafId = args.leafId
       layout.expandedLeafId = null

@@ -66,7 +66,21 @@ describe('runtime window file-open notifications', () => {
     })
     for (const [, payload] of send.mock.calls) {
       expect(payload).not.toHaveProperty('navigation')
+      expect(payload).not.toHaveProperty('position')
     }
+  })
+
+  it('adds position only when requested', () => {
+    const { notifier, send } = attachNotifier()
+    notifier.openFile?.('wt-1', '/repo/a.ts', 'a.ts', 'host-1', 'caller', { line: 12, column: 5 })
+    expect(send).toHaveBeenCalledWith('ui:openFileFromMobile', {
+      worktreeId: 'wt-1',
+      filePath: '/repo/a.ts',
+      relativePath: 'a.ts',
+      runtimeEnvironmentId: 'host-1',
+      navigation: 'caller',
+      position: { line: 12, column: 5 }
+    })
   })
 
   it('forwards an explicit navigation target to the renderer', () => {
@@ -83,5 +97,28 @@ describe('runtime window file-open notifications', () => {
       'ui:openDiffFromMobile',
       expect.objectContaining({ navigation: 'caller' })
     )
+  })
+})
+
+describe('runtime window terminal split notifications', () => {
+  it('retains the host-selected workspace and both pane identities', () => {
+    const { notifier, send } = attachNotifier()
+    const options = {
+      worktreeId: 'repo::/worktree',
+      sourceLeafId: '11111111-1111-4111-8111-111111111111',
+      newLeafId: '22222222-2222-4222-8222-222222222222',
+      direction: 'horizontal' as const,
+      command: 'codex',
+      telemetrySource: 'command' as const
+    }
+
+    notifier.splitTerminal?.('tab-1', 41, options)
+
+    expect(send).toHaveBeenCalledOnce()
+    expect(send).toHaveBeenCalledWith('ui:splitTerminal', {
+      tabId: 'tab-1',
+      paneRuntimeId: 41,
+      ...options
+    })
   })
 })

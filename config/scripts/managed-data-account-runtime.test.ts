@@ -6,7 +6,10 @@ import { resolveConfig } from 'electron-vite'
 import { build } from 'vite'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { runProcess } from '@orca/process-host'
-import { stagePackagedProcessHost } from './packaged-process-host-fixture.mjs'
+import {
+  stagePackagedProcessHost,
+  stagePackagedRuntimeNodeModule
+} from './packaged-process-host-fixture.mjs'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 const require = createRequire(import.meta.url)
@@ -38,6 +41,9 @@ beforeAll(async () => {
     }
   })
   await stagePackagedProcessHost(outputDir)
+  if (process.platform === 'win32') {
+    await stagePackagedRuntimeNodeModule(outputDir, '@orca/windows-security')
+  }
   mkdirSync(join(outputDir, 'source', 'devin'), { recursive: true })
   writeFileSync(
     join(outputDir, 'source', 'devin', 'credentials.toml'),

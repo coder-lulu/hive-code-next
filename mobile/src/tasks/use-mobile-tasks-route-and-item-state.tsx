@@ -7,6 +7,8 @@ import {
   normalizeVisibleTaskProviders,
   useHostClient,
   useHostRepoList,
+  useMemo,
+  reconcileRepoSelection,
   useLastConnectedAt,
   useRelayRecoveryStatus,
   useLocalSearchParams,
@@ -44,6 +46,8 @@ import {
   getTaskPresetQuery
 } from './mobile-tasks-legacy-foundation'
 import { useMobileTasksItemState } from './use-mobile-tasks-item-state'
+import { useMobileJiraConnectionState } from './use-mobile-jira-connection-state'
+import type { JiraIssueFilter } from '../../../src/shared/jira-types'
 
 export function useMobileTasksRouteAndItemState() {
   const { hostId, taskSource } = useLocalSearchParams<{ hostId: string; taskSource?: string }>()
@@ -62,17 +66,23 @@ export function useMobileTasksRouteAndItemState() {
       ? async () => {
           const reply = await newTabRepoListRead.request(client)
           // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
-          return newTabRepoListRead.interpret(reply) as RepoSummary[]
+          const listed = newTabRepoListRead.interpret(reply) as RepoSummary[]
+          return listed.filter((repo) => !repo.executionHostId?.startsWith('runtime:'))
         }
       : null
   )
-  const repos = repoList.state.repos
+  const { repos } = repoList.state
   const { ensureLoaded: repoListEnsureLoaded, reload: repoListReload } = repoList
   const [provider, setProvider] = useState<TaskProvider>('github')
   const [visibleProviders, setVisibleProviders] = useState<TaskProvider[]>(() =>
     normalizeVisibleTaskProviders(undefined)
   )
   const [linearConnected, setLinearConnected] = useState(false)
+  const [jiraConnection, setJiraConnection] = useMobileJiraConnectionState(client, connState)
+  const jiraStatusRequestIdRef = useRef(0)
+  const [jiraFilter, setJiraFilter] = useState<JiraIssueFilter>('assigned')
+  const [showJiraFilterPicker, setShowJiraFilterPicker] = useState(false)
+  const [showJiraSitePicker, setShowJiraSitePicker] = useState(false)
   const [githubMode, setGithubMode] = useState<'items' | 'project'>('items')
   const [githubKind, setGithubKind] = useState<GitHubTaskKind>('issues')
   const [githubPreset, setGithubPreset] = useState<GitHubPreset>('issues')
@@ -92,8 +102,6 @@ export function useMobileTasksRouteAndItemState() {
     null
   )
   const [selectedLinearTeamIds, setSelectedLinearTeamIds] = useState<Set<string>>(new Set())
-  const defaultRepoSelectionRef = useRef<string[] | null>(null)
-  const repoSelectionHydratedRef = useRef(false)
   const defaultLinearTeamSelectionRef = useRef<string[] | null>(null)
   const [showLinearWorkspacePicker, setShowLinearWorkspacePicker] = useState(false)
   const [showLinearTeamPicker, setShowLinearTeamPicker] = useState(false)
@@ -109,6 +117,15 @@ export function useMobileTasksRouteAndItemState() {
   const [linearConnectError, setLinearConnectError] = useState('')
   const [taskSort, setTaskSort] = useState<TaskSort>('updated')
   const [selectedRepoIds, setSelectedRepoIds] = useState<Set<string>>(new Set())
+  // The saved choice narrowed to what is listed now (empty = all). Listing changes never prune the
+  // choice; a user edit rewrites it from what's shown, so it can drop a briefly gone server's ids.
+  const effectiveRepoKey = [...reconcileRepoSelection(repos, [...selectedRepoIds])]
+    .sort()
+    .join('\n')
+  const effectiveRepoIds = useMemo(
+    (): ReadonlySet<string> => new Set(effectiveRepoKey ? effectiveRepoKey.split('\n') : []),
+    [effectiveRepoKey]
+  )
   const [items, setItems] = useState<TaskItem[]>([])
   const [githubPages, setGithubPages] = useState<
     Array<Extract<TaskItem, { provider: 'github' }>[]>
@@ -189,6 +206,15 @@ export function useMobileTasksRouteAndItemState() {
     setVisibleProviders,
     linearConnected,
     setLinearConnected,
+    jiraConnection,
+    setJiraConnection,
+    jiraStatusRequestIdRef,
+    jiraFilter,
+    setJiraFilter,
+    showJiraFilterPicker,
+    setShowJiraFilterPicker,
+    showJiraSitePicker,
+    setShowJiraSitePicker,
     githubMode,
     setGithubMode,
     githubKind,
@@ -219,8 +245,6 @@ export function useMobileTasksRouteAndItemState() {
     setSelectedLinearWorkspaceId,
     selectedLinearTeamIds,
     setSelectedLinearTeamIds,
-    defaultRepoSelectionRef,
-    repoSelectionHydratedRef,
     defaultLinearTeamSelectionRef,
     showLinearWorkspacePicker,
     setShowLinearWorkspacePicker,
@@ -245,6 +269,7 @@ export function useMobileTasksRouteAndItemState() {
     taskSort,
     setTaskSort,
     selectedRepoIds,
+    effectiveRepoIds,
     setSelectedRepoIds,
     items,
     setItems,

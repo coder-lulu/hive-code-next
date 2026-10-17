@@ -40,10 +40,15 @@ it('captures exact native filesystem identity in the existing single stat acquis
   const numeric = await stat(path)
   statProbe.mockClear()
   const discovery = await discoverFiles({
-    rootDir: root, agent: 'claude', limit: 10, extensions: ['.jsonl'], issues: []
+    rootDir: root,
+    agent: 'claude',
+    limit: 10,
+    extensions: ['.jsonl'],
+    issues: []
   })
   expect(discovery.files[0]?.filesystemIdentity).toEqual({
-    dev: String(exact.dev), ino: String(exact.ino)
+    dev: String(exact.dev),
+    ino: String(exact.ino)
   })
   expect(discovery.files[0]?.mtimeMs).toBe(numeric.mtimeMs)
   expect(typeof discovery.files[0]?.dev).toBe('number')
@@ -70,14 +75,17 @@ it.each([9_007_199_254_740_992n, 9_007_199_254_740_993n])(
 it.each([
   [7, { dev: '42', ino: '7' }],
   [9_007_199_254_740_992, null]
-])('keeps UNC stat inside the WSL gate and refuses an unsafe observation %s', async (ino, identity) => {
-  const path = '\\\\wsl.localhost\\Ubuntu\\home\\ada\\session.jsonl'
-  const gated = vi.spyOn(WslFs, 'wslGatedStat').mockResolvedValue({ dev: 42, ino } as Stats)
-  if (identity) {
-    expect((await statSessionFile(path)).filesystemIdentity).toEqual(identity)
-  } else {
-    await expect(statSessionFile(path)).rejects.toThrow(/identity/i)
+])(
+  'keeps UNC stat inside the WSL gate and refuses an unsafe observation %s',
+  async (ino, identity) => {
+    const path = '\\\\wsl.localhost\\Ubuntu\\home\\ada\\session.jsonl'
+    const gated = vi.spyOn(WslFs, 'wslGatedStat').mockResolvedValue({ dev: 42, ino } as Stats)
+    if (identity) {
+      expect((await statSessionFile(path)).filesystemIdentity).toEqual(identity)
+    } else {
+      await expect(statSessionFile(path)).rejects.toThrow(/identity/i)
+    }
+    expect(gated).toHaveBeenCalledWith(path, 'scan', undefined)
+    expect(statProbe).not.toHaveBeenCalled()
   }
-  expect(gated).toHaveBeenCalledWith(path, 'scan')
-  expect(statProbe).not.toHaveBeenCalled()
-})
+)

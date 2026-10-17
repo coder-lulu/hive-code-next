@@ -1,6 +1,11 @@
 import { MOBILE_AGENT_SESSION_RPC_METHODS } from './runtime-rpc-mobile-agent-session-methods'
 
 export const MOBILE_RPC_METHOD_ALLOWLIST = new Set([
+  'jira.status',
+  'jira.getIssue',
+  'jira.issueComments',
+  'jira.listIssues',
+  'jira.searchIssues',
   'accounts.list',
   'accounts.consumeCodexResetCredit',
   'accounts.selectClaude',

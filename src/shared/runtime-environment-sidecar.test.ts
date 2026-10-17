@@ -1,7 +1,11 @@
+import {
+  drainNativeFixture,
+  restoreNativeFixture
+} from '../main/ipc/ephemeral-vm-native-test-fixture'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { encodePairingOffer } from './pairing'
 import {
   addEnvironmentFromPairingCode,
@@ -30,12 +34,16 @@ const pairing = {
 }
 const tunnel = { sshTargetId: 'target', sshTargetGeneration: 3, localPort: 41000, remotePort: 6768 }
 
+const pendingChildren = new Set<Promise<void>>()
+afterAll(restoreNativeFixture)
+
 describe('runtime environment sidecar across a downgrade', () => {
   let userDataPath: string
   beforeEach(() => {
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-environment-sidecar-'))
   })
-  afterEach(() => {
+  afterEach(async () => {
+    await drainNativeFixture(pendingChildren)
     rmSync(userDataPath, { recursive: true, force: true })
   })
 

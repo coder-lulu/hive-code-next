@@ -1,4 +1,5 @@
 import type { ProviderLoadActionsModel } from './use-mobile-tasks-provider-load-actions'
+import { fetchJiraTaskIssues } from './mobile-jira-task-source'
 import { isHostedTaskRepo, useCallback } from './mobile-tasks-dependencies'
 import {
   GITHUB_REPO_CONCURRENCY,
@@ -10,6 +11,7 @@ import {
   sortLinearIssues,
   createGitLabTask,
   createGitLabTodoTask,
+  createJiraTask,
   createLinearTask,
   mapWithConcurrency,
   taskTime
@@ -33,6 +35,8 @@ export function useMobileTasksTaskListLoading(model: ProviderLoadActionsModel) {
     gitlabFilter,
     gitlabView,
     linearConnected,
+    jiraConnection,
+    jiraFilter,
     linearFilter,
     linearOrderBy,
     loadGenerationRef,
@@ -41,7 +45,7 @@ export function useMobileTasksTaskListLoading(model: ProviderLoadActionsModel) {
     resetGitHubItemsState,
     selectedLinearTeamIds,
     selectedLinearWorkspaceId,
-    selectedRepoIds,
+    effectiveRepoIds,
     setError,
     setGithubCurrentPage,
     setGithubPages,
@@ -79,10 +83,24 @@ export function useMobileTasksTaskListLoading(model: ProviderLoadActionsModel) {
           setItems([])
           return
         }
-        // Why: Linear issues do not need the repo list, only the composer does, so
-        // start the fetch either way but never make Linear wait on it.
+        // Jira and Linear need repositories for workspace creation, not issue reads.
         const repoListRequest = repoListEnsureLoaded()
         void repoListRequest.catch(() => {})
+        if (provider === 'jira') {
+          if (!jiraConnection.connected) {
+            setItems([])
+            return
+          }
+          const issues = await fetchJiraTaskIssues(requestClient, {
+            jql: appliedQuery,
+            filter: jiraFilter,
+            siteId: jiraConnection.selection
+          })
+          if (isCurrent()) {
+            setItems(issues.map(createJiraTask))
+          }
+          return
+        }
         const currentRepos = provider === 'linear' ? [] : await repoListRequest
         if (!isCurrent()) {
           return
@@ -96,9 +114,9 @@ export function useMobileTasksTaskListLoading(model: ProviderLoadActionsModel) {
         if (provider === 'github' || provider === 'gitlab') {
           const supportedRepos = currentRepos.filter(isHostedTaskRepo)
           const queriedRepos =
-            selectedRepoIds.size === 0
+            effectiveRepoIds.size === 0
               ? supportedRepos
-              : supportedRepos.filter((repo) => selectedRepoIds.has(repo.id))
+              : supportedRepos.filter((repo) => effectiveRepoIds.has(repo.id))
           if (queriedRepos.length === 0) {
             if (!isCurrent()) {
               return
@@ -121,7 +139,7 @@ export function useMobileTasksTaskListLoading(model: ProviderLoadActionsModel) {
             setGithubPages([page.items])
             setGithubCurrentPage(0)
             setItems(page.items)
-            if (selectedRepoIds.size > 0) {
+            if (effectiveRepoIds.size > 0) {
               void countGitHubItems(requestClient, queriedRepos).then((count) => {
                 if (isCurrent()) {
                   setGithubTotalCount(count)
@@ -258,6 +276,8 @@ export function useMobileTasksTaskListLoading(model: ProviderLoadActionsModel) {
       gitlabFilter,
       gitlabView,
       githubMode,
+      jiraConnection,
+      jiraFilter,
       linearConnected,
       linearFilter,
       linearOrderBy,
@@ -267,7 +287,7 @@ export function useMobileTasksTaskListLoading(model: ProviderLoadActionsModel) {
       provider,
       selectedLinearTeamIds,
       selectedLinearWorkspaceId,
-      selectedRepoIds,
+      effectiveRepoIds,
       taskStateHydrated,
       tasksSupported
     ]

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- The dialog coordinates several host-specific add flows. */
 
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { useAppStore } from '@/store'
 import { useRemoteRepo } from './AddRepoSteps'
 import { useCreateRepo } from './useCreateRepo'
@@ -23,6 +23,8 @@ import {
 import { routeAddRepoBrowse } from './add-repo-browse-authority'
 import type { AddRepoPathOptions } from '@/store/repos/repo-state'
 import { normalizeExecutionHostId } from '../../../../shared/execution-host'
+import { readDroppedHostPath } from './add-repo-wsl-host-folder-picker'
+import { useAddRepoWslHostPaths } from './use-add-repo-wsl-host-paths'
 
 export default React.memo(function AddRepoDialog({
   hosted
@@ -51,6 +53,11 @@ export default React.memo(function AddRepoDialog({
       ? normalizeExecutionHostId(value)
       : null
   })
+  const droppedHostPathData = useAppStore((s) => (hosted ? undefined : s.modalData.droppedHostPath))
+  const droppedHostPath = useMemo(
+    () => readDroppedHostPath({ droppedHostPath: droppedHostPathData }),
+    [droppedHostPathData]
+  )
   const addRepoPath = useAppStore((s) => s.addRepoPath)
   const scanNestedRepos = useAppStore((s) => s.scanNestedRepos)
   const cancelNestedRepoScan = useAppStore((s) => s.cancelNestedRepoScan)
@@ -82,7 +89,11 @@ export default React.memo(function AddRepoDialog({
     finishProjectAdd,
     projectGroupId
   })
-  const hostSelection = useAddRepoHostSelection({ isOpen, preferredHostId, setStep })
+  const hostSelection = useAddRepoHostSelection({
+    isOpen,
+    setStep,
+    preferredHostId: preferredHostId ?? droppedHostPath?.hostId ?? null
+  })
   const selectedRuntimeEnvironmentId =
     hostSelection.selectedParsedHost?.kind === 'runtime'
       ? hostSelection.selectedParsedHost.environmentId
@@ -300,6 +311,15 @@ export default React.memo(function AddRepoDialog({
     onResetHostScopedState: resetHostScopedState
   })
 
+  // Why after the host-change reset: a drop's path must survive the reset its host switch causes.
+  const { browseWslHost, prefilledServerPath, clearPrefilledServerPath } = useAddRepoWslHostPaths({
+    isOpen,
+    droppedHostPath,
+    selectedHostId: hostSelection.selectedHostId,
+    setServerPath,
+    setStep
+  })
+
   const handleBack = useCallback(() => {
     if (step === 'nested') {
       trackNestedBackAction()
@@ -340,6 +360,7 @@ export default React.memo(function AddRepoDialog({
         nestedScanInProgress={nestedScanInProgress}
         nestedScanId={nestedScanId}
         serverPath={serverPath}
+        serverPathPrefilled={prefilledServerPath !== null && prefilledServerPath === serverPath}
         isAddingServerPath={isAddingServerPath}
         cloneUrl={cloneUrl}
         cloneDestination={cloneDestination}
@@ -373,7 +394,11 @@ export default React.memo(function AddRepoDialog({
         onBrowse={() =>
           routeAddRepoBrowse(hostSelection.selectedParsedHost, {
             browseLocal: () => void handleBrowse(),
-            browseRuntime: () => setStep('server-path')
+            browseRuntime: () => {
+              clearPrefilledServerPath()
+              setStep('server-path')
+            },
+            browseWslHost
           })
         }
         onOpenCloneStep={() => {

@@ -75,9 +75,7 @@ const electronHeaderURL = process.env.ELECTRON_REBUILD_DIST_URL?.trim() || undef
 const ignoreModules = ['cpu-features']
 const NODE_PTY_CONPTY_RUNTIME_FILES = ['conpty.dll', 'OpenConsole.exe']
 
-if (ignoreModules.length > 0) {
-  console.log(`[rebuild] Skipping optional Electron rebuild modules: ${ignoreModules.join(', ')}`)
-}
+console.log(`[rebuild] Skipping optional Electron rebuild modules: ${ignoreModules.join(', ')}`)
 
 // Why: @electron/rebuild's default module walker doesn't reliably find native
 // modules inside pnpm's .pnpm/ store. Passing an explicit list of modules to
@@ -86,7 +84,9 @@ if (ignoreModules.length > 0) {
 const onlyModules = [
   'node-pty',
   'cpu-features',
-  ...(rebuildPlatform === 'win32' ? ['@orca/windows-registry', '@vscode/windows-process-tree'] : [])
+  ...(rebuildPlatform === 'win32'
+    ? ['@orca/windows-registry', '@orca/windows-security', '@vscode/windows-process-tree']
+    : [])
 ].filter((moduleName) => !ignoreModules.includes(moduleName))
 /** Whether this rebuild targets something other than the machine running it. */
 const isCrossHostRebuild = rebuildPlatform !== osPlatform() || rebuildArch !== process.arch
@@ -613,6 +613,11 @@ function loadNativeModule(moduleName) {
     const registry = projectRequire(moduleName)
     // Why: the package defers loading its .node addon until the first registry call.
     registry.getRegistryKey(registry.HK.CU, 'Environment')
+    return
+  }
+  if (moduleName === '@orca/windows-security') {
+    // Why: the package defers loading its .node addon until the first call.
+    projectRequire(moduleName).currentUserSid()
     return
   }
   if (moduleName === 'node-pty') {

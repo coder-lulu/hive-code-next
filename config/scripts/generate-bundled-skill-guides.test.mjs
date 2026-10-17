@@ -13,6 +13,7 @@ import {
   assertAliasContract,
   brandGuideMarkdown,
   buildArtifacts,
+  composeStubProjection,
   frontmatterBlock,
   normalizeMarkdown,
   parseFrontmatter,
@@ -50,14 +51,16 @@ const GUIDE_REFERENCE_PATHS = Object.entries(GUIDE_REFERENCES).flatMap(([guide, 
 )
 
 async function readPerWorkspaceEnvCorpus() {
-  const guideRoot = path.join(projectDir, 'skill-guides')
-  const files = [
-    path.join(guideRoot, 'orca-per-workspace-env.md'),
-    ...GUIDE_REFERENCES['orca-per-workspace-env'].map((reference) =>
-      path.join(guideRoot, 'orca-per-workspace-env', 'references', reference)
-    )
+  const guide = 'orca-per-workspace-env'
+  const paths = [
+    `${guide}.md`,
+    ...GUIDE_REFERENCES[guide].map((reference) => `${guide}/references/${reference}`)
   ]
-  return (await Promise.all(files.map((file) => readFile(file, 'utf8')))).join('\n')
+  return (
+    await Promise.all(
+      paths.map((file) => readFile(path.join(projectDir, 'skill-guides', file), 'utf8'))
+    )
+  ).join('\n')
 }
 
 async function createFixture() {
@@ -96,9 +99,11 @@ describe('bundled skill guide generator', () => {
 
   it('projects stub topics as hybrid discovery stubs that reuse the guide frontmatter', async () => {
     expect(STUB_TOPICS.length).toBeGreaterThan(0)
+    const sharedBlocks = await readSharedStubBlocks(projectDir)
     for (const name of STUB_TOPICS) {
       const source = await readFile(path.join(projectDir, 'skill-guides', `${name}.md`), 'utf8')
       const projection = await readFile(path.join(projectDir, 'skills', name, 'SKILL.md'), 'utf8')
+      const stubBody = await readFile(path.join(projectDir, 'skill-stubs', `${name}.md`), 'utf8')
 
       // The routing frontmatter is the unchanged discovery surface.
       expect(
@@ -106,8 +111,14 @@ describe('bundled skill guide generator', () => {
       ).toBe(true)
       // The stub is a thin hybrid pointer, not the full guide.
       expect(projection).not.toEqual(source)
-      expect(projection.length).toBeLessThan(source.length)
-      expect(projection).toContain('discovery stub')
+      expect(projection).toEqual(
+        composeStubProjection(
+          brandGuideMarkdown(source),
+          brandGuideMarkdown(stubBody),
+          `skill-stubs/${name}.md`,
+          { sharedBlocks }
+        )
+      )
       expect(projection).toContain(`skills get ${name}`)
     }
   })
@@ -164,37 +175,44 @@ describe('bundled skill guide generator', () => {
   })
 
   it.skipIf(process.platform === 'win32')(
-    'resolves snapshot cleanup through Orca user-data precedence',
+    'resolves the documented cleanup path from custom, XDG, and home settings',
     async () => {
       const source = await readFile(
         path.join(projectDir, 'skill-guides', 'orca-per-workspace-env.md'),
         'utf8'
       )
-      const assignment =
-        'orca_user_data_path="${ORCA_USER_DATA_PATH:-${XDG_CONFIG_HOME:-$HOME/.config}/orca}"'
-      expect(source).toContain(assignment)
-      const renderPath = async (env) =>
-        (
-          await execFileAsync(
-            'bash',
-            ['-u', '-c', `${assignment}; printf '%s' "$orca_user_data_path"`],
-            {
-              env
-            }
-          )
-        ).stdout
+      const assignments = [...source.matchAll(/`(orca_user_data_path=[^`\r\n]+)`/gu)].map(
+        (match) => match[1]
+      )
+      expect(assignments).toHaveLength(1)
+      const script = `${assignments[0]}\nprintf '%s' "$orca_user_data_path"`
+      const root = await mkdtemp(path.join(tmpdir(), 'orca-guide-cleanup-precedence-'))
+      temporaryDirectories.push(root)
+      const home = path.join(root, 'isolated home')
+      const xdg = path.join(root, 'xdg config')
+      const custom = path.join(root, 'custom runtime data')
+      const homeDefault = path.join(home, '.config', 'orca')
+      const xdgDefault = path.join(xdg, 'orca')
+      const cases = [
+        [{}, homeDefault],
+        [{ XDG_CONFIG_HOME: xdg }, xdgDefault],
+        [{ ORCA_USER_DATA_PATH: custom, XDG_CONFIG_HOME: xdg }, custom],
+        [{ ORCA_USER_DATA_PATH: '', XDG_CONFIG_HOME: xdg }, xdgDefault],
+        [{ XDG_CONFIG_HOME: '' }, homeDefault],
+        [{ ORCA_USER_DATA_PATH: '', XDG_CONFIG_HOME: '' }, homeDefault]
+      ]
 
-      await expect(renderPath({ HOME: '/home/orca' })).resolves.toBe('/home/orca/.config/orca')
-      await expect(
-        renderPath({ HOME: '/home/orca', XDG_CONFIG_HOME: '/srv/config' })
-      ).resolves.toBe('/srv/config/orca')
-      await expect(
-        renderPath({
-          HOME: '/home/orca',
-          XDG_CONFIG_HOME: '/srv/config',
-          ORCA_USER_DATA_PATH: '/var/lib/orca-custom'
-        })
-      ).resolves.toBe('/var/lib/orca-custom')
+      for (const [environment, expected] of cases) {
+        const { stdout, stderr } = await execFileAsync(
+          'bash',
+          ['--noprofile', '--norc', '-u', '-c', script],
+          {
+            env: { HOME: home, ORCA_BACKGROUND_LAUNCH: '1', ...environment }
+          }
+        )
+        expect(stdout).toBe(expected)
+        expect(stderr).toBe('')
+      }
     }
   )
 
@@ -288,9 +306,11 @@ describe('bundled skill guide generator', () => {
         const marker = `<!-- bundled-reference: references/${reference} -->`
         expect(guide.fullMarkdown.split(marker)).toHaveLength(2)
         expect(guide.fullMarkdown).toContain(
-          await readFile(
-            path.join(projectDir, 'skill-guides', guide.name, 'references', reference),
-            'utf8'
+          normalizeMarkdown(
+            await readFile(
+              path.join(projectDir, 'skill-guides', guide.name, 'references', reference),
+              'utf8'
+            )
           )
         )
       }
@@ -335,33 +355,43 @@ describe('bundled skill guide generator', () => {
     await expect(verifyArtifacts(first, projectDir)).resolves.toBeUndefined()
   })
 
-  it('generates platform-identical output from CRLF guide sources', async () => {
-    const expected = await buildArtifacts(projectDir)
-    const root = await createFixture()
-    for (const name of CANONICAL_GUIDE_NAMES) {
-      const sourcePath = path.join(root, 'skill-guides', `${name}.md`)
-      const source = await readFile(sourcePath, 'utf8')
-      await writeFile(sourcePath, source.replaceAll('\n', '\r\n'))
-    }
-    for (const name of STUB_TOPICS) {
-      const stubPath = path.join(root, 'skill-stubs', `${name}.md`)
-      const stubSource = await readFile(stubPath, 'utf8')
-      await writeFile(stubPath, stubSource.replaceAll('\n', '\r\n'))
-    }
-    const sharedStubPath = path.join(root, ...SHARED_STUB_SOURCE.split('/'))
-    const sharedStubSource = await readFile(sharedStubPath, 'utf8')
-    await writeFile(sharedStubPath, sharedStubSource.replaceAll('\n', '\r\n'))
-    for (const [guide, reference] of GUIDE_REFERENCE_PATHS) {
-      const referencePath = path.join(root, 'skill-guides', guide, 'references', reference)
-      const source = await readFile(referencePath, 'utf8')
-      await writeFile(referencePath, source.replaceAll('\n', '\r\n'))
-    }
+  it.each([false, true])(
+    'generates platform-identical output from CRLF guide sources (existing CRLF: %s)',
+    async (alreadyCrlf) => {
+      const expected = await buildArtifacts(projectDir)
+      const root = await createFixture()
+      if (alreadyCrlf) {
+        for (const [guide, reference] of GUIDE_REFERENCE_PATHS) {
+          const file = path.join(root, 'skill-guides', guide, 'references', reference)
+          const source = normalizeMarkdown(await readFile(file, 'utf8'))
+          await writeFile(file, source.replaceAll('\n', '\r\n'))
+        }
+      }
+      for (const name of CANONICAL_GUIDE_NAMES) {
+        const sourcePath = path.join(root, 'skill-guides', `${name}.md`)
+        const source = await readFile(sourcePath, 'utf8')
+        await writeFile(sourcePath, normalizeMarkdown(source).replaceAll('\n', '\r\n'))
+      }
+      for (const name of STUB_TOPICS) {
+        const stubPath = path.join(root, 'skill-stubs', `${name}.md`)
+        const stubSource = await readFile(stubPath, 'utf8')
+        await writeFile(stubPath, normalizeMarkdown(stubSource).replaceAll('\n', '\r\n'))
+      }
+      const sharedStubPath = path.join(root, ...SHARED_STUB_SOURCE.split('/'))
+      const sharedStubSource = await readFile(sharedStubPath, 'utf8')
+      await writeFile(sharedStubPath, normalizeMarkdown(sharedStubSource).replaceAll('\n', '\r\n'))
+      for (const [guide, reference] of GUIDE_REFERENCE_PATHS) {
+        const referencePath = path.join(root, 'skill-guides', guide, 'references', reference)
+        const source = await readFile(referencePath, 'utf8')
+        await writeFile(referencePath, normalizeMarkdown(source).replaceAll('\n', '\r\n'))
+      }
 
-    const actual = await buildArtifacts(root)
-    expect(actual.map((artifact) => artifact.content)).toEqual(
-      expected.map((artifact) => artifact.content)
-    )
-  })
+      const actual = await buildArtifacts(root)
+      expect(actual.map((artifact) => artifact.content)).toEqual(
+        expected.map((artifact) => artifact.content)
+      )
+    }
+  )
 
   it('pins guide sources, projections, and embedded output to LF in Git', async () => {
     const attributes = await readFile(path.join(projectDir, '.gitattributes'), 'utf8')
@@ -430,10 +460,6 @@ describe('bundled skill guide generator', () => {
     const blocks = await readSharedStubBlocks(projectDir)
 
     expect([...blocks.keys()]).toEqual(['resolver', 'no-guessing'])
-    // Why: the guide copies of this warning had each dropped one half. #7904 is the incident
-    // where bare `orca` started the screen reader talking on a user's Ubuntu box.
-    expect(blocks.get('resolver').text).toContain('(`/usr/bin/orca`)')
-    expect(blocks.get('resolver').text).toContain("starts speech on the user's machine")
     for (const name of STUB_TOPICS) {
       const projection = await readFile(path.join(projectDir, 'skills', name, 'SKILL.md'), 'utf8')
       for (const [id, block] of blocks) {

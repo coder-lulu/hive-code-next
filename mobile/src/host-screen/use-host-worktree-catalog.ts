@@ -15,7 +15,6 @@ import {
 import { savePinnedIds } from '../storage/preferences'
 import type { FetchHostRepoMetadata } from './use-host-repo-metadata'
 import type { HostScreenState } from './use-host-screen-state'
-
 export function useHostWorktreeCatalog(args: {
   client: RpcClient | null
   connState: ConnectionState
@@ -49,7 +48,6 @@ export function useHostWorktreeCatalog(args: {
     setWorktreesLoaded,
     worktreeCatalogRef
   } = state
-
   const fetchWorktrees = useCallback(
     async (options: { allowDuringModal?: boolean } = {}) => {
       if (!client || connState !== 'connected' || !hostId) {

@@ -207,7 +207,41 @@
       "optionLayoutAlt": "ABC or U.S. — Option sends Alt/Esc sequences",
       "optionLayoutCompose": "layout uses Option to compose characters like @, €, [, ]",
       "optionLayoutUnknown": "unknown layout — Option composes characters (safe default)",
-      "optionShortcutHint": "Choose Both for Option shortcuts, Off for accents and symbols, or Left/Right to use one Option key for each."
+      "optionShortcutHint": "Choose Both for Option shortcuts, Off for accents and symbols, or Left/Right to use one Option key for each.",
+      "windows": {
+        "checkingAdministrator": "Checking…",
+        "unknownAdministrator": "Unable to determine",
+        "administratorStatus": "Administrator",
+        "standardStatus": "Standard user",
+        "keywordAdmin": "admin",
+        "keywordAdministrator": "administrator",
+        "keywordElevated": "elevated",
+        "keywordPermissions": "permissions",
+        "keywordRestart": "restart",
+        "keywordUac": "uac",
+        "returnStandardHelp": "Standard mode guide",
+        "runAdministratorHelp": "Administrator guide",
+        "restartAdministrator": "Restart as administrator",
+        "administratorLabel": "Administrator mode",
+        "administratorScope": "Permissions for the HiveCode app. Existing terminals may differ.",
+        "confirmAdministratorRestart": "Restart as administrator?",
+        "administratorRestartConsequences": "Save your work first. After approval, terminals and agents on the current local terminal host close. Restored tabs open new administrator shells.",
+        "administratorDialogScope": "This changes permissions for the whole app. SSH and WSL keep their own permissions.",
+        "administratorPromptCancellation": "Canceling Windows’ prompt reopens HiveCode with its retained terminals. SSH and WSL permissions stay controlled on their hosts.",
+        "closeLocalSessions": "Save your work, close all local terminal sessions, then exit HiveCode.",
+        "launchStandard": "Open HiveCode normally from the Windows Start menu.",
+        "launchAdministrator": "In the Windows Start menu, right-click HiveCode and choose Run as administrator. Approve the Windows prompt using your usual account.",
+        "retainedTerminalPermissions": "If new terminals still use the previous permissions, open Manage Sessions and choose Restart daemon. This closes local terminals and their running commands.",
+        "administratorRestartFailed": "HiveCode could not restart. Try again or use the manual instructions.",
+        "manualAdministratorHelp": "Manual instructions",
+        "administratorDocumentation": "Read the guide",
+        "cancelAdministratorRestart": "Cancel",
+        "closeAdministratorHelp": "Close",
+        "restartingAdministrator": "Restarting…",
+        "openManageSessions": "Open Manage Sessions",
+        "administratorSearchDescription": "See HiveCode’s Windows permissions or restart with administrator approval.",
+        "administratorApproval": "Windows will ask for approval. Use your usual account."
+      }
     },
     "appearance": {
       "language": {
@@ -323,7 +357,19 @@
       "codexSharedServerWarning": {
         "title": "Warn when a Codex tab shares a server",
         "description": "Shows a notice on a Codex you started yourself when it shares a server with other tabs, because its agent status may be wrong."
-      }
+      },
+      "environmentName": "Environment variable name",
+      "environmentValue": "Value for {{name}}",
+      "savedEnvironment": "Saved value · enter to replace",
+      "newEnvironment": "Value",
+      "removeEnvironment": "Remove",
+      "loadingHost": "Loading agent settings…",
+      "updateHost": "Update this server to edit its agent launch settings.",
+      "readFailed": "Couldn’t read agent settings. Check the host connection and try again.",
+      "saveFailed": "Couldn’t save agent settings. Check the host connection and try again.",
+      "hostDefaults": "Defaults for new agents on the selected host.",
+      "save": "Save",
+      "clearDefault": "Clear default agent"
     },
     "followSymlinkedDirectoriesKeywords": {
       "symlink": "symlink",
@@ -426,7 +472,12 @@
     "taskUrl": {
       "loadingHint": "Loading {{value0}}…",
       "createHint": "Create worktree from {{value0}}"
-    }
+    },
+    "tasksHeader": "Tasks",
+    "taskCreate": "Create workspace",
+    "taskSearchLoading": "Searching tasks…",
+    "taskSearchFailed": "Some task sources could not be searched",
+    "taskSearchRetry": "Retry"
   },
   "auto": {
     "App": {
@@ -538,7 +589,6 @@
         "signIn": "Sign in to HiveCloud",
         "title": "Connect to your computers"
       },
-      "pairingSecurity": {},
       "runtimeAuth": {
         "insecureOrigin": "HiveCode refused to pair from this page: it is plain http on another machine, so anyone on the network path could replace it and take the pairing code. Open the web client over https, at localhost on this computer, or through an SSH tunnel. To allow it anyway, the server operator can restart HiveCode with ORCA_ALLOW_INSECURE_WEB_PAIRING=1.",
         "deviceDowngraded": "This HiveCode server no longer supports this browser’s sign-in key (it may have been downgraded). Update the server, or pair this browser again.",
@@ -842,13 +892,6 @@
             }
           }
         },
-        "worktree": {
-          "background": {
-            "terminals": {
-              "setupTitle": "Setup"
-            }
-          }
-        },
         "work": {
           "item": {
             "direct": {
@@ -1121,7 +1164,8 @@
               "locationRemoteHost": "Read from browsers on {{value0}} and stored there.",
               "googleCookiesSkippedLocal": "Google cookies were not imported. Open a browser in HiveCode with this profile, then sign into Google.",
               "googleCookiesSkippedClientHosted": "Google cookies were not imported. Open a browser tab in the {{value0}} workspace with this profile — it opens on this device — then sign into Google.",
-              "googleCookiesSkippedRemoteWorkspace": "Google cookies were not imported. Open a browser tab in the {{value0}} workspace with this profile, then sign into Google."
+              "googleCookiesSkippedRemoteWorkspace": "Google cookies were not imported. Open a browser tab in the {{value0}} workspace with this profile, then sign into Google.",
+              "partitionSkippedBreakdown": "Cookies with unreadable site partitions: {{value0}}. Related cookies left unimported to protect existing sessions: {{value1}}. Existing cookies for these sites were left unchanged. Check these sites in this profile before signing in again."
             }
           }
         }
@@ -1191,6 +1235,10 @@
             }
           }
         }
+      },
+      "aiVaultResumeRefusal": {
+        "openInChat": "This {{value0}} conversation is open in a chat. Refresh Session History to open it.",
+        "ownershipUnknown": "HiveCode could not confirm who owns this {{value0}} conversation. Refresh Session History and try again."
       }
     },
     "hooks": {
@@ -1854,7 +1902,6 @@
         "f0470c7383": "Advanced",
         "ba64270bdb": "Configure agents",
         "ab63f25397": "Open agent settings",
-        "01d1e8f601": "Agent",
         "0c5d6a479c": "[Optional]",
         "b5a0796911": "Connect",
         "dccd26d4e4": "Choose project",
@@ -1927,8 +1974,7 @@
       },
       "NewWorkspaceComposerModal": {
         "createWorktree": "Create worktree",
-        "createWorkspace": "Create workspace",
-        "fa90f739a5": "Choose the project, workspace name, and agent before creating the workspace."
+        "createWorkspace": "Create workspace"
       },
       "PullRequestPage": {
         "2560588245": "Failed to request reviewer",
@@ -2154,7 +2200,6 @@
         "notConfirmedMany": "Couldn’t confirm {{value0}} chats were resumed",
         "notConfirmedOtherOne": "Couldn’t confirm 1 other chat was resumed",
         "notConfirmedOtherMany": "Couldn’t confirm {{value0}} other chats were resumed",
-        "show": "Show",
         "activityUnnamed": "unnamed",
         "activityApproval": "Waiting for your approval: {{value0}}",
         "activityQuestion": "Waiting for your answer: {{value0}}",
@@ -2163,6 +2208,18 @@
         "activitySubagentMany": "{{value0}} subagents running",
         "activityMonitorOne": "Monitoring: {{value0}}",
         "activityMonitorMany": "Monitoring {{value0}} background tasks",
+        "selectWorkspace": "Select all chats in {{value0}}",
+        "workspaceSelectedCount": "{{value0}} of {{value1}}",
+        "selectAll": "Select all chats",
+        "selectAllLabel": "Select all",
+        "selectedCount": "{{value0}} of {{value1}} selected",
+        "selectProject": "Select all chats in {{value0}}",
+        "collapseNode": "Collapse {{value0}}",
+        "expandNode": "Expand {{value0}}",
+        "selectMachine": "Select all chats on {{value0}}",
+        "sshHost": "SSH",
+        "done": "Done",
+        "resultListLabel": "Chats in this resume",
         "continueRefused": "{{value0}} chats could not be continued. Open them to continue manually.",
         "continueRefused_one": "{{value0}} chat could not be continued. Open it to continue manually.",
         "continueRefused_other": "{{value0}} chats could not be continued. Open them to continue manually.",
@@ -2186,18 +2243,8 @@
         "terminalSessionsUnaffected": "Only chats are affected — your terminal sessions kept running and need nothing from you.",
         "whatIsSentBody": "Continuing sends one short message to each agent, telling it that Orca restarted and asking it to check its last action before carrying on. Your own prompt is never re-sent.",
         "whatIsSentTitle": "What Orca sends",
-        "selectWorkspace": "Select all chats in {{value0}}",
-        "workspaceSelectedCount": "{{value0}} of {{value1}}",
-        "selectAll": "Select all chats",
-        "selectAllLabel": "Select all",
-        "selectedCount": "{{value0}} of {{value1}} selected",
-        "selectProject": "Select all chats in {{value0}}",
-        "collapseNode": "Collapse {{value0}}",
-        "expandNode": "Expand {{value0}}",
-        "selectMachine": "Select all chats on {{value0}}",
-        "sshHost": "SSH",
-        "done": "Done",
-        "resultListLabel": "Chats in this resume"
+        "viewChats": "View chats",
+        "review": "Review"
       },
       "StarNagCard": {
         "92b0f9d921": "is authenticated and try again.",
@@ -2545,7 +2592,14 @@
         "linearModeHasWorktreeTooltip": "Linear tickets linked to a HiveCode workspace",
         "linearEmptyHasWorktree": "No Linear tickets are linked to a HiveCode workspace yet. Start work from a Linear issue to see it here.",
         "linearOpenAttachedWorkspace": "Open workspace attached to {{value0}}",
-        "linearWorktreesColumn": "Workspaces"
+        "linearWorktreesColumn": "Workspaces",
+        "jiraColumnsPicker": "Columns",
+        "jiraColumnParent": "Parent",
+        "jiraColumnSprint": "Sprint",
+        "jiraColumnStoryPoints": "Points",
+        "jiraColumnOriginalEstimate": "Estimate",
+        "jiraColumnRemainingEstimate": "Remaining",
+        "jiraBoardEmptyColumn": "No issues"
       },
       "Terminal": {
         "73768427cf": "Close",
@@ -2657,8 +2711,8 @@
         "34c8fbb46e": "SSH remote",
         "63c2be1914": "SSH disconnected",
         "95be6587d3": "Create worktree \"{{value0}}\"",
-        "worktreesHeader": "Worktrees",
-        "recentWorktreesHeader": "Recent Worktrees",
+        "worktreesHeader": "Workspaces",
+        "recentWorktreesHeader": "Recent Workspaces",
         "settingsBadge": "Settings",
         "actionBadge": "Action",
         "paletteHostBadge": "Host: {{value0}}",
@@ -2668,8 +2722,8 @@
         "repoGroupBadge": "Repo group",
         "pluginCommandFailed": "Could not run the plugin command.",
         "recentChatsTerminalsHeader": "Recent Chats & Terminals",
-        "27f10cca63": "Search chats, terminals, worktrees, settings, and actions...",
-        "2770f02910": "Search chats, terminals, worktrees, settings, and actions",
+        "27f10cca63": "Search chats, terminals, workspaces, tasks, settings, and actions...",
+        "2770f02910": "Search chats, terminals, workspaces, tasks, settings, and actions",
         "lastActiveTime": "Last active {{value0}} ago"
       },
       "github": {
@@ -3642,6 +3696,9 @@
             "title": "Sleeping — click to resume",
             "resume": "Resume",
             "resumeAutomaticRestores": "Resume automatic restores"
+          },
+          "WslHostUnavailableBanner": {
+            "turnOn": "Turn on"
           }
         }
       },
@@ -3669,7 +3726,8 @@
             "sessionQueued": "Session queued",
             "openSupportedWorkspace": "Open a workspace before resuming a session.",
             "sessionHostMismatchUnsupported": "This session belongs to a different host. Drop it onto a workspace on the same host.",
-            "localSessionSshWorkspaceUnsupported": "This session's history is stored on this machine, so it can't resume in an SSH workspace. Drop it onto a local workspace instead."
+            "localSessionSshWorkspaceUnsupported": "This session's history is stored on this machine, so it can't resume in an SSH workspace. Drop it onto a local workspace instead.",
+            "oldPayload": "This session was dragged from an older HiveCode window. Resume it from Session History instead."
           },
           "TabGroupDropOverlay": {
             "paneColumnLabel": "New split"
@@ -5437,7 +5495,11 @@
           "addRemoteHostTooltip": "Choose SSH for a machine you can log into, or remote server for a HiveCode server.",
           "addSshHostDetail": "Use an existing machine over SSH.",
           "addRemoteServerDetail": "Pair with HiveCode running on another computer.",
-          "addRemoteHostDetail": "SSH host or HiveCode server"
+          "addRemoteHostDetail": "SSH host or HiveCode server",
+          "addWslHost": "Add WSL distro",
+          "addWslHostDetail": "Run an HiveCode server inside a WSL 2 distro. Experimental.",
+          "addRemoteHostDetailWithWsl": "SSH host, HiveCode server, or WSL distro",
+          "turnOnWslHosts": "Turn on"
         },
         "AddRepoNestedImportStep": {
           "496f68cf8c": "Scanning repositories. Click to stop.",
@@ -6149,7 +6211,8 @@
           "0bed8727db": "It may have been moved or deleted. Refresh workspaces or remove it from HiveCode.",
           "3921d3d9a5": "Workspace folder was not found.",
           "f387af445b": "Workspace path is not a valid local path.",
-          "3ec372b664": "file-manager"
+          "3ec372b664": "file-manager",
+          "wsl": "WSL"
         },
         "WorktreeTitleInlineRename": {
           "2f42ae024f": "Unread:",
@@ -6274,7 +6337,9 @@
               "740e8d0d46": "Use Add Project for host paths",
               "e344666fb8": "Server runtime active",
               "d0f8943f8b": "Preparing the project add flow",
-              "18d3cf40e9": "Checking folder"
+              "18d3cf40e9": "Checking folder",
+              "wslFolder": "Drop a WSL folder to add project",
+              "wslFolderDescription": "Folders under \\\\wsl.localhost"
             }
           }
         },
@@ -6312,7 +6377,9 @@
           "451a4638db": "Drop a folder to add it as a project.",
           "5ccb56c7be": "Use Add Project to enter a host path.",
           "849ef13dc0": "Local folder drops are unavailable for server runtimes.",
-          "c0315153d1": "Drop one folder at a time."
+          "c0315153d1": "Drop one folder at a time.",
+          "windowsDriveOnWslHost": "Folders on a Windows drive stay on this computer, not in {{value0}}.",
+          "windowsDriveOnWslHostDescription": "Git in WSL is slow on Windows drives. Switch the host to this computer to add it, or drop a folder from \\\\wsl.localhost\\{{value0}}."
         },
         "workspace": {
           "status": {
@@ -6392,7 +6459,8 @@
           "alsoForgetLocal": "Also remove these {{value0}} from HiveCode",
           "advanced": "Advanced",
           "alsoDeleteRemoteHint": "Permanently deletes the remote Git worktrees and their branches. Cannot be undone.",
-          "alsoForgetLocalHint": "Clears them from HiveCode only. Remote files, worktrees, and branches are left untouched."
+          "alsoForgetLocalHint": "Clears them from HiveCode only. Remote files, worktrees, and branches are left untouched.",
+          "wslHostEndsTerminals": "Removes {{value0}} from HiveCode, ends its open terminals and stops HiveCode’s server in that distro. Files in the distro are untouched."
         },
         "HostRenameDialog": {
           "1a2b3c4d5e": "Rename host",
@@ -6523,7 +6591,8 @@
           "3b7e4a1c96": "Hide external worktrees"
         },
         "useAddRepoHostSelection": {
-          "connectionFailed": "SSH connection failed."
+          "connectionFailed": "SSH connection failed.",
+          "wslConnectionFailed": "Couldn’t start the WSL host."
         },
         "AddRemoteHostDialog": {
           "sshHostRequired": "Host or SSH config alias is required.",
@@ -6765,6 +6834,49 @@
           "signInSuccess": "Signed in to HiveCloud",
           "signOutFailed": "Couldn't sign out of HiveCloud. Check file permissions and try again.",
           "signOutSuccess": "Signed out of HiveCloud"
+        },
+        "AddWslHostDialogBody": {
+          "added": "{{value0}} added."
+        },
+        "AddWslHostFormPanel": {
+          "wsl1": "WSL 1 · not supported",
+          "added": "Already a host",
+          "running": "Running",
+          "stopped": "Stopped",
+          "title": "Add WSL distro",
+          "description": "HiveCode runs its server inside the distro, so git, files and terminals run natively in Linux. Use it for new projects; projects you opened through \\\\wsl.localhost keep working as they are.",
+          "distro": "Distro",
+          "loading": "Looking for WSL distros…",
+          "placeholder": "Choose a distro",
+          "none": "No WSL distros found. Install one with: wsl --install",
+          "stoppedHint": "{{value0}} is stopped. Adding it starts it.",
+          "addingHint": "Installing and starting the HiveCode server in the distro. The first time can take a minute.",
+          "adding": "Setting up…",
+          "startAndAdd": "Start and add",
+          "add": "Add host",
+          "refresh": "Refresh"
+        },
+        "wslHostRowStatus": {
+          "connecting": "Starting",
+          "reconnecting": "Reconnecting",
+          "distroStopped": "Distro stopped",
+          "unverifiable": "Can’t verify",
+          "idle": "Idle",
+          "failed": "Failed to start",
+          "kind": "WSL distro",
+          "turnedOff": "WSL hosts are turned off in Settings → Experimental",
+          "turnedOffShort": "Turned off in Settings → Experimental",
+          "serverFilesMissing": "This build of HiveCode can’t run WSL hosts (server files missing).",
+          "serverFilesMissingShort": "This build can’t run WSL hosts"
+        },
+        "wslHostRemoval": {
+          "partial": "The host was removed, but something in the distro is still running: {{value0}}"
+        },
+        "addRepoWslHostFolderPicker": {
+          "otherDistro": "That folder is in {{value0}}, not {{value1}}.",
+          "outsideDistro": "Pick a folder inside {{value0}}.",
+          "underDistro": "This host can only add folders under \\\\wsl.localhost\\{{value0}}.",
+          "windowsDrive": "Folders on a Windows drive stay on this computer. Choose this computer as the host to add one."
         }
       },
       "shared": {
@@ -7129,7 +7241,6 @@
           "remoteDetectionFailed": "Couldn’t detect installed agents. Check the host connection and try again.",
           "retryDetection": "Retry",
           "02e0143be5": "Installed",
-          "110b74b022": "No agent (blank terminal)",
           "92033495ff": "Auto",
           "9b175d0f5e": "Pre-selected agent when opening a new workspace.",
           "385212c7a1": "Default Agent",
@@ -7152,7 +7263,6 @@
           "959b67385b": "Set default",
           "24e032fa34": "Default",
           "5f986a9b92": "Set as default",
-          "d7625cf8b2": "Default agent",
           "cfb3f35775": "Arguments",
           "6f99bf5dd0": "No default arguments",
           "8fbe1f37c1": "Environment",
@@ -7168,7 +7278,8 @@
           "codexSessionSourceInfo": "About importing Codex history",
           "codexSessionSourceTooltip": "HiveCode runs Codex in an isolated home. Point this at your existing Codex home to import that session history. Empty uses ~/.codex.",
           "storedDefaultUndetected": "Saved as your default, but not detected right now",
-          "noAgentsDetected": "No agents detected. If one is installed, the probe may have timed out."
+          "noAgentsDetected": "No agents detected. If one is installed, the probe may have timed out.",
+          "110b74b022": "No agent (blank terminal)"
         },
         "AppIconSelector": {
           "d5a112dc9b": "Next icon",
@@ -7241,14 +7352,6 @@
           "1626524572": "Nautilus",
           "0de9fda203": "Discard",
           "c71770c455": "{basePrompt}",
-          "f19a56498d": "; your branch prefix setting still applies.",
-          "800edb1e54": "fix-login-flow",
-          "5d569f5199": ". HiveCode generates only the final segment, like",
-          "570817d126": "and",
-          "56580dcf60": ". You can also reference",
-          "9c9b54e4ea": "built-in branch-name prompt",
-          "69bf4830c2": "to include HiveCode's",
-          "9241b59bf5": "Use",
           "a869d0edd8": "Branch name command template",
           "e784ea62dc": "Advanced",
           "d9b65054ef": ") to a short name summarizing the task. Only branches HiveCode named itself are renamed, and never after they have been pushed.",
@@ -7259,8 +7362,7 @@
           "cfd82406dd": "Saving...",
           "40e7be7850": "Saved",
           "7c7e34a66d": "Unsaved changes",
-          "a4fa380b67": "{assistantMessage}",
-          "2ee2779c05": "{firstPrompt}"
+          "commandTemplateDescription": "Use <basePrompt>{basePrompt}</basePrompt> to include HiveCode's <promptLink>built-in branch-name prompt</promptLink>. You can also reference <firstPrompt>{firstPrompt}</firstPrompt> and <assistantMessage>{assistantMessage}</assistantMessage>. HiveCode generates only the final segment, like <example>fix-login-flow</example>; your branch prefix setting still applies."
         },
         "AutoRenameBranchPromptEditor": {
           "63121132c0": "Discard",
@@ -7876,13 +7978,6 @@
           "aa204f185f": "Current GitHub CLI REST, Search, and GraphQL rate limits.",
           "612a440e57": "GitHub API Budget",
           "2cde9044a8": "graphql",
-          "36e3de3619": "from comparing against stale history. HiveCode skips the update if that branch has uncommitted changes or local-only commits.",
-          "d072a12995": "git diff main...HEAD",
-          "db3a127eb1": ". This keeps commands like",
-          "3ae3de8898": "master",
-          "5bf885be48": "or",
-          "ffba483bae": "main",
-          "976afc6b3e": "When you create a workspace, HiveCode refreshes the remote base and safely fast-forwards your matching local branch, such as",
           "1ec5c91e1d": "Choose whether branch names use your Git username, a custom prefix, or no prefix.",
           "330f584b50": "Branch Prefix",
           "1ffaadf0a0": "Prefix added to branch names when creating worktrees.",
@@ -7903,7 +7998,12 @@
           "compareAgainstUpstreamTitle": "Default Compare Base",
           "compareAgainstUpstreamDescription": "Choose which base Source Control uses by default for committed-change comparisons. Branch upstream follows the current branch automatically and falls back to the repository default branch when no upstream exists. You can still change the compare base per worktree from that worktree's Git panel. Pull Request and rebase targets don't change.",
           "compareBaseRepositoryDefault": "Repository default",
-          "compareBaseBranchUpstream": "Branch upstream"
+          "compareBaseBranchUpstream": "Branch upstream",
+          "refreshLocalBaseDescription": "When you create a workspace, HiveCode refreshes the remote base and safely fast-forwards your matching local branch, such as <mainBranch>main</mainBranch> or <masterBranch>master</masterBranch>. This keeps commands like <diffCommand>git diff main...HEAD</diffCommand> from comparing against stale history. HiveCode skips the update if that branch has uncommitted changes or local-only commits.",
+          "jiraIssueKeyCasingTitle": "Jira Key Casing",
+          "jiraIssueKeyCasingDescription": "Casing of the Jira issue key in the workspace and branch names HiveCode suggests for new Jira-linked workspaces, such as PROJ-123-fix-login instead of proj-123-fix-login. Existing workspaces and names you type are never changed.",
+          "jiraIssueKeyCasingLowercase": "Lowercase",
+          "jiraIssueKeyCasingPreserve": "Uppercase key"
         },
         "HiddenExperimentalGroup": {
           "7c4e18d2f6": "Arms the bold-glitch capture gestures on this machine: {{samplingShortcut}} starts a sampling burst; {{captureShortcut}} captures pane evidence to disk.",
@@ -8199,7 +8299,9 @@
           "274af61bc0": "system",
           "6e6df3a09a": "Choose Custom File",
           "76e02467b8": "Change Custom File",
-          "d3756cf5bc": "disabled"
+          "d3756cf5bc": "disabled",
+          "ba07e60f38": "Notify About Hidden Workspaces",
+          "e4b5e909ff": "When off, workspaces hidden by a Hide switch in the sidebar's Filters menu show no unread dot and send no notifications to this computer or your phone."
         },
         "OpenAiTranscriptionKeyDialog": {
           "fa83512e48": "Save Key",
@@ -8352,18 +8454,13 @@
         },
         "RepositoryHooksSection": {
           "af49e2a19e": "The file is present, but HiveCode could not find valid `scripts` or `issueCommand` definitions.",
-          "3397879bee": "and local commands exist, choose which run.",
           "39da2ae12f": "orca.yaml",
-          "ac9038d2cc": "When both",
           "32fec28f5b": "Command Source",
           "bbbd6e0bc4": "Command source & orca.yaml",
           "c9bc1bfd8f": "Advanced",
           "610d90fdbd": "Command source and orca.yaml details.",
-          "52aef29e69": "Leave blank to use the repo default from",
           "4084720f47": "Complete {{artifact_url}}",
           "13394103bd": "Custom GitHub Issue Command",
-          "70ad20f883": "for the linked issue or PR URL.",
-          "b997331366": "Optional override. Use",
           "2cc27dc12b": "Optional per-user override for the linked-issue command.",
           "b91a0f297d": "Local and shared scripts that run before a worktree is archived.",
           "9a100323ff": "Archive Script",
@@ -8422,8 +8519,6 @@
           "e03d9a8f38": "Ask every time",
           "8dbe6bedf5": "invalid",
           "0e0dd5b9a5": "loaded",
-          "9b12f15b1e": "when one exists.",
-          "c85c2c88a2": "{{artifact_url}}",
           "fac13f8c1e": "authoritative",
           "0518758f38": "both",
           "d2b3016c20": "shared",
@@ -8437,7 +8532,11 @@
           "da37d6f10e": "Copy",
           "3149964b66": "Copied",
           "waitForSetupBeforeAgent": "Wait for setup to complete before starting agent",
-          "waitForSetupBeforeAgentHelp": "Turn this on when setup installs dependencies, MCP servers, or config files the agent needs during startup."
+          "waitForSetupBeforeAgentHelp": "Turn this on when setup installs dependencies, MCP servers, or config files the agent needs during startup.",
+          "issueCommandDescription": "Optional override. Use <artifactUrl>{{artifact_url}}</artifactUrl> for the linked issue or PR URL.",
+          "issueCommandSharedDefault": "Leave blank to use the repo default from <yaml>orca.yaml</yaml>.",
+          "issueCommandOptionalDefault": "Leave blank to use the repo default from <yaml>orca.yaml</yaml> when one exists.",
+          "commandSourceDescription": "When both <yaml>orca.yaml</yaml> and local commands exist, choose which run."
         },
         "RepositoryIconPicker": {
           "2b7d27b93c": "Use {{value0}} repo color",
@@ -8984,7 +9083,6 @@
           "a7d28dff81": "Add a remote host to connect to it in HiveCode.",
           "94c5284560": "Targets",
           "f495689b82": "Import failed",
-          "f8050f6307": "Synced {{value0}} server{{value1}}",
           "68c13b4589": "Test failed",
           "81d08bcddf": "Connection successful",
           "a43de1d3ee": "Disconnect failed",
@@ -8997,7 +9095,9 @@
           "4db9afce1c": "Port must be between 1 and 65535",
           "0e5aa04161": "Host or SSH config alias is required",
           "f1fc50dad2": "Failed to load SSH targets",
-          "0cda732f43": "Connection test failed"
+          "0cda732f43": "Connection test failed",
+          "syncedServerSingular": "Synced {{count}} server",
+          "syncedServerPlural": "Synced {{count}} servers"
         },
         "SshPassphraseDialog": {
           "d5a234456f": "Cancel",
@@ -9198,7 +9298,6 @@
           "6e6480a7df": "Let programs in the terminal (Zellij, tmux, Neovim, fzf, Grok, SSH) copy to your system clipboard.",
           "3338dcf8c1": "Allow TUI Clipboard Writes (OSC 52)",
           "69c64a479c": "Let Zellij, tmux, Neovim, fzf, and Grok copy to the system clipboard over the PTY (including over SSH).",
-          "4729c645fc": "Automatically copy terminal selections to the clipboard.",
           "902f5dee1f": "Copy on Select",
           "9129b7e805": "Hovering a terminal pane activates it without needing to click.",
           "8eefeaa3da": "Focus Follows Mouse",
@@ -9393,13 +9492,8 @@
           "1ba81c0ff0": "recommended",
           "cfde55c7b0": "Failed to download model.",
           "43fd4f454b": "Speech Model",
-          "7cf715f891": "is held.",
-          "295d84b849": "once to start, again to stop. Hold: dictate while",
-          "ff9a680010": "Toggle: press",
           "ba4a900d1d": "Dictation Mode",
           "0121960365": "Enable Voice Dictation",
-          "366e1b4f36": "to dictate text into any focused pane.",
-          "4465596675": "Press",
           "62d2a84d31": "Failed to clear OpenAI API key",
           "37aba8bb63": "OpenAI API key cleared",
           "8572bbb537": "Failed to save OpenAI API key",
@@ -9418,7 +9512,9 @@
           "f9a9cf6928": "Microphone permission is required before enabling voice dictation.",
           "1eac933202": "Opened macOS Privacy & Security. Enable dictation again after granting access.",
           "cd9fe37556": "Microphone permission granted",
-          "openAiKeyName": "Your OpenAI transcription key"
+          "openAiKeyName": "Your OpenAI transcription key",
+          "dictationShortcutDescription": "Press {{shortcut}} to dictate text into any focused pane.",
+          "dictationModesDescription": "Toggle: press {{shortcut}} once to start, again to stop. Hold: dictate while {{shortcut}} is held."
         },
         "WorktreeSymlinksSection": {
           "1c1e35b219": "Remove {{value0}}",
@@ -10432,7 +10528,13 @@
             "localChanges": "local changes",
             "originMaster": "origin/master",
             "committedChanges": "committed changes",
-            "diffBase": "diff base"
+            "diffBase": "diff base",
+            "jiraIssueKeyCasingTitle": "Jira Key Casing",
+            "jiraIssueKeyCasingDescription": "Casing of the Jira issue key in the workspace and branch names HiveCode suggests for new Jira-linked workspaces, such as PROJ-123-fix-login instead of proj-123-fix-login. Existing workspaces and names you type are never changed.",
+            "jira": "jira",
+            "issueKey": "issue key",
+            "uppercase": "uppercase",
+            "lowercase": "lowercase"
           }
         },
         "input": {
@@ -11032,7 +11134,6 @@
               "664789b73a": "auto",
               "c38c18be15": "selection",
               "797fdfe4ca": "select",
-              "603818e8d8": "Automatically copy terminal selections to the clipboard as soon as a selection is made.",
               "3bdc84f059": "Copy on Select",
               "zellij": "zellij",
               "grok": "grok"
@@ -11443,21 +11544,23 @@
                 "60996beda6": "Add Jira site",
                 "7ca5ffffdb": "Browse, create, and start work from Jira Cloud issues.",
                 "a1093a06c7": "Checking Jira access before showing setup actions.",
-                "9fa04a032e": "{{value0}} site{{value1}} connected",
                 "cef18762a2": "Add access with a Personal API key from your Linear settings. Full-access keys can see every team the key owner can reach.",
                 "6224fe9d34": "Each connected Linear workspace has one key stored by the active runtime. Full-access keys can cover all teams the key owner can access; restricted keys can be replaced any time.",
                 "1a12e33fe5": "Add Linear access",
                 "622c224082": "Add workspace access",
                 "eae4a9f16b": "Add Linear access to browse and link issues.",
                 "fe9231215b": "Checking Linear access before showing setup actions.",
-                "e1f5e6424c": "{{value0}} workspace{{value1}} connected",
                 "disconnect_all": "Disconnect",
                 "account_scope_prefix": "Account scope",
                 "2d60ec7921": "Connect a Jira Cloud site with an API token, or a self-hosted Jira with a personal access token or username and password. Credentials are sent to the selected remote runtime and stored there with runtime-supported encryption.",
                 "977e360b71": "Connect a Jira Cloud site with an API token, or a self-hosted Jira with a personal access token or username and password. Credentials are stored locally and encrypted when local runtime storage supports it.",
                 "statusConnected": "Connected",
                 "statusNotConnected": "Not connected",
-                "linearTokenName": "Your Linear API token"
+                "linearTokenName": "Your Linear API token",
+                "connectedSiteSingular": "{{count}} site connected",
+                "connectedSitePlural": "{{count}} sites connected",
+                "connectedWorkspaceSingular": "{{count}} workspace connected",
+                "connectedWorkspacePlural": "{{count}} workspaces connected"
               }
             }
           }
@@ -12925,7 +13028,25 @@
           "olderTerminalsUnverifiable": "HiveCode couldn’t confirm that terminals started by an older version of HiveCode have exited. Reconnect to try again.",
           "olderTerminals_one": "{{count}} terminal started by an older version of HiveCode is still running on this host, and it doesn’t stop on its own. Close it in that version of HiveCode or end it on the host, then reconnect.",
           "olderTerminals_other": "{{count}} terminals started by an older version of HiveCode are still running on this host, and they don’t stop on their own. Close them in that version of HiveCode or end them on the host, then reconnect.",
-          "olderTerminals": "{{count}} terminals started by an older version of HiveCode are still running on this host, and they don’t stop on their own. Close them in that version of HiveCode or end them on the host, then reconnect."
+          "olderTerminals": "{{count}} terminals started by an older version of HiveCode are still running on this host, and they don’t stop on their own. Close them in that version of HiveCode or end them on the host, then reconnect.",
+          "linkedProjects_one": "This host’s HiveCode server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automation there were not moved, and worktrees it created there show as external worktrees.",
+          "linkedProjects_other": "This host’s HiveCode server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automations there were not moved, and worktrees it created there show as external worktrees.",
+          "linkedProjects": "This host’s HiveCode server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs and {{count}} automations there were not moved, and worktrees it created there show as external worktrees.",
+          "linkedProjectsNoAutomations": "This host’s HiveCode server already had {{paths}}, so this desktop now uses the server’s copy. This desktop’s tabs there were not moved, and worktrees it created there show as external worktrees."
+        },
+        "ZcodeCliSetupSection": {
+          "title": "Use GLM with ZCode",
+          "description": "Sign in to use GLM as a coding agent. The quota API key above only monitors usage; ZCode owns its own sign-in and model selection.",
+          "help": "Choose browser sign-in for your plan site, or use ZCode’s masked API-key setup. After signing in, start ZCode and use /model to choose a GLM model.",
+          "zai": "Z.AI browser sign-in",
+          "bigmodel": "BigModel browser sign-in",
+          "apiKey": "ZCode API-key setup",
+          "close": "Close setup terminal",
+          "loading": "Loading sign-in terminal…",
+          "terminalTitle": "ZCode sign-in",
+          "terminalLabel": "ZCode sign-in terminal",
+          "apiKeyInstructions": "Press Enter to start ZCode, then enter /login and choose the API-key option for your plan site. Enter the key in ZCode’s masked prompt.",
+          "oauthInstructions": "Press Enter to run the sign-in command, then open the authorization URL printed by ZCode. Sign-in is saved on this terminal’s execution host."
         },
         "ZcodePlanAccountsSection": {
           "site": {
@@ -12996,6 +13117,12 @@
           "machines": "Machines",
           "machinesDescription": "Choose which machines can show notifications on this computer. A paired server’s switch also covers work reached through it."
         },
+        "SettingsHostScopePicker": {
+          "label": "Host",
+          "unavailable": "{{value0}} (unavailable)",
+          "description": "Accounts, detected agents and terminal options below are for this host.",
+          "unavailableNotice": "This server is no longer saved, so nothing can be shown for it. Choose another host at the top of Settings."
+        },
         "RuntimeCloudDisplayNameDialog": {
           "cancel": "Cancel",
           "clear": "Clear cloud name",
@@ -13049,25 +13176,23 @@
           "thisDevice": "This device",
           "title": "Runtime sessions"
         },
-        "ZcodeCliSetupSection": {
-          "title": "Use GLM with ZCode",
-          "description": "Sign in to use GLM as a coding agent. The quota API key above only monitors usage; ZCode owns its own sign-in and model selection.",
-          "help": "Choose browser sign-in for your plan site, or use ZCode’s masked API-key setup. After signing in, start ZCode and use /model to choose a GLM model.",
-          "zai": "Z.AI browser sign-in",
-          "bigmodel": "BigModel browser sign-in",
-          "apiKey": "ZCode API-key setup",
-          "close": "Close setup terminal",
-          "loading": "Loading sign-in terminal…",
-          "terminalTitle": "ZCode sign-in",
-          "terminalLabel": "ZCode sign-in terminal",
-          "apiKeyInstructions": "Press Enter to start ZCode, then enter /login and choose the API-key option for your plan site. Enter the key in ZCode’s masked prompt.",
-          "oauthInstructions": "Press Enter to run the sign-in command, then open the authorization URL printed by ZCode. Sign-in is saved on this terminal’s execution host."
+        "wslHostsExperimental": {
+          "toggleLabel": "Toggle WSL distros as hosts",
+          "title": "WSL distros as hosts",
+          "description": "Add a WSL 2 distro as a host. HiveCode runs its server inside the distro, so git, files and terminals in new projects there run natively in Linux.",
+          "keywordWsl": "wsl",
+          "keywordLinux": "linux",
+          "keywordDistro": "distro"
         },
-        "SettingsHostScopePicker": {
-          "label": "Host",
-          "unavailable": "{{value0}} (unavailable)",
-          "description": "Accounts, detected agents and terminal options below are for this host.",
-          "unavailableNotice": "This server is no longer saved, so nothing can be shown for it. Choose another host at the top of Settings."
+        "wslHosts": {
+          "title": "WSL hosts",
+          "experimental": "Experimental",
+          "description": "HiveCode runs a server inside each distro. A stopped distro starts only when you open one of its projects or connect it here.",
+          "add": "Add WSL distro",
+          "connect": "Connect",
+          "remove": "Remove",
+          "forceUpdate": "Force update",
+          "turnOn": "Turn on in Experimental"
         }
       },
       "right": {
@@ -16118,7 +16243,8 @@
           "1829437fce": "New Markdown"
         },
         "MermaidBlock": {
-          "dcc132e691": "Diagram error:"
+          "dcc132e691": "Diagram error:",
+          "expand": "Expand diagram"
         },
         "MonacoEditor": {
           "68cb83f4a7": "Add note on selected text",
@@ -16556,7 +16682,14 @@
         },
         "untitledPlaceholderPreserved": "This host cannot safely remove the blank file. The file was preserved.",
         "untitledPlaceholderRecovery": "The file was retained for recovery. Recover it from {{path}}.",
-        "untitledDiscardFailed": "Could not discard this file. Its edits were kept."
+        "untitledDiscardFailed": "Could not discard this file. Its edits were kept.",
+        "DiagramViewerModal": {
+          "title": "Diagram",
+          "zoomOut": "Zoom out",
+          "zoomIn": "Zoom in",
+          "fit": "Fit to screen",
+          "close": "Close"
+        }
       },
       "diff": {
         "comments": {
@@ -16966,7 +17099,9 @@
                     "09a7c1df70": "Edit annotation {{value0}}",
                     "c16f932cb3": "Save",
                     "024467ceac": "Cancel",
-                    "449d2c2629": "Annotation intent"
+                    "449d2c2629": "Annotation intent",
+                    "38d320108c": "Collapse annotations",
+                    "9f209891a7": "Expand annotations"
                   }
                 }
               }
@@ -17075,13 +17210,9 @@
         },
         "AutomationEditorDialogHeader": {
           "31f9253920": "Use template",
-          "7e35393632": "Hermes",
-          "6f309eef8d": "HiveCode",
           "58f56b73d9": "Automation name",
           "1d9826933e": "Weekday repo audit",
           "4133d33862": "Create automation",
-          "0a75e5e2fa": "Create Hermes automation",
-          "03142e7721": "Edit Hermes automation",
           "17086b48ee": "Edit automation",
           "4c8e1a72b9": "A recurring agent task"
         },
@@ -17155,7 +17286,6 @@
           "295698292f": "Rerun",
           "0e110a3469": "Runs",
           "bb1b2cd31e": "Overview",
-          "97ff587ee3": "Connect this source to check for Hermes automations in the remote profile.",
           "aaa007846f": "source unavailable",
           "25060635c6": "Add new",
           "d207ab4c25": "Start from a template",
@@ -17197,9 +17327,6 @@
           "moved": "Automation moved to {host}.",
           "moveOriginalKept": "Created on {host}, but the original could not be deleted. Remove it on the old host.",
           "moveOriginalUnverified": "Created on {host}, but the original deletion could not be verified. Check the old host before retrying.",
-          "77b81bc4ac": "Hermes automation created.",
-          "08efc3ae12": "Hermes automation updated.",
-          "e431bb85d4": "Choose a workspace on the same host as this Hermes automation.",
           "32534e7c9c": "Choose an available workspace before saving.",
           "2360ffc956": "Choose an enabled agent before saving.",
           "6e91dab317": "Enter a valid advanced schedule before saving.",
@@ -17210,7 +17337,6 @@
           "8705757e27": "job",
           "376631ef2b": "Resume",
           "b457436d6a": "Pause",
-          "0ae52dd760": "hermes",
           "e059042585": "Read-only",
           "aecdc3681f": "Manageable",
           "8500baacb4": "external source",
@@ -17269,17 +17395,11 @@
           "a42bf2b27e": "Delete external automation",
           "1c3bfd38fe": "Resume external automation",
           "0def1693bb": "Pause external automation",
-          "1df491fd00": "Edit external automation",
           "cc77ba88ff": "Run external automation",
           "5820648765": "Last",
-          "844f1acb72": "found",
           "20fd7a3a15": "next",
           "c6695e6fbd": "External automations",
           "5524365227": "OpenClaw",
-          "766abf833c": "Hermes",
-          "bf5f67b590": "hermes",
-          "e66091daf4": "runs",
-          "8e9165af08": "run",
           "2b0adbce21": "Paused",
           "b3feba84c7": "Active",
           "92405f1431": "Unavailable",
@@ -17288,25 +17408,6 @@
           "330b3c32e8": "available",
           "e2532150ed": "automations",
           "701515f010": "automation"
-        },
-        "ExternalAutomationRunTable": {
-          "0ba9c0a95c": "Next run page",
-          "52d468a0b8": "Previous run page",
-          "7475c0ce96": "of",
-          "be551397ca": "Status",
-          "a813df9808": "Preview",
-          "d4b34feb66": "Run time",
-          "2d4388a908": "Runs",
-          "9c080765ff": "No Hermes runs found yet.",
-          "8ea934cacf": "Loading runs...",
-          "d5527d8fe7": "runs",
-          "872d032d05": "run"
-        },
-        "HermesCronOutputView": {
-          "e27c716b43": "Prompt",
-          "4557213074": "Response",
-          "05affc68e3": "Error",
-          "88d48157fc": "default"
         },
         "WorkspaceCombobox": {
           "ee5b280eba": "No workspaces found.",
@@ -18224,7 +18325,8 @@
           "6112db5a1c": "Artifacts shared from HiveCode must be smaller than 800 KB.",
           "e2ed5acd8c": "HiveCode couldn't read this file. Open it from a workspace and try again.",
           "6d475e9b25": "Only local HTML and Markdown files can be shared as artifacts.",
-          "29a406be09": "Artifacts must contain text."
+          "29a406be09": "Artifacts must contain text.",
+          "visualUnreadable": "Couldn't read this visual to share it."
         },
         "ArtifactPublishedLinkPanel": {
           "copyLink": "Copy link",
@@ -18263,7 +18365,6 @@
       },
       "native": {
         "chat": {
-          "NativeChatStructuredSession": {},
           "NativeChatLaunchRetry": {
             "failed": "Chat could not be started.",
             "unknown": "Chat connection could not be confirmed.",
@@ -18371,6 +18472,23 @@
         "resuming": "Resuming automatically after the restart.",
         "resumed": "Resumed automatically after the restart.",
         "changeInSettings": "Change in Settings"
+      },
+      "TaskPageJiraSavedFilters": {
+        "6c381858a1": "Saved filters",
+        "d14121662d": "No saved filters yet.",
+        "af0dd8c528": "Edit {{value0}}",
+        "bae9bd87bf": "You can save up to {{value0}} filters.",
+        "85506127a5": "Save current filter",
+        "7aef259c28": "Edit Jira filter",
+        "4f0e55d2e5": "Save Jira filter",
+        "466c1b12ce": "Give this JQL query a name for quick access.",
+        "e4c2f52972": "Name",
+        "0ab71bb840": "A saved filter with this name already exists.",
+        "42ce360813": "JQL",
+        "7b21c59a26": "Delete filter",
+        "a62f9db53d": "Cancel",
+        "c77189bc0c": "Update filter",
+        "19af906d12": "Save filter"
       }
     },
     "i18n": {
@@ -18424,8 +18542,7 @@
         "retry": "Retry",
         "connect": "Connect",
         "connecting": "Connecting…"
-      },
-      "managedServerMove": {}
+      }
     },
     "main": {
       "window": {
@@ -18498,7 +18615,13 @@
         "sendAgainToTryOnceMore": "Send your message again to try once more.",
         "couldNotStart": "{{agent}} couldn't start.",
         "couldNotRestart": "{{agent}} couldn't restart.",
+        "codexCliTooOld": "Codex {{installedVersion}} is too old for chats. Update to {{minimumVersion}} or newer.",
         "notSignedIn": "{{agent}} is not signed in.",
+        "claudeSystemNotSignedIn": "Claude isn't signed in. Run `{{loginCommand}}`, or choose an account in Claude Accounts settings.",
+        "claudeManagedNotSignedIn": "This Claude account isn't signed in. Sign in again in Claude Accounts settings.",
+        "codexSystemNotSignedIn": "Codex isn't signed in. Run `{{loginCommand}}`.",
+        "codexManagedNotSignedIn": "This Codex account isn't signed in. Sign in again in Codex Accounts settings.",
+        "cliMissing": "{{agent}} wasn't found on the computer running this chat. Install it, or check its Command in Settings → Agents.",
         "signInFirst": "Sign in first.",
         "signInThenRunCommand": "Sign in, then run /{{command}} again.",
         "signInThenSend": "Sign in, then send your message again.",
@@ -18508,6 +18631,8 @@
         "managedAccountUnsupported": "While a Claude account is added in WSL, Claude chats need a Windows Claude account.",
         "launchFolderMissing": "The folder this chat ran in no longer exists. Restore it to continue this chat.",
         "historyInOtherAccount": "This chat's history is in another Claude account. Switch back to that account to continue it.",
+        "claudeAccountFolderMissing": "The selected Claude account's folder is missing. Sign in to it again or choose another account.",
+        "claudeAccountSetupFailed": "The selected Claude account could not be set up. Try again or choose another account.",
         "agentCommandNotRunnable": "{{agent}}'s Command in Settings → Agents must be a program path or name HiveCode can find, with no arguments or variables. Change it or reset it.",
         "chooseClaudeAccount": "Choose or add one in Claude Accounts settings.",
         "chooseClaudeAccountThenRunCommand": "Choose or add one in Claude Accounts settings, then run /{{command}} again.",
@@ -18562,20 +18687,17 @@
         "argumentsMultipleValues": "Saved Arguments give {{option}} more than one value.",
         "argumentsPositionalPrompt": "Saved Arguments include a prompt.",
         "editSavedArguments": "Edit them in Settings > Agents > Arguments.",
-        "codexCliTooOld": "Codex {{installedVersion}} is too old for chats. Update to {{minimumVersion}} or newer.",
-        "claudeSystemNotSignedIn": "Claude isn't signed in. Run `{{loginCommand}}`, or choose an account in Claude Accounts settings.",
-        "claudeManagedNotSignedIn": "This Claude account isn't signed in. Sign in again in Claude Accounts settings.",
-        "codexSystemNotSignedIn": "Codex isn't signed in. Run `{{loginCommand}}`.",
-        "codexManagedNotSignedIn": "This Codex account isn't signed in. Sign in again in Codex Accounts settings.",
-        "cliMissing": "{{agent}} wasn't found on the computer running this chat. Install it, or check its Command in Settings → Agents.",
-        "claudeAccountFolderMissing": "The selected Claude account's folder is missing. Sign in to it again or choose another account.",
-        "claudeAccountSetupFailed": "The selected Claude account could not be set up. Try again or choose another account.",
         "agentCommandNotSignedIn": "Sign in to {{agent}} with `{{loginCommand}}` on the computer running this chat.",
         "interactiveAgentNotSignedIn": "Sign in to {{agent}} by running `{{loginCommand}}` and using `{{slashCommand}}` on the computer running this chat.",
         "agentNotSignedIn": "Sign in to {{agent}}.",
         "thenSendAgain": "Then send your message again.",
         "runCommandWhenDone": "Run /{{command}} when it's done.",
-        "commandAfterAnswer": "Answer the agent's question or approval, then run /{{command}}."
+        "commandAfterAnswer": "Answer the agent's question or approval, then run /{{command}}.",
+        "providerExitedAnswer": "{{agent}} has stopped, so your answer was not sent. Send a message to continue.",
+        "backgroundTaskNotStopped": "The background task wasn't stopped.",
+        "backgroundTasksNotStopped": "The background tasks weren't stopped.",
+        "couldNotStop": "Couldn't stop {{agent}}.",
+        "couldNotStopTheAgent": "Couldn't stop the agent."
       },
       "writeNotice": {
         "notDoneReadHistory": "This chat's history couldn't be loaded.",
@@ -18606,6 +18728,8 @@
         "cannotRunHere": "Orca can't run this agent in a chat here.",
         "unreachable": "HiveCode couldn't reach the agent.",
         "recordFailed": "HiveCode couldn't save this to the chat's history.",
+        "attachmentExpired": "This attachment expired.",
+        "reattachFile": "Remove it and attach it again.",
         "conversationCleared": "This conversation has been cleared.",
         "openCurrentConversation": "Open the current conversation to continue.",
         "clearUnfinished": "The last /clear didn't finish.",
@@ -18621,6 +18745,8 @@
         "waitForBackgroundTasks": "Wait for the background tasks to finish.",
         "messagesUnsettled": "A message you sent earlier isn't confirmed yet.",
         "settleEarlierMessage": "Wait for your earlier message to go through, or retry it.",
+        "queueTooLarge": "Too much text is waiting in the queue.",
+        "shrinkQueue": "Delete a queued message, or wait for one to go through, then try again.",
         "optionRejected": "The agent didn't accept this setting.",
         "goalsUnsupported": "This agent doesn't support goals.",
         "agentRefused": "The agent turned this down.",
@@ -18634,10 +18760,6 @@
         "chatNotFound": "HiveCode can't find this chat.",
         "startNewChat": "Start a new chat to continue.",
         "tryAgain": "Try again.",
-        "attachmentExpired": "This attachment expired.",
-        "reattachFile": "Remove it and attach it again.",
-        "queueTooLarge": "Too much text is waiting in the queue.",
-        "shrinkQueue": "Delete a queued message, or wait for one to go through, then try again.",
         "agentStillWorking": "The agent is still working.",
         "runClearWhenDone": "Run /clear when it's done.",
         "clearAfterAnswer": "Answer the agent's question or approval, then run /clear.",
@@ -18646,7 +18768,8 @@
         "clearAfterRetry": "Retry your earlier message, then run /clear.",
         "compactAfterRetry": "Retry your earlier message, then run /compact.",
         "clearAfterSending": "Your earlier message is still being sent. Run /clear once it has gone.",
-        "compactAfterSending": "Your earlier message is still being sent. Run /compact once it has gone."
+        "compactAfterSending": "Your earlier message is still being sent. Run /compact once it has gone.",
+        "cancelNotSaved": "Couldn't cancel this question or approval."
       },
       "taskList": {
         "title": "Tasks",
@@ -18715,6 +18838,7 @@
         "skills": "Skills",
         "loadingSkills": "Loading skills...",
         "skillsLoaded": "Skills loaded",
+        "clearDescription": "Clear conversation context",
         "skillsUnavailableHost": "Skills are unavailable for this host",
         "skillsLoadFailed": "Couldn't load skills",
         "retrySkills": "Retry",
@@ -18725,6 +18849,9 @@
         "skillScopeBuiltIn": "Built-in",
         "skillScopePlugin": "Plugin",
         "localAttachmentUnsupported": "Local attachments are not available for remote sessions.",
+        "attachFailed": "Couldn't attach {{files}}.",
+        "attachFailedBecause": "Couldn't attach {{files}}. {{reason}}",
+        "uploadingFile": "Uploading {{name}}…",
         "removeAttachment": "Remove attachment",
         "pastedImageLabel": "Pasted image",
         "draftNotSaved": "This draft couldn't be saved yet. Orca keeps trying.",
@@ -18741,8 +18868,8 @@
         "model": "Model",
         "effort": "Effort",
         "fastMode": "Fast mode",
+        "speed": "Speed",
         "thinking": "Thinking",
-        "options": "Options",
         "sessionOptions": "Session options",
         "chooseInAgentPicker": "Choose in agent picker…",
         "searchModels": "Search models…",
@@ -18776,15 +18903,6 @@
         "attachmentOwnerChanged": "This workspace changed hosts while attaching — drop the files again.",
         "attachmentUnreadable": "Couldn't read the dropped files.",
         "tooManyAttachments": "Attach {{value0}} or fewer files at a time.",
-        "pasteFailed": "Paste failed.",
-        "commandAttachmentsUnsupported": "Remove attachments before using a chat-session command.",
-        "valueIsDefault": "Default",
-        "valueNotReported": "Not reported",
-        "clearDescription": "Clear conversation context",
-        "attachFailed": "Couldn't attach {{files}}.",
-        "attachFailedBecause": "Couldn't attach {{files}}. {{reason}}",
-        "uploadingFile": "Uploading {{name}}…",
-        "speed": "Speed",
         "permissions": "Permissions",
         "permissionAsk": "Ask for approval",
         "permissionAskDescription": "Asks before edits and commands your settings don't allow",
@@ -18797,7 +18915,16 @@
         "permissionFullAccess": "Full access",
         "permissionFullAccessDescription": "Never asks before edits or commands",
         "permissionFullAccessCodexDescription": "Never asks; can edit any file and use the network",
-        "permissionFullAccessSharedDescription": "Never asks before edits or commands"
+        "permissionFullAccessSharedDescription": "Never asks before edits or commands",
+        "pasteFailed": "Paste failed.",
+        "commandAttachmentsUnsupported": "Remove attachments before using a chat-session command.",
+        "valueIsDefault": "Default",
+        "valueNotReported": "Not reported",
+        "optionValueShort": {
+          "minimal": "Min",
+          "medium": "Med",
+          "xhigh": "XHigh"
+        }
       },
       "tool": {
         "exitCode": "exit {{value0}}",
@@ -18957,9 +19084,20 @@
         "reasonUnverifiable": "no contact"
       },
       "jumpToLatest": "Jump to latest",
+      "find": {
+        "label": "Find in chat",
+        "noResults": "No results",
+        "previousMatch": "Previous match",
+        "nextMatch": "Next match",
+        "close": "Close"
+      },
       "transcriptLabel": "Conversation",
       "toggle": {
         "showTerminal": "Show terminal"
+      },
+      "resumeInNewChat": {
+        "notSavedYet": "{{agent}} hasn't saved this conversation yet. Try again after it replies.",
+        "cannotResume": "This {{agent}} conversation can't be resumed in a native chat."
       },
       "state": {
         "loading": {
@@ -19079,6 +19217,8 @@
         "subtitle": "Files are added to your message as paths the agent can read."
       },
       "copyCode": "Copy code",
+      "wrapLines": "Wrap lines",
+      "disableLineWrap": "Disable line wrap",
       "context": {
         "unavailable": "Context usage is not known yet. It becomes available after the agent next responds.",
         "summary": "Context: {{used}} / {{window}} tokens ({{percent}}%), estimated from the last response.",
@@ -19122,9 +19262,17 @@
         "orcaSessionIdTooltip": "HiveCode's ID for this chat, separate from the agent CLI's own session ID. Agents use it to refer to each other through HiveCode."
       },
       "dismissDeliveryNotice": "Dismiss",
+      "addSelectionToChat": "Add to chat",
       "messageNotSent": "Message not sent",
       "deliveryUnconfirmed": "Delivery unconfirmed — check chat before retrying",
       "messageSending": "Sending…",
+      "userMessage": {
+        "showFull": "Show full message",
+        "showLess": "Show less"
+      },
+      "visualUnavailable": "Visualization unavailable",
+      "visualLoading": "Loading visualization",
+      "visualOpenInNewTab": "Open in new tab",
       "queuedMessages": {
         "behindReturnedHold": "Waiting — a message ahead needs attention",
         "steer": "Steer",
@@ -19174,6 +19322,14 @@
         "reconnecting": "{{hostName}} is reconnecting…",
         "reconnect": "Reconnect"
       },
+      "interruptedContinue": {
+        "continue": "Continue",
+        "failed": "Couldn't continue this chat. Try again, or send a message.",
+        "explanation": "Continue, and the agent first checks whether its last step finished."
+      },
+      "claudeSignIn": {
+        "signingIn": "Signing in…"
+      },
       "handoff": {
         "agentOpen": "Agent is open in terminal.",
         "agentOpenOnHost": "Agent is open in terminal on {{value0}}.",
@@ -19210,35 +19366,8 @@
       "structuredSessionCloseFailedDescription": "The terminal stayed open so the provider remains recoverable.",
       "structuredSessionLaunchFailed": "Could not open {{value0}} chat",
       "structuredSessionLaunchFailedDescription": "HiveCode could not open a structured {{value0}} chat. See the logs for details.",
-      "find": {
-        "label": "Find in chat",
-        "noResults": "No results",
-        "previousMatch": "Previous match",
-        "nextMatch": "Next match",
-        "close": "Close"
-      },
-      "resumeInNewChat": {
-        "notSavedYet": "{{agent}} hasn't saved this conversation yet. Try again after it replies.",
-        "cannotResume": "This {{agent}} conversation can't be resumed in a native chat."
-      },
-      "wrapLines": "Wrap lines",
-      "disableLineWrap": "Disable line wrap",
-      "addSelectionToChat": "Add to chat",
-      "userMessage": {
-        "showFull": "Show full message",
-        "showLess": "Show less"
-      },
-      "visualUnavailable": "Visualization unavailable",
-      "visualLoading": "Loading visualization",
-      "visualOpenInNewTab": "Open in new tab",
-      "interruptedContinue": {
-        "continue": "Continue",
-        "failed": "Couldn't continue this chat. Try again, or send a message.",
-        "explanation": "Continue, and the agent first checks whether its last step finished."
-      },
-      "claudeSignIn": {
-        "signingIn": "Signing in…"
-      }
+      "newRowsAnnouncement": "New messages arrived while you were away",
+      "newRowsMarker": "New"
     },
     "tab": {
       "bar": {
@@ -19568,11 +19697,15 @@
     "settings": {
       "TerminalInteraction": {
         "copyTrimsGutter": "Trim Gutter on Copy",
-        "copyTrimsGutterDescription": "Drop the left gutter agent output is painted behind, so copied text is not indented. Only the indent every selected line shares is removed."
+        "copyTrimsGutterDescription": "Drop the left gutter agent output is painted behind, so copied text is not indented. Only the indent every selected line shares is removed.",
+        "copyOnSelectDescription": "Automatically copy text you select in a terminal or chat to the clipboard."
       },
       "terminal": {
         "clipboard": {
           "search": {
+            "copyOnSelectDescription": "Automatically copy text you select in a terminal or chat to the clipboard as soon as the selection is made.",
+            "highlight": "highlight",
+            "chat": "chat",
             "gutter": "gutter",
             "indent": "indent",
             "margin": "margin",
@@ -19602,6 +19735,16 @@
     },
     "agentChildRow": {
       "ended": "Ended"
+    },
+    "markdown-callout": {
+      "note": "Note",
+      "tip": "Tip",
+      "important": "Important",
+      "warning": "Warning",
+      "caution": "Caution"
+    },
+    "automations": {
+      "runTerminalUnavailable": "Run terminal is unavailable."
     },
     "activity": {
       "temporarySessions": {
@@ -19929,7 +20072,6 @@
       "unsaved": "Unsaved",
       "workspace": "Workspace"
     },
-    "nativeChat": {},
     "petStatus": {
       "hidden": "{{pet}} hidden"
     },
@@ -20225,15 +20367,44 @@
       "inactive": "Inactive",
       "permission": "Needs permission"
     },
-    "markdown-callout": {
-      "note": "Note",
-      "tip": "Tip",
-      "important": "Important",
-      "warning": "Warning",
-      "caution": "Caution"
+    "jiraIssueTitleField": {
+      "generate": "Generate title from description",
+      "stop": "Stop generating title",
+      "canceled": "Generation canceled.",
+      "webUnavailable": "Jira title generation is unavailable in the web client.",
+      "hostUpdateRequired": "Generating Jira titles requires a newer HiveCode server. Update the Jira connection’s host and try again.",
+      "generating": "Generating title. Click to stop.",
+      "failed": "Failed to generate a summary from the description."
     },
-    "automations": {
-      "runTerminalUnavailable": "Run terminal is unavailable."
+    "agentCombobox": {
+      "clearSelection": "Clear agent selection"
+    },
+    "newWorkspace": {
+      "agentOptional": "Agent [Optional]",
+      "createDescription": "Choose the project and workspace name. Select an agent if you want to start one."
+    },
+    "JiraIssueWorkspace": {
+      "pendingChange": "Another issue change is in progress."
+    },
+    "jiraProjectPicker": {
+      "search": "Search Jira projects",
+      "empty": "No projects found.",
+      "label": "Jira project",
+      "all": "All Jira projects"
+    },
+    "RepositoryJiraProjectSection": {
+      "saveFailed": "Could not save the default Jira project.",
+      "runtimeUpdate": "Update this runtime to save a default Jira project.",
+      "title": "Default Jira project",
+      "description": "Default the Jira issue picker and Tasks list to this project. You can change it for each worktree.",
+      "none": "No default project",
+      "connect": "Connect Jira in Integrations to choose a project.",
+      "keywordJira": "jira",
+      "keywordDefaultProject": "default project",
+      "keywordIssuePicker": "issue picker"
+    },
+    "agentLaunch": {
+      "workspaceHostUnavailable": "The selected workspace host is unavailable. Refresh projects before starting a task."
     }
   },
   "dashboardPopout": {
@@ -20343,6 +20514,19 @@
     }
   },
   "featureTips": {
+    "nativeChatUpgrade": {
+      "eyebrow": "New",
+      "title": "Native chat got an upgrade",
+      "leaveOff": "Leave Off",
+      "enableNow": "Enable Now",
+      "enableError": "Could not enable chat mode.",
+      "intro": "New chats with supported agents now open in the upgraded chat view. To move between chat and CLI, open {{panel}} in the right sidebar:",
+      "resumeInNativeChat": "{{action}} opens a supported CLI conversation in native chat.",
+      "resumeInCli": "{{action}} copies a Claude or Codex chat into a new CLI session. The original chat stays as it is.",
+      "settingsInstruction": "Manage Chat UI in",
+      "settingsLink": "Settings → Experimental",
+      "gotIt": "Got It"
+    },
     "voice": {
       "demoPrompt": "Review this diff for edge cases and add tests for anything you find.",
       "startDictation": "Start dictation",
@@ -20400,20 +20584,6 @@
       "demoHit6Age": "1mo",
       "readyToast": "Session search is ready",
       "readyToastOpen": "Open"
-    },
-    "nativeChatUpgrade": {
-      "eyebrow": "New",
-      "title": "Native chat got an upgrade",
-      "chatModeNote": "New agent tabs still open in the terminal, as before.",
-      "okay": "Okay",
-      "enableNow": "Enable Now",
-      "enableError": "Could not enable chat mode.",
-      "intro": "New chats with supported agents now open in the upgraded chat view. To move between chat and CLI, open {{panel}} in the right sidebar:",
-      "resumeInNativeChat": "{{action}} opens a supported CLI conversation in native chat.",
-      "resumeInCli": "{{action}} copies a Claude or Codex chat into a new CLI session. The original chat stays as it is.",
-      "settingsInstruction": "Manage Chat UI in",
-      "settingsLink": "Settings → Experimental",
-      "gotIt": "Got It"
     }
   },
   "quickOpen": {
@@ -20572,7 +20742,8 @@
   },
   "common": {
     "retry": "Retry",
-    "close": "Close"
+    "close": "Close",
+    "cancel": "Cancel"
   },
   "terminal": {
     "sessionSaveFailure": {
@@ -20756,21 +20927,6 @@
         "accounts": "accounts"
       }
     },
-    "managedData": {
-      "description": "Add accounts by running this command in a terminal on the HiveCode host. Selection applies to new explicit agent launches on that host; direct SSH relay and Windows-hosted WSL launches use their own credentials.",
-      "copied": "Copied",
-      "add": "Copy add account command",
-      "refresh": "Refresh accounts",
-      "upgrade": "If accounts do not appear, update or restart the HiveCode host.",
-      "system": "System default",
-      "active": "Active",
-      "select": "Select",
-      "remove": "Remove",
-      "removeTitle": "Remove managed account?",
-      "removeDescription": "Stop agents using this profile first. Removal deletes its saved credentials and conversation data. Your system login stays unchanged.",
-      "cancel": "Cancel",
-      "wslUnavailable": "Managed OpenCode and Devin accounts are unavailable for this WSL runtime. Launches use its own credentials."
-    },
     "claude": {
       "added": "Account added. Select it to use it for the next Claude you start.",
       "nextLaunch": "{{value0}} → {{value1}}. The next Claude you start uses it. Running sessions keep their account.",
@@ -20787,10 +20943,35 @@
       "copySignInLink": "Copy sign-in link instead",
       "signInLinkCopied": "Sign-in link copied. Open it in a private window to sign in with a different account.",
       "signInLinkCopyFailed": "Could not copy the link."
+    },
+    "managedData": {
+      "description": "Add accounts by running this command in a terminal on the HiveCode host. Selection applies to new explicit agent launches on that host; direct SSH relay and Windows-hosted WSL launches use their own credentials.",
+      "copied": "Copied",
+      "add": "Copy add account command",
+      "refresh": "Refresh accounts",
+      "upgrade": "If accounts do not appear, update or restart the HiveCode host.",
+      "system": "System default",
+      "active": "Active",
+      "select": "Select",
+      "remove": "Remove",
+      "removeTitle": "Remove managed account?",
+      "removeDescription": "Stop agents using this profile first. Removal deletes its saved credentials and conversation data. Your system login stays unchanged.",
+      "cancel": "Cancel",
+      "wslUnavailable": "Managed OpenCode and Devin accounts are unavailable for this WSL runtime. Launches use its own credentials."
+    },
+    "wslAccountNotApplied": {
+      "title": "Account selection not applied in {{distro}}",
+      "description": "Agents there use the distro's default Claude and Codex accounts until HiveCode in WSL is updated."
     }
   },
   "fileSearch": {
     "failed": "Search failed. Try again."
+  },
+  "workspaceDeletion": {
+    "preferenceSaveFailed": "Could not save deletion preference",
+    "alwaysForceDelete": "Always force delete",
+    "moreActions": "More force delete options",
+    "alwaysForceDeleteTooltip": "Applies to all future workspace deletions."
   },
   "worktree": {
     "nestedRemoval": {
@@ -20828,11 +21009,90 @@
   "projectField": {
     "updateFailed": "Failed to update project field"
   },
-  "settings.appearance.chat.title": "Chat",
   "mediaPreview": {
     "unavailable": "Unable to play this media file. The file may be unavailable or use an unsupported codec.",
     "openFailed": "Could not open this file in the default app.",
     "openDefault": "Open in Default App"
+  },
+  "workspace": {
+    "links": {
+      "foreignReview": "This review belongs to another repository. Add reviews from this workspace’s repository.",
+      "repositoryLoading": "Repository identity is still loading. Try again once it is available.",
+      "duplicate": "This link is already attached.",
+      "title": "Linked work",
+      "count": "{{count}} linked",
+      "empty": "Keep every review and task for this workspace together.",
+      "reviews": "Reviews",
+      "tasks": "Issues & tasks",
+      "openItem": "Open {{label}}",
+      "open": "Open link",
+      "unlinkItem": "Unlink {{label}}",
+      "unlink": "Unlink from workspace",
+      "show": "Show {{count}} linked reviews and tasks",
+      "manage": "Manage links…",
+      "details": "Workspace details",
+      "description": "Attach reviews and tasks, and keep notes for this workspace.",
+      "commentHelp": "Markdown supported. Enter or {{shortcut}} to save · Shift+Enter for a new line.",
+      "kind": {
+        "github_pr": "GitHub PR",
+        "github_issue": "GitHub issue",
+        "linear_task": "Linear task",
+        "gitlab_mr": "GitLab MR",
+        "gitlab_issue": "GitLab issue",
+        "jira_task_url": "Jira task (URL)",
+        "bitbucket_pr": "Bitbucket PR",
+        "azure_devops_pr": "Azure DevOps PR",
+        "gitea_pr": "Gitea PR"
+      },
+      "mrReference": "MR !{{number}}",
+      "prReference": "PR #{{number}}",
+      "issueReference": "Issue #{{number}}",
+      "foreignIssue": "This issue belongs to another repository. Add issues from this workspace’s repository.",
+      "linkedResult": "Linked",
+      "addReference": "Add reference",
+      "searchLabel": "Search references",
+      "searchReferences": "Search reviews and tasks, or paste a link",
+      "noReferences": "No matching references. Try a title, number, or URL.",
+      "addItem": "Add {{label}}",
+      "referenceType": "Reference type",
+      "clearSearch": "Clear search",
+      "inlineSearchHint": "Select a result to attach it.",
+      "nameHelp": "Shown in the sidebar. The folder name stays the same.",
+      "notes": "Notes",
+      "addNotes": "Add notes",
+      "notesOptional": "Optional · Markdown",
+      "saveHint": "Changes apply when you save",
+      "terminal": "Terminal",
+      "seenIn": "Seen in {{label}}",
+      "unavailableTab": "Tab unavailable",
+      "sessions": "Sessions & terminals",
+      "jiraModeRequired": "Select Smart or Jira to load this issue.",
+      "linearModeRequired": "Select Smart or Linear to load this issue.",
+      "loadingLinear": "Loading Linear issue…",
+      "linearConnectRequired": "Connect Linear in Settings to link this issue.",
+      "linearReadFailed": "Couldn’t load this Linear issue. Check the URL and connected workspace.",
+      "retrySource": "Retry",
+      "lastKnownStatus": "Last known status",
+      "reviewTarget": "Target: {{branch}}",
+      "reviewUrlRequired": "Paste the review URL to verify its repository and provider.",
+      "stackSummary": "{{count}} linked: {{references}}",
+      "sessionsForItem": "Sessions & terminals for {{label}} · {{count}}",
+      "checksFailed": "Failed",
+      "checksPending": "Pending",
+      "checksPassing": "Passing",
+      "checksUnknown": "Unknown",
+      "checksNeutral": "Neutral",
+      "allReviewChecks": "Reviews: {{count}} · Checks: {{status}}"
+    },
+    "attachments": {
+      "updateRuntime": "Update the remote runtime to change workspace links",
+      "updateRuntimeSafely": "Update the remote runtime to safely change workspace links"
+    }
+  },
+  "tabHoverCard": {
+    "browser": "Browser",
+    "editor": "Editor",
+    "terminal": "Terminal"
   },
   "agentCapabilities": {
     "agentCoverage": "Agent coverage",
@@ -21122,103 +21382,113 @@
     "title": "Board",
     "workspaces": "Workspaces"
   },
-  "agents": {},
-  "workspaceDeletion": {
-    "preferenceSaveFailed": "Could not save deletion preference",
-    "alwaysForceDelete": "Always force delete",
-    "moreActions": "More force delete options",
-    "alwaysForceDeleteTooltip": "Applies to all future workspace deletions."
-  },
-  "workspace": {
-    "links": {
-      "foreignReview": "This review belongs to another repository. Add reviews from this workspace’s repository.",
-      "repositoryLoading": "Repository identity is still loading. Try again once it is available.",
-      "duplicate": "This link is already attached.",
-      "title": "Linked work",
-      "count": "{{count}} linked",
-      "empty": "Keep every review and task for this workspace together.",
-      "reviews": "Reviews",
-      "tasks": "Issues & tasks",
-      "openItem": "Open {{label}}",
-      "open": "Open link",
-      "unlinkItem": "Unlink {{label}}",
-      "unlink": "Unlink from workspace",
-      "show": "Show {{count}} linked reviews and tasks",
-      "manage": "Manage links…",
-      "details": "Workspace details",
-      "description": "Attach reviews and tasks, and keep notes for this workspace.",
-      "commentHelp": "Markdown supported. Enter or {{shortcut}} to save · Shift+Enter for a new line.",
-      "kind": {
-        "github_pr": "GitHub PR",
-        "github_issue": "GitHub issue",
-        "linear_task": "Linear task",
-        "gitlab_mr": "GitLab MR",
-        "gitlab_issue": "GitLab issue",
-        "jira_task_url": "Jira task (URL)",
-        "bitbucket_pr": "Bitbucket PR",
-        "azure_devops_pr": "Azure DevOps PR",
-        "gitea_pr": "Gitea PR"
-      },
-      "mrReference": "MR !{{number}}",
-      "prReference": "PR #{{number}}",
-      "issueReference": "Issue #{{number}}",
-      "foreignIssue": "This issue belongs to another repository. Add issues from this workspace’s repository.",
-      "linkedResult": "Linked",
-      "addReference": "Add reference",
-      "searchLabel": "Search references",
-      "searchReferences": "Search reviews and tasks, or paste a link",
-      "noReferences": "No matching references. Try a title, number, or URL.",
-      "addItem": "Add {{label}}",
-      "referenceType": "Reference type",
-      "clearSearch": "Clear search",
-      "inlineSearchHint": "Select a result to attach it.",
-      "nameHelp": "Shown in the sidebar. The folder name stays the same.",
-      "notes": "Notes",
-      "addNotes": "Add notes",
-      "notesOptional": "Optional · Markdown",
-      "saveHint": "Changes apply when you save",
-      "terminal": "Terminal",
-      "seenIn": "Seen in {{label}}",
-      "unavailableTab": "Tab unavailable",
-      "sessions": "Sessions & terminals",
-      "jiraModeRequired": "Select Smart or Jira to load this issue.",
-      "linearModeRequired": "Select Smart or Linear to load this issue.",
-      "loadingLinear": "Loading Linear issue…",
-      "linearConnectRequired": "Connect Linear in Settings to link this issue.",
-      "linearReadFailed": "Couldn’t load this Linear issue. Check the URL and connected workspace.",
-      "retrySource": "Retry",
-      "lastKnownStatus": "Last known status",
-      "reviewTarget": "Target: {{branch}}",
-      "reviewUrlRequired": "Paste the review URL to verify its repository and provider.",
-      "stackSummary": "{{count}} linked: {{references}}",
-      "sessionsForItem": "Sessions & terminals for {{label}} · {{count}}",
-      "checksFailed": "Failed",
-      "checksPending": "Pending",
-      "checksPassing": "Passing",
-      "checksUnknown": "Unknown",
-      "checksNeutral": "Neutral",
-      "allReviewChecks": "Reviews: {{count}} · Checks: {{status}}"
-    },
-    "attachments": {
-      "updateRuntime": "Update the remote runtime to change workspace links",
-      "updateRuntimeSafely": "Update the remote runtime to safely change workspace links"
+  "updates": {
+    "installBlock": {
+      "instancesLabel": "Instances using HiveCode",
+      "browserLabel": "Background browser",
+      "serverLabel": "Background server",
+      "windowLabel": "Other HiveCode window",
+      "instanceLabel": "Other HiveCode instance",
+      "processId": "PID {{pid}}",
+      "preparingTitle": "Preparing your update",
+      "preparingSummary": "Checking running HiveCode instances before restarting.",
+      "later": "Later",
+      "retainedDownload": "HiveCode stays open. No need to download again.",
+      "retryInstallation": "Retry installation",
+      "waitingLabel": "Update waiting",
+      "busyTitle": "Another HiveCode is updating",
+      "busySummary": "An update is already being installed by another HiveCode instance.",
+      "busyGuidance": "Wait a moment, then retry. Your downloaded update is ready.",
+      "unresponsiveTitle": "Waiting for background servers",
+      "unresponsiveSummary": "HiveCode could not finish pausing its background servers for the update.",
+      "unresponsiveGuidance": "Stop it from the terminal or service that started it, then retry. Connected devices will disconnect.",
+      "readyTitle": "Your update is ready",
+      "serverSummary": "A background HiveCode server is still using this app.",
+      "instanceSummary": "Another HiveCode instance is still using this app.",
+      "serverGuidance": "Stop the server from the terminal or service that started it, then retry. Connected devices will disconnect.",
+      "mixedGuidance": "Close any other HiveCode windows and stop the server from the terminal or service that started it. Connected devices will disconnect. Then retry.",
+      "instanceGuidance": "Quit other HiveCode instances, then retry. Your downloaded update will be kept ready.",
+      "waitingAriaLabel": "Update waiting for other HiveCode instances. Click to expand.",
+      "preparingLabel": "Preparing update",
+      "preparingAriaLabel": "Preparing update. Click to expand."
     }
   },
-  "settings.agents.environmentName": "Environment variable name",
-  "settings.agents.environmentValue": "Value for {{name}}",
-  "settings.agents.savedEnvironment": "Saved value · enter to replace",
-  "settings.agents.newEnvironment": "Value",
-  "settings.agents.removeEnvironment": "Remove",
-  "settings.agents.loadingHost": "Loading agent settings…",
-  "settings.agents.updateHost": "Update this server to edit its agent launch settings.",
-  "settings.agents.readFailed": "Couldn’t read agent settings. Check the host connection and try again.",
-  "settings.agents.saveFailed": "Couldn’t save agent settings. Check the host connection and try again.",
-  "settings.agents.hostDefaults": "Defaults for new agents on the selected host.",
-  "settings.agents.save": "Save",
-  "tabHoverCard": {
-    "browser": "Browser",
-    "editor": "Editor",
-    "terminal": "Terminal"
-  },
-  "components.agentLaunch.workspaceHostUnavailable": "The selected workspace host is unavailable. Refresh projects before starting a task."
+  "jira": {
+    "connect": {
+      "scopedTokenGuide": "Scoped tokens need read:jira-work, write:jira-work, and read:jira-user. Leave email empty to use Bearer authentication.",
+      "oldHostGuide": "This remote runtime requires an email and an unscoped API token. Update the remote runtime to use scoped tokens.",
+      "scopedDescription": "Use a Jira Cloud site URL and API token to browse issues. Scoped tokens can omit the email.",
+      "optionalEmail": "Atlassian email (optional for scoped tokens)"
+    },
+    "workspace": {
+      "open": "Open workspace linked to {{key}}",
+      "count": "{{count}} workspaces linked to {{key}}",
+      "startAnother": "Start new workspace",
+      "empty": "Link a Jira issue to a workspace, or choose another view.",
+      "openFailed": "Unable to open the workspace linked to this Jira issue.",
+      "mode": "Has Workspace",
+      "search": "Search linked issues",
+      "single": "1 workspace linked to {{key}}"
+    },
+    "prompt": {
+      "dialogTitle": "Copy prompt from template",
+      "template": "Template",
+      "custom": "Custom template",
+      "templateText": "Template text",
+      "variables": "Use $jira-issue for the issue context and $other-prompt for your additional instructions. Saved on this device.",
+      "other": "Additional instructions (optional)",
+      "preview": "Preview",
+      "implementation": "Start implementation",
+      "bug": "Investigate bug",
+      "testPlan": "Write test plan",
+      "prSummary": "Draft PR summary"
+    },
+    "copy": {
+      "context": "Copy context for {{key}}",
+      "actions": "Copy issue context"
+    },
+    "savedFilters": {
+      "retry": "Retry",
+      "find": "Find a saved filter",
+      "noMatch": "No matching filters.",
+      "loadFailed": "Could not load saved Jira filters.",
+      "saveFailed": "Could not save Jira filters."
+    },
+    "statusFilters": {
+      "loadFailed": "Could not load Jira status filters.",
+      "saveFailed": "Could not save Jira status filters.",
+      "manualQuery": "Status filters apply to preset views. Clear the search to use them.",
+      "label": "Filter Jira issues by status",
+      "clear": "Clear statuses",
+      "jql": "Status filter JQL",
+      "editJql": "Edit as JQL",
+      "catalogHint": "Statuses come from loaded issues. Clear statuses to discover others in this view."
+    },
+    "transitions": {
+      "changeStatus": "Change status: {{status}}",
+      "loadError": "Could not load status changes.",
+      "retry": "Retry",
+      "loading": "Loading status changes…",
+      "completeInJira": "Complete “{{name}}” in Jira",
+      "unsupported": "Jira requires fields HiveCode cannot collect yet: {{fields}}.",
+      "chooseResolution": "Choose a resolution",
+      "comment": "Comment",
+      "back": "Back",
+      "apply": "Change status",
+      "empty": "No status changes available."
+    },
+    "board": {
+      "currentSprint": "Current sprint",
+      "viewMode": "Jira view",
+      "list": "List",
+      "board": "Board",
+      "moveIssue": "Move {{key}}",
+      "moveTitle": "Move {{key}} to {{column}}",
+      "moveDescription": "Jira controls which status changes are available and which fields they require.",
+      "chooseTransition": "Choose a status change:",
+      "cancel": "Cancel",
+      "noTransition": "No status change to {{column}} is available for {{key}}.",
+      "queryTooLong": "The Jira query is too long. Shorten the query or clear filters."
+    }
+  }
 }

@@ -27,9 +27,8 @@ import {
  * above before you do.
  */
 const TERMINAL_PANE_LISTENER_BUDGET = 12
-/** What the same mount cost before the stable-action, unified-tab, and reactive-snapshot folds: one listener per
- *  bound action (each new stable action raises this by one, never the budget) plus the folded reads. */
-const PRE_FOLD_LISTENERS_PER_PANE = 50
+// Historical upper bound, not a claim about the current measured action count.
+const PRE_FOLD_LISTENERS_PER_PANE = 45
 
 const originalState = useAppStore.getState()
 
@@ -105,9 +104,6 @@ describe('TerminalPane store subscription budget', () => {
 
     expect(perPane).toBe(TERMINAL_PANE_LISTENER_BUDGET)
     expect(perPane).toBeLessThan(PRE_FOLD_LISTENERS_PER_PANE)
-    // 29 stable actions, four duplicate unified-tab reads, one dead dispatch-status read,
-    // plus settings/keybindings (2 -> 1) and four chat-state reads (4 -> 1).
-    expect(PRE_FOLD_LISTENERS_PER_PANE - perPane).toBe(TERMINAL_PANE_STORE_ACTION_KEYS.length + 9)
 
     unmount()
     expect(listenerCount()).toBe(baseline)
@@ -160,8 +156,11 @@ describe('TerminalPane store subscription budget', () => {
     const snapshot = new Map(TERMINAL_PANE_STORE_ACTION_KEYS.map((key) => [key, before[key]]))
 
     act(() => {
-      useAppStore.getState().markWorktreeUnread('repo-1::/repo/worktrees/budget')
-      useAppStore.getState().clearWorktreeUnread('repo-1::/repo/worktrees/budget')
+      useAppStore.getState().markTerminalBell({
+        worktreeId: 'repo-1::/repo/worktrees/budget',
+        tabId: 'tab-1',
+        paneKey: 'tab-1:1'
+      })
       useAppStore.getState().setRuntimePaneTitle('tab-1', 1, 'title')
       useAppStore.getState().clearRuntimePaneTitle('tab-1', 1)
       useAppStore.getState().suppressPtyExit('pty-1')

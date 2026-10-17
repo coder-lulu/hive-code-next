@@ -1,15 +1,18 @@
-import { existsSync } from 'node:fs'
+import type * as NodeFs from 'node:fs'
+import { existsSync, lstatSync } from 'node:fs'
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { basename, dirname, join } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { PRODUCT_CONFIG } from '../../shared/brand'
 import {
   ensureAppImageExtractedRoot,
+  stageAppImageExtractedRoot,
   getAppImageCacheRootPath,
   isAppImageExtractedLauncherPath,
   isAppImageExtractionComplete,
   isAppImageInstalledLauncherOwnedBySibling,
+  readAppImageSourceOfNamespace,
   resolveAppImageCacheKey,
   resolveAppImageExtractedRoot
 } from './appimage-extracted-root'
@@ -22,6 +25,7 @@ import {
 const created: string[] = []
 
 afterEach(async () => {
+  executableFixtureInodes.clear()
   await Promise.all(created.splice(0).map((path) => rm(path, { recursive: true, force: true })))
 })
 
@@ -45,6 +49,7 @@ async function writePayload(cwd: string, content = ''): Promise<void> {
     encoding: 'utf8',
     mode: 0o755
   })
+  executableFixtureInodes.add(String(lstatSync(join(launcherDir, PRODUCT_CONFIG.cli.primary)).ino))
 }
 
 describe('appimage extracted root', () => {
@@ -96,6 +101,22 @@ describe('appimage extracted root', () => {
       expect(isAppImageExtractionComplete(first!)).toBe(true)
     }
   )
+
+  // Why: a server running from the copy has no $APPIMAGE; this record is how it finds the file.
+  it('records which AppImage a namespace came from, and rejects a record for another path', async () => {
+    const { appImagePath, cacheRootPath } = await makeFixture()
+    const root = await stageAppImageExtractedRoot({
+      appImagePath,
+      cacheRootPath,
+      runExtract: async (_path, cwd) => writePayload(cwd)
+    })
+    const namespacePath = dirname(root!.rootPath)
+    const namespaceKey = basename(namespacePath)
+
+    expect(readAppImageSourceOfNamespace(cacheRootPath, namespaceKey)).toBe(appImagePath)
+    await writeFile(join(namespacePath, 'source-appimage'), '/elsewhere/Orca.AppImage')
+    expect(readAppImageSourceOfNamespace(cacheRootPath, namespaceKey)).toBeNull()
+  })
 
   // Why: an update replaces the file in place, so stat identity must change the key or the command
   // would keep resolving through the previous version's payload.
@@ -407,4 +428,31 @@ describe('appimage extracted root', () => {
       expect(isAppImageInstalledLauncherOwnedBySibling(options)).toBe(true)
     }
   )
+})
+
+// Only fixture files explicitly written executable receive POSIX mode bits on Windows.
+// Their inode survives extraction rename; directories, symlinks and non-executable files do not qualify.
+const { executableFixtureInodes } = vi.hoisted(() => ({
+  executableFixtureInodes: new Set<string>()
+}))
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof NodeFs>()
+  return {
+    ...actual,
+    lstatSync: (
+      path: NodeFs.PathLike,
+      options?: { bigint?: boolean; throwIfNoEntry?: boolean }
+    ) => {
+      const stats = actual.lstatSync(path, options)
+      if (
+        process.platform === 'win32' &&
+        stats?.isFile() &&
+        executableFixtureInodes.has(String(stats.ino)) &&
+        typeof stats.mode === 'number'
+      ) {
+        stats.mode |= 0o111
+      }
+      return stats
+    }
+  }
 })

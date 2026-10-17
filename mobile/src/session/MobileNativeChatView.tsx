@@ -17,8 +17,13 @@ import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-prov
 import { createMobileNativeChatViewStyles } from './mobile-native-chat-view-styles'
 import { buildMobileNativeChatTransientData } from './mobile-native-chat-render-data'
 import { mobileNativeChatListFooter } from './mobile-native-chat-list-footer'
+import { mobileNativeChatListHeader } from './mobile-native-chat-list-header'
+import { useMobileNativeChatPageHistory } from './use-mobile-native-chat-page-history'
 import { useMobileNativeChatPinchGesture } from './use-mobile-native-chat-pinch-gesture'
-import { useMobileNativeChatTailFollow } from './use-mobile-native-chat-tail-follow'
+import {
+  mobileNativeChatRowAnchor,
+  useMobileNativeChatTailFollow
+} from './use-mobile-native-chat-tail-follow'
 import { useMobileNativeChatTurnDisclosure } from './use-mobile-native-chat-turn-disclosure'
 import {
   mobileNativeChatComposerPlaceholder,
@@ -32,6 +37,7 @@ import { MobileNativeChatMessage } from './MobileNativeChatMessage'
 import { MobileNativeChatPromptCard } from './MobileNativeChatPromptCard'
 import type { MobileNativeChatViewProps } from './mobile-native-chat-view-props'
 import { NO_COMPOSER_TRAY } from './use-mobile-native-chat-composer-tray'
+import { MobileNativeChatScrollHold } from './MobileNativeChatScrollHold'
 import { mobileNativeChatUnsentNotices } from './mobile-native-chat-unsent-notices'
 
 const EMPTY_ERROR = '无法读取对话记录。你可以切回终端继续工作。'
@@ -128,11 +134,13 @@ export function MobileNativeChatView({
     pinToTail,
     pinToTailAfterContentResize,
     jumpToTail,
+    detachFromTail,
+    pageInputHandlers,
     beginUserScroll,
     endUserDrag,
     beginMomentum,
     endMomentum,
-    detachFromTail,
+    readerIsScrolling,
     recordScrollMetrics
   } = useMobileNativeChatTailFollow<NativeChatMessage>({ hasItems: data.length > 0 })
 
@@ -152,21 +160,18 @@ export function MobileNativeChatView({
     [onSend, onClearSendError, jumpToTail]
   )
 
-  const loadEarlier = useCallback(() => {
-    detachFromTail()
-    onLoadEarlier?.()
-  }, [detachFromTail, onLoadEarlier])
+  const loadEarlier = useCallback(() => onLoadEarlier?.(), [onLoadEarlier])
 
   const onScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       const { contentOffset } = e.nativeEvent
       recordScrollMetrics(e.nativeEvent)
-      // Near the top — page in older history.
-      if (contentOffset.y < 60 && hasMore && !loadingEarlier) {
+      // Near the top — page in older history. Only the reader's scroll: a pin reports offsets too.
+      if (contentOffset.y < 60 && hasMore && !loadingEarlier && readerIsScrolling()) {
         loadEarlier()
       }
     },
-    [hasMore, loadingEarlier, loadEarlier, recordScrollMetrics]
+    [hasMore, loadingEarlier, loadEarlier, readerIsScrolling, recordScrollMetrics]
   )
 
   // Per-turn status rows: one live indicator while the turn runs, then a settled
@@ -226,6 +231,8 @@ export function MobileNativeChatView({
     ]
   )
 
+  const history = useMobileNativeChatPageHistory(turns.listMessages, renderItem)
+
   const liveStatus = turns.liveLine ? (
     <MobileNativeChatLiveLine
       line={turns.liveLine}
@@ -266,16 +273,18 @@ export function MobileNativeChatView({
         </View>
       ) : (
         <GestureHandlerRootView style={styles.listWrap}>
+          <MobileNativeChatScrollHold headKey={turns.listMessages[0]?.id} listRef={listRef} />
           <GestureDetector gesture={pinchGesture}>
             <FlatList
               ref={listRef}
-              data={turns.listMessages}
+              data={history.listRows}
               keyExtractor={(item) => item.id}
-              renderItem={renderItem}
+              renderItem={history.renderListRow}
               contentContainerStyle={styles.listContent}
               // Let link/file taps land while the composer keyboard is up
               // instead of being swallowed by the dismiss gesture.
               keyboardShouldPersistTaps="handled"
+              {...pageInputHandlers}
               onScroll={onScroll}
               onScrollBeginDrag={beginUserScroll}
               onScrollEndDrag={endUserDrag}
@@ -284,30 +293,10 @@ export function MobileNativeChatView({
               scrollEventThrottle={32}
               onContentSizeChange={pinToTailAfterContentResize}
               onLayout={pinToTail}
-              // scrollToIndex can fail before an off-screen row is measured —
-              // fall back to an estimated offset, then retry once it's laid out.
-              onScrollToIndexFailed={(info) => {
-                listRef.current?.scrollToOffset({
-                  offset: info.averageItemLength * info.index,
-                  animated: true
-                })
-                setTimeout(() => onScrollToMessage(info.index), 120)
-              }}
-              ListHeaderComponent={
-                hasMore ? (
-                  <Pressable
-                    style={styles.loadEarlier}
-                    onPress={loadEarlier}
-                    disabled={loadingEarlier}
-                  >
-                    {loadingEarlier ? (
-                      <ActivityIndicator size="small" color={theme.color.text.tertiary} />
-                    ) : (
-                      <Text style={styles.loadEarlierText}>加载更早的消息</Text>
-                    )}
-                  </Pressable>
-                ) : null
-              }
+              maintainVisibleContentPosition={mobileNativeChatRowAnchor(hasMore === true)}
+              ListHeaderComponent={history.withHistory(
+                mobileNativeChatListHeader(hasMore, loadingEarlier, loadEarlier, theme, styles)
+              )}
               ListFooterComponent={mobileNativeChatListFooter(
                 liveStatus,
                 turns.waitingRows,

@@ -1,7 +1,11 @@
+import {
+  drainNativeFixture,
+  restoreNativeFixture
+} from '../main/ipc/ephemeral-vm-native-test-fixture'
 import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { encodePairingOffer } from './pairing'
 import {
   getEnvironmentStorePath,
@@ -41,11 +45,17 @@ const pairingCode = (endpoint = 'ws://127.0.0.1:46768') =>
   })
 
 describe('managed orcad environment store', () => {
+  const pendingChildren = new Set<Promise<void>>()
+  afterAll(restoreNativeFixture)
+
   let userDataPath: string
   beforeEach(() => {
     userDataPath = mkdtempSync(join(tmpdir(), 'orca-managed-orcad-store-'))
   })
-  afterEach(() => rmSync(userDataPath, { recursive: true, force: true }))
+  afterEach(async () => {
+    await drainNativeFixture(pendingChildren)
+    rmSync(userDataPath, { recursive: true, force: true })
+  })
 
   const add = (overrides: Partial<Parameters<typeof addManagedOrcadEnvironment>[1]> = {}) =>
     addManagedOrcadEnvironment(userDataPath, {

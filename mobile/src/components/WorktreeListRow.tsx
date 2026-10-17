@@ -1,21 +1,13 @@
 import { memo } from 'react'
-import {
-  Bell,
-  ChevronDown,
-  ChevronRight,
-  GitBranch,
-  GitPullRequest,
-  Monitor,
-  Server
-} from 'lucide-react-native'
+import { Bell, ChevronDown, ChevronRight, GitBranch, GitPullRequest } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { parseExecutionHostId } from '../../../src/shared/execution-host'
 import type { MobileRenderableRepoIcon } from '../host-screen/host-screen-reply-schema'
 import { triggerMediumImpact } from '../platform/haptics'
 import type { MobileTheme } from '../theme/mobile-theme'
 import type { Worktree } from '../worktree/workspace-list-types'
 import { areStructurallyEqual } from '../worktree/structural-equality'
 import { AgentSpinner } from './AgentSpinner'
+import { HostKindIcon } from './HostKindIcon'
 import { MobileRepoIcon } from './MobileRepoIcon'
 import { WorktreeAgentList } from './WorktreeAgentList'
 import { WorktreeMetaGlyphs, prStateColor, prStateTextColor } from './WorktreeMetaGlyphs'
@@ -148,13 +140,7 @@ function WorktreeListRowComponent({
                 .filter(Boolean)
                 .join(', ')}
             >
-              {/* Rows from hosts that predate hostId stamping are local: a remote row always carries one. */}
-              {(parseExecutionHostId(item.hostContextHostId ?? item.hostId)?.kind ?? 'local') ===
-              'local' ? (
-                <Monitor size={16} color={theme.color.text.tertiary} />
-              ) : (
-                <Server size={16} color={theme.color.text.tertiary} />
-              )}
+              <HostKindIcon hostId={item.hostContextHostId ?? item.hostId} size={16} />
               <Text style={[styles.childBadgeText, styles.hostBadgeText]} numberOfLines={1}>
                 {item.hostContextLabel}
               </Text>
@@ -277,7 +263,7 @@ function createStyles(theme: MobileTheme) {
     repoName: { ...theme.typography.caption, maxWidth: 100, color: theme.color.text.secondary },
     branchName: {
       ...theme.typography.code,
-      flexShrink: 1,
+      flex: 1,
       color: theme.color.text.secondary
     },
     childBadge: {
@@ -289,8 +275,8 @@ function createStyles(theme: MobileTheme) {
       backgroundColor: theme.color.bg.subtle
     },
     childBadgeText: { ...theme.typography.caption, color: theme.color.text.tertiary },
-    hostBadge: { flexShrink: 1, maxWidth: 140 },
-    hostBadgeText: { flexShrink: 1 },
+    hostBadge: { flexShrink: 1 },
+    hostBadgeText: { flexShrink: 1, maxWidth: 100 },
     hostHealthText: { flexShrink: 0 },
     lineageToggle: {
       minHeight: theme.size.minimumTouchTarget,

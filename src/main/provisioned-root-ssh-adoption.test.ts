@@ -14,24 +14,14 @@ import {
 import { adoptProvisionedRootSshCheckout } from './provisioned-root-ssh-adoption'
 
 const pendingWindowsHardening = new Set<Promise<void>>()
-const restrictWindowsPath = windowsAcl.bestEffortRestrictWindowsPath
+const restrictWindowsPath = windowsAcl.restrictWindowsDirectory
 const aclHardeningSpy = vi
-  .spyOn(windowsAcl, 'bestEffortRestrictWindowsPath')
-  .mockImplementation(
-    (targetPath: string, isDirectory: boolean, onSettled?: (restricted: boolean) => void): void => {
-      pendingWindowsHardening.add(
-        new Promise<void>((resolve) => {
-          restrictWindowsPath(targetPath, isDirectory, (restricted) => {
-            try {
-              onSettled?.(restricted)
-            } finally {
-              resolve()
-            }
-          })
-        })
-      )
-    }
-  )
+  .spyOn(windowsAcl, 'restrictWindowsDirectory')
+  .mockImplementation((targetPath) => {
+    const pending = restrictWindowsPath(targetPath)
+    pendingWindowsHardening.add(pending.then(() => undefined))
+    return pending
+  })
 
 afterAll(() => aclHardeningSpy.mockRestore())
 

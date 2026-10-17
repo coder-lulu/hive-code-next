@@ -5,6 +5,7 @@ import {
   resolveEnvironment
 } from '../../shared/runtime-environment-store'
 import {
+  isWslHostRuntimeEnvironment,
   redactRuntimeEnvironment,
   type PublicKnownRuntimeEnvironment
 } from '../../shared/runtime-environments'
@@ -33,22 +34,17 @@ import {
   clearRuntimeEnvironmentManualDisconnect,
   isRuntimeEnvironmentManuallyDisconnected,
   markRuntimeEnvironmentManuallyDisconnected,
-  RUNTIME_MANUALLY_DISCONNECTED_MESSAGE
+  manuallyDisconnectedResponse
 } from './runtime-environment-manual-disconnect'
-
-function manuallyDisconnectedResponse(
-  environment: Pick<PublicKnownRuntimeEnvironment, 'id' | 'runtimeId' | 'runtimeRecordId'>
-): RuntimeRpcResponse<never> {
-  return {
-    id: 'runtime.manualDisconnect',
-    ok: false,
-    error: {
-      code: 'runtime_manually_disconnected',
-      message: RUNTIME_MANUALLY_DISCONNECTED_MESSAGE
-    },
-    _meta: { runtimeId: environment.runtimeId ?? environment.runtimeRecordId ?? environment.id }
-  }
-}
+import { callRuntimeEnvironment } from './runtime-environment-transport-routing'
+import { withWslOrcadAccountEnv } from '../wsl/wsl-orcad-account-env'
+import { clearSshCredentialDeclinedForEnvironment } from '../ssh/ssh-credential-decline'
+import {
+  observeWslOrcadHostResponse,
+  wslOrcadHostSupports
+} from '../wsl/wsl-orcad-host-environments'
+import { getWslHostService } from '../wsl/wsl-host-service-instance'
+import { assertWslHostReachable } from '../wsl/wsl-host-gate'
 
 export { isRuntimeEnvironmentManuallyDisconnected }
 
@@ -102,12 +98,26 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
   )
   ipcMain.handle(
     'runtimeEnvironments:remove',
-    (_event, args: { selector: string }): { removed: PublicKnownRuntimeEnvironment } => {
+    (
+      _event,
+      args: { selector: string }
+    ):
+      | { removed: PublicKnownRuntimeEnvironment }
+      | Promise<{ removed: PublicKnownRuntimeEnvironment }> => {
       const environment = resolveEnvironment(getUserDataPath(), args.selector)
       if (store.getSettings().activeRuntimeEnvironmentId === environment.id) {
         throw new Error(
           'This server is the default host for new projects. Choose another one in Advanced before removing it.'
         )
+      }
+      // A closed gate leaves persisted WSL hosts untouched on disk.
+      assertWslHostReachable(environment)
+      const wsl = isWslHostRuntimeEnvironment(environment) ? getWslHostService() : null
+      if (wsl) {
+        // Also releases the distro's holder and drops the WSL record.
+        return wsl
+          .remove(environment.id)
+          .then(() => ({ removed: redactRuntimeEnvironment(environment) }))
       }
       const removed = removeEnvironment(getUserDataPath(), args.selector)
       void retireRemovedRuntimeEnvironment(removed.id, invalidateTransport, store)
@@ -140,7 +150,12 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
       args: { selector: string; timeoutMs?: number }
     ): Promise<RuntimeRpcResponse<RuntimeStatus>> => {
       const environment = resolveRuntimeEnvironmentCatalogEntry(getUserDataPath(), args.selector)
+      assertWslHostReachable(environment)
       clearRuntimeEnvironmentManualDisconnect(environment.id)
+      clearSshCredentialDeclinedForEnvironment(environment)
+      if (isWslHostRuntimeEnvironment(environment)) {
+        await getWslHostService()?.connect(environment.id)
+      }
       return getEnvironmentStatusWithCloudFallback(getUserDataPath(), environment, args.timeoutMs, {
         reconnect: true
       })
@@ -186,6 +201,7 @@ function registerPassiveStatusHandler(getUserDataPath: () => string): void {
         args.timeoutMs,
         args.observeOnly ? { observeOnly: true } : undefined
       )
+      observeWslOrcadHostResponse(environment.id, 'status.get', response)
       return isRuntimeEnvironmentManuallyDisconnected(environment.id)
         ? manuallyDisconnectedResponse(environment)
         : response
@@ -233,13 +249,36 @@ function registerPassiveCallHandler(getUserDataPath: () => string): void {
       if (isRuntimeEnvironmentManuallyDisconnected(catalogEnvironment.id)) {
         return manuallyDisconnectedResponse(catalogEnvironment)
       }
+      // Why here: every renderer call to a paired host passes this one handler.
+      const accounts = await withWslOrcadAccountEnv({
+        environmentId: catalogEnvironment.id,
+        method: args.method,
+        params: args.params,
+        hostSupports: (capability) =>
+          wslOrcadHostSupports(catalogEnvironment.id, capability, () =>
+            callRuntimeEnvironment(
+              getUserDataPath(),
+              catalogEnvironment.id,
+              'status.get',
+              undefined
+            )
+          )
+      })
+      if (!accounts.ok) {
+        return {
+          id: args.method,
+          ok: false,
+          error: { code: 'account_preparation_failed', message: accounts.message },
+          _meta: { runtimeId: catalogEnvironment.runtimeId }
+        }
+      }
       let response: RuntimeRpcResponse<unknown>
       try {
         response = await callEnvironmentWithCloudFallback(
           getUserDataPath(),
           catalogEnvironment,
           args.method,
-          args.params,
+          accounts.params,
           args.timeoutMs,
           args.expectedEnvironmentPairingRevision,
           undefined,
@@ -252,6 +291,7 @@ function registerPassiveCallHandler(getUserDataPath: () => string): void {
         }
         throw error
       }
+      observeWslOrcadHostResponse(catalogEnvironment.id, args.method, response)
       return isRuntimeEnvironmentManuallyDisconnected(catalogEnvironment.id)
         ? manuallyDisconnectedResponse(catalogEnvironment)
         : response

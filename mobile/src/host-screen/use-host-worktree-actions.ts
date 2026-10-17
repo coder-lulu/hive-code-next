@@ -11,7 +11,12 @@ import { setHostRouteNewWorktreeVisible } from '../host-route-action-state'
 import { leaveHostRoute } from '../host-route-exit'
 import { getWorktreeRowIdentity, removeWorktreeRow } from '../worktree/worktree-host-row-identity'
 import { isWorktreePinned, type Worktree } from '../worktree/workspace-list-sections'
-import { worktreeActivate, worktreePinWrite, worktreeRemove } from './host-screen-operations'
+import {
+  worktreeActivate,
+  worktreePinWrite,
+  worktreeRemove,
+  worktreeSleep
+} from './host-screen-operations'
 import type { HostScreenState } from './use-host-screen-state'
 
 export function useHostWorktreeActions(args: {
@@ -48,6 +53,7 @@ export function useHostWorktreeActions(args: {
     setOptimisticActiveWorktreeIdentity,
     setPinnedIds,
     setRouteActionState,
+    setSleptIds,
     setWorktrees,
     worktrees
   } = state
@@ -88,7 +94,11 @@ export function useHostWorktreeActions(args: {
   )
 
   const togglePin = useCallback(
-    (worktreeId: string) => {
+    (item: Worktree) => {
+      if (item.hostId?.startsWith('runtime:')) {
+        return
+      }
+      const { worktreeId } = item
       const worktree = worktrees.find((w) => w.worktreeId === worktreeId)
       const currentlyPinned = worktree
         ? isWorktreePinned(worktree, pinnedIds)
@@ -116,9 +126,20 @@ export function useHostWorktreeActions(args: {
     [client, worktrees, pinnedIds, updateLocalPins]
   )
 
+  const putWorktreeToSleep = useCallback(
+    (item: Worktree) => {
+      if (!client || item.hostId?.startsWith('runtime:')) {
+        return
+      }
+      setSleptIds((prev) => new Set(prev).add(getWorktreeRowIdentity(item)))
+      void worktreeSleep.request(client, { worktree: `id:${item.worktreeId}` }).catch(() => null)
+    },
+    [client, setSleptIds]
+  )
+
   const handleDeleteWorktree = useCallback(
     async (item: Worktree) => {
-      if (!client) {
+      if (!client || item.hostId?.startsWith('runtime:')) {
         return
       }
 
@@ -189,6 +210,10 @@ export function useHostWorktreeActions(args: {
 
   const openWorktreeSession = useCallback(
     (item: Worktree) => {
+      if (item.hostId?.startsWith('runtime:')) {
+        setActionError('此工作区需要直接连接所属 Runtime。')
+        return
+      }
       setOptimisticActiveWorktreeIdentity(getWorktreeRowIdentity(item))
       if (client && connState === 'connected') {
         void worktreeActivate
@@ -223,6 +248,7 @@ export function useHostWorktreeActions(args: {
     openNewWorktreeModal,
     openWorktreeSession,
     setShowNewWorktreeVisible,
+    putWorktreeToSleep,
     togglePin
   }
 }

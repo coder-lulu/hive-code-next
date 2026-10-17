@@ -86,24 +86,14 @@ import { channelHandlerLookup, pairingCode } from './runtime-environments-ipc-te
 const handler = channelHandlerLookup(handleMock)
 
 const pendingWindowsHardening = new Set<Promise<void>>()
-const restrictWindowsPath = windowsAcl.bestEffortRestrictWindowsPath
+const restrictWindowsPath = windowsAcl.restrictWindowsDirectory
 const aclHardeningSpy = vi
-  .spyOn(windowsAcl, 'bestEffortRestrictWindowsPath')
-  .mockImplementation(
-    (targetPath: string, isDirectory: boolean, onSettled?: (restricted: boolean) => void): void => {
-      pendingWindowsHardening.add(
-        new Promise<void>((resolve) => {
-          restrictWindowsPath(targetPath, isDirectory, (restricted) => {
-            try {
-              onSettled?.(restricted)
-            } finally {
-              resolve()
-            }
-          })
-        })
-      )
-    }
-  )
+  .spyOn(windowsAcl, 'restrictWindowsDirectory')
+  .mockImplementation((targetPath) => {
+    const pending = restrictWindowsPath(targetPath)
+    pendingWindowsHardening.add(pending.then(() => undefined))
+    return pending
+  })
 
 afterAll(() => aclHardeningSpy.mockRestore())
 

@@ -11,6 +11,7 @@ import { agentSessionFailureWords } from '../../../shared/agent-session-failure-
 import { computeAgentSessionPayloadFingerprint } from '../../../shared/agent-session-mutation-envelope'
 import type { AgentJournalSubmission } from '../../../shared/agent-session-journal-types'
 import type { AgentSessionQueuePause } from '../../../shared/agent-session-wire'
+import type { AgentSessionExecutionLocation } from '../../../shared/agent-session-record'
 import type { AgentMessageSource } from '../../../shared/agent-session-message-source'
 import { agentSessionMessagePayload } from '../../../shared/structured-agent-session-send-mutation'
 import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
@@ -38,7 +39,12 @@ import {
 import { claudeAndCodexDeclared } from './structured-agent-session-adapter-router-test-support'
 
 export const QUEUED_RIG_CALLER = { callerKey: 'client-1' }
-type RigSendOptions = { internal?: true; from?: AgentMessageSource }
+type RigSendOptions = {
+  internal?: true
+  from?: AgentMessageSource
+  /** The model and effort the send carries. */
+  carried?: Readonly<Record<string, string>>
+}
 
 export function eventually(assertion: () => void | Promise<void>): Promise<void> {
   return vi.waitFor(assertion, { timeout: 10_000 })
@@ -52,6 +58,8 @@ export async function createQueuedMessageTestRig(
     idleSweep?: { idleMs: number; intervalMs: number }
     /** Teardown records its restart offers, which `restartOffers` lists. */
     recoveryCapsule?: true
+    /** Where the chat runs, when not the default worktree. */
+    location?: AgentSessionExecutionLocation
   } = {}
 ) {
   const root = await mkdtemp(join(tmpdir(), 'orca-queued-messages-'))
@@ -73,9 +81,11 @@ export async function createQueuedMessageTestRig(
       ...(options.recoveryCapsule ? { recoveryCapsule: new AgentSessionRecoveryCapsule(root) } : {})
     })
   let host = makeHost()
-  expect(await host.attach(QUEUED_RIG_CALLER, hostTestAttachParams(null))).toMatchObject({
-    ok: true
-  })
+  const firstAttach = hostTestAttachParams(
+    null,
+    options.location ? { location: options.location } : {}
+  )
+  expect(await host.attach(QUEUED_RIG_CALLER, firstAttach)).toMatchObject({ ok: true })
 
   function envelope(
     fields: Record<string, unknown>,
@@ -98,7 +108,11 @@ export async function createQueuedMessageTestRig(
     const body = { ...hostTestMessage(text), ...(options?.from ? { from: options.from } : {}) }
     const clientOperationId = hostTestOperationId()
     // Fingerprinted as the host digests a send: the message without its sender.
-    const fields = { body: agentSessionMessagePayload(body), ...(delivery ? { delivery } : {}) }
+    const fields = {
+      body: agentSessionMessagePayload(body),
+      ...(delivery ? { delivery } : {}),
+      ...(options?.carried ? { options: options.carried } : {})
+    }
     const result = host.send(QUEUED_RIG_CALLER, {
       envelope: envelope(fields, 'agentSession.send', clientOperationId),
       ...fields,
@@ -288,6 +302,7 @@ export async function createQueuedMessageTestRig(
     cancelTurn,
     closeSession,
     compact,
+    setOption: provider.adapter.setOption,
     starts: provider.starts,
     holdNextStart: provider.holdNextStart,
     failNextStart: provider.failNextStart,

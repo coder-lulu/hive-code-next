@@ -1,3 +1,4 @@
+import { APP_DISPLAY_NAME } from '../../../../shared/brand'
 import { describe, expect, it, vi } from 'vitest'
 import type { ExecutionHostRegistryEntry } from '../../../../shared/execution-host-registry'
 import {
@@ -108,7 +109,7 @@ describe('buildSetupHostOptions', () => {
       })[0]
     ).toMatchObject({
       isAvailable: false,
-      detail: 'Update Orca on this host to set up projects'
+      detail: `Update ${APP_DISPLAY_NAME} on this host to set up projects`
     })
   })
 })

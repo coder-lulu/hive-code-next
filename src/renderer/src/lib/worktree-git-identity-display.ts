@@ -1,21 +1,9 @@
 import { translate } from '@/i18n/i18n'
-
-export type WorktreeGitIdentityDisplay =
-  | {
-      kind: 'branch'
-      branchName: string
-    }
-  | {
-      kind: 'detached'
-      shortHead: string
-      sidebarLabel: string
-      sourceControlLabel: string
-      tooltip: string
-    }
-
-function shortGitHead(head: string | null | undefined): string {
-  return (head ?? '').trim().slice(0, 7)
-}
+import {
+  getWorktreeGitIdentityDisplay as getIdentity,
+  type WorktreeGitIdentityDisplay
+} from '../../../shared/worktree/git-identity-display'
+export type { WorktreeGitIdentityDisplay } from '../../../shared/worktree/git-identity-display'
 
 export function getDetachedHeadTooltip(shortHead: string): string {
   return translate(
@@ -25,31 +13,24 @@ export function getDetachedHeadTooltip(shortHead: string): string {
   )
 }
 
-export function getWorktreeGitIdentityDisplay(input: {
-  branch?: string | null
-  head?: string | null
-}): WorktreeGitIdentityDisplay | null {
-  const branchName = (input.branch ?? '').replace(/^refs\/heads\//, '').trim()
-  if (branchName) {
-    return { kind: 'branch', branchName }
+export function getWorktreeGitIdentityDisplay(
+  input: Parameters<typeof getIdentity>[0]
+): WorktreeGitIdentityDisplay | null {
+  const identity = getIdentity(input)
+  if (!identity || identity.kind !== 'detached') {
+    return identity
   }
-
-  const shortHead = shortGitHead(input.head)
-  if (!shortHead) {
-    return null
-  }
-
+  const head = identity.shortHead
   return {
-    kind: 'detached',
-    shortHead,
+    ...identity,
     sidebarLabel: translate('components.detachedHead.sidebar', 'Detached HEAD @ {{head}}', {
-      head: shortHead
+      head
     }),
     sourceControlLabel: translate(
       'components.detachedHead.sourceControl',
       'Detached HEAD · {{head}}',
-      { head: shortHead }
+      { head }
     ),
-    tooltip: getDetachedHeadTooltip(shortHead)
+    tooltip: getDetachedHeadTooltip(head)
   }
 }

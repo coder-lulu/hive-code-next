@@ -29,6 +29,7 @@ import type { TaskSourceContext } from '../../../shared/task-source-context'
 import { translate } from '@/i18n/i18n'
 import { getWorkspaceComposerInitialFocusTarget } from '@/lib/workspace-composer-initial-focus'
 import { getFolderWorkspacePrimaryActionLabel } from '@/components/sidebar/folder-workspace-composer-helpers'
+import type { WorkspaceCreationTargetHint } from '@/lib/project-host-workspace-target'
 
 // Why: match App-level AddRepoDialog loading — the add flow is off the hot
 // path for the composer, so keep its clone/SSH machinery out of the entry render.
@@ -52,6 +53,7 @@ type ComposerModalData = {
   linkedWorkItem?: LinkedWorkItemSummary | null
   initialGitHubWorkItem?: GitHubWorkItem | null
   taskSourceContext?: TaskSourceContext | null
+  initialWorkspaceTarget?: WorkspaceCreationTargetHint | null
   initialBaseBranch?: string
   initialWorkspaceStatus?: WorkspaceStatus
   enableIssueAutomation?: boolean
@@ -173,6 +175,7 @@ function QuickTabBody({
     initialLinkedWorkItem: modalData.linkedWorkItem ?? null,
     initialGitHubWorkItem: modalData.initialGitHubWorkItem ?? null,
     initialTaskSourceContext: modalData.taskSourceContext ?? null,
+    initialWorkspaceTarget: modalData.initialWorkspaceTarget ?? null,
     initialRepoId: modalData.initialRepoId,
     initialExecutionHostId: modalData.initialExecutionHostId,
     initialEphemeralVmRecipeId: modalData.initialEphemeralVmRecipeId,
@@ -221,10 +224,13 @@ function QuickTabBody({
     }
   }
   const quickAgent = resolvedQuickAgentSelection.quickAgent
+  const [quickSelectionCleared, setQuickSelectionCleared] = useState(false)
+  const quickSetupOnly = quickAgent === null && quickSelectionCleared
 
   const handleQuickAgentChange = useCallback(
     (agent: TuiAgent | null) => {
       setQuickAgentOverride(agent)
+      setQuickSelectionCleared(false)
       if (agent !== modalData.initialAgent) {
         // The home permission choice was made for the home-selected agent. The
         // modal does not expose that selector, so changing agents must not carry
@@ -235,9 +241,14 @@ function QuickTabBody({
     [modalData.initialAgent]
   )
 
+  const handleQuickSetupOnlySelect = useCallback(() => {
+    setQuickAgentOverride(null)
+    setQuickSelectionCleared(true)
+  }, [])
+
   const handleCreate = useCallback(async (): Promise<void> => {
-    await submitQuick(quickAgent)
-  }, [quickAgent, submitQuick])
+    await submitQuick(quickAgent, { setupOnly: quickSetupOnly })
+  }, [quickAgent, quickSetupOnly, submitQuick])
   // Why: Add Project layers over the composer as a nested dialog instead of
   // replacing it in the activeModal slot — closing the composer mid-flow (and
   // losing the typed name/prompt) was the old, abrupt behavior. Once opened it
@@ -336,8 +347,8 @@ function QuickTabBody({
         </DialogTitle>
         <DialogDescription className="sr-only">
           {translate(
-            'auto.components.NewWorkspaceComposerModal.fa90f739a5',
-            'Choose the project, workspace name, and agent before creating the workspace.'
+            'components.newWorkspace.createDescription',
+            'Choose the project and workspace name. Select an agent if you want to start one.'
           )}
         </DialogDescription>
       </DialogHeader>
@@ -351,6 +362,8 @@ function QuickTabBody({
         nameInputRef={nameInputRef}
         quickAgent={quickAgent}
         onQuickAgentChange={handleQuickAgentChange}
+        quickSetupOnly={quickSetupOnly}
+        onQuickSetupOnlySelect={handleQuickSetupOnlySelect}
         {...cardProps}
         primaryActionLabel={primaryActionLabel}
         onOpenAgentSettings={() => setAgentSettingsOpen(true)}

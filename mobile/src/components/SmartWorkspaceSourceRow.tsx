@@ -58,6 +58,13 @@ function resolveRowContent(row: SourceRow, theme: MobileTheme): RowContent {
         subtitle: `${row.issue.identifier} · ${row.issue.team?.key ?? 'Linear'}`,
         status: row.issue.state?.name
       }
+    case 'jira':
+      return {
+        icon: <TaskProviderLogo provider="jira" size={16} color={theme.color.text.secondary} />,
+        title: row.issue.title,
+        subtitle: `${row.issue.key} · ${row.issue.project?.key ?? 'Jira'}`,
+        status: row.issue.status?.name
+      }
     default:
       return {
         icon: <CaseSensitive size={16} color={theme.color.text.secondary} />,

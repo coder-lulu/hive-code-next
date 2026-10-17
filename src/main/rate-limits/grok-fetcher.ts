@@ -1,10 +1,13 @@
-import { net } from 'electron'
+import { cancelUnreadResponseBody } from '../lib/unread-response-body'
 import { applyProductBranding } from '../../shared/brand'
+import { getMainHttpClient } from '../network/http-client'
 import type {
   ProviderRateLimits,
   RateLimitWindow,
   UsageRateLimitMetadata
 } from '../../shared/rate-limit-types'
+import { abortSignalWithTimeout } from '../lib/abort-signal-with-timeout'
+import { classifyThrownUsageRequestError } from './usage-request-failure-kind'
 import {
   isGrokAccessTokenFresh,
   readGrokAuthSession,
@@ -243,29 +246,25 @@ async function fetchBillingData(
   session: GrokAuthSession,
   signal?: AbortSignal
 ): Promise<GrokBillingFetchOutcome> {
-  const requestSignal = signal
-    ? AbortSignal.any([signal, AbortSignal.timeout(API_TIMEOUT_MS)])
-    : AbortSignal.timeout(API_TIMEOUT_MS)
-  const res = await net.fetch(url, {
+  const res = await getMainHttpClient().fetch(url, {
     headers: grokRequestHeaders(session),
-    signal: requestSignal
+    signal: abortSignalWithTimeout(signal, API_TIMEOUT_MS)
   })
-  if (res.status === 401 || res.status === 403) {
-    return {
-      kind: 'result',
-      result: result('error', `Grok usage request unauthorized (HTTP ${res.status})`)
+  try {
+    if (!res.ok) {
+      const reason = [401, 403].includes(res.status) ? 'unauthorized' : 'failed'
+      return {
+        kind: 'result',
+        result: result('error', `Grok usage request ${reason} (HTTP ${res.status})`)
+      }
     }
-  }
-  if (!res.ok) {
+    const data: unknown = await res.json()
     return {
-      kind: 'result',
-      result: result('error', `Grok usage request failed (HTTP ${res.status})`)
+      kind: 'data',
+      data: typeof data === 'object' && data !== null ? (data as GrokBillingResponse) : {}
     }
-  }
-  const data: unknown = await res.json()
-  return {
-    kind: 'data',
-    data: typeof data === 'object' && data !== null ? (data as GrokBillingResponse) : {}
+  } finally {
+    await cancelUnreadResponseBody(res)
   }
 }
 
@@ -352,6 +351,7 @@ export async function fetchGrokRateLimits(
       ? result('unavailable', 'Grok did not report a usage percentage for this account')
       : result('unavailable', 'Grok billing response did not include credit usage')
   } catch (err) {
-    return result('error', err instanceof Error ? err.message : 'Grok usage request failed')
+    const message = err instanceof Error ? err.message : 'Grok usage request failed'
+    return result('error', message, { failureKind: classifyThrownUsageRequestError(err) })
   }
 }

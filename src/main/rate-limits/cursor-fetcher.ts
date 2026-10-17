@@ -1,6 +1,8 @@
+import { cancelUnreadResponseBody } from '../lib/unread-response-body'
 import { createHash } from 'node:crypto'
-import { net } from 'electron'
+import { getMainHttpClient } from '../network/http-client'
 import type { ProviderRateLimits, UsageRateLimitSource } from '../../shared/rate-limit-types'
+import { abortSignalWithTimeout } from '../lib/abort-signal-with-timeout'
 import {
   readCursorAuthSession,
   type CursorAuthReadResult,
@@ -12,6 +14,7 @@ import {
   mapCursorUsageSummary,
   parseCursorUsageSummary
 } from './cursor-usage-mapping'
+import { parseUsageRetryAfterMs } from './usage-retry-after'
 
 const DASHBOARD_ORIGIN = 'https://cursor.com'
 const USAGE_SUMMARY_URL = `${DASHBOARD_ORIGIN}/api/usage-summary`
@@ -78,74 +81,74 @@ async function fetchDashboardJson(
   // previous account's figures when the fresh result names an account, and a
   // switch whose first refresh 401s or 5xxs is exactly when it must.
   const provenance = accountFingerprint(session)
-  const requestSignal = signal
-    ? AbortSignal.any([signal, AbortSignal.timeout(API_TIMEOUT_MS)])
-    : AbortSignal.timeout(API_TIMEOUT_MS)
-  const res = await net.fetch(url, {
+  const res = await getMainHttpClient().fetch(url, {
     // Keep dashboard redirects visible without forwarding session credentials.
     redirect: 'manual',
     // The selected account's Cookie must not be replaced by Electron's session jar.
     credentials: 'omit',
     headers: requestHeaders(session),
-    signal: requestSignal
+    signal: abortSignalWithTimeout(signal, API_TIMEOUT_MS)
   })
-  if (res.status === 401) {
-    return {
-      kind: 'result',
-      result: result('error', EXPIRED_MESSAGE, {
-        usageMetadata: {
-          source,
-          credentialSource: session.source,
-          authProvenance: provenance,
-          failureKind: 'stale-token'
-        }
-      })
-    }
-  }
-  if (res.status === 429) {
-    const retryAfterSeconds = Number(res.headers.get('retry-after'))
-    return {
-      kind: 'result',
-      result: result('error', 'Cursor usage is rate limited right now', {
-        usageMetadata: {
-          source,
-          credentialSource: session.source,
-          authProvenance: provenance,
-          failureKind: 'rate-limited',
-          ...(Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0
-            ? { retryAtMs: Date.now() + retryAfterSeconds * 1000 }
-            : {})
-        }
-      })
-    }
-  }
-  if (!res.ok) {
-    return {
-      kind: 'result',
-      result: result('error', `Cursor usage request failed (HTTP ${res.status})`, {
-        usageMetadata: {
-          source,
-          credentialSource: session.source,
-          authProvenance: provenance,
-          failureKind: 'server'
-        }
-      })
-    }
-  }
   try {
-    return { kind: 'data', data: await res.json() }
-  } catch {
-    return {
-      kind: 'result',
-      result: result('error', 'Cursor usage response could not be parsed', {
-        usageMetadata: {
-          source,
-          credentialSource: session.source,
-          authProvenance: provenance,
-          failureKind: 'parse'
-        }
-      })
+    if (res.status === 401) {
+      return {
+        kind: 'result',
+        result: result('error', EXPIRED_MESSAGE, {
+          usageMetadata: {
+            source,
+            credentialSource: session.source,
+            authProvenance: provenance,
+            failureKind: 'stale-token'
+          }
+        })
+      }
     }
+    if (res.status === 429) {
+      const nowMs = Date.now()
+      const retryAfterMs = parseUsageRetryAfterMs(res.headers.get('retry-after'), nowMs)
+      return {
+        kind: 'result',
+        result: result('error', 'Cursor usage is rate limited right now', {
+          usageMetadata: {
+            source,
+            credentialSource: session.source,
+            authProvenance: provenance,
+            failureKind: 'rate-limited',
+            ...(retryAfterMs !== null ? { retryAtMs: nowMs + retryAfterMs } : {})
+          }
+        })
+      }
+    }
+    if (!res.ok) {
+      return {
+        kind: 'result',
+        result: result('error', `Cursor usage request failed (HTTP ${res.status})`, {
+          usageMetadata: {
+            source,
+            credentialSource: session.source,
+            authProvenance: provenance,
+            failureKind: 'server'
+          }
+        })
+      }
+    }
+    try {
+      return { kind: 'data', data: await res.json() }
+    } catch {
+      return {
+        kind: 'result',
+        result: result('error', 'Cursor usage response could not be parsed', {
+          usageMetadata: {
+            source,
+            credentialSource: session.source,
+            authProvenance: provenance,
+            failureKind: 'parse'
+          }
+        })
+      }
+    }
+  } finally {
+    await cancelUnreadResponseBody(res)
   }
 }
 

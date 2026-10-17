@@ -26,7 +26,7 @@ let root: string
 let storage: string
 let directoryHardening: Map<string, Promise<boolean>>
 let directoryJobs: Promise<boolean>[]
-const applyDirectoryHardening = windowsAcl.bestEffortRestrictWindowsPath
+const applyDirectoryHardening = windowsAcl.restrictWindowsDirectory
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'orca-account-removal-recovery-'))
@@ -35,33 +35,12 @@ beforeEach(() => {
   directoryJobs = []
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   if (process.platform === 'win32') {
-    vi.spyOn(windowsAcl, 'bestEffortRestrictWindowsPath').mockImplementation(
-      (path, isDirectory, onSettled) => {
-        if (!isDirectory) {
-          return applyDirectoryHardening(path, isDirectory, onSettled)
-        }
-        let settle!: (restricted: boolean) => void
-        let fail!: (error: unknown) => void
-        const pending = new Promise<boolean>((resolve, reject) => {
-          settle = resolve
-          fail = reject
-        })
-        directoryHardening.set(path, pending)
-        directoryJobs.push(pending)
-        try {
-          applyDirectoryHardening(path, isDirectory, (restricted) => {
-            try {
-              onSettled?.(restricted)
-            } finally {
-              settle(restricted)
-            }
-          })
-        } catch (error) {
-          fail(error)
-          throw error
-        }
-      }
-    )
+    vi.spyOn(windowsAcl, 'restrictWindowsDirectory').mockImplementation((targetPath) => {
+      const pending = applyDirectoryHardening(targetPath)
+      directoryHardening.set(targetPath, pending)
+      directoryJobs.push(pending)
+      return pending
+    })
   }
 })
 

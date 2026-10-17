@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../constants'
 import { LOCAL_EXECUTION_HOST_ID, type ExecutionHostId } from '../execution-host'
 import type { WorkspaceSessionState } from '../workspace-session-state-types'
 import type { SessionProjectAssignment } from '../session-project-assignment'
@@ -9,10 +8,9 @@ import { checkWorkspaceLayoutRules } from './workspace-layout-rules'
 import { saveWorkspaceLayout } from './workspace-layout-save'
 import {
   localDesktopSession,
-  relaySshSession,
-  serverRuntimeSession
+  WORKSPACE_LAYOUT_PROFILES
 } from './workspace-layout-profile.test-fixture'
-import { addWorkspace, emptySession, leaf } from './workspace-layout-session.test-fixture'
+import { leaf } from './workspace-layout-session.test-fixture'
 
 /** What reaches disk: the profile documents are JSON, so an undefined field is a missing one. */
 const onDisk = (session: WorkspaceSessionState): unknown => JSON.parse(JSON.stringify(session))
@@ -35,41 +33,35 @@ function roundTrip(hostId: ExecutionHostId, session: WorkspaceSessionState) {
   return { loaded, saved: saveWorkspaceLayout(loaded) }
 }
 
-const PROFILES: [string, ExecutionHostId, () => WorkspaceSessionState][] = [
-  [
-    'local desktop (git worktree, folder workspace, all tab kinds)',
-    LOCAL_EXECUTION_HOST_ID,
-    localDesktopSession
-  ],
-  [
-    'floating terminal',
-    LOCAL_EXECUTION_HOST_ID,
-    () =>
-      addWorkspace(emptySession(), FLOATING_TERMINAL_WORKTREE_ID, [
-        { id: 'group-floating', tabs: [{ id: 'tab-floating', leaves: [[leaf(1), 'floating@@1']] }] }
-      ])
-  ],
-  ['relay SSH host partition', 'ssh:target-1', () => relaySshSession('target-1')],
-  ['remote server partition', 'runtime:env-1', () => serverRuntimeSession('env-1')],
-  ['empty profile', LOCAL_EXECUTION_HOST_ID, emptySession]
-]
+const PROFILES = WORKSPACE_LAYOUT_PROFILES.map(
+  (profile) => [profile.name, profile.hostId, profile.build] as const
+)
 
 describe('workspace layout Loader and Serializer', () => {
   it('preserves project organization and adopted session identity without restoring setup authority', () => {
     const stored = localDesktopSession()
     const row = Object.values(stored.tabsByWorktree).flat()[0]!
-    const entry = Object.values(stored.unifiedTabs ?? {}).flat().find((tab) => tab.entityId === row.id)!
+    const entry = Object.values(stored.unifiedTabs ?? {})
+      .flat()
+      .find((tab) => tab.entityId === row.id)!
     const assignment: SessionProjectAssignment = {
-      projectId: 'project-1', projectIdentityKey: 'project-key', projectGroupId: null,
-      executionHostId: LOCAL_EXECUTION_HOST_ID, assignedAt: 123
+      projectId: 'project-1',
+      projectIdentityKey: 'project-key',
+      projectGroupId: null,
+      executionHostId: LOCAL_EXECUTION_HOST_ID,
+      assignedAt: 123
     }
     row.projectAssignment = assignment
     row.pinnedSetupRuntimeEnvironmentId = 'transient-setup-owner'
     entry.projectAssignment = assignment
     entry.structuredSessionId = 'adopted-session'
     const { saved } = roundTrip(LOCAL_EXECUTION_HOST_ID, stored)
-    const restored = Object.values(saved.tabsByWorktree).flat().find((tab) => tab.id === row.id)!
-    const restoredEntry = Object.values(saved.unifiedTabs ?? {}).flat().find((tab) => tab.id === entry.id)!
+    const restored = Object.values(saved.tabsByWorktree)
+      .flat()
+      .find((tab) => tab.id === row.id)!
+    const restoredEntry = Object.values(saved.unifiedTabs ?? {})
+      .flat()
+      .find((tab) => tab.id === entry.id)!
     expect(restored.projectAssignment).toEqual(assignment)
     expect(restoredEntry.projectAssignment).toEqual(assignment)
     expect(restoredEntry.structuredSessionId).toBe('adopted-session')

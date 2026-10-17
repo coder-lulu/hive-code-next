@@ -7,6 +7,7 @@ import type { SmartModeAvailabilityInput } from '../tasks/mobile-smart-source-mo
 import { deriveRepoSlug, type PasteRepoCandidate } from '../tasks/smart-source-paste-intent'
 import { useMobileComposerSource } from '../tasks/use-mobile-composer-source'
 import { useNewWorktreeRuntimeCapabilities } from '../tasks/worktree-create-capability'
+import { isSameMobileWorkspaceRepo } from '../worktree/new-workspace-dialog-repo-selection'
 import {
   buildRetiredWorktreeNamesRefreshKey,
   useRetiredWorktreeNames
@@ -59,23 +60,26 @@ function NewWorktreeModalContent(props: NewWorktreeModalProps) {
     visible,
     client,
     hostId,
+    hostLabelById,
     existingWorktreePaths,
     existingWorktrees,
     openExternalUrl,
     onCreated,
     onClose
   } = props
-  const { repos, selectedRepo, setSelectedRepo, loading } = useNewWorkspaceRepositories({
-    client,
-    hostId,
-    visible
-  })
+  const { repos, selectedRepo, setSelectedRepo, loading, selectionError } =
+    useNewWorkspaceRepositories({
+      client,
+      hostId,
+      visible
+    })
   const navigation = useNewWorktreeDrawerNavigation(visible)
   const [note, setNote] = useState('')
   const [error, setError] = useState('')
   const runtime = useNewWorkspaceRuntimeContext(client, visible, hostId)
-  const { tasksSupported, hostPlatform, getWorktreeCreateCutoverSupport, getAgentLaunchSupport } =
-    useNewWorktreeRuntimeCapabilities(client, visible)
+  const repoRuntime = useNewWorktreeRuntimeCapabilities(client, visible)
+  const { tasksSupported, getWorktreeCreateCutoverSupport, getAgentLaunchSupport } = repoRuntime
+  const hostPlatform = repoRuntime.hostPlatform
   const selectedRepoConnectionId = selectedRepo?.connectionId ?? null
   const executionTarget = useNewWorkspaceExecutionTarget({
     client,
@@ -143,7 +147,8 @@ function NewWorktreeModalContent(props: NewWorktreeModalProps) {
     hasRepo: selectedRepo != null,
     githubAvailable: runtime.availableProviders.includes('github'),
     gitlabAvailable: runtime.availableProviders.includes('gitlab'),
-    linearAvailable: runtime.availableProviders.includes('linear')
+    linearAvailable: runtime.availableProviders.includes('linear'),
+    jiraAvailable: runtime.jiraConnection.connected && runtime.availableProviders.includes('jira')
   }
   const pasteRepos = useMemo<PasteRepoCandidate[]>(
     () =>
@@ -164,12 +169,13 @@ function NewWorktreeModalContent(props: NewWorktreeModalProps) {
         repos,
         selectedProjectId,
         hostPlatform,
+        hostLabelById,
         props.runtimeSelection?.name
       ),
-    [hostPlatform, repos, selectedProjectId, props.runtimeSelection?.name]
+    [hostLabelById, hostPlatform, repos, selectedProjectId, props.runtimeSelection?.name]
   )
   const selectedRunTarget = selectedRepo
-    ? getNewWorkspaceRunTarget(selectedRepo, hostPlatform, props.runtimeSelection?.name)
+    ? getNewWorkspaceRunTarget(selectedRepo, hostPlatform, hostLabelById)
     : null
   const needsSetupChoice = Boolean(setupScript.setupCommand) && setupScript.setupRunPolicy === 'ask'
   const canCreate =
@@ -184,7 +190,7 @@ function NewWorktreeModalContent(props: NewWorktreeModalProps) {
   }
 
   function selectRepo(repo: MobileWorkspaceRepo, clearRepoScopedSource: boolean): void {
-    const repoChanged = repo.id !== selectedRepo?.id
+    const repoChanged = !selectedRepo || !isSameMobileWorkspaceRepo(repo, selectedRepo)
     setSelectedRepo(repo)
     if (
       clearRepoScopedSource &&
@@ -228,7 +234,7 @@ function NewWorktreeModalContent(props: NewWorktreeModalProps) {
         setupRunPolicy={setupScript.setupRunPolicy}
         setupDecisionChoice={setupScript.setupDecisionChoice}
         runSetup={setupScript.runSetup}
-        error={error}
+        error={selectionError || error}
         creating={createSubmit.creating}
         canCreate={canCreate}
         onClose={onClose}
@@ -268,6 +274,8 @@ function NewWorktreeModalContent(props: NewWorktreeModalProps) {
         selectedRepo={selectedRepo}
         repos={repos}
         pasteRepos={pasteRepos}
+        jiraSiteId={runtime.jiraConnection.selection}
+        jiraSites={runtime.jiraConnection.sites}
         sshReady={!executionTarget.sshGate.requiresConnection}
         projectPickerItems={projectPickerItems}
         selectedProjectId={selectedProjectId}

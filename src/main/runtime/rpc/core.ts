@@ -76,6 +76,8 @@ export type RpcContext = {
   // Bound by the activated account relay session, never supplied in RPC params.
   authenticatedAccountRuntimeSessionId?: string
   authenticatedAccountOperationCallerKey?: string
+  // Why: a delegated phone's desktop device; its workspaces are that desktop's, not this host's.
+  pairedDeviceParentId?: string
   // Why: host-assigned from the transport (rpc-caller-identity.ts); absent when the transport could not name its caller.
   caller?: RpcCallerIdentity
   // Why: lets handlers gate mobile payload truncation to phones only; undefined for in-process callers → treat as full-class (no clip).

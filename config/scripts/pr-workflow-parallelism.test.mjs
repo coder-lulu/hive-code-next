@@ -1,3 +1,6 @@
+const evidenceWorkflow = parse(
+  readFileSync('.github/workflows/unit-selection-evidence.yml', 'utf8')
+)
 import { existsSync, globSync, readFileSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { parse } from 'yaml'
@@ -598,18 +601,21 @@ describe('PR workflow parallelism', () => {
 describe('current process-host and advisory evidence CI boundaries', () => {
   it('enforces process-host boundaries in the required static-analysis checks', () => {
     const guard = workflow.jobs.preflight.steps.find((step) =>
-      step.run?.includes('bun --bun run check:process-host-imports')
+      step.run?.includes('bun config/scripts/check-import-boundaries.mjs')
     )
     expect(guard?.if).toBe('!cancelled()')
     expect(guard?.env.PREFLIGHT_PHASE_SELECTED).toBe(
       "${{ needs.code_paths.outputs.static_analysis == 'true' }}"
     )
     expect(guard?.background).toBe(true)
-    const typecheckIndex = workflow.jobs.preflight.steps.findIndex(
-      (step) => step.wait === 'typecheck'
-    )
-    const waitIndex = workflow.jobs.preflight.steps.findIndex((step) => step.wait === guard.id)
-    expect(waitIndex).toBeGreaterThan(typecheckIndex)
+    const steps = workflow.jobs.preflight.steps
+    const typecheckIndex = steps.findIndex((step) => step.id === 'typecheck')
+    const waitIndex = steps.findIndex((step) => [step.wait].flat().includes(guard.id))
+    expect(waitIndex).toBeGreaterThan(steps.indexOf(guard))
+    expect(waitIndex).toBeLessThan(typecheckIndex)
+    expect(steps[waitIndex].wait).toEqual(['process-host-imports', 'main-sync-spawn-ratchet'])
+    expect(steps[waitIndex].if).toBeUndefined()
+    expect(steps[waitIndex]['continue-on-error']).toBeUndefined()
     expect(guard?.['continue-on-error']).toBeUndefined()
   })
 
@@ -637,10 +643,30 @@ describe('current process-host and advisory evidence CI boundaries', () => {
     }
     expect(workflow.jobs.verify.needs).not.toContain('unit_selection_evidence')
     expect(unitTestWorkflow.jobs.selection_evidence).toBeUndefined()
-    const evidenceWorkflow = parse(
-      readFileSync('.github/workflows/unit-selection-evidence.yml', 'utf8')
-    )
     const job = evidenceWorkflow.jobs.selection_evidence
     expect(job['continue-on-error']).toBe(true)
+  })
+
+  it('runs the advisory CLI without an action credential and preserves failures', async () => {
+    const steps = evidenceWorkflow.jobs.selection_evidence.steps
+    expect(steps.some((step) => step.uses?.startsWith('actions/setup-node@'))).toBe(false)
+    const comparison = steps.find((step) => step.name === 'Compare selection with full results')
+    expect(comparison.uses).toBe('actions/github-script@v8')
+    expect(comparison.with['github-token']).toBe('unused')
+    const env = { 'INPUT_GITHUB-TOKEN': 'test-token', GITHUB_STEP_SUMMARY: '/tmp/summary' }
+    const failure = new Error('comparison failed')
+    const result = runInNewContext(`(async () => { ${comparison.with.script} })()`, {
+      process: { env, execPath: '/bundled/node24' },
+      exec: {
+        exec: async (command, args, options) => {
+          expect(command).toBe('/bundled/node24')
+          expect(args).toEqual(['config/scripts/ci-unit-selection-review.mjs', 'unit-evidence'])
+          expect(options.env).toEqual({ GITHUB_STEP_SUMMARY: '/tmp/summary' })
+          throw failure
+        }
+      }
+    })
+    await expect(result).rejects.toBe(failure)
+    expect(env['INPUT_GITHUB-TOKEN']).toBe('test-token')
   })
 })

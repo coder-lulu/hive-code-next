@@ -15,6 +15,7 @@ type FieldShape = 'list' | 'map' | 'whole'
  * `Record<keyof Observation, …>` makes a new observation field declare how it interns.
  */
 import {
+  canonicalRecordingJson as canonicalJson,
   OBSERVATION_FIELD_KINDS,
   OBSERVATION_FIELDS
 } from '../../../../config/scripts/upstream-recording-inputs.mjs'
@@ -37,10 +38,13 @@ export type InternedRecording = {
 }
 
 export { canonicalRecordingJson as canonicalJson } from '../../../../config/scripts/upstream-recording-inputs.mjs'
-import { canonicalRecordingJson as canonicalJson } from '../../../../config/scripts/upstream-recording-inputs.mjs'
 
 export function valueHash(value: RecordedValue): string {
-  return createHash('sha256').update(canonicalJson(value)).digest('hex').slice(0, 12)
+  return canonicalJsonHash(canonicalJson(value))
+}
+
+function canonicalJsonHash(json: string): string {
+  return createHash('sha256').update(json).digest('hex').slice(0, 12)
 }
 
 function listEntries(at: string, value: RecordedValue): RecordedValue[] {
@@ -64,9 +68,12 @@ export function internRecording(recording: Recording): {
 } {
   const pool: ValuePool = {}
   const canonical = new Map<string, string>()
+  // Checkpoints repeat their append-only histories; hash each distinct entry once.
+  const hashes = new Map<string, string>()
   const intern = (entry: RecordedValue, at: string): string => {
-    const hash = valueHash(entry)
     const json = canonicalJson(entry)
+    const hash = hashes.get(json) ?? canonicalJsonHash(json)
+    hashes.set(json, hash)
     const seen = canonical.get(hash)
     if (seen !== undefined && seen !== json) {
       throw new Error(`Golden value hash collision at ${hash} (${at})`)

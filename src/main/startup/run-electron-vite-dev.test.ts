@@ -111,7 +111,7 @@ function devWrapperTestEnv(extra: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
     }
   }
   delete env.ELECTRON_EXEC_PATH
-  return { ...env, ...extra }
+  return { ...env, ORCA_SKIP_DEV_STORAGE_RECLAIM: '1', ...extra }
 }
 
 /**
@@ -314,6 +314,7 @@ describe('run-electron-vite-dev', () => {
         for (const filename of [
           'run-electron-vite-dev.mjs',
           'dev-cli-terminal-wrapper.mjs',
+          'dev-storage-reclaim.mjs',
           'dev-electron-bundle-cache.mjs',
           'space-sharing-copy.mjs',
           'dev-electron-bundle-identity.mjs'

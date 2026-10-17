@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME } from '../shared/brand'
 
 const {
   callMock,
@@ -383,7 +384,7 @@ describe('reference CLI', () => {
     const priorExitCode = process.exitCode
     await main(argv, '/tmp/api')
     const printed = vi.mocked(console.error).mock.calls.flat().join('\n')
-    expect(printed).toContain('Update Orca on the execution host')
+    expect(printed).toContain(`Update ${APP_DISPLAY_NAME} on the execution host`)
     expect(printed).not.toContain('Unknown method')
     expect(process.exitCode).toBe(1)
     process.exitCode = priorExitCode

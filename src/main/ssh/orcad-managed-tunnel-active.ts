@@ -30,6 +30,17 @@ export type ManagedTunnelExpectation = {
   remotePort: number
 }
 
+export function forgetClosedOrcadTunnel(
+  active: Map<string, ActiveOrcadTunnel>,
+  forwardId: string
+): void {
+  for (const [environmentId, entry] of active) {
+    if (entry.forwardId === forwardId) {
+      active.delete(environmentId)
+    }
+  }
+}
+
 /** The environment's SSH access while it and its target still name this tunnel; null otherwise. */
 export function managedTunnelAccess(
   environment: KnownRuntimeEnvironment | null | undefined,

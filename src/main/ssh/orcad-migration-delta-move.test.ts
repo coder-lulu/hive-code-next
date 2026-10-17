@@ -53,7 +53,7 @@ const TARGET: SshTarget = {
   generation: 2
 }
 
-const hardenPath = windowsAcl.bestEffortRestrictWindowsPath
+const hardenPath = windowsAcl.restrictWindowsDirectory
 let pendingAclJobs: Promise<boolean>[] = []
 
 let userDataPath: string
@@ -76,29 +76,11 @@ function repo(id: string, path: string): Repo {
 beforeEach(() => {
   vi.resetAllMocks()
   pendingAclJobs = []
-  vi.spyOn(windowsAcl, 'bestEffortRestrictWindowsPath').mockImplementation(
-    (path, isDirectory, onSettled) => {
-      let settle!: (restricted: boolean) => void
-      let fail!: (error: unknown) => void
-      const pending = new Promise<boolean>((resolve, reject) => {
-        settle = resolve
-        fail = reject
-      })
-      pendingAclJobs.push(pending)
-      try {
-        hardenPath(path, isDirectory, (restricted) => {
-          try {
-            onSettled?.(restricted)
-          } finally {
-            settle(restricted)
-          }
-        })
-      } catch (error) {
-        fail(error)
-        throw error
-      }
-    }
-  )
+  vi.spyOn(windowsAcl, 'restrictWindowsDirectory').mockImplementation((targetPath) => {
+    const pending = hardenPath(targetPath)
+    pendingAclJobs.push(pending)
+    return pending
+  })
   userDataPath = mkdtempSync(join(tmpdir(), 'orcad-delta-'))
   store = createSqliteTestStore(Store, { dataFile: join(userDataPath, 'orca-data.json') })
   store.addSshTarget(TARGET)

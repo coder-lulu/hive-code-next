@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
-import { existsSync, mkdirSync, writeFileSync, renameSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, renameSync, rmSync } from 'node:fs'
 import { dirname } from 'node:path'
-import { restrictWindowsPathAsync } from './secure-path-windows-acl'
+import { restrictWindowsPathAsync, writeRestrictedWindowsFile } from './secure-path-windows-acl'
 import { recordHardeningOutcome } from './secure-path-hardening-retry-budget'
 import { writeSecureJsonFile, rememberHardenedPath } from './secure-file'
 
@@ -20,7 +20,7 @@ export async function writeSecureJsonFileAsync(
   await restrictWindowsPathAsync(dir, true)
   const tmpFile = `${targetPath}.${process.pid}.${Date.now()}.${randomBytes(4).toString('hex')}.tmp`
   try {
-    writeFileSync(tmpFile, JSON.stringify(value, null, 2), { encoding: 'utf-8', mode: 0o600 })
+    const createdRestricted = writeRestrictedWindowsFile(tmpFile, JSON.stringify(value, null, 2))
     const stagedRestricted = await restrictWindowsPathAsync(tmpFile, false)
     renameSync(tmpFile, targetPath)
     const publishedRestricted = await restrictWindowsPathAsync(targetPath, false)
@@ -28,7 +28,7 @@ export async function writeSecureJsonFileAsync(
       rememberHardenedPath(targetPath, false)
       recordHardeningOutcome(targetPath, true)
     }
-    return stagedRestricted && publishedRestricted
+    return createdRestricted && stagedRestricted && publishedRestricted
   } catch (error) {
     rmSync(tmpFile, { force: true })
     throw error

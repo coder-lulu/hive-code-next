@@ -90,6 +90,8 @@ export function registerSpeechHandlers(store: Store): void {
   const getDesktopOwner = (senderId: number, sessionId: string): string =>
     `desktop:${senderId}:${sessionId}`
 
+  const dictationListeners = new Map<number, { owner: string; cleanup: () => void }>()
+
   ipcMain.handle(
     'speech:startDictation',
     async (event, modelId: string, hotwords?: string[], sessionId = 'desktop') => {
@@ -99,9 +101,13 @@ export function registerSpeechHandlers(store: Store): void {
       }
       let resolvedHotwordsPath: string | undefined
       let windowClosed = false
-      const owner = getDesktopOwner(event.sender.id, sessionId)
+      const senderId = event.sender.id
+      const owner = getDesktopOwner(senderId, sessionId)
+      let sessionListenerRemoved = false
+      let sessionReady = false
       const cleanupOnWindowClosed = (): void => {
         windowClosed = true
+        cleanupSessionListener()
         void getSpeechSttService(store)
           .stopDictation(owner)
           .finally(() => {
@@ -112,7 +118,11 @@ export function registerSpeechHandlers(store: Store): void {
           .catch(() => {})
       }
       const cleanupSessionListener = (): void => {
+        sessionListenerRemoved = true
         window.off('closed', cleanupOnWindowClosed)
+        if (dictationListeners.get(senderId)?.cleanup === cleanupSessionListener) {
+          dictationListeners.delete(senderId)
+        }
       }
       window.once('closed', cleanupOnWindowClosed)
 
@@ -154,6 +164,9 @@ export function registerSpeechHandlers(store: Store): void {
         await getSpeechSttService(store).startDictation(
           modelId,
           (msg) => {
+            if (msg.type === 'ready') {
+              sessionReady = true
+            }
             if (window.isDestroyed()) {
               return
             }
@@ -183,6 +196,15 @@ export function registerSpeechHandlers(store: Store): void {
           resolvedHotwordsPath,
           owner
         )
+        // Coalesced starts install no sink; only an accepted start supersedes the close hook.
+        if (sessionReady) {
+          dictationListeners.get(senderId)?.cleanup()
+          if (!sessionListenerRemoved) {
+            dictationListeners.set(senderId, { owner, cleanup: cleanupSessionListener })
+          }
+        } else {
+          cleanupSessionListener()
+        }
         if (resolvedHotwordsPath) {
           unlink(resolvedHotwordsPath).catch(() => {})
         }
@@ -211,6 +233,11 @@ export function registerSpeechHandlers(store: Store): void {
   )
 
   ipcMain.handle('speech:stopDictation', async (_event, sessionId = 'desktop') => {
-    await getSpeechSttService(store).stopDictation(getDesktopOwner(_event.sender.id, sessionId))
+    const owner = getDesktopOwner(_event.sender.id, sessionId)
+    const listener = dictationListeners.get(_event.sender.id)
+    await getSpeechSttService(store).stopDictation(owner)
+    if (listener?.owner === owner) {
+      listener.cleanup()
+    }
   })
 }

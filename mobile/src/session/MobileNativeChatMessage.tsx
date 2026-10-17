@@ -1,7 +1,7 @@
 import { isAgentSessionProviderContextBoundary } from '../../../src/shared/agent-session-provider-context'
 import { MobileSelectableText as Text } from '../components/MobileSelectableText'
 import { memo, useCallback, useContext, useState } from 'react'
-import { ArrowUp, Copy } from 'lucide-react-native'
+import { ArrowUp } from 'lucide-react-native'
 import { Image, Pressable, Text as NativeText, View } from 'react-native'
 import { INLINE_TEXT_SELECTION } from '../components/inline-text-selection'
 import { MobileNativeChatMessageActionsSheet } from './MobileNativeChatMessageActionsSheet'
@@ -23,7 +23,6 @@ import {
 } from '../../../src/shared/agent-session-host-status-rows'
 import type { NativeChatBlock, NativeChatMessage } from '../../../src/shared/native-chat-types'
 import { MobileMarkdown } from '../components/MobileMarkdown'
-import { useClipboardWriter } from '../platform/clipboard'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 import { MobileSourceCopyButton } from '../components/MobileSourceCopyButton'
 import { nativeChatMessagePlainText } from './mobile-native-chat-message-plain-text'
@@ -35,7 +34,6 @@ import { ToolRun } from './MobileNativeChatToolRun'
 import type { NativeChatTurnStatus } from './use-mobile-native-chat-turn-status'
 import { isRenderableImageUri } from './mobile-native-chat-image-preview'
 import { createMobileNativeChatMessageStyles } from './mobile-native-chat-message-styles'
-import { nativeChatMessageText } from './mobile-native-chat-message-text'
 import { agentMessageAttribution } from './mobile-agent-message-attribution'
 import { withoutPendingNativeChatVisualDirectiveTail } from '../../../src/shared/native-chat-visual-directive'
 import {
@@ -164,39 +162,21 @@ function Prose({
   return null
 }
 
-/** Subtle top-right controls for an agent message: copy its prose, or scroll so
- *  this message's top aligns to the top of the viewport. */
-function AgentControls({
-  onCopy,
-  onScrollToTop
-}: {
-  onCopy: () => void
-  onScrollToTop?: () => void
-}): React.JSX.Element {
+/** Message navigation stays outside the native selectable prose. */
+function AgentControls({ onScrollToTop }: { onScrollToTop: () => void }): React.JSX.Element {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
   return (
     <View style={styles.controls}>
       <Pressable
         style={({ pressed }) => [styles.controlButton, pressed && styles.controlPressed]}
-        onPress={onCopy}
+        onPress={onScrollToTop}
         hitSlop={8}
         accessibilityRole="button"
-        accessibilityLabel="复制消息"
+        accessibilityLabel="将此消息滚动到顶部"
       >
-        <Copy size={16} color={theme.color.text.tertiary} strokeWidth={2} />
+        <ArrowUp size={16} color={theme.color.text.tertiary} strokeWidth={2} />
       </Pressable>
-      {onScrollToTop ? (
-        <Pressable
-          style={({ pressed }) => [styles.controlButton, pressed && styles.controlPressed]}
-          onPress={onScrollToTop}
-          hitSlop={8}
-          accessibilityRole="button"
-          accessibilityLabel="将此消息滚动到顶部"
-        >
-          <ArrowUp size={16} color={theme.color.text.tertiary} strokeWidth={2} />
-        </Pressable>
-      ) : null}
     </View>
   )
 }
@@ -258,10 +238,6 @@ function MobileNativeChatMessageImpl({
   onToggleSubagentGroup?: (groupId: string) => void
 }): React.JSX.Element {
   const styles = useMobileThemeStyles(createMobileNativeChatMessageStyles)
-  const clipboard = useClipboardWriter()
-  const copyMessage = useCallback(() => {
-    void clipboard.writeText(nativeChatMessageText(message.blocks)).catch(() => {})
-  }, [clipboard, message])
   // Another agent's message is set apart from the person's bubble, left-aligned and named.
   const attribution = agentMessageAttribution('Message from', message.from)
   const isUser = message.role === 'user' && attribution === null
@@ -289,9 +265,6 @@ function MobileNativeChatMessageImpl({
   // Keep the memoized Markdown context stable as the message streams.
   const openActions = useCallback(() => setActionsOpen(true), [])
   const onLongPress = INLINE_TEXT_SELECTION ? undefined : openActions
-  // Like desktop's hover-only copy: a tap on the message shows it, another tap hides it.
-  const [copyShown, setCopyShown] = useState(false)
-  const toggleCopy = useCallback(() => setCopyShown((shown) => !shown), [])
   const renderVisual = useContext(MobileNativeChatVisualContext) ?? undefined
   // Structured replies grow in place: only the last block of the newest row may still be typing.
   const growingBlock =
@@ -340,8 +313,9 @@ function MobileNativeChatMessageImpl({
       </>
     )
   }
+  // Always shown, so the row never shifts when copy appears.
   const copyText =
-    INLINE_TEXT_SELECTION && (message.role === 'user' || message.role === 'assistant')
+    message.role === 'user' || message.role === 'assistant'
       ? nativeChatMessagePlainText(message)
       : ''
   return (
@@ -351,23 +325,12 @@ function MobileNativeChatMessageImpl({
       <View style={[styles.row, isUser && styles.rowUser]}>
         <Content
           onLongPress={onLongPress}
-          onPress={copyText.length > 0 ? toggleCopy : undefined}
           style={[
             styles.content,
             isUser && styles.userBubble,
             attribution !== null && styles.agentMessage
           ]}
         >
-          {!isUser && prose.length > 0 ? (
-            <AgentControls
-              onCopy={copyMessage}
-              onScrollToTop={
-                messageIndex != null && onScrollToMessage
-                  ? () => onScrollToMessage(messageIndex)
-                  : undefined
-              }
-            />
-          ) : null}
           {attribution !== null ? (
             <Text selectable={INLINE_TEXT_SELECTION} style={styles.agentAttribution}>
               {attribution}
@@ -409,8 +372,11 @@ function MobileNativeChatMessageImpl({
             />
           ) : null}
         </Content>
+        {!isUser && prose.length > 0 && messageIndex != null && onScrollToMessage ? (
+          <AgentControls onScrollToTop={() => onScrollToMessage(messageIndex)} />
+        ) : null}
         {unsentNotice ? <NativeText style={styles.unsentNotice}>{unsentNotice}</NativeText> : null}
-        {copyShown && copyText.length > 0 ? (
+        {copyText.length > 0 ? (
           <MobileSourceCopyButton
             key={message.id}
             text={copyText}

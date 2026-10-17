@@ -27,7 +27,7 @@ import { stdioForWindowsInteractiveChild } from '../../shared/windows-console-in
 import {
   ACCOUNT_IMPORT_RUNTIME_CAPABILITY,
   CLAUDE_SIGN_IN_RUNTIME_CAPABILITY
-} from '../../shared/protocol-version'
+} from '../../shared/account-runtime-capabilities'
 import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import type {
@@ -112,7 +112,8 @@ async function runAgentLoginInTerminal(
       child = spawnProcess({
         program: spawnCmd,
         args: spawnArgs,
-        windowsVerbatimArguments: process.platform === 'win32' && /(^|[\\/])cmd\.exe$/i.test(spawnCmd),
+        windowsVerbatimArguments:
+          process.platform === 'win32' && /(^|[\\/])cmd\.exe$/i.test(spawnCmd),
         // Why: JSON mode reserves stdout for the response envelope while keeping
         // the interactive login attached to the user's terminal via stderr.
         stdio: consoleStdio.stdio,

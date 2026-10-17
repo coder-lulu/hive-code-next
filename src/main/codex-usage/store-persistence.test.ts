@@ -88,7 +88,7 @@ describe('CodexUsageStore', () => {
     } as unknown as CodexUsagePersistedState)
 
     expect(normalized).toEqual({
-      schemaVersion: 6,
+      schemaVersion: CODEX_USAGE_SCHEMA_VERSION,
       worktreeFingerprint: null,
       processedFiles: [],
       sessions: [],
@@ -102,7 +102,7 @@ describe('CodexUsageStore', () => {
     })
   })
 
-  it('rescans from scratch when the cache predates per-request long-context counts', async () => {
+  it('rescans from scratch when the cache predates whole-file fingerprints', async () => {
     const scanMock = vi.mocked(scanCodexUsageFilesViaWorker)
     const sourceCachePath = join(storeEnv.tempUserData, 'orca-codex-usage-sources.json')
     const cacheFile = join(storeEnv.tempUserData, 'orca-codex-usage.json')
@@ -122,7 +122,7 @@ describe('CodexUsageStore', () => {
       reuse: true
     })
 
-    writeFileSync(cacheFile, JSON.stringify({ ...JSON.parse(current), schemaVersion: 5 }))
+    writeFileSync(cacheFile, JSON.stringify({ ...JSON.parse(current), schemaVersion: 6 }))
     scanMock.mockClear()
     await new CodexUsageStore({ getRepos: () => [], getAllWorktreeMeta: () => ({}) }).refresh(false)
     expect(scanMock).toHaveBeenLastCalledWith([], {

@@ -10,7 +10,7 @@ vi.mock('sonner', () => ({
 }))
 
 import type { BrowserCookieImportSummary } from '../../../shared/browser-workspace-types'
-import { APP_DISPLAY_NAME } from '@/product-brand'
+import { applyProductBranding } from '@/product-brand'
 import { emitBrowserCookieImportToast } from './browser-cookie-import-toast'
 
 const summary: BrowserCookieImportSummary = {
@@ -18,6 +18,24 @@ const summary: BrowserCookieImportSummary = {
   importedCookies: 3,
   skippedCookies: 0,
   domains: ['example.com']
+}
+
+const localExecution = {
+  executionHostLabel: 'Local Mac',
+  executionMachine: 'client' as const,
+  executionRemoteEnvironment: false
+}
+
+const clientHostedExecution = {
+  executionHostLabel: 'm4 air',
+  executionMachine: 'client' as const,
+  executionRemoteEnvironment: true
+}
+
+const remoteExecution = {
+  executionHostLabel: 'Remote Mac',
+  executionMachine: 'remote' as const,
+  executionRemoteEnvironment: true
 }
 
 describe('emitBrowserCookieImportToast', () => {
@@ -37,7 +55,7 @@ describe('emitBrowserCookieImportToast', () => {
         }
       },
       'Imported 3 cookies.',
-      'Local Mac'
+      localExecution
     )
 
     expect(warningToastMock).toHaveBeenCalledWith(
@@ -47,7 +65,7 @@ describe('emitBrowserCookieImportToast', () => {
   })
 
   it('shows success when the import has no warning', () => {
-    emitBrowserCookieImportToast(summary, 'Imported 3 cookies.', 'Local Mac')
+    emitBrowserCookieImportToast(summary, 'Imported 3 cookies.', localExecution)
 
     expect(successToastMock).toHaveBeenCalledWith('Imported 3 cookies.')
     expect(warningToastMock).not.toHaveBeenCalled()
@@ -64,30 +82,68 @@ describe('emitBrowserCookieImportToast', () => {
         }
       },
       'Imported 0 cookies.',
-      'Local Windows'
+      localExecution
     )
 
     const message = warningToastMock.mock.calls[0]?.[0]
     expect(message).toBe(
-      `${APP_DISPLAY_NAME} cannot decrypt 3 of this browser's cookies because they use app-bound encryption. You can import cookies from a file using “From File…”.`
+      applyProductBranding(
+        "Orca cannot decrypt 3 of this browser's cookies because they use app-bound encryption. You can import cookies from a file using “From File…”."
+      )
     )
     expect(message).not.toContain('export')
   })
 
-  it('shows separate host-specific Google guidance after success', () => {
+  it('shows workspace-specific Google guidance after a remote-side import', () => {
     emitBrowserCookieImportToast(
       { ...summary, importedCookies: 2, skippedCookies: 1, googleCookiesSkipped: 1 },
       'Imported 2 cookies.',
-      'Remote Mac'
+      remoteExecution
     )
 
-    expect(successToastMock).toHaveBeenCalledWith('Imported 2 cookies.')
+    expect(successToastMock).toHaveBeenCalledWith('Imported 2 cookies.', {
+      description: 'Read from browsers on Remote Mac and stored there.'
+    })
     expect(warningToastMock).toHaveBeenCalledWith(
-      `Google cookies were not imported. Open a browser in ${APP_DISPLAY_NAME} on Remote Mac with this profile, then sign into Google.`,
+      'Google cookies were not imported. Open a browser tab in the Remote Mac workspace with this profile, then sign into Google.',
       { duration: 12000 }
     )
     expect(successToastMock.mock.invocationCallOrder[0]).toBeLessThan(
       warningToastMock.mock.invocationCallOrder[0]
+    )
+  })
+
+  // Why: a client-hosted import stores cookies on this desktop for the named workspace; the
+  // guidance must not read as "go sign in on the other machine".
+  it('says the workspace tab opens on this device for a client-hosted import', () => {
+    emitBrowserCookieImportToast(
+      { ...summary, importedCookies: 2, skippedCookies: 1, googleCookiesSkipped: 1 },
+      'Imported 2 cookies.',
+      clientHostedExecution
+    )
+
+    expect(successToastMock).toHaveBeenCalledWith('Imported 2 cookies.', {
+      description: 'Read from this device and stored here for the m4 air workspace.'
+    })
+    expect(warningToastMock).toHaveBeenCalledWith(
+      'Google cookies were not imported. Open a browser tab in the m4 air workspace with this profile — it opens on this device — then sign into Google.',
+      { duration: 12000 }
+    )
+  })
+
+  it('names no machine in the Google guidance for a purely local import', () => {
+    emitBrowserCookieImportToast(
+      { ...summary, importedCookies: 2, skippedCookies: 1, googleCookiesSkipped: 1 },
+      'Imported 2 cookies.',
+      localExecution
+    )
+
+    expect(successToastMock).toHaveBeenCalledWith('Imported 2 cookies.')
+    expect(warningToastMock).toHaveBeenCalledWith(
+      applyProductBranding(
+        'Google cookies were not imported. Open a browser in Orca with this profile, then sign into Google.'
+      ),
+      { duration: 12000 }
     )
   })
 
@@ -97,12 +153,75 @@ describe('emitBrowserCookieImportToast', () => {
     emitBrowserCookieImportToast(
       { ...summary, importedCookies: 2, skippedCookies: 1, partitionSkippedCookies: 1 },
       'Imported 2 cookies.',
-      'Local Mac'
+      localExecution
     )
 
     expect(successToastMock).toHaveBeenCalledWith('Imported 2 cookies.')
     expect(warningToastMock).toHaveBeenCalledWith(
-      `1 cookies were not imported because their site-partition could not be read. Sign in to those sites again in ${APP_DISPLAY_NAME}.`,
+      applyProductBranding(
+        '1 cookies were not imported because their site-partition could not be read. Sign in to those sites again in Orca.'
+      ),
+      { duration: 12000 }
+    )
+  })
+
+  it('distinguishes unreadable cookies from readable cookies withheld to protect sessions', () => {
+    emitBrowserCookieImportToast(
+      {
+        ...summary,
+        importedCookies: 1,
+        skippedCookies: 2,
+        partitionSkippedCookies: 2,
+        partitionSkipBreakdown: { unreadableCookies: 1, preservedRelatedCookies: 1 }
+      },
+      'Imported 1 cookie.',
+      remoteExecution
+    )
+    expect(warningToastMock).toHaveBeenCalledWith(
+      'Cookies with unreadable site partitions: 1. Related cookies left unimported to protect existing sessions: 1. Existing cookies for these sites were left unchanged. Check these sites in this profile before signing in again.',
+      { duration: 12000 }
+    )
+  })
+
+  it('localizes the count breakdown without changing either count', async () => {
+    const { i18n } = await import('@/i18n/i18n')
+    const originalLanguage = i18n.language
+    try {
+      await i18n.changeLanguage('ja')
+      emitBrowserCookieImportToast(
+        {
+          ...summary,
+          partitionSkippedCookies: 2,
+          partitionSkipBreakdown: { unreadableCookies: 1, preservedRelatedCookies: 1 }
+        },
+        'Imported 1 cookie.',
+        localExecution
+      )
+      expect(warningToastMock.mock.calls[0]?.[0]).toContain('読み取れない Cookie: 1')
+      expect(warningToastMock.mock.calls[0]?.[0]).toContain('インポートしなかった関連 Cookie: 1')
+    } finally {
+      await i18n.changeLanguage(originalLanguage)
+    }
+  })
+
+  it.each([
+    { unreadableCookies: 1, preservedRelatedCookies: 2 },
+    { unreadableCookies: -1, preservedRelatedCookies: 3 },
+    { unreadableCookies: 1.5, preservedRelatedCookies: 0.5 },
+    { unreadableCookies: 0, preservedRelatedCookies: 2 },
+    { unreadableCookies: Number.NaN, preservedRelatedCookies: 1 },
+    { unreadableCookies: 1, preservedRelatedCookies: Number.POSITIVE_INFINITY },
+    { unreadableCookies: Number.MAX_SAFE_INTEGER + 1, preservedRelatedCookies: 0 }
+  ])('uses the existing warning for invalid breakdown counts: %j', (partitionSkipBreakdown) => {
+    emitBrowserCookieImportToast(
+      { ...summary, partitionSkippedCookies: 2, partitionSkipBreakdown },
+      'Imported 1 cookie.',
+      remoteExecution
+    )
+    expect(warningToastMock).toHaveBeenCalledWith(
+      applyProductBranding(
+        '2 cookies were not imported because their site-partition could not be read. Sign in to those sites again in Orca.'
+      ),
       { duration: 12000 }
     )
   })
@@ -111,9 +230,8 @@ describe('emitBrowserCookieImportToast', () => {
     emitBrowserCookieImportToast(
       { ...summary, importedCookies: 2, skippedCookies: 1 },
       'Imported 2 cookies.',
-      'Local Mac'
+      localExecution
     )
-
     expect(warningToastMock).not.toHaveBeenCalled()
   })
 
@@ -121,7 +239,7 @@ describe('emitBrowserCookieImportToast', () => {
     emitBrowserCookieImportToast(
       { ...summary, importedCookies: 2, skippedCookies: 1 },
       'Imported 2 cookies.',
-      'Local Mac'
+      localExecution
     )
 
     expect(successToastMock).toHaveBeenCalledWith('Imported 2 cookies.')
@@ -141,7 +259,7 @@ describe('emitBrowserCookieImportToast', () => {
         } as unknown as BrowserCookieImportSummary['warning']
       },
       'Imported 0 cookies.',
-      'Remote Linux'
+      remoteExecution
     )
 
     const message = warningToastMock.mock.calls[0]?.[0]
@@ -160,7 +278,7 @@ describe('emitBrowserCookieImportToast', () => {
         } as unknown as BrowserCookieImportSummary['warning']
       },
       'Imported 0 cookies.',
-      'Remote Linux'
+      remoteExecution
     )
 
     const message = warningToastMock.mock.calls[0]?.[0]
@@ -181,7 +299,7 @@ describe('emitBrowserCookieImportToast', () => {
         } as unknown as BrowserCookieImportSummary['warning']
       },
       'Imported 0 cookies.',
-      'Remote Linux'
+      remoteExecution
     )
 
     const message = warningToastMock.mock.calls[0]?.[0]
@@ -200,7 +318,7 @@ describe('emitBrowserCookieImportToast', () => {
         } as unknown as BrowserCookieImportSummary['warning']
       },
       'Imported 0 cookies.',
-      'Remote Linux'
+      remoteExecution
     )
 
     const message = warningToastMock.mock.calls[0]?.[0]
@@ -222,7 +340,7 @@ describe('emitBrowserCookieImportToast', () => {
         }
       },
       'Imported 1 cookie.',
-      'Remote Mac'
+      remoteExecution
     )
 
     expect(successToastMock).not.toHaveBeenCalled()
@@ -231,7 +349,7 @@ describe('emitBrowserCookieImportToast', () => {
         'Imported 1 of 2 cookies. The rest could not be loaded, and the restart fallback was unavailable. Try the import again.'
       ],
       [
-        `Google cookies were not imported. Open a browser in ${APP_DISPLAY_NAME} on Remote Mac with this profile, then sign into Google.`,
+        'Google cookies were not imported. Open a browser tab in the Remote Mac workspace with this profile, then sign into Google.',
         { duration: 12000 }
       ]
     ])

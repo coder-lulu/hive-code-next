@@ -1,3 +1,4 @@
+import './unused-default-rpc-methods.test-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { formatOrcaSessionAddress } from '../../../shared/orca-session-address'

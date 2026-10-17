@@ -17,7 +17,8 @@ it('runs artifact profile persistence and share races with real secure-file prot
   for (const [module, name] of [
     ['/profile-index-store', 'ensureActiveOrcaProfile'],
     ['/profile-cloud-index', 'linkOrcaProfileToCloud'],
-    ['/profile-cloud-session-mutation', 'recordSuccessfulCloudSessionLogin']
+    ['/profile-cloud-session-store', 'saveOrcaCloudSession'],
+    ['/profile-cloud-session-owner', 'signOutCloudSession']
   ]) {
     expect(callsImportedRuntime(source, module, name), name).toBe(true)
   }
@@ -25,6 +26,16 @@ it('runs artifact profile persistence and share races with real secure-file prot
   expect(races).toContain('new ArtifactCloudService(path, () => true)')
   expect(races).toContain('await service.share(writeRequest)')
   for (const [relative, module, name] of [
+    [
+      'orca-profiles/profile-cloud-session-owner.ts',
+      '/profile-cloud-session-mutation',
+      'captureCloudSessionMutation'
+    ],
+    [
+      'orca-profiles/profile-cloud-session-owner.ts',
+      '/profile-cloud-session-mutation',
+      'tombstoneCurrentCloudSession'
+    ],
     ['orca-profiles/profile-cloud-session-mutation.ts', '/secure-file', 'writeSecureJsonFile'],
     ['artifacts/artifact-share-record-store.ts', '/secure-file', 'writeSecureJsonFile'],
     ['artifacts/artifact-cloud-service.ts', '/profile-index-store', 'ensureActiveOrcaProfile']
@@ -336,6 +347,11 @@ it('keeps real durable runtime stores and lifecycle listeners on their Node host
     ['src/main/runtime/runtime-metadata.ts', '/secure-file', 'writeSecureJsonFile'],
     [
       'src/main/ssh/orcad-migration-cutover-journal.ts',
+      '/migration-journal-directory',
+      'createMigrationJournalDirectory'
+    ],
+    [
+      'src/main/persistence/migrating-orcad-catalog/migration-journal-directory.ts',
       '/bounded-secure-json-file',
       'writeSecureJsonFileWithinLimit'
     ],
@@ -353,6 +369,15 @@ it('keeps real durable runtime stores and lifecycle listeners on their Node host
   ]) {
     expect(callsImportedRuntime(source(file), module, name), file).toBe(true)
   }
+  expect(source('src/main/ssh/orcad-migration-cutover-journal.ts').text).toContain(
+    'journals.write(userDataPath, parsed)'
+  )
+  const journal = source(
+    'src/main/persistence/migrating-orcad-catalog/migration-journal-directory.ts'
+  )
+  expect(journal.text).toContain('{ durable: true }')
+  expect(journal.text).toContain('syncDirectoryDurablySync(dir)')
+  expect(journal.text).toContain('syncDirectoryDurablySync(userDataPath)')
   for (const pure of [
     'src/shared/ephemeral-vm-recipes.test.ts',
     'src/shared/orcad-stop-request.test.ts',
@@ -409,10 +434,16 @@ it('keeps artifact response-loss recovery on real profile and secure-file persis
   const owner = 'src/main/artifacts/artifact-cloud-recovery.test.ts'
   const fixture = source(owner)
   expect(callsImportedObject(fixture, '/artifact-cloud-service', 'ArtifactCloudService')).toBe(true)
-  expect(fixture.text).toContain(
-    'const restrictWindowsPath = windowsAcl.bestEffortRestrictWindowsPath'
+  expect(fixture.text).toContain('const restrictWindowsPath = windowsAcl.restrictWindowsDirectory')
+  expect(fixture.text).toContain(".spyOn(windowsAcl, 'restrictWindowsDirectory')")
+  expect(fixture.text).toContain('const pending = restrictWindowsPath(targetPath)')
+  expect(fixture.text).toContain('pendingWindowsHardening.add(pending.then(() => undefined))')
+  expect(fixture.text).toContain('return pending')
+  expect(fixture.text.indexOf('await Promise.all(pendingWindowsHardening)')).toBeLessThan(
+    fixture.text.indexOf(
+      'createdPaths.splice(0).map((path) => rm(path, { recursive: true, force: true }))'
+    )
   )
-  expect(fixture.text).toContain('restrictWindowsPath(targetPath, isDirectory, (restricted) =>')
   expect(fixture.text).toContain('await Promise.all(pendingWindowsHardening)')
   expect(fixture.text).not.toMatch(
     /vi\.mock\(['"][^'"]*(?:secure-file|artifact-share-record-store)/
@@ -487,11 +518,11 @@ it('keeps real ephemeral VM IPC recipe cancellation and secure persistence on No
     fixture.text.indexOf('rmSync(dir, { recursive: true, force: true })')
   )
   const drain = source('src/main/ipc/ephemeral-vm-native-test-fixture.ts')
-  expect(drain.text).toContain(
-    'const restrictWindowsPath = windowsAcl.bestEffortRestrictWindowsPath'
-  )
-  expect(drain.text).toContain('restrictWindowsPath(targetPath, isDirectory, (restricted) =>')
-  expect(drain.text).toContain('onSettled?.(restricted)')
+  expect(drain.text).toContain('const restrictWindowsPath = windowsAcl.restrictWindowsDirectory')
+  expect(drain.text).toContain(".spyOn(windowsAcl, 'restrictWindowsDirectory')")
+  expect(drain.text).toContain('const pending = restrictWindowsPath(targetPath)')
+  expect(drain.text).toContain('pendingWindowsHardening.add(pending.then(() => undefined))')
+  expect(drain.text).toContain('return pending')
   expect(drain.text).toContain('await Promise.all(pendingChildren)')
   expect(drain.text).toContain('await Promise.all(pendingWindowsHardening)')
   const processOwner = source('src/shared/ephemeral-vm-recipe-process.ts')
@@ -507,4 +538,77 @@ it('keeps real ephemeral VM IPC recipe cancellation and secure persistence on No
   expect(NODE_RUNTIME_INCLUDE).toContain(owner)
   expect(NODE_RUNTIME_INCLUDE).not.toContain('src/shared/ephemeral-vm-recipes.test.ts')
   expect(NODE_RUNTIME_INCLUDE).not.toContain('src/shared/ephemeral-vm-recipe-checkout-mode.test.ts')
+})
+
+it('keeps idle-stop records on real durable secure storage with native cleanup completion', () => {
+  const owner = 'src/main/orcad/orcad-idle-stop-record.test.ts'
+  const fixture = source(owner)
+  expect(callsImportedRuntime(fixture, '/orcad-idle-stop-record', 'writeOrcadIdleStopRecord')).toBe(
+    true
+  )
+  expect(
+    callsImportedRuntime(
+      source('src/main/orcad/orcad-idle-stop-record.ts'),
+      '/secure-file',
+      'writeDurableSecureJsonFile'
+    )
+  ).toBe(true)
+  expect(
+    callsImportedRuntime(fixture, '/ephemeral-vm-native-test-fixture', 'drainNativeFixture')
+  ).toBe(true)
+  expect(fixture.text).toContain('afterAll(restoreNativeFixture)')
+  expect(fixture.text).toContain('await drainNativeFixture(pendingChildren)')
+  expect(fixture.text.indexOf('await drainNativeFixture(pendingChildren)')).toBeLessThan(
+    fixture.text.indexOf('rmSync(root,')
+  )
+  expect(fixture.text).not.toContain('vi.restoreAllMocks()')
+  expect(fixture.text).toContain('consoleError.mockRestore()')
+  expect(fixture.text).not.toMatch(/vi\.mock\(['"][^'"]*(?:secure-file|secure-path-windows-acl)/)
+  expect(NODE_RUNTIME_INCLUDE).toContain(owner)
+})
+
+it('keeps Cell startup cleanup refusal on the Node filesystem host', () => {
+  const owner = 'tests/e2e/hiverelay/hive-account-relay-cell-startup.unit.test.ts'
+  const fixture = source(owner)
+  expect(
+    callsImportedRuntime(fixture, '/hive-account-relay-cell-fixture', 'startAccountRelayCell')
+  ).toBe(true)
+  const startup = source('tests/e2e/hiverelay/hive-account-relay-cell-fixture.ts')
+  expect(callsImportedRuntime(startup, 'node:fs', 'writeFileSync')).toBe(true)
+  expect(
+    callsImportedRuntime(
+      startup,
+      '@orca/process-host/process-tree-termination',
+      'forceTerminateProcessTree'
+    )
+  ).toBe(true)
+  expect(fixture.text).toContain("mkdirSync(join(directory, 'stop'))")
+  expect(startup.text).toContain("writeFileSync(join(directory, 'stop'), '')")
+  expect(fixture.text).not.toMatch(/vi\.mock\(['"]node:fs/)
+  expect(NODE_RUNTIME_INCLUDE).toContain(owner)
+})
+
+it('keeps real Windows tree termination and Node child-process diagnostics on Node', () => {
+  const owner = 'src/main/windows-live-tree-kill.win32.test.ts'
+  const fixture = source(owner)
+  expect(callsImportedRuntime(fixture, 'node:child_process', 'spawn')).toBe(true)
+  for (const name of ['subscribe', 'unsubscribe']) {
+    expect(callsImportedRuntime(fixture, 'node:diagnostics_channel', name)).toBe(true)
+  }
+  expect(fixture.text).toContain("subscribe('child_process', observeSpawn)")
+  expect(fixture.text).toContain("unsubscribe('child_process', observeSpawn)")
+  expect(
+    callsImportedRuntime(
+      fixture,
+      '@orca/process-host/process-tree-termination',
+      'signalProcessTree'
+    )
+  ).toBe(true)
+  expect(
+    callsImportedRuntime(fixture, '/windows-process-tree-kill', 'terminateWindowsProcessTree')
+  ).toBe(true)
+  expect(fixture.text).not.toMatch(
+    /vi\.mock\(['"](?:node:child_process|node:diagnostics_channel|[^'"]*process-tree)/
+  )
+  expect(NODE_RUNTIME_INCLUDE).toContain(owner)
 })

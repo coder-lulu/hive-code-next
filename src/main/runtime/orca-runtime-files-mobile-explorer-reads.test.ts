@@ -1,7 +1,7 @@
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { SshHostNotServedError } from '../providers/ssh-host-not-served-error'
 import type * as FileSystem from 'node:fs/promises'
-import { join } from 'node:path'
 import {
   enoent,
   readdirMock,
@@ -125,6 +125,18 @@ describe('RuntimeFileCommands', () => {
       relativePath: 'docs/readme.md',
       kind: 'markdown',
       opened: true
+    })
+  })
+
+  it('passes file positioning to the renderer with the resolved owner', async () => {
+    const openFile = vi.fn()
+    const { commands } = createRuntimeFileCommands({ openFile })
+    resolveAuthorizedPathMock.mockResolvedValue('/repo/a.ts')
+    statMock.mockResolvedValue({ isDirectory: () => false })
+    await commands.openMobileFile('id:wt-1', 'a.ts', 'caller', { line: 12, column: 5 })
+    expect(openFile).toHaveBeenCalledWith('wt-1', '/repo/a.ts', 'a.ts', null, 'caller', {
+      line: 12,
+      column: 5
     })
   })
 
@@ -291,7 +303,7 @@ describe('RuntimeFileCommands', () => {
       { name: 'linked-docs', isDirectory: false, isSymlink: true },
       { name: 'README.md', isDirectory: false, isSymlink: false }
     ])
-    expect(statMock).not.toHaveBeenCalledWith('/repo/linked-docs')
+    expect(statMock).not.toHaveBeenCalledWith(join('/repo', 'linked-docs'))
   })
   it.each([
     { setting: true, override: undefined, expected: true },

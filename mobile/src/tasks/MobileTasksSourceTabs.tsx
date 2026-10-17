@@ -4,7 +4,7 @@ import { Code2, ListTodo } from 'lucide-react-native'
 import { PickerModal, type PickerOption } from '../components/PickerModal'
 import { TaskProviderLogo } from '../components/TaskProviderLogo'
 import { colors, type MobileTheme } from '../theme/mobile-theme'
-import type { TaskProvider } from './mobile-task-providers'
+import type { TaskProvider } from '../../../src/shared/task-providers'
 import {
   createMobileTaskScreenPalette,
   createMobileTaskScreenStyles

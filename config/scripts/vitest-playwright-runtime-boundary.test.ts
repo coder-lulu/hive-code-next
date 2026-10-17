@@ -188,13 +188,14 @@ const HELPER_OWNERS = [
 ]
 
 const PURE_OWNERS = [
-  'config/scripts/mobile-web-app-browser-pane-text-inputs.test.mjs',
   'config/scripts/mobile-web-app-csp.test.mjs',
   'config/scripts/mobile-web-app-editable-host-font-size.test.mjs',
   'config/scripts/mobile-web-app-external-link-seam.test.mjs',
   'config/scripts/mobile-web-app-external-navigation-grant.test.mjs',
   'config/scripts/mobile-web-app-files-external-links.test.mjs',
   'config/scripts/mobile-web-app-haptics-seam.test.mjs',
+  'config/scripts/mobile-web-app-module-closure-entrypoints.test.mjs',
+  'config/scripts/mobile-web-app-module-entry-resolution.test.mjs',
   'config/scripts/mobile-web-app-override-inventory.test.mjs',
   'config/scripts/mobile-web-app-page-closure-families.test.mjs',
   'config/scripts/mobile-web-app-page-grant-call-sites.test.mjs',
@@ -211,7 +212,8 @@ const PURE_OWNERS = [
   'config/scripts/mobile-web-app-source-control-external-links.test.mjs',
   'config/scripts/mobile-web-app-source-control-keyboard.test.mjs',
   'config/scripts/mobile-web-app-source-control-text-inputs.test.mjs',
-  'config/scripts/mobile-web-app-tasks-external-links.test.mjs'
+  'config/scripts/mobile-web-app-tasks-external-links.test.mjs',
+  'config/scripts/mobile-web-app-text-input-discovery.test.mjs'
 ]
 
 it.each([
@@ -314,7 +316,7 @@ it.each([...DIRECT_OWNERS, ...HELPER_OWNERS])(
 it('keeps the reviewed browser inventory exact without prefix or wider glob ownership', () => {
   expect(DIRECT_OWNERS).toHaveLength(23)
   expect(HELPER_OWNERS).toHaveLength(2)
-  expect(PURE_OWNERS).toHaveLength(24)
+  expect(PURE_OWNERS).toHaveLength(26)
   const owners = [...DIRECT_OWNERS, ...HELPER_OWNERS]
   expect(new Set(owners).size).toBe(25)
   const prefixFiles = globSync('config/scripts/mobile-web-app-*.test.{mjs,ts}').map((file) =>

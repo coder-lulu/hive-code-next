@@ -11,7 +11,11 @@ import {
   callerProfileCases,
   type AgentLaunchCallerProfile
 } from './agent-launch-caller-profiles-test-harness'
-import { createLaunchFunnelStore, resetLaunchFunnelStore } from './agent-launch-funnel-test-harness'
+import {
+  createLaunchFunnelStore,
+  queuedStartupCommand,
+  resetLaunchFunnelStore
+} from './agent-launch-funnel-test-harness'
 
 import type * as LaunchAdmissionModule from './structured-agent-session-launch-admission'
 const store = createLaunchFunnelStore()
@@ -274,7 +278,11 @@ describe('agent launch caller routing', () => {
   // Before, a local chat opened first and this machine's "no" left it failed, with a Retry that
   // failed the same way and no terminal.
   it("runs the caller's own launch as a local terminal when this machine declines the chat", async () => {
-    store.settings = { ...store.settings, ...CHAT_DEFAULT_SETTINGS }
+    store.settings = {
+      ...store.settings,
+      ...CHAT_DEFAULT_SETTINGS,
+      agentDefaultArgs: { claude: '--model sonnet' }
+    }
     await useActualAdmission()
     mockCreateSupport.mockResolvedValue({ supported: false, reason: 'wsl' })
     const { launchAgentInNewTab } = await import('./launch-agent-in-new-tab')
@@ -291,12 +299,10 @@ describe('agent launch caller routing', () => {
     expect(result?.surface).toEqual({ kind: 'host-published' })
     expect(store.createTab).not.toHaveBeenCalled()
     await expect(result?.structuredSettlement).resolves.toEqual({ kind: 'terminal' })
+    expect(mockCreateSupport).toHaveBeenCalledOnce()
     expect(store.createTab).toHaveBeenCalledOnce()
     expect(store.createTab.mock.calls[0]?.slice(0, 2)).toEqual(['wt-1', 'group-1'])
-    expect(store.queueTabStartupCommand).toHaveBeenCalledOnce()
-    expect(store.queueTabStartupCommand.mock.calls[0]?.[1]?.command).toBe(
-      "claude '--dangerously-skip-permissions'"
-    )
+    expect(queuedStartupCommand(store)).toBe("claude '--model' 'sonnet'")
     // The typed prompt goes to that terminal once, and the caller hears it arrived.
     await expect(result?.promptDeliveryResult).resolves.toEqual({
       delivered: true,
@@ -392,7 +398,6 @@ describe('agent launch caller routing', () => {
     expect(result).toBeNull()
     expect(beforeSurfaceOpen).toHaveBeenCalledExactlyOnceWith({ kind: 'local-terminal' })
     expect(store.createTab).not.toHaveBeenCalled()
-    expect(store.queueTabStartupCommand).not.toHaveBeenCalled()
   })
 
   it('aborts a host-published open when beforeSurfaceOpen refuses', async () => {

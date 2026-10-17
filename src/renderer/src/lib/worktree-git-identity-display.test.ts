@@ -1,41 +1,31 @@
-import { describe, expect, it } from 'vitest'
-import { getWorktreeGitIdentityDisplay } from './worktree-git-identity-display'
-
-describe('worktree git identity display', () => {
-  it('shows a branch name when the worktree has a branch ref', () => {
-    expect(
-      getWorktreeGitIdentityDisplay({
-        branch: 'refs/heads/review/merge-queue',
-        head: 'abcdef123456'
-      })
-    ).toEqual({ kind: 'branch', branchName: 'review/merge-queue' })
-  })
-
-  it('shows detached HEAD labels when branch is empty and head is known', () => {
-    expect(
-      getWorktreeGitIdentityDisplay({
-        branch: '',
-        head: 'abcdef123456'
-      })
-    ).toEqual({
-      kind: 'detached',
-      shortHead: 'abcdef1',
-      sidebarLabel: 'Detached HEAD @ abcdef1',
-      sourceControlLabel: 'Detached HEAD · abcdef1',
-      tooltip: 'Detached HEAD at abcdef1. You are viewing a commit, not a branch.'
+import { describe, expect, it, vi } from 'vitest'
+vi.mock('@/i18n/i18n', () => ({
+  translate: (key: string, _fallback: string, values: { head: string }) => `${key}:${values.head}`
+}))
+import {
+  getWorktreeGitIdentityDisplay,
+  getDetachedHeadTooltip
+} from './worktree-git-identity-display'
+describe('translated git identity adapter', () => {
+  it('delegates branch normalization without translating branch names', () => {
+    expect(getWorktreeGitIdentityDisplay({ branch: ' refs/heads/main ' })).toEqual({
+      kind: 'branch',
+      branchName: 'refs/heads/main'
     })
+    expect(getWorktreeGitIdentityDisplay({ branch: 'refs/heads/main' })).toEqual({
+      kind: 'branch',
+      branchName: 'main'
+    })
+    expect(getWorktreeGitIdentityDisplay({})).toBeNull()
   })
-
-  it('treats missing branch from git status as detached when head is known', () => {
-    expect(
-      getWorktreeGitIdentityDisplay({
-        branch: undefined,
-        head: '1234567890'
-      })
-    ).toMatchObject({ kind: 'detached', shortHead: '1234567' })
-  })
-
-  it('returns null when neither branch nor head is known', () => {
-    expect(getWorktreeGitIdentityDisplay({ branch: '', head: '' })).toBeNull()
+  it('translates all detached labels using the shared shortened hash', () => {
+    expect(getWorktreeGitIdentityDisplay({ head: 'abcdef012345' })).toEqual({
+      kind: 'detached',
+      shortHead: 'abcdef0',
+      sidebarLabel: 'components.detachedHead.sidebar:abcdef0',
+      sourceControlLabel: 'components.detachedHead.sourceControl:abcdef0',
+      tooltip: 'components.detachedHead.tooltip:abcdef0'
+    })
+    expect(getDetachedHeadTooltip('abc')).toBe('components.detachedHead.tooltip:abc')
   })
 })

@@ -1,3 +1,4 @@
+import { removeTree } from '../../shared/windows-transient-lock-removal'
 import {
   commandLifecycleIndex,
   observeRealClaudeConnection,
@@ -850,7 +851,7 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
         )
       } finally {
         await adapter.closeAll()
-        await rm(cwd, { recursive: true, force: true })
+        await removeTree(cwd)
       }
     },
     150_000
@@ -882,7 +883,7 @@ describe.skipIf(!realClaudeAvailable)(suiteTitle, () => {
       })
     } finally {
       await adapter.closeAll()
-      await rm(claudeConfigDir, { recursive: true, force: true })
+      await removeTree(claudeConfigDir)
     }
   }, 10_000)
 })

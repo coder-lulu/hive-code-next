@@ -59,6 +59,7 @@ export type StatusBarProps = {
 export function StatusBarSurface({
   floatingTerminalOpen
 }: StatusBarProps): React.JSX.Element | null {
+  // Memoized labels still need to follow language changes.
   useTranslation()
   const controller = useStatusBarController(floatingTerminalOpen)
   if (!controller) {

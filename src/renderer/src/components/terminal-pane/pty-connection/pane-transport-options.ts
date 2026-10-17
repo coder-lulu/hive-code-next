@@ -72,6 +72,7 @@ export function buildPaneTransportOptions(session: ConnectPanePtySession): IpcPt
     ...(session.paneStartup?.agentPermissionMode
       ? { agentPermissionMode: session.paneStartup.agentPermissionMode }
       : {}),
+    ...(session.paneStartup?.agentLaunch ? { agentLaunch: session.paneStartup.agentLaunch } : {}),
     ...(session.paneStartup?.telemetry ? { telemetry: session.paneStartup.telemetry } : {}),
     onPtyExit: session.onExit,
     onPtySpawn: session.onPtySpawn,

@@ -1,4 +1,5 @@
 import type { Repo } from '../../../../../../shared/repo-types'
+import { translate } from '@/i18n/i18n'
 import type { WorktreeLineage } from '../../../../../../shared/worktree/lineage-types'
 import type { WorkspaceStatusDefinition, Worktree } from '../../../../../../shared/worktree/types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
@@ -14,7 +15,8 @@ import {
   getLaneHostWorktreeIds,
   getMixedHostContextLabels
 } from './host-labels'
-import type { OrderedGroupEntry, ProjectGroupingIndex } from './project-grouping'
+import type { OrderedGroupEntry } from './worktree-group-entry'
+import type { ProjectGroupingIndex } from '../../../../../../shared/project-section-grouping'
 import {
   appendWorktreeRows,
   buildFolderWorkspaceRow,
@@ -84,7 +86,10 @@ export function appendOrderedGroups(
         ? {
             type: 'header' as const,
             key,
-            label: group.label,
+            label:
+              !repo && key.startsWith('repo:')
+                ? translate('sidebar.projectInfoUnavailable', 'Project information unavailable')
+                : group.label,
             count: group.items.length,
             tone: PROJECT_GROUP_META.tone,
             icon: PROJECT_GROUP_META.icon,

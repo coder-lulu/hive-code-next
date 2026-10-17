@@ -12,8 +12,13 @@ import {
   runtimeEnvironmentIdByWorktree
 } from './__mocks__/new-workspace'
 
-import { ensureAgentStartupInTerminal } from './new-workspace'
+import { ensureAgentStartupInTerminal, getLinkedWorkItemProvider } from './new-workspace'
 import { resetAgentStartupDelayedDeliveryForTests } from './agent-startup-delayed-delivery'
+import { getLinkedWorkItemProvider as directGetLinkedWorkItemProvider } from './linked-work-item-provider'
+
+it('keeps linked item provider selection available through the workspace module', () => {
+  expect(getLinkedWorkItemProvider).toBe(directGetLinkedWorkItemProvider)
+})
 
 describe('ensureAgentStartupInTerminal prompt delivery', () => {
   beforeEach(() => {

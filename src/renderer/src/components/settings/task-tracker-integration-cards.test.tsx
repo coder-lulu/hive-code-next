@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getExecutionHostLabel } from '../../../../shared/execution-host'
+import { setRendererUiLanguage } from '@/i18n/i18n'
 import { getProviderRuntimeContextKey } from '@/lib/provider-runtime-context'
 import { TooltipProvider } from '../ui/tooltip'
 import { LinearIntegrationCard } from './task-tracker-integration-cards'
@@ -122,6 +123,7 @@ describe('LinearIntegrationCard account scope', () => {
     container?.remove()
     container = null
     mocks.store.current = null
+    await setRendererUiLanguage('en')
     Reflect.deleteProperty(window, 'api')
   })
 
@@ -221,6 +223,40 @@ describe('LinearIntegrationCard account scope', () => {
     expect(document.body.textContent).not.toContain('No workspace access configured.')
     expect(state.testLinearConnection).not.toHaveBeenCalled()
   })
+  it.each([
+    ['en', false],
+    ['en', true],
+    ['ko', false],
+    ['ko', true]
+  ] as const)(
+    'renders complete %s connection counts without an English suffix (settings list: %s)',
+    async (language, list) => {
+      await setRendererUiLanguage(language)
+      for (const count of [0, 1, 2]) {
+        const state = installStore(true)
+        state.linearStatus.workspaces = Array.from({ length: count }, (_, index) => ({
+          id: `workspace-${index}`,
+          organizationName: 'Fixture',
+          displayName: 'Fixture workspace'
+        }))
+        const rendered = await renderCard(list)
+        const description = rendered.textContent ?? ''
+        const expected =
+          language === 'ko'
+            ? `워크스페이스 ${count}개 연결됨`
+            : `${count} workspace${count === 1 ? '' : 's'} connected`
+        expect(description).toContain(expected)
+        expect(description).not.toMatch(/개(?: 사이트| 워크스페이스)?s/)
+        await act(async () => {
+          root?.unmount()
+        })
+        root = null
+        container?.remove()
+        container = null
+      }
+    }
+  )
+
   it('shows local-client account ownership when Linear is disconnected', async () => {
     const state = installStore(false)
 

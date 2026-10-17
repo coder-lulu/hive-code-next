@@ -163,7 +163,7 @@ export const BRIDGED_PARITY_EXCLUSIONS: Readonly<Partial<Record<BridgedParityCla
 }
 
 /**
- * What this tree measures, per class, over the 755 upstream goldens supported by the Hive manifest.
+ * What this tree measures, per class, over the 757 reference goldens supported by the Hive manifest.
  *
  * A pin, not a description: `bridgedParityTallyDrift` holds every number below to itself exactly,
  * in both directions, and this module's test pins their sum to the size of the corpus. A class that
@@ -184,7 +184,7 @@ export const BRIDGED_PARITY_BASELINE: Readonly<Record<BridgedParityClass | 'iden
   // now arrives differs before the ordinal that also moved does. Nothing stopped replaying
   // identically, and the corpus is a fixed size, so a shuffle between two excluded classes cannot
   // hide one.
-  'result-absent-settlement': 325,
+  'result-absent-settlement': 327,
   // The Hive-supported domain contains one downstream-observation case; the two other frozen
   // upstream cases belong to operations outside the manifest's product adapter map.
   'result-absent-observation': 1,

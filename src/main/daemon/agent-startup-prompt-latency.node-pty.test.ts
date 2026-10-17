@@ -15,6 +15,9 @@ async function launch(
 ): Promise<{ output: string; ms: number }> {
   const root = mkdtempSync(join(tmpdir(), 'orca-startup-latency-'))
   const bash = shell.endsWith('bash')
+  if (shell.endsWith('zsh')) {
+    writeFileSync(join(root, '.zshenv'), 'unsetopt GLOBAL_RCS\n')
+  }
   const pause = slow ? 'sleep 0.6\n' : ''
   const prompt = slow ? "PS1='$(sleep 0.3)prompt> '\n" : "PS1='prompt> '\n"
   writeFileSync(

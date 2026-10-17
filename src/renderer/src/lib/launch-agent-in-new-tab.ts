@@ -209,7 +209,7 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
   }
   if (
     pasteDraftAfterLaunch !== null &&
-    newTabPromptLaunchesThroughHost({ promptDelivery, pastesPrompt: true })
+    newTabPromptLaunchesThroughHost({ promptDelivery, pastesPrompt: true, isRemote })
   ) {
     const launched = launchNewTabPromptThroughHost({
       agent,
@@ -235,21 +235,17 @@ function launchAgentInNewTabInternal(args: LaunchAgentInNewTabArgs): LaunchAgent
       promptDeliveryResult: launched.promptDeliveryResult
     }
   }
-  // Why: queue startup BEFORE TerminalPane mounts — it snapshots pendingStartupByTabId in useState on first render.
   const tab = store.createTab(worktreeId, groupId, undefined, {
     launchAgent: agent,
     quickCommandLabel,
     ...(pendingActivationSpawn ? { pendingActivationSpawn: true } : {}),
-    ...(activate === false ? { activate: false } : {})
+    ...(activate === false ? { activate: false } : {}),
+    pendingStartup: buildNewTabAgentStartupPayload(args, startupPlan, trimmedPrompt)
   })
   if (initialCwd?.trim()) {
     // Why: queue before mount so local, WSL, and SSH continuations preserve their subdirectory.
     store.queueTabInitialCwd(tab.id, initialCwd)
   }
-  store.queueTabStartupCommand(
-    tab.id,
-    buildNewTabAgentStartupPayload(args, startupPlan, trimmedPrompt)
-  )
   // Why: fire-and-forget the paste-after-ready delivery so callers keep the synchronous { tabId, startupPlan } signature.
   // Why: safe to call unconditionally — the helper short-circuits (no paste) for native-prefill agents already holding the draft.
   if (hasPrompt && promptDelivery === 'draft' && pasteDraftAfterLaunch === null) {

@@ -1,6 +1,7 @@
 import { applyProductBranding } from '@/product-brand'
 // @vitest-environment happy-dom
 import { StrictMode } from 'react'
+import userEvent from '@testing-library/user-event'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
@@ -58,6 +59,64 @@ beforeEach(() => {
 })
 
 describe('host launch settings form', () => {
+  it.each(['claude', null] as const)(
+    'selects a blank terminal instead of default %s and restores the selection',
+    async (defaultTuiAgent) => {
+      const user = userEvent.setup()
+      transport.read.mockResolvedValue({ ...host(), defaultTuiAgent })
+      transport.mutate.mockResolvedValue({ ...host(), defaultTuiAgent: 'blank' })
+      render(pane(17))
+      await screen.findByDisplayValue('--host-marker')
+      await user.click(screen.getByRole('combobox', { name: 'Default Agent' }))
+      await user.click(screen.getByRole('option', { name: 'No agent (blank terminal)' }))
+      await waitFor(() =>
+        expect(transport.mutate).toHaveBeenCalledWith(
+          { environmentId: 'ssh-host', pairingRevision: 17 },
+          { type: 'default', agent: 'blank' },
+          expect.any(AbortSignal)
+        )
+      )
+      await waitFor(() =>
+        expect(screen.getByRole('combobox', { name: 'Default Agent' }).textContent).toContain(
+          'No agent (blank terminal)'
+        )
+      )
+      transport.mutate.mockResolvedValue({ ...host(), defaultTuiAgent })
+      await user.click(screen.getByRole('combobox', { name: 'Default Agent' }))
+      await user.click(
+        screen.getByRole('option', { name: defaultTuiAgent === 'claude' ? 'Claude' : 'Auto' })
+      )
+      await waitFor(() =>
+        expect(screen.getByRole('combobox', { name: 'Default Agent' }).textContent).toContain(
+          defaultTuiAgent === 'claude' ? 'Claude' : 'Auto'
+        )
+      )
+      expect(transport.mutate).toHaveBeenLastCalledWith(
+        { environmentId: 'ssh-host', pairingRevision: 17 },
+        { type: 'default', agent: defaultTuiAgent },
+        expect.any(AbortSignal)
+      )
+    }
+  )
+
+  it('selects Auto instead of a saved default on the selected host', async () => {
+    const user = userEvent.setup()
+    transport.read.mockResolvedValue({ ...host(), defaultTuiAgent: 'claude' })
+    transport.mutate.mockResolvedValue(host())
+    render(pane(17))
+    await screen.findByDisplayValue('--host-marker')
+    await user.click(screen.getByRole('combobox', { name: 'Default Agent' }))
+    await user.click(screen.getByRole('option', { name: 'Auto' }))
+    await waitFor(() =>
+      expect(screen.getByRole('combobox', { name: 'Default Agent' }).textContent).toContain('Auto')
+    )
+    expect(transport.mutate).toHaveBeenCalledWith(
+      { environmentId: 'ssh-host', pairingRevision: 17 },
+      { type: 'default', agent: null },
+      expect.any(AbortSignal)
+    )
+  })
+
   it('routes the pane to the chosen host and saves arguments without editing desktop defaults', async () => {
     const desktop = createGlobalSettingsFixture({
       activeRuntimeEnvironmentId: null,

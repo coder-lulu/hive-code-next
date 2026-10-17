@@ -8,9 +8,13 @@ type SessionFileStat = Pick<Stats, 'dev' | 'ino' | 'nlink' | 'size' | 'mtimeMs'>
   Pick<FileWithMtime, 'filesystemIdentity'>
 
 /** Keep exact identity at discovery; Number cannot represent every NTFS inode. */
-export async function statSessionFile(path: string): Promise<SessionFileStat> {
+export async function statSessionFile(
+  path: string,
+  signal?: AbortSignal
+): Promise<SessionFileStat> {
+  signal?.throwIfAborted()
   if (isWslUncPath(path)) {
-    const fileStat = await wslGatedStat(path, 'scan')
+    const fileStat = await wslGatedStat(path, 'scan', signal)
     if (typeof fileStat.dev === 'number' && typeof fileStat.ino === 'number') {
       if (!Number.isSafeInteger(fileStat.dev) || !Number.isSafeInteger(fileStat.ino)) {
         throw new Error('Transcript filesystem identity was not represented exactly')
@@ -24,6 +28,7 @@ export async function statSessionFile(path: string): Promise<SessionFileStat> {
   }
   // One stat, at the existing acquisition; no extra probe on an index read/write.
   const fileStat = await stat(path, { bigint: true })
+  signal?.throwIfAborted()
   return {
     dev: Number(fileStat.dev),
     ino: Number(fileStat.ino),

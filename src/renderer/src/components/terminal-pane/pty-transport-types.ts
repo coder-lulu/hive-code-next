@@ -23,6 +23,7 @@ import type { ExecutionHostId } from '../../../../shared/execution-host'
 import type { PtyDataMeta } from './pty-dispatcher'
 import type { RemoteRuntimeSnapshotOutcome } from '../../runtime/remote-runtime-terminal-multiplexer-types'
 import type { AcceptedInputOptions, PtyPreconnectInputEntry } from './pty-preconnect-input-buffer'
+import type { AgentPaneLaunchRequest } from '../../../../shared/agent-pane-launch-request'
 
 export type PtyBufferSnapshot = {
   data: string
@@ -291,6 +292,7 @@ export type IpcPtyTransportOptions = {
   launchToken?: string
   launchAgent?: TuiAgent
   agentPermissionMode?: AgentExplicitLaunchPermissionMode
+  agentLaunch?: AgentPaneLaunchRequest
   startupCommandDelivery?: StartupCommandDelivery
   connectionId?: string | null
   executionHostId?: ExecutionHostId | null

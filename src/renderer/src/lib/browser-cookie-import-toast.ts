@@ -2,7 +2,6 @@ import { toast } from 'sonner'
 import type { BrowserCookieImportSummary } from '../../../shared/browser-workspace-types'
 import { isHandledWireDiscriminant } from '../../../shared/handled-wire-discriminant'
 import { translate } from '@/i18n/i18n'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 
 type CookieImportWarning = NonNullable<BrowserCookieImportSummary['warning']>
 type CookieImportWarningCode = CookieImportWarning['code']
@@ -99,31 +98,10 @@ export type BrowserCookieImportExecution = {
   executionRemoteEnvironment: boolean
 }
 
-type BrowserCookieImportExecutionInput = BrowserCookieImportExecution | string
-
-function normalizeCookieImportExecution(
-  input: BrowserCookieImportExecutionInput
-): BrowserCookieImportExecution & { legacyLabel?: boolean } {
-  if (typeof input !== 'string') {
-    return input
-  }
-  // Keep older renderer callers source-compatible while they migrate to the
-  // structured execution result. Legacy labels never displayed a success
-  // location, but still distinguished local and remote Google guidance.
-  return {
-    executionHostLabel: input,
-    executionMachine: 'remote',
-    executionRemoteEnvironment: !input.startsWith('Local '),
-    legacyLabel: true
-  }
-}
-
 // Why: for a remote environment the same Import control silently runs on either machine, so the
 // success toast must say where the cookies were read and stored. Local imports need no location.
-function cookieImportLocationDescription(
-  execution: BrowserCookieImportExecution & { legacyLabel?: boolean }
-): string | null {
-  if (!execution.executionRemoteEnvironment || execution.legacyLabel) {
+function cookieImportLocationDescription(execution: BrowserCookieImportExecution): string | null {
+  if (!execution.executionRemoteEnvironment) {
     return null
   }
   return execution.executionMachine === 'client'
@@ -141,7 +119,7 @@ function cookieImportLocationDescription(
 
 function emitGoogleCookieImportWarning(
   summary: BrowserCookieImportSummary,
-  execution: BrowserCookieImportExecution & { legacyLabel?: boolean }
+  execution: BrowserCookieImportExecution
 ): void {
   if (!summary.googleCookiesSkipped) {
     return
@@ -149,31 +127,24 @@ function emitGoogleCookieImportWarning(
   // Why: the sign-in must happen in the jar the import populated — the named workspace for a
   // remote environment, any Orca browser locally. Client-hosted pages render on this desktop, so
   // say that or the instruction reads as "go to the other machine".
-  const message = execution.legacyLabel
-    ? !execution.executionRemoteEnvironment
+  const message = !execution.executionRemoteEnvironment
+    ? translate(
+        'auto.lib.browser.cookie.import.toast.googleCookiesSkippedLocal',
+        'Google cookies were not imported. Open a browser in Orca with this profile, then sign into Google.'
+      )
+    : execution.executionMachine === 'client'
       ? translate(
-          'auto.lib.browser.cookie.import.toast.googleCookiesSkippedLocal',
-          'Google cookies were not imported. Open a browser in Orca with this profile, then sign into Google.'
+          'auto.lib.browser.cookie.import.toast.googleCookiesSkippedClientHosted',
+          'Google cookies were not imported. Open a browser tab in the {{value0}} workspace with this profile — it opens on this device — then sign into Google.',
+          { value0: execution.executionHostLabel }
         )
-      : `Google cookies were not imported. Open a browser in ${APP_DISPLAY_NAME} on ${execution.executionHostLabel} with this profile, then sign into Google.`
-    : !execution.executionRemoteEnvironment
-      ? translate(
-          'auto.lib.browser.cookie.import.toast.googleCookiesSkippedLocal',
-          'Google cookies were not imported. Open a browser in Orca with this profile, then sign into Google.'
+      : // Why: not the legacy googleCookiesSkipped key — reworded copy must not inherit the old
+        // catalog entry, which i18next prefers over the inline default.
+        translate(
+          'auto.lib.browser.cookie.import.toast.googleCookiesSkippedRemoteWorkspace',
+          'Google cookies were not imported. Open a browser tab in the {{value0}} workspace with this profile, then sign into Google.',
+          { value0: execution.executionHostLabel }
         )
-      : execution.executionMachine === 'client'
-        ? translate(
-            'auto.lib.browser.cookie.import.toast.googleCookiesSkippedClientHosted',
-            'Google cookies were not imported. Open a browser tab in the {{value0}} workspace with this profile — it opens on this device — then sign into Google.',
-            { value0: execution.executionHostLabel }
-          )
-        : // Why: not the legacy googleCookiesSkipped key — reworded copy must not inherit the old
-          // catalog entry, which i18next prefers over the inline default.
-          translate(
-            'auto.lib.browser.cookie.import.toast.googleCookiesSkippedRemoteWorkspace',
-            'Google cookies were not imported. Open a browser tab in the {{value0}} workspace with this profile, then sign into Google.',
-            { value0: execution.executionHostLabel }
-          )
   toast.warning(message, { duration: 12000 })
 }
 
@@ -181,6 +152,27 @@ function emitGoogleCookieImportWarning(
 // is lossy in a way the success count alone would hide.
 function emitPartitionSkippedImportWarning(summary: BrowserCookieImportSummary): void {
   if (!summary.partitionSkippedCookies) {
+    return
+  }
+  const breakdown = summary.partitionSkipBreakdown
+  if (
+    breakdown &&
+    Number.isSafeInteger(summary.partitionSkippedCookies) &&
+    Number.isSafeInteger(breakdown.unreadableCookies) &&
+    breakdown.unreadableCookies > 0 &&
+    Number.isSafeInteger(breakdown.preservedRelatedCookies) &&
+    breakdown.preservedRelatedCookies >= 0 &&
+    breakdown.unreadableCookies + breakdown.preservedRelatedCookies ===
+      summary.partitionSkippedCookies
+  ) {
+    toast.warning(
+      translate(
+        'auto.lib.browser.cookie.import.toast.partitionSkippedBreakdown',
+        'Cookies with unreadable site partitions: {{value0}}. Related cookies left unimported to protect existing sessions: {{value1}}. Existing cookies for these sites were left unchanged. Check these sites in this profile before signing in again.',
+        { value0: breakdown.unreadableCookies, value1: breakdown.preservedRelatedCookies }
+      ),
+      { duration: 12000 }
+    )
     return
   }
   toast.warning(
@@ -198,9 +190,8 @@ function emitPartitionSkippedImportWarning(summary: BrowserCookieImportSummary):
 export function emitBrowserCookieImportToast(
   summary: BrowserCookieImportSummary,
   successMessage: string,
-  executionInput: BrowserCookieImportExecutionInput
+  execution: BrowserCookieImportExecution
 ): void {
-  const execution = normalizeCookieImportExecution(executionInput)
   const warning = summary.warning
   if (warning) {
     toast.warning(formatCookieImportWarning(warning))

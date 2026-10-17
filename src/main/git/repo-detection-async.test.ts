@@ -134,7 +134,7 @@ describe('asynchronous repository detection with real Git', () => {
     vi.spyOn(runner, 'gitExecFileAsync').mockRejectedValue(new Error('Git unavailable'))
     await expectSameDetection(alias)
     expect((await inspectGitRepoForRegistrationAsync(alias)).rootPath).toBe(
-      realpathSync(repo).replaceAll('\\', '/')
+      realpathSync.native(repo).replaceAll('\\', '/')
     )
     writeFileSync(join(nested, '.git'), 'gitdir: missing-metadata')
     await expectSameDetection(alias)

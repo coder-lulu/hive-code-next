@@ -33,6 +33,53 @@ const REQUIRED_CJS_SIBLINGS = [
 ]
 
 describe('ensure-native-runtime', () => {
+  it('prepares macOS binding before Node compilation and leaves successful checks read-only', () => {
+    const projectDir = mkTempProject()
+    try {
+      writeFakeNativeModules(projectDir)
+      writeNodePtyPatchFile(projectDir)
+      writeFakeNodeGyp(projectDir)
+      const bindingPath = join(projectDir, 'node_modules', 'node-pty', 'binding.gyp')
+      const binding = "{ 'target_defaults': {}, 'targets': [] }\n"
+      writeFileSync(bindingPath, binding)
+      const snapshotPath = join(projectDir, 'compile-binding.gyp')
+      const markerPath = join(projectDir, 'rebuilt.marker')
+      const logPath = join(projectDir, 'native-runtime.log')
+      const scriptPath = join(projectDir, 'config', 'scripts', 'ensure-native-runtime.mjs')
+      const options = {
+        cwd: projectDir,
+        env: envForNativeFixture(projectDir, {
+          ORCA_NATIVE_TEST_LOG: logPath,
+          ORCA_NATIVE_TEST_MARKER: markerPath,
+          ORCA_NATIVE_TEST_BINDING_SNAPSHOT: snapshotPath
+        })
+      }
+      const rebuilt = runProcessSync({
+        program: process.execPath,
+        args: [scriptPath, '--runtime=node'],
+        ...options
+      })
+      expect(rebuilt.code, rebuilt.stderr).toBe(0)
+      const compiledBinding = readFileSync(snapshotPath, 'utf8')
+      expect(compiledBinding !== binding).toBe(process.platform === 'darwin')
+      expect(readFileSync(bindingPath, 'utf8')).toBe(compiledBinding)
+      writePatchedNodePtyBuildArtifacts(projectDir)
+      writeFileSync(snapshotPath, 'no further compilation')
+      for (const args of [['--runtime=node'], ['--runtime=node', '--check-only']]) {
+        const checked = runProcessSync({
+          program: process.execPath,
+          args: [scriptPath, ...args],
+          ...options
+        })
+        expect(checked.code, checked.stderr).toBe(0)
+        expect(readFileSync(snapshotPath, 'utf8')).toBe('no further compilation')
+        expect(readFileSync(bindingPath, 'utf8')).toBe(compiledBinding)
+      }
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true })
+    }
+  })
+
   it('rechecks Node native modules in fresh child processes after rebuilding', () => {
     const projectDir = mkTempProject()
 
@@ -427,6 +474,9 @@ function writeFakeWindowsRegistry(projectDir, { requiresMarker = false } = {}) {
     join(processTreeDir, 'index.js'),
     'exports.supportedProcessDataFlags = 4; exports.getProcessCreationTime = () => 1; exports.terminateProcessIfCreationTimeMatches = () => false\n'
   )
+  const securityDir = join(projectDir, 'node_modules', '@orca', 'windows-security')
+  mkdirSync(securityDir, { recursive: true })
+  writeFileSync(join(securityDir, 'index.js'), "exports.currentUserSid = () => 'S-1-5-18'\n")
 }
 
 function writeNodePtyPatchFile(projectDir) {
@@ -457,7 +507,7 @@ function writeFakeNodeGyp(projectDir) {
   writeFileSync(
     join(toolDir, 'node-gyp.js'),
     `
-const { appendFileSync, writeFileSync, writeSync } = require('node:fs')
+const { appendFileSync, copyFileSync, writeFileSync, writeSync } = require('node:fs')
 const { join } = require('node:path')
 appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`node-gyp \${process.argv.slice(2).join(' ')}\\n\`)
 appendFileSync(process.env.ORCA_NATIVE_TEST_LOG, \`cwd=\${process.cwd()}\\n\`)
@@ -470,6 +520,9 @@ if (process.env.ORCA_NATIVE_TEST_VERBOSE_OUTPUT_BYTES) {
   }
   writeSync(1, 'node-gyp stdout complete\\n')
   writeSync(2, 'node-gyp stderr complete\\n')
+}
+if (process.env.ORCA_NATIVE_TEST_BINDING_SNAPSHOT) {
+  copyFileSync(join(process.cwd(), 'binding.gyp'), process.env.ORCA_NATIVE_TEST_BINDING_SNAPSHOT)
 }
 writeFileSync(process.env.ORCA_NATIVE_TEST_MARKER, 'rebuilt')
 if (process.platform === 'win32' && process.cwd().endsWith('node-pty')) {

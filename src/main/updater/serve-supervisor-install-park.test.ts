@@ -1,5 +1,14 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, utimes, writeFile } from 'node:fs/promises'
-import { realpathSync } from 'node:fs'
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rm,
+  stat,
+  utimes,
+  writeFile
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -34,7 +43,7 @@ describe('parkServeSupervisorsForInstall', () => {
     executable = join(bundle, 'Contents', 'MacOS', 'Orca')
     await mkdir(join(bundle, 'Contents', 'MacOS'), { recursive: true })
     await writeFile(join(bundle, 'Contents', 'Info.plist'), 'v1')
-    dir = bundleCoordinationDir(realpathSync(bundle), join(root, 'data'))
+    dir = bundleCoordinationDir(await realpath(bundle), join(root, 'data'))
   })
 
   afterEach(async () => {

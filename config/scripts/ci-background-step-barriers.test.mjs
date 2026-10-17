@@ -28,6 +28,19 @@ describe('CI background step barriers', () => {
       cloud.jobs.security,
       headless.jobs.persistence
     ]) {
+      const packageTasks = [
+        'linux-native',
+        'shutdown-fixture-cache',
+        'cli-fixture-cache',
+        'linux-package-tools',
+        'web-client'
+      ]
+      if (job === pr.jobs.package) {
+        expect(job.steps.filter((step) => step.background).map((step) => step.id)).toEqual([
+          'daemon-fixture-cache',
+          ...packageTasks
+        ])
+      }
       const pending = new Set()
       for (const step of job.steps) {
         if (step.background) {
@@ -43,7 +56,10 @@ describe('CI background step barriers', () => {
             expect(pending.delete(id), `missing background step ${id}`).toBe(true)
           }
         }
-        expect(pending.size).toBeLessThanOrEqual(job === pr.jobs.package ? 4 : 3)
+        if (job === pr.jobs.package && pending.size === 5) {
+          expect([...pending]).toEqual(packageTasks)
+        }
+        expect(pending.size).toBeLessThanOrEqual(job === pr.jobs.package ? packageTasks.length : 3)
       }
       expect([...pending]).toEqual([])
     }

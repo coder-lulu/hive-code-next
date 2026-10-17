@@ -8,7 +8,7 @@ import { useActivityTerminalPortals } from '../activity/activity-terminal-portal
 import { RetainedPaneHost } from '../tab-group/RetainedPaneHost'
 import NativeChatView from './NativeChatView'
 import { resolveStructuredSessionRuntimeTarget } from './structured-session-runtime-target'
-import { isStructuredTab } from './structured-agent-session-tabs'
+import { isStructuredTab } from '../../../../shared/structured-agent-session-tab'
 
 type StructuredAgentSessionTab = Tab & {
   contentType: 'agent-session'

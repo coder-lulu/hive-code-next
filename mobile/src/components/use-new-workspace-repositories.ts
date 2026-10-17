@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { RpcClient } from '../transport/rpc-client'
-import { nativeChatRepoListRead } from '../session/mobile-session-read-operations'
 import { getCachedRepos, setCachedRepos } from '../cache/repo-cache'
+import { listHostRepos } from '../worktree/server-repos'
 import { useLastVisitedWorktreeRepoId } from '../worktree/use-last-visited-worktree-repo'
 import {
   getMobileNewWorkspaceDialogEligibleRepos,
@@ -19,18 +19,42 @@ export function useNewWorkspaceRepositories(args: {
   selectedRepo: MobileWorkspaceRepo | null
   setSelectedRepo: (repo: MobileWorkspaceRepo | null) => void
   loading: boolean
+  selectionError: string
 } {
   const { client, hostId, visible } = args
   const [initialRepos] = useState(() =>
     hostId ? (getCachedRepos(hostId) as MobileWorkspaceRepo[] | null) : null
   )
-  const [repos, setRepos] = useState<MobileWorkspaceRepo[]>(initialRepos ?? [])
-  const [selectedRepo, setSelectedRepo] = useState<MobileWorkspaceRepo | null>(null)
+  const [listedRepos, setRepos] = useState<MobileWorkspaceRepo[]>(initialRepos ?? [])
+  const [pickedRepo, setSelectedRepo] = useState<MobileWorkspaceRepo | null>(null)
   const [loading, setLoading] = useState(initialRepos == null)
   const lastVisitedRepo = useLastVisitedWorktreeRepoId(hostId, visible)
+  const repos = useMemo(
+    () => listedRepos.filter((repo) => !repo.executionHostId?.startsWith('runtime:')),
+    [listedRepos]
+  )
+  const retiredSelection = pickedRepo
+    ? pickedRepo.executionHostId?.startsWith('runtime:')
+    : [...(initialRepos ?? []), ...listedRepos].some(
+        (repo) => repo.id === lastVisitedRepo.repoId && repo.executionHostId?.startsWith('runtime:')
+      )
+  const selectionError = retiredSelection
+    ? '所选仓库需要直接连接所属 Runtime，请重新选择仓库。'
+    : ''
+  // Why derived: the pick follows its repo's latest listing, and goes once its host stops listing it.
+  const selectedRepo = useMemo(
+    () => refreshMobileNewWorkspaceDialogSelectedRepo(repos, pickedRepo),
+    [pickedRepo, repos]
+  )
 
   useEffect(() => {
-    if (!visible || !lastVisitedRepo.loaded || selectedRepo || repos.length === 0) {
+    if (
+      !visible ||
+      !lastVisitedRepo.loaded ||
+      selectedRepo ||
+      retiredSelection ||
+      repos.length === 0
+    ) {
       return
     }
     const eligibleRepos = getMobileNewWorkspaceDialogEligibleRepos(repos)
@@ -42,7 +66,14 @@ export function useNewWorkspaceRepositories(args: {
     if (preferredRepo) {
       setSelectedRepo(preferredRepo)
     }
-  }, [lastVisitedRepo.loaded, lastVisitedRepo.repoId, repos, selectedRepo, visible])
+  }, [
+    lastVisitedRepo.loaded,
+    lastVisitedRepo.repoId,
+    repos,
+    retiredSelection,
+    selectedRepo,
+    visible
+  ])
 
   useEffect(() => {
     if (!visible || !client) {
@@ -50,25 +81,15 @@ export function useNewWorkspaceRepositories(args: {
     }
     let stale = false
     setLoading(true)
-    void nativeChatRepoListRead
-      .request(client)
-      .then((response) => {
-        if (stale) {
+    void listHostRepos<MobileWorkspaceRepo>(client)
+      .then((listed) => {
+        if (stale || !listed) {
           return
         }
-        const listed = nativeChatRepoListRead.interpret(response)
-        if (!listed.accepted) {
-          return
-        }
-        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Preserve the established response shape at this boundary.
-        const listedRepos = listed.value as MobileWorkspaceRepo[]
-        setRepos(listedRepos)
+        setRepos(listed)
         if (hostId) {
-          setCachedRepos(hostId, listedRepos)
+          setCachedRepos(hostId, listed)
         }
-        setSelectedRepo((current) =>
-          refreshMobileNewWorkspaceDialogSelectedRepo(listedRepos, current)
-        )
       })
       .catch(() => undefined)
       .finally(() => {
@@ -81,5 +102,11 @@ export function useNewWorkspaceRepositories(args: {
     }
   }, [visible, client, hostId])
 
-  return { repos, selectedRepo, setSelectedRepo, loading: loading && repos.length === 0 }
+  return {
+    repos,
+    selectedRepo,
+    setSelectedRepo,
+    loading: loading && repos.length === 0,
+    selectionError
+  }
 }

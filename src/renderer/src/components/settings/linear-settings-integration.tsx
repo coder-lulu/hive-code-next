@@ -77,8 +77,12 @@ export function LinearSettingsIntegration() {
       description={
         connected
           ? translate(
-              'components.integrationSettings.workspaceCount',
-              '{{count}} workspaces connected',
+              workspaces.length === 1
+                ? 'auto.components.settings.task.tracker.integration.cards.connectedWorkspaceSingular'
+                : 'auto.components.settings.task.tracker.integration.cards.connectedWorkspacePlural',
+              workspaces.length === 1
+                ? '{{count}} workspace connected'
+                : '{{count}} workspaces connected',
               { count: workspaces.length }
             )
           : text('linearDescription', 'Browse and link issues')

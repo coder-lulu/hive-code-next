@@ -45,8 +45,16 @@ describe('task completion Dock badge', () => {
     ).toBe(2)
   })
 
-  it('keeps completion counts awaiting tab inventory without inventing workspace flags', () => {
-    expect(getUnreadBadgeCount(sources({ tabsByWorktree: {}, worktreesByRepo: {} }))).toBe(2)
+  it('counts retained completions once their navigable owner inventory arrives', () => {
+    const pending = sources({ tabsByWorktree: {}, worktreesByRepo: {} })
+    expect(getUnreadBadgeCount(pending)).toBe(0)
+    expect(
+      getUnreadBadgeCount({
+        ...pending,
+        tabsByWorktree: sources().tabsByWorktree,
+        worktreesByRepo: sources().worktreesByRepo
+      })
+    ).toBe(2)
   })
 
   it('excludes archived task owners from the badge', () => {

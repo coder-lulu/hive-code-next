@@ -1,6 +1,6 @@
 import type { MobileLocalTaskFeed } from './mobile-local-task-hook'
 import { mobileLocalTaskSourceLabel, type MobileLocalTaskRow } from './mobile-local-task-model'
-import type { TaskProvider } from './mobile-task-providers'
+import type { TaskProvider } from '../../../src/shared/task-providers'
 
 export type MobileTaskExecutionScope = 'all' | 'local'
 export type MobileTaskExecutionGroupFilter = 'all' | 'in-progress' | 'recent-completed'

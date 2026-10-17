@@ -1,7 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { removeTreeSync } from '../../shared/windows-transient-lock-removal'
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { writeSecureJsonFileWithinLimit } from '../../shared/bounded-secure-json-file'
+import { parseOrcadMigrationSourceCutover } from '../../shared/orcad-migration-source-cutover'
 import { orcadMigrationCutoverFixture as cutover } from './orcad-migration-cutover-fixture'
 import {
   findOrcadMigrationSourceCutoverForTarget,
@@ -15,7 +18,7 @@ let userDataPath: string
 beforeEach(() => {
   userDataPath = mkdtempSync(join(tmpdir(), 'orcad-cutover-journal-'))
 })
-afterEach(() => rmSync(userDataPath, { recursive: true, force: true }))
+afterEach(() => removeTreeSync(userDataPath))
 
 const journalPath = (id: string) =>
   join(orcadMigrationCutoverJournalDirectory(userDataPath), `${id}.json`)
@@ -33,7 +36,10 @@ describe('migration cutover journal sidecar', () => {
 
   it.each([
     ['corrupt JSON', '{not json'],
-    ['unsupported legacy terminal grant', JSON.stringify({ ...cutover(), bridgedPtyIds: ['running'] })],
+    [
+      'unsupported legacy terminal grant',
+      JSON.stringify({ ...cutover(), bridgedPtyIds: ['running'] })
+    ],
     ['unsupported empty bridge grant', JSON.stringify({ ...cutover(), bridgedPtyIds: [] })],
     ['a manifest bound to another target', JSON.stringify({ ...cutover(), sshTargetId: 'ssh-2' })],
     ['a tampered manifest', JSON.stringify({ ...cutover(), manifestSha256: 'f'.repeat(64) })],
@@ -91,5 +97,22 @@ describe('migration cutover journal sidecar', () => {
     expect(findOrcadMigrationSourceCutoverForTarget(userDataPath, 'ssh-1')?.phase).toBe(
       'destination-staged'
     )
+  })
+
+  // Older desktops read these files: the shared store must keep the path and bytes the SSH
+  // journal has always written (the exact call it made before the store existed).
+  it('writes the same path and bytes the SSH journal always wrote', () => {
+    writeOrcadMigrationSourceCutover(userDataPath, cutover())
+    expect(orcadMigrationCutoverJournalDirectory(userDataPath)).toBe(
+      join(userDataPath, 'orcad-migration-cutovers')
+    )
+    const reference = join(userDataPath, 'reference.json')
+    writeSecureJsonFileWithinLimit(
+      reference,
+      parseOrcadMigrationSourceCutover(cutover()),
+      16 * 1024 * 1024,
+      { durable: true }
+    )
+    expect(readFileSync(journalPath('migration-1'))).toEqual(readFileSync(reference))
   })
 })

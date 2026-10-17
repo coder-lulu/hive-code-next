@@ -11,7 +11,7 @@ import {
 } from '../onboarding/mobile-onboarding-plan'
 import { totalHomeStats, type HomeStatsRow } from '../stats/home-stats-total'
 import { useAccountVisibleHostCatalog } from '../runtime-directory/use-account-visible-host-catalog'
-import type { TaskProvider } from '../tasks/mobile-task-providers'
+import type { TaskProvider } from '../../../src/shared/task-providers'
 import {
   selectConnectableHostProfiles,
   sortHostsByLastConnected

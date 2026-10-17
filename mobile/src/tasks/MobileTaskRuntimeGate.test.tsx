@@ -13,7 +13,7 @@ vi.mock('react-native', () => ({
   StyleSheet: { hairlineWidth: 1, create: <T,>(styles: T) => styles }
 }))
 vi.mock('lucide-react-native', () => ({ ListTodo: 'ListTodo', RefreshCw: 'RefreshCw' }))
-let activeTheme = lightTheme
+let activeTheme: MobileTheme = lightTheme
 vi.mock('../theme/mobile-theme-provider', () => ({
   useMobileTheme: () => activeTheme,
   useMobileThemeStyles: (factory: (theme: MobileTheme) => unknown) => factory(activeTheme)
@@ -38,10 +38,10 @@ describe.each([lightTheme, darkTheme])('task Runtime gate in $scheme', (theme) =
     act(() => {
       renderer = create(createElement(MobileTaskRuntimeGate, { state, onRetry, onSelectRuntime }))
     })
-    const texts = renderer!.root.findAllByType('Text')
+    const texts = renderer!.root.findAll((node) => String(node.type) === 'Text')
     expect(texts.map((text) => text.props.children)).toContain(title)
     expect(texts.every((text) => text.props.maxFontSizeMultiplier === 1.3)).toBe(true)
-    const buttons = renderer!.root.findAllByType('Pressable')
+    const buttons = renderer!.root.findAll((node) => String(node.type) === 'Pressable')
     act(() => buttons[0]!.props.onPress())
     act(() => buttons[1]!.props.onPress())
     expect(onRetry).toHaveBeenCalledOnce()
@@ -55,7 +55,9 @@ describe.each([lightTheme, darkTheme])('task Runtime gate in $scheme', (theme) =
         createElement(MobileTaskRuntimeGate, { state: 'loading', onSelectRuntime: vi.fn() })
       )
     })
-    expect(renderer!.root.findAllByType('ActivityIndicator')).toHaveLength(1)
-    expect(renderer!.root.findAllByType('Text')).toHaveLength(0)
+    expect(
+      renderer!.root.findAll((node) => String(node.type) === 'ActivityIndicator')
+    ).toHaveLength(1)
+    expect(renderer!.root.findAll((node) => String(node.type) === 'Text')).toHaveLength(0)
   })
 })

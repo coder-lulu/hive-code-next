@@ -16,7 +16,7 @@ export function useComposerTargetState(
   decisions: ComposerDecisions
 ): ComposerTargetState {
   const composerTargetStore = useComposerTargetStore(options, decisions)
-  const initialTargetState = useComposerInitialTargetState({
+  const initialTargetSeedState = useComposerInitialTargetState({
     actionableHostIds: composerTargetStore.actionableHostIds,
     decisions: composerTargetStore.decisions,
     eligibleRepos: composerTargetStore.eligibleRepos,
@@ -24,6 +24,7 @@ export function useComposerTargetState(
     initialRepoId: composerTargetStore.initialRepoId,
     initialExecutionHostId: composerTargetStore.initialExecutionHostId,
     initialTaskSourceContext: composerTargetStore.initialTaskSourceContext,
+    initialWorkspaceTarget: composerTargetStore.initialWorkspaceTarget,
     initialWorkspaceStatus: composerTargetStore.initialWorkspaceStatus,
     newWorkspaceDraft: composerTargetStore.newWorkspaceDraft,
     persistDraft: composerTargetStore.persistDraft,
@@ -41,18 +42,25 @@ export function useComposerTargetState(
     eligibleRepos: composerTargetStore.eligibleRepos,
     hostOptions: composerTargetStore.hostOptions,
     initialEphemeralVmRecipeId: composerTargetStore.initialEphemeralVmRecipeId,
+    pendingInitialWorkspaceTarget: initialTargetSeedState.pendingInitialWorkspaceTarget,
     projectGroups: composerTargetStore.projectGroups,
     projectHostSetups: composerTargetStore.projectHostSetups,
     projects: composerTargetStore.projects,
-    repoId: initialTargetState.repoId,
+    repoId: initialTargetSeedState.repoId,
     repos: composerTargetStore.repos,
-    selectedProjectGroup: initialTargetState.selectedProjectGroup,
-    selectedProjectHostSetupOverrideId: initialTargetState.selectedProjectHostSetupOverrideId,
+    selectedProjectGroup: initialTargetSeedState.selectedProjectGroup,
+    selectedProjectHostSetupOverrideId: initialTargetSeedState.selectedProjectHostSetupOverrideId,
+    selectedProjectHostSetupOverrideHostId:
+      initialTargetSeedState.selectedProjectHostSetupOverrideHostId,
     settings: composerTargetStore.settings,
     sshConnectionStates: composerTargetStore.sshConnectionStates,
     workspaceHostScope: composerTargetStore.workspaceHostScope,
     worktreesByRepo: composerTargetStore.worktreesByRepo
   })
+  const initialTargetState = {
+    ...initialTargetSeedState,
+    repoId: runtimeTargetSelection.resolvedRepoId
+  }
   const sourceContextState = useComposerSourceContextState({
     folderSourceRepos: runtimeTargetSelection.folderSourceRepos,
     decisions: composerTargetStore.decisions,
@@ -72,6 +80,7 @@ export function useComposerTargetState(
     selectedRepo: runtimeTargetSelection.selectedRepo,
     selectedRepoIsGit: runtimeTargetSelection.selectedRepoIsGit,
     setInternalRepoId: initialTargetState.setInternalRepoId,
+    setPendingInitialWorkspaceTarget: initialTargetState.setPendingInitialWorkspaceTarget,
     selectedWorkspaceTarget: runtimeTargetSelection.selectedWorkspaceTarget
   })
   const workspaceIdentityState = useWorkspaceIdentityState({
@@ -170,6 +179,7 @@ export function useComposerTargetState(
     note: sourceContextState.note,
     persistDraft: composerTargetStore.persistDraft,
     repoId: initialTargetState.repoId,
+    pendingInitialWorkspaceTarget: initialTargetState.pendingInitialWorkspaceTarget,
     selectedProjectGroup: initialTargetState.selectedProjectGroup,
     selectedRepo: runtimeTargetSelection.selectedRepo,
     selectedRepoIsGit: runtimeTargetSelection.selectedRepoIsGit,

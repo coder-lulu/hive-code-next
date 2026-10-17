@@ -4,12 +4,14 @@ on:
   pull_request:
     paths:
       - cloud/**
+      - src/packages/process-host/**
       - .github/workflows/cloud-*.yml
       - .github/actions/cloud-sql-rollout-lease/**
   push:
     branches: [main]
     paths:
       - cloud/**
+      - src/packages/process-host/**
       - .github/workflows/cloud-*.yml
       - .github/actions/cloud-sql-rollout-lease/**
 
@@ -111,6 +113,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
+      ORCA_BACKGROUND_LAUNCH: '1'
       ORCA_PUSH_TEST_DATABASE_URL: postgres://push_test:push_test@127.0.0.1:5432/orca_push_test
     steps:
       - uses: actions/checkout@v4

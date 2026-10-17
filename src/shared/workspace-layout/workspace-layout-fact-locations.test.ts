@@ -117,8 +117,11 @@ function fill(
 
 function populate(loaded: LoadedWorkspaceLayout): LoadedWorkspaceLayout {
   fill(loaded, 'tab.projectAssignment', {
-    projectId: 'project-1', projectIdentityKey: 'key', projectGroupId: null,
-    executionHostId: LOCAL_EXECUTION_HOST_ID, assignedAt: 123
+    projectId: 'project-1',
+    projectIdentityKey: 'key',
+    projectGroupId: null,
+    executionHostId: LOCAL_EXECUTION_HOST_ID,
+    assignedAt: 123
   })
   fill(loaded, 'tab.structuredSessionId', 'adopted-session')
   const terminal = (holder: Holder) => holder.kind === 'terminal'
@@ -126,7 +129,6 @@ function populate(loaded: LoadedWorkspaceLayout): LoadedWorkspaceLayout {
   fill(loaded, 'tab.quickCommandLabel', 'build', terminal)
   fill(loaded, 'tab.isPreview', true, (holder) => holder.kind === 'editor')
   fill(loaded, 'tab.terminal.forceHostRuntime', true)
-  fill(loaded, 'tab.terminal.agentLaunchPane', { leafId: leaf(1) })
   fill(loaded, 'file.externalSshTargetId', 'box')
   fill(loaded, 'file.runtimeEnvironmentId', 'env')
   fill(loaded, 'file.readOnly', true)

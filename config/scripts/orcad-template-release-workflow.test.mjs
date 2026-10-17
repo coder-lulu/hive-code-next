@@ -179,7 +179,20 @@ describe('orcad template release wiring (design D2)', () => {
       for (const need of needsOf(name).filter(
         (need) => need !== 'orcad-template' && need !== 'cut'
       )) {
-        expect(condition, `${name} -> ${need}`).toContain(`needs.${need}.result == 'success'`)
+        if (name === 'verify-mac-build' && need === 'build') {
+          expect(needsOf(name)).toEqual(['cut', 'build-mac', 'build'])
+          expect(condition).toBe(
+            "!cancelled() && needs.cut.result == 'success' && needs.cut.outputs.should_release == 'true' && needs.build-mac.result == 'success'"
+          )
+          for (const required of ['build', 'build-mac', 'verify-mac-build']) {
+            expect(needsOf('publish-release')).toContain(required)
+            expect(releaseCut.jobs['publish-release'].if).toContain(
+              `needs.${required}.result == 'success'`
+            )
+          }
+        } else {
+          expect(condition, `${name} -> ${need}`).toContain(`needs.${need}.result == 'success'`)
+        }
       }
     }
   })

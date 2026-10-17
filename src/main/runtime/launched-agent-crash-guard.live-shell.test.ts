@@ -48,6 +48,7 @@ let savedLoginOptOut: string | undefined
 
 beforeEach(() => {
   home = mkdtempSync(join(tmpdir(), 'orca-crash-guard-'))
+  writeFileSync(join(home, '.zshenv'), 'unsetopt GLOBAL_RCS\n')
   // The production spawn: a pane on macOS runs under `login` unless the user opted out.
   savedLoginOptOut = process.env.ORCA_DISABLE_MACOS_LOGIN_SHELL
   delete process.env.ORCA_DISABLE_MACOS_LOGIN_SHELL

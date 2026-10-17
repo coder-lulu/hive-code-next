@@ -37,6 +37,11 @@ vi.mock('lucide-react-native', () => ({
   Server: 'Server'
 }))
 
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { createLightThemeTestModule } = await import('../theme/mobile-theme.test-fixture')
+  return createLightThemeTestModule()
+})
+
 vi.mock('../platform/haptics', () => ({ triggerMediumImpact: vi.fn() }))
 vi.mock('./AgentSpinner', () => ({
   AgentSpinner: (props: unknown) => {

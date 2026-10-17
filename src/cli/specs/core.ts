@@ -68,7 +68,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
     repeatableFlags: ['reference'],
     summary: 'Create a new HiveCode-managed worktree',
     usage:
-      'hive worktree create --name <name> [--repo <selector>|--project <id> [--host <host-id>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--model <id>] [--effort <level>] [--setup run|skip|inherit] [--base-branch <ref>] [--reference <url>...] [--issue <number>] [--pr <number>] [--linear-issue <identifier-or-url>] [--gitlab-issue <number-or-url>] [--gitlab-mr <number-or-url>] [--comment <text>] [--parent-worktree <selector>] [--no-parent] [--run-hooks] [--activate] [--retry-launch <operationId>] [--json]',
+      'hive worktree create --name <name> [--repo <selector>|--project <id> [--host <host-id>]|--project-host-setup <id>] [--agent <id>] [--prompt <text>] [--model <id>] [--effort <level>] [--setup run|skip|inherit] [--base-branch <ref>] [--reference <url-or-jira-key>...] [--reference-site <id>] [--issue <number>] [--pr <number>] [--linear-issue <identifier-or-url>] [--gitlab-issue <number-or-url>] [--gitlab-mr <number-or-url>] [--comment <text>] [--parent-worktree <selector>] [--no-parent] [--run-hooks] [--activate] [--retry-launch <operationId>] [--json]',
     allowedFlags: [
       ...GLOBAL_FLAGS,
       'repo',
@@ -83,6 +83,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'retry-launch',
       'base-branch',
       'reference',
+      'reference-site',
       'issue',
       'pr',
       'linear-issue',
@@ -96,7 +97,7 @@ export const CORE_COMMAND_SPECS: CommandSpec[] = [
       'activate'
     ],
     notes: [
-      'Repeat --reference to attach full issue or review URLs before setup or agent startup. Cannot combine with legacy link flags.',
+      'Repeat --reference to attach full issue or review URLs, or Jira issue keys, before setup or agent startup. Use --reference-site to choose the Jira site for keys. Other providers require full URLs. Cannot combine with legacy link flags.',
       'This creates a new checkout. For a fresh agent in an existing worktree, use `hive agent launch` instead.',
       'By default, HiveCode records the new worktree as a child of the caller context when it can infer one from the HiveCode terminal or current directory.',
       'If --repo is omitted, HiveCode infers the repo from the current HiveCode-managed worktree.',

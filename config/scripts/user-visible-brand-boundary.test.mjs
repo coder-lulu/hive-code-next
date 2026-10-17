@@ -30,6 +30,8 @@ const userVisibleSharedFiles = [
   path.join(repoRoot, 'src', 'shared', 'source-control-ai-action-variables.ts'),
   path.join(repoRoot, 'src', 'shared', 'workbench-steps.ts')
 ]
+const terminalReplayFixture =
+  'src/renderer/src/components/terminal-pane/terminal-ime-linux-pane-replay-fixture.ts'
 function isProductionSourceName(name) {
   return (
     /\.[jt]sx?$/.test(name) &&
@@ -37,7 +39,7 @@ function isProductionSourceName(name) {
   )
 }
 
-function sourceFilesUnder(root) {
+function sourceFilesUnder(root, includeTests = false) {
   const files = []
   for (const entry of readdirSync(root)) {
     const absolutePath = path.join(root, entry)
@@ -46,10 +48,16 @@ function sourceFilesUnder(root) {
       if (entry === '__tests__' || entry === '__fixtures__') {
         continue
       }
-      files.push(...sourceFilesUnder(absolutePath))
+      files.push(...sourceFilesUnder(absolutePath, includeTests))
       continue
     }
-    if (!isProductionSourceName(entry)) {
+    if (
+      !/\.[jt]sx?$/.test(entry) ||
+      (!includeTests &&
+        (!isProductionSourceName(entry) ||
+          path.relative(repoRoot, absolutePath).split(path.sep).join('/') ===
+            terminalReplayFixture))
+    ) {
       continue
     }
     files.push(absolutePath)
@@ -94,9 +102,7 @@ function collectVisibleBrandLeaks(filePath) {
     const isInsideProductNameAdapter = productNameAdapterDepth > 0 || adapterIndex >= 0
     const adapterSlice = adapterIndex >= 0 ? code.slice(adapterIndex) : code
     if (isInsideProductNameAdapter) {
-      productNameAdapterDepth +=
-        [...adapterSlice].filter((char) => char === '(').length -
-        [...adapterSlice].filter((char) => char === ')').length
+      productNameAdapterDepth += adapterSlice.split('(').length - adapterSlice.split(')').length
       productNameAdapterDepth = Math.max(0, productNameAdapterDepth)
     }
     if (!isInsideProductNameAdapter && upstreamVisibleBrandPattern.test(code)) {
@@ -109,6 +115,30 @@ function collectVisibleBrandLeaks(filePath) {
 }
 
 describe('user-visible brand boundary', () => {
+  it('keeps the captured terminal user agent restricted to its exact replay tests', () => {
+    const target = path.resolve(repoRoot, terminalReplayFixture).replace(/\.ts$/, '')
+    const importers = sourceFilesUnder(path.join(repoRoot, 'src'), true)
+      .filter((filePath) =>
+        [
+          ...readFileSync(filePath, 'utf8').matchAll(
+            /(?:\bfrom\s*|\bimport\s*(?:\(\s*)?|\brequire\s*\(\s*)['"]([^'"]+)['"]/g
+          )
+        ].some(
+          ([, specifier]) =>
+            specifier.startsWith('.') &&
+            path.resolve(path.dirname(filePath), specifier).replace(/\.[jt]sx?$/, '') === target
+        )
+      )
+      .map((filePath) => path.relative(repoRoot, filePath).split(path.sep).join('/'))
+      .sort()
+    expect(importers).toEqual([
+      'src/renderer/src/components/terminal-pane/terminal-ime-hangul-terminating-digit.test.ts',
+      'src/renderer/src/components/terminal-pane/terminal-ime-linux-fcitx4-trace-replay.test.ts',
+      'src/renderer/src/components/terminal-pane/terminal-ime-linux-kitty-orphan-keyup.test.ts'
+    ])
+    expect(isProductionSourceName('wsl-host-e2e-fake-connector.ts')).toBe(true)
+  })
+
   it('excludes test support modules while continuing to scan production helpers', () => {
     for (const name of [
       'workspace-reference-fixtures.test-support.ts',
@@ -219,7 +249,7 @@ describe('user-visible brand boundary', () => {
       path.join(repoRoot, 'mobile', 'src')
     ]
     const leaks = [
-      ...roots.flatMap(sourceFilesUnder),
+      ...roots.flatMap((root) => sourceFilesUnder(root)),
       ...localeCatalogFiles,
       ...userVisibleSharedFiles
     ]
@@ -244,7 +274,7 @@ describe('user-visible brand boundary', () => {
       path.join(repoRoot, 'mobile', 'app'),
       path.join(repoRoot, 'mobile', 'src')
     ]
-    const leaks = [...roots.flatMap(sourceFilesUnder), ...localeCatalogFiles]
+    const leaks = [...roots.flatMap((root) => sourceFilesUnder(root)), ...localeCatalogFiles]
       .filter((filePath) => !filePath.includes('test-fakes'))
       .flatMap((filePath) =>
         readFileSync(filePath, 'utf8')

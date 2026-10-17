@@ -68,8 +68,6 @@ vi.mock('@dnd-kit/sortable', () => ({
   })
 }))
 
-vi.mock('@/lib/use-tab-agent', () => ({ useTabAgent: () => null }))
-
 vi.mock('@/components/ui/tooltip', () => ({
   TooltipProvider: ({ children }: { children: ReactNode }) => <>{children}</>,
   Tooltip: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -145,6 +143,7 @@ function Harness({ tab }: { tab: TerminalTab }): ReactElement {
   return (
     <SortableTab
       tab={tab}
+      agent={null}
       unifiedTabId="unified-1"
       groupId="group-1"
       tabCount={1}

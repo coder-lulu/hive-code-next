@@ -39,7 +39,7 @@ export function MobileTaskRuntimeGate(props: {
     },
     offline: {
       title: 'Runtime 当前离线',
-      description: '任务状态不可验证。请确认电脑上的 HiveCode 正在运行，再重试连接。'
+      description: productNameText('任务状态不可验证。请确认电脑上的 Orca 正在运行，再重试连接。')
     },
     disconnected: {
       title: '尚未连接 Runtime',
@@ -47,7 +47,7 @@ export function MobileTaskRuntimeGate(props: {
     },
     unavailable: {
       title: 'Runtime 连接暂不可用',
-      description: '任务状态不可验证。请检查电脑上的 HiveCode 连接状态，稍后重试。'
+      description: productNameText('任务状态不可验证。请检查电脑上的 Orca 连接状态，稍后重试。')
     }
   }[props.state]
   return (

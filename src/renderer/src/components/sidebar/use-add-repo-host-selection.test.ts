@@ -176,6 +176,23 @@ describe('useAddRepoHostSelection', () => {
     expect(mocks.stateSetters[0]).not.toHaveBeenCalledWith('runtime:env-1')
   })
 
+  it('keeps an unavailable preferred server pending instead of selecting the local filesystem', async () => {
+    mocks.stateValues = ['runtime:env-1', false]
+    mocks.hostOptions[2] = { ...mocks.hostOptions[2], health: 'disconnected' }
+    const { useAddRepoHostSelection } = await import('./use-add-repo-host-selection')
+
+    const result = useAddRepoHostSelection({
+      isOpen: true,
+      preferredHostId: 'runtime:env-1',
+      setStep: vi.fn()
+    })
+
+    expect(mocks.stateSetters[0]).toHaveBeenCalledWith('runtime:env-1')
+    expect(result.displayedHostId).toBe('runtime:env-1')
+    expect(result.selectedHostId).toBeNull()
+    expect(result.selectedParsedHost).toBeNull()
+  })
+
   it('uses the paired runtime as the only local filesystem authority in web clients', async () => {
     mocks.isWebClient = true
     mocks.stateValues = ['local', false]

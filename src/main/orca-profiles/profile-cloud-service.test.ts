@@ -295,4 +295,54 @@ describe('Orca cloud profile service', () => {
     })
     expect(getCurrentOrcaProfileAuthStatus(userDataPath).organizations).toEqual(organizations)
   })
+  it.each(['sign-out', 'org-change', 'profile-change'])(
+    'refuses a delayed profile-create reply after %s',
+    async (change) => {
+      configureCloudEnv()
+      mockSuccessfulConnect()
+      await expect(connectCurrentOrcaProfile(userDataPath)).resolves.toMatchObject({
+        status: 'connected'
+      })
+      const pending = Promise.withResolvers<OrcaCloudSessionExchangeResponse>()
+      const started = Promise.withResolvers<void>()
+      createOrcaCloudProfileMock.mockImplementation(() => {
+        started.resolve()
+        return pending.promise
+      })
+      const creating = createCloudLinkedOrcaProfile(userDataPath, { orgId: 'org-1', name: 'Late' })
+      await started.promise
+      const index = await import('./profile-index-store')
+      if (change === 'sign-out') {
+        await signOutCurrentOrcaProfile(userDataPath)
+      } else if (change === 'org-change') {
+        const owner = await import('./profile-cloud-session-owner')
+        const ticket = owner.beginCloudSessionRelink('local-default', userDataPath)
+        owner.commitCloudSessionRelink('local-default', userDataPath, ticket, {
+          cloud: { ...cloudSummary, activeOrgId: 'org-2' },
+          capabilities
+        })
+      } else {
+        const created = index.createLocalOrcaProfile({ name: 'Other' }, userDataPath)
+        index.setActiveOrcaProfile(created.profile.id, userDataPath)
+      }
+      const before = index.getOrcaProfileListState(userDataPath)
+      pending.resolve({
+        accessToken: 'late-access',
+        refreshToken: 'late-refresh',
+        expiresAt: futureExpiresAt(),
+        cloud: { ...cloudSummary, cloudProfileId: 'late-cloud', activeOrgId: 'org-1' },
+        capabilities
+      })
+      await expect(creating).resolves.toMatchObject({
+        status: 'failed',
+        error: 'stale_cloud_session_mutation'
+      })
+      expect(index.getOrcaProfileListState(userDataPath)).toEqual(before)
+      expect(
+        index
+          .loadOrCreateProfileIndex(userDataPath)
+          .profiles.some((profile) => profile.cloud?.cloudProfileId === 'late-cloud')
+      ).toBe(false)
+    }
+  )
 })

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, Text, View, useWindowDimensions } from 'react-native'
-import { SafeAreaView } from 'react-native-safe-area-context'
+import { Pressable, Text, View } from 'react-native'
+import { SafeAreaView, useSafeAreaFrame } from 'react-native-safe-area-context'
 import { ChevronLeft, Save } from 'lucide-react-native'
 import { ConfirmModal } from '../components/ConfirmModal'
-import { useRouteHandoff } from '../navigation/route-handoff'
 import { getWorktreeLabel } from '../session/worktree-label'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
-import { useForceReconnect, useHostClient } from '../transport/client-context'
+import { useWorkspaceRouteHandoff } from '../navigation/workspace-route-handoff'
+import { useForceReconnect } from '../transport/client-context'
+import { useWorkspaceClient } from '../transport/use-workspace-client'
 import { connectionRetryAction } from '../transport/connection-retry-action'
 import {
   loadMobileFilePreview,
@@ -37,9 +38,9 @@ type Props = {
 export function MobileFilePreviewScreen({ route }: Props) {
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createFilePreviewStyles)
-  const router = useRouteHandoff()
+  const router = useWorkspaceRouteHandoff()
   const previewParams = route.ok ? route.params : null
-  const { client, state: connState } = useHostClient(previewParams?.hostId)
+  const { client, state: connState } = useWorkspaceClient(previewParams?.hostId)
   const forceReconnect = useForceReconnect()
   const [preview, setPreview] = useState<MobileFilePreviewResult>(() =>
     route.ok ? { status: 'loading', message: '正在加载预览…' } : previewError(route.message)
@@ -51,7 +52,7 @@ export function MobileFilePreviewScreen({ route }: Props) {
   const draftContentRef = useRef(draftContent)
   const savedContentRef = useRef(savedContent)
   const draftSourceKeyRef = useRef<string | null>(null)
-  const { width, height } = useWindowDimensions()
+  const { width, height } = useSafeAreaFrame()
   const routePreviewSource = useMemo(
     () => (previewParams ? previewSourceFromRoute(previewParams) : null),
     [previewParams]

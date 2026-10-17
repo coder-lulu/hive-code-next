@@ -16,12 +16,9 @@ describe('windows-process-tree node-addon-api gyp path', () => {
     expect(PATCH).not.toContain('+        "../../node-addon-api')
     expect(PATCH).toContain('+          "include_dirs": ["deps/node-addon-api"],')
     expect(PATCH).toContain('+          "defines": ["NAPI_CPP_EXCEPTIONS", "_HAS_EXCEPTIONS=1"],')
-    const buildScript = readFileSync(
-      join(projectDir, 'config/scripts/build-windows-process-tree-relay-addon.mjs'),
-      'utf8'
-    )
-    expect(buildScript).toContain('stageWindowsProcessTreeNodeAddonApiHeaders(PACKAGE_DIR)')
-    expect(buildScript).toContain('Repaired un-applied pnpm patch hunks before build.')
+    expect(
+      existsSync(join(projectDir, 'config/scripts/build-windows-process-tree-relay-addon.mjs'))
+    ).toBe(false)
     const rebuildHelper = readFileSync(
       join(projectDir, 'config/scripts/windows-process-tree-gyp-rebuild.mjs'),
       'utf8'
@@ -38,6 +35,17 @@ describe('windows-process-tree node-addon-api gyp path', () => {
     expect(rebuildScript).toContain('prepareWindowsProcessTreeBuild()')
     expect(rebuildScript).toContain('$(TEMP)\\\\hivecode-wpt\\\\$(ProjectGuid)')
     expect(rebuildScript).toContain('stageWindowsProcessTreeNodeAddonApiHeaders(packageDir)')
+    expect(rebuildScript).toContain('stageWindowsProcessTreeNodeAddonApiHeaders()')
+    expect(rebuildScript).toContain('if (ensureWindowsProcessTreeCommandLinePatch())')
+    expect(rebuildScript).toContain(
+      'Repaired the un-applied windows-process-tree command-line patch.'
+    )
+    expect(rebuildScript.indexOf('stageWindowsProcessTreeNodeAddonApiHeaders()')).toBeLessThan(
+      rebuildScript.indexOf('await rebuild({')
+    )
+    expect(rebuildScript.indexOf('if (ensureWindowsProcessTreeCommandLinePatch())')).toBeLessThan(
+      rebuildScript.indexOf('await rebuild({')
+    )
   })
 
   // The installed Windows dependency is exercised by the Windows CI lane.

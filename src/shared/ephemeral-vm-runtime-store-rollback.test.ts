@@ -1,4 +1,8 @@
 import {
+  drainNativeFixture,
+  restoreNativeFixture
+} from '../main/ipc/ephemeral-vm-native-test-fixture'
+import {
   existsSync,
   mkdtempSync,
   readFileSync,
@@ -10,7 +14,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import {
   getEphemeralVmRuntimeFeatureStorePath,
   featureIdentity,
@@ -95,10 +99,14 @@ function provisionedRootRecord(): EphemeralVmRuntimeRecord {
   })
 }
 
+const pendingChildren = new Set<Promise<void>>()
+afterAll(restoreNativeFixture)
+
 describe('ephemeral VM runtime store rollback projection', () => {
   const tempDirs: string[] = []
 
-  afterEach(() => {
+  afterEach(async () => {
+    await drainNativeFixture(pendingChildren)
     for (const dir of tempDirs.splice(0)) {
       rmSync(dir, { recursive: true, force: true })
     }

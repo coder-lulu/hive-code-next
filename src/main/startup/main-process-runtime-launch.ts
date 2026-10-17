@@ -23,6 +23,7 @@ import { prepareCodexSessionResumeForLaunch } from './codex-session-resume-launc
 import { startWindowsDesktopBeforeShellPathReady } from './windows-desktop-shell-path-startup'
 import { repairKnownPoisonedInstallDirBeforeWindow } from './windows-install-dir-acl-recovery'
 import { installServeQuitHandling } from './serve-quit-handling'
+import { installCloudSessionShutdownFlush } from './cloud-session-shutdown-flush'
 import { registerHeadlessServeSshHandlers } from './headless-serve-ssh-registration'
 import { settleServeDesktopActivation } from './serve-desktop-activation'
 import {
@@ -30,6 +31,7 @@ import {
   showRuntimeRpcStartupFailureDialog
 } from '../runtime/runtime-rpc-startup-failure'
 import { registerCliForHeadlessServe } from './serve-cli-registration'
+import { startAppImageCopyPreExtraction } from '../cli/appimage-copy-pre-extraction'
 import { scheduleAllPendingHistoryTreeRemovals } from '../terminal-history-deletion'
 import { triggerStartupNotificationRegistration } from '../ipc/startup-notification-registration'
 import { mainProcessState as state } from './main-process-state'
@@ -90,7 +92,8 @@ async function launchServeMode(
   if (state.headlessBrowserDisplayAvailable) {
     runtime.setOffscreenBrowserBackend(
       new OffscreenBrowserBackend(browserManager, {
-        getAgentBrowserBridge: () => state.agentBrowserBridge
+        getAgentBrowserBridge: () => state.agentBrowserBridge,
+        onPageNavigated: (page) => runtime.serveBrowserPageNavigated(page)
       })
     )
   }
@@ -188,6 +191,7 @@ export async function initializeMainProcessRuntimeLaunch(
     return
   }
   state.serveOptions = serveOptions
+  installCloudSessionShutdownFlush()
   const runtimeRpc = installRuntimeRpc(runtime, serveOptions)
   const shellPathReady = shellPathHydration.whenReady()
   // Why published: the renderer's git-environment barrier must fence on the same
@@ -214,6 +218,11 @@ export async function initializeMainProcessRuntimeLaunch(
     })
     desktopWindow = desktopStartup.window
   } else {
+    // Why before the daemon starts: its host choice waits briefly for a copy unpacking here.
+    // Serve unpacks for itself, with a deadline and progress on its own output.
+    if (!serveOptions) {
+      void startAppImageCopyPreExtraction()
+    }
     await shellPathReady
     bindTerminalRuntimeStartupServices(Promise.resolve(startTerminalRuntimeStartupServices()))
   }

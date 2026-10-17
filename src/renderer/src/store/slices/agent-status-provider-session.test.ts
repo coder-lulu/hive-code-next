@@ -686,8 +686,15 @@ describe('recordAgentProviderSession', () => {
         { tabId: 'tab-1', worktreeId: 'wt-1' },
         { providerSession }
       )
-    store.getState().markAgentCompletionPaneUnread(paneKey, 'agent-completion')
-    store.getState().incrementAgentCompletionUnread(paneKey)
+    store.getState().markAgentAttentionUnread(
+      {
+        workspaceId: 'wt-1',
+        subjectKey: paneKey,
+        groupId: 'tab-1',
+        reason: 'agent-completion'
+      },
+      { countCompletion: true }
+    )
 
     store
       .getState()
@@ -700,7 +707,8 @@ describe('recordAgentProviderSession', () => {
       )
 
     expect(store.getState().unreadAgentCompletionCountByPane).toEqual({ [paneKey]: 1 })
-    expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBe('agent-completion')
+    // A provider-session refresh clears the transient marker, not accumulated task completions.
+    expect(store.getState().unreadAgentCompletionPanes[paneKey]).toBeUndefined()
   })
 
   it.each(PI_COMPATIBLE_CASES)(

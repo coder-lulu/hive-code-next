@@ -28,9 +28,15 @@ afterEach(async () => {
   }
 })
 
-function fixture(): { root: string; packageDir: string; main: string } {
-  const root = mkdtempSync(join(tmpdir(), 'orca-process-host-dev-'))
-  temporaryRoots.push(root)
+function fixture(aliased = false): { root: string; packageDir: string; main: string } {
+  const temporaryRoot = mkdtempSync(join(tmpdir(), 'orca-process-host-dev-'))
+  temporaryRoots.push(temporaryRoot)
+  const root = aliased ? join(temporaryRoot, 'alias') : temporaryRoot
+  if (aliased) {
+    const physicalRoot = join(temporaryRoot, 'physical')
+    mkdirSync(physicalRoot)
+    symlinkSync(physicalRoot, root, process.platform === 'win32' ? 'junction' : 'dir')
+  }
   const packageDir = join(root, 'src', 'packages', 'process-host')
   const sourceDir = join(packageDir, 'src')
   mkdirSync(sourceDir, { recursive: true })
@@ -69,6 +75,7 @@ function fixture(): { root: string; packageDir: string; main: string } {
       extends: '../../../tsconfig.base.json',
       compilerOptions: {
         target: 'ES2022',
+        lib: ['ES2022'],
         module: 'Node16',
         moduleResolution: 'Node16',
         rootDir: 'src',
@@ -126,41 +133,46 @@ function readEmittedVersion(root: string): number {
 }
 
 describe('External process-host development rebuilds', () => {
-  it('emits private source edits and new imports before the Electron reload hook', async () => {
-    const { root, packageDir, main } = fixture()
-    const loadedVersions: number[] = []
-    const reloadHook: Plugin = {
-      name: 'fake-electron-reload',
-      closeBundle() {
-        loadedVersions.push(readEmittedVersion(root))
+  it.each([false, true])(
+    'emits private source edits and new imports before the Electron reload hook (aliased=%s)',
+    async (aliased) => {
+      const { root, packageDir, main } = fixture(aliased)
+      const loadedVersions: number[] = []
+      const reloadHook: Plugin = {
+        name: 'fake-electron-reload',
+        closeBundle() {
+          loadedVersions.push(readEmittedVersion(root))
+        }
       }
+      const watcher = watch({
+        input: main,
+        external: ['@orca/process-host'],
+        plugins: [createProcessHostDevRebuildPlugin(root), reloadHook],
+        output: { file: join(root, 'out', 'main.cjs'), format: 'cjs' }
+      })
+      watchers.push(watcher)
+      closeSuccessfulBundles(watcher)
+      await nextEvent(watcher, 'END')
+      expect(loadedVersions).toEqual([1])
+      expect(readFileSync(join(root, 'out', 'main.cjs'), 'utf8')).toContain('@orca/process-host')
+
+      writeFileSync(join(packageDir, 'src', 'internal.ts'), 'export const version = 2\n')
+      await expect.poll(() => loadedVersions.at(-1), { timeout: 15_000 }).toBe(2)
+
+      writeFileSync(join(packageDir, 'src', 'new-feature.ts'), 'export const added = 3\n')
+      writeFileSync(
+        join(packageDir, 'src', 'internal.ts'),
+        "import { added } from './new-feature'\nexport const version = added\n"
+      )
+      await expect.poll(() => loadedVersions.at(-1), { timeout: 15_000 }).toBe(3)
+      await expect
+        .poll(() => existsSync(join(packageDir, 'dist', 'new-feature.js')), { timeout: 15_000 })
+        .toBe(true)
+      expect(readFileSync(join(packageDir, 'dist', 'new-feature.js'), 'utf8')).toContain(
+        'added = 3'
+      )
     }
-    const watcher = watch({
-      input: main,
-      external: ['@orca/process-host'],
-      plugins: [createProcessHostDevRebuildPlugin(root), reloadHook],
-      output: { file: join(root, 'out', 'main.cjs'), format: 'cjs' }
-    })
-    watchers.push(watcher)
-    closeSuccessfulBundles(watcher)
-    await nextEvent(watcher, 'END')
-    expect(loadedVersions).toEqual([1])
-    expect(readFileSync(join(root, 'out', 'main.cjs'), 'utf8')).toContain('@orca/process-host')
-
-    writeFileSync(join(packageDir, 'src', 'internal.ts'), 'export const version = 2\n')
-    await expect.poll(() => loadedVersions.at(-1), { timeout: 15_000 }).toBe(2)
-
-    writeFileSync(join(packageDir, 'src', 'new-feature.ts'), 'export const added = 3\n')
-    writeFileSync(
-      join(packageDir, 'src', 'internal.ts'),
-      "import { added } from './new-feature'\nexport const version = added\n"
-    )
-    await expect.poll(() => loadedVersions.at(-1), { timeout: 15_000 }).toBe(3)
-    await expect
-      .poll(() => existsSync(join(packageDir, 'dist', 'new-feature.js')), { timeout: 15_000 })
-      .toBe(true)
-    expect(readFileSync(join(packageDir, 'dist', 'new-feature.js'), 'utf8')).toContain('added = 3')
-  })
+  )
 
   it('rebuilds when an inherited compiler configuration changes', async () => {
     const { root, packageDir, main } = fixture()

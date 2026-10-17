@@ -16,7 +16,7 @@ import { extractRuntimeTransportDiagnostics } from '@/runtime/runtime-status-pro
 import { useAppStore } from '@/store'
 import { accountRuntimeCatalogAccessFingerprint } from '@/store/slices/account-runtime-cloud'
 import {
-  isUserManagedRuntimeEnvironment,
+  isListedRemoteServer,
   type PublicKnownRuntimeEnvironment
 } from '../../../../shared/runtime-environments'
 import type { RuntimeStatus } from '../../../../shared/runtime-types'
@@ -42,7 +42,7 @@ type RuntimeEnvironmentCatalog = {
 export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
   const savedEnvironments = useAppStore((state) => state.runtimeEnvironments)
   const environments = useMemo(
-    () => savedEnvironments.filter(isUserManagedRuntimeEnvironment),
+    () => savedEnvironments.filter(isListedRemoteServer),
     [savedEnvironments]
   )
   const [isLoading, setIsLoading] = useState(false)
@@ -75,7 +75,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
         if (!isCurrent()) {
           return
         }
-        const visibleEnvironments = nextEnvironments.filter(isUserManagedRuntimeEnvironment)
+        const visibleEnvironments = nextEnvironments.filter(isListedRemoteServer)
         // Why: drop store status for servers no longer saved so stale hosts don't
         // linger in the sidebar registry.
         useAppStore.getState().setRuntimeEnvironments(nextEnvironments)
@@ -172,7 +172,7 @@ export function useRuntimeEnvironmentCatalog(): RuntimeEnvironmentCatalog {
 
   const runtimeEnvironmentCatalog = useAppStore((state) => state.runtimeEnvironments)
   useEffect(() => {
-    const visibleEnvironments = runtimeEnvironmentCatalog.filter(isUserManagedRuntimeEnvironment)
+    const visibleEnvironments = runtimeEnvironmentCatalog.filter(isListedRemoteServer)
     setDetailsByEnvironmentId((current) => {
       const next: Record<string, RuntimeHostDetails> = {}
       for (const environment of visibleEnvironments) {

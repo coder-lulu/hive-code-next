@@ -32,17 +32,19 @@ describe('arch-aware packaging guard', () => {
   })
 
   const packHost = (arch) =>
-    electronBuilderConfig.beforePack({ electronPlatformName: process.platform, arch }, bundleDir)
+    electronBuilderConfig.beforePack(
+      { electronPlatformName: process.platform, arch },
+      bundleDir,
+      () => undefined
+    )
 
   it('packages without reading a Paperclip service directory', () => {
-    const forbiddenResources = new Proxy(
-      {},
-      {
-        get() {
-          throw new Error('Paperclip resources must not be read')
-        }
+    // The Wayland seam is callable; retired service-resource property reads remain forbidden.
+    const forbiddenResources = new Proxy(() => undefined, {
+      get() {
+        throw new Error('Paperclip resources must not be read')
       }
-    )
+    })
     expect(() =>
       electronBuilderConfig.beforePack(
         { electronPlatformName: process.platform, arch: HOST_ARCH },

@@ -2,10 +2,15 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { cp, mkdir, mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
-import { delimiter, dirname, join, relative, resolve } from 'node:path'
+import { dirname, join, relative, resolve } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { removeTree } from '../../src/shared/windows-transient-lock-removal.ts'
-import { createAfterPackFixture, seedBundledRipgrep } from './electron-builder-test-fixtures.mjs'
+import {
+  createAfterPackFixture,
+  seedBundledRipgrep,
+  seedClipboardPublisher,
+  stubObjdump
+} from './electron-builder-test-fixtures.mjs'
 
 const require = createRequire(import.meta.url)
 const projectRoot = resolve(import.meta.dirname, '..', '..')
@@ -481,7 +486,12 @@ describe('packaged runtime resources', () => {
           { recursive: true }
         )
         await seedBundledRipgrep(resourcesDir)
-        await seedClipboardPublisher(resourcesDir, 0x3e)
+        // Layout fixtures use a cross-arch slice; native PTY probes need real packaged binaries.
+        const target =
+          process.arch === 'x64'
+            ? { electronArch: 3, machine: 0xb7 }
+            : { electronArch: 1, machine: 0x3e }
+        await seedClipboardPublisher(resourcesDir, target.machine)
         await stubObjdump(root)
         await mkdir(join(resourcesDir, 'node_modules', 'zod', 'src'), { recursive: true })
         // Why: afterPack now fails hard when the unpacked daemon entry is
@@ -516,7 +526,7 @@ describe('packaged runtime resources', () => {
         await fixtureConfig.afterPack({
           appOutDir: join(root, 'linux-unpacked'),
           electronPlatformName: 'linux',
-          arch: 1,
+          arch: target.electronArch,
           packager: { appInfo: { version: '9.9.9' } }
         })
 
@@ -535,26 +545,6 @@ describe('packaged runtime resources', () => {
     }
   )
 })
-
-// Headers model architecture; objdump is stubbed for these packaging-layout tests.
-async function seedClipboardPublisher(resourcesDir, machine) {
-  const binDir = join(resourcesDir, 'bin')
-  await mkdir(binDir, { recursive: true })
-  const elf = Buffer.alloc(64)
-  elf.set([0x7f, 0x45, 0x4c, 0x46, 2, 1, 1])
-  elf.writeUInt16LE(2, 16)
-  elf.writeUInt16LE(machine, 18)
-  elf.writeUInt32LE(1, 20)
-  elf.writeUInt16LE(64, 52)
-  await writeFile(join(binDir, 'orca-wayland-clipboard'), elf)
-}
-
-async function stubObjdump(root) {
-  const directory = join(root, 'bin')
-  await mkdir(directory)
-  await writeFile(join(directory, 'objdump'), '#!/bin/sh\nexit 0\n', { mode: 0o755 })
-  process.env.PATH = `${directory}${delimiter}${process.env.PATH ?? ''}`
-}
 
 // Why source-anchored: the bundler renames a createRequire()'d require, so
 // verifyPackagedMainRuntimeDeps' `require("x")` scan cannot see these specifiers — packaging

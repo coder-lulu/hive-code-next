@@ -24,7 +24,6 @@ import type {
 } from './automations-types'
 
 export const EXTERNAL_AUTOMATION_PROVIDERS = [
-  'hermes',
   'openclaw'
 ] as const satisfies readonly ExternalAutomationProvider[]
 
@@ -41,9 +40,7 @@ export const EXTERNAL_AUTOMATION_SCOPE_CODES = {
   /** Only the desktop authority owns external managers; runtime authorities must not be tunnelled. */
   authorityNotSupported: 'external_automation_authority_not_supported',
   /** The SSH target is an Orca implementation detail and stays out of user-facing surfaces. */
-  targetHidden: 'external_automation_target_hidden',
-  /** The relay answered `-32601`: it is healthy but has no external-runs method. */
-  runsUnsupported: 'external_automation_runs_unsupported'
+  targetHidden: 'external_automation_target_hidden'
 } as const
 
 export type ExternalAutomationScopeCode =
@@ -56,9 +53,7 @@ const SCOPE_MESSAGES: Record<ExternalAutomationScopeCode, string> = {
     'External automation managers are available only on this computer and its SSH hosts.',
   [EXTERNAL_AUTOMATION_SCOPE_CODES.targetHidden]: applyProductBranding(
     'That host is managed by Orca and does not expose external automations.'
-  ),
-  [EXTERNAL_AUTOMATION_SCOPE_CODES.runsUnsupported]:
-    'This host does not report external automation run history.'
+  )
 }
 
 /**
@@ -94,26 +89,6 @@ export type ScopedExternalAutomationRequest = {
 export type ScopedExternalManagerListRequest = ScopedExternalAutomationRequest & {
   /** Skips a cached entry that is still fresh; a probe is scheduled either way when absent. */
   refresh?: boolean
-}
-
-export type ScopedExternalManagerRunsRequest = ScopedExternalAutomationRequest & {
-  jobId: string
-  page: number
-  pageSize: number
-}
-
-export type ScopedExternalManagerMutationFields = {
-  name: string
-  prompt: string
-  schedule: string
-  workdir: string | null
-}
-
-export type ScopedExternalManagerCreateRequest = ScopedExternalAutomationRequest &
-  ScopedExternalManagerMutationFields
-
-export type ScopedExternalManagerUpdateRequest = ScopedExternalManagerCreateRequest & {
-  jobId: string
 }
 
 export type ScopedExternalManagerActionRequest = ScopedExternalAutomationRequest & {

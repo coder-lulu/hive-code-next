@@ -1,3 +1,4 @@
+import { cancelUnreadResponseBody } from '../../lib/unread-response-body'
 import type { ProviderRateLimits } from '../../../shared/rate-limit-types'
 import {
   logMiniMaxFetchFailure,
@@ -15,7 +16,7 @@ import {
 
 // Why: split out of minimax-fetcher.ts so the transport + routing file
 // stays under the 300-line cap (AGENTS.md disallows max-lines disables).
-// Pure data-shape → ProviderRateLimits translation; no I/O.
+// Owns response consumption and translates the payload into ProviderRateLimits.
 
 export type MiniMaxUsageResponse = {
   base_resp?: {
@@ -100,47 +101,51 @@ export async function parseMiniMaxUsageResponse(
   fetchResult: MiniMaxFetchResponse,
   models: MiniMaxModelList
 ): Promise<ProviderRateLimits> {
-  const httpError = handleMiniMaxHttpError(fetchResult)
-  if (httpError) {
-    return httpError
-  }
-  let payload: MiniMaxUsageResponse
   try {
-    const value: unknown = await fetchResult.response.json()
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return makeMiniMaxError('Invalid MiniMax usage response', 'parse')
+    const httpError = handleMiniMaxHttpError(fetchResult)
+    if (httpError) {
+      return httpError
     }
-    payload = value
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Invalid MiniMax usage response'
-    return makeMiniMaxError(redactMiniMaxSecret(message), 'parse')
-  }
-  const payloadError = handleMiniMaxPayloadError(fetchResult, payload)
-  if (payloadError) {
-    return payloadError
-  }
-  // Why: a non-array `model_remains` (object / string) throws inside `.map`
-  // and surfaces as a 'network' error rather than 'parse'. Treat any
-  // non-array as an empty list and let the snapshot selection flag the
-  // missing usage.
-  const rawItems = Array.isArray(payload.model_remains) ? payload.model_remains : []
-  const snapshots = rawItems
-    .map(parseMiniMaxUsageItem)
-    .filter((snapshot): snapshot is MiniMaxUsageSnapshot => snapshot !== null)
-  const selected = selectMiniMaxSnapshot(snapshots, parseMiniMaxModels(models))
-  if (!selected) {
-    return makeMiniMaxError(
-      'MiniMax usage data for the configured model was not found',
-      'usage-unavailable'
-    )
-  }
-  return {
-    provider: 'minimax',
-    session: selected.session,
-    weekly: selected.weekly,
-    updatedAt: Date.now(),
-    error: null,
-    status: 'ok',
-    usageMetadata: { source: 'web' }
+    let payload: MiniMaxUsageResponse
+    try {
+      const value: unknown = await fetchResult.response.json()
+      if (!value || typeof value !== 'object' || Array.isArray(value)) {
+        return makeMiniMaxError('Invalid MiniMax usage response', 'parse')
+      }
+      payload = value
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Invalid MiniMax usage response'
+      return makeMiniMaxError(redactMiniMaxSecret(message), 'parse')
+    }
+    const payloadError = handleMiniMaxPayloadError(fetchResult, payload)
+    if (payloadError) {
+      return payloadError
+    }
+    // Why: a non-array `model_remains` (object / string) throws inside `.map`
+    // and surfaces as a 'network' error rather than 'parse'. Treat any
+    // non-array as an empty list and let the snapshot selection flag the
+    // missing usage.
+    const rawItems = Array.isArray(payload.model_remains) ? payload.model_remains : []
+    const snapshots = rawItems
+      .map(parseMiniMaxUsageItem)
+      .filter((snapshot): snapshot is MiniMaxUsageSnapshot => snapshot !== null)
+    const selected = selectMiniMaxSnapshot(snapshots, parseMiniMaxModels(models))
+    if (!selected) {
+      return makeMiniMaxError(
+        'MiniMax usage data for the configured model was not found',
+        'usage-unavailable'
+      )
+    }
+    return {
+      provider: 'minimax',
+      session: selected.session,
+      weekly: selected.weekly,
+      updatedAt: Date.now(),
+      error: null,
+      status: 'ok',
+      usageMetadata: { source: 'web' }
+    }
+  } finally {
+    await cancelUnreadResponseBody(fetchResult.response)
   }
 }

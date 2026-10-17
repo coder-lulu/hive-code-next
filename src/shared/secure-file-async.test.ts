@@ -2,12 +2,14 @@ import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'n
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-const acl = vi.hoisted(() => ({ restrictWindowsPathAsync: vi.fn() }))
+const acl = vi.hoisted(() => ({
+  restrictWindowsPathAsync: vi.fn(),
+  writeRestrictedWindowsFile: vi.fn()
+}))
 vi.mock('./secure-path-windows-acl', () => ({
   ...acl,
-  bestEffortRestrictWindowsPath: vi.fn(),
-  restrictWindowsPathSync: vi.fn(),
-  resetSecureFileWindowsUserSidForTests: vi.fn()
+  restrictWindowsDirectory: vi.fn(),
+  restrictWindowsPathSync: vi.fn()
 }))
 import { writeSecureJsonFileAsync } from './secure-file-async'
 const directories: string[] = []
@@ -25,6 +27,10 @@ it('keeps old contents until staged hardening settles and awaits published verif
   directories.push(dir)
   const target = join(dir, 'token.json')
   writeFileSync(target, 'old')
+  acl.writeRestrictedWindowsFile.mockImplementation((path: string, contents: string) => {
+    writeFileSync(path, contents)
+    return true
+  })
   let finishStage!: (result: boolean) => void
   let finishPublished!: (result: boolean) => void
   acl.restrictWindowsPathAsync
