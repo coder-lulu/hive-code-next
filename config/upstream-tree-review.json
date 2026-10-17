@@ -17364,6 +17364,90 @@
       },
       "reason": "Validate legal timer-dependent output ACKs separately from the exact 16 mandatory journey frames: retain every observed frame and receiving-peer decoder check, require exact credit payload/stream/sequence/order/cardinality, and preserve all eight completed steps, snapshots and original ten cases. Deterministic ACK flush/dispose schedules and decoder-negative, malformed-credit and missing-core-evidence regressions pass the complete 17-case file under Node and Bun.",
       "regressionTests": ["tests/e2e/cross-version-wire/cross-version-terminal-wire.unit.test.ts"]
+    },
+    {
+      "path": "src/main/daemon/agent-startup-prompt-latency.node-pty.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "cfa01fed8e56130516be81e6239506ec3d722a05"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "cfa01fed8e56130516be81e6239506ec3d722a05"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "cfa01fed8e56130516be81e6239506ec3d722a05"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "aa986b09391016f940b8f34df219bf7f36950582"
+      },
+      "reason": "Isolate this controlled real-PTY zsh fixture from subsequent host global rc files through its owned .zshenv unsetopt GLOBAL_RCS; retain owned user .zshrc, slow/early-input behavior, command counts, timeouts and assertions. Q6 official run 38972927102 preserves six failures: three directly show compinit prompt interference, while three null-only failures still require fresh official CI for individual causal confirmation. Isolated Debian baseline and proposal each pass the original four files (8 passed, 1 existing skip); this does not reproduce Ubuntu RED or establish full-candidate acceptance. Global zshenv remains unavoidable; compinit security checks and product code are unchanged.",
+      "regressionTests": ["src/main/daemon/agent-startup-prompt-latency.node-pty.test.ts"]
+    },
+    {
+      "path": "src/main/providers/startup-line-typed-length.live-shell.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "e74816351b4c04c1b573ed7ba3aa936f8c37258e"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "e74816351b4c04c1b573ed7ba3aa936f8c37258e"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "e74816351b4c04c1b573ed7ba3aa936f8c37258e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "52c9c0952159ed7b33a16d390facac920abb7765"
+      },
+      "reason": "Isolate this controlled real-PTY zsh fixture from subsequent host global rc files through its owned .zshenv unsetopt GLOBAL_RCS; retain owned user .zshrc, slow/early-input behavior, command counts, timeouts and assertions. Q6 official run 38972927102 preserves six failures: three directly show compinit prompt interference, while three null-only failures still require fresh official CI for individual causal confirmation. Isolated Debian baseline and proposal each pass the original four files (8 passed, 1 existing skip); this does not reproduce Ubuntu RED or establish full-candidate acceptance. Global zshenv remains unavoidable; compinit security checks and product code are unchanged.",
+      "regressionTests": ["src/main/providers/startup-line-typed-length.live-shell.test.ts"]
+    },
+    {
+      "path": "src/main/providers/local-pty-shell-startup-command.node-pty.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "936e10b2626c2bc78507881e3295c90490451c61"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "4992f171dc206f843c2cf51574da7a1a718c83c2"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "936e10b2626c2bc78507881e3295c90490451c61"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "63e1caee3a24a6e00e875b22088302def7f643be"
+      },
+      "reason": "Isolate this controlled real-PTY zsh fixture from subsequent host global rc files through its owned .zshenv unsetopt GLOBAL_RCS; retain owned user .zshrc, slow/early-input behavior, command counts, timeouts and assertions. Q6 official run 38972927102 preserves six failures: three directly show compinit prompt interference, while three null-only failures still require fresh official CI for individual causal confirmation. Isolated Debian baseline and proposal each pass the original four files (8 passed, 1 existing skip); this does not reproduce Ubuntu RED or establish full-candidate acceptance. Global zshenv remains unavoidable; compinit security checks and product code are unchanged.",
+      "regressionTests": ["src/main/providers/local-pty-shell-startup-command.node-pty.test.ts"]
+    },
+    {
+      "path": "src/main/runtime/launched-agent-crash-guard.live-shell.test.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "5801e94df97625c89445a9d04e1399b56228b75b"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "5801e94df97625c89445a9d04e1399b56228b75b"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "5801e94df97625c89445a9d04e1399b56228b75b"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "2445e80410888012f6eda24c80297fa201912dc8"
+      },
+      "reason": "Isolate this controlled real-PTY zsh fixture from subsequent host global rc files through its owned .zshenv unsetopt GLOBAL_RCS; retain owned user .zshrc, slow/early-input behavior, command counts, timeouts and assertions. Q6 official run 38972927102 preserves six failures: three directly show compinit prompt interference, while three null-only failures still require fresh official CI for individual causal confirmation. Isolated Debian baseline and proposal each pass the original four files (8 passed, 1 existing skip); this does not reproduce Ubuntu RED or establish full-candidate acceptance. Global zshenv remains unavoidable; compinit security checks and product code are unchanged.",
+      "regressionTests": ["src/main/runtime/launched-agent-crash-guard.live-shell.test.ts"]
     }
   ],
   "documentation": {
