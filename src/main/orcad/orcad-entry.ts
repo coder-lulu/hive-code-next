@@ -11,6 +11,7 @@
  * Chromium proves available at startup.
  */
 import process from 'node:process'
+import { resolveOrcadWebClientRoot } from './orcad-web-client-root'
 import { getAppEnvironment } from '../../shared/app-environment'
 import type { ServeReadiness } from '../server/serve-readiness'
 import { resolveOrcadInstallRoot, resolveUserDataPath } from './orcad-app-paths'
@@ -298,6 +299,7 @@ async function startOrcadRuntime(
     hiveRuntimeCloud: runtimeCloud.ownership,
     userDataPath: runtimeUserDataPath,
     enableWebSocket: true,
+    webClientRoot: resolveOrcadWebClientRoot(resolveOrcadInstallRoot()),
     // Why pinned and not `exposeNetworkByDefault`: an unattended host's exposure must be
     // exactly what the operator asked for, on every launch. The default path widens itself
     // once a device has connected, so a loopback deployment would silently go wide one

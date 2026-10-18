@@ -36,9 +36,11 @@ describe('Linux Runtime deb contract', () => {
       preserveStateOnRemove: true
     })
     expect(unit).toContain('User=hivecode-runtime')
-    expect(unit).toContain(
-      'ExecStart=/usr/bin/hive serve --port 6768 --json $HIVECODE_RUNTIME_ARGS'
+    const execStart = unit.split(/\r?\n/u).find((line) => line.startsWith('ExecStart='))
+    expect(execStart).toBe(
+      'ExecStart=/usr/bin/hive serve --port 6768 --json $HIVECODE_RUNTIME_ARGS --no-pairing'
     )
+    expect(execStart).toMatch(/\$HIVECODE_RUNTIME_ARGS --no-pairing$/)
     expect(unit).toContain('RestartPreventExitStatus=3')
     expect(unit).toContain('KillMode=mixed')
     expect(unit).toContain('NoNewPrivileges=false')
@@ -63,7 +65,7 @@ describe('Linux Runtime deb contract', () => {
       'libatk-bridge2.0-0',
       'libcups2',
       'libgbm1',
-      'libasound2',
+      'libasound2t64 | libasound2',
       'libxss1'
     ]) {
       expect(builder).toContain(`'${dependency}'`)
@@ -73,6 +75,9 @@ describe('Linux Runtime deb contract', () => {
       'utf8'
     )
     expect(buildScript).toMatch(/'--publish',\s*'never'/u)
+    expect(buildScript).toContain('`--config.buildNumber=${buildNumber}`')
+    expect(buildScript).toContain("ORCA_LINUX_ARM64_RELEASE: process.arch === 'arm64' ? '1' : '0'")
+    expect(builder).toContain("isHeadlessRuntimeDeb ? 'hivecode' : 'hivecode-runtime'")
   })
 
   it('keeps every directly executed Linux package script LF-only', () => {

@@ -885,7 +885,7 @@ module.exports = {
       'libxdamage1',
       'libxrandr2',
       'libgbm1',
-      'libasound2',
+      'libasound2t64 | libasound2',
       'python3',
       'python3-gi',
       'gir1.2-atspi-2.0',
@@ -901,7 +901,11 @@ module.exports = {
     afterInstall: 'resources/linux/packaging/after-install.sh',
     afterRemove: 'resources/linux/packaging/after-remove.sh',
     // Why: only an AppImage's files can vanish under a running daemon (see appimage-node-runtime.cjs).
-    fpm: appImageNodeRuntimeFpmArgs
+    fpm: [
+      ...appImageNodeRuntimeFpmArgs,
+      '--conflicts',
+      isHeadlessRuntimeDeb ? 'hivecode' : 'hivecode-runtime'
+    ]
   },
   rpm: {
     packageName: 'hivecode',

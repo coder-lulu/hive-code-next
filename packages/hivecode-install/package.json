@@ -1,0 +1,32 @@
+{
+  "name": "@hivecode/install",
+  "version": "0.1.0",
+  "description": "Official HiveCode Headless Runtime installer",
+  "homepage": "https://hivekernel.com/headless/",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/coder-lulu/hive-code-next.git",
+    "directory": "packages/hivecode-install"
+  },
+  "bin": {
+    "hivecode-install": "bin/install.mjs"
+  },
+  "files": [
+    "bin/",
+    "lib/",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "scripts": {
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

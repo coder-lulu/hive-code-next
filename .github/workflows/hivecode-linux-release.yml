@@ -1,4 +1,4 @@
-name: HiveCode Linux AppImage release
+name: HiveCode Linux release
 
 on:
   push:
@@ -7,9 +7,14 @@ on:
   workflow_dispatch:
     inputs:
       release_version:
-        description: 'Exact package version to publish, e.g. 1.5.0-beta.1'
+        description: 'Exact package version to build, e.g. 1.5.0-beta.1'
         required: true
         type: string
+      publish_release:
+        description: 'Publish the built artifacts to HiveCloud'
+        required: true
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -91,10 +96,13 @@ jobs:
     timeout-minutes: 60
     env:
       HIVECODE_BUILD_NUMBER: ${{ needs.reserve.outputs.build_number }}
+      HIVECODE_VERSION: ${{ needs.reserve.outputs.version }}
       HIVECODE_COMMIT_SHA: ${{ github.sha }}
       HIVECODE_EMBED_RELEASE_IDENTITY: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ORCA_REQUIRE_ORCAD_TEMPLATE: '1'
+      ORCA_LINUX_ARM64_RELEASE: ${{ matrix.architecture == 'arm64' && '1' || '0' }}
+      ORCA_BUILD_IDENTITY: ${{ needs.reserve.outputs.channel == 'stable' && 'stable' || 'rc' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -176,14 +184,55 @@ jobs:
           mkdir -p upload
           cp "$artifact" "upload/hivecode-linux-${TARGET_ARCH}.AppImage"
 
+      - name: Build headless Runtime deb
+        run: pnpm build:linux:runtime-deb
+
+      - name: Smoke packaged headless Runtime
+        run: node config/scripts/run-linux-packaged-node-pty-floor-smoke.mjs --app-dir ${{ matrix.unpacked_dir }}
+
+      - name: Stage immutable Runtime deb
+        shell: bash
+        env:
+          TARGET_ARCH: ${{ matrix.architecture }}
+          RELEASE_VERSION: ${{ needs.reserve.outputs.version }}
+        run: |
+          set -euo pipefail
+          mapfile -t artifacts < <(find dist -maxdepth 1 -type f -name 'hivecode-runtime_*.deb')
+          test "${#artifacts[@]}" -eq 1
+          expected_deb_arch=amd64
+          if [[ "$TARGET_ARCH" == arm64 ]]; then expected_deb_arch=arm64; fi
+          test "$(dpkg-deb -f "${artifacts[0]}" Architecture)" = "$expected_deb_arch"
+          test "$(dpkg-deb -f "${artifacts[0]}" Package)" = hivecode-runtime
+          test "$(dpkg-deb -f "${artifacts[0]}" Version)" = "${RELEASE_VERSION//-/\~}-${HIVECODE_BUILD_NUMBER}"
+          cp "${artifacts[0]}" "upload/hivecode-runtime-${TARGET_ARCH}.deb"
+
+      - name: Stage the qualified glibc headless native slot
+        uses: actions/download-artifact@v8
+        with:
+          name: orcad-prebuild-glibc-${{ matrix.runner }}
+          path: out/orcad-prebuilds
+
+      - name: Require the qualified headless native slot
+        run: pnpm build:orcad-prebuilds --require-slots linux-${{ matrix.architecture }}-glibc
+
+      - name: Build self-contained Headless Runtime archive
+        run: pnpm build:linux:runtime-archive
+
+      - name: Stage immutable Runtime archive
+        run: cp dist/hivecode-runtime-${{ matrix.architecture }}.tar.gz upload/
+
       - uses: actions/upload-artifact@v7
         with:
           name: hivecode-linux-${{ matrix.architecture }}-${{ github.sha }}
-          path: upload/*.AppImage
+          path: |
+            upload/*.AppImage
+            upload/*.deb
+            upload/*.tar.gz
           if-no-files-found: error
           retention-days: 2
 
   publish:
+    if: github.event_name == 'push' || inputs.publish_release
     needs: [reserve, build]
     runs-on: ubuntu-latest
     steps:
@@ -201,7 +250,7 @@ jobs:
           path: signed-artifacts
           merge-multiple: true
 
-      - name: Publish AppImages to HiveCloud object storage
+      - name: Publish AppImages and Runtime debs to HiveCloud object storage
         env:
           HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
           HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
@@ -211,8 +260,9 @@ jobs:
           HIVECODE_RELEASE_CHANNEL: ${{ needs.reserve.outputs.channel }}
           HIVECODE_DESKTOP_PLATFORM: linux
           HIVECODE_DESKTOP_ARCHITECTURE: x64
-          HIVECODE_EXPECTED_ARTIFACTS: '2'
+          HIVECODE_EXPECTED_ARTIFACTS: '6'
           HIVECODE_EXPECTED_ARTIFACT_ARCHITECTURES: x64,arm64
-          HIVECODE_ARTIFACT_PATHS: x64=signed-artifacts/hivecode-linux-x64.AppImage,arm64=signed-artifacts/hivecode-linux-arm64.AppImage
+          HIVECODE_EXPECTED_ARTIFACT_FORMATS: APPIMAGE,DEB,TAR_GZ
+          HIVECODE_ARTIFACT_PATHS: x64=signed-artifacts/hivecode-linux-x64.AppImage,arm64=signed-artifacts/hivecode-linux-arm64.AppImage,x64=signed-artifacts/hivecode-runtime-x64.deb,arm64=signed-artifacts/hivecode-runtime-arm64.deb,x64=signed-artifacts/hivecode-runtime-x64.tar.gz,arm64=signed-artifacts/hivecode-runtime-arm64.tar.gz
           HIVECODE_RELEASE_NOTES: ${{ github.ref_name }}
         run: node config/scripts/publish-hivecloud-desktop-release.mjs

@@ -43,6 +43,10 @@ const artifactPaths = String(process.env.HIVECODE_ARTIFACT_PATHS ?? '')
   .split(/[\r\n,]+/)
   .map((value) => value.trim())
   .filter(Boolean)
+const configuredExpectedFormats = String(process.env.HIVECODE_EXPECTED_ARTIFACT_FORMATS ?? '')
+  .split(/[\r\n,]+/)
+  .map((value) => value.trim().toUpperCase())
+  .filter(Boolean)
 
 const VALID_PLATFORMS = new Set(['windows', 'macos', 'linux'])
 const VALID_ARCHITECTURES = new Set(['x64', 'arm64'])
@@ -50,7 +54,8 @@ const VALID_CHANNELS = new Set(['internal', 'beta', 'stable'])
 const FORMAT_BY_EXTENSION = new Map([
   ['.exe', 'NSIS'],
   ['.zip', 'ZIP'],
-  ['.appimage', 'APPIMAGE']
+  ['.appimage', 'APPIMAGE'],
+  ['.deb', 'DEB']
 ])
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const MAX_ARTIFACT_BYTES = 512 * 1024 * 1024
@@ -125,11 +130,11 @@ function validateInputs() {
     throw new Error('HIVECODE_ARTIFACT_PATHS is required')
   }
   const expectedArchitectures = getExpectedArtifactArchitectures()
-  if (expectedArchitectures.length !== expectedArtifactCount) {
-    throw new Error(
-      'HIVECODE_EXPECTED_ARTIFACT_ARCHITECTURES must list each expected architecture exactly once'
-    )
+  const expectedArtifacts = getExpectedArtifacts()
+  if (expectedArtifacts.length !== expectedArtifactCount) {
+    throw new Error('Expected architecture/format matrix must match HIVECODE_EXPECTED_ARTIFACTS')
   }
+  const seenArtifacts = new Set()
   for (const spec of artifactPaths) {
     const [artifactArchitecture, artifactPath] = splitArtifactSpec(spec)
     if (
@@ -139,12 +144,20 @@ function validateInputs() {
     ) {
       throw new Error(`Artifact must use <architecture>=<path>: ${spec}`)
     }
+    const identity = `${artifactArchitecture}/${packageFormat(artifactPath)}`
+    if (!expectedArtifacts.includes(identity) || seenArtifacts.has(identity)) {
+      throw new Error(`Unexpected or duplicate artifact: ${identity}`)
+    }
+    seenArtifacts.add(identity)
   }
 }
 
 function getExpectedArtifactArchitectures() {
   if (configuredExpectedArchitectures.length > 0) {
     const unique = [...new Set(configuredExpectedArchitectures)]
+    if (unique.length !== configuredExpectedArchitectures.length) {
+      throw new Error('Expected architectures must not contain duplicates')
+    }
     if (unique.some((value) => !VALID_ARCHITECTURES.has(value))) {
       throw new Error(
         'HIVECODE_EXPECTED_ARTIFACT_ARCHITECTURES contains an unsupported architecture'
@@ -160,6 +173,25 @@ function getExpectedArtifactArchitectures() {
   )
 }
 
+function getExpectedArtifacts() {
+  const allowedFormats =
+    platform === 'windows'
+      ? ['NSIS']
+      : platform === 'macos'
+        ? ['ZIP']
+        : ['APPIMAGE', 'DEB', 'TAR_GZ']
+  const formats = configuredExpectedFormats.length ? configuredExpectedFormats : [allowedFormats[0]]
+  if (
+    new Set(formats).size !== formats.length ||
+    formats.some((format) => !allowedFormats.includes(format))
+  ) {
+    throw new Error('Expected artifact formats contain duplicates or unsupported platform formats')
+  }
+  return getExpectedArtifactArchitectures().flatMap((arch) =>
+    formats.map((format) => `${arch}/${format}`)
+  )
+}
+
 function splitArtifactSpec(spec) {
   const separator = spec.indexOf('=')
   if (separator === -1) {
@@ -169,7 +201,9 @@ function splitArtifactSpec(spec) {
 }
 
 function packageFormat(path) {
-  const format = FORMAT_BY_EXTENSION.get(extname(path).toLowerCase())
+  const format = path.toLowerCase().endsWith('.tar.gz')
+    ? 'TAR_GZ'
+    : FORMAT_BY_EXTENSION.get(extname(path).toLowerCase())
   if (!format) {
     throw new Error(`Unsupported desktop artifact extension: ${basename(path)}`)
   }
@@ -179,8 +213,8 @@ function packageFormat(path) {
   if (platform === 'macos' && format !== 'ZIP') {
     throw new Error('macOS HiveCloud releases must upload a ZIP updater artifact')
   }
-  if (platform === 'linux' && format !== 'APPIMAGE') {
-    throw new Error('Linux auto-update releases must upload an AppImage')
+  if (platform === 'linux' && !['APPIMAGE', 'DEB', 'TAR_GZ'].includes(format)) {
+    throw new Error('Linux releases must upload an AppImage, Runtime deb, or Runtime tar.gz')
   }
   return format
 }
@@ -353,7 +387,8 @@ export async function main() {
         artifactId,
         sha256,
         size: metadata.size,
-        architecture: artifactArchitecture
+        architecture: artifactArchitecture,
+        packageFormat: format
       })
       continue
     }
@@ -418,7 +453,8 @@ export async function main() {
       artifactId,
       sha256,
       size: metadata.size,
-      architecture: artifactArchitecture
+      architecture: artifactArchitecture,
+      packageFormat: format
     })
   }
 
@@ -426,19 +462,19 @@ export async function main() {
     console.log(`Uploaded HiveCode Desktop artifacts for draft ${releaseId}`)
     return
   }
-  const expectedArchitectures = getExpectedArtifactArchitectures()
+  const expectedArtifacts = getExpectedArtifacts()
   if (expectedArtifactCount > uploadedArtifacts.length || expectedArtifactCount > 1) {
     const deadline = Date.now() + 20 * 60 * 1000
     while (Date.now() < deadline) {
       const current = await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}`)
-      if (hasExpectedVerifiedArtifacts(current, expectedArchitectures)) {
+      if (hasExpectedVerifiedArtifacts(current, expectedArtifacts)) {
         break
       }
       await new Promise((resolve) => setTimeout(resolve, 5000))
     }
   }
   const complete = await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}`)
-  if (!hasExpectedVerifiedArtifacts(complete, expectedArchitectures)) {
+  if (!hasExpectedVerifiedArtifacts(complete, expectedArtifacts)) {
     throw new Error(
       `HiveCloud release ${releaseId} did not receive all expected verified artifacts`
     )
@@ -446,27 +482,28 @@ export async function main() {
   if (releaseStatus !== 'PUBLISHED') {
     await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}/publish`, { method: 'POST' })
   }
-  const checkQuery = new URLSearchParams({
-    product: 'hivecode',
-    platform,
-    architecture,
-    channel,
-    // Use a known lower prerelease/build pair so post-publish checks do not
-    // depend on the release build being greater than one.
-    currentVersion: '0.0.0-beta.0',
-    currentBuild: '1'
-  })
-  const check = await hiveCloudRequest(`/hive/v1/updates/check?${checkQuery}`)
-  const latest = check?.latest
-  if (
-    !check?.hasUpdate ||
-    latest?.versionName !== versionName ||
-    Number(latest?.buildNumber) !== buildNumber
-  ) {
-    throw new Error('HiveCloud post-publish update check did not expose the desktop release')
-  }
-  const artifacts = [check?.artifact, latest?.artifact].filter(Boolean)
   for (const uploaded of uploadedArtifacts) {
+    const checkQuery = new URLSearchParams({
+      product: 'hivecode',
+      platform,
+      architecture: uploaded.architecture,
+      packageFormat: uploaded.packageFormat.toLowerCase(),
+      channel,
+      // Use a known lower prerelease/build pair so post-publish checks do not
+      // depend on the release build being greater than one.
+      currentVersion: '0.0.0-beta.0',
+      currentBuild: '1'
+    })
+    const check = await hiveCloudRequest(`/hive/v1/updates/check?${checkQuery}`)
+    const latest = check?.latest
+    if (
+      !check?.hasUpdate ||
+      latest?.versionName !== versionName ||
+      Number(latest?.buildNumber) !== buildNumber
+    ) {
+      throw new Error('HiveCloud post-publish update check did not expose the desktop release')
+    }
+    const artifacts = [check?.artifact, latest?.artifact].filter(Boolean)
     if (
       !artifacts.some(
         (artifact) =>
@@ -482,18 +519,18 @@ export async function main() {
   )
 }
 
-function hasExpectedVerifiedArtifacts(release, expectedArchitectures) {
-  const expectedFormat = platform === 'windows' ? 'NSIS' : platform === 'macos' ? 'ZIP' : 'APPIMAGE'
+export function hasExpectedVerifiedArtifacts(release, expectedArtifacts) {
   const expectedDistribution = channel === 'internal' ? 'INTERNAL' : 'DIRECT'
   const artifacts = Array.isArray(release?.artifacts) ? release.artifacts : []
-  return expectedArchitectures.every((expectedArchitecture) =>
-    artifacts.some(
-      (candidate) =>
-        String(candidate?.architecture ?? '').toLowerCase() === expectedArchitecture &&
-        String(candidate?.packageFormat ?? '').toUpperCase() === expectedFormat &&
-        String(candidate?.distributionType ?? '').toUpperCase() === expectedDistribution &&
-        String(candidate?.status ?? '').toUpperCase() === 'VERIFIED'
-    )
+  return expectedArtifacts.every(
+    (identity) =>
+      artifacts.filter(
+        (candidate) =>
+          `${String(candidate?.architecture ?? '').toLowerCase()}/${String(candidate?.packageFormat ?? '').toUpperCase()}` ===
+            identity &&
+          String(candidate?.distributionType ?? '').toUpperCase() === expectedDistribution &&
+          String(candidate?.status ?? '').toUpperCase() === 'VERIFIED'
+      ).length === 1
   )
 }
 

@@ -1,0 +1,73 @@
+name: HiveCode npm installer release
+
+on:
+  pull_request:
+    paths:
+      - 'packages/hivecode-install/**'
+      - '.github/workflows/hivecode-install-npm.yml'
+  workflow_dispatch:
+    inputs:
+      release_version:
+        description: 'Exact checked-in installer version, e.g. 0.1.0'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hivecode-install-npm-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify npm installer
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: ['18', '22']
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Test and inspect package
+        working-directory: packages/hivecode-install
+        run: |
+          npm test
+          npm pack --dry-run --json
+  publish:
+    needs: verify
+    if: github.repository == 'coder-lulu/hive-code-next' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/hivecode-install
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          registry-url: https://registry.npmjs.org/
+      - name: Verify requested version
+        env:
+          RELEASE_VERSION: ${{ inputs.release_version }}
+        run: |
+          node --input-type=module -e 'import fs from "node:fs"; const p=JSON.parse(fs.readFileSync("package.json")); if (!/^\d+\.\d+\.\d+$/.test(process.env.RELEASE_VERSION) || p.version !== process.env.RELEASE_VERSION || p.name !== "@hivecode/install") process.exit(1)'
+      - name: Test installer
+        run: npm test
+      - name: Inspect and pack release
+        run: |
+          mkdir -p ../../logs/npm-installer/release
+          npm pack --json --pack-destination ../../logs/npm-installer/release > ../../logs/npm-installer/release/pack.json
+          node --input-type=module -e 'import fs from "node:fs"; const [p]=JSON.parse(fs.readFileSync("../../logs/npm-installer/release/pack.json")); const allowed=new Set(["package.json","README.md","LICENSE","bin/install.mjs","lib/installer.mjs"]); if(p.files.length !== allowed.size || p.files.some(f=>!allowed.has(f.path))) process.exit(1)'
+      - name: Publish inspected tarball
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          test -n "$NODE_AUTH_TOKEN" || { echo '::error::NPM_TOKEN with publish permission is required'; exit 1; }
+          npm publish ../../logs/npm-installer/release/*.tgz --access public --tag latest --registry https://registry.npmjs.org/

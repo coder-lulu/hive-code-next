@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
+import { runProcess } from '@orca/process-host'
 
 const projectDir = resolve(import.meta.dirname, '../..')
 
@@ -16,6 +17,74 @@ function findStep(workflow, job, name) {
 }
 
 describe('HiveCloud release publishing contract', () => {
+  it.each([
+    ['1.5.0-beta.42', '1.5.0~beta.42-123'],
+    ['1.5.0', '1.5.0-123']
+  ])('preserves Debian version tilde in real Bash for %s', async (version, expected) => {
+    const linux = readWorkflow('hivecode-linux-release.yml')
+    const stage = findStep(linux, 'build', 'Stage immutable Runtime deb')
+    const expression = stage.run.match(/= "(\$\{RELEASE_VERSION[^\n]+)"/)[1]
+    const bash =
+      process.platform === 'win32'
+        ? join(process.env.ProgramFiles ?? 'C:/Program Files', 'Git/bin/bash.exe')
+        : 'bash'
+    const result = await runProcess({
+      program: bash,
+      args: ['--noprofile', '--norc', '-c', `printf '%s' "${expression}"`],
+      env: {
+        ...process.env,
+        RELEASE_VERSION: version,
+        HIVECODE_BUILD_NUMBER: '123',
+        ORCA_BACKGROUND_LAUNCH: '1'
+      }
+    })
+    expect(result.code).toBe(0)
+    expect(result.stdout).toBe(expected)
+  })
+
+  it('builds native Runtime debs with the reserved identity and publishes the full format matrix', () => {
+    const linux = readWorkflow('hivecode-linux-release.yml')
+    const build = linux.jobs.build
+    const steps = build.steps
+    const deb = findStep(linux, 'build', 'Build headless Runtime deb')
+    const stage = findStep(linux, 'build', 'Stage immutable Runtime deb')
+    const smoke = findStep(linux, 'build', 'Smoke packaged headless Runtime')
+    const publish = findStep(
+      linux,
+      'publish',
+      'Publish AppImages and Runtime debs to HiveCloud object storage'
+    )
+    expect(build.strategy.matrix.include.map(({ architecture }) => architecture)).toEqual([
+      'x64',
+      'arm64'
+    ])
+    expect(build.env.ORCA_LINUX_ARM64_RELEASE).toContain("matrix.architecture == 'arm64'")
+    expect(build.env.HIVECODE_BUILD_NUMBER).toBe('${{ needs.reserve.outputs.build_number }}')
+    const archive = findStep(linux, 'build', 'Build self-contained Headless Runtime archive')
+    const nativeSlot = findStep(linux, 'build', 'Stage the qualified glibc headless native slot')
+    const requireSlot = findStep(linux, 'build', 'Require the qualified headless native slot')
+    expect(archive.run).toBe('pnpm build:linux:runtime-archive')
+    expect(nativeSlot.uses).toBe('actions/download-artifact@v8')
+    expect(nativeSlot.with).toEqual({
+      name: 'orcad-prebuild-glibc-${{ matrix.runner }}',
+      path: 'out/orcad-prebuilds'
+    })
+    expect(requireSlot.run).toBe(
+      'pnpm build:orcad-prebuilds --require-slots linux-${{ matrix.architecture }}-glibc'
+    )
+    expect(steps.indexOf(nativeSlot)).toBeLessThan(steps.indexOf(requireSlot))
+    expect(steps.indexOf(requireSlot)).toBeLessThan(steps.indexOf(archive))
+    expect(deb.run).toBe('pnpm build:linux:runtime-deb')
+    expect(steps.indexOf(deb)).toBeLessThan(steps.indexOf(smoke))
+    expect(steps.indexOf(smoke)).toBeLessThan(steps.indexOf(stage))
+    expect(stage.run).toContain('dpkg-deb -f "${artifacts[0]}" Architecture')
+    expect(stage.run).toContain('${RELEASE_VERSION//-/\\~}-${HIVECODE_BUILD_NUMBER}')
+    expect(stage.run).toContain('upload/hivecode-runtime-${TARGET_ARCH}.deb')
+    expect(publish.env.HIVECODE_EXPECTED_ARTIFACTS).toBe('6')
+    expect(publish.env.HIVECODE_EXPECTED_ARTIFACT_FORMATS).toBe('APPIMAGE,DEB,TAR_GZ')
+    expect(publish.env.HIVECODE_ARTIFACT_PATHS.split(',')).toHaveLength(6)
+  })
+
   it('sets up the packageManager-pinned pnpm before caching and installing Linux dependencies', () => {
     const linux = readWorkflow('hivecode-linux-release.yml')
     const packageJson = JSON.parse(readFileSync(join(projectDir, 'package.json'), 'utf8'))
@@ -53,7 +122,7 @@ describe('HiveCloud release publishing contract', () => {
       expect(steps.indexOf(compile)).toBeLessThan(steps.indexOf(runtime))
       expect(steps.indexOf(runtime)).toBeLessThan(steps.indexOf(pack))
       expect(linux.jobs.publish.needs).toContain('build')
-      expect(linux.jobs.publish.if).toBeUndefined()
+      expect(linux.jobs.publish.if).toBe("github.event_name == 'push' || inputs.publish_release")
       expect(build['continue-on-error']).toBeUndefined()
       for (const gate of [runtime]) {
         expect(gate.if).toBeUndefined()
@@ -81,6 +150,17 @@ describe('HiveCloud release publishing contract', () => {
     }
   )
 
+  it('keeps manual Linux builds unpublished unless publishing is explicitly requested', () => {
+    const linux = readWorkflow('hivecode-linux-release.yml')
+    expect(linux.on.workflow_dispatch.inputs.publish_release).toEqual({
+      description: 'Publish the built artifacts to HiveCloud',
+      required: true,
+      type: 'boolean',
+      default: false
+    })
+    expect(linux.jobs.publish.if).toBe("github.event_name == 'push' || inputs.publish_release")
+  })
+
   it('embeds release identity before packaging and publishes desktop artifacts to object storage', () => {
     const linux = readWorkflow('hivecode-linux-release.yml')
     const windows = readWorkflow('hivecode-windows-hardware-sign.yml')
@@ -102,7 +182,8 @@ describe('HiveCloud release publishing contract', () => {
       findStep(mac, 'build-mac', 'Verify macOS application signatures and certificates').run
     ).toContain('codesign --verify --deep --strict')
     expect(
-      findStep(linux, 'publish', 'Publish AppImages to HiveCloud object storage').run
+      findStep(linux, 'publish', 'Publish AppImages and Runtime debs to HiveCloud object storage')
+        .run
     ).toContain('publish-hivecloud-desktop-release.mjs')
     expect(findStep(linux, 'reserve', 'Reserve Linux build number in HiveCloud').run).toContain(
       'reserve-hivecloud-build-number.mjs'
