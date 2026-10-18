@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, realpathSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { expect, it } from 'vitest'
@@ -23,7 +23,7 @@ const skip = skipForMissingInputs('artifact', runtime ? [] : ['a Node orcad slot
 it.skipIf(skip)(
   "an agent's CLI reaches its owning server while a person's selector is honoured",
   async () => {
-    const root = mkdtempSync(join(tmpdir(), 'orcad-cli-'))
+    const root = realpathSync(mkdtempSync(join(tmpdir(), 'orcad-cli-')))
     const home = join(root, 'home')
     mkdirSync(home)
     const userData = join(root, 'state')
