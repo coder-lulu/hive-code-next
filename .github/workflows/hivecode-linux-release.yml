@@ -30,7 +30,7 @@ jobs:
     outputs:
       version: ${{ steps.identity.outputs.version }}
       channel: ${{ steps.identity.outputs.channel }}
-      build_number: ${{ steps.reserve.outputs.build_number }}
+      build_number: ${{ steps.reserve.outputs.build_number || steps.identity.outputs.build_number }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -50,6 +50,7 @@ jobs:
           version="${REQUESTED_VERSION:-${GITHUB_REF_NAME#v}}"
           package_version="$(node -p "require('./package.json').version")"
           test "$version" = "$package_version"
+          build_number="$(node -e "const n = require('./config/client-build.json').desktopBuildNumber; if (!Number.isSafeInteger(n) || n < 1) process.exit(1); console.log(n)")"
           if [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-beta\.[0-9]+$ ]]; then
             channel=beta
           elif [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -60,8 +61,10 @@ jobs:
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
 
       - name: Reserve Linux build number in HiveCloud
+        if: github.event_name == 'push' || inputs.publish_release
         id: reserve
         env:
           HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}

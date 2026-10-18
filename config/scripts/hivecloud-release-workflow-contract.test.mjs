@@ -159,6 +159,16 @@ describe('HiveCloud release publishing contract', () => {
       default: false
     })
     expect(linux.jobs.publish.if).toBe("github.event_name == 'push' || inputs.publish_release")
+    expect(findStep(linux, 'reserve', 'Reserve Linux build number in HiveCloud').if).toBe(
+      linux.jobs.publish.if
+    )
+    expect(linux.jobs.reserve.outputs.build_number).toBe(
+      '${{ steps.reserve.outputs.build_number || steps.identity.outputs.build_number }}'
+    )
+    const identity = findStep(linux, 'reserve', 'Validate release identity')
+    expect(identity.run).toContain("require('./config/client-build.json').desktopBuildNumber")
+    expect(identity.run).toContain('Number.isSafeInteger(n) || n < 1')
+    expect(identity.run).toContain('echo "build_number=$build_number" >> "$GITHUB_OUTPUT"')
   })
 
   it('embeds release identity before packaging and publishes desktop artifacts to object storage', () => {
