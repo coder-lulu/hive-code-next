@@ -13,10 +13,29 @@ const retainedUpstreamReleaseWorkflows = [
   'hourly-mac-build.yml',
   'daily-mac-build.yml',
   'adhoc-mac-build.yml',
-  'dev-channel-win-build.yml',
-  'mobile-ios-release.yml'
+  'dev-channel-win-build.yml'
 ]
 const upstreamRepositoryGuard = "github.repository == 'stablyai/orca'"
+const expectTrustedBatchGuard = (expression) => {
+  const evaluate = (batchId, sourceSha) => {
+    const values = {
+      'github.repository': "'coder-lulu/hive-code-next'",
+      'github.sha': "'trusted-source'",
+      'inputs.batch_id': JSON.stringify(batchId),
+      'inputs.source_sha': JSON.stringify(sourceSha)
+    }
+    const resolved = Object.entries(values).reduce(
+      (value, [name, replacement]) => value.replaceAll(name, replacement),
+      expression
+    )
+    // Only this small boolean guard grammar is accepted before evaluation.
+    expect(resolved).toMatch(/^[\w\s'"!&|=()./-]+$/)
+    return Function(`return (${resolved})`)()
+  }
+  expect(evaluate('batch-id', 'untrusted-source')).toBe(false)
+  expect(evaluate('batch-id', 'trusted-source')).toBe(true)
+  expect(evaluate('', '')).toBe(true)
+}
 const packageJson = JSON.parse(readFileSync(join(repoRoot, 'package.json'), 'utf8'))
 const packagingScripts = [
   'build:desktop',
@@ -81,6 +100,44 @@ function isUpstreamGuardedJob(jobs, jobName, visiting = new Set()) {
 }
 
 describe('HiveCloud product release workflow boundary', () => {
+  it('keeps iOS batch uploads frozen and gated on Apple public availability in the product repository', () => {
+    const workflow = parse(
+      readFileSync(join(repoRoot, '.github/workflows/mobile-ios-release.yml'), 'utf8')
+    )
+    for (const job of Object.values(workflow.jobs)) {
+      expect(job.if).toContain("github.repository == 'coder-lulu/hive-code-next'")
+      expect(job.if).toContain('(!inputs.batch_id || inputs.source_sha == github.sha)')
+      expectTrustedBatchGuard(job.if)
+      const checkout = job.steps.find((step) => step.uses === 'actions/checkout@v6')
+      expect(checkout.with.ref).toBe('${{ inputs.source_sha || github.sha }}')
+    }
+    const prepare = findStep(
+      workflow.jobs['ios-build'],
+      (step) => step.run?.includes('prepare_batch_release'),
+      'frozen iOS version gate'
+    )
+    expect(prepare.if).toBe('${{ inputs.batch_id }}')
+    expect(prepare.run).toContain('test "$(git rev-parse HEAD)" = "$SOURCE_SHA"')
+    expect(prepare.env.BATCH_VERSION).toBe('${{ inputs.release_version }}')
+    expect(prepare.env.BATCH_BUILD).toBe('${{ inputs.release_build_number }}')
+    const job = workflow.jobs['ios-distribute']
+    const gate = findStep(
+      job,
+      (step) => step.run?.includes('verify_batch_availability'),
+      'Apple public availability gate'
+    )
+    const publish = findStep(
+      job,
+      (step) => step.run?.includes('publish-hivecloud-ios-store-release.mjs'),
+      'HiveCloud draft upload'
+    )
+    expect(job.steps.indexOf(gate)).toBeLessThan(job.steps.indexOf(publish))
+    expect(gate['continue-on-error']).toBeUndefined()
+    expect(publish.if).toBe('${{ inputs.batch_id }}')
+    expect(publish.env.HIVECODE_PUBLISH).toBe('false')
+    expect(publish.env.HIVECLOUD_RELEASE_BATCH_ID).toBe('${{ inputs.batch_id }}')
+    expect(publish.env.HIVECODE_COMMIT_SHA).toBe('${{ inputs.source_sha }}')
+  })
   it('uses only the approved HiveCloud beta feed and keeps retained upstream jobs unreachable', () => {
     expect(productManifest.desktop.updateRepository).toBeNull()
     expect(productManifest.desktop.updateProvider).toBe('hivecloud')
@@ -142,7 +199,13 @@ describe('HiveCloud product release workflow boundary', () => {
     const workflow = parse(
       readFileSync(join(repoRoot, '.github/workflows/release-mac-build.yml'), 'utf8')
     )
-    expect(workflow.jobs['build-mac'].if).toBe("github.repository == 'coder-lulu/hive-code-next'")
+    expect(workflow.jobs['build-mac'].if).toContain(
+      "github.repository == 'coder-lulu/hive-code-next'"
+    )
+    expect(workflow.jobs['build-mac'].if).toContain(
+      "inputs.batch_id == '' || inputs.source_sha == github.sha"
+    )
+    expectTrustedBatchGuard(workflow.jobs['build-mac'].if)
   })
 })
 

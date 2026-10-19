@@ -47,6 +47,7 @@ it.each(['windows', 'macos'])(
       }
       for (const [key, value] of Object.entries({
         HIVECLOUD_API_URL: 'https://releases.example.test',
+        HIVECLOUD_API_CLIENT_ID: 'release-ci',
         HIVECLOUD_API_TOKEN: 'test-token',
         HIVECLOUD_RELEASE_ID: releaseId,
         HIVECODE_VERSION: release.versionName,
@@ -68,6 +69,12 @@ it.each(['windows', 'macos'])(
       vi.stubGlobal(
         'fetch',
         vi.fn(async (url, options) => {
+          expect(options.headers?.clientid).toBe(
+            url.includes('/hive/v1/admin/') ? 'release-ci' : undefined
+          )
+          if (!url.includes('/hive/v1/admin/')) {
+            expect(options.headers?.authorization).toBeUndefined()
+          }
           requests.push(url)
           if (url.endsWith('/artifacts')) {
             expect(options.body.has('signingCertificateFingerprint')).toBe(platform === 'macos')
@@ -137,6 +144,7 @@ async function linuxReleaseFixture() {
   })
   for (const [key, value] of Object.entries({
     HIVECLOUD_API_URL: 'https://releases.example.test',
+    HIVECLOUD_API_CLIENT_ID: 'release-ci',
     HIVECLOUD_API_TOKEN: 'test-token',
     HIVECLOUD_RELEASE_ID: release.releaseId,
     HIVECODE_VERSION: release.versionName,
@@ -157,6 +165,12 @@ async function linuxReleaseFixture() {
     vi.stubEnv(key, value)
   }
   const fetchMock = vi.fn(async (url, options) => {
+    expect(options.headers?.clientid).toBe(
+      url.includes('/hive/v1/admin/') ? 'release-ci' : undefined
+    )
+    if (!url.includes('/hive/v1/admin/')) {
+      expect(options.headers?.authorization).toBeUndefined()
+    }
     if (url.endsWith('/artifacts')) {
       const artifact = artifacts.find(
         (candidate) =>
@@ -274,4 +288,15 @@ it('requires exactly one verified artifact for every architecture/format pair', 
   } finally {
     rmSync(fixture.root, { recursive: true, force: true })
   }
+})
+
+it('rejects missing client identity before uploading any artifact', async () => {
+  vi.stubEnv('HIVECLOUD_API_URL', 'https://api.example.test')
+  vi.stubEnv('HIVECLOUD_API_TOKEN', 'secret')
+  vi.stubEnv('HIVECLOUD_API_CLIENT_ID', ' ')
+  const request = vi.fn()
+  vi.stubGlobal('fetch', request)
+  const { main } = await import('./publish-hivecloud-desktop-release.mjs')
+  await expect(main()).rejects.toThrow('HIVECLOUD_API_CLIENT_ID')
+  expect(request).not.toHaveBeenCalled()
 })

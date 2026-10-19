@@ -65,7 +65,7 @@ describe('HiveCloud release publishing contract', () => {
     const requireSlot = findStep(linux, 'build', 'Require the qualified headless native slot')
     expect(archive.run).toBe('pnpm build:linux:runtime-archive')
     expect(nativeSlot.uses).toBe('actions/download-artifact@v8')
-    expect(nativeSlot.with).toEqual({
+    expect(nativeSlot.with).toMatchObject({
       name: 'orcad-prebuild-glibc-${{ matrix.runner }}',
       path: 'out/orcad-prebuilds'
     })
@@ -122,7 +122,7 @@ describe('HiveCloud release publishing contract', () => {
       expect(steps.indexOf(compile)).toBeLessThan(steps.indexOf(runtime))
       expect(steps.indexOf(runtime)).toBeLessThan(steps.indexOf(pack))
       expect(linux.jobs.publish.needs).toContain('build')
-      expect(linux.jobs.publish.if).toBe("github.event_name == 'push' || inputs.publish_release")
+      expect(linux.jobs.publish.if).toContain("inputs.batch_id != ''")
       expect(build['continue-on-error']).toBeUndefined()
       for (const gate of [runtime]) {
         expect(gate.if).toBeUndefined()
@@ -152,18 +152,16 @@ describe('HiveCloud release publishing contract', () => {
 
   it('keeps manual Linux builds unpublished unless publishing is explicitly requested', () => {
     const linux = readWorkflow('hivecode-linux-release.yml')
-    expect(linux.on.workflow_dispatch.inputs.publish_release).toEqual({
-      description: 'Publish the built artifacts to HiveCloud',
-      required: true,
-      type: 'boolean',
-      default: false
-    })
-    expect(linux.jobs.publish.if).toBe("github.event_name == 'push' || inputs.publish_release")
-    expect(findStep(linux, 'reserve', 'Reserve Linux build number in HiveCloud').if).toBe(
-      linux.jobs.publish.if
-    )
+    expect(linux.on.push).toBeUndefined()
+    expect(linux.on.workflow_dispatch.inputs.publish_release).toBeUndefined()
+    expect(linux.jobs.publish.if).toContain("inputs.batch_id != ''")
+    expect(
+      linux.jobs.reserve.steps.some((step) =>
+        step.run?.includes('reserve-hivecloud-build-number.mjs')
+      )
+    ).toBe(false)
     expect(linux.jobs.reserve.outputs.build_number).toBe(
-      '${{ steps.reserve.outputs.build_number || steps.identity.outputs.build_number }}'
+      '${{ steps.identity.outputs.build_number }}'
     )
     const identity = findStep(linux, 'reserve', 'Validate release identity')
     expect(identity.run).toContain("require('./config/client-build.json').desktopBuildNumber")
@@ -178,10 +176,7 @@ describe('HiveCloud release publishing contract', () => {
 
     expect(linux.jobs.build.env.HIVECODE_EMBED_RELEASE_IDENTITY).toBe('1')
     expect(mac.jobs['build-mac'].env.HIVECODE_EMBED_RELEASE_IDENTITY).toBe('1')
-    expect(mac.jobs['build-mac'].if).toBe("github.repository == 'coder-lulu/hive-code-next'")
-    expect(findStep(mac, 'build-mac', 'Reserve macOS build number in HiveCloud').run).toContain(
-      'reserve-hivecloud-build-number.mjs'
-    )
+    expect(mac.jobs['build-mac'].if).toContain("github.repository == 'coder-lulu/hive-code-next'")
     expect(findStep(mac, 'build-mac', 'Build release artifacts (macOS)').with.command).toContain(
       '--mac --publish never'
     )
@@ -195,12 +190,9 @@ describe('HiveCloud release publishing contract', () => {
       findStep(linux, 'publish', 'Publish AppImages and Runtime debs to HiveCloud object storage')
         .run
     ).toContain('publish-hivecloud-desktop-release.mjs')
-    expect(findStep(linux, 'reserve', 'Reserve Linux build number in HiveCloud').run).toContain(
-      'reserve-hivecloud-build-number.mjs'
-    )
     expect(
       findStep(windows, 'build-and-sign', 'Resolve identity and reserve Windows build number').run
-    ).toContain('reserve-hivecloud-build-number.mjs')
+    ).not.toContain('reserve-hivecloud-build-number.mjs')
     expect(
       findStep(
         windows,
@@ -220,11 +212,6 @@ describe('HiveCloud release publishing contract', () => {
     )
     const workflow = parse(workflowText)
     const publishStep = findStep(workflow, 'android-build', 'Publish signed APK to HiveCloud')
-    const reservationStep = findStep(
-      workflow,
-      'android-build',
-      'Reserve Android build number in HiveCloud'
-    )
     const signingStep = findStep(workflow, 'android-build', 'Configure Android release signing')
     const verifyStep = findStep(
       workflow,
@@ -238,7 +225,6 @@ describe('HiveCloud release publishing contract', () => {
       "github.repository == 'coder-lulu/hive-code-next'"
     )
     expect(publishStep?.run).toContain('publish-hivecloud-release.mjs')
-    expect(reservationStep.run).toContain('reserve-hivecloud-build-number.mjs')
     expect(workflowText).not.toContain('gh release upload')
     expect(workflowText).not.toContain('gh release create')
   })

@@ -37,6 +37,8 @@ it.each([
   'mobile/fastlane/Appfile',
   'mobile/fastlane/ios_release_version.rb',
   'mobile/fastlane/ios_release_version_test.rb',
+  'mobile/fastlane/ios_batch_release.rb',
+  'mobile/fastlane/ios_batch_release_test.rb',
   'mobile/Gemfile',
   'mobile/Gemfile.lock',
   'mobile/.ruby-version',
@@ -90,6 +92,7 @@ it('gates Ruby independently and retains mobile static validation', () => {
     'Setup Ruby and fastlane',
     'Test iOS release version resolution',
     'Test TestFlight lane arguments',
+    'Test frozen iOS batch and Apple availability',
     'Smoke-check the Fastfile'
   ])
   for (const step of gated) {
@@ -114,6 +117,9 @@ it('gates Ruby independently and retains mobile static validation', () => {
   expect(steps.find((step) => step.name === 'Smoke-check the Fastfile').run).toBe(
     'bundle exec fastlane lanes'
   )
+  expect(
+    steps.find((step) => step.name === 'Test frozen iOS batch and Apple availability').run
+  ).toBe('ruby fastlane/ios_batch_release_test.rb')
 })
 
 function fixture(detectorStep = detector) {

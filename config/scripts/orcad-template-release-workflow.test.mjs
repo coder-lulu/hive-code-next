@@ -115,7 +115,7 @@ describe('orcad template release wiring (design D2)', () => {
     expect(macSteps[macDownload].with).toMatchObject({
       name: 'orcad-template',
       path: 'out/orcad-template',
-      'run-id': '${{ inputs.release_run_id }}'
+      'run-id': '${{ inputs.runtime_run_id || inputs.release_run_id || github.run_id }}'
     })
     const packageStep = stepIndex(macSteps, (step) =>
       String(step.with?.command ?? '').includes('electron-builder')

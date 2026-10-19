@@ -1,0 +1,357 @@
+name: Publish all HiveCode clients
+
+run-name: Publish HiveCode ${{ inputs.source_ref }} (${{ inputs.channel }}, targets=${{ inputs.targets }})
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Release tag resolving to the same trusted commit as this workflow
+        required: true
+        type: string
+      channel:
+        description: Public release channel
+        required: true
+        type: choice
+        options: [beta, stable]
+      targets:
+        description: Explicit client selection for this release batch
+        required: true
+        type: choice
+        options: [all, linux-android]
+        default: all
+      release_notes:
+        description: Release notes shared by all clients
+        required: false
+        type: string
+
+permissions:
+  id-token: write
+  actions: read
+  contents: read
+
+concurrency:
+  group: hivecode-publish-all-${{ inputs.channel }}
+  cancel-in-progress: false
+
+env:
+  ORCA_BACKGROUND_LAUNCH: '1'
+
+jobs:
+  plan:
+    if: github.repository == 'coder-lulu/hive-code-next'
+    permissions:
+      id-token: write
+      actions: read
+      contents: read
+    runs-on: ubuntu-22.04
+    environment: release-production
+    timeout-minutes: 10
+    outputs:
+      batch_id: ${{ steps.plan.outputs.batch_id }}
+      source_sha: ${{ steps.plan.outputs.source_sha }}
+      version: ${{ steps.plan.outputs.version }}
+      channel: ${{ steps.plan.outputs.channel }}
+      already_published: ${{ steps.plan.outputs.already_published }}
+      windows_release_id: ${{ steps.plan.outputs.windows_release_id }}
+      windows_build_number: ${{ steps.plan.outputs.windows_build_number }}
+      windows_selected: ${{ steps.plan.outputs.windows_selected }}
+      windows_ready: ${{ steps.plan.outputs.windows_ready }}
+      macos_release_id: ${{ steps.plan.outputs.macos_release_id }}
+      macos_build_number: ${{ steps.plan.outputs.macos_build_number }}
+      macos_selected: ${{ steps.plan.outputs.macos_selected }}
+      macos_ready: ${{ steps.plan.outputs.macos_ready }}
+      linux_release_id: ${{ steps.plan.outputs.linux_release_id }}
+      linux_build_number: ${{ steps.plan.outputs.linux_build_number }}
+      linux_selected: ${{ steps.plan.outputs.linux_selected }}
+      linux_ready: ${{ steps.plan.outputs.linux_ready }}
+      android_release_id: ${{ steps.plan.outputs.android_release_id }}
+      android_build_number: ${{ steps.plan.outputs.android_build_number }}
+      android_selected: ${{ steps.plan.outputs.android_selected }}
+      android_ready: ${{ steps.plan.outputs.android_ready }}
+      ios_release_id: ${{ steps.plan.outputs.ios_release_id }}
+      ios_build_number: ${{ steps.plan.outputs.ios_build_number }}
+      ios_selected: ${{ steps.plan.outputs.ios_selected }}
+      ios_ready: ${{ steps.plan.outputs.ios_ready }}
+    steps:
+      - name: Require a trusted release trigger
+        shell: bash
+        env:
+          TRIGGER_REF: ${{ github.ref }}
+          REF_PROTECTED: ${{ github.ref_protected }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+        run: |
+          set -euo pipefail
+          if [[ "$TRIGGER_REF" != "refs/tags/$SOURCE_REF" ]]; then
+            echo '::error::Run public publication from the selected release tag.'
+            exit 1
+          fi
+          if [[ ! "$SOURCE_REF" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-beta\.[0-9]+)?$ ]]; then
+            echo '::error::source_ref must be a vSemVer release tag.'
+            exit 1
+          fi
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_ref }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+      - name: Freeze source identity
+        shell: bash
+        env:
+          SOURCE_REF: ${{ inputs.source_ref }}
+          TRUSTED_SOURCE_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain --untracked-files=no)"
+          source_sha="$(git rev-parse HEAD)"
+          if [[ "$source_sha" != "$TRUSTED_SOURCE_SHA" ]]; then
+            echo '::error::Release source must equal the trusted workflow commit. Select the release tag as the workflow ref.'
+            exit 1
+          fi
+          if [[ "$SOURCE_REF" == v* ]]; then
+            test "${SOURCE_REF#v}" = "$(node -p "require('./package.json').version")"
+          fi
+          printf 'HIVECODE_COMMIT_SHA=%s\n' "$source_sha" >> "$GITHUB_ENV"
+      - name: Require public release credentials and signing configuration
+        shell: bash
+        env:
+          HIVECODE_RELEASE_TARGETS: ${{ inputs.targets }}
+          HIVECLOUD_API_CLIENT_ID: ${{ vars.HIVECLOUD_API_CLIENT_ID }}
+          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
+          HIVECODE_ANDROID_KEYSTORE_BASE64: ${{ secrets.HIVECODE_ANDROID_KEYSTORE_BASE64 }}
+          HIVECODE_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.HIVECODE_ANDROID_KEYSTORE_PASSWORD }}
+          HIVECODE_ANDROID_KEY_ALIAS: ${{ secrets.HIVECODE_ANDROID_KEY_ALIAS }}
+          HIVECODE_ANDROID_KEY_PASSWORD: ${{ secrets.HIVECODE_ANDROID_KEY_PASSWORD }}
+          HIVECODE_ANDROID_SIGNING_FINGERPRINT: ${{ secrets.HIVECODE_ANDROID_SIGNING_FINGERPRINT }}
+          MAC_CERTS: ${{ secrets.MAC_CERTS }}
+          MAC_CERTS_PASSWORD: ${{ secrets.MAC_CERTS_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          HIVECODE_MAC_SIGNING_FINGERPRINT: ${{ secrets.HIVECODE_MAC_SIGNING_FINGERPRINT }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          IOS_DIST_CERT_P12: ${{ secrets.IOS_DIST_CERT_P12 }}
+          IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECODE_WINDOWS_SIGNING_EXECUTABLE: ${{ vars.HIVECODE_WINDOWS_SIGNING_EXECUTABLE }}
+          HIVECODE_WINDOWS_SIGNING_ARGUMENTS: ${{ vars.HIVECODE_WINDOWS_SIGNING_ARGUMENTS }}
+          HIVECODE_WINDOWS_EXPECTED_SIGNERS: ${{ vars.HIVECODE_WINDOWS_EXPECTED_SIGNERS }}
+          HIVECODE_WINDOWS_EXPECTED_THUMBPRINTS: ${{ vars.HIVECODE_WINDOWS_EXPECTED_THUMBPRINTS }}
+        run: |
+          node --input-type=module <<'NODE'
+          const targets = process.env.HIVECODE_RELEASE_TARGETS
+          if (!['all', 'linux-android'].includes(targets)) throw new Error('Invalid HIVECODE_RELEASE_TARGETS')
+          const shared = ['ACTIONS_ID_TOKEN_REQUEST_URL', 'ACTIONS_ID_TOKEN_REQUEST_TOKEN', 'HIVECLOUD_API_CLIENT_ID', 'HIVECLOUD_RELEASE_ATTESTATION_KEY', 'HIVECLOUD_API_URL']
+          const configured = [
+            'ACTIONS_ID_TOKEN_REQUEST_URL',
+            'ACTIONS_ID_TOKEN_REQUEST_TOKEN',
+            'HIVECLOUD_API_CLIENT_ID',
+            'HIVECLOUD_RELEASE_ATTESTATION_KEY',
+            'HIVECODE_ANDROID_KEYSTORE_BASE64',
+            'HIVECODE_ANDROID_KEYSTORE_PASSWORD',
+            'HIVECODE_ANDROID_KEY_ALIAS',
+            'HIVECODE_ANDROID_KEY_PASSWORD',
+            'HIVECODE_ANDROID_SIGNING_FINGERPRINT',
+            'MAC_CERTS',
+            'MAC_CERTS_PASSWORD',
+            'APPLE_ID',
+            'APPLE_APP_SPECIFIC_PASSWORD',
+            'APPLE_TEAM_ID',
+            'HIVECODE_MAC_SIGNING_FINGERPRINT',
+            'ASC_KEY_ID',
+            'ASC_ISSUER_ID',
+            'ASC_API_KEY_P8',
+            'IOS_DIST_CERT_P12',
+            'IOS_DIST_CERT_PASSWORD',
+            'HIVECLOUD_API_URL',
+            'HIVECODE_WINDOWS_SIGNING_EXECUTABLE',
+            'HIVECODE_WINDOWS_SIGNING_ARGUMENTS',
+          ]
+          const required = configured.filter(name => shared.includes(name) || name.startsWith('HIVECODE_ANDROID_') || targets === 'all')
+          const present = name => typeof process.env[name] === 'string' && process.env[name].trim().length > 0
+          const missing = required.filter(name => !present(name))
+          if (targets === 'all' && !present('HIVECODE_WINDOWS_EXPECTED_SIGNERS') && !present('HIVECODE_WINDOWS_EXPECTED_THUMBPRINTS')) {
+            missing.push('HIVECODE_WINDOWS_EXPECTED_SIGNERS or HIVECODE_WINDOWS_EXPECTED_THUMBPRINTS')
+          }
+          if (missing.length > 0) {
+            for (const name of missing) console.error(`::error::Missing release configuration: ${name}`)
+            process.exit(1)
+          }
+          NODE
+      - name: Reserve identities and create the complete release batch
+        id: plan
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECODE_RELEASE_TARGETS: ${{ inputs.targets }}
+          HIVECLOUD_RELEASE_SCOPE: plan
+          HIVECLOUD_API_CLIENT_ID: ${{ vars.HIVECLOUD_API_CLIENT_ID }}
+          HIVECODE_RELEASE_CHANNEL: ${{ inputs.channel }}
+          HIVECODE_RELEASE_NOTES: ${{ inputs.release_notes }}
+        run: node config/scripts/hivecloud-release-batch.mjs plan
+      - name: Summarize explicit release selection
+        env:
+          RELEASE_TARGETS: ${{ inputs.targets }}
+          RELEASE_BATCH_ID: ${{ steps.plan.outputs.batch_id }}
+        run: |
+          printf 'Release targets: `%s`\nBatch: `%s`\n' "$RELEASE_TARGETS" "$RELEASE_BATCH_ID" >> "$GITHUB_STEP_SUMMARY"
+      - name: Preserve the frozen release plan
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hivecode-release-plan-${{ github.run_id }}-${{ github.run_attempt }}
+          path: logs/release-batch/
+          if-no-files-found: ignore
+          retention-days: 30
+
+  runtime:
+    needs: plan
+    if: (needs.plan.outputs.windows_selected == 'true' && needs.plan.outputs.windows_ready != 'true') || (needs.plan.outputs.macos_selected == 'true' && needs.plan.outputs.macos_ready != 'true') || (needs.plan.outputs.linux_selected == 'true' && needs.plan.outputs.linux_ready != 'true')
+    uses: ./.github/workflows/node-server-tests.yml
+    with:
+      ref: ${{ needs.plan.outputs.source_sha }}
+      build_template: true
+
+  windows:
+    needs: [plan, runtime]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.runtime.result == 'success' && needs.plan.outputs.windows_selected == 'true' && needs.plan.outputs.windows_ready != 'true' }}
+    uses: ./.github/workflows/hivecode-windows-hardware-sign.yml
+    with:
+      source_sha: ${{ needs.plan.outputs.source_sha }}
+      release_version: ${{ needs.plan.outputs.version }}
+      release_channel: ${{ needs.plan.outputs.channel }}
+      release_build_number: ${{ needs.plan.outputs.windows_build_number }}
+      release_id: ${{ needs.plan.outputs.windows_release_id }}
+      batch_id: ${{ needs.plan.outputs.batch_id }}
+      runtime_run_id: ${{ github.run_id }}
+    secrets: inherit
+
+  macos:
+    needs: [plan, runtime]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.runtime.result == 'success' && needs.plan.outputs.macos_selected == 'true' && needs.plan.outputs.macos_ready != 'true' }}
+    permissions:
+      id-token: write
+      actions: read
+      contents: write
+    uses: ./.github/workflows/release-mac-build.yml
+    with:
+      source_sha: ${{ needs.plan.outputs.source_sha }}
+      release_version: ${{ needs.plan.outputs.version }}
+      release_channel: ${{ needs.plan.outputs.channel }}
+      release_build_number: ${{ needs.plan.outputs.macos_build_number }}
+      release_id: ${{ needs.plan.outputs.macos_release_id }}
+      batch_id: ${{ needs.plan.outputs.batch_id }}
+      runtime_run_id: ${{ github.run_id }}
+    secrets: inherit
+
+  linux:
+    needs: [plan, runtime]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.runtime.result == 'success' && needs.plan.outputs.linux_selected == 'true' && needs.plan.outputs.linux_ready != 'true' }}
+    uses: ./.github/workflows/hivecode-linux-release.yml
+    with:
+      source_sha: ${{ needs.plan.outputs.source_sha }}
+      release_version: ${{ needs.plan.outputs.version }}
+      release_channel: ${{ needs.plan.outputs.channel }}
+      release_build_number: ${{ needs.plan.outputs.linux_build_number }}
+      release_id: ${{ needs.plan.outputs.linux_release_id }}
+      batch_id: ${{ needs.plan.outputs.batch_id }}
+      runtime_run_id: ${{ github.run_id }}
+    secrets: inherit
+
+  android:
+    needs: plan
+    if: needs.plan.outputs.android_selected == 'true' && needs.plan.outputs.android_ready != 'true'
+    permissions:
+      id-token: write
+      actions: read
+      contents: write
+    uses: ./.github/workflows/mobile-android-release.yml
+    with:
+      source_sha: ${{ needs.plan.outputs.source_sha }}
+      release_version: ${{ needs.plan.outputs.version }}
+      release_channel: ${{ needs.plan.outputs.channel }}
+      release_build_number: ${{ needs.plan.outputs.android_build_number }}
+      release_id: ${{ needs.plan.outputs.android_release_id }}
+      batch_id: ${{ needs.plan.outputs.batch_id }}
+      runtime_run_id: ${{ github.run_id }}
+    secrets: inherit
+
+  ios:
+    needs: plan
+    if: needs.plan.outputs.ios_selected == 'true' && needs.plan.outputs.ios_ready != 'true'
+    uses: ./.github/workflows/mobile-ios-release.yml
+    with:
+      source_sha: ${{ needs.plan.outputs.source_sha }}
+      release_version: ${{ needs.plan.outputs.version }}
+      release_channel: ${{ needs.plan.outputs.channel }}
+      release_build_number: ${{ needs.plan.outputs.ios_build_number }}
+      release_id: ${{ needs.plan.outputs.ios_release_id }}
+      batch_id: ${{ needs.plan.outputs.batch_id }}
+      runtime_run_id: ${{ github.run_id }}
+    secrets: inherit
+
+  publish:
+    needs: [plan, runtime, windows, macos, linux, android, ios]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    environment: release-production
+    permissions:
+      id-token: write
+      actions: read
+      contents: read
+    runs-on: ubuntu-22.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.plan.outputs.source_sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+      - name: Require every client to complete or already have verified artifacts
+        env:
+          RELEASE_JOB_RESULTS: ${{ toJSON(needs) }}
+          HIVECODE_RELEASE_TARGETS: ${{ inputs.targets }}
+        run: |
+          node --input-type=module <<'NODE'
+          const jobs = JSON.parse(process.env.RELEASE_JOB_RESULTS)
+          const selection = process.env.HIVECODE_RELEASE_TARGETS
+          if (!['all', 'linux-android'].includes(selection)) throw new Error('Invalid HIVECODE_RELEASE_TARGETS')
+          for (const target of ['windows', 'macos', 'linux', 'android', 'ios']) {
+            const selected = selection === 'all' || ['linux', 'android'].includes(target)
+            if (jobs.plan.outputs[`${target}_selected`] !== String(selected)) {
+              throw new Error(`Release selection mismatch: ${target}`)
+            }
+            const result = jobs[target].result
+            if (!selected) {
+              if (result !== 'skipped') throw new Error(`Unselected client ran: ${target}`)
+              continue
+            }
+            if (result !== 'success' && !(result === 'skipped' && jobs.plan.outputs[`${target}_ready`] === 'true')) {
+              throw new Error(`Release batch is incomplete: ${target} (${result})`)
+            }
+          }
+          NODE
+      - name: Atomically publish and verify all public artifacts
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_PUBLIC_RELEASE_URL: ${{ vars.HIVECLOUD_PUBLIC_RELEASE_URL || 'https://releases.hivekernel.com' }}
+          HIVECODE_RELEASE_TARGETS: ${{ inputs.targets }}
+          HIVECLOUD_RELEASE_SCOPE: publish
+          HIVECLOUD_API_CLIENT_ID: ${{ vars.HIVECLOUD_API_CLIENT_ID }}
+          HIVECLOUD_RELEASE_BATCH_ID: ${{ needs.plan.outputs.batch_id }}
+          HIVECODE_COMMIT_SHA: ${{ needs.plan.outputs.source_sha }}
+          HIVECODE_VERSION: ${{ needs.plan.outputs.version }}
+          HIVECODE_RELEASE_CHANNEL: ${{ needs.plan.outputs.channel }}
+        run: node config/scripts/hivecloud-release-batch.mjs publish
+      - name: Preserve publication evidence
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: hivecode-publication-${{ github.run_id }}-${{ github.run_attempt }}
+          path: logs/release-batch/
+          if-no-files-found: ignore
+          retention-days: 30

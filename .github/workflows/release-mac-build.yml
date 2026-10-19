@@ -3,6 +3,29 @@ name: Release macOS Build
 run-name: Mac release build ${{ inputs.tag }} (${{ inputs.release_run_id }})
 
 on:
+  workflow_call:
+    inputs:
+      source_sha:
+        required: true
+        type: string
+      release_version:
+        required: true
+        type: string
+      release_channel:
+        required: true
+        type: string
+      release_build_number:
+        required: true
+        type: string
+      release_id:
+        required: true
+        type: string
+      batch_id:
+        required: true
+        type: string
+      runtime_run_id:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -25,24 +48,28 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-mac-build-${{ inputs.tag }}
+  group: release-mac-build-${{ inputs.batch_id || inputs.tag }}
   cancel-in-progress: false
 
 jobs:
   build-mac:
-    if: github.repository == 'coder-lulu/hive-code-next'
+    if: (inputs.batch_id == '' || inputs.source_sha == github.sha) && github.repository == 'coder-lulu/hive-code-next'
     # Why: this workflow is outside the SignPath signing run, so Blacksmith
     # cannot enter Windows artifact provenance while mac notarization gets the
     # faster runner.
+    environment: release-production
     runs-on: blacksmith-6vcpu-macos-15
     timeout-minutes: 60
     # actions: read fetches the release-cut run's artifacts.
     permissions:
+      id-token: write
       actions: read
       contents: write
     env:
+      HIVECODE_VERSION: ${{ inputs.release_version }}
+      HIVECODE_BUILD_NUMBER: ${{ inputs.release_build_number }}
       NODE_OPTIONS: --max-old-space-size=4096
-      HIVECODE_COMMIT_SHA: ${{ github.sha }}
+      HIVECODE_COMMIT_SHA: ${{ inputs.source_sha || github.sha }}
       # Packaging runs after the Vite build; keep identity embedding enabled
       # for electron-builder so the shipped app carries its release metadata.
       HIVECODE_EMBED_RELEASE_IDENTITY: '1'
@@ -50,7 +77,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          ref: refs/tags/${{ inputs.tag }}
+          ref: ${{ inputs.source_sha || format('refs/tags/{0}', inputs.tag) }}
+          persist-credentials: false
+
+      - name: Use committed build number for standalone packaging
+        if: inputs.batch_id == ''
+        shell: bash
+        run: |
+          node -e "const fs = require('node:fs'); const n = require('./config/client-build.json').desktopBuildNumber; if (!Number.isSafeInteger(n) || n < 1) process.exit(1); fs.appendFileSync(process.env.GITHUB_ENV, 'HIVECODE_BUILD_NUMBER=' + n + '\n')"
 
       - name: Stamp checked-out commit in release identity
         shell: bash
@@ -70,26 +104,6 @@ jobs:
             pnpm-lock.yaml
             mobile/pnpm-lock.yaml
 
-      - name: Reserve macOS build number in HiveCloud
-        shell: bash
-        env:
-          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
-          RELEASE_TAG: ${{ inputs.tag }}
-        run: |
-          set -euo pipefail
-          version="${RELEASE_TAG#v}"
-          if [[ "$version" == *-beta.* || "$version" == *-rc.* ]]; then
-            channel=beta
-          else
-            channel=stable
-          fi
-          export HIVECODE_RELEASE_PLATFORM=macos
-          export HIVECODE_RELEASE_CHANNEL="$channel"
-          export HIVECODE_BUILD_RESERVATION_KEY="hivecode:macos:${channel}:${version}"
-          node config/scripts/reserve-hivecloud-build-number.mjs
-      # Why: packaging bundles the pinned Node into the macOS terminal host. Keyed on the pin alone
-      # with no restore-keys, so a pin bump starts empty instead of carrying old archives forward.
       - name: Locate the pinned Node runtime cache
         shell: bash
         run: echo "ORCA_NODE_RUNTIME_CACHE_DIR=$HOME/Library/Caches/orca-node-runtime" >>"$GITHUB_ENV"
@@ -151,7 +165,11 @@ jobs:
         id: tag-classify
         shell: bash
         env:
-          TAG: ${{ inputs.tag }}
+          BATCH_ID: ${{ inputs.batch_id }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          RELEASE_CHANNEL: ${{ inputs.release_channel }}
+          RESERVED_BUILD_NUMBER: ${{ inputs.release_build_number }}
+          TAG: ${{ inputs.batch_id != '' && format('v{0}', inputs.release_version) || inputs.tag }}
         run: |
           set -euo pipefail
           # Why the optional trailing identifier: suffixed side-branch RCs
@@ -165,6 +183,13 @@ jobs:
             echo "::error::Tag $TAG does not match stable, beta, or rc pattern; refusing to build official artifact"
             exit 1
           fi
+          if [[ -n "$BATCH_ID" ]]; then
+            test "$(node -p "require('./package.json').version")" = "$RELEASE_VERSION"
+            [[ "$RESERVED_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]
+            channel=beta
+            if [[ "$identity" == stable ]]; then channel=stable; fi
+            test "$channel" = "$RELEASE_CHANNEL"
+          fi
           echo "identity=$identity" >>"$GITHUB_OUTPUT"
           echo "Classified $TAG as $identity"
 
@@ -174,7 +199,7 @@ jobs:
         with:
           name: release-javascript
           path: .build/release-javascript
-          run-id: ${{ inputs.release_run_id }}
+          run-id: ${{ inputs.runtime_run_id || inputs.release_run_id || github.run_id }}
           github-token: ${{ github.token }}
 
       - name: Build app
@@ -200,7 +225,7 @@ jobs:
         with:
           name: orcad-template
           path: out/orcad-template
-          run-id: ${{ inputs.release_run_id }}
+          run-id: ${{ inputs.runtime_run_id || inputs.release_run_id || github.run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Gate runtime file-watcher process isolation
@@ -252,13 +277,19 @@ jobs:
           done <<< "$apps"
 
       - name: Publish macOS ZIP artifacts to HiveCloud object storage
+        if: inputs.batch_id != ''
         shell: bash
         env:
           HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_SCOPE: ${{ inputs.batch_id != '' && 'artifact' || '' }}
+          HIVECLOUD_API_CLIENT_ID: ${{ vars.HIVECLOUD_API_CLIENT_ID }}
+          HIVECODE_COMMIT_SHA: ${{ inputs.source_sha || env.HIVECODE_COMMIT_SHA }}
+          HIVECLOUD_RELEASE_ID: ${{ inputs.release_id }}
+          HIVECLOUD_RELEASE_BATCH_ID: ${{ inputs.batch_id }}
+          HIVECODE_PUBLISH: ${{ inputs.batch_id != '' && 'false' || 'true' }}
           HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
-          HIVECODE_VERSION: ${{ inputs.tag }}
-          HIVECODE_RELEASE_CHANNEL: ${{ contains(inputs.tag, '-beta.') && 'beta' || contains(inputs.tag, '-rc.') && 'beta' || 'stable' }}
+          HIVECODE_VERSION: ${{ inputs.release_version || inputs.tag }}
+          HIVECODE_RELEASE_CHANNEL: ${{ inputs.release_channel || ((contains(inputs.tag, '-beta.') || contains(inputs.tag, '-rc.')) && 'beta' || 'stable') }}
           HIVECODE_DESKTOP_PLATFORM: macos
           HIVECODE_DESKTOP_ARCHITECTURE: x64
           HIVECODE_EXPECTED_ARTIFACTS: '2'

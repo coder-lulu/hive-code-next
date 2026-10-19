@@ -6,11 +6,13 @@ import { stat } from 'node:fs/promises'
 import { basename, extname } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createReleaseVerificationAttestation } from './hivecloud-release-attestation.mjs'
+import { assertBatchRelease } from './hivecloud-release-client.mjs'
+import { releaseAuthentication } from './hivecloud-release-auth.mjs'
 
 const apiBase = String(process.env.HIVECLOUD_API_URL ?? '')
   .trim()
   .replace(/\/$/, '')
-const token = String(process.env.HIVECLOUD_API_TOKEN ?? '').trim()
+let authentication
 const versionName = String(process.env.HIVECODE_VERSION ?? '').trim()
 const releaseNotes = String(process.env.HIVECODE_RELEASE_NOTES ?? '').trim()
 const platform = String(process.env.HIVECODE_DESKTOP_PLATFORM ?? '')
@@ -70,15 +72,11 @@ function requireValue(value, name) {
   return value
 }
 
-function unwrapData(payload) {
-  return payload && typeof payload === 'object' && payload.data !== undefined
-    ? payload.data
-    : payload
-}
+const unwrapData = (payload) => (payload?.data === undefined ? payload : payload.data)
 
 function validateInputs() {
   requireValue(apiBase, 'HIVECLOUD_API_URL')
-  requireValue(token, 'HIVECLOUD_API_TOKEN')
+  authentication = releaseAuthentication()
   requireValue(versionName, 'HIVECODE_VERSION')
   requireValue(platform, 'HIVECODE_DESKTOP_PLATFORM')
   requireValue(architecture, 'HIVECODE_DESKTOP_ARCHITECTURE')
@@ -222,14 +220,11 @@ function packageFormat(path) {
 async function hiveCloudRequest(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, {
     ...options,
-    // Release metadata and bearer credentials must never follow a server-side
-    // redirect to an untrusted origin. Artifact downloads are performed by
-    // the client through the separately validated HiveCloud gateway.
     redirect: 'error',
     signal: options.signal ?? AbortSignal.timeout(60_000),
     headers: {
       accept: 'application/json',
-      authorization: `Bearer ${token}`,
+      ...(path.startsWith('/hive/v1/admin/') ? await authentication() : {}),
       ...(options.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
       ...options.headers
     }
@@ -321,6 +316,7 @@ export async function main() {
       ? release
       : await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}`)
   assertReleaseIdentity(releaseDetails, buildNumber)
+  await assertBatchRelease(process.env, releaseDetails, hiveCloudRequest)
   const releaseStatus = String(releaseDetails?.status ?? '').toUpperCase()
   if (releaseStatus === 'WITHDRAWN') {
     throw new Error('The requested HiveCloud release identity has already been withdrawn')

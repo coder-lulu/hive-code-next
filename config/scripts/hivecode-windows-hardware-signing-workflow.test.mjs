@@ -14,13 +14,15 @@ describe('HiveCode Windows hardware signing workflow', () => {
     const workflow = parse(source)
     const job = workflow.jobs['build-and-sign']
 
-    expect(Object.keys(workflow.on).sort()).toEqual(['push', 'workflow_dispatch'])
+    expect(Object.keys(workflow.on).sort()).toEqual(['push', 'workflow_call', 'workflow_dispatch'])
     expect(workflow.on.push).toEqual({ tags: ['v*'] })
     expect(workflow.on.workflow_dispatch.inputs.release_version.required).toBe(true)
-    expect(workflow.permissions).toEqual({ contents: 'read' })
+    expect(workflow.permissions).toEqual({ actions: 'read', contents: 'read' })
     expect(job['runs-on']).toEqual(['self-hosted', 'windows', 'x64'])
-    expect(job.environment).toBe('hivecode-windows-signing')
-    expect(job.if).toBe(
+    expect(job.environment).toBe(
+      "${{ inputs.batch_id != '' && 'release-production' || 'hivecode-windows-signing' }}"
+    )
+    expect(job.if).toContain(
       "github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/v') || github.ref_protected == true)"
     )
     expect(source).not.toMatch(/continue-on-error/u)

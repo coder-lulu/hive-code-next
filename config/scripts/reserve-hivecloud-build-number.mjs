@@ -2,6 +2,7 @@
 
 import { appendFile } from 'node:fs/promises'
 import { pathToFileURL } from 'node:url'
+import { releaseAuthentication } from './hivecloud-release-auth.mjs'
 
 const MAX_RESPONSE_BYTES = 1024 * 1024
 
@@ -56,7 +57,7 @@ async function responseText(response) {
 
 export async function reserveHiveCloudBuildNumber(environment = process.env, request = fetch) {
   const apiBase = required(environment.HIVECLOUD_API_URL, 'HIVECLOUD_API_URL').replace(/\/$/, '')
-  const token = required(environment.HIVECLOUD_API_TOKEN, 'HIVECLOUD_API_TOKEN')
+  const authentication = releaseAuthentication(environment, request)
   const platform = required(
     environment.HIVECODE_RELEASE_PLATFORM,
     'HIVECODE_RELEASE_PLATFORM'
@@ -98,7 +99,7 @@ export async function reserveHiveCloudBuildNumber(environment = process.env, req
     signal: AbortSignal.timeout(30_000),
     headers: {
       accept: 'application/json',
-      authorization: `Bearer ${token}`,
+      ...(await authentication()),
       'content-type': 'application/json'
     },
     body: JSON.stringify({

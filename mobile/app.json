@@ -2,7 +2,7 @@
   "expo": {
     "name": "HiveCode",
     "slug": "hivecode-mobile",
-    "version": "1.5.0-beta.27",
+    "version": "1.5.0-beta.28",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -16,7 +16,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.hivekernel.hivecode.mobile",
-      "buildNumber": "2",
+      "buildNumber": "3",
       "infoPlist": {
         "NSLocalNetworkUsageDescription": "HiveCode connects to the desktop app on your LAN.",
         "NSMicrophoneUsageDescription": "Allow HiveCode to record voice dictation and transcribe it on your paired desktop.",
@@ -75,7 +75,7 @@
       "allowBackup": false,
       "permissions": ["RECORD_AUDIO", "MODIFY_AUDIO_SETTINGS", "REQUEST_INSTALL_PACKAGES"],
       "package": "com.hivekernel.hivecode.mobile",
-      "versionCode": 40
+      "versionCode": 41
     },
     "plugins": [
       "expo-router",

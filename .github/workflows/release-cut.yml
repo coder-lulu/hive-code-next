@@ -1573,30 +1573,6 @@ jobs:
             node config/scripts/run-linux-packaged-node-pty-floor-smoke.mjs
             --app-dir ${{ matrix.unpacked_dir }}
 
-      - name: Publish Linux AppImage to HiveCloud object storage
-        if: matrix.platform == 'linux-x64' || matrix.platform == 'linux-arm64'
-        shell: bash
-        env:
-          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
-          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
-          HIVECODE_VERSION: ${{ needs.cut.outputs.tag }}
-          HIVECODE_BUILD_NUMBER: ${{ env.HIVECODE_BUILD_NUMBER }}
-          HIVECODE_RELEASE_CHANNEL: ${{ contains(needs.cut.outputs.tag, '-beta.') && 'beta' || contains(needs.cut.outputs.tag, '-rc.') && 'beta' || 'stable' }}
-          HIVECODE_DESKTOP_PLATFORM: linux
-          HIVECODE_DESKTOP_ARCHITECTURE: ${{ matrix.platform == 'linux-arm64' && 'arm64' || 'x64' }}
-          HIVECODE_EXPECTED_ARTIFACTS: '2'
-          HIVECODE_EXPECTED_ARTIFACT_ARCHITECTURES: x64,arm64
-          HIVECODE_PUBLISH: ${{ matrix.platform == 'linux-arm64' && 'true' || 'false' }}
-          HIVECODE_RELEASE_NOTES: ${{ needs.cut.outputs.tag }}
-        run: |
-          set -euo pipefail
-          export HIVECODE_VERSION="${HIVECODE_VERSION#v}"
-          artifact="$(find dist -maxdepth 1 -type f -iname '*.AppImage' -print -quit)"
-          test -n "$artifact"
-          export HIVECODE_ARTIFACT_PATHS="$artifact"
-          node config/scripts/publish-hivecloud-desktop-release.mjs
-
       # Why: SignPath signs GitHub workflow artifacts, so Windows builds must
       # upload only after the production-signed installer has been returned.
       - name: Build Windows release artifacts
@@ -2335,27 +2311,6 @@ jobs:
       # failed identity/integrity gate must never leave a published release.
       - name: Verify telemetry constants present in app.asar
         run: node config/scripts/verify-telemetry-constants.mjs
-
-      - name: Publish signed Windows installer to HiveCloud object storage
-        if: matrix.platform == 'win' && github.run_attempt == 1
-        uses: nick-fields/retry@v4
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 30
-          command: >-
-            $env:HIVECODE_VERSION = '${{ needs.cut.outputs.tag }}'.TrimStart('v');
-            $env:HIVECODE_ARTIFACT_PATHS = 'x64=dist/hivecode-windows-setup.exe';
-            node config/scripts/publish-hivecloud-desktop-release.mjs
-        env:
-          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
-          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
-          HIVECODE_BUILD_NUMBER: ${{ env.HIVECODE_BUILD_NUMBER }}
-          HIVECODE_RELEASE_CHANNEL: ${{ contains(needs.cut.outputs.tag, '-beta.') && 'beta' || contains(needs.cut.outputs.tag, '-rc.') && 'beta' || 'stable' }}
-          HIVECODE_DESKTOP_PLATFORM: windows
-          HIVECODE_DESKTOP_ARCHITECTURE: x64
-          HIVECODE_RELEASE_NOTES: ${{ needs.cut.outputs.tag }}
 
   build-mac:
     needs:
