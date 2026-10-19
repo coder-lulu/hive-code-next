@@ -158,14 +158,14 @@ describe('Windows signing workflow contract', () => {
       'Upload unsigned Windows installer for SignPath',
       'Submit Windows installer signing request',
       'Download signed Windows installer from SignPath',
-      'Stage signed Windows release assets',
-      'Publish signed Windows installer to HiveCloud object storage'
+      'Stage signed Windows release assets'
     ]
 
     for (const stepName of signingStepNames) {
       const step = steps[stepNames.indexOf(stepName)]
       expect(step?.if, stepName).toContain('github.run_attempt == 1')
     }
+    expect(stepNames).not.toContain('Publish signed Windows installer to HiveCloud object storage')
   })
 
   it('shares one SignPath module install path between release and rehearsal', () => {
@@ -200,7 +200,23 @@ describe('Windows signing workflow contract', () => {
     expect(innerVerifyIndex).toBe(outerVerifyIndex + 1)
     expect(evidenceIndex).toBe(innerVerifyIndex + 1)
     expect(telemetryIndex).toBe(evidenceIndex + 1)
-    expect(publishIndex).toBe(telemetryIndex + 1)
+    expect(publishIndex).toBe(-1)
+    const hiveSteps = readWorkflow('.github/workflows/hivecode-windows-hardware-sign.yml').jobs[
+      'build-and-sign'
+    ].steps
+    const hiveVerifyIndex = hiveSteps.findIndex(
+      (step) => step.name === 'Verify final signed installer'
+    )
+    const hiveUploadIndex = hiveSteps.findIndex((step) =>
+      step.run?.includes('publish-hivecloud-desktop-release.mjs')
+    )
+    expect(hiveVerifyIndex).toBeGreaterThan(-1)
+    expect(hiveUploadIndex).toBeGreaterThan(hiveVerifyIndex)
+    expect(hiveSteps[hiveVerifyIndex]['continue-on-error']).toBeUndefined()
+    expect(hiveSteps[hiveVerifyIndex].run).toContain(
+      'pnpm run verify:windows:hardware -- $artifact'
+    )
+    expect(hiveSteps[hiveUploadIndex].if).toBe("inputs.batch_id != ''")
 
     // The final verifier is required even though the preceding signing steps
     // continue long enough to leave useful failure evidence.

@@ -1,7 +1,7 @@
 const evidenceWorkflow = parse(
   readFileSync('.github/workflows/unit-selection-evidence.yml', 'utf8')
 )
-import { existsSync, globSync, readFileSync } from 'node:fs'
+import { existsSync, globSync, readFileSync, readdirSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
@@ -314,14 +314,17 @@ describe('PR workflow parallelism', () => {
   })
 
   it('uses the repository package-manager version for every direct pnpm setup', () => {
-    const directSetups = globSync('.github/workflows/*.yml').flatMap((workflowPath) => {
-      const parsed = parse(readFileSync(workflowPath, 'utf8'))
-      return Object.values(parsed.jobs ?? {}).flatMap((job) =>
-        (job.steps ?? [])
-          .filter((step) => step.uses === 'pnpm/setup@v2')
-          .map((step) => ({ workflowPath, step }))
-      )
-    })
+    const directSetups = readdirSync('.github/workflows')
+      .filter((name) => name.endsWith('.yml'))
+      .flatMap((name) => {
+        const workflowPath = `.github/workflows/${name}`
+        const parsed = parse(readFileSync(workflowPath, 'utf8'))
+        return Object.values(parsed.jobs ?? {}).flatMap((job) =>
+          (job.steps ?? [])
+            .filter((step) => step.uses === 'pnpm/setup@v2')
+            .map((step) => ({ workflowPath, step }))
+        )
+      })
 
     expect(directSetups.length).toBeGreaterThan(0)
     for (const { workflowPath, step } of directSetups) {

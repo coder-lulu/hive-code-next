@@ -12,6 +12,7 @@ import {
   parseDaemonProtocolFacts
 } from './daemon-protocol-facts.mjs'
 import { selectLatestStableReleaseTag } from './stable-release-tags.mjs'
+import { resolvePinnedUpstreamRef } from './prepare-cross-version-baselines.mjs'
 
 // Same override the cross-version-wire harness honors, so both pair against one ref.
 const RELEASE_REF_ENV = 'ORCA_CROSS_VERSION_BASELINE_REF'
@@ -64,9 +65,10 @@ export function assessDaemonProtocolCrossing({ release, candidate, releaseRef })
 
 export function checkDaemonProtocolCrossing({ repoRoot, releaseRef: explicitRef, env }) {
   const releaseRef = resolveReleaseRef(repoRoot, explicitRef, env)
+  const objectRef = resolvePinnedUpstreamRef(releaseRef)
   let releaseSource
   try {
-    releaseSource = git(repoRoot, ['show', `${releaseRef}:${DAEMON_PROTOCOL_SOURCE_PATH}`])
+    releaseSource = git(repoRoot, ['show', `${objectRef}:${DAEMON_PROTOCOL_SOURCE_PATH}`])
   } catch (error) {
     throw new Error(
       `cannot read ${DAEMON_PROTOCOL_SOURCE_PATH} at ${releaseRef}: ${error.stderr?.trim() || String(error)}`

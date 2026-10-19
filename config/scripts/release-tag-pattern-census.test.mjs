@@ -82,6 +82,11 @@ const DESKTOP_ONLY_PROOFS = {
       for (const [name, value] of Object.entries({
         HIVECLOUD_API_URL: 'https://releases.example.test',
         HIVECLOUD_API_TOKEN: 'test-token',
+        HIVECLOUD_API_CLIENT_ID: 'test-client',
+        GITHUB_ACTIONS: '',
+        ACTIONS_ID_TOKEN_REQUEST_URL: '',
+        ACTIONS_ID_TOKEN_REQUEST_TOKEN: '',
+        HIVECLOUD_RELEASE_SCOPE: '',
         HIVECODE_VERSION: tag,
         HIVECODE_DESKTOP_PLATFORM: 'windows',
         HIVECODE_DESKTOP_ARCHITECTURE: 'x64',

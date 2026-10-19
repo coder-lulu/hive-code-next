@@ -108,6 +108,7 @@ export async function giveWorkspaceALivePty(page: Page, worktreeId: string): Pro
 
 /** The shipping sleep path: right-click the sidebar row, click "Sleep". */
 export async function sleepWorkspaceViaSidebar(page: Page, worktreeId: string): Promise<void> {
+  await page.getByRole('button', { name: 'Projects', exact: true }).click()
   const row = rowLocator(page, worktreeId)
   await expect(row).toBeVisible()
   await row.scrollIntoViewIfNeeded()
@@ -120,6 +121,7 @@ export async function sleepWorkspaceViaSidebar(page: Page, worktreeId: string): 
 }
 
 export async function activateWorkspaceByClick(page: Page, worktreeId: string): Promise<void> {
+  await page.getByRole('button', { name: 'Projects', exact: true }).click()
   const row = rowLocator(page, worktreeId)
   await expect(row).toBeVisible()
   await row.scrollIntoViewIfNeeded()

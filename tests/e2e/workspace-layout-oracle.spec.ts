@@ -20,9 +20,12 @@ import {
   splitActiveTerminalPane,
   waitForActiveTerminalManager
 } from './helpers/terminal'
-import { bootstrapFirstLaunch, seededRepoPathOrSkip } from './helpers/terminal-restart-persistence'
+import {
+  bootstrapFirstLaunch,
+  seededRepoPathOrSkip,
+  reopenPersistedWorkspaceFromHome
+} from './helpers/terminal-restart-persistence'
 import { createTerminalTabFromMenu, SORTABLE_TAB } from './helpers/terminal-tab-menu'
-import { ensureTerminalVisible, waitForSessionReady } from './helpers/store'
 import {
   addFolderWorkspace,
   closeActivePaneFromKeyboard,
@@ -69,9 +72,8 @@ async function firstHandle(run: OracleRun, worktreeId: string): Promise<string> 
 }
 
 /** The relaunched window shows the worktree again, however many panes its tab restores. */
-async function reopenActiveWorktree(page: Page): Promise<void> {
-  await waitForSessionReady(page)
-  await ensureTerminalVisible(page)
+async function reopenActiveWorktree(page: Page, worktreeId: string): Promise<void> {
+  await reopenPersistedWorkspaceFromHome(page, worktreeId)
   await waitForActiveTerminalManager(page, 30_000)
 }
 
@@ -341,7 +343,7 @@ const SCENARIOS: Scenario[] = [
       await splitActiveTerminalPane(run.page, 'vertical')
       await waitForBoundPanes(run.page, 2)
       await run.oracle.step('split', { worktreeId, panesPerTab: [2] })
-      await run.reloadWindow()
+      await run.reloadWindow(worktreeId)
       await waitForActiveTerminalManager(run.page)
       await waitForBoundPanes(run.page, 2).catch(() => {})
       await run.oracle.step(

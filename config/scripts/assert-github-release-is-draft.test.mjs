@@ -127,9 +127,32 @@ describe('release publication boundary', () => {
       expect(entry.release_command).toContain('--publish never')
     }
     expect(macBuildStep.with.command).toContain('--publish never')
-    expect(linuxPublishStep.run).toContain('publish-hivecloud-desktop-release.mjs')
-    expect(windowsPublishStep.with.command).toContain('publish-hivecloud-desktop-release.mjs')
+    expect(linuxPublishStep).toBeUndefined()
+    expect(windowsPublishStep).toBeUndefined()
+    for (const file of [
+      'hivecode-linux-release.yml',
+      'hivecode-windows-hardware-sign.yml',
+      'release-mac-build.yml'
+    ]) {
+      const workflow = parse(readFileSync(join(repoRoot, '.github/workflows', file), 'utf8'))
+      const uploads = Object.values(workflow.jobs)
+        .flatMap((job) => job.steps ?? [])
+        .filter((step) => step.run?.includes('publish-hivecloud-desktop-release.mjs'))
+      expect(uploads).toHaveLength(1)
+      if (file === 'hivecode-linux-release.yml') {
+        expect(workflow.jobs.publish.if).toContain("needs.build.result == 'success'")
+        expect(workflow.jobs.publish.if).toContain("inputs.batch_id != ''")
+      } else {
+        expect(uploads[0].if).toBe("inputs.batch_id != ''")
+      }
+      expect(uploads[0].env.HIVECLOUD_RELEASE_BATCH_ID).toBe('${{ inputs.batch_id }}')
+      expect(uploads[0].env.HIVECODE_PUBLISH).toBe(
+        "${{ inputs.batch_id != '' && 'false' || 'true' }}"
+      )
+    }
     expect(macPublishStep.run).toContain('publish-hivecloud-desktop-release.mjs')
-    expect(releaseWorkflow.jobs['publish-release'].if).toContain("github.repository == 'stablyai/orca'")
+    expect(releaseWorkflow.jobs['publish-release'].if).toContain(
+      "github.repository == 'stablyai/orca'"
+    )
   })
 })

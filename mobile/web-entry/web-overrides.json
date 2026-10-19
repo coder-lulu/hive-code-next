@@ -218,6 +218,10 @@
       "reason": "expo-router's Stack renders @react-navigation/native-stack's web view on the page, which flips each screen's display and ignores the animation option, so pushing the session from the worktree list and Back were instant cuts where the native stack slides. This one keeps a popped screen mounted until it has slid out."
     },
     {
+      "file": "src/runtime-directory/mobile-runtime-delete-cleanup.web.ts",
+      "reason": "Runtime deletion requires the native app to remove paired host clients and clear their local caches and persisted aliases. The web sibling reports deletion as unsupported and rejects cleanup explicitly rather than importing native storage and connection lifecycle modules."
+    },
+    {
       "file": "src/app-update/use-wall-app-update.web.ts",
       "reason": "Package updates are owned by the HiveCode native updater. The page wall offers configured product links without importing the native updater or its device modules."
     }
