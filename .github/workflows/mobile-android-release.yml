@@ -113,7 +113,10 @@ jobs:
           HIVECODE_ANDROID_KEYSTORE_PASSWORD: ${{ secrets.HIVECODE_ANDROID_KEYSTORE_PASSWORD }}
           HIVECODE_ANDROID_KEY_ALIAS: ${{ secrets.HIVECODE_ANDROID_KEY_ALIAS }}
           HIVECODE_ANDROID_KEY_PASSWORD: ${{ secrets.HIVECODE_ANDROID_KEY_PASSWORD }}
-        run: node scripts/configure-android-release-signing.mjs
+          HIVECODE_ANDROID_SIGNING_FINGERPRINT: ${{ secrets.HIVECODE_ANDROID_SIGNING_FINGERPRINT }}
+        run: |
+          node scripts/configure-android-release-signing.mjs
+          node scripts/verify-android-release-signing.mjs key
 
       - name: Build Android release APK
         env:
@@ -126,16 +129,7 @@ jobs:
       - name: Verify Android APK signature and certificate
         env:
           HIVECODE_ANDROID_SIGNING_FINGERPRINT: ${{ secrets.HIVECODE_ANDROID_SIGNING_FINGERPRINT }}
-        run: |
-          set -euo pipefail
-          apk="android/app/build/outputs/apk/release/app-release.apk"
-          apksigner="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
-          test -x "$apksigner"
-          expected="$(printf '%s' "$HIVECODE_ANDROID_SIGNING_FINGERPRINT" | tr '[:upper:]' '[:lower:]' | tr -d ':')"
-          [[ "$expected" =~ ^[0-9a-f]{64}$ ]]
-          verification="$($apksigner verify --verbose --print-certs "$apk")"
-          actual="$(printf '%s\n' "$verification" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 | tr '[:upper:]' '[:lower:]' | tr -d ':')"
-          test "$actual" = "$expected"
+        run: node scripts/verify-android-release-signing.mjs apk
 
       - name: Remove Android signing key
         if: always()
