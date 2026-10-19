@@ -206,6 +206,7 @@
     "config/scripts/rebuild-native-deps-test-fixtures.mjs",
     "config/scripts/rebuild-native-deps.mjs",
     "config/scripts/relay-windows-process-tree-workflow-contract.test.mjs",
+    "config/scripts/release-cut-token-permissions.test.mjs",
     "config/scripts/release-javascript-artifact.mjs",
     "config/scripts/release-javascript-artifact.test.mjs",
     "config/scripts/release-tag-pattern-census.test.mjs",
