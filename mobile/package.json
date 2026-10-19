@@ -1,6 +1,6 @@
 {
   "name": "hivecode-mobile",
-  "version": "1.5.0-beta.28",
+  "version": "1.5.0-beta.29",
   "private": true,
   "main": "index.js",
   "scripts": {
@@ -54,6 +54,7 @@
     "expo-status-bar": "^55.0.6",
     "expo-task-manager": "~55.0.20",
     "fflate": "0.8.3",
+    "jsonc-parser": "3.3.1",
     "lowlight": "^3.3.0",
     "lucide-react-native": "^1.14.0",
     "markdown-it": "^14.3.2",
