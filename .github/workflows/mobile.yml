@@ -72,6 +72,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  release-js-bundle:
+    name: Mobile release JS bundle
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+      - uses: pnpm/setup@v2
+        with:
+          install: false
+      - name: Install only mobile dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Bundle production Android JavaScript without root dependencies
+        env:
+          CI: 'true'
+          NODE_ENV: production
+        run: |
+          test ! -e ../node_modules
+          mkdir -p ../logs/mobile-release-bundle
+          node node_modules/expo/bin/cli export:embed --platform android --dev false \
+            --entry-file index.js --max-workers 2 \
+            --bundle-output ../logs/mobile-release-bundle/index.android.bundle \
+            --assets-dest ../logs/mobile-release-bundle/assets
+
   verify:
     name: Mobile verify
     if: github.event_name == 'pull_request'

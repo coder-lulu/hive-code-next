@@ -4,7 +4,7 @@ const { getDefaultConfig } = require('expo/metro-config')
 const projectRoot = __dirname
 const sharedRoot = path.resolve(projectRoot, '..', 'src', 'shared')
 const relayJsonParserRoot = path.dirname(
-  require.resolve('jsonc-parser/package.json', { paths: [path.resolve(projectRoot, '..')] })
+  require.resolve('jsonc-parser/package.json', { paths: [projectRoot] })
 )
 
 const config = getDefaultConfig(projectRoot)
