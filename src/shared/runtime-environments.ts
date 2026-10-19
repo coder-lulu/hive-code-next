@@ -202,6 +202,13 @@ export type PublicKnownRuntimeEnvironment = Omit<KnownRuntimeEnvironment, 'endpo
   hostKeyFingerprint?: string
 }
 
+export function usesAccountRuntimeRelay(environment: PublicKnownRuntimeEnvironment): boolean {
+  if (!environment.accountClaim || environment.connectionDependency === 'ssh-tunnel') {
+    return false
+  }
+  return !isWslHostRuntimeEnvironment(environment)
+}
+
 export function redactRuntimeEnvironment(
   environment: KnownRuntimeEnvironment
 ): PublicKnownRuntimeEnvironment {

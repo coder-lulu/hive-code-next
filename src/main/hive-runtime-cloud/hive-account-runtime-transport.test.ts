@@ -149,7 +149,13 @@ describe('account client authorization boundary', () => {
     const claim = { runtimeRecordId: uuid, resourceVersion: 1 } as never
     try {
       await transport.subscribe(claim, 'browser.screencast', {}, 15_000, callbacks)
-      expect(subscribe).toHaveBeenCalledExactlyOnceWith('browser.screencast', {}, callbacks, 15_000)
+      expect(subscribe).toHaveBeenCalledExactlyOnceWith(
+        'browser.screencast',
+        {},
+        callbacks,
+        15_000,
+        undefined
+      )
     } finally {
       subscribe.mockRestore()
       transport.stop()

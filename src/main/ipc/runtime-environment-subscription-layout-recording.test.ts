@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ handle: vi.fn(), on: vi.fn(), subscribe: vi.fn
 vi.mock('electron', () => ({ ipcMain: { handle: mocks.handle, on: mocks.on } }))
 vi.mock('./runtime-environment-account-routing', () => ({
   resolveRuntimeEnvironmentCatalogEntry: () => ({ id: 'env', pairingRevision: 1, createdAt: 1 }),
-  subscribeEnvironmentWithCloudFallback: mocks.subscribe
+  subscribeCatalogEnvironment: mocks.subscribe
 }))
 import { advanceRuntimeEnvironmentTransportGeneration } from './runtime-environment-transport-generation'
 import {

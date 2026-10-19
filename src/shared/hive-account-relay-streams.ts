@@ -33,8 +33,10 @@ export class HiveAccountRelayStreams {
     method: string,
     params: unknown,
     callbacks: HiveAccountRelayCallbacks,
-    timeoutMs: number
+    timeoutMs: number,
+    signal?: AbortSignal
   ) {
+    signal?.throwIfAborted()
     const deadline = createHiveAccountRelayDeadline(timeoutMs)
     if (this.options.isClosed() || this.consumers >= MAX_CONSUMERS) {
       throw unavailable()
@@ -103,6 +105,7 @@ export class HiveAccountRelayStreams {
         return
       }
       released = true
+      signal?.removeEventListener('abort', release)
       this.consumers--
       current.consumers.delete(consumer)
       if (current.consumers.size === 0) {
@@ -131,8 +134,10 @@ export class HiveAccountRelayStreams {
       }
     }
     current.consumers.add(consumer)
+    signal?.addEventListener('abort', release, { once: true })
     try {
-      const channel = await waitForHiveAccountRelayDeadline(current.channel, deadline)
+      const channel = await waitForHiveAccountRelayDeadline(current.channel, deadline, signal)
+      signal?.throwIfAborted()
       if (channel.isClosed || this.options.isClosed()) {
         throw unavailable()
       }
@@ -148,6 +153,10 @@ export class HiveAccountRelayStreams {
               )
       }
     } catch (error) {
+      if (signal?.aborted) {
+        release()
+        signal.throwIfAborted()
+      }
       const clientError = toHiveAccountRelayClientError(error)
       publishHiveAccountRelayConsumers(new Set([consumer]), (listener) =>
         listener.onError?.(clientError)

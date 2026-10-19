@@ -4,7 +4,10 @@ import type {
   HiveAccountRuntimeDirectoryState,
   HiveRuntimePendingDisplayName
 } from '../../shared/hive-runtime-cloud'
-import type { PublicKnownRuntimeEnvironment } from '../../shared/runtime-environments'
+import {
+  usesAccountRuntimeRelay,
+  type PublicKnownRuntimeEnvironment
+} from '../../shared/runtime-environments'
 import type { RemoteRuntimeSubscription } from '../../shared/remote-runtime-client'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
 import type {
@@ -66,38 +69,24 @@ function pendingDisplayNameMap(
   )
 }
 
-export async function getEnvironmentStatusWithCloudFallback(
+export async function getCatalogEnvironmentStatus(
   userDataPath: string,
   environment: PublicKnownRuntimeEnvironment,
   timeoutMs?: number,
   options?: { observeOnly?: true; signal?: AbortSignal; reconnect?: true }
 ): Promise<RuntimeRpcResponse<RuntimeStatus>> {
-  let localResponse: RuntimeRpcResponse<RuntimeStatus> | null = null
-  if (hasLocalPairing(environment)) {
-    localResponse = await getRuntimeEnvironmentStatus(
-      userDataPath,
-      environment.id,
-      timeoutMs,
-      options
-    )
-    if (
-      localResponse.ok ||
-      !environment.accountClaim ||
-      localResponse.error.code !== 'runtime_unavailable'
-    ) {
-      return localResponse
-    }
+  options?.signal?.throwIfAborted()
+  if (!usesAccountRuntimeRelay(environment)) {
+    return getRuntimeEnvironmentStatus(userDataPath, environment.id, timeoutMs, options)
   }
   const access = getHiveAccountRuntimeAccess()
   if (environment.accountClaim && access) {
-    return access.transport.getStatus(environment.accountClaim, timeoutMs)
+    return access.transport.getStatus(environment.accountClaim, timeoutMs, options?.signal)
   }
-  return (
-    localResponse ?? unavailableResponse(environment, 'Cloud Runtime transport is not available.')
-  )
+  return unavailableResponse(environment, 'Cloud Runtime transport is not available.')
 }
 
-export async function callEnvironmentWithCloudFallback(
+export async function callCatalogEnvironment(
   userDataPath: string,
   environment: PublicKnownRuntimeEnvironment,
   method: string,
@@ -108,24 +97,17 @@ export async function callEnvironmentWithCloudFallback(
   options?: { signal?: AbortSignal; expectedEnvironmentRuntimeId?: string }
 ): Promise<RuntimeRpcResponse<unknown>> {
   options?.signal?.throwIfAborted()
-  const local = hasLocalPairing(environment)
-  if (local) {
-    try {
-      return await callRuntimeEnvironment(
-        userDataPath,
-        environment.id,
-        method,
-        params,
-        timeoutMs,
-        expectedEnvironmentPairingRevision,
-        envelope,
-        options
-      )
-    } catch (error) {
-      if (!environment.accountClaim || !isPreDeliveryConnectionFailure(error)) {
-        throw error
-      }
-    }
+  if (!usesAccountRuntimeRelay(environment)) {
+    return callRuntimeEnvironment(
+      userDataPath,
+      environment.id,
+      method,
+      params,
+      timeoutMs,
+      expectedEnvironmentPairingRevision,
+      envelope,
+      options
+    )
   }
   if (
     expectedEnvironmentPairingRevision !== undefined ||
@@ -159,7 +141,7 @@ export async function callEnvironmentWithCloudFallback(
   )
 }
 
-export async function subscribeEnvironmentWithCloudFallback(
+export async function subscribeCatalogEnvironment(
   userDataPath: string,
   environment: PublicKnownRuntimeEnvironment,
   method: string,
@@ -182,23 +164,17 @@ export async function subscribeEnvironmentWithCloudFallback(
   if (assertCurrent && !assertCurrent()) {
     throw new Error('Runtime environment transport was invalidated')
   }
-  if (hasLocalPairing(environment)) {
-    try {
-      return await subscribeRuntimeEnvironment(
-        userDataPath,
-        environment.id,
-        method,
-        params,
-        timeoutMs,
-        callbacks,
-        assertCurrent,
-        signal
-      )
-    } catch (error) {
-      if (!environment.accountClaim || !isPreDeliveryConnectionFailure(error)) {
-        throw error
-      }
-    }
+  if (!usesAccountRuntimeRelay(environment)) {
+    return subscribeRuntimeEnvironment(
+      userDataPath,
+      environment.id,
+      method,
+      params,
+      timeoutMs,
+      callbacks,
+      assertCurrent,
+      signal
+    )
   }
   const access = getHiveAccountRuntimeAccess()
   if (!environment.accountClaim || !access) {
@@ -211,33 +187,21 @@ export async function subscribeEnvironmentWithCloudFallback(
   if (assertCurrent && !assertCurrent()) {
     throw new Error('Runtime environment transport was invalidated')
   }
-  return access.transport.subscribe(environment.accountClaim, method, params, timeoutMs, {
-    onResponse: (response) => callbacks.onEvent({ type: 'response', response }),
-    onBinary: (bytes) => callbacks.onEvent({ type: 'binary', bytes }),
-    onError: (error) => callbacks.onEvent({ type: 'error', ...error }),
-    onClose: () => {
-      callbacks.onEvent({ type: 'close' })
-      callbacks.onClose()
-    }
-  })
-}
-
-function hasLocalPairing(environment: PublicKnownRuntimeEnvironment): boolean {
-  return environment.accessSources?.includes('local-pairing') ?? !environment.accountClaim
-}
-
-function isConnectionFailure(error: unknown): boolean {
-  return (
-    error instanceof RemoteRuntimeClientError &&
-    (error.code === 'remote_runtime_unavailable' || error.code === 'runtime_timeout')
-  )
-}
-
-export function isPreDeliveryConnectionFailure(error: unknown): boolean {
-  return (
-    isConnectionFailure(error) &&
-    error instanceof RemoteRuntimeClientError &&
-    (error.pairingStage === 'connect' || error.pairingStage === 'host-identity')
+  return access.transport.subscribe(
+    environment.accountClaim,
+    method,
+    params,
+    timeoutMs,
+    {
+      onResponse: (response) => callbacks.onEvent({ type: 'response', response }),
+      onBinary: (bytes) => callbacks.onEvent({ type: 'binary', bytes }),
+      onError: (error) => callbacks.onEvent({ type: 'error', ...error }),
+      onClose: () => {
+        callbacks.onEvent({ type: 'close' })
+        callbacks.onClose()
+      }
+    },
+    signal
   )
 }
 

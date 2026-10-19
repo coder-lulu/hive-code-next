@@ -4,6 +4,7 @@ import { REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY } from '../../shared/protocol-
 import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/electron-remote-runtime-client-capabilities'
 import {
   getPreferredPairingOffer,
+  usesAccountRuntimeRelay,
   type KnownRuntimeEnvironment
 } from '../../shared/runtime-environments'
 import { recordRuntimeEnvironmentUsage } from './runtime-environment-usage-record'
@@ -22,6 +23,8 @@ import {
 import { isRuntimeEnvironmentManuallyDisconnected } from './runtime-environment-manual-disconnect'
 import { runtimeEnvironmentChangedFailure } from './runtime-environment-revision-guard'
 import { resolveManagedRuntimeEnvironment } from './runtime-environment-managed-tunnel'
+import { getHiveAccountRuntimeAccess } from '../hive-runtime-cloud/hive-account-runtime-access'
+import { projectHiveRuntimeAccountClaim } from '../../shared/hive-runtime-cloud'
 
 export function createRuntimeEnvironmentStatusOwner(
   userDataPath: string,
@@ -35,13 +38,43 @@ export function createRuntimeEnvironmentStatusOwner(
 ): RuntimeHostStatusOwner {
   const connection = getPreferredPairingOffer(environment)
   let evidence = captureRuntimeEnvironmentCapabilityEvidence(environment.id, connection)
-  return new RuntimeHostStatusOwner({
+  const relayResponses = new WeakSet<object>()
+  const accountRoute = () => {
+    const access = getHiveAccountRuntimeAccess()
+    const runtime = environment.runtimeRecordId
+      ? access?.directory
+          .getState()
+          .items.find((item) => item.runtimeRecordId === environment.runtimeRecordId)
+      : undefined
+    const accountClaim = runtime ? projectHiveRuntimeAccountClaim(runtime) : undefined
+    return access && accountClaim && usesAccountRuntimeRelay({ ...environment, accountClaim })
+      ? { access, accountClaim }
+      : null
+  }
+  const owner = new RuntimeHostStatusOwner({
     environmentId: environment.id,
     pairingRevision: environment.pairingRevision ?? environment.createdAt,
     request: async (signal) => {
       const incarnation = getRuntimeEnvironmentCapabilityIncarnation(environment.id)
       const isCurrent = (): boolean =>
         getRuntimeEnvironmentCapabilityIncarnation(environment.id) === incarnation
+      const relay = accountRoute()
+      if (relay) {
+        transport.pause()
+        // Clearing a ready transport would retire this in-flight verification.
+        owner.connectionChanged(owner.read().transport === 'ready' ? 'ready' : 'unknown', null)
+        signal.throwIfAborted()
+        const response = await relay.access.transport.call<RuntimeStatus>(
+          relay.accountClaim,
+          'status.get',
+          {},
+          15_000,
+          undefined,
+          signal
+        )
+        relayResponses.add(response)
+        return isCurrent() ? response : runtimeEnvironmentChangedFailure(environment, 'status.get')
+      }
       if (environment.connectionDependency === 'ssh-tunnel') {
         await resolveManagedRuntimeEnvironment(userDataPath, environment.id)
         if (!isCurrent()) {
@@ -66,6 +99,10 @@ export function createRuntimeEnvironmentStatusOwner(
       return isCurrent() ? response : runtimeEnvironmentChangedFailure(environment, 'status.get')
     },
     verified: (response, active) => {
+      if (relayResponses.has(response) || accountRoute()) {
+        transport.pause()
+        return false
+      }
       const capable =
         response.result.capabilities?.includes(REMOTE_RUNTIME_SHARED_CONTROL_CAPABILITY) ?? false
       const accepted = applyRuntimeEnvironmentCapabilityVerdict({
@@ -101,4 +138,5 @@ export function createRuntimeEnvironmentStatusOwner(
       }
     }
   })
+  return owner
 }

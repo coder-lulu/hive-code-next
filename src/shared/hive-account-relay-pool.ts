@@ -120,9 +120,10 @@ export class HiveAccountRelayPool {
     method: string,
     params: unknown,
     callbacks: HiveAccountRelayCallbacks,
-    timeoutMs = 30_000
+    timeoutMs = 30_000,
+    signal?: AbortSignal
   ) {
-    return this.streams.subscribe(method, params, callbacks, timeoutMs)
+    return this.streams.subscribe(method, params, callbacks, timeoutMs, signal)
   }
 
   close(): void {

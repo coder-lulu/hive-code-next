@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PublicKnownRuntimeEnvironment } from '../../shared/runtime-environments'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
-import { callEnvironmentWithCloudFallback } from './runtime-environment-account-routing'
+import { callCatalogEnvironment } from './runtime-environment-account-routing'
 
 const mocks = vi.hoisted(() => ({ localCall: vi.fn(), cloudCall: vi.fn(), resolve: vi.fn() }))
 vi.mock('../../shared/runtime-environment-store', () => ({ listEnvironments: () => [] }))
@@ -69,12 +69,12 @@ beforeEach(() => {
   mocks.resolve.mockReturnValue(environment())
 })
 
-describe('cloud fallback call authority', () => {
+describe('account call authority', () => {
   it.each([true, false])('does not send an already aborted call (local=%s)', async (local) => {
     const controller = new AbortController()
     controller.abort()
     await expect(
-      callEnvironmentWithCloudFallback(
+      callCatalogEnvironment(
         'unused',
         environment(local),
         'files.upload',
@@ -90,21 +90,18 @@ describe('cloud fallback call authority', () => {
   })
 
   it.each(['pairing', 'runtime'] as const)(
-    'rejects %s changes while local connection is pending',
+    'rejects %s changes before Relay delivery',
     async (changed) => {
       const frozen = environment()
       const current = { ...frozen }
       mocks.resolve.mockImplementation(() => current)
-      mocks.localCall.mockImplementation(async () => {
-        if (changed === 'pairing') {
-          current.pairingRevision = 4
-        } else {
-          current.runtimeId = 'replacement-runtime'
-        }
-        throw connectionFailure()
-      })
+      if (changed === 'pairing') {
+        current.pairingRevision = 4
+      } else {
+        current.runtimeId = 'replacement-runtime'
+      }
       await expect(
-        callEnvironmentWithCloudFallback('unused', frozen, 'files.upload', {}, 1234, 3, undefined, {
+        callCatalogEnvironment('unused', frozen, 'files.upload', {}, 1234, 3, undefined, {
           expectedEnvironmentRuntimeId: 'runtime-1'
         })
       ).resolves.toMatchObject({
@@ -112,6 +109,7 @@ describe('cloud fallback call authority', () => {
         error: { code: 'runtime_environment_changed' }
       })
       expect(mocks.resolve).toHaveBeenCalledOnce()
+      expect(mocks.localCall).not.toHaveBeenCalled()
       expect(mocks.cloudCall).not.toHaveBeenCalled()
     }
   )
@@ -120,29 +118,22 @@ describe('cloud fallback call authority', () => {
     const frozen = environment(false)
     mocks.resolve.mockReturnValue({ ...frozen, pairingRevision: 4 })
     await expect(
-      callEnvironmentWithCloudFallback('unused', frozen, 'files.upload', {}, undefined, 3)
+      callCatalogEnvironment('unused', frozen, 'files.upload', {}, undefined, 3)
     ).resolves.toMatchObject({ ok: false, error: { code: 'runtime_environment_changed' } })
     expect(mocks.localCall).not.toHaveBeenCalled()
     expect(mocks.cloudCall).not.toHaveBeenCalled()
   })
 
-  it('does not fall back when cancellation occurs during local connection', async () => {
+  it('does not deliver when cancellation occurs during catalog revalidation', async () => {
     const controller = new AbortController()
-    mocks.localCall.mockImplementation(async () => {
+    mocks.resolve.mockImplementation(() => {
       controller.abort()
-      throw connectionFailure()
+      return environment()
     })
     await expect(
-      callEnvironmentWithCloudFallback(
-        'unused',
-        environment(),
-        'files.upload',
-        {},
-        undefined,
-        undefined,
-        undefined,
-        { signal: controller.signal }
-      )
+      callCatalogEnvironment('unused', environment(), 'files.upload', {}, 1234, 3, undefined, {
+        signal: controller.signal
+      })
     ).rejects.toMatchObject({ name: 'AbortError' })
     expect(mocks.cloudCall).not.toHaveBeenCalled()
   })
@@ -155,28 +146,12 @@ describe('cloud fallback call authority', () => {
       throw new Error('Catalog not available')
     })
     await expect(
-      callEnvironmentWithCloudFallback(
-        'unused',
-        frozen,
-        'files.upload',
-        params,
-        1234,
-        undefined,
-        undefined,
-        { signal: controller.signal }
-      )
+      callCatalogEnvironment('unused', frozen, 'files.upload', params, 1234, undefined, undefined, {
+        signal: controller.signal
+      })
     ).resolves.toMatchObject({ ok: true })
     expect(mocks.resolve).not.toHaveBeenCalled()
-    expect(mocks.localCall).toHaveBeenCalledWith(
-      'unused',
-      frozen.id,
-      'files.upload',
-      params,
-      1234,
-      undefined,
-      undefined,
-      { signal: controller.signal }
-    )
+    expect(mocks.localCall).not.toHaveBeenCalled()
     expect(mocks.cloudCall).toHaveBeenCalledWith(
       frozen.accountClaim,
       'files.upload',
@@ -187,19 +162,12 @@ describe('cloud fallback call authority', () => {
     )
   })
 
-  it('delivers a still-current frozen call after a pre-delivery failure', async () => {
+  it('delivers a still-current frozen call through Relay', async () => {
     const frozen = environment()
     await expect(
-      callEnvironmentWithCloudFallback(
-        'unused',
-        frozen,
-        'files.upload',
-        {},
-        undefined,
-        3,
-        undefined,
-        { expectedEnvironmentRuntimeId: 'runtime-1' }
-      )
+      callCatalogEnvironment('unused', frozen, 'files.upload', {}, undefined, 3, undefined, {
+        expectedEnvironmentRuntimeId: 'runtime-1'
+      })
     ).resolves.toMatchObject({ ok: true })
     expect(mocks.cloudCall).toHaveBeenCalledOnce()
   })
@@ -212,24 +180,26 @@ describe('cloud fallback call authority', () => {
         'Delivery uncertain',
         { pairingStage }
       )
-      mocks.localCall.mockRejectedValue(error)
+      mocks.cloudCall.mockRejectedValue(error)
       await expect(
-        callEnvironmentWithCloudFallback('unused', environment(), 'files.upload', {})
+        callCatalogEnvironment('unused', environment(), 'files.upload', {})
       ).rejects.toBe(error)
-      expect(mocks.cloudCall).not.toHaveBeenCalled()
+      expect(mocks.cloudCall).toHaveBeenCalledOnce()
+      expect(mocks.localCall).not.toHaveBeenCalled()
     }
   )
 
-  it('preserves a received local RPC failure without retrying it', async () => {
+  it('preserves a received Relay RPC failure without retrying it', async () => {
     const response = {
       id: 'files.upload',
       ok: false,
       error: { code: 'runtime_unavailable', message: 'received' }
     }
-    mocks.localCall.mockResolvedValue(response)
-    await expect(
-      callEnvironmentWithCloudFallback('unused', environment(), 'files.upload', {})
-    ).resolves.toBe(response)
-    expect(mocks.cloudCall).not.toHaveBeenCalled()
+    mocks.cloudCall.mockResolvedValue(response)
+    await expect(callCatalogEnvironment('unused', environment(), 'files.upload', {})).resolves.toBe(
+      response
+    )
+    expect(mocks.cloudCall).toHaveBeenCalledOnce()
+    expect(mocks.localCall).not.toHaveBeenCalled()
   })
 })

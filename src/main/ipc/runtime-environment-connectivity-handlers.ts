@@ -6,6 +6,7 @@ import {
 } from '../../shared/runtime-environment-store'
 import {
   isWslHostRuntimeEnvironment,
+  usesAccountRuntimeRelay,
   redactRuntimeEnvironment,
   type PublicKnownRuntimeEnvironment
 } from '../../shared/runtime-environments'
@@ -16,8 +17,8 @@ import type { RuntimeStatus } from '../../shared/runtime-types'
 import type { Store } from '../persistence'
 import { getHiveAccountRuntimeAccess } from '../hive-runtime-cloud/hive-account-runtime-access'
 import {
-  callEnvironmentWithCloudFallback,
-  getEnvironmentStatusWithCloudFallback,
+  callCatalogEnvironment,
+  getCatalogEnvironmentStatus,
   listRuntimeEnvironmentCatalog,
   resolveRuntimeEnvironmentCatalogEntry
 } from './runtime-environment-account-routing'
@@ -156,18 +157,28 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
       if (isWslHostRuntimeEnvironment(environment)) {
         await getWslHostService()?.connect(environment.id)
       }
-      return getEnvironmentStatusWithCloudFallback(getUserDataPath(), environment, args.timeoutMs, {
+      return getCatalogEnvironmentStatus(getUserDataPath(), environment, args.timeoutMs, {
         reconnect: true
       })
     }
   )
   ipcMain.handle(
     'runtimeEnvironments:retryControlConnection',
-    (_event, args: { selector: string }): void => {
-      const environment = resolveEnvironment(getUserDataPath(), args.selector)
-      if (!isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
-        retryRemoteRuntimeSharedControlConnectionNow(environment.id)
+    async (_event, args: { selector: string }): Promise<void> => {
+      const environment = resolveRuntimeEnvironmentCatalogEntry(getUserDataPath(), args.selector)
+      if (isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
+        return
       }
+      if (usesAccountRuntimeRelay(environment) && environment.accountClaim) {
+        getHiveAccountRuntimeAccess()?.transport.disconnect(
+          environment.accountClaim.runtimeRecordId
+        )
+        await getCatalogEnvironmentStatus(getUserDataPath(), environment, undefined, {
+          reconnect: true
+        })
+        return
+      }
+      retryRemoteRuntimeSharedControlConnectionNow(environment.id)
     }
   )
 }
@@ -195,7 +206,7 @@ function registerPassiveStatusHandler(getUserDataPath: () => string): void {
       if (isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
         return manuallyDisconnectedResponse(environment)
       }
-      const response = await getEnvironmentStatusWithCloudFallback(
+      const response = await getCatalogEnvironmentStatus(
         getUserDataPath(),
         environment,
         args.timeoutMs,
@@ -274,7 +285,7 @@ function registerPassiveCallHandler(getUserDataPath: () => string): void {
       }
       let response: RuntimeRpcResponse<unknown>
       try {
-        response = await callEnvironmentWithCloudFallback(
+        response = await callCatalogEnvironment(
           getUserDataPath(),
           catalogEnvironment,
           args.method,

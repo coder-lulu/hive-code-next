@@ -1,6 +1,12 @@
 import type { PairingOffer } from '../../shared/pairing'
 import { resolveEnvironment } from '../../shared/runtime-environment-store'
-import { getPreferredPairingOffer } from '../../shared/runtime-environments'
+import {
+  getPreferredPairingOffer,
+  usesAccountRuntimeRelay,
+  type KnownRuntimeEnvironment
+} from '../../shared/runtime-environments'
+import { projectHiveRuntimeAccountClaim } from '../../shared/hive-runtime-cloud'
+import { getHiveAccountRuntimeAccess } from '../hive-runtime-cloud/hive-account-runtime-access'
 import type { RuntimeHostStatusOwner } from '../../shared/runtime-host-status-owner'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import { createRuntimeEnvironmentStatusOwner } from './runtime-environment-status-owner'
@@ -35,7 +41,10 @@ type CachedSharedControlConnection = {
 
 const requestConnections = new Map<string, CachedRuntimeConnection>()
 const sharedControlConnections = new Map<string, CachedSharedControlConnection>()
-const statusOwners = new Map<string, { key: string; owner: RuntimeHostStatusOwner }>()
+const statusOwners = new Map<
+  string,
+  { key: string; owner: RuntimeHostStatusOwner; environment: KnownRuntimeEnvironment }
+>()
 
 export function getRuntimeEnvironmentStatusOwner(
   userDataPath: string,
@@ -67,7 +76,7 @@ export function getRuntimeEnvironmentStatusOwner(
       },
       pause: () => pauseRemoteRuntimeSharedControlRetry(environment.id)
     })
-    cached = { key, owner }
+    cached = { key, owner, environment }
     statusOwners.set(environment.id, cached)
     if (isRuntimeEnvironmentManuallyDisconnected(environment.id)) {
       owner.dispose()
@@ -219,6 +228,22 @@ function getSharedControlConnection(
         isCapabilityPaused: () => isRuntimeEnvironmentCapabilityPaused(environmentId),
         onDiagnosticsChanged: (diagnostics) => {
           if (getRuntimeEnvironmentTransportGeneration(environmentId) !== transportGeneration) {
+            return
+          }
+          const environment = statusOwners.get(environmentId)?.environment
+          const accountRuntime = environment?.runtimeRecordId
+            ? getHiveAccountRuntimeAccess()
+                ?.directory.getState()
+                .items.find((runtime) => runtime.runtimeRecordId === environment.runtimeRecordId)
+            : undefined
+          if (
+            environment &&
+            accountRuntime &&
+            usesAccountRuntimeRelay({
+              ...environment,
+              accountClaim: projectHiveRuntimeAccountClaim(accountRuntime)
+            })
+          ) {
             return
           }
           publishRuntimeEnvironmentDiagnostics({

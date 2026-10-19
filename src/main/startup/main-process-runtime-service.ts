@@ -25,7 +25,7 @@ import { resolveTuiAgentLaunchEnv } from '../../shared/tui-agent-launch-defaults
 import { getPreferredPairingOffer } from '../../shared/runtime-environments'
 import { fingerprintOrchestrationPeer } from '../runtime/orchestration/environment-transport'
 import {
-  callEnvironmentWithCloudFallback,
+  callCatalogEnvironment,
   resolveRuntimeEnvironmentCatalogEntry
 } from '../ipc/runtime-environment-account-routing'
 import { mainProcessState as state } from './main-process-state'
@@ -86,7 +86,7 @@ export function initializeMainProcessRuntime(): OrcaRuntimeService {
     call: async (selector, method, params, timeoutMs, envelope, expectedPairingRevision) => {
       const userDataPath = app.getPath('userData')
       const environment = resolveRuntimeEnvironmentCatalogEntry(userDataPath, selector)
-      return callEnvironmentWithCloudFallback(
+      return callCatalogEnvironment(
         userDataPath,
         environment,
         method,

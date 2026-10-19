@@ -2,7 +2,7 @@ import { ipcMain } from 'electron'
 import { randomUUID } from 'node:crypto'
 import {
   resolveRuntimeEnvironmentCatalogEntry,
-  subscribeEnvironmentWithCloudFallback
+  subscribeCatalogEnvironment
 } from './runtime-environment-account-routing'
 import { REMOTE_RUNTIME_MAX_SUBSCRIPTIONS } from '../../shared/remote-runtime-memory-limits'
 import { RemoteRuntimeClientError } from '../../shared/remote-runtime-client-error'
@@ -142,7 +142,7 @@ export function registerRuntimeEnvironmentSubscriptionHandlers(args: {
       sender.once('destroyed', closeSubscription)
       destroyedListenerAttached = true
       try {
-        subscription = await subscribeEnvironmentWithCloudFallback(
+        subscription = await subscribeCatalogEnvironment(
           getUserDataPath(),
           environment,
           args.method,

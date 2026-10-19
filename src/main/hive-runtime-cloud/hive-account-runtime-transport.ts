@@ -61,16 +61,25 @@ export class HiveAccountRuntimeTransport {
 
   async getStatus(
     claim: RuntimeEnvironmentAccountClaim,
-    timeoutMs?: number
+    timeoutMs?: number,
+    signal?: AbortSignal
   ): Promise<RuntimeRpcResponse<RuntimeStatus>> {
     try {
-      return await this.call(claim, 'status.get', {}, timeoutMs)
-    } catch {
-      const error = unavailable()
+      return await this.call(claim, 'status.get', {}, timeoutMs, undefined, signal)
+    } catch (failure) {
+      signal?.throwIfAborted()
+      if (failure instanceof Error && failure.name === 'AbortError') {
+        throw failure
+      }
+      const error = toHiveAccountRelayClientError(failure)
       return {
         id: 'status.get',
         ok: false,
-        error: { code: error.code, message: error.message },
+        error: {
+          code: error.code,
+          message: error.message,
+          ...(error.data !== undefined ? { data: error.data } : {})
+        },
         _meta: { runtimeId: claim.runtimeRecordId }
       }
     }
@@ -109,12 +118,21 @@ export class HiveAccountRuntimeTransport {
       onBinary?: (bytes: Uint8Array<ArrayBufferLike>) => void
       onError: (error: { code: string; message: string }) => void
       onClose: () => void
-    }
+    },
+    signal?: AbortSignal
   ): Promise<RemoteRuntimeSubscription> {
+    signal?.throwIfAborted()
     try {
-      const subscription = await this.pool(claim).subscribe(method, params, callbacks, timeoutMs)
+      const subscription = await this.pool(claim).subscribe(
+        method,
+        params,
+        callbacks,
+        timeoutMs,
+        signal
+      )
       return { requestId: `account-subscription-${++this.sequence}`, ...subscription }
     } catch (error) {
+      signal?.throwIfAborted()
       throw toHiveAccountRelayClientError(error)
     }
   }
