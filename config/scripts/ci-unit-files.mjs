@@ -15,6 +15,8 @@ export const UNIT_INCLUDE = [
 
 export const UNIT_EXCLUDE = [
   ...defaultExclude,
+  // The first unit shard runs this browser deadline contract in isolation.
+  'config/scripts/mobile-web-app-stack-transition-render.test.mjs',
   'src/main/daemon/repro-13767-shell-ready-marker-lost-to-exec.test.ts',
   'src/main/daemon/shell-ready.test.ts',
   'src/main/daemon/node-pty-fd-leak.test.ts',

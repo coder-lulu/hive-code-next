@@ -149,6 +149,17 @@ jobs:
             --shard=${{ matrix.shard.index }}/${{ matrix.shard.count }} \
             ${{ inputs.runner == 'ubuntu-24.04-arm' && '--maxWorkers=4' || '' }}
 
+      - name: Test isolated mobile stack transitions
+        if: matrix.shard.index == 1
+        env:
+          ORCA_BALANCE_UNIT_SHARDS: '0'
+          ORCA_BACKGROUND_LAUNCH: '1'
+          ORCA_MOBILE_WEB_APP_DEPS_REQUIRED: '1'
+        run: >-
+          node config/scripts/run-vitest.mjs run --config config/vitest.config.ts
+          --maxWorkers=1 --no-file-parallelism
+          config/scripts/mobile-web-app-stack-transition-render.test.mjs
+
       - name: Seal unit module cache
         id: module-cache-seal
         if: >-
