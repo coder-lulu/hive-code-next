@@ -1008,7 +1008,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 2
           fetch-tags: false
           persist-credentials: false
 
@@ -1031,6 +1031,7 @@ jobs:
           ORCA_ALLOW_RUNTIME_LAUNCHER_PROTOCOL_BUMP: ${{ contains(github.event.pull_request.labels.*.name, 'allow-runtime-launcher-protocol-bump') }}
         run: |
           DIFF_BASE="$(node config/scripts/git-pull-request-diff-base.mjs "$BASE_SHA")"
+          git cat-file -e "$DIFF_BASE^{commit}"
           pnpm run check:runtime-launcher-protocol-ratchet -- --base "$DIFF_BASE"
 
       # Runs the whole directory so a new file there cannot be left out; an empty match

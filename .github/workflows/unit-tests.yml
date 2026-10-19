@@ -87,6 +87,9 @@ jobs:
       # Root recording contracts load the mobile mount adapters and their test renderer.
       - uses: ./.github/actions/install-mobile-dependencies
 
+      - name: Install unit render browsers
+        run: pnpm exec playwright-core install --with-deps chromium webkit
+
       - name: Install Electron package binary for tests
         run: node config/scripts/install-electron-package-binary.mjs
 

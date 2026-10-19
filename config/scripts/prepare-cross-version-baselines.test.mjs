@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, globSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { parse } from 'yaml'
@@ -9,6 +9,17 @@ const owner = path
 const load = () => import(/* @vite-ignore */ owner)
 
 describe('immutable upstream compatibility baseline acquisition', () => {
+  it('prepares every literal historical commit used by the wire fixtures', async () => {
+    const { UPSTREAM_BASELINE_PINS } = await load()
+    const commits = new Set(Object.values(UPSTREAM_BASELINE_PINS))
+    const root = path.resolve(import.meta.dirname, '../../tests/e2e/cross-version-wire')
+    for (const file of globSync('**/*.ts', { cwd: root })) {
+      const source = readFileSync(path.join(root, file), 'utf8')
+      for (const [, sha] of source.matchAll(/['"]([a-f0-9]{40})['"]/g)) {
+        expect(commits.has(sha), `${file}: missing historical commit ${sha}`).toBe(true)
+      }
+    }
+  })
   it('preserves the reviewed stable and browser placement releases as their real upstream commits', async () => {
     const { BASELINE_RELEASE, resolvePinnedUpstreamRef } = await load()
     expect(BASELINE_RELEASE).toBe('v1.4.186')
@@ -42,6 +53,7 @@ describe('immutable upstream compatibility baseline acquisition', () => {
     ['v1.4.220', 'a7927b28ce45cbb044add478d957abe36c99ccd8'],
     ['v1.4.221', '9dd8812384db85d0b4ede2d1e37f9d73bdb4ea8c'],
     ['5a56636f6679071d6ec68b851ef7932cd3222560', '5a56636f6679071d6ec68b851ef7932cd3222560'],
+    ['b6b4d68cd844c921c7c5191cef72d5adafc0dafa', 'b6b4d68cd844c921c7c5191cef72d5adafc0dafa'],
     ['e817b0e23747ffd6f16f2ddefea861950d82a3c0', 'e817b0e23747ffd6f16f2ddefea861950d82a3c0'],
     ['3727100cc9dbcea6201f8a3e506676a3c4b53b18', '3727100cc9dbcea6201f8a3e506676a3c4b53b18'],
     ['aac38d698ff75ac4c8658addab48ef5a83617619', 'aac38d698ff75ac4c8658addab48ef5a83617619'],
