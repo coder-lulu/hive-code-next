@@ -340,6 +340,8 @@
     "mobile/scripts/publish-hivecloud-release.mjs",
     "mobile/scripts/repro-mobile-foreground-stall.sh",
     "mobile/scripts/start-emulator.mjs",
+    "mobile/scripts/verify-android-release-signing.mjs",
+    "mobile/scripts/verify-android-release-signing.test.mjs",
     "mobile/src/app-update/use-wall-app-update.web.ts",
     "mobile/src/auth/mobile-auth-contract.ts",
     "mobile/src/auth/mobile-login-capabilities.test.ts",

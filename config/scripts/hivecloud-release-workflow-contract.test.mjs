@@ -220,7 +220,15 @@ describe('HiveCloud release publishing contract', () => {
     )
 
     expect(signingStep.run).toContain('configure-android-release-signing.mjs')
-    expect(verifyStep.run).toContain('apksigner verify --verbose --print-certs')
+    expect(signingStep.run).toContain('verify-android-release-signing.mjs key')
+    expect(signingStep.env.HIVECODE_ANDROID_SIGNING_FINGERPRINT).toContain(
+      'secrets.HIVECODE_ANDROID_SIGNING_FINGERPRINT'
+    )
+    expect(verifyStep.run).toBe('node scripts/verify-android-release-signing.mjs apk')
+    expect(verifyStep.env.HIVECODE_ANDROID_SIGNING_FINGERPRINT).toContain(
+      'secrets.HIVECODE_ANDROID_SIGNING_FINGERPRINT'
+    )
+    expect(workflowText).not.toContain('find "$ANDROID_HOME/build-tools"')
     expect(workflow.jobs['android-build'].if).toContain(
       "github.repository == 'coder-lulu/hive-code-next'"
     )
