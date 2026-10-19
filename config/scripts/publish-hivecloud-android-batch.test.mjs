@@ -1,10 +1,16 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { afterEach, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const testRoot = new URL('../../logs/release-batch/tests/', import.meta.url)
 mkdirSync(testRoot, { recursive: true })
+
+beforeEach(() => {
+  vi.stubEnv('GITHUB_ACTIONS', 'false')
+  vi.stubEnv('ACTIONS_ID_TOKEN_REQUEST_URL', '')
+  vi.stubEnv('ACTIONS_ID_TOKEN_REQUEST_TOKEN', '')
+})
 
 afterEach(() => {
   vi.unstubAllEnvs()
