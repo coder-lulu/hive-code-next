@@ -4,15 +4,18 @@ import { createReadStream, openAsBlob } from 'node:fs'
 import { readFile, stat } from 'node:fs/promises'
 import { basename } from 'node:path'
 import { createHash } from 'node:crypto'
+import { pathToFileURL } from 'node:url'
 import { createReleaseVerificationAttestation } from '../../config/scripts/hivecloud-release-attestation.mjs'
+import { assertBatchRelease } from '../../config/scripts/hivecloud-release-client.mjs'
+import { releaseAuthentication } from '../../config/scripts/hivecloud-release-auth.mjs'
 
 const apiBase = String(process.env.HIVECLOUD_API_URL ?? '')
   .trim()
   .replace(/\/$/, '')
-const token = String(process.env.HIVECLOUD_API_TOKEN ?? '').trim()
+let authentication
 const apkPath = String(process.env.HIVECLOUD_APK_PATH ?? '').trim()
 const versionName = String(process.env.HIVECODE_VERSION ?? '').trim()
-const architecture = String(process.env.HIVECODE_ANDROID_ARCHITECTURE || 'arm64_v8a')
+const architecture = String(process.env.HIVECODE_ANDROID_ARCHITECTURE || 'universal')
   .trim()
   .toLowerCase()
 const releaseNotes = String(process.env.HIVECODE_RELEASE_NOTES ?? '').trim()
@@ -20,9 +23,18 @@ const signingCertificateFingerprint = String(
   process.env.HIVECODE_ANDROID_SIGNING_FINGERPRINT ?? ''
 ).trim()
 const attestationKey = String(process.env.HIVECLOUD_RELEASE_ATTESTATION_KEY ?? '').trim()
+const channel = String(process.env.HIVECODE_RELEASE_CHANNEL || 'beta')
+  .trim()
+  .toLowerCase()
+const requestedReleaseId = String(process.env.HIVECLOUD_RELEASE_ID ?? '').trim()
+const shouldPublish =
+  String(process.env.HIVECODE_PUBLISH ?? 'true')
+    .trim()
+    .toLowerCase() !== 'false'
 const MAX_ANDROID_ARTIFACT_BYTES = 512 * 1024 * 1024
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
 const BETA_VERSION_PATTERN = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)-beta\.(?:0|[1-9]\d*)$/
+const STABLE_VERSION_PATTERN = /^(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)\.(?:0|[1-9]\d*)$/
 const MAX_CONTROL_RESPONSE_BYTES = 1024 * 1024
 
 function requireValue(value, name) {
@@ -47,7 +59,7 @@ async function hiveCloudRequest(path, options = {}) {
     signal: options.signal ?? AbortSignal.timeout(60_000),
     headers: {
       accept: 'application/json',
-      authorization: `Bearer ${token}`,
+      ...(path.startsWith('/hive/v1/admin/') ? await authentication() : {}),
       ...(options.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
       ...options.headers
     }
@@ -117,9 +129,9 @@ async function digestFile(path) {
   return { sha256: sha256.digest('hex'), sha512: sha512.digest('hex') }
 }
 
-async function main() {
+export async function main() {
   requireValue(apiBase, 'HIVECLOUD_API_URL')
-  requireValue(token, 'HIVECLOUD_API_TOKEN')
+  authentication = releaseAuthentication()
   requireValue(apkPath, 'HIVECLOUD_APK_PATH')
   requireValue(versionName, 'HIVECODE_VERSION')
   requireValue(attestationKey, 'HIVECLOUD_RELEASE_ATTESTATION_KEY')
@@ -135,15 +147,14 @@ async function main() {
       'HIVECLOUD_API_URL must be an HTTPS URL without credentials or query parameters'
     )
   }
-  if (!BETA_VERSION_PATTERN.test(versionName)) {
-    throw new Error(
-      `Android HiveCloud releases must use a beta SemVer value (X.Y.Z-beta.N): ${versionName}`
-    )
-  }
   if (
-    !['arm64_v8a', 'armeabi_v7a', 'x86_64', 'universal', 'any'].includes(architecture.toLowerCase())
+    !['beta', 'stable'].includes(channel) ||
+    !(channel === 'beta' ? BETA_VERSION_PATTERN : STABLE_VERSION_PATTERN).test(versionName)
   ) {
-    throw new Error(`Unsupported Android ABI architecture: ${architecture}`)
+    throw new Error('Android product version must match its beta or stable release channel')
+  }
+  if (architecture !== 'universal') {
+    throw new Error('Android releases must use the universal APK architecture')
   }
   if (!/^(?:[0-9a-fA-F]{2}:?){32}$/.test(signingCertificateFingerprint)) {
     throw new Error('HIVECODE_ANDROID_SIGNING_FINGERPRINT must be a SHA-256 fingerprint')
@@ -165,12 +176,18 @@ async function main() {
   const digests = await digestFile(apkPath)
   const sha256 = digests.sha256
   const sha512 = digests.sha512
-  const release = await findOrCreateRelease(buildNumber)
+  if (requestedReleaseId && !UUID_PATTERN.test(requestedReleaseId)) {
+    throw new Error('HIVECLOUD_RELEASE_ID must be a UUID')
+  }
+  const release = requestedReleaseId
+    ? await hiveCloudRequest(`/hive/v1/admin/releases/${requestedReleaseId}`)
+    : await findOrCreateRelease(buildNumber)
   const releaseId = requireValue(release?.releaseId, 'HiveCloud releaseId')
   if (!UUID_PATTERN.test(releaseId)) {
     throw new Error('HiveCloud releaseId must be a UUID')
   }
   assertReleaseIdentity(release, buildNumber)
+  await assertBatchRelease(process.env, release, hiveCloudRequest)
   if (
     !['DRAFT', 'UPLOADING', 'VERIFYING', 'VERIFIED', 'PUBLISHED'].includes(
       String(release.status ?? '').toUpperCase()
@@ -270,13 +287,19 @@ async function main() {
         })
       })
     }
-    await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}/publish`, { method: 'POST' })
+    if (shouldPublish) {
+      await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}/publish`, { method: 'POST' })
+    }
+  }
+  if (!shouldPublish) {
+    console.log(`Uploaded and verified Android APK for draft ${releaseId}`)
+    return
   }
   const checkQuery = new URLSearchParams({
     product: 'hivecode',
     platform: 'android',
     architecture,
-    channel: 'beta',
+    channel,
     currentVersion: '0.0.0-beta.0',
     currentBuild: '1'
   })
@@ -299,7 +322,7 @@ async function findOrCreateRelease(buildNumber) {
   const query = new URLSearchParams({
     product: 'hivecode',
     platform: 'ANDROID',
-    channel: 'BETA',
+    channel: channel.toUpperCase(),
     limit: '50'
   })
   const existing = await hiveCloudRequest(`/hive/v1/admin/releases?${query}`)
@@ -310,7 +333,7 @@ async function findOrCreateRelease(buildNumber) {
   const payload = {
     product: 'hivecode',
     platform: 'ANDROID',
-    channel: 'BETA',
+    channel: channel.toUpperCase(),
     versionName,
     buildNumber,
     releaseNotes,
@@ -347,7 +370,7 @@ function assertReleaseIdentity(release, buildNumber) {
   if (
     String(release?.productCode ?? release?.product ?? '').toLowerCase() !== 'hivecode' ||
     String(release?.platform ?? '').toLowerCase() !== 'android' ||
-    String(release?.channel ?? '').toLowerCase() !== 'beta' ||
+    String(release?.channel ?? '').toLowerCase() !== channel ||
     release?.versionName !== versionName ||
     Number(release?.buildNumber) !== buildNumber
   ) {
@@ -371,7 +394,9 @@ function findUploadedArtifact(candidates, expectedArchitecture, sha256, sha512, 
   return matches[0]
 }
 
-main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error))
-  process.exitCode = 1
-})
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main().catch((error) => {
+    console.error(error instanceof Error ? error.message : String(error))
+    process.exitCode = 1
+  })
+}

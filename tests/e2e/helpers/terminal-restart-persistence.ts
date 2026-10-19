@@ -3,6 +3,7 @@ import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { test, expect } from './orca-app'
 import { TEST_REPO_PATH_FILE } from '../global-setup'
 import { attachRepoAndOpenTerminal } from './orca-restart'
+import { activateWorkspaceByClick } from './slept-workspace-probe'
 import { discoverActivePtyId, waitForActiveTerminalManager, waitForPaneCount } from './terminal'
 import {
   waitForSessionReady,
@@ -62,21 +63,35 @@ export async function bootstrapFirstLaunch(
   return { worktreeId, ptyId }
 }
 
-/**
- * Shared bootstrap for a *second* launch: just wait for the session to
- * restore, and confirm the previously-active worktree is the active one
- * again so downstream assertions operate against the right worktree.
- */
+/** Startup opens Home; verify the saved target before reopening it through Projects. */
+export async function reopenPersistedWorkspaceFromHome(
+  page: Page,
+  expectedWorktreeId: string
+): Promise<void> {
+  await waitForSessionReady(page)
+  await expect(page.getByTestId('desktop-home')).toBeVisible()
+  const saved = await page.evaluate(() => window.api.session.get())
+  const tabs = saved.tabsByWorktree[expectedWorktreeId] ?? []
+  expect(tabs.length, `saved workspace ${expectedWorktreeId} has no tabs`).toBeGreaterThan(0)
+  for (const tab of tabs) {
+    expect(
+      saved.terminalLayoutsByTabId[tab.id]?.root,
+      `saved terminal layout ${tab.id}`
+    ).toBeTruthy()
+  }
+  await activateWorkspaceByClick(page, expectedWorktreeId)
+}
+
+/** Reopen the restored target and wait for its original terminal surface. */
 export async function bootstrapRestoredLaunch(
   page: Page,
   expectedWorktreeId: string,
   paneCount = 1
 ): Promise<void> {
-  await waitForSessionReady(page)
+  await reopenPersistedWorkspaceFromHome(page, expectedWorktreeId)
   await expect
     .poll(async () => getActiveWorktreeId(page), { timeout: 10_000 })
     .toBe(expectedWorktreeId)
-  await ensureTerminalVisible(page)
   // Why: the PaneManager remounts asynchronously after session hydration. The
   // restored terminal surface is what we're about to assert against, so make
   // sure it exists before any content/layout assertion races.

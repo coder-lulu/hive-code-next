@@ -371,7 +371,11 @@ describe('release-cut.yml swaps the cached elevate.exe through the resolver', ()
     )
     const gate = steps[gateIndex]
     expect(gateIndex).toBeGreaterThan(steps.findIndex((step) => step.id === 'sign-elevate-cache'))
-    expect(publishIndex).toBeGreaterThan(gateIndex)
+    expect(publishIndex).toBe(-1)
+    const evidenceIndex = steps.findIndex(
+      (step) => step.name === 'Upload Windows inner signing evidence'
+    )
+    expect(evidenceIndex).toBeGreaterThan(gateIndex)
     expect(gate['continue-on-error']).toBeUndefined()
     expect(gate.env.ORCA_WINDOWS_INNER_SIGNATURE_REQUIRED).toBe('true')
     expect(gate.run).toContain("$targets += 'resources\\elevate.exe'")

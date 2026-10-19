@@ -19,7 +19,11 @@ const EXPECTED_MATRIX = {
   '.github/workflows/node-server-tests.yml#linux_glibc_floor': { contents: 'read' },
   '.github/workflows/node-server-tests.yml#linux_musl': { contents: 'read' },
   '.github/workflows/node-server-tests.yml#persistence': { contents: 'read' },
-  '.github/workflows/release-mac-build.yml#build-mac': { actions: 'read', contents: 'write' },
+  '.github/workflows/release-mac-build.yml#build-mac': {
+    actions: 'read',
+    contents: 'write',
+    'id-token': 'write'
+  },
   [`${RELEASE_WORKFLOW}#build`]: { actions: 'read', contents: 'write' },
   [`${RELEASE_WORKFLOW}#build-mac`]: { actions: 'write', contents: 'read' },
   [`${RELEASE_WORKFLOW}#verify-mac-build`]: { actions: 'read', contents: 'read' },
@@ -244,9 +248,25 @@ describe('release-cut token permissions', () => {
 
     const macWorkflow = readWorkflow('.github/workflows/release-mac-build.yml')
     expect(macWorkflow.jobs['build-mac'].if).toBe(
-      "github.repository == 'coder-lulu/hive-code-next'"
+      "(inputs.batch_id == '' || inputs.source_sha == github.sha) && github.repository == 'coder-lulu/hive-code-next'"
     )
-    expect(checkoutRef(macWorkflow.jobs['build-mac'])).toBe('refs/tags/${{ inputs.tag }}')
+    expect(checkoutRef(macWorkflow.jobs['build-mac'])).toBe(
+      "${{ inputs.source_sha || format('refs/tags/{0}', inputs.tag) }}"
+    )
+    const macSteps = macWorkflow.jobs['build-mac'].steps
+    const signature = macSteps.findIndex(
+      (step) => step.name === 'Verify macOS application signatures and certificates'
+    )
+    const upload = macSteps.findIndex((step) =>
+      step.run?.includes('publish-hivecloud-desktop-release.mjs')
+    )
+    expect(signature).toBeGreaterThan(-1)
+    expect(upload).toBeGreaterThan(signature)
+    expect(macSteps[signature]['continue-on-error']).toBeUndefined()
+    expect(macSteps[upload].if).toBe("inputs.batch_id != ''")
+    expect(macSteps[upload].env.HIVECODE_PUBLISH).toBe(
+      "${{ inputs.batch_id != '' && 'false' || 'true' }}"
+    )
 
     const e2eWorkflow = readWorkflow('.github/workflows/e2e.yml')
     for (const jobName of Object.keys(e2eWorkflow.jobs)) {

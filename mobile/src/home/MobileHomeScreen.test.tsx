@@ -31,6 +31,7 @@ vi.mock('lucide-react-native', () => ({
   Edit3: 'Icon',
   PowerOff: 'Icon',
   RefreshCw: 'Icon',
+  Trash2: 'Icon',
   Users: 'Icon'
 }))
 vi.mock('react-native', () => ({

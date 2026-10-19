@@ -453,6 +453,26 @@ describe('Electron runtime package contract', () => {
     expect(installStep.run).toBe('node config/scripts/install-electron-package-binary.mjs')
   })
 
+  it('verifies and uploads the AppImage produced by the PR package config', () => {
+    const config = require('../electron-builder-pr-linux.config.cjs')
+    const artifact = `dist/${config.appImage.artifactName.replace('${ext}', 'AppImage')}`
+    const steps = parse(readProject('.github/workflows/pr.yml')).jobs.package.steps
+    const markerStep = steps.find((step) => step.name === 'Verify root-package marker payloads')
+    expect(markerStep.run).toContain(`"$GITHUB_WORKSPACE/${artifact}" --appimage-extract`)
+    expect(markerStep.run).toContain(`ls -l ${artifact} "$deb" "$rpm"`)
+    expect(
+      steps.some(
+        (step) => step.uses === 'actions/upload-artifact@v7' && step.with.path === artifact
+      )
+    ).toBe(true)
+    for (const name of [
+      'Verify headless serve signal shutdown',
+      'Verify Linux CLI launch contract'
+    ]) {
+      expect(steps.find((step) => step.name === name).run).toContain(`--appimage ${artifact}`)
+    }
+  })
+
   it('smokes the packaged CLI from outside the checkout in PR checks', () => {
     const parsedWorkflow = parse(readProject('.github/workflows/pr.yml'))
     const smokeStep = parsedWorkflow.jobs.package.steps.find(

@@ -1,6 +1,29 @@
 name: HiveCode Windows x64 hardware-signed package
 
 on:
+  workflow_call:
+    inputs:
+      source_sha:
+        required: true
+        type: string
+      release_version:
+        required: true
+        type: string
+      release_channel:
+        required: true
+        type: string
+      release_build_number:
+        required: true
+        type: string
+      release_id:
+        required: true
+        type: string
+      batch_id:
+        required: true
+        type: string
+      runtime_run_id:
+        required: true
+        type: string
   push:
     tags:
       - 'v*'
@@ -10,13 +33,9 @@ on:
         description: 'Exact package version to publish, e.g. 1.5.0-beta.1'
         required: true
         type: string
-      publish_hivecloud_release:
-        description: 'Publish the verified installer to HiveCloud object storage'
-        required: false
-        default: true
-        type: boolean
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -25,18 +44,22 @@ concurrency:
 
 jobs:
   desktop-runtime:
-    if: github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/v') || github.ref_protected == true)
+    if: inputs.batch_id == '' && github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/v') || github.ref_protected == true)
     uses: ./.github/workflows/node-server-tests.yml
     with:
-      ref: ${{ github.sha }}
+      ref: ${{ inputs.source_sha || github.sha }}
       build_template: true
 
   build-and-sign:
     needs: [desktop-runtime]
     name: Build and hardware-sign HiveCode Windows x64
-    if: github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/v') || github.ref_protected == true)
+    if: ${{ (inputs.batch_id == '' || inputs.source_sha == github.sha) && !cancelled() && github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/v') || github.ref_protected == true) && (needs.desktop-runtime.result == 'success' || (inputs.batch_id != '' && needs.desktop-runtime.result == 'skipped')) }}
+    permissions:
+      id-token: write
+      actions: read
+      contents: read
     runs-on: [self-hosted, windows, x64]
-    environment: hivecode-windows-signing
+    environment: ${{ inputs.batch_id != '' && 'release-production' || 'hivecode-windows-signing' }}
     timeout-minutes: 120
     env:
       ORCA_REQUIRE_ORCAD_TEMPLATE: '1'
@@ -50,18 +73,23 @@ jobs:
       - name: Checkout requested revision
         uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           persist-credentials: false
 
       - name: Stage the qualified headless runtime template
         uses: actions/download-artifact@v8
         with:
           name: orcad-template
+          run-id: ${{ inputs.runtime_run_id || github.run_id }}
+          github-token: ${{ github.token }}
           path: out/orcad-template
 
       - name: Stage the qualified Windows process-tree addons
         uses: actions/download-artifact@v8
         with:
           name: orcad-windows-process-tree
+          run-id: ${{ inputs.runtime_run_id || github.run_id }}
+          github-token: ${{ github.token }}
           path: .build/windows-process-tree
 
       - name: Setup pnpm
@@ -78,9 +106,10 @@ jobs:
       - name: Resolve identity and reserve Windows build number
         shell: pwsh
         env:
-          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
-          REQUESTED_VERSION: ${{ github.event.inputs.release_version }}
+          REQUESTED_VERSION: ${{ inputs.release_version }}
+          REQUESTED_CHANNEL: ${{ inputs.release_channel }}
+          RESERVED_BUILD_NUMBER: ${{ inputs.release_build_number }}
+          BATCH_ID: ${{ inputs.batch_id }}
         run: |
           $version = if (-not [string]::IsNullOrWhiteSpace($env:REQUESTED_VERSION)) {
             $env:REQUESTED_VERSION.Trim().TrimStart('v')
@@ -98,14 +127,17 @@ jobs:
           } else {
             throw "Unsupported HiveCode release version: $version"
           }
-          $env:HIVECODE_RELEASE_PLATFORM = 'windows'
-          $env:HIVECODE_RELEASE_CHANNEL = $channel
-          $env:HIVECODE_BUILD_RESERVATION_KEY = "hivecode:windows:${channel}:${version}"
-          node config/scripts/reserve-hivecloud-build-number.mjs
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if ($env:BATCH_ID) {
+            if ($channel -ne $env:REQUESTED_CHANNEL -or $env:RESERVED_BUILD_NUMBER -notmatch '^[1-9][0-9]*$') { throw 'Invalid reserved batch identity' }
+            "HIVECODE_BUILD_NUMBER=$env:RESERVED_BUILD_NUMBER" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          } else {
+            $buildNumber = (Get-Content config/client-build.json -Raw | ConvertFrom-Json).desktopBuildNumber
+            if ($buildNumber -lt 1) { throw 'Invalid committed desktopBuildNumber' }
+            "HIVECODE_BUILD_NUMBER=$buildNumber" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          }
           "HIVECODE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "HIVECODE_RELEASE_CHANNEL=$channel" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-          "HIVECODE_COMMIT_SHA=${{ github.sha }}" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          "HIVECODE_COMMIT_SHA=${{ inputs.source_sha || github.sha }}" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
           "HIVECODE_EMBED_RELEASE_IDENTITY=1" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Preflight protected hardware signing boundary
@@ -139,11 +171,16 @@ jobs:
           "HIVECODE_SIGNING_CERTIFICATE_FINGERPRINT=$fingerprint" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
       - name: Publish verified Windows installer to HiveCloud object storage
-        if: github.event_name == 'push' || github.event.inputs.publish_hivecloud_release == 'true'
+        if: inputs.batch_id != ''
         shell: pwsh
         env:
           HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_SCOPE: ${{ inputs.batch_id != '' && 'artifact' || '' }}
+          HIVECLOUD_API_CLIENT_ID: ${{ vars.HIVECLOUD_API_CLIENT_ID }}
+          HIVECODE_COMMIT_SHA: ${{ inputs.source_sha || github.sha }}
+          HIVECLOUD_RELEASE_ID: ${{ inputs.release_id }}
+          HIVECLOUD_RELEASE_BATCH_ID: ${{ inputs.batch_id }}
+          HIVECODE_PUBLISH: ${{ inputs.batch_id != '' && 'false' || 'true' }}
           HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
           HIVECODE_DESKTOP_PLATFORM: windows
           HIVECODE_DESKTOP_ARCHITECTURE: x64
@@ -154,7 +191,7 @@ jobs:
       - name: Upload verified HiveCode Windows artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: hivecode-windows-x64-${{ github.sha }}
+          name: hivecode-windows-x64-${{ inputs.source_sha || github.sha }}
           path: |
             dist/hivecode-windows-setup.exe
             dist/hivecode-windows-setup.exe.blockmap

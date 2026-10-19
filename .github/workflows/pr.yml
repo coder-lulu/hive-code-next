@@ -81,6 +81,7 @@ jobs:
             /config/.bun-version
             /config/scripts/check-readme-local-links.mjs
             /config/scripts/pr-code-change-scope.mjs
+            /config/scripts/pr-daemon-init-test-scope.mjs
             /config/scripts/pr-package-test-paths.mjs
             /config/scripts/pr-layout-oracle-route.mjs
             /config/scripts/pr-e2e-source-routing.mjs
@@ -1007,7 +1008,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 2
           fetch-tags: false
           persist-credentials: false
 
@@ -1030,6 +1031,7 @@ jobs:
           ORCA_ALLOW_RUNTIME_LAUNCHER_PROTOCOL_BUMP: ${{ contains(github.event.pull_request.labels.*.name, 'allow-runtime-launcher-protocol-bump') }}
         run: |
           DIFF_BASE="$(node config/scripts/git-pull-request-diff-base.mjs "$BASE_SHA")"
+          git cat-file -e "$DIFF_BASE^{commit}"
           pnpm run check:runtime-launcher-protocol-ratchet -- --base "$DIFF_BASE"
 
       # Runs the whole directory so a new file there cannot be left out; an empty match
@@ -1224,17 +1226,17 @@ jobs:
             echo "The rpm must not carry the AppImage's Node"; exit 1
           fi
           appimage_root="$(mktemp -d)"
-          (cd "$appimage_root" && "$GITHUB_WORKSPACE/dist/orca-linux.AppImage" --appimage-extract 'resources/node-runtime/bin/node' >/dev/null)
+          (cd "$appimage_root" && "$GITHUB_WORKSPACE/dist/hivecode-linux.AppImage" --appimage-extract 'resources/node-runtime/bin/node' >/dev/null)
           test -x "$appimage_root/squashfs-root/resources/node-runtime/bin/node"
           "$appimage_root/squashfs-root/resources/node-runtime/bin/node" --version
           rm -rf "$appimage_root"
-          ls -l dist/orca-linux.AppImage "$deb" "$rpm"
+          ls -l dist/hivecode-linux.AppImage "$deb" "$rpm"
 
       # Kept briefly so a reviewer can run this exact AppImage on a real Linux desktop.
       - uses: actions/upload-artifact@v7
         with:
           name: orca-linux-appimage-${{ github.event.pull_request.head.sha }}
-          path: dist/orca-linux.AppImage
+          path: dist/hivecode-linux.AppImage
           retention-days: 3
           compression-level: 0
 

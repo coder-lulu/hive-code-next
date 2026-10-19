@@ -3,6 +3,7 @@ import { reserveHiveCloudBuildNumber } from './reserve-hivecloud-build-number.mj
 
 const environment = {
   HIVECLOUD_API_URL: 'https://updates.hive.test',
+  HIVECLOUD_API_CLIENT_ID: 'release-ci',
   HIVECLOUD_API_TOKEN: 'secret-token',
   HIVECODE_RELEASE_PLATFORM: 'android',
   HIVECODE_RELEASE_CHANNEL: 'beta',
@@ -25,6 +26,7 @@ describe('HiveCloud build number reservation', () => {
     const [url, options] = request.mock.calls[0]
     expect(url).toBe('https://updates.hive.test/hive/v1/admin/releases/build-numbers/reserve')
     expect(options.redirect).toBe('error')
+    expect(options.headers.clientid).toBe('release-ci')
     expect(JSON.parse(options.body)).toMatchObject({
       product: 'hivecode',
       platform: 'android',
@@ -42,4 +44,12 @@ describe('HiveCloud build number reservation', () => {
       'reserved build 15, expected 14'
     )
   })
+})
+
+it('rejects a missing client identity before reserving a build number', async () => {
+  const request = vi.fn()
+  await expect(
+    reserveHiveCloudBuildNumber({ ...environment, HIVECLOUD_API_CLIENT_ID: ' ' }, request)
+  ).rejects.toThrow('HIVECLOUD_API_CLIENT_ID')
+  expect(request).not.toHaveBeenCalled()
 })

@@ -68,7 +68,10 @@ describe('current Windows process-tree packaging owner', () => {
       expect(jobs['relay-native-addons']).toBeUndefined()
       expect(jobs['desktop-runtime'].uses).toBe(CURRENT_OWNER)
       expect(jobs['desktop-runtime'].with).toEqual({
-        ref: '${{ github.sha }}',
+        ref:
+          name === 'hivecode-client-build.yml'
+            ? '${{ github.sha }}'
+            : '${{ inputs.source_sha || github.sha }}',
         build_template: true
       })
       const job = jobs[jobName]
@@ -106,7 +109,7 @@ describe('current Windows process-tree packaging owner', () => {
     const mac = readWorkflow('release-mac-build.yml').jobs['build-mac']
     expect(mac.permissions).toMatchObject({ actions: 'read' })
     expect(mac.steps[downloadIndex(mac, TEMPLATE)].with['run-id']).toBe(
-      '${{ inputs.release_run_id }}'
+      '${{ inputs.runtime_run_id || inputs.release_run_id || github.run_id }}'
     )
   })
 

@@ -1,22 +1,38 @@
 name: HiveCode Linux release
 
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
+    inputs:
+      source_sha:
+        required: true
+        type: string
+      release_version:
+        required: true
+        type: string
+      release_channel:
+        required: true
+        type: string
+      release_build_number:
+        required: true
+        type: string
+      release_id:
+        required: true
+        type: string
+      batch_id:
+        required: true
+        type: string
+      runtime_run_id:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       release_version:
         description: 'Exact package version to build, e.g. 1.5.0-beta.1'
         required: true
         type: string
-      publish_release:
-        description: 'Publish the built artifacts to HiveCloud'
-        required: true
-        type: boolean
-        default: false
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
@@ -25,15 +41,21 @@ concurrency:
 
 jobs:
   reserve:
-    if: github.repository == 'coder-lulu/hive-code-next'
+    if: (inputs.batch_id == '' || inputs.source_sha == github.sha) && github.repository == 'coder-lulu/hive-code-next'
+    environment: release-production
+    permissions:
+      id-token: write
+      actions: read
+      contents: read
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.identity.outputs.version }}
       channel: ${{ steps.identity.outputs.channel }}
-      build_number: ${{ steps.reserve.outputs.build_number || steps.identity.outputs.build_number }}
+      build_number: ${{ steps.identity.outputs.build_number }}
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           persist-credentials: false
 
       - uses: actions/setup-node@v6
@@ -44,7 +66,10 @@ jobs:
         id: identity
         shell: bash
         env:
-          REQUESTED_VERSION: ${{ github.event.inputs.release_version }}
+          REQUESTED_VERSION: ${{ inputs.release_version }}
+          REQUESTED_CHANNEL: ${{ inputs.release_channel }}
+          RESERVED_BUILD_NUMBER: ${{ inputs.release_build_number }}
+          BATCH_ID: ${{ inputs.batch_id }}
         run: |
           set -euo pipefail
           version="${REQUESTED_VERSION:-${GITHUB_REF_NAME#v}}"
@@ -59,29 +84,25 @@ jobs:
             echo "::error::Unsupported HiveCode release version: $version"
             exit 1
           fi
+          if [[ -n "$BATCH_ID" ]]; then
+            test "$channel" = "$REQUESTED_CHANNEL"
+            [[ "$RESERVED_BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]]
+            build_number="$RESERVED_BUILD_NUMBER"
+          fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "channel=$channel" >> "$GITHUB_OUTPUT"
           echo "build_number=$build_number" >> "$GITHUB_OUTPUT"
 
-      - name: Reserve Linux build number in HiveCloud
-        if: github.event_name == 'push' || inputs.publish_release
-        id: reserve
-        env:
-          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
-          HIVECODE_RELEASE_PLATFORM: linux
-          HIVECODE_RELEASE_CHANNEL: ${{ steps.identity.outputs.channel }}
-          HIVECODE_BUILD_RESERVATION_KEY: hivecode:linux:${{ steps.identity.outputs.channel }}:${{ steps.identity.outputs.version }}
-        run: node config/scripts/reserve-hivecloud-build-number.mjs
-
   desktop-runtime:
+    if: inputs.batch_id == ''
     needs: reserve
     uses: ./.github/workflows/node-server-tests.yml
     with:
-      ref: ${{ github.sha }}
+      ref: ${{ inputs.source_sha || github.sha }}
       build_template: true
 
   build:
+    if: ${{ !cancelled() && needs.reserve.result == 'success' && (needs.desktop-runtime.result == 'success' || (inputs.batch_id != '' && needs.desktop-runtime.result == 'skipped')) }}
     needs: [reserve, desktop-runtime]
     strategy:
       fail-fast: false
@@ -100,7 +121,7 @@ jobs:
     env:
       HIVECODE_BUILD_NUMBER: ${{ needs.reserve.outputs.build_number }}
       HIVECODE_VERSION: ${{ needs.reserve.outputs.version }}
-      HIVECODE_COMMIT_SHA: ${{ github.sha }}
+      HIVECODE_COMMIT_SHA: ${{ inputs.source_sha || github.sha }}
       HIVECODE_EMBED_RELEASE_IDENTITY: '1'
       NODE_OPTIONS: --max-old-space-size=4096
       ORCA_REQUIRE_ORCAD_TEMPLATE: '1'
@@ -109,18 +130,23 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           persist-credentials: false
 
       - name: Stage the qualified headless runtime template
         uses: actions/download-artifact@v8
         with:
           name: orcad-template
+          run-id: ${{ inputs.runtime_run_id || github.run_id }}
+          github-token: ${{ github.token }}
           path: out/orcad-template
 
       - name: Stage the qualified Windows process-tree addons
         uses: actions/download-artifact@v8
         with:
           name: orcad-windows-process-tree
+          run-id: ${{ inputs.runtime_run_id || github.run_id }}
+          github-token: ${{ github.token }}
           path: .build/windows-process-tree
 
       - uses: pnpm/setup@v2
@@ -213,6 +239,8 @@ jobs:
         uses: actions/download-artifact@v8
         with:
           name: orcad-prebuild-glibc-${{ matrix.runner }}
+          run-id: ${{ inputs.runtime_run_id || github.run_id }}
+          github-token: ${{ github.token }}
           path: out/orcad-prebuilds
 
       - name: Require the qualified headless native slot
@@ -226,7 +254,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: hivecode-linux-${{ matrix.architecture }}-${{ github.sha }}
+          name: hivecode-linux-${{ matrix.architecture }}-${{ inputs.source_sha || github.sha }}
           path: |
             upload/*.AppImage
             upload/*.deb
@@ -235,12 +263,18 @@ jobs:
           retention-days: 2
 
   publish:
-    if: github.event_name == 'push' || inputs.publish_release
+    if: ${{ !cancelled() && needs.reserve.result == 'success' && needs.build.result == 'success' && inputs.batch_id != '' }}
     needs: [reserve, build]
+    environment: release-production
+    permissions:
+      id-token: write
+      actions: read
+      contents: read
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ inputs.source_sha || github.sha }}
           persist-credentials: false
 
       - uses: actions/setup-node@v6
@@ -249,14 +283,19 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: hivecode-linux-*-${{ github.sha }}
+          pattern: hivecode-linux-*-${{ inputs.source_sha || github.sha }}
           path: signed-artifacts
           merge-multiple: true
 
       - name: Publish AppImages and Runtime debs to HiveCloud object storage
         env:
           HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_SCOPE: ${{ inputs.batch_id != '' && 'artifact' || '' }}
+          HIVECLOUD_API_CLIENT_ID: ${{ vars.HIVECLOUD_API_CLIENT_ID }}
+          HIVECODE_COMMIT_SHA: ${{ inputs.source_sha || github.sha }}
+          HIVECLOUD_RELEASE_ID: ${{ inputs.release_id }}
+          HIVECLOUD_RELEASE_BATCH_ID: ${{ inputs.batch_id }}
+          HIVECODE_PUBLISH: ${{ inputs.batch_id != '' && 'false' || 'true' }}
           HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
           HIVECODE_VERSION: ${{ needs.reserve.outputs.version }}
           HIVECODE_BUILD_NUMBER: ${{ needs.reserve.outputs.build_number }}

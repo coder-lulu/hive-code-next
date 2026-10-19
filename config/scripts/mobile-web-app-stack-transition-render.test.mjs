@@ -48,6 +48,7 @@ const ENGINES = [
 ]
 
 const browsers = new Map()
+const frameDiagnostics = new WeakMap()
 let origin = null
 let scratch = null
 let server = null
@@ -179,57 +180,92 @@ function sampleFrames(
   action,
   { followUp = null, afterFrames = 0, observeFullWindow = false } = {}
 ) {
-  return page.evaluate(
-    ([name, sampleMs, nextAction, followAt, settledGraceMs, fullWindow]) =>
-      new Promise((resolve) => {
-        const leftOf = (id) => {
-          const node = document.querySelector(`[data-testid="${id}"]`)
-          const rect = node?.getBoundingClientRect()
-          return rect && rect.width > 0 ? Math.round(rect.left) : null
-        }
-        const hitAt = () =>
-          document
-            .elementFromPoint(innerWidth / 2, innerHeight / 2)
-            ?.closest('[data-testid^="stack-probe-"]')
-            ?.getAttribute('data-testid')
-            ?.replace('stack-probe-', '') ?? null
-        const frames = []
-        const start = performance.now()
-        let settledAt = null
-        const destination = nextAction ?? name
-        const pushing = destination === 'push' || destination === 'pushOther'
-        globalThis.__orcaStackProbe[name]()
-        const tick = () => {
-          if (nextAction !== null && frames.length === followAt) {
-            globalThis.__orcaStackProbe[nextAction]()
+  return page
+    .evaluate(
+      ([name, sampleMs, nextAction, followAt, settledGraceMs, fullWindow]) =>
+        new Promise((resolve) => {
+          const leftOf = (id) => {
+            const node = document.querySelector(`[data-testid="${id}"]`)
+            const rect = node?.getBoundingClientRect()
+            return rect && rect.width > 0 ? Math.round(rect.left) : null
           }
-          frames.push({
-            list: leftOf('stack-probe-list'),
-            session: leftOf('stack-probe-session'),
-            hit: hitAt(),
-            // Where the running slide starts, which is how a slide that restarts from 0 shows.
-            from: document.getAnimations()[0]?.effect?.getKeyframes()[0]?.transform ?? null
-          })
-          const last = frames.at(-1)
-          const arrived = pushing
-            ? last.list === null && last.session === 0 && last.hit === 'session'
-            : last.list === 0 && last.session === null && last.hit === 'list'
-          const followUpDelivered = nextAction === null || frames.length > followAt
-          const settled = arrived && followUpDelivered && document.getAnimations().length === 0
-          const now = performance.now()
-          settledAt = settled ? (settledAt ?? now) : null
-          // Observe cleanup after actual arrival; retain the full window for interruption races.
-          const finished = !fullWindow && settledAt !== null && now - settledAt >= settledGraceMs
-          if (!finished && now - start < sampleMs) {
-            requestAnimationFrame(tick)
-          } else {
-            resolve(frames)
+          const hitAt = () =>
+            document
+              .elementFromPoint(innerWidth / 2, innerHeight / 2)
+              ?.closest('[data-testid^="stack-probe-"]')
+              ?.getAttribute('data-testid')
+              ?.replace('stack-probe-', '') ?? null
+          const frames = []
+          const trace = []
+          const start = performance.now()
+          let observedAt = null
+          const targetIsSession = name === 'push' || name === 'pushOther'
+          let settledAt = null
+          const destination = nextAction ?? name
+          const pushing = destination === 'push' || destination === 'pushOther'
+          globalThis.__orcaStackProbe[name]()
+          const tick = () => {
+            if (nextAction !== null && frames.length === followAt) {
+              globalThis.__orcaStackProbe[nextAction]()
+            }
+            frames.push({
+              list: leftOf('stack-probe-list'),
+              session: leftOf('stack-probe-session'),
+              hit: hitAt(),
+              // Where the running slide starts, which is how a slide that restarts from 0 shows.
+              from: document.getAnimations()[0]?.effect?.getKeyframes()[0]?.transform ?? null
+            })
+            const last = frames.at(-1)
+            const arrived = pushing
+              ? last.list === null && last.session === 0 && last.hit === 'session'
+              : last.list === 0 && last.session === null && last.hit === 'list'
+            const followUpDelivered = nextAction === null || frames.length > followAt
+            const settled = arrived && followUpDelivered && document.getAnimations().length === 0
+            const now = performance.now()
+            if (
+              observedAt === null &&
+              (targetIsSession ? last.session !== null : last.list !== null)
+            ) {
+              observedAt = now
+            }
+            trace.push({
+              elapsedMs: now - start,
+              ...last,
+              animations: document.getAnimations().map((animation) => ({
+                playState: animation.playState,
+                currentTime: animation.currentTime,
+                startTime: animation.startTime,
+                duration: animation.effect?.getComputedTiming().duration
+              }))
+            })
+            settledAt = settled ? (settledAt ?? now) : null
+            // Observe cleanup after actual arrival; retain the full window for interruption races.
+            const finished = !fullWindow && settledAt !== null && now - settledAt >= settledGraceMs
+            // A cold route may finish mounting at the end of the startup window. Observe its
+            // actual transition for a full window; keep the same bounded wait if it never appears.
+            if (!finished && now - (observedAt ?? start) < sampleMs) {
+              requestAnimationFrame(tick)
+            } else {
+              resolve({
+                frames,
+                diagnostics: {
+                  action: name,
+                  sampleMs,
+                  observedAtMs: observedAt === null ? null : observedAt - start,
+                  finished,
+                  trace
+                }
+              })
+            }
           }
-        }
-        requestAnimationFrame(tick)
-      }),
-    [action, SAMPLE_MS, followUp, afterFrames, SETTLED_GRACE_MS, observeFullWindow]
-  )
+          requestAnimationFrame(tick)
+        }),
+      [action, SAMPLE_MS, followUp, afterFrames, SETTLED_GRACE_MS, observeFullWindow]
+    )
+    .then(({ frames, diagnostics }) => {
+      frameDiagnostics.set(frames, JSON.stringify(diagnostics))
+      return frames
+    })
 }
 
 /** Every element in the document, hidden ones included: a retained slot still counts. */
@@ -269,11 +305,14 @@ describeRender('the host stack transition on the page', () => {
         const frames = await sampleFrames(page, 'push')
         const firstShown = frames.find((frame) => frame.session !== null)
         // Red on native-stack's web view: the session's first visible frame is already at x = 0.
-        expect(firstShown?.session).toBeGreaterThan(0)
-        expect(frames.some((frame) => between(frame.session) && frame.list === 0)).toBe(true)
+        expect(firstShown?.session, frameDiagnostics.get(frames)).toBeGreaterThan(0)
+        expect(
+          frames.some((frame) => between(frame.session) && frame.list === 0),
+          frameDiagnostics.get(frames)
+        ).toBe(true)
         // The list stays painted under the slide but takes no tap, so a double tap cannot push twice.
         expect(sliding(frames).map((frame) => frame.hit)).toEqual(sliding(frames).map(() => null))
-        expect(frames.at(-1)).toEqual(SESSION_SETTLED)
+        expect(frames.at(-1), frameDiagnostics.get(frames)).toEqual(SESSION_SETTLED)
         expect(errors).toEqual([])
         await page.close()
       }, 120_000)
@@ -284,10 +323,13 @@ describeRender('the host stack transition on the page', () => {
         expect(await sessionMounts(page)).toBe(1)
         const frames = await sampleFrames(page, 'back')
         // Red on native-stack's web view: the popped screen is gone on the first frame after Back.
-        expect(frames.some((frame) => between(frame.session) && frame.list === 0)).toBe(true)
+        expect(
+          frames.some((frame) => between(frame.session) && frame.list === 0),
+          frameDiagnostics.get(frames)
+        ).toBe(true)
         // The screen sliding out is the one that was on screen, not a fresh mount of it.
         expect(await sessionMounts(page)).toBe(1)
-        expect(frames.at(-1)).toEqual(LIST_SETTLED)
+        expect(frames.at(-1), frameDiagnostics.get(frames)).toEqual(LIST_SETTLED)
         expect(errors).toEqual([])
         await page.close()
       }, 120_000)
@@ -298,8 +340,11 @@ describeRender('the host stack transition on the page', () => {
         await sampleFrames(page, 'push')
         await waitForBackClaim(page)
         const frames = await sampleFrames(page, 'hardwareBack')
-        expect(frames.some((frame) => between(frame.session) && frame.list === 0)).toBe(true)
-        expect(frames.at(-1)).toEqual(LIST_SETTLED)
+        expect(
+          frames.some((frame) => between(frame.session) && frame.list === 0),
+          frameDiagnostics.get(frames)
+        ).toBe(true)
+        expect(frames.at(-1), frameDiagnostics.get(frames)).toEqual(LIST_SETTLED)
         expect(await nodeCount(page)).toBe(baseline)
         expect(errors).toEqual([])
         await page.close()
@@ -314,8 +359,11 @@ describeRender('the host stack transition on the page', () => {
           afterFrames: 3,
           observeFullWindow: true
         })
-        expect(frames.slice(0, 3).some((frame) => between(frame.session))).toBe(true)
-        expect(frames.at(-1)).toEqual(SESSION_SETTLED)
+        expect(
+          frames.slice(0, 3).some((frame) => between(frame.session)),
+          frameDiagnostics.get(frames)
+        ).toBe(true)
+        expect(frames.at(-1), frameDiagnostics.get(frames)).toEqual(SESSION_SETTLED)
         expect(await nodeCount(page)).toBe(pushed)
         expect(
           await page.evaluate(
@@ -338,17 +386,17 @@ describeRender('the host stack transition on the page', () => {
           afterFrames: 6,
           observeFullWindow: true
         })
-        expect(between(frames[5].session)).toBe(true)
+        expect(between(frames[5].session), frameDiagnostics.get(frames)).toBe(true)
         // Leaves from where the push stopped, not from 0: the exit's first keyframe is mid-screen.
         const exitFrom = frames.slice(6).find((frame) => frame.from?.startsWith('matrix'))?.from
         const startX = Number(exitFrom?.match(/matrix\(1, 0, 0, 1, ([\d.]+), 0\)/)?.[1])
-        expect(between(startX)).toBe(true)
+        expect(between(startX), frameDiagnostics.get(frames)).toBe(true)
         const leaving = frames
           .slice(6)
           .map((frame) => frame.session)
           .filter((left) => left !== null)
         expect(leaving).toEqual(leaving.toSorted((a, b) => a - b))
-        expect(frames.at(-1)).toEqual(LIST_SETTLED)
+        expect(frames.at(-1), frameDiagnostics.get(frames)).toEqual(LIST_SETTLED)
         expect(await nodeCount(page)).toBe(baseline)
         expect(await sessionMounts(page)).toBe(mounts + 1)
         expect(errors).toEqual([])
@@ -365,7 +413,7 @@ describeRender('the host stack transition on the page', () => {
         const frames = await sampleFrames(page, 'back')
         // getKeyframes() reports the keyframe normalized, as translateX(0px).
         expect(frames.find((frame) => frame.from !== null)?.from).toMatch(/^translateX\(0(px)?\)$/)
-        expect(frames.at(-1)).toEqual(LIST_SETTLED)
+        expect(frames.at(-1), frameDiagnostics.get(frames)).toEqual(LIST_SETTLED)
         expect(errors).toEqual([])
         await page.close()
       }, 120_000)
@@ -380,7 +428,7 @@ describeRender('the host stack transition on the page', () => {
           )
           const popped = await sampleFrames(page, 'back')
           expect(popped.filter((frame) => between(frame.session))).toEqual([])
-          expect(popped.at(-1)).toEqual(LIST_SETTLED)
+          expect(popped.at(-1), frameDiagnostics.get(popped)).toEqual(LIST_SETTLED)
           expect(errors).toEqual([])
           await page.close()
         }

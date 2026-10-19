@@ -70,6 +70,13 @@ const binary = process.env.ORCA_CODEX_HOOK_CONTRACT_BINARY
 const expectedVersion = process.env.ORCA_CODEX_HOOK_CONTRACT_VERSION
 const TIMEOUT_MS = 60_000
 
+describe('Codex hook contract terminal transcript', () => {
+  it('preserves review text between ST and BEL terminated terminal strings', () => {
+    const raw = '\x1b]7501;state=working\x1b\\1 hook needs review before it can run\x1b]0;title\x07'
+    expect(decodeTerminalScreen(raw)).toBe('1hookneedsreviewbeforeitcanrun')
+  })
+})
+
 describe.runIf(process.env.ORCA_CODEX_HOOK_CONTRACT_REQUIRED === '1' && !binary)(
   'codex hook file-entry contract prerequisites',
   () => {
@@ -500,14 +507,25 @@ describe.runIf(binary)('codex hook file-entry binary contract', { timeout: 180_0
       model.close()
       receiver.close()
     }
-    const screen = readFileSync(out, 'utf-8').replace(/\s+/g, '')
+    const screen = decodeTerminalScreen(readFileSync(out, 'utf-8'))
     return { screen, posts }
   }
 })
 
+function decodeTerminalScreen(raw: string): string {
+  let painted = ''
+  createTerminalEscapeScanner({
+    onCsi: () => {},
+    onText: (text) => {
+      painted += text
+    }
+  }).observe(raw)
+  return painted.replace(/\s+/g, '')
+}
+
 // Why a pty: Codex's review screen only exists in the TUI, which `codex exec` never shows.
 const PTY_DRIVER = `
-import os, pty, re, sys, time, select, signal, struct, fcntl, termios
+import os, pty, sys, time, select, signal, struct, fcntl, termios
 out, prompt, cwd = sys.argv[1], sys.argv[2], sys.argv[3]
 control, expected = sys.argv[4], sys.argv[5]
 cmd = sys.argv[sys.argv.index('--') + 1:]
@@ -557,8 +575,6 @@ finally:
         except ProcessLookupError: pass
         finally:
             waited_pid, status = os.waitpid(pid, 0)
-        buf = re.sub(rb'\\x1b\\[[0-9;?<>=]*[A-Za-z]', b'', buf)
-        buf = re.sub(rb'\\x1b\\][^\\x07]*\\x07', b'', buf)
         open(out, 'wb').write(buf)
 `
 

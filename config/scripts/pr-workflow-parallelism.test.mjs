@@ -1,7 +1,7 @@
 const evidenceWorkflow = parse(
   readFileSync('.github/workflows/unit-selection-evidence.yml', 'utf8')
 )
-import { existsSync, globSync, readFileSync } from 'node:fs'
+import { existsSync, globSync, readFileSync, readdirSync } from 'node:fs'
 import { runInNewContext } from 'node:vm'
 import { parse } from 'yaml'
 import { describe, expect, it } from 'vitest'
@@ -55,6 +55,18 @@ const realZshUsage =
   /(?:spawnSync|execFileSync|spawn)\(\s*['"](?:\/(?:usr\/)?bin\/)?zsh['"]|program:\s*['"](?:\/(?:usr\/)?bin\/)?zsh['"]|spawnSync\(\s*['"]which['"]\s*,\s*\[\s*['"]zsh['"]|name:\s*['"]zsh['"]\s*,\s*path:\s*executablePath|from '[^']*zsh-startup-hook-pty-harness'/
 
 describe('PR workflow parallelism', () => {
+  it('installs both pinned render browsers before unit shards without a failure bypass', () => {
+    const steps = unitTestWorkflow.jobs.test.steps
+    const mobile = steps.findIndex((s) => s.uses?.endsWith('/install-mobile-dependencies'))
+    const browser = steps.findIndex((s) => s.name === 'Install unit render browsers')
+    const test = steps.findIndex((s) => s.name === 'Test shard')
+    expect(mobile).toBeGreaterThan(-1)
+    expect(browser).toBeGreaterThan(mobile)
+    expect(test).toBeGreaterThan(browser)
+    expect(steps[browser].run).toBe('pnpm exec playwright-core install --with-deps chromium webkit')
+    expect(steps[browser].if).toBeUndefined()
+    expect(steps[browser]['continue-on-error']).toBeUndefined()
+  })
   it('keeps lightweight orchestration jobs on the free slim runner', () => {
     expect(workflow.jobs.code_paths['runs-on']).toBe('ubuntu-slim')
     expect(workflow.jobs.preflight['runs-on']).toBe('ubuntu-24.04-arm')
@@ -314,14 +326,17 @@ describe('PR workflow parallelism', () => {
   })
 
   it('uses the repository package-manager version for every direct pnpm setup', () => {
-    const directSetups = globSync('.github/workflows/*.yml').flatMap((workflowPath) => {
-      const parsed = parse(readFileSync(workflowPath, 'utf8'))
-      return Object.values(parsed.jobs ?? {}).flatMap((job) =>
-        (job.steps ?? [])
-          .filter((step) => step.uses === 'pnpm/setup@v2')
-          .map((step) => ({ workflowPath, step }))
-      )
-    })
+    const directSetups = readdirSync('.github/workflows')
+      .filter((name) => name.endsWith('.yml'))
+      .flatMap((name) => {
+        const workflowPath = `.github/workflows/${name}`
+        const parsed = parse(readFileSync(workflowPath, 'utf8'))
+        return Object.values(parsed.jobs ?? {}).flatMap((job) =>
+          (job.steps ?? [])
+            .filter((step) => step.uses === 'pnpm/setup@v2')
+            .map((step) => ({ workflowPath, step }))
+        )
+      })
 
     expect(directSetups.length).toBeGreaterThan(0)
     for (const { workflowPath, step } of directSetups) {
@@ -498,7 +513,7 @@ describe('PR workflow parallelism', () => {
     const job = workflow.jobs['cross-version-wire']
     const checkout = job.steps.find((step) => step.uses?.startsWith('actions/checkout@'))
     expect(checkout.with).toMatchObject({
-      'fetch-depth': 1,
+      'fetch-depth': 2,
       'fetch-tags': false,
       'persist-credentials': false
     })
@@ -514,6 +529,13 @@ describe('PR workflow parallelism', () => {
     expect(testIndex).toBeGreaterThan(prepareIndex)
     expect(job.steps[prepareIndex].if).toBeUndefined()
     expect(job.steps[prepareIndex]['continue-on-error']).toBeUndefined()
+    const ratchet = job.steps.find(
+      (step) => step.name === 'Runtime launcher change does not bump daemon protocol'
+    )
+    expect(ratchet.run).toContain('git cat-file -e "$DIFF_BASE^{commit}"')
+    expect(ratchet.run).toContain('check:runtime-launcher-protocol-ratchet -- --base "$DIFF_BASE"')
+    expect(ratchet.if).toBeUndefined()
+    expect(ratchet['continue-on-error']).toBeUndefined()
   })
 
   it('keeps advisory unit-selection evidence off the gate', () => {

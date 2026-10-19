@@ -4,6 +4,29 @@ name: Mobile Android Release
 # which can take days. Decoupling the triggers lets an Android release ship
 # immediately without waiting on iOS, and vice versa.
 on:
+  workflow_call:
+    inputs:
+      source_sha:
+        required: true
+        type: string
+      release_version:
+        required: true
+        type: string
+      release_channel:
+        required: true
+        type: string
+      release_build_number:
+        required: true
+        type: string
+      release_id:
+        required: true
+        type: string
+      batch_id:
+        required: true
+        type: string
+      runtime_run_id:
+        required: true
+        type: string
   push:
     tags:
       - 'mobile-android-v*'
@@ -13,20 +36,17 @@ on:
         description: 'Optional exact HiveCode marketing version assertion, e.g. 1.5.0-beta.1'
         required: false
         type: string
-      publish_hivecloud_release:
-        description: 'Publish the signed APK to HiveCloud object storage'
-        required: false
-        default: true
-        type: boolean
 
 jobs:
   android-build:
-    if: github.repository == 'coder-lulu/hive-code-next' && (startsWith(github.ref, 'refs/tags/mobile-android-v') || github.event_name == 'workflow_dispatch')
+    if: (inputs.batch_id == '' || inputs.source_sha == github.sha) && github.repository == 'coder-lulu/hive-code-next' && (inputs.batch_id != '' || startsWith(github.ref, 'refs/tags/mobile-android-v') || github.event_name == 'workflow_dispatch')
+    environment: release-production
     runs-on: ubuntu-latest
 
     # The Git tag remains in GitHub as source provenance, but release artifacts
     # are owned by HiveCloud and stored through its private OSS service.
     permissions:
+      id-token: write
       contents: write
 
     outputs:
@@ -40,6 +60,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v6
@@ -57,20 +79,23 @@ jobs:
       - name: Resolve release version and version code
         id: release
         env:
-          MOBILE_ANDROID_RELEASE_VERSION: ${{ github.event.inputs.release_version }}
-          MOBILE_ANDROID_PUBLISH_RELEASE: ${{ github.event.inputs.publish_hivecloud_release }}
+          MOBILE_ANDROID_RELEASE_VERSION: ${{ inputs.release_version }}
+          MOBILE_ANDROID_PUBLISH_RELEASE: 'false'
         run: node scripts/prepare-android-release.mjs
 
-      - name: Reserve Android build number in HiveCloud
-        if: steps.release.outputs.publish_release == 'true'
+      - name: Validate reserved Android identity
+        if: inputs.batch_id != ''
         env:
-          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
-          HIVECODE_RELEASE_PLATFORM: android
-          HIVECODE_RELEASE_CHANNEL: beta
-          HIVECODE_BUILD_RESERVATION_KEY: hivecode:android:beta:${{ steps.release.outputs.version }}
-          HIVECODE_EXPECTED_BUILD_NUMBER: ${{ steps.release.outputs.android_version_code }}
-        run: node ../config/scripts/reserve-hivecloud-build-number.mjs
+          RESERVED_BUILD_NUMBER: ${{ inputs.release_build_number }}
+          ACTUAL_BUILD_NUMBER: ${{ steps.release.outputs.android_version_code }}
+          RELEASE_VERSION: ${{ inputs.release_version }}
+          RELEASE_CHANNEL: ${{ inputs.release_channel }}
+        run: |
+          set -euo pipefail
+          test "$RESERVED_BUILD_NUMBER" = "$ACTUAL_BUILD_NUMBER"
+          channel=stable
+          if [[ "$RELEASE_VERSION" == *-beta.* ]]; then channel=beta; fi
+          test "$RELEASE_CHANNEL" = "$channel"
 
       - name: Setup JDK 17
         uses: actions/setup-java@v5
@@ -155,29 +180,21 @@ jobs:
             mobile/android/app/build/outputs/apk/release/*.apk
             mobile/android/app/build/outputs/apk/release/*.apk.sha256
 
-      - name: Ensure GitHub release tag
-        if: steps.release.outputs.publish_release == 'true' && !startsWith(github.ref, 'refs/tags/mobile-android-v')
-        run: |
-          set -euo pipefail
-          tag="${{ steps.release.outputs.tag }}"
-
-          if git ls-remote --exit-code --tags origin "refs/tags/$tag" >/dev/null 2>&1; then
-            echo "Tag $tag already exists"
-            exit 0
-          fi
-
-          git tag "$tag" "$GITHUB_SHA"
-          git push origin "refs/tags/$tag"
-
       - name: Publish signed APK to HiveCloud
-        if: steps.release.outputs.publish_release == 'true'
+        if: inputs.batch_id != ''
         env:
           HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
-          HIVECLOUD_API_TOKEN: ${{ secrets.HIVECLOUD_API_TOKEN }}
+          HIVECLOUD_RELEASE_SCOPE: ${{ inputs.batch_id != '' && 'artifact' || '' }}
+          HIVECLOUD_API_CLIENT_ID: ${{ vars.HIVECLOUD_API_CLIENT_ID }}
+          HIVECODE_COMMIT_SHA: ${{ inputs.source_sha || github.sha }}
+          HIVECLOUD_RELEASE_ID: ${{ inputs.release_id }}
+          HIVECLOUD_RELEASE_BATCH_ID: ${{ inputs.batch_id }}
+          HIVECODE_PUBLISH: ${{ inputs.batch_id != '' && 'false' || 'true' }}
           HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
           HIVECLOUD_APK_PATH: android/app/build/outputs/apk/release/app-release.apk
           HIVECODE_VERSION: ${{ steps.release.outputs.version }}
           HIVECODE_ANDROID_BUILD_NUMBER: ${{ steps.release.outputs.android_version_code }}
-          HIVECODE_ANDROID_ARCHITECTURE: ${{ vars.HIVECODE_ANDROID_ARCHITECTURE }}
+          HIVECODE_ANDROID_ARCHITECTURE: universal
+          HIVECODE_RELEASE_CHANNEL: ${{ inputs.release_channel || (contains(steps.release.outputs.version, '-') && 'beta' || 'stable') }}
           HIVECODE_ANDROID_SIGNING_FINGERPRINT: ${{ secrets.HIVECODE_ANDROID_SIGNING_FINGERPRINT }}
         run: node scripts/publish-hivecloud-release.mjs

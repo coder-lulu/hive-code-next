@@ -18,6 +18,7 @@
 require "base64"
 require "json"
 require_relative "ios_release_version"
+require_relative "ios_batch_release"
 
 default_platform(:ios)
 
@@ -29,7 +30,7 @@ WORKSPACE = File.join(MOBILE_ROOT, "ios", "HiveCode.xcworkspace")
 BUILD_OUTPUT_DIRECTORY = File.join(MOBILE_ROOT, "build")
 SCHEME = "HiveCode"
 BUNDLE_ID = "com.hivekernel.hivecode.mobile"
-TESTFLIGHT_GROUPS = ["peeps"].freeze
+TESTFLIGHT_GROUPS = (ENV.fetch("HIVECODE_IOS_TESTFLIGHT_GROUPS", "").strip.empty? ? "HiveCode Beta" : ENV.fetch("HIVECODE_IOS_TESTFLIGHT_GROUPS")).split(",").map(&:strip).reject(&:empty?).freeze
 DEFAULT_TESTFLIGHT_CHANGELOG = "Latest HiveCode Mobile updates and fixes.".freeze
 TESTFLIGHT_PROCESSING_TIMEOUT_SECONDS = 20 * 60
 
@@ -120,6 +121,30 @@ rescue StandardError => error
 end
 
 platform :ios do
+  desc "Prepare the committed batch version with its reserved build number"
+  lane :prepare_batch_release do |options|
+    api_key = app_store_connect_api_key_from_env
+    product_version = options[:version].to_s
+    marketing_version = product_version.split("-").first
+    latest = latest_testflight_build_number(api_key: api_key, app_identifier: BUNDLE_ID, version: marketing_version, initial_build_number: 0)
+    config = IosBatchRelease.prepare(config: load_mobile_app_config, product_version: product_version,
+      build_number: options[:build_number].to_s, latest_build: latest)
+    write_mobile_app_config(config)
+  end
+
+  desc "Verify exact Apple version/build is publicly distributable"
+  lane :verify_batch_availability do |options|
+    app_store_connect_api_key_from_env
+    app = Spaceship::ConnectAPI::App.find(BUNDLE_ID)
+    UI.user_error!("App Store app is unavailable") unless app
+    version = options[:version].to_s.split("-").first
+    build_number = options[:build_number].to_s
+    builds = Spaceship::ConnectAPI::Build.all(app_id: app.id, version: version, build_number: build_number, platform: "IOS")
+    UI.user_error!("Expected exactly one Apple build") unless builds.length == 1
+    IosBatchRelease.verify!(app: app, build: builds.first, version: version, build_number: build_number,
+      channel: options[:channel].to_s, store_url: ENV.fetch("HIVECODE_IOS_STORE_URL"), groups: TESTFLIGHT_GROUPS)
+  end
+
   desc "Resolve the iOS release version and next TestFlight build number"
   lane :prepare_release_version do |options|
     api_key = app_store_connect_api_key_from_env

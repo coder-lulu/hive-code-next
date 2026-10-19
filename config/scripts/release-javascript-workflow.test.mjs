@@ -24,12 +24,7 @@ describe('release JavaScript job boundaries', () => {
     (name) => {
       const job = release.jobs[name]
       expect(job.needs).toEqual(
-        expect.arrayContaining([
-          'cut',
-          'create-release',
-          'release-preflight',
-          'release-javascript'
-        ])
+        expect.arrayContaining(['cut', 'create-release', 'release-preflight', 'release-javascript'])
       )
       expect(job.if).toContain("needs.release-preflight.result == 'success'")
       expect(job.if).toContain("needs.release-javascript.result == 'success'")
@@ -59,16 +54,16 @@ describe('release JavaScript job boundaries', () => {
     const download = mac.jobs['build-mac'].steps.find(
       (step) => step.name === 'Download release JavaScript from the release run'
     )
-    expect(download.with['run-id']).toBe('${{ inputs.release_run_id }}')
+    expect(download.with['run-id']).toBe(
+      '${{ inputs.runtime_run_id || inputs.release_run_id || github.run_id }}'
+    )
     expect(download.with.name).toBe('release-javascript')
     const build = mac.jobs['build-mac'].steps.find((step) => step.name === 'Build app')
     expect(build.env.ORCA_RELEASE_JAVASCRIPT_SOURCE_SHA).toBe('${{ inputs.javascript_source_sha }}')
     expect(build.run).toContain('pnpm run build:release:host')
     for (const job of [release.jobs.build, mac.jobs['build-mac']]) {
       expect(job.steps.map((step) => step.name)).toEqual(
-        expect.arrayContaining([
-          'Gate runtime file-watcher process isolation'
-        ])
+        expect.arrayContaining(['Gate runtime file-watcher process isolation'])
       )
     }
   })

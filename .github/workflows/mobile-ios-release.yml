@@ -4,6 +4,33 @@ name: Mobile iOS Release
 # review, which can take days. Decoupling the triggers lets an Android release
 # ship immediately without waiting on iOS, and vice versa.
 on:
+  workflow_call:
+    inputs:
+      source_sha:
+        type: string
+        required: true
+      release_version:
+        type: string
+        required: true
+      release_channel:
+        type: string
+        required: true
+      release_build_number:
+        type: string
+        required: true
+      release_id:
+        type: string
+        required: true
+      batch_id:
+        type: string
+        required: true
+      runtime_run_id:
+        type: string
+        required: true
+      store_url:
+        type: string
+        required: false
+        default: ''
   push:
     tags:
       - 'mobile-ios-v*'
@@ -25,7 +52,7 @@ on:
 
 jobs:
   ios-build:
-    if: github.repository == 'stablyai/orca'
+    if: github.repository == 'coder-lulu/hive-code-next' && (!inputs.batch_id || inputs.source_sha == github.sha)
     # GitHub-hosted macOS runner: required for Xcode. Expo SDK 55's
     # expo-modules-core declares swift_version 6.0 and uses Swift 6 syntax
     # (@MainActor isolation). Xcode 16.x (macos-15) can't even parse it
@@ -52,6 +79,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Select Xcode
         uses: maxim-lobanov/setup-xcode@v1
@@ -80,6 +109,7 @@ jobs:
           working-directory: mobile
 
       - name: Resolve release version and build number
+        if: ${{ !inputs.batch_id }}
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -89,6 +119,19 @@ jobs:
           FASTLANE_SKIP_UPDATE_CHECK: '1'
           FASTLANE_HIDE_CHANGELOG: '1'
         run: bundle exec fastlane ios prepare_release_version version:"$MOBILE_IOS_RELEASE_VERSION" bump_patch:"$MOBILE_IOS_BUMP_PATCH_VERSION"
+
+      - name: Prepare frozen batch identity
+        if: ${{ inputs.batch_id }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          BATCH_VERSION: ${{ inputs.release_version }}
+          BATCH_BUILD: ${{ inputs.release_build_number }}
+          SOURCE_SHA: ${{ inputs.source_sha }}
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          bundle exec fastlane ios prepare_batch_release version:"$BATCH_VERSION" build_number:"$BATCH_BUILD"
 
       - name: Capture release metadata
         id: release_metadata
@@ -112,10 +155,10 @@ jobs:
           IOS_DIST_CERT_PASSWORD: ${{ secrets.IOS_DIST_CERT_PASSWORD }}
         run: |
           set -euo pipefail
-          KEYCHAIN_PATH="$RUNNER_TEMP/orca-signing.keychain-db"
+          KEYCHAIN_PATH="$RUNNER_TEMP/hivecode-signing.keychain-db"
           # Random per-run keychain password; never persisted.
           KEYCHAIN_PASSWORD="$(openssl rand -base64 24)"
-          CERT_PATH="$RUNNER_TEMP/orca-dist-cert.p12"
+          CERT_PATH="$RUNNER_TEMP/hivecode-dist-cert.p12"
 
           echo "$IOS_DIST_CERT_P12" | base64 --decode > "$CERT_PATH"
 
@@ -146,14 +189,19 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: orca-mobile-ipa
+          name: hivecode-mobile-ipa
           path: mobile/build/*.ipa
           if-no-files-found: ignore
 
   ios-distribute:
     name: Distribute to external TestFlight testers
-    if: github.repository == 'stablyai/orca'
+    if: github.repository == 'coder-lulu/hive-code-next' && (!inputs.batch_id || inputs.source_sha == github.sha)
     needs: ios-build
+    environment: release-production
+    permissions:
+      id-token: write
+      actions: read
+      contents: read
     runs-on: ubuntu-latest
     # Fastlane's processing wait fails after 20m; this outer bound leaves setup
     # margin without allowing App Store Connect polling to hang for hours.
@@ -170,6 +218,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+        with:
+          ref: ${{ inputs.source_sha || github.sha }}
 
       - name: Setup Ruby and fastlane
         uses: ruby/setup-ruby@v1
@@ -178,11 +228,13 @@ jobs:
           bundler-cache: true
           working-directory: mobile
 
-      - name: Wait for processing and distribute to peeps
+      - name: Wait for processing and distribute to HiveCode testers
+        if: ${{ !inputs.batch_id || inputs.release_channel == 'beta' }}
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          HIVECODE_IOS_TESTFLIGHT_GROUPS: ${{ vars.HIVECODE_IOS_TESTFLIGHT_GROUPS }}
           TESTFLIGHT_CHANGELOG: ${{ github.event.inputs.testflight_changelog }}
           MOBILE_IOS_RELEASE_VERSION: ${{ needs.ios-build.outputs.release_version }}
           MOBILE_IOS_BUILD_NUMBER: ${{ needs.ios-build.outputs.build_number }}
@@ -192,6 +244,42 @@ jobs:
           if ! bundle exec fastlane ios distribute_testflight \
             version:"$MOBILE_IOS_RELEASE_VERSION" \
             build_number:"$MOBILE_IOS_BUILD_NUMBER"; then
-            echo "::error::TestFlight $MOBILE_IOS_RELEASE_VERSION ($MOBILE_IOS_BUILD_NUMBER) was uploaded but not distributed to peeps. If App Store Connect is still processing it, rerun only this failed job after the build becomes Ready; otherwise inspect the Fastlane error above."
+            echo "::error::TestFlight $MOBILE_IOS_RELEASE_VERSION ($MOBILE_IOS_BUILD_NUMBER) was uploaded but not distributed to HiveCode testers. If App Store Connect is still processing it, rerun only this failed job after the build becomes Ready; otherwise inspect the Fastlane error above."
             exit 1
           fi
+
+      - name: Verify exact Apple build is publicly distributable
+        if: ${{ inputs.batch_id }}
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          HIVECODE_IOS_TESTFLIGHT_GROUPS: ${{ vars.HIVECODE_IOS_TESTFLIGHT_GROUPS }}
+          HIVECODE_IOS_STORE_URL: ${{ inputs.store_url || (inputs.release_channel == 'beta' && vars.HIVECODE_IOS_TESTFLIGHT_URL || vars.HIVECODE_IOS_APP_STORE_URL) }}
+          BATCH_VERSION: ${{ inputs.release_version }}
+          BATCH_BUILD: ${{ inputs.release_build_number }}
+          BATCH_CHANNEL: ${{ inputs.release_channel }}
+        run: bundle exec fastlane ios verify_batch_availability version:"$BATCH_VERSION" build_number:"$BATCH_BUILD" channel:"$BATCH_CHANNEL"
+
+      - name: Setup Node for HiveCloud store registration
+        if: ${{ inputs.batch_id }}
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Register verified Apple store link in batch draft
+        if: ${{ inputs.batch_id }}
+        env:
+          HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
+          HIVECLOUD_RELEASE_SCOPE: ${{ inputs.batch_id != '' && 'artifact' || '' }}
+          HIVECLOUD_API_CLIENT_ID: ${{ vars.HIVECLOUD_API_CLIENT_ID }}
+          HIVECLOUD_RELEASE_ATTESTATION_KEY: ${{ secrets.HIVECLOUD_RELEASE_ATTESTATION_KEY }}
+          HIVECLOUD_RELEASE_ID: ${{ inputs.release_id }}
+          HIVECLOUD_RELEASE_BATCH_ID: ${{ inputs.batch_id }}
+          HIVECODE_COMMIT_SHA: ${{ inputs.source_sha }}
+          HIVECODE_PUBLISH: 'false'
+          HIVECODE_VERSION: ${{ inputs.release_version }}
+          HIVECODE_BUILD_NUMBER: ${{ inputs.release_build_number }}
+          HIVECODE_RELEASE_CHANNEL: ${{ inputs.release_channel }}
+          HIVECODE_IOS_STORE_URL: ${{ inputs.store_url || (inputs.release_channel == 'beta' && vars.HIVECODE_IOS_TESTFLIGHT_URL || vars.HIVECODE_IOS_APP_STORE_URL) }}
+        run: node ../config/scripts/publish-hivecloud-ios-store-release.mjs

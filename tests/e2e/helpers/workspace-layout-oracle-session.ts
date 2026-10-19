@@ -10,7 +10,10 @@ import { RuntimeClient } from '../../../src/cli/runtime/client'
 import { PROTOCOL_VERSION } from '../../../src/main/daemon/types'
 import { expect } from './orca-app'
 import { createRestartSession } from './orca-restart'
-import { bootstrapRestoredLaunch } from './terminal-restart-persistence'
+import {
+  bootstrapRestoredLaunch,
+  reopenPersistedWorkspaceFromHome
+} from './terminal-restart-persistence'
 import { waitForPaneCount } from './terminal'
 import { LayoutOracle, type OracleFinding } from './workspace-layout-oracle'
 import { LiveLayoutFeed } from './workspace-layout-oracle-feed'
@@ -28,7 +31,7 @@ export type OracleRun = {
   /** Worktrees the client checks compare; scenarios add the ones they create. */
   worktreeIds: string[]
   /** Reloads the window's renderer (main keeps running) and re-arms the window checks. */
-  reloadWindow: () => Promise<void>
+  reloadWindow: (worktreeId: string) => Promise<void>
   /** Quit, optionally kill the PTY daemon, relaunch, and diff the layout against before. */
   relaunch: (options: {
     worktreeId: string
@@ -98,11 +101,12 @@ export async function runOracleScenario(
       client,
       oracle: new LayoutOracle(target(first.page, client), scenarioId),
       worktreeIds,
-      reloadWindow: async () => {
+      reloadWindow: async (worktreeId) => {
         await run.page.reload()
         await run.page.waitForFunction(() => Boolean(window.__store), null, { timeout: 30_000 })
         await subscribeWindowLayout(run.page, feed)
         await run.oracle.retarget(target(run.page, run.client))
+        await reopenPersistedWorkspaceFromHome(run.page, worktreeId)
       },
       relaunch: async (options) => {
         const { worktreeId, paneCount, coldDaemon, panesPerTab, reopen } = options

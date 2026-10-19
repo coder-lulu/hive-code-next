@@ -1,13 +1,14 @@
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { tmpdir } from 'node:os'
-import { dirname, join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { dirname, join, resolve } from 'node:path'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { checkDaemonProtocolCrossing } from './check-daemon-protocol-crossing.mjs'
 import { DAEMON_PROTOCOL_SOURCE_PATH } from './daemon-protocol-facts.mjs'
 import { selectLatestStableReleaseTag } from './stable-release-tags.mjs'
+import * as upstreamPins from './prepare-cross-version-baselines.mjs'
 
 const repos = []
+const logs = resolve(import.meta.dirname, '../../logs/daemon-protocol-crossing')
 
 function git(repo, args) {
   execFileSync('git', args, { cwd: repo, stdio: 'ignore' })
@@ -24,7 +25,8 @@ function writeProtocol(repo, current) {
 }
 
 function repoWithTags(tagged) {
-  const repo = mkdtempSync(join(tmpdir(), 'daemon-protocol-crossing-'))
+  mkdirSync(logs, { recursive: true })
+  const repo = mkdtempSync(join(logs, 'test-'))
   repos.push(repo)
   git(repo, ['init', '-q'])
   for (const [tag, protocol] of tagged) {
@@ -47,6 +49,7 @@ function repoWithTags(tagged) {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   for (const repo of repos.splice(0)) {
     rmSync(repo, { recursive: true, force: true })
   }
@@ -101,5 +104,20 @@ describe('checkDaemonProtocolCrossing', () => {
     const result = checkDaemonProtocolCrossing({ repoRoot: repo, releaseRef: 'v1.0.0', env })
     expect(result).toMatchObject({ upgrade: true, rollback: false })
     expect(result.lines[0]).toBe('release v1.0.0: daemon protocol 5')
+  })
+
+  it('reads the prepared pinned object when its release tag is absent', () => {
+    const repo = repoWithTags([['nightly', 6]])
+    const commit = execFileSync('git', ['rev-parse', 'HEAD'], {
+      cwd: repo,
+      encoding: 'utf8'
+    }).trim()
+    const pin = vi.spyOn(upstreamPins, 'resolvePinnedUpstreamRef').mockReturnValue(commit)
+    const result = checkDaemonProtocolCrossing({
+      repoRoot: repo,
+      env: { ORCA_CROSS_VERSION_BASELINE_REF: 'v1.4.186' }
+    })
+    expect(pin).toHaveBeenCalledWith('v1.4.186')
+    expect(result).toMatchObject({ upgrade: true, rollback: true })
   })
 })
