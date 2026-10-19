@@ -9,14 +9,19 @@ const workflowPath = resolve(
 )
 
 describe('HiveCode Windows hardware signing workflow', () => {
+  it('runs only through the unified batch caller or an explicit manual dispatch', () => {
+    const workflow = parse(readFileSync(workflowPath, 'utf8'))
+    expect(Object.keys(workflow.on).sort()).toEqual(['workflow_call', 'workflow_dispatch'])
+    expect(workflow.on.push).toBeUndefined()
+    expect(workflow.on.workflow_call.inputs.batch_id.required).toBe(true)
+    expect(workflow.on.workflow_dispatch.inputs.release_version.required).toBe(true)
+  })
+
   it('uses a protected self-hosted Windows x64 runner and no retained product fallback', () => {
     const source = readFileSync(workflowPath, 'utf8')
     const workflow = parse(source)
     const job = workflow.jobs['build-and-sign']
 
-    expect(Object.keys(workflow.on).sort()).toEqual(['push', 'workflow_call', 'workflow_dispatch'])
-    expect(workflow.on.push).toEqual({ tags: ['v*'] })
-    expect(workflow.on.workflow_dispatch.inputs.release_version.required).toBe(true)
     expect(workflow.permissions).toEqual({ actions: 'read', contents: 'read' })
     expect(job['runs-on']).toEqual(['self-hosted', 'windows', 'x64'])
     expect(job.environment).toBe(

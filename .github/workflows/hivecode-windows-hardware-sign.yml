@@ -24,9 +24,6 @@ on:
       runtime_run_id:
         required: true
         type: string
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       release_version:
