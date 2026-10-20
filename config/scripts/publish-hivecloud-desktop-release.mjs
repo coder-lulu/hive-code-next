@@ -8,6 +8,7 @@ import { pathToFileURL } from 'node:url'
 import { createReleaseVerificationAttestation } from './hivecloud-release-attestation.mjs'
 import { assertBatchRelease } from './hivecloud-release-client.mjs'
 import { releaseAuthentication } from './hivecloud-release-auth.mjs'
+import { artifactRequest } from './hivecloud-release-artifact-request.mjs'
 
 const apiBase = String(process.env.HIVECLOUD_API_URL ?? '')
   .trim()
@@ -242,10 +243,13 @@ async function verifyUploadedArtifact(artifact, artifactId, sha256, sha512) {
 }
 
 async function hiveCloudRequest(path, options = {}) {
-  const response = await fetch(`${apiBase}${path}`, {
+  const isArtifactRequest =
+    options.headers?.['content-type'] === 'application/octet-stream' || path.endsWith('/verify')
+  const response = await (isArtifactRequest ? artifactRequest : fetch)(`${apiBase}${path}`, {
     ...options,
     redirect: 'error',
-    signal: options.signal ?? AbortSignal.timeout(60_000),
+    signal:
+      options.signal ?? AbortSignal.timeout(path.endsWith('/verify') ? 10 * 60 * 1000 : 60_000),
     headers: {
       accept: 'application/json',
       ...(path.startsWith('/hive/v1/admin/') ? await authentication() : {}),
