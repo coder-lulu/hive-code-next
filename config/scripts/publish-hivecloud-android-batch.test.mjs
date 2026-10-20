@@ -3,6 +3,10 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
+vi.mock('./hivecloud-release-artifact-request.mjs', () => ({
+  artifactRequest: (...args) => globalThis.fetch(...args)
+}))
+
 const testRoot = new URL('../../logs/release-batch/tests/', import.meta.url)
 mkdirSync(testRoot, { recursive: true })
 
@@ -92,7 +96,11 @@ it.each(
       const request = vi.fn(async (url, options) => {
         expect(options.redirect).toBe('error')
         expect(timeoutDurations.get(options.signal)).toBe(
-          url.endsWith('/artifacts') ? 45 * 60 * 1000 : 60_000
+          url.endsWith('/artifacts')
+            ? 45 * 60 * 1000
+            : url.endsWith('/verify')
+              ? 10 * 60 * 1000
+              : 60_000
         )
         expect(options.headers?.clientid).toBe(
           url.includes('/hive/v1/admin/') ? 'release-ci' : undefined

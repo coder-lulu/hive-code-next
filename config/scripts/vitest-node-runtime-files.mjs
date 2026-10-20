@@ -292,6 +292,8 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/codex/hook-service-wsl-runtime.test.ts',
   'src/main/ssh/orcad-migration-cutover-journal.test.ts',
   'src/shared/runtime-environment-managed-orcad-store.test.ts',
+  // Real TLS uploads and deadline handling use the production Node transport.
+  'config/scripts/hivecloud-release-artifact-request.test.mjs',
   // Real Playwright browser and launcher contracts use its documented Node host.
   'config/scripts/mobile-web-app-agent-history-render.test.mjs',
   'config/scripts/mobile-web-app-browser-pane-render.test.mjs',
