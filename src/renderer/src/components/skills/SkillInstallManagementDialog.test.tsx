@@ -536,7 +536,7 @@ describe('SkillInstallManagementDialog', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: /alpha-skill \+1/ }))
     const removeButton = await screen.findByRole('button', { name: 'Discard my edits and remove' })
-    await waitFor(() => expect((removeButton as HTMLButtonElement).disabled).toBe(false))
+    await waitFor(() => expect(removeButton.hasAttribute('disabled')).toBe(false))
     fireEvent.click(removeButton)
 
     await waitFor(() => expect(skills.removeInstall).toHaveBeenCalledTimes(2))
