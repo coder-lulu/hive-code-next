@@ -50,6 +50,7 @@ import { readFileSync, openAsBlob, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createServer } from 'node:https'
+import { Socket } from 'node:net'
 import { once } from 'node:events'
 import { setTimeout as delay } from 'node:timers/promises'
 const [scenario, fixture, helper] = process.argv.slice(1)
@@ -76,6 +77,16 @@ server.on('connection', socket => {
 server.listen(0, '127.0.0.1')
 await once(server, 'listening')
 const url = 'https://localhost:' + server.address().port + '/artifact'
+const keepAliveCalls = []
+const originalSetKeepAlive = Socket.prototype.setKeepAlive
+if (scenario === 'socket-keepalive') {
+  Socket.prototype.setKeepAlive = function (enable, initialDelay) {
+    const call = { enable, initialDelay, remotePort: this.remotePort }
+    this.once('connect', () => { call.remotePort = this.remotePort })
+    keepAliveCalls.push(call)
+    return originalSetKeepAlive.call(this, enable, initialDelay)
+  }
+}
 const options = (body = '{}', milliseconds = 2000) => ({
   method: 'POST', headers: { authorization: 'Bearer never-expose-this' },
   body, signal: AbortSignal.timeout(milliseconds)
@@ -105,7 +116,33 @@ class SlowBlob extends Blob {
   }
 }
 try {
-  if (scenario === 'exact-file') {
+  if (scenario === 'socket-keepalive') {
+    handler = (req, res) => consume(req, res, 100)
+    const response = await artifactRequest(url, options())
+    assert.equal(await response.text(), '{"ok":true}')
+    assert.deepEqual(
+      keepAliveCalls.filter(call => call.remotePort === server.address().port),
+      [{ enable: true, initialDelay: 30000, remotePort: server.address().port }]
+    )
+  } else if (scenario === 'disconnect-upload') {
+    handler = req => req.once('data', () => req.socket.destroy())
+    await assert.rejects(
+      artifactRequest(url, options(new SlowBlob([Buffer.alloc(1024 * 1024)]))),
+      /\((NETWORK|SOURCE)\)/
+    )
+    await delay(50)
+    assert.ok(sourceCancelled)
+    assert.equal(sockets.size, 0)
+  } else if (scenario === 'disconnect-after-body') {
+    handler = req => {
+      req.resume()
+      req.on('end', () => { requestEnded = true; req.socket.destroy() })
+    }
+    await assert.rejects(artifactRequest(url, options()), /\(NETWORK\)/)
+    assert.ok(requestEnded)
+    await delay(50)
+    assert.equal(sockets.size, 0)
+  } else if (scenario === 'exact-file') {
     const bytes = Buffer.alloc(1024 * 1024 + 7, 113)
     const path = join(fixture, 'artifact.bin')
     writeFileSync(path, bytes)
@@ -129,8 +166,8 @@ try {
     assert.ok(Date.now() - started >= 5400)
     assert.ok(requestEnded)
   } else if (scenario === 'headers-deadline') {
-    handler = (req, res) => consume(req, res, 500)
-    await assert.rejects(artifactRequest(url, options('{}', 100)), /\(ABORTED\)/)
+    handler = (req, res) => consume(req, res, 2500)
+    await assert.rejects(artifactRequest(url, options('{}', 1500)), /\(ABORTED\)/)
     assert.ok(requestEnded)
   } else if (scenario === 'abort-prestart') {
     const controller = new AbortController()
@@ -232,12 +269,16 @@ try {
   await delay(25)
   console.log('PASS ' + scenario)
 } finally {
+  Socket.prototype.setKeepAlive = originalSetKeepAlive
   for (const socket of sockets) socket.destroy()
   server.close()
 }
 `
 
 it.each([
+  'socket-keepalive',
+  'disconnect-upload',
+  'disconnect-after-body',
   'exact-file',
   'delayed-headers',
   'headers-deadline',
