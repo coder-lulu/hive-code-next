@@ -288,6 +288,10 @@ jobs:
           path: signed-artifacts
           merge-multiple: true
 
+      - name: Configure release upload sender
+        shell: bash
+        run: bash config/scripts/configure-release-upload-network.sh
+
       - name: Publish AppImages and Runtime debs to HiveCloud object storage
         env:
           HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}

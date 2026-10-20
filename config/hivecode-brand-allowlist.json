@@ -151,6 +151,7 @@
     "config/scripts/client-build-ios.test.mjs",
     "config/scripts/client-build.mjs",
     "config/scripts/computer-use-skill-guidance.test.mjs",
+    "config/scripts/configure-release-upload-network.test.mjs",
     "config/scripts/dev-electron-bundle-identity.mjs",
     "config/scripts/dev-electron-bundle-identity.test.ts",
     "config/scripts/electron-builder-config-basics.test.mjs",
