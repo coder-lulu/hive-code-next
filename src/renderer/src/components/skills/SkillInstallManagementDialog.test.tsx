@@ -535,7 +535,9 @@ describe('SkillInstallManagementDialog', () => {
     render(<SkillInstallManagementDialog open onOpenChange={() => undefined} />)
 
     fireEvent.click(await screen.findByRole('button', { name: /alpha-skill \+1/ }))
-    fireEvent.click(await screen.findByRole('button', { name: 'Discard my edits and remove' }))
+    const removeButton = await screen.findByRole('button', { name: 'Discard my edits and remove' })
+    await waitFor(() => expect((removeButton as HTMLButtonElement).disabled).toBe(false))
+    fireEvent.click(removeButton)
 
     await waitFor(() => expect(skills.removeInstall).toHaveBeenCalledTimes(2))
     expect(skills.removeInstall.mock.calls).toEqual(
