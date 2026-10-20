@@ -38,11 +38,17 @@ tc() {
     'qdisc replace dev eth0 root fq') [[ "$MOCK_CASE" != qdisc-replace-fails ]];;
     'qdisc show dev eth0')
       [[ "$MOCK_CASE" != qdisc-read-fails ]] || return 1
-      if [[ "$MOCK_CASE" == wrong-qdisc ]]; then
-        printf 'qdisc fq_codel 0: root refcnt 2\n'
-      else
-        printf 'qdisc fq 8001: root refcnt 2 limit 10000p\n'
-      fi;;
+      case "$MOCK_CASE" in
+        wrong-qdisc) printf 'qdisc fq_codel 0: root refcnt 2\n';;
+        fq-with-ingress) printf 'qdisc fq 8001: root refcnt 2 limit 10000p\nqdisc ingress ffff: parent ffff:fff1 ----------------\n';;
+        fq-with-clsact) printf 'qdisc clsact ffff: parent ffff:fff1\nqdisc fq 8001: root refcnt 2 limit 10000p\n';;
+        no-root) printf 'qdisc clsact ffff: parent ffff:fff1\n';;
+        empty-qdisc) return 0;;
+        duplicate-root) printf 'qdisc fq 8001: root refcnt 2\nqdisc fq 8002: root refcnt 2\n';;
+        mixed-root) printf 'qdisc fq_codel 0: root refcnt 2\nqdisc fq 8001: root refcnt 2\n';;
+        wrong-root-with-child-fq) printf 'qdisc fq_codel 0: root refcnt 2\nqdisc fq 8001: parent 1:1\n';;
+        *) printf 'qdisc fq 8001: root refcnt 2 limit 10000p\n';;
+      esac;;
     *) return 90;;
   esac
 }
@@ -90,11 +96,14 @@ it.each([
   expect(result.stderr).not.toContain('sudo ')
 })
 
-it.each(['success', 'module-tcp_bbr-fails'])(
+it.each(['success', 'module-tcp_bbr-fails', 'fq-with-ingress', 'fq-with-clsact'])(
   'verifies fq and bbr, including already available BBR after module load failure: %s',
   async (scenario) => {
     const result = await run(scenario)
     expect(result.code).toBe(0)
+    expect(result.stdout).toContain(
+      'Verified sender root: qdisc fq 8001: root refcnt 2 limit 10000p'
+    )
     expect(result.stdout).toContain('interface=eth0, root qdisc=fq, congestion control=bbr')
     expect(result.stderr.match(/^sudo .+$/gm)).toEqual([
       'sudo -n modprobe tcp_bbr',
@@ -116,6 +125,11 @@ it.each([
   'qdisc-replace-fails',
   'qdisc-read-fails',
   'wrong-qdisc',
+  'no-root',
+  'empty-qdisc',
+  'duplicate-root',
+  'mixed-root',
+  'wrong-root-with-child-fq',
   'sysctl-write-fails',
   'selected-read-fails',
   'wrong-controller'
@@ -126,8 +140,23 @@ it.each([
   if (['no-bbr', 'available-read-fails'].includes(scenario)) {
     expect(result.stderr).not.toContain('sudo -n modprobe sch_fq')
   }
-  if (['wrong-qdisc', 'qdisc-read-fails', 'qdisc-replace-fails'].includes(scenario)) {
+  if (
+    [
+      'wrong-qdisc',
+      'no-root',
+      'empty-qdisc',
+      'duplicate-root',
+      'mixed-root',
+      'wrong-root-with-child-fq',
+      'qdisc-read-fails',
+      'qdisc-replace-fails'
+    ].includes(scenario)
+  ) {
     expect(result.stderr).not.toContain('sudo -n sysctl -w')
+    if (scenario !== 'qdisc-replace-fails') {
+      expect(result.stderr).toContain('Observed qdiscs:')
+      expect(result.stderr).not.toContain('1.2.3.4')
+    }
   }
 })
 

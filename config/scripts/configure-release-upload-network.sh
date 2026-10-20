@@ -24,11 +24,25 @@ fi
 interface="${BASH_REMATCH[1]}"
 sudo -n modprobe sch_fq
 sudo -n tc qdisc replace dev "$interface" root fq
-qdisc="$(tc qdisc show dev "$interface")"
-if [[ ! "$qdisc" =~ ^qdisc[[:space:]]fq[[:space:]][^[:space:]]+[[:space:]]root([[:space:]]|$) || "$qdisc" == *$'\n'* ]]; then
-  echo 'The sender root qdisc did not read back as fq.' >&2
+if ! qdisc="$(tc qdisc show dev "$interface")"; then
+  printf 'Unable to read sender qdiscs. Observed qdiscs:\n%s\n' "$qdisc" >&2
   exit 1
 fi
+root_count=0
+root_type=''
+root_line=''
+while IFS= read -r line; do
+  if [[ "$line" =~ ^qdisc[[:space:]]+([^[:space:]]+)[[:space:]]+[^[:space:]]+[[:space:]]+root([[:space:]]|$) ]]; then
+    root_count=$((root_count + 1))
+    root_type="${BASH_REMATCH[1]}"
+    root_line="$line"
+  fi
+done <<< "$qdisc"
+if [[ "$root_count" != 1 || "$root_type" != fq ]]; then
+  printf 'Expected exactly one sender root qdisc of type fq. Observed qdiscs:\n%s\n' "$qdisc" >&2
+  exit 1
+fi
+printf 'Verified sender root: %s\n' "$root_line"
 sudo -n sysctl -w net.ipv4.tcp_congestion_control=bbr
 if [[ "$(sysctl -n net.ipv4.tcp_congestion_control)" != bbr ]]; then
   echo 'The sender congestion control did not read back as bbr.' >&2
