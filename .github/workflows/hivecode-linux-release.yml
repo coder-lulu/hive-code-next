@@ -263,6 +263,7 @@ jobs:
           retention-days: 2
 
   publish:
+    timeout-minutes: 360
     if: ${{ !cancelled() && needs.reserve.result == 'success' && needs.build.result == 'success' && inputs.batch_id != '' }}
     needs: [reserve, build]
     environment: release-production

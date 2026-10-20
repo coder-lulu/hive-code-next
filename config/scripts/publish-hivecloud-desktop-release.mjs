@@ -249,7 +249,7 @@ async function hiveCloudRequest(path, options = {}) {
     headers: {
       accept: 'application/json',
       ...(path.startsWith('/hive/v1/admin/') ? await authentication() : {}),
-      ...(options.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
+      'content-type': 'application/json',
       ...options.headers
     }
   })
@@ -403,22 +403,23 @@ export async function main() {
         `Published HiveCloud release ${releaseId} is missing ${artifactArchitecture}/${format}`
       )
     }
-    const form = new FormData()
     const file = await openAsBlob(artifactPath)
     if (file.size !== metadata.size) {
       throw new Error(`Desktop artifact changed while it was being hashed: ${artifactPath}`)
     }
-    form.append('file', file, basename(artifactPath))
-    form.append('architecture', artifactArchitecture)
-    form.append('packageFormat', format)
-    form.append('distributionType', channel === 'internal' ? 'INTERNAL' : 'DIRECT')
-    if (signingFingerprint) {
-      form.append('signingCertificateFingerprint', signingFingerprint)
-    }
     const uploaded = await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}/artifacts`, {
       method: 'POST',
-      signal: AbortSignal.timeout(600_000),
-      body: form
+      signal: AbortSignal.timeout(45 * 60 * 1000),
+      headers: {
+        'content-type': 'application/octet-stream',
+        'content-length': String(metadata.size),
+        'X-Hive-Artifact-File-Name': encodeURIComponent(basename(artifactPath)),
+        'X-Hive-Artifact-Architecture': artifactArchitecture,
+        'X-Hive-Artifact-Package-Format': format,
+        'X-Hive-Artifact-Distribution-Type': channel === 'internal' ? 'INTERNAL' : 'DIRECT',
+        ...(signingFingerprint ? { 'X-Hive-Artifact-Signing-Fingerprint': signingFingerprint } : {})
+      },
+      body: file
     })
     const artifact = findUploadedArtifact(
       uploaded?.artifacts,

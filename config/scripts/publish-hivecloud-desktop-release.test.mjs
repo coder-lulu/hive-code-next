@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 
 const testRoot = new URL('../../logs/headless-install/', import.meta.url)
@@ -21,8 +21,12 @@ afterEach(() => {
 
 it.each(
   ['windows', 'macos'].flatMap((platform) =>
-    ['UPLOADED', 'VERIFIED', 'REJECTED', 'VERIFIED_WRONG_HASH'].flatMap((status) =>
-      [false, true].map((existing) => [platform, status, existing])
+    ['UPLOADED', 'VERIFIED', 'REJECTED', 'VERIFIED_WRONG_HASH', 'UPLOAD_FAILED'].flatMap((status) =>
+      (status === 'UPLOAD_FAILED' ? [false] : [false, true]).map((existing) => [
+        platform,
+        status,
+        existing
+      ])
     )
   )
 )(
@@ -30,7 +34,10 @@ it.each(
   async (platform, status, existing) => {
     const root = mkdtempSync(new URL('hive-unsigned-publish-', testRoot))
     try {
-      const path = join(root, platform === 'windows' ? 'hivecode.exe' : 'hivecode.zip')
+      const path = join(
+        root,
+        platform === 'windows' ? 'hivecode+signed.exe' : 'hivecode+signed.zip'
+      )
       const fingerprint = platform === 'macos' ? 'ab'.repeat(32) : ''
       const bytes = Buffer.from('MZ unsigned installer fixture')
       writeFileSync(path, bytes)
@@ -91,8 +98,9 @@ it.each(
       vi.stubGlobal(
         'fetch',
         vi.fn(async (url, options) => {
+          expect(options.redirect).toBe('error')
           expect(timeoutDurations.get(options.signal)).toBe(
-            options.body instanceof FormData ? 600_000 : 60_000
+            url.endsWith('/artifacts') ? 45 * 60 * 1000 : 60_000
           )
           expect(options.headers?.clientid).toBe(
             url.includes('/hive/v1/admin/') ? 'release-ci' : undefined
@@ -102,8 +110,22 @@ it.each(
           }
           requests.push(url)
           if (url.endsWith('/artifacts')) {
-            expect(options.body.has('signingCertificateFingerprint')).toBe(platform === 'macos')
-            expect(Buffer.from(await options.body.get('file').arrayBuffer())).toEqual(bytes)
+            expect(options.body).toBeInstanceOf(Blob)
+            expect(options.headers).toMatchObject({
+              'content-type': 'application/octet-stream',
+              'content-length': String(bytes.length),
+              'X-Hive-Artifact-File-Name': encodeURIComponent(basename(path)),
+              'X-Hive-Artifact-Architecture': 'x64',
+              'X-Hive-Artifact-Package-Format': artifact.packageFormat,
+              'X-Hive-Artifact-Distribution-Type': 'DIRECT'
+            })
+            expect(options.headers['X-Hive-Artifact-Signing-Fingerprint']).toBe(
+              fingerprint || undefined
+            )
+            expect(Buffer.from(await options.body.arrayBuffer())).toEqual(bytes)
+            if (status === 'UPLOAD_FAILED') {
+              return new Response('upload interrupted', { status: 503 })
+            }
             release.artifacts = [artifact]
           }
           if (url.endsWith('/verify')) {
@@ -123,6 +145,14 @@ it.each(
       )
       vi.spyOn(console, 'log').mockImplementation(() => {})
       const { main } = await import('./publish-hivecloud-desktop-release.mjs')
+      if (status === 'UPLOAD_FAILED' && !existing) {
+        await expect(main()).rejects.toThrow('HiveCloud request failed (503)')
+        expect(requests.filter((url) => url.endsWith('/artifacts'))).toHaveLength(1)
+        expect(requests.some((url) => url.endsWith('/verify') || url.endsWith('/publish'))).toBe(
+          false
+        )
+        return
+      }
       if (status === 'REJECTED' || status === 'VERIFIED_WRONG_HASH') {
         await expect(main()).rejects.toThrow(
           status === 'REJECTED'
@@ -217,10 +247,21 @@ async function linuxReleaseFixture() {
     if (url.endsWith('/artifacts')) {
       const artifact = artifacts.find(
         (candidate) =>
-          candidate.architecture === options.body.get('architecture') &&
-          candidate.packageFormat === options.body.get('packageFormat')
+          candidate.architecture === options.headers['X-Hive-Artifact-Architecture'] &&
+          candidate.packageFormat === options.headers['X-Hive-Artifact-Package-Format']
       )
       expect(artifact).toBeDefined()
+      expect(options.body).toBeInstanceOf(Blob)
+      expect(options.headers).toMatchObject({
+        'content-type': 'application/octet-stream',
+        'content-length': String(artifact.fileSize),
+        'X-Hive-Artifact-File-Name': encodeURIComponent(basename(artifact.path)),
+        'X-Hive-Artifact-Distribution-Type': 'DIRECT'
+      })
+      expect(options.headers['X-Hive-Artifact-Signing-Fingerprint']).toBeUndefined()
+      expect(Buffer.from(await options.body.arrayBuffer())).toEqual(
+        Buffer.from(`${artifact.architecture}/${artifact.packageFormat}`)
+      )
       release.artifacts.push({ ...artifact, status: 'UPLOADED' })
     }
     if (url.endsWith('/verify')) {

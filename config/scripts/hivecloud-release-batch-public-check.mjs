@@ -12,7 +12,7 @@ async function verifyDownload(artifact, origin, request) {
   if (url.origin !== origin || url.pathname !== downloadPath || url.search || url.hash) {
     throw new Error('Public artifact download does not use the configured release service')
   }
-  const signal = AbortSignal.timeout(15 * 60 * 1000)
+  const signal = AbortSignal.timeout(45 * 60 * 1000)
   let response
   for (let redirects = 0; redirects <= 3; redirects += 1) {
     if (url.protocol !== 'https:' || url.username || url.password) {

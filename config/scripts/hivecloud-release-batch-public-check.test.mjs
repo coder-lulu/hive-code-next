@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto'
-import { expect, it, vi } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { verifyPublicBatch } from './hivecloud-release-batch-public-check.mjs'
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
 
 function fixture() {
   const bytes = Buffer.from('qualified published installer')
@@ -53,12 +57,24 @@ function fixture() {
 
 it('checks the real public API and streams the final bytes without forwarding release credentials', async () => {
   const { artifact, batch, control, request, environment } = fixture()
+  const durations = new Map()
+  const timeout = AbortSignal.timeout.bind(AbortSignal)
+  vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+    const signal = timeout(milliseconds)
+    durations.set(signal, milliseconds)
+    return signal
+  })
   expect(await verifyPublicBatch(batch, control, environment, request)).toHaveLength(1)
   expect(request.mock.calls[0][0]).toContain('packageFormat=nsis')
   expect(request.mock.calls[1][0]).toBe(artifact.downloadUrl)
-  for (const [, options] of request.mock.calls) {
+  expect(request).toHaveBeenCalledTimes(3)
+  for (const [url, options] of request.mock.calls) {
+    const metadata = url.includes('/updates/check?')
+    expect(durations.get(options.signal)).toBe(metadata ? 30_000 : 45 * 60 * 1000)
+    expect(options.redirect).toBe(metadata ? 'error' : 'manual')
     expect(options.headers?.authorization).toBeUndefined()
   }
+  expect(request.mock.calls[2][1].signal).toBe(request.mock.calls[1][1].signal)
 })
 
 it.each(['version', 'format', 'id'])(

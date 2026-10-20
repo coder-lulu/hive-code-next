@@ -21,8 +21,12 @@ afterEach(() => {
 
 it.each(
   ['beta', 'stable'].flatMap((channel) =>
-    ['UPLOADED', 'VERIFIED', 'REJECTED', 'VERIFIED_WRONG_HASH'].flatMap((status) =>
-      [false, true].map((existing) => [channel, status, existing])
+    ['UPLOADED', 'VERIFIED', 'REJECTED', 'VERIFIED_WRONG_HASH', 'UPLOAD_FAILED'].flatMap((status) =>
+      (status === 'UPLOAD_FAILED' ? [false] : [false, true]).map((existing) => [
+        channel,
+        status,
+        existing
+      ])
     )
   )
 )(
@@ -31,7 +35,7 @@ it.each(
     const root = mkdtempSync(new URL('android-', testRoot))
     try {
       const bytes = Buffer.from('signed APK fixture')
-      const apkPath = join(root, 'hivecode.apk')
+      const apkPath = join(root, 'hivecode+signed.apk')
       writeFileSync(apkPath, bytes)
       const releaseId = '20000000-0000-4000-8000-000000000001'
       const batchId = '10000000-0000-4000-8000-000000000001'
@@ -86,8 +90,9 @@ it.each(
         return signal
       })
       const request = vi.fn(async (url, options) => {
+        expect(options.redirect).toBe('error')
         expect(timeoutDurations.get(options.signal)).toBe(
-          options.body instanceof FormData ? 600_000 : 60_000
+          url.endsWith('/artifacts') ? 45 * 60 * 1000 : 60_000
         )
         expect(options.headers?.clientid).toBe(
           url.includes('/hive/v1/admin/') ? 'release-ci' : undefined
@@ -107,8 +112,20 @@ it.each(
           })
         }
         if (url.endsWith('/artifacts')) {
-          expect(options.body.get('architecture')).toBe('universal')
-          expect(Buffer.from(await options.body.get('file').arrayBuffer())).toEqual(bytes)
+          expect(options.body).toBeInstanceOf(Blob)
+          expect(options.headers).toMatchObject({
+            'content-type': 'application/octet-stream',
+            'content-length': String(bytes.length),
+            'X-Hive-Artifact-File-Name': 'hivecode%2Bsigned.apk',
+            'X-Hive-Artifact-Architecture': 'universal',
+            'X-Hive-Artifact-Package-Format': 'APK',
+            'X-Hive-Artifact-Distribution-Type': 'DIRECT',
+            'X-Hive-Artifact-Signing-Fingerprint': 'ab'.repeat(32)
+          })
+          expect(Buffer.from(await options.body.arrayBuffer())).toEqual(bytes)
+          if (status === 'UPLOAD_FAILED') {
+            return new Response('upload interrupted', { status: 503 })
+          }
           release.artifacts = [artifact]
         }
         if (url.endsWith('/verify')) {
@@ -122,6 +139,14 @@ it.each(
       vi.stubGlobal('fetch', request)
       vi.spyOn(console, 'log').mockImplementation(() => {})
       const { main } = await import('../../mobile/scripts/publish-hivecloud-release.mjs')
+      if (status === 'UPLOAD_FAILED' && !existing) {
+        await expect(main()).rejects.toThrow('HiveCloud request failed (503)')
+        expect(request.mock.calls.filter(([url]) => url.endsWith('/artifacts'))).toHaveLength(1)
+        expect(
+          request.mock.calls.some(([url]) => url.endsWith('/verify') || url.endsWith('/publish'))
+        ).toBe(false)
+        return
+      }
       if (status === 'REJECTED' || status === 'VERIFIED_WRONG_HASH') {
         await expect(main()).rejects.toThrow(
           status === 'REJECTED'
