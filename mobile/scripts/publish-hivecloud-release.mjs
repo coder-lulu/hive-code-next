@@ -60,7 +60,7 @@ async function hiveCloudRequest(path, options = {}) {
     headers: {
       accept: 'application/json',
       ...(path.startsWith('/hive/v1/admin/') ? await authentication() : {}),
-      ...(options.body instanceof FormData ? {} : { 'content-type': 'application/json' }),
+      'content-type': 'application/json',
       ...options.headers
     }
   })
@@ -229,16 +229,19 @@ export async function main() {
     if (file.size !== metadata.size) {
       throw new Error('Android APK changed while it was being hashed')
     }
-    const form = new FormData()
-    form.append('file', file, basename(apkPath))
-    form.append('architecture', architecture)
-    form.append('packageFormat', 'APK')
-    form.append('distributionType', 'DIRECT')
-    form.append('signingCertificateFingerprint', signingCertificateFingerprint)
     const uploaded = await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}/artifacts`, {
       method: 'POST',
-      signal: AbortSignal.timeout(600_000),
-      body: form
+      signal: AbortSignal.timeout(45 * 60 * 1000),
+      headers: {
+        'content-type': 'application/octet-stream',
+        'content-length': String(metadata.size),
+        'X-Hive-Artifact-File-Name': encodeURIComponent(basename(apkPath)),
+        'X-Hive-Artifact-Architecture': architecture,
+        'X-Hive-Artifact-Package-Format': 'APK',
+        'X-Hive-Artifact-Distribution-Type': 'DIRECT',
+        'X-Hive-Artifact-Signing-Fingerprint': signingCertificateFingerprint
+      },
+      body: file
     })
     const uploadedArtifact = findUploadedArtifact(
       uploaded?.artifacts,

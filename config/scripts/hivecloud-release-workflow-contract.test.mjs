@@ -44,6 +44,8 @@ describe('HiveCloud release publishing contract', () => {
 
   it('builds native Runtime debs with the reserved identity and publishes the full format matrix', () => {
     const linux = readWorkflow('hivecode-linux-release.yml')
+    expect(linux.jobs.publish['timeout-minutes']).toBe(360)
+    expect(linux.jobs.build['timeout-minutes']).toBe(60)
     const build = linux.jobs.build
     const steps = build.steps
     const deb = findStep(linux, 'build', 'Build headless Runtime deb')

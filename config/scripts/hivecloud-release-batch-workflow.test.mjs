@@ -9,6 +9,11 @@ const workflow = parse(
 )
 const targets = ['windows', 'macos', 'linux', 'android', 'ios']
 
+it('allows the full public artifact download matrix while keeping planning bounded', () => {
+  expect(workflow.jobs.publish['timeout-minutes']).toBe(360)
+  expect(workflow.jobs.plan['timeout-minutes']).toBe(10)
+})
+
 it('defaults to all clients and routes only explicitly selected batch members', () => {
   expect(workflow.on.workflow_dispatch.inputs.targets).toMatchObject({
     default: 'all',
