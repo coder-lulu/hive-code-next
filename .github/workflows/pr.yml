@@ -1081,6 +1081,10 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Configure release upload sender
+        shell: bash
+        run: bash config/scripts/configure-release-upload-network.sh
+
       - name: Cache electron-builder downloads
         uses: actions/cache/restore@v5
         with:
