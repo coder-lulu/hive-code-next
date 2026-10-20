@@ -335,6 +335,33 @@ jobs:
             }
           }
           NODE
+      - name: Setup Ruby for final Apple availability check
+        if: needs.plan.outputs.ios_selected == 'true' && needs.plan.outputs.already_published != 'true'
+        uses: ruby/setup-ruby@v1
+        timeout-minutes: 5
+        env:
+          BUNDLE_FROZEN: 'true'
+        with:
+          ruby-version: '3.3'
+          bundler-cache: true
+          working-directory: mobile
+      - name: Recheck Apple availability before batch publication
+        if: needs.plan.outputs.ios_selected == 'true' && needs.plan.outputs.already_published != 'true'
+        working-directory: mobile
+        timeout-minutes: 10
+        env:
+          BUNDLE_FROZEN: 'true'
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          HIVECODE_IOS_TESTFLIGHT_GROUPS: ${{ vars.HIVECODE_IOS_TESTFLIGHT_GROUPS }}
+          HIVECODE_IOS_STORE_URL: ${{ needs.plan.outputs.channel == 'beta' && vars.HIVECODE_IOS_TESTFLIGHT_URL || vars.HIVECODE_IOS_APP_STORE_URL }}
+          BATCH_VERSION: ${{ needs.plan.outputs.version }}
+          BATCH_BUILD: ${{ needs.plan.outputs.ios_build_number }}
+          BATCH_CHANNEL: ${{ needs.plan.outputs.channel }}
+          FASTLANE_SKIP_UPDATE_CHECK: '1'
+          FASTLANE_HIDE_CHANGELOG: '1'
+        run: bundle exec fastlane ios verify_batch_availability version:"$BATCH_VERSION" build_number:"$BATCH_BUILD" channel:"$BATCH_CHANNEL"
       - name: Atomically publish and verify all public artifacts
         env:
           HIVECLOUD_API_URL: ${{ vars.HIVECLOUD_API_URL }}
