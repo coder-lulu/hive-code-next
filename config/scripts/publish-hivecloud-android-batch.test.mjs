@@ -19,9 +19,15 @@ afterEach(() => {
   vi.resetModules()
 })
 
-it.each(['beta', 'stable'])(
-  'uploads and verifies a %s universal APK without exposing a partial batch',
-  async (channel) => {
+it.each(
+  ['beta', 'stable'].flatMap((channel) =>
+    ['UPLOADED', 'VERIFIED', 'REJECTED', 'VERIFIED_WRONG_HASH'].flatMap((status) =>
+      [false, true].map((existing) => [channel, status, existing])
+    )
+  )
+)(
+  'uploads and verifies a %s universal APK returned as %s (existing=%s) without exposing a partial batch',
+  async (channel, status, existing) => {
     const root = mkdtempSync(new URL('android-', testRoot))
     try {
       const bytes = Buffer.from('signed APK fixture')
@@ -30,6 +36,19 @@ it.each(['beta', 'stable'])(
       const releaseId = '20000000-0000-4000-8000-000000000001'
       const batchId = '10000000-0000-4000-8000-000000000001'
       const artifactId = '30000000-0000-4000-8000-000000000001'
+      const artifact = {
+        artifactId,
+        architecture: 'UNIVERSAL',
+        packageFormat: 'APK',
+        distributionType: 'DIRECT',
+        sha256: createHash('sha256').update(bytes).digest('hex'),
+        sha512: createHash('sha512').update(bytes).digest('hex'),
+        fileSize: bytes.length,
+        status: status === 'VERIFIED_WRONG_HASH' ? 'VERIFIED' : status
+      }
+      if (status === 'VERIFIED_WRONG_HASH') {
+        artifact.sha256 = '0'.repeat(64)
+      }
       const release = {
         releaseId,
         productCode: 'hivecode',
@@ -38,7 +57,7 @@ it.each(['beta', 'stable'])(
         versionName: channel === 'beta' ? '1.5.0-beta.28' : '1.5.0',
         buildNumber: 41,
         status: 'DRAFT',
-        artifacts: []
+        artifacts: existing ? [artifact] : []
       }
       const sourceCommit = 'a'.repeat(40)
       for (const [name, value] of Object.entries({
@@ -59,7 +78,17 @@ it.each(['beta', 'stable'])(
       })) {
         vi.stubEnv(name, value)
       }
+      const timeoutDurations = new Map()
+      const timeout = AbortSignal.timeout.bind(AbortSignal)
+      vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+        const signal = timeout(milliseconds)
+        timeoutDurations.set(signal, milliseconds)
+        return signal
+      })
       const request = vi.fn(async (url, options) => {
+        expect(timeoutDurations.get(options.signal)).toBe(
+          options.body instanceof FormData ? 600_000 : 60_000
+        )
         expect(options.headers?.clientid).toBe(
           url.includes('/hive/v1/admin/') ? 'release-ci' : undefined
         )
@@ -80,18 +109,7 @@ it.each(['beta', 'stable'])(
         if (url.endsWith('/artifacts')) {
           expect(options.body.get('architecture')).toBe('universal')
           expect(Buffer.from(await options.body.get('file').arrayBuffer())).toEqual(bytes)
-          release.artifacts = [
-            {
-              artifactId,
-              architecture: 'UNIVERSAL',
-              packageFormat: 'APK',
-              distributionType: 'DIRECT',
-              sha256: createHash('sha256').update(bytes).digest('hex'),
-              sha512: createHash('sha512').update(bytes).digest('hex'),
-              fileSize: bytes.length,
-              status: 'UPLOADED'
-            }
-          ]
+          release.artifacts = [artifact]
         }
         if (url.endsWith('/verify')) {
           expect(JSON.parse(options.body).verificationEvidence).toContain(
@@ -104,8 +122,29 @@ it.each(['beta', 'stable'])(
       vi.stubGlobal('fetch', request)
       vi.spyOn(console, 'log').mockImplementation(() => {})
       const { main } = await import('../../mobile/scripts/publish-hivecloud-release.mjs')
+      if (status === 'REJECTED' || status === 'VERIFIED_WRONG_HASH') {
+        await expect(main()).rejects.toThrow(
+          status === 'REJECTED'
+            ? 'artifact is not verifiable'
+            : existing
+              ? 'different artifact'
+              : 'did not identify exactly one uploaded artifact'
+        )
+        expect(
+          request.mock.calls.some(([url]) => url.endsWith('/verify') || url.endsWith('/publish'))
+        ).toBe(false)
+        expect(request.mock.calls.filter(([url]) => url.endsWith('/artifacts'))).toHaveLength(
+          existing ? 0 : 1
+        )
+        return
+      }
       await main()
-      expect(request.mock.calls.some(([url]) => url.endsWith('/verify'))).toBe(true)
+      expect(request.mock.calls.filter(([url]) => url.endsWith('/artifacts'))).toHaveLength(
+        existing ? 0 : 1
+      )
+      expect(request.mock.calls.filter(([url]) => url.endsWith('/verify'))).toHaveLength(
+        status === 'UPLOADED' ? 1 : 0
+      )
       expect(
         request.mock.calls.some(
           ([url]) => url.endsWith('/publish') || url.includes('/updates/check')

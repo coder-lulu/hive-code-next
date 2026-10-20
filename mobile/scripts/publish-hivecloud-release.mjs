@@ -208,6 +208,7 @@ export async function main() {
   }
   const existingArtifact = existingMatches[0] ?? null
   let artifactId
+  let selectedArtifact = existingArtifact
   if (existingArtifact) {
     if (
       String(existingArtifact.sha256 ?? '').toLowerCase() !== sha256 ||
@@ -219,12 +220,6 @@ export async function main() {
     artifactId = requireValue(existingArtifact.artifactId, 'HiveCloud artifactId')
     if (!UUID_PATTERN.test(artifactId)) {
       throw new Error('HiveCloud artifactId must be a UUID')
-    }
-    const artifactStatus = String(existingArtifact.status ?? '').toUpperCase()
-    if (!['UPLOADED', 'VERIFIED'].includes(artifactStatus)) {
-      throw new Error(
-        `HiveCloud Android artifact is not verifiable (status ${artifactStatus || 'unknown'})`
-      )
     }
   } else {
     if (String(release.status ?? '').toUpperCase() === 'PUBLISHED') {
@@ -242,6 +237,7 @@ export async function main() {
     form.append('signingCertificateFingerprint', signingCertificateFingerprint)
     const uploaded = await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}/artifacts`, {
       method: 'POST',
+      signal: AbortSignal.timeout(600_000),
       body: form
     })
     const uploadedArtifact = findUploadedArtifact(
@@ -251,6 +247,7 @@ export async function main() {
       sha512,
       metadata.size
     )
+    selectedArtifact = uploadedArtifact
     artifactId = requireValue(uploadedArtifact?.artifactId, 'HiveCloud artifactId')
     if (!UUID_PATTERN.test(artifactId)) {
       throw new Error('HiveCloud artifactId must be a UUID')
@@ -267,12 +264,14 @@ export async function main() {
     }
   }
 
+  const artifactStatus = String(selectedArtifact?.status ?? '').toUpperCase()
+  if (!['UPLOADED', 'VERIFIED'].includes(artifactStatus)) {
+    throw new Error(
+      `HiveCloud Android artifact is not verifiable (status ${artifactStatus || 'unknown'})`
+    )
+  }
   if (String(release.status ?? '').toUpperCase() !== 'PUBLISHED') {
-    const existingStatus = String(existingArtifact?.status ?? '').toUpperCase()
-    if (existingArtifact && existingStatus === 'VERIFIED') {
-      // A retried publisher may find an artifact that another worker already
-      // verified. The backend intentionally rejects a second verify call.
-    } else {
+    if (artifactStatus === 'UPLOADED') {
       await hiveCloudRequest(`/hive/v1/admin/releases/artifacts/${artifactId}/verify`, {
         method: 'POST',
         body: JSON.stringify({

@@ -217,6 +217,30 @@ function packageFormat(path) {
   return format
 }
 
+async function verifyUploadedArtifact(artifact, artifactId, sha256, sha512) {
+  const artifactStatus = String(artifact.status ?? '').toUpperCase()
+  if (!['UPLOADED', 'VERIFIED'].includes(artifactStatus)) {
+    throw new Error(
+      `HiveCloud desktop artifact is not verifiable (status ${artifactStatus || 'unknown'})`
+    )
+  }
+  if (artifactStatus === 'UPLOADED') {
+    await hiveCloudRequest(`/hive/v1/admin/releases/artifacts/${artifactId}/verify`, {
+      method: 'POST',
+      body: JSON.stringify({
+        verificationEvidence: createReleaseVerificationAttestation({
+          artifactId,
+          sha256,
+          sha512,
+          signingFingerprint,
+          platform,
+          key: attestationKey
+        })
+      })
+    })
+  }
+}
+
 async function hiveCloudRequest(path, options = {}) {
   const response = await fetch(`${apiBase}${path}`, {
     ...options,
@@ -364,21 +388,7 @@ export async function main() {
       if (!UUID_PATTERN.test(artifactId)) {
         throw new Error('HiveCloud artifactId must be a UUID')
       }
-      if (String(existingArtifact.status ?? '').toUpperCase() !== 'VERIFIED') {
-        await hiveCloudRequest(`/hive/v1/admin/releases/artifacts/${artifactId}/verify`, {
-          method: 'POST',
-          body: JSON.stringify({
-            verificationEvidence: createReleaseVerificationAttestation({
-              artifactId,
-              sha256,
-              sha512,
-              signingFingerprint,
-              platform,
-              key: attestationKey
-            })
-          })
-        })
-      }
+      await verifyUploadedArtifact(existingArtifact, artifactId, sha256, sha512)
       uploadedArtifacts.push({
         artifactId,
         sha256,
@@ -407,6 +417,7 @@ export async function main() {
     }
     const uploaded = await hiveCloudRequest(`/hive/v1/admin/releases/${releaseId}/artifacts`, {
       method: 'POST',
+      signal: AbortSignal.timeout(600_000),
       body: form
     })
     const artifact = findUploadedArtifact(
@@ -432,19 +443,7 @@ export async function main() {
     ) {
       throw new Error(`HiveCloud artifact evidence did not match ${basename(artifactPath)}`)
     }
-    await hiveCloudRequest(`/hive/v1/admin/releases/artifacts/${artifactId}/verify`, {
-      method: 'POST',
-      body: JSON.stringify({
-        verificationEvidence: createReleaseVerificationAttestation({
-          artifactId,
-          sha256,
-          sha512,
-          signingFingerprint,
-          platform,
-          key: attestationKey
-        })
-      })
-    })
+    await verifyUploadedArtifact(artifact, artifactId, sha256, sha512)
     uploadedArtifacts.push({
       artifactId,
       sha256,

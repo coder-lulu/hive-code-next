@@ -19,9 +19,15 @@ afterEach(() => {
   vi.resetModules()
 })
 
-it.each(['windows', 'macos'])(
-  'uploads, verifies and publishes a %s single-format release',
-  async (platform) => {
+it.each(
+  ['windows', 'macos'].flatMap((platform) =>
+    ['UPLOADED', 'VERIFIED', 'REJECTED', 'VERIFIED_WRONG_HASH'].flatMap((status) =>
+      [false, true].map((existing) => [platform, status, existing])
+    )
+  )
+)(
+  'uploads, verifies and publishes a %s single-format release returned as %s (existing=%s)',
+  async (platform, status, existing) => {
     const root = mkdtempSync(new URL('hive-unsigned-publish-', testRoot))
     try {
       const path = join(root, platform === 'windows' ? 'hivecode.exe' : 'hivecode.zip')
@@ -39,7 +45,10 @@ it.each(['windows', 'macos'])(
         sha512: createHash('sha512').update(bytes).digest('hex'),
         fileSize: bytes.length,
         size: bytes.length,
-        status: 'VERIFIED'
+        status: status === 'VERIFIED_WRONG_HASH' ? 'VERIFIED' : status
+      }
+      if (status === 'VERIFIED_WRONG_HASH') {
+        artifact.sha256 = '0'.repeat(64)
       }
       const release = {
         releaseId,
@@ -49,7 +58,7 @@ it.each(['windows', 'macos'])(
         versionName: '1.5.0-beta.3',
         buildNumber: 3,
         status: 'DRAFT',
-        artifacts: []
+        artifacts: existing ? [artifact] : []
       }
       for (const [key, value] of Object.entries({
         HIVECLOUD_API_URL: 'https://releases.example.test',
@@ -71,10 +80,20 @@ it.each(['windows', 'macos'])(
       })) {
         vi.stubEnv(key, value)
       }
+      const timeoutDurations = new Map()
+      const timeout = AbortSignal.timeout.bind(AbortSignal)
+      vi.spyOn(AbortSignal, 'timeout').mockImplementation((milliseconds) => {
+        const signal = timeout(milliseconds)
+        timeoutDurations.set(signal, milliseconds)
+        return signal
+      })
       const requests = []
       vi.stubGlobal(
         'fetch',
         vi.fn(async (url, options) => {
+          expect(timeoutDurations.get(options.signal)).toBe(
+            options.body instanceof FormData ? 600_000 : 60_000
+          )
           expect(options.headers?.clientid).toBe(
             url.includes('/hive/v1/admin/') ? 'release-ci' : undefined
           )
@@ -88,6 +107,7 @@ it.each(['windows', 'macos'])(
             release.artifacts = [artifact]
           }
           if (url.endsWith('/verify')) {
+            artifact.status = 'VERIFIED'
             expect(JSON.parse(options.body).verificationEvidence).toContain(
               platform === 'macos'
                 ? `.${fingerprint}.macos.macos-codesign.`
@@ -103,8 +123,25 @@ it.each(['windows', 'macos'])(
       )
       vi.spyOn(console, 'log').mockImplementation(() => {})
       const { main } = await import('./publish-hivecloud-desktop-release.mjs')
+      if (status === 'REJECTED' || status === 'VERIFIED_WRONG_HASH') {
+        await expect(main()).rejects.toThrow(
+          status === 'REJECTED'
+            ? 'artifact is not verifiable'
+            : existing
+              ? 'different artifact'
+              : 'did not identify exactly one uploaded artifact'
+        )
+        expect(requests.some((url) => url.endsWith('/verify') || url.endsWith('/publish'))).toBe(
+          false
+        )
+        expect(requests.filter((url) => url.endsWith('/artifacts'))).toHaveLength(existing ? 0 : 1)
+        return
+      }
       await main()
-      expect(requests.some((url) => url.endsWith('/verify'))).toBe(true)
+      expect(requests.filter((url) => url.endsWith('/artifacts'))).toHaveLength(existing ? 0 : 1)
+      expect(requests.filter((url) => url.endsWith('/verify'))).toHaveLength(
+        status === 'UPLOADED' ? 1 : 0
+      )
       expect(requests.some((url) => url.endsWith('/publish'))).toBe(true)
     } finally {
       rmSync(root, { recursive: true, force: true })
@@ -184,10 +221,12 @@ async function linuxReleaseFixture() {
           candidate.packageFormat === options.body.get('packageFormat')
       )
       expect(artifact).toBeDefined()
-      release.artifacts.push(artifact)
+      release.artifacts.push({ ...artifact, status: 'UPLOADED' })
     }
     if (url.endsWith('/verify')) {
       expect(JSON.parse(options.body).verificationEvidence).toContain('.none.linux.linux-hash.')
+      const artifact = release.artifacts.find((candidate) => url.includes(candidate.artifactId))
+      artifact.status = 'VERIFIED'
     }
     if (url.endsWith('/publish')) {
       expect(release.artifacts).toHaveLength(6)
