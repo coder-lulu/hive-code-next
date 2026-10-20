@@ -268,6 +268,93 @@ function sampleFrames(
     })
 }
 
+/** Sample a cold entry on the real native animation timeline, then require native completion. */
+async function sampleColdPush(page) {
+  await page.evaluate(() => {
+    const animate = Element.prototype.animate
+    Element.prototype.animate = function (...args) {
+      const animation = animate.apply(this, args)
+      const keyframes = animation.effect?.getKeyframes()
+      if (keyframes?.[0]?.transform !== 'translateX(100%)') {
+        return animation
+      }
+      Element.prototype.animate = animate
+      const play = animation.play
+      const pause = animation.pause
+      const probe = { animation, play, requestedPlay: false }
+      globalThis.__orcaColdPushAnimation = probe
+      // Preserve the native Animation and the product's onfinish handler. Hold only its clock
+      // when the product requests playback after the lazy screen has actually committed.
+      animation.play = function () {
+        probe.requestedPlay = true
+        pause.call(this)
+      }
+      return animation
+    }
+    globalThis.__orcaStackProbe.push()
+  })
+  await page.waitForFunction(
+    () =>
+      globalThis.__orcaColdPushAnimation?.requestedPlay === true &&
+      document.querySelector('[data-testid="stack-probe-session"]') !== null,
+    null,
+    { timeout: 60_000, polling: 100 }
+  )
+  const { frames, duration } = await page.evaluate(async () => {
+    const probe = globalThis.__orcaColdPushAnimation
+    const animation = probe.animation
+    await animation.ready
+    const duration = animation.effect.getComputedTiming().duration
+    const readFrame = () => {
+      const leftOf = (id) => {
+        const rect = document.querySelector(`[data-testid="${id}"]`)?.getBoundingClientRect()
+        return rect && rect.width > 0 ? Math.round(rect.left) : null
+      }
+      return {
+        list: leftOf('stack-probe-list'),
+        session: leftOf('stack-probe-session'),
+        hit:
+          document
+            .elementFromPoint(innerWidth / 2, innerHeight / 2)
+            ?.closest('[data-testid^="stack-probe-"]')
+            ?.getAttribute('data-testid')
+            ?.replace('stack-probe-', '') ?? null,
+        from: document.getAnimations()[0]?.effect?.getKeyframes()[0]?.transform ?? null
+      }
+    }
+    probe.readFrame = readFrame
+    const frames = [0, 50, 100].map((time) => {
+      if (!(time < duration)) {
+        throw new Error('Cold entry sample must precede native animation completion')
+      }
+      animation.currentTime = time
+      return readFrame()
+    })
+    animation.play = probe.play
+    animation.play()
+    return { frames, duration }
+  })
+  expect(duration).toBe(200)
+  // Never finish/seek to the end or call onfinish: native playback must trigger the product's
+  // own cleanup and restore hit testing, so a broken completion handler still fails.
+  await page.waitForFunction(
+    () => {
+      const frame = globalThis.__orcaColdPushAnimation.readFrame()
+      return (
+        document.getAnimations().length === 0 &&
+        frame.list === null &&
+        frame.session === 0 &&
+        frame.hit === 'session'
+      )
+    },
+    null,
+    { timeout: SAMPLE_MS, polling: 50 }
+  )
+  frames.push(await page.evaluate(() => globalThis.__orcaColdPushAnimation.readFrame()))
+  frameDiagnostics.set(frames, JSON.stringify({ duration, sampleTimes: [0, 50, 100], frames }))
+  return frames
+}
+
 /** Every element in the document, hidden ones included: a retained slot still counts. */
 const nodeCount = (page) => page.evaluate(() => document.querySelectorAll('*').length)
 
@@ -302,7 +389,7 @@ describeRender('the host stack transition on the page', () => {
       })
       it('slides the session in from the right on push, over the list', async () => {
         const { errors, page } = await open()
-        const frames = await sampleFrames(page, 'push')
+        const frames = await sampleColdPush(page)
         const firstShown = frames.find((frame) => frame.session !== null)
         // Red on native-stack's web view: the session's first visible frame is already at x = 0.
         expect(firstShown?.session, frameDiagnostics.get(frames)).toBeGreaterThan(0)
