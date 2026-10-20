@@ -72,6 +72,8 @@ export async function artifactRequest(url, { method = 'POST', headers, body, sig
         headers: Object.fromEntries(outgoingHeaders),
         agent: false
       })
+      // Keep an otherwise idle upload connection live while the server stores it.
+      req.setSocketKeepAlive(true, 30_000)
     } catch {
       reject(transportError('INVALID_REQUEST'))
       return
