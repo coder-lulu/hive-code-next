@@ -135422,6 +135422,25 @@
       ],
       "reviewReason": "Exact candidate review for 3ae885be: three-way content receipt is independently recomputed from 8e350554..3ae885be, private documentation coverage is authenticated for all 384 documentation paths and 70 documentation commits, and every conflict path has a frozen B/P/U/result decision with regression obligations. This row closes the final upstream commit review; formal platform gates remain required.",
       "productSha": "581c9616dc210491b219110b77e6139519cf7db0"
+    },
+    {
+      "upstreamSha": "2071e7be888ff727d4fe1f43d47d57aafae9c58a",
+      "type": "维护",
+      "applied": "已移植",
+      "dependencies": [],
+      "reviewReason": "Refactor the renderer GitHub task read and refresh owners while preserving HiveCode task-page routing, API identity, and maintained task capabilities. The exact candidate tree receipt includes the full three-way content change and file moves; product-owned overlays and wire/persistence contracts remain unchanged. Review the GitHub task-page owner split, cache/resume refresh paths, mutation registry, and related Jira/detail routing together.",
+      "adaptation": "Absorb the exact upstream refactor through the candidate tree receipt; preserve HiveCode product identity and existing task-page contracts while accepting the owner grouping and file moves.",
+      "regressionTests": [
+        "src/renderer/src/components/task-page/github/task-page-github-dialog-state-authority.test.ts",
+        "src/renderer/src/components/task-page/github/task-page-github-list-scroll-restore.test.ts",
+        "src/renderer/src/components/task-page/github/task-page-github-resume-cache.test.ts",
+        "src/renderer/src/components/task-page/github/task-page-github-reviewer-suggestions.test.ts",
+        "src/renderer/src/components/task-page/github/task-page-github-task-kind.test.ts",
+        "src/renderer/src/components/task-page/github/task-page-github-work-item-mutation-regressions.test.ts",
+        "src/renderer/src/components/task-page/github/task-page-github-work-item-mutations.test.ts",
+        "src/renderer/src/components/use-task-page-jira-project-scope.test.tsx",
+        "pnpm run typecheck"
+      ]
     }
   ]
 }
