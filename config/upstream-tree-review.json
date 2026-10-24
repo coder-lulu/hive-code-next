@@ -36049,6 +36049,83 @@
       "regressionTests": [
         "pnpm run typecheck"
       ]
+    },
+    {
+      "path": "src/shared/jira-agent-capability.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "a3cd972965ea1144f9f4ba9cc6763c47c9933f16"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "a3cd972965ea1144f9f4ba9cc6763c47c9933f16"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "a3cd972965ea1144f9f4ba9cc6763c47c9933f16"
+      },
+      "reason": "Preserve the product-owned Jira runtime capability declaration: upstream deletes the file while its final protocol-version and CLI imports still reference it. Keep HiveCode capability identity and wire compatibility; the exact candidate must retain this declaration until the upstream import graph is repaired.",
+      "regressionTests": [
+        "src/cli/jira-target.test.ts",
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "config/scripts/vitest-sqlite-database-runtime-files.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "7d30a421bacc4453ced2c5e3dd6cf4ddd364c360"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "7d30a421bacc4453ced2c5e3dd6cf4ddd364c360"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "7d30a421bacc4453ced2c5e3dd6cf4ddd364c360"
+      },
+      "reason": "Preserve the product-owned SQLite runtime file list: upstream deletes the helper while vitest-sqlite-runtime-files.mjs still imports it in the frozen tree. Retain the helper and existing SQLite test-runtime boundary until the import/deletion pair is reviewed together.",
+      "regressionTests": [
+        "config/scripts/vitest-sqlite-runtime-files.test.mjs",
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/shared/remote-runtime-tailscale-hint.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "6dcccbb9e123940dd49c4bf603b538ddaa953097"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "72d45baf2a22fde7a608aa65b1e755deae799d82"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "72d45baf2a22fde7a608aa65b1e755deae799d82"
+      },
+      "reason": "Preserve the product-owned remote-runtime Tailscale guidance: upstream deletes the helper while mobile diagnostics and connection-health code still import it. Keep HiveCode remote-host guidance and product copy stable.",
+      "regressionTests": [
+        "mobile/src/diagnostics/connection-diagnostics-analysis.test.ts",
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "mobile/src/transport/workspace-server.test.ts",
+      "base": null,
+      "product": null,
+      "upstream": {
+        "mode": "100644",
+        "sha": "4a9887a60c0854f8e3b70ead533c75ae00ddff0a"
+      },
+      "result": null,
+      "reason": "Remove the upstream workspace-server test with the unsupported workspace-server forwarding facade. The product boundary intentionally removes that context; retaining the test would import a deleted source module and reintroduce the unsupported delegation surface.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
     }
   ]
 }
