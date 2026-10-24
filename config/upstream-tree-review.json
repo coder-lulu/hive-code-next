@@ -23675,7 +23675,9 @@
         "sha": "81e8c0f975569202785b63e36f9b7ff0a5d3be98"
       },
       "reason": "Preserve the product-owned imported path src/main/runtime/rpc/e2ee-crypto.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
-      "regressionTests": []
+      "regressionTests": [
+        "src/main/runtime/rpc/e2ee-crypto.test.ts"
+      ]
     },
     {
       "path": "src/main/runtime/rpc/e2ee-integration.test.ts",
@@ -34749,7 +34751,9 @@
         "sha": "a11b81df7b20942ca2a90559648a3a74d0cbaaee"
       },
       "reason": "Preserve the product-owned imported path src/shared/jira-attachment-image.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
-      "regressionTests": []
+      "regressionTests": [
+        "src/renderer/src/components/jira-attachment-image.test.tsx"
+      ]
     },
     {
       "path": "src/shared/jira-detail-capabilities.ts",
@@ -34948,7 +34952,9 @@
         "sha": "5e5bc2b34ae633edb956b67c9e26e2f6e6309ec2"
       },
       "reason": "Preserve the product-owned imported path src/shared/orcad-migration-manifest-fields.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
-      "regressionTests": []
+      "regressionTests": [
+        "src/shared/orcad-migration-manifest.test.ts"
+      ]
     },
     {
       "path": "src/shared/orcad-migration-manifest-validation.ts",
