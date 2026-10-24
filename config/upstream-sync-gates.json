@@ -158,7 +158,7 @@
         "argv": ["pnpm", "exec", "vitest", "run", "--config", "config/vitest.config.ts"],
         "paths": [
           "src/renderer/src/components/terminal-pane/pty-connection-agent-session-resume.test.ts",
-          "src/renderer/src/components/terminal-pane/pty-connection-cold-restore-agent-resume.test.ts",
+          "src/renderer/src/components/terminal-pane/pty-connection-cold-restore-agent-resume.spec.ts",
           "src/main/git/runner.test.ts",
           "src/main/git/runner-wsl-read-routing.test.ts",
           "src/main/git/runner-wsl-direct-read.test.ts",
@@ -166,7 +166,7 @@
           "src/main/providers/local-git-provider.test.ts",
           "src/main/runtime/runtime-git-execution-host-ownership.test.ts",
           "src/main/runtime/runtime-git-stage-worktree-scope.test.ts",
-          "src/main/ssh/orcad-runtime-conversion.test.ts",
+          "src/main/managed-server/lifecycle/orcad-runtime-conversion.test.ts",
           "src/main/ssh/orcad-migration-terminal-gate.test.ts"
         ]
       },
