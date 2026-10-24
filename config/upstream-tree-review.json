@@ -36149,6 +36149,510 @@
         "src/renderer/src/components/use-task-page-jira-saved-filters.test.tsx",
         "pnpm run typecheck"
       ]
+    },
+    {
+      "path": "config/scripts/mobile-web-app-bundle-test-fixture.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "3846cc4a54e8a07477c35783f13569d0449655f4"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "3846cc4a54e8a07477c35783f13569d0449655f4"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "3846cc4a54e8a07477c35783f13569d0449655f4"
+      },
+      "reason": "Preserve the product-owned imported path config/scripts/mobile-web-app-bundle-test-fixture.mjs: upstream removes the target blob while the frozen Hive import graph still references it from config/scripts/build-mobile-web-app-bundle.test.mjs. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "config/scripts/mobile-web-app-route-manifest.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "54fe2e968a75204fb7008c9e9daa78bab56aacaf"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "54fe2e968a75204fb7008c9e9daa78bab56aacaf"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "54fe2e968a75204fb7008c9e9daa78bab56aacaf"
+      },
+      "reason": "Preserve the product-owned imported path config/scripts/mobile-web-app-route-manifest.mjs: upstream removes the target blob while the frozen Hive import graph still references it from config/scripts/build-mobile-web-app-bundle.test.mjs. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "config/scripts/mobile-web-app-bundle-dependencies.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "57ec6325033b6f08917a54eed7ecd863b2ed4643"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "57ec6325033b6f08917a54eed7ecd863b2ed4643"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "57ec6325033b6f08917a54eed7ecd863b2ed4643"
+      },
+      "reason": "Preserve the product-owned imported path config/scripts/mobile-web-app-bundle-dependencies.mjs: upstream removes the target blob while the frozen Hive import graph still references it from config/scripts/mobile-web-app-session-text-inputs.test.mjs. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/renderer/src/lib/locale-text-collators.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "d8e7bccda12f86c3991e117e01a230ff9234ab90"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "d8e7bccda12f86c3991e117e01a230ff9234ab90"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "d8e7bccda12f86c3991e117e01a230ff9234ab90"
+      },
+      "reason": "Preserve the product-owned imported path src/renderer/src/lib/locale-text-collators.ts: upstream removes the target blob while the frozen Hive import graph still references it from config/scripts/locale-collator-sort-benchmark.mjs. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "config/scripts/pr-e2e-linux-packages.test-fixture.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "dfbb2d4b7981ec1f94564e9a3811d5818602c362"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "dfbb2d4b7981ec1f94564e9a3811d5818602c362"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "dfbb2d4b7981ec1f94564e9a3811d5818602c362"
+      },
+      "reason": "Preserve the product-owned imported path config/scripts/pr-e2e-linux-packages.test-fixture.mjs: upstream removes the target blob while the frozen Hive import graph still references it from config/scripts/pr-e2e-gate-contract.test.mjs. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "config/scripts/mobile-web-app-text-input-font-size-seam.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "758252e08865f4b7b83d2cdde46fd077bf8e70f8"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "c1d9b14f749b0a99c0552ef66783ab1527b2c9dc"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "c1d9b14f749b0a99c0552ef66783ab1527b2c9dc"
+      },
+      "reason": "Preserve the product-owned imported path config/scripts/mobile-web-app-text-input-font-size-seam.mjs: upstream removes the target blob while the frozen Hive import graph still references it from config/scripts/mobile-web-app-session-text-inputs.test.mjs. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "config/scripts/mobile-web-app-render-harness.mjs",
+      "base": {
+        "mode": "100644",
+        "sha": "ffdfc690da2ef8ba478dc3e8d446c29aff335613"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "4c51312582f79fbde6508f8565c1d5afb5431500"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "4c51312582f79fbde6508f8565c1d5afb5431500"
+      },
+      "reason": "Preserve the product-owned imported path config/scripts/mobile-web-app-render-harness.mjs: upstream removes the target blob while the frozen Hive import graph still references it from config/scripts/mobile-web-app-csp.test.mjs. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "resources/product-logo.png",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "7bc90c9f8e4a6023cf865c90fbb1044a6abeba49"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "7bc90c9f8e4a6023cf865c90fbb1044a6abeba49"
+      },
+      "reason": "Preserve the product-owned imported path resources/product-logo.png: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/product-brand.ts. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "resources/desktop-home-mascot-float.png",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "35c745837aedf85f79a09bfbd84da9bab1c46e8c"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "35c745837aedf85f79a09bfbd84da9bab1c46e8c"
+      },
+      "reason": "Preserve the product-owned imported path resources/desktop-home-mascot-float.png: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/components/Landing.tsx. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "config/hiverelay-contract/registries/close-codes.json",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "4c6644d835352db5f9624b7b8cee42e095d380ce"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "4c6644d835352db5f9624b7b8cee42e095d380ce"
+      },
+      "reason": "Preserve the product-owned imported path config/hiverelay-contract/registries/close-codes.json: upstream removes the target blob while the frozen Hive import graph still references it from src/main/hive-runtime-cloud/relay-host/hive-runtime-relay-socket.ts. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "config/hiverelay-contract/registries/limits.json",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "d9a30a44e1b5e65232435f41028a34341b8f2fae"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "d9a30a44e1b5e65232435f41028a34341b8f2fae"
+      },
+      "reason": "Preserve the product-owned imported path config/hiverelay-contract/registries/limits.json: upstream removes the target blob while the frozen Hive import graph still references it from src/main/hive-runtime-cloud/relay-host/hive-runtime-relay-broker-retry.test.ts. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "resources/desktop-login-mascot.png",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "989f8d23c725c89fde488194109842c157622f6f"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "989f8d23c725c89fde488194109842c157622f6f"
+      },
+      "reason": "Preserve the product-owned imported path resources/desktop-login-mascot.png: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/components/settings/HiveAccountSignInConfirmDialog.tsx. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "mobile/assets/auth-icons/github.png",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "3cbabde828732a5557e2628015a0cf27b213e725"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "3cbabde828732a5557e2628015a0cf27b213e725"
+      },
+      "reason": "Preserve the product-owned imported path mobile/assets/auth-icons/github.png: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/components/settings/HiveAccountSignInConfirmDialog.tsx. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "mobile/assets/auth-icons/wechat.png",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "248575682c98d2336a9e5afacc004570ecb33666"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "248575682c98d2336a9e5afacc004570ecb33666"
+      },
+      "reason": "Preserve the product-owned imported path mobile/assets/auth-icons/wechat.png: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/components/settings/HiveAccountSignInConfirmDialog.tsx. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "mobile/assets/auth-icons/qq.png",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "d140116871303179b9facfe35bc3504986492e94"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "d140116871303179b9facfe35bc3504986492e94"
+      },
+      "reason": "Preserve the product-owned imported path mobile/assets/auth-icons/qq.png: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/components/settings/HiveAccountSignInConfirmDialog.tsx. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/agents-settings.css",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "d28fb9fce4fbd7752af0dbb0aba33e4f2528fc3a"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "d28fb9fce4fbd7752af0dbb0aba33e4f2528fc3a"
+      },
+      "reason": "Preserve the product-owned imported path src/renderer/src/components/settings/agents-settings.css: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/components/settings/AgentsPane.tsx. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/agent-capabilities.css",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "10cb48a532e7c345f1fe8dc68b71e9728336b550"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "10cb48a532e7c345f1fe8dc68b71e9728336b550"
+      },
+      "reason": "Preserve the product-owned imported path src/renderer/src/components/settings/agent-capabilities.css: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/components/settings/AgentCapabilitiesPane.tsx. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/settings/accounts-pane.css",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "fc98603d291190d3ce3d42c5b67f3e584cbd6251"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "fc98603d291190d3ce3d42c5b67f3e584cbd6251"
+      },
+      "reason": "Preserve the product-owned imported path src/renderer/src/components/settings/accounts-pane.css: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/components/settings/AccountsPane.tsx. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "resources/desktop-home-mascot.png",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "35e40451f0039524763243100136bccfd0645fd4"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "35e40451f0039524763243100136bccfd0645fd4"
+      },
+      "reason": "Preserve the product-owned imported path resources/desktop-home-mascot.png: upstream removes the target blob while the frozen Hive import graph still references it from src/renderer/src/components/sidebar/SidebarFooter.tsx. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/shared/jira-detail-capabilities.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "b64d6dfaa9ec53868b6d1b83efd55a5faa7f9a17"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "4bcd4b1315a198929c9fd52337d06def67bb7618"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "4bcd4b1315a198929c9fd52337d06def67bb7618"
+      },
+      "reason": "Preserve the product-owned imported path src/shared/jira-detail-capabilities.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/shared/orcad-migration-evicted-receipts.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "f4e92e0ba9e2604ab1ed9d9646f28737db7cdb63"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "f4e92e0ba9e2604ab1ed9d9646f28737db7cdb63"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "f4e92e0ba9e2604ab1ed9d9646f28737db7cdb63"
+      },
+      "reason": "Preserve the product-owned imported path src/shared/orcad-migration-evicted-receipts.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/main/linear/issue-context-errors.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "1dde1b58537706059b93043e582b6fedafe1de0c"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "1dde1b58537706059b93043e582b6fedafe1de0c"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "1dde1b58537706059b93043e582b6fedafe1de0c"
+      },
+      "reason": "Preserve the product-owned imported path src/main/linear/issue-context-errors.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/renderer/src/web/web-runtime-client-capabilities.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "f7f8b9f53da44c6532ef03d5d3a49c3240a83016"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "c4049b901429f497b7e6a8584fcbcddc2c904352"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "c4049b901429f497b7e6a8584fcbcddc2c904352"
+      },
+      "reason": "Preserve the product-owned imported path src/renderer/src/web/web-runtime-client-capabilities.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/shared/remote-runtime-request-frames.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "eb9f7e8e1794098d8595baa19c8927a8016c6f7d"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "c4b0977e7fb49c2f76c99a636140bb4f7e5461f2"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "c4b0977e7fb49c2f76c99a636140bb4f7e5461f2"
+      },
+      "reason": "Preserve the product-owned imported path src/shared/remote-runtime-request-frames.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/main/ssh/ssh-connection-utils.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "48057b9c088442405537db75700e06da800c218e"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "48057b9c088442405537db75700e06da800c218e"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "48057b9c088442405537db75700e06da800c218e"
+      },
+      "reason": "Preserve the product-owned imported path src/main/ssh/ssh-connection-utils.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/shared/orcad-migration-manifest-validation.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "ba20b2934d605e5a2bbcfd2fac0e99d8a4550c4c"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "ba20b2934d605e5a2bbcfd2fac0e99d8a4550c4c"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "ba20b2934d605e5a2bbcfd2fac0e99d8a4550c4c"
+      },
+      "reason": "Preserve the product-owned imported path src/shared/orcad-migration-manifest-validation.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/shared/orcad-migration-staged-catalog-validation.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "ff835e3bdb6a8c3378984c4a728c6a31c7e85f17"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "ff835e3bdb6a8c3378984c4a728c6a31c7e85f17"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "ff835e3bdb6a8c3378984c4a728c6a31c7e85f17"
+      },
+      "reason": "Preserve the product-owned imported path src/shared/orcad-migration-staged-catalog-validation.ts: upstream removes the target blob while the frozen Hive import graph still references it. Retain the target implementation and HiveCode boundary until the importing module is independently reconciled.",
+      "regressionTests": [
+        "pnpm run typecheck"
+      ]
     }
   ]
 }
