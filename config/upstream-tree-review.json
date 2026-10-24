@@ -7436,10 +7436,12 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "b14ae50bb23710a23fdb8f12568df6af2da23526"
+        "sha": "b6fa067711c98b35bc46b496a1a9aeef2ed8b3bc"
       },
-      "reason": "Run the WSL host and two real SQLite browser/worktree suites in the established Node pool through exact paths; keep all cases and the ordinary Bun pool intact. Route the exact actual SQLite/journal mailbox and cross-version consumers, secure idle-stop/Cell fixtures, and Windows live-tree diagnostics to Node; preserve prior explicit native owners without broad prefix routing. Current frozen base/product/upstream identities were rechecked for config/scripts/vitest-node-runtime-files.mjs; retained decision source: prior-adaptation-shape.",
+      "reason": "Adapt the product-owned Node runtime include helper to the upstream vitest.config.ts contract. The product helper already contains the reviewed static Node and SQLite include list; add the upstream-compatible getNodeRuntimeInclude facade without changing the selected test families.",
       "regressionTests": [
+        "config/vitest.config.ts",
+        "config/scripts/vitest-node-runtime-pool.test.ts",
         "pnpm run typecheck"
       ]
     },
@@ -36124,6 +36126,27 @@
       "result": null,
       "reason": "Remove the upstream workspace-server test with the unsupported workspace-server forwarding facade. The product boundary intentionally removes that context; retaining the test would import a deleted source module and reintroduce the unsupported delegation surface.",
       "regressionTests": [
+        "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "src/shared/jira-saved-filter-capability.ts",
+      "base": {
+        "mode": "100644",
+        "sha": "b0adb7369c832f0fbac31e45fd93cb6e0b72c639"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "b0adb7369c832f0fbac31e45fd93cb6e0b72c639"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "b0adb7369c832f0fbac31e45fd93cb6e0b72c639"
+      },
+      "reason": "Preserve the product-owned saved-filter runtime capability declaration: upstream deletes the file while protocol-version still imports it in the frozen product graph. Keep HiveCode capability identity and wire compatibility.",
+      "regressionTests": [
+        "src/renderer/src/components/use-task-page-jira-saved-filters.test.tsx",
         "pnpm run typecheck"
       ]
     }
