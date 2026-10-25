@@ -230,27 +230,27 @@ function settingUpLabel(phase: (typeof SSH_MANAGED_SERVER_PHASES)[number]): stri
   switch (phase) {
     case 'deploying':
       return translate(
-        'auto.components.settings.sshHostServer.deploying',
+        'auto.components.settings.sshHostServer.status.deploying',
         'Setting up a managed HiveCode server…'
       )
     case 'converting':
       return translate(
-        'auto.components.settings.sshHostServer.converting',
+        'auto.components.settings.sshHostServer.status.converting',
         'Moving this host’s projects to its managed HiveCode server…'
       )
     case 'connecting':
       return translate(
-        'auto.components.settings.sshHostServer.connecting',
+        'auto.components.settings.sshHostServer.status.connecting',
         'Connecting to the managed HiveCode server…'
       )
     case 'updating':
       return translate(
-        'auto.components.settings.sshHostServer.updating',
+        'auto.components.settings.sshHostServer.status.updating',
         'Updating managed server…'
       )
     case 'starting':
       return translate(
-        'auto.components.settings.sshHostServer.starting',
+        'auto.components.settings.sshHostServer.status.starting',
         'Starting managed server…'
       )
   }

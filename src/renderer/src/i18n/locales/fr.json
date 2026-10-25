@@ -3546,12 +3546,12 @@
             "restoring": "Restauration du terminal…"
           },
           "AgentLaunchPaneNotice": {
-            "commandNotFound": "Sa commande est introuvable sur cette machine.",
+            "commandNotFound": "La commande de {{agent}} est introuvable sur cette machine.",
             "copyPrompt": "Copier le prompt",
-            "exitedDuringStart": "Il s'est arrêté pendant le démarrage.",
-            "notStarted": "L'agent n'a pas pu démarrer.",
-            "unconfirmed": "Impossible de confirmer que l'agent a démarré.",
-            "workspaceGone": "Son espace de travail n'est plus disponible."
+            "exitedDuringStart": "{{agent}} s'est arrêté pendant le démarrage.",
+            "notStarted": "L'agent {{agent}} n'a pas pu démarrer.",
+            "unconfirmed": "Impossible de confirmer que {{agent}} a démarré.",
+            "workspaceGone": "L'espace de travail de {{agent}} n'est plus disponible."
           },
           "TerminalSleepingPaneOverlay": {
             "pausedDetail": "Les restaurations automatiques sont en pause car l'hôte s'est arrêté de façon inattendue. Votre session est enregistrée.",
@@ -12897,11 +12897,11 @@
         },
         "sshHostServer": {
           "sourceChanged": "Une version plus ancienne d'HiveCode a modifié les projets de cet hôte. Déplacez ces modifications vers son serveur géré, ou conservez la version du serveur, pour vous reconnecter.",
-          "deploying": "Configuration d'un serveur HiveCode géré…",
-          "converting": "Déplacement des projets de cet hôte vers son serveur HiveCode géré…",
-          "connecting": "Connexion au serveur HiveCode géré…",
-          "updating": "Mise à jour du serveur géré…",
-          "starting": "Démarrage du serveur géré…",
+          "deploying": "Configuration de {{host}} avec un serveur HiveCode géré…",
+          "converting": "Déplacement des projets de cet hôte vers le serveur HiveCode géré de {{host}}…",
+          "connecting": "Connexion au serveur HiveCode géré de {{host}}…",
+          "updating": "Mise à jour du serveur HiveCode géré de {{host}}…",
+          "starting": "Démarrage du serveur HiveCode géré de {{host}}…",
           "notServing": "HiveCode n’a pas pu confirmer que le serveur géré répond.",
           "hostNewer": "Exécute un serveur HiveCode géré issu d'une version plus récente d'HiveCode ; il conserve cette version.",
           "failureDetails": "Détails",

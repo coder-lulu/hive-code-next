@@ -17,8 +17,8 @@
   },
   "settings": {
     "chat": {
-      "permissionsTitle": "新しいチャットの権限",
-      "permissionsDescription": "新しいチャットにのみ適用されます。ターミナルで開くAgentには、設定 → Agent → Agentの権限が適用されます。",
+      "permissionsTitle": "新規チャットの権限",
+      "permissionsDescription": "新規チャットにのみ適用されます。ターミナルで開くエージェントには、設定 → Agent → エージェントの権限が適用されます。",
       "description": "チャットの外観と動作を選びます。",
       "names": {
         "title": "チャット名",
@@ -43,7 +43,7 @@
         "administratorDocumentation": "ガイドを読む",
         "administratorLabel": "管理者モード",
         "administratorPromptCancellation": "Windows のプロンプトをキャンセルすると、保持されているターミナルとともに HiveCode が再び開きます。SSH と WSL の権限はそれぞれのホストで管理されたままです。",
-        "administratorRestartConsequences": "先に作業を保存してください。承認後、現在のローカルターミナルホスト上のターミナルと Agent が閉じられます。復元されたタブは新規管理者シェルを開きます。",
+        "administratorRestartConsequences": "先に作業を保存してください。承認後、現在のローカルターミナルホスト上のターミナルとエージェントが閉じられます。復元されたタブは新規管理者シェルを開きます。",
         "administratorRestartFailed": "HiveCode を再起動できませんでした。もう一度試すか、マニュアルの手順を使用してください。",
         "administratorScope": "HiveCode アプリの権限。既存のターミナルでは異なる場合があります。",
         "administratorSearchDescription": "HiveCode の Windows 権限を確認するか、管理者承認で再起動します。",
@@ -136,13 +136,13 @@
     "browser": {
       "clientHostedRemote": {
         "title": "このデバイスでリモートブラウザページを動作させる",
-        "description": "リモートワークスペースのページをこのデスクトップで描画します。ネットワーク通信は引き続きリモートホストを経由します。新しいページにのみ適用されます。",
+        "description": "リモートワークスペースのページをこのデスクトップで描画します。ネットワーク通信は引き続きリモートホストを経由します。新規ページにのみ適用されます。",
         "optionDevice": "このデバイス",
         "optionDeviceTooltip": "ページはこのデスクトップで描画されるため、入力やポップアップがネイティブに動作します。",
         "optionServer": "サーバー（ストリーミング）",
         "optionServerTooltip": "ページはリモートサーバーで描画され、このデバイスにストリーミングされます。",
         "rowTitle": "リモートサーバーのワークスペース",
-        "rowDescription": "ページの描画先です。通信は常にリモートサーバーを経由します。新しいページにのみ適用されます。"
+        "rowDescription": "ページの描画先です。通信は常にリモートサーバーを経由します。新規ページにのみ適用されます。"
       },
       "sshWorkspaceRouting": {
         "title": "SSH ワークスペースのホスト経由で閲覧",
@@ -165,7 +165,7 @@
       },
       "userAgent": {
         "title": "ブラウザのアイデンティティ",
-        "description": "すべてのブラウザプロファイルとページのユーザー Agent を選択します。ネイティブモードでは Google サインインが無効になります。変更は再起動後に有効になります。",
+        "description": "すべてのブラウザプロファイルとページのユーザーエージェントを選択します。ネイティブモードでは Google サインインが無効になります。変更は再起動後に有効になります。",
         "remoteUnsupported": "HiveCode CLI を使用して、リモートホスト上のブラウザ ID を管理します。",
         "loading": "読み込み中…",
         "resetRequired": "ID データは変更する前に明示的にリセットする必要があります。",
@@ -181,24 +181,24 @@
     "agents": {
       "codexTerminalServerIsolation": {
         "title": "Codex の各ターミナルを専用サーバーで実行",
-        "description": "HiveCode のステータス表示とタブの終了が正しく動作するようにします。Codex の共有サーバーとエージェント一覧を使うには、オフにしてください。新しいターミナルに適用されます。"
+        "description": "HiveCode のステータス表示とタブの終了が正しく動作するようにします。Codex の共有サーバーとエージェント一覧を使うには、オフにしてください。新規ターミナルに適用されます。"
       },
       "codexSharedServerWarning": {
         "title": "Codex タブがサーバーを共有する場合に警告する",
-        "description": "自分で開始した Codex が他のタブとサーバーを共有している場合、Agent のステータスが間違っている可能性があるため、その Codex に関する通知が表示されます。"
+        "description": "自分で開始した Codex が他のタブとサーバーを共有している場合、エージェントのステータスが間違っている可能性があるため、その Codex に関する通知が表示されます。"
       },
       "environmentName": "環境変数名",
       "environmentValue": "{{name}} の値",
       "savedEnvironment": "保存済みの値 · 置き換えるには入力",
       "newEnvironment": "値",
       "removeEnvironment": "削除",
-      "loadingHost": "Agent設定を読み込み中…",
-      "updateHost": "Agentの起動設定を編集するには、このサーバーを更新してください。",
-      "readFailed": "Agent設定を読み込めませんでした。ホストへの接続を確認して再試行してください。",
-      "saveFailed": "Agent設定を保存できませんでした。ホストへの接続を確認して再試行してください。",
-      "hostDefaults": "選択したホストで起動する新しいAgentの既定値。",
+      "loadingHost": "エージェント設定を読み込み中…",
+      "updateHost": "エージェントの起動設定を編集するには、このサーバーを更新してください。",
+      "readFailed": "エージェント設定を読み込めませんでした。ホストへの接続を確認して再試行してください。",
+      "saveFailed": "エージェント設定を保存できませんでした。ホストへの接続を確認して再試行してください。",
+      "hostDefaults": "選択したホストで起動する新規エージェントの既定値。",
       "save": "保存",
-      "clearDefault": "デフォルトの Agent をクリア"
+      "clearDefault": "デフォルトのエージェントをクリア"
     },
     "followSymlinkedDirectoriesKeywords": {
       "symlink": "シンボリックリンク",
@@ -274,8 +274,8 @@
       "hosts": "ホスト",
       "projects": "プロジェクト",
       "trigger": "結果を絞り込み",
-      "search": "ホストまたはプロジェクトで絞り込み...",
-      "searchHosts": "ホストを絞り込み...",
+      "search": "ホストまたはプロジェクトで絞り込み…",
+      "searchHosts": "ホストを絞り込み…",
       "searchProjects": "プロジェクトをフィルタリング…",
       "noOptions": "一致するホストやプロジェクトはありません",
       "noHosts": "一致するホストはありません",
@@ -410,13 +410,13 @@
         "accountLink": "HiveCloud アカウントで接続",
         "connect": "接続",
         "connecting": "接続中…",
-        "description": "HiveCloud アカウントでコンピューターの Runtime に接続します。",
-        "empty": "このアカウントに登録されたコンピューターはありません。",
+        "description": "HiveCloud アカウントでコンピュータの Runtime に接続します。",
+        "empty": "このアカウントに登録されたコンピュータはありません。",
         "nextPage": "次のページ",
         "refresh": "更新",
         "runtimeName": "Hive Runtime",
         "signIn": "HiveCloud にログイン",
-        "title": "自分のコンピューターに接続"
+        "title": "自分のコンピュータに接続"
       },
       "runtimeAuth": {
         "insecureOrigin": "HiveCode はこのページからのペアリングを拒否しました。このページが別のマシン上の平文 http であるため、ネットワーク経路上の誰でも置き換えてペアリングコードを奪う可能性があります。https で、このコンピュータの localhost で、または SSH トンネル経由で Web クライアントを開いてください。それでも許可するには、サーバーの管理者が ORCA_ALLOW_INSECURE_WEB_PAIRING=1 を指定して HiveCode を再起動できます。",
@@ -521,7 +521,7 @@
                   "4367540861": "Linear の Issue をリンクするにはリモートランタイムを更新してください",
                   "github": {
                     "pr": {
-                      "suppression": "GitHub のプルリクエストのリンクを解除するにはリモートランタイムを更新してください"
+                      "suppression": "GitHub の PR のリンクを解除するにはリモートランタイムを更新してください"
                     }
                   }
                 }
@@ -994,7 +994,7 @@
               "googleCookiesSkippedLocal": "Google の Cookie はインポートされませんでした。HiveCode でこのプロファイルのブラウザを開き、Google にログインしてください。",
               "googleCookiesSkippedClientHosted": "Google の Cookie はインポートされませんでした。{{value0}} ワークスペースでこのプロファイルのブラウザタブを開いてください。このデバイスで開きます。その後 Google にログインしてください。",
               "googleCookiesSkippedRemoteWorkspace": "Google の Cookie はインポートされませんでした。{{value0}} ワークスペースでこのプロファイルのブラウザタブを開き、Google にログインしてください。",
-              "partitionSkippedBreakdown": "サイト パーティションを読み取れない Cookie: {{value0}}。既存のセッションを保護するためにインポートしなかった関連 Cookie: {{value1}}。これらのサイトの既存の Cookie は変更されていません。再度ログインする前に、このプロファイルでこれらのサイトを確認してください。"
+              "partitionSkippedBreakdown": "サイトパーティションを読み取れない Cookie: {{value0}}。既存のセッションを保護するためにインポートしなかった関連 Cookie: {{value1}}。これらのサイトの既存の Cookie は変更されていません。再度ログインする前に、このプロファイルでこれらのサイトを確認してください。"
             }
           }
         }
@@ -1051,8 +1051,8 @@
         "storageNotPrivate": "ドロップされたファイル用の HiveCode の保存先が他のユーザーから読み取れる状態のため、何もコピーしませんでした。",
         "timedOut": "コピーに時間がかかりすぎました。もう一度ドロップしてください。",
         "busy": "コピー中のドロップが多すぎます。しばらく待ってから、もう一度お試しください。",
-        "tooLarge": "サイズが大きすぎてコピーできないため、HiveCode は Agent に渡せませんでした。",
-        "storageFull": "ドロップされたファイル用の HiveCode の保存先がいっぱいのため、HiveCode は Agent に渡せませんでした。",
+        "tooLarge": "サイズが大きすぎてコピーできないため、HiveCode はエージェントに渡せませんでした。",
+        "storageFull": "ドロップされたファイル用の HiveCode の保存先がいっぱいのため、HiveCode はエージェントに渡せませんでした。",
         "generic": "もう一度ドロップしてください。"
       },
       "reveal": {
@@ -1473,10 +1473,10 @@
         "86d84a17ca": "レビューコメントを追加",
         "d9fa90b625": "差分の読み込みに失敗しました。",
         "4aecf121e7": "閉じる",
-        "8812225174": "再開",
+        "8812225174": "再度開く",
         "09d67a0f9b": "PR のクローズに失敗しました",
         "88809e79db": "PR の再オープンに失敗しました",
-        "00f55cc17b": "このプルリクエストではリポジトリにアクセスできません。"
+        "00f55cc17b": "この PR ではリポジトリにアクセスできません。"
       },
       "GitLabItemDialog": {
         "65e784c1f1": "再度開く",
@@ -1969,8 +1969,8 @@
         "71a3c0f9d2": "ワークスペースを開始",
         "filesUnavailable": "変更されたファイルを読み込めませんでした。",
         "filesRetry": "再試行",
-        "77482513f8": "クローズ",
-        "2f5195c6a0": "再オープン",
+        "77482513f8": "閉じる",
+        "2f5195c6a0": "再度開く",
         "4b8ae7303f": "差分の読み込みに失敗しました。",
         "closePullRequestFailed": "PR のクローズに失敗しました",
         "reopenPullRequestFailed": "PR の再オープンに失敗しました",
@@ -2819,9 +2819,9 @@
           }
         },
         "CommentReactions": {
-          "addReaction": "リアクションを追加",
-          "removeNamedReaction": "{{value0}} のリアクションを削除",
-          "addNamedReaction": "{{value0}} のリアクションを追加"
+          "addReaction": "リ操作を追加",
+          "removeNamedReaction": "{{value0}} のリ操作を削除",
+          "addNamedReaction": "{{value0}} のリ操作を追加"
         }
       },
       "linear": {
@@ -3253,8 +3253,8 @@
             "retryUnavailable": "まだ再接続できませんでした。しばらくしてから再試行してください。",
             "ownerUnknown": "HiveCode はこのターミナルの所有者を確認できませんでした。",
             "42b283ecfc": "ホストが保存済みセッションを検証できず、Orca は安全に再接続できませんでした。保存済みセッションは変更されていません。「再試行」で再接続できます。それでも接続できない場合は新しいターミナルを開いてください。",
-            "e16012e31e": "このセッションを所有していたターミナルデーモンが終了したため、セッションとスクロールバックを復元できませんでした。続行するには新しいターミナルを開いてください。",
-            "sessionUnavailable": "HiveCode はホスト上のこのペインのターミナルセッションに再接続できませんでした。続行するには新しいターミナルを開いてください。",
+            "e16012e31e": "このセッションを所有していたターミナルデーモンが終了したため、セッションとスクロールバックを復元できませんでした。続行するには新規ターミナルを開いてください。",
+            "sessionUnavailable": "HiveCode はホスト上のこのペインのターミナルセッションに再接続できませんでした。続行するには新規ターミナルを開いてください。",
             "sourceRestoring": "このターミナルに再接続中です。出力の復旧中ですが、セッションは引き続き実行中です。",
             "ptyAllocationLimit": "システムはこれ以上 pty デバイスを割り当てられません。HiveCode または他のプログラムで使っていないターミナルをいくつか閉じてから、もう一度お試しください。",
             "terminalProcessLimit": "システムはこれ以上ターミナルプロセスを起動できません。使っていないターミナルを閉じるか、不要なプロセスを終了してから、もう一度お試しください。",
@@ -3438,16 +3438,16 @@
             "restoring": "ターミナルを復元中…"
           },
           "AgentLaunchPaneNotice": {
-            "commandNotFound": "このマシンでコマンドが見つかりませんでした。",
+            "commandNotFound": "このマシンで {{agent}} のコマンドが見つかりませんでした。",
             "copyPrompt": "プロンプトをコピー",
-            "exitedDuringStart": "起動中に終了しました。",
-            "notStarted": "Agent を起動できませんでした。",
-            "unconfirmed": "Agent が起動したか確認できませんでした。",
-            "workspaceGone": "ワークスペースは利用できなくなりました。"
+            "exitedDuringStart": "{{agent}} は起動中に終了しました。",
+            "notStarted": "{{agent}} を起動できませんでした。",
+            "unconfirmed": "{{agent}} が起動したか確認できませんでした。",
+            "workspaceGone": "{{agent}} のワークスペースは利用できなくなりました。"
           },
           "TerminalSleepingPaneOverlay": {
             "pausedDetail": "ホストが予期せず停止したため、自動復元は一時停止しています。セッションは保存されています。",
-            "liveCapDetail": "このホストではすでに十分な数の Agent が実行されています。セッションは保存されています。",
+            "liveCapDetail": "このホストではすでに十分な数のエージェントが実行されています。セッションは保存されています。",
             "pressureDetail": "ホストに高い負荷がかかっています。セッションは保存されています。",
             "deadlineDetail": "ホストが他のターミナルの復元で忙しかったためです。セッションは保存されています。",
             "title": "スリープ中 — クリックして再開",
@@ -3527,8 +3527,8 @@
             "465e432ef1": "{{value0}} の起動コマンドを作成できませんでした。",
             "e518f544b1": "エージェントが検出されませんでした",
             "8dea9b5cdf": "有効なエージェントがありません",
-            "needsServerUpdate": "このワークスペースの Agent を表示するには、このサーバーの HiveCode を更新してください",
-            "hostUnreachable": "このワークスペースのホストに接続できないため、Agent を一覧表示できません"
+            "needsServerUpdate": "このワークスペースのエージェントを表示するには、このサーバーの HiveCode を更新してください",
+            "hostUnreachable": "このワークスペースのホストに接続できないため、エージェントを一覧表示できません"
           },
           "RecentTabSwitcher": {
             "329638ff6f": "タブの切り替え",
@@ -3595,7 +3595,7 @@
             "4f0d9a71c2": "タブは存在しません",
             "d7d496a451": "ブラウザページは存在しません",
             "7726ce9970": "モバイルエミュレータのタブは存在しません",
-            "chooseAction": "アクションを選択してください。",
+            "chooseAction": "操作を選択してください。",
             "searchProvider": "{{value0}} で検索"
           },
           "TabBarQuickCommandsButton": {
@@ -4425,7 +4425,7 @@
           "c760c481c5": "使用方法の概要",
           "55c910f4f1": "- 一部のモデルの価格は利用できません",
           "enableMuse": "Muse を有効にする",
-          "noLocalUsageYet": "ローカルの Claude、Codex、OpenCode、Muse の使用状況はまだ見つかりません。次の Agent セッションがトークンログを書き込むと、概要に反映されます。",
+          "noLocalUsageYet": "ローカルの Claude、Codex、OpenCode、Muse の使用状況はまだ見つかりません。次のエージェントセッションがトークンログを書き込むと、概要に反映されます。",
           "60002bb22f": "ローカルの Claude、Codex、OpenCode の使用状況はまだ見つかりません。次のエージェントセッションがトークンログを書き込むと、概要に反映されます。"
         },
         "share": {
@@ -4591,7 +4591,7 @@
           "9963dff6d3": "説明が見つかりません。",
           "995fde8337": "スキルファイルを表示できませんでした",
           "4acd6d68ec": "スキルが見つかりません",
-          "6a62a0168c": "一致する項目はありません",
+          "6a62a0168c": "一致なし",
           "08a321a984": "現在の検索条件とフィルターに一致するスキルはありません。",
           "cd7893fbc1": "スキルをスキャン中",
           "35b9a724a0": "利用可能",
@@ -4664,7 +4664,7 @@
         "sourceKind": {
           "home": "ホーム",
           "workspace": "ワークスペース",
-          "bundled": "バンドル済み",
+          "bundled": "同梱",
           "plugin": "プラグイン"
         },
         "count": {
@@ -4708,7 +4708,7 @@
         },
         "SkillDetailDialog": {
           "agents": "エージェント",
-          "updated": "更新日",
+          "updated": "更新済み",
           "copy": "コピー"
         },
         "SkillFreshnessNudge": {
@@ -4750,7 +4750,7 @@
           "skippedReasonDuplicate": "これは別のコピーのため、更新は反映されません。コマンドはメインのコピーのみを更新します。このコピーを削除してからスキルを再インストールすると、この場所もメインに追従します。",
           "skippedReasonNewer": "このコピーは、このビルドの HiveCode に同梱されているものより新しいバージョンです。そのため HiveCode はロールバックせず、そのままにしました。HiveCode を更新すると整合します。",
           "skippedReasonStaleRecord": "スキル更新機能はこのコピーの記録を利用できないため、スキルは最新であると報告し、何も変更しません。記録を整合させるには再インストールしてください: {{value0}}",
-          "chipNewer": "新しい順",
+          "chipNewer": "新規順",
           "tipNewer": "このコピーは、このビルドの HiveCode に同梱されているものより新しいバージョンです。"
         },
         "SkillFreshnessUpdateDialog": {
@@ -4829,7 +4829,7 @@
           "newVersionDescription": "ファイルを確認し、変更不可のバージョンを既存の Cloud パッケージに公開してください。",
           "description": "ファイルを確認してアクセス可能なユーザーを選択し、変更不可のバージョンを公開してください。",
           "0f07fa2a79": "スキルを公開",
-          "7aa4ba0dba": "新しいバージョンを公開",
+          "7aa4ba0dba": "新規バージョンを公開",
           "3a51d0f34f": "アップロードをキャンセル",
           "e9d652ae3d": "キャンセル中…",
           "30985d4fc0": "キャンセル",
@@ -4890,7 +4890,7 @@
           "64c71cf7b9": "このマシンに HiveCode が管理するスキルのインストールは見つかりませんでした。",
           "0900db719a": "— 未接続",
           "176fef9516": "· SSH",
-          "6cb1fbe039": "このコンピューター",
+          "6cb1fbe039": "このコンピュータ",
           "3677ae58e7": "HiveCode がインストールしたバージョンの更新、ロールバック、安全な削除を行います。",
           "44d118a8f7": "インストール済みスキルを管理",
           "1c9e7f420a": "インストール済みのバンドルスキル",
@@ -4938,11 +4938,11 @@
           "85d85880df": "· SSH",
           "71eefd7660": "— 未接続",
           "0785d0a503": "— 更新が必要",
-          "8562dd1e6e": "このコンピューター",
+          "8562dd1e6e": "このコンピュータ",
           "b8a0b706ad": "マシン"
         },
         "SkillInstallWorkspaceCombobox": {
-          "search": "ワークスペースを検索...",
+          "search": "ワークスペースを検索…",
           "empty": "ワークスペースが見つかりません。"
         },
         "SkillShareReviewContent": {
@@ -4966,7 +4966,7 @@
           "77f636eac3": "実行可能ファイル",
           "8edd32622f": "スクリプト",
           "3121f44358": "ファイル",
-          "2dca0b720b": "スキルの新しいバージョンを公開",
+          "2dca0b720b": "スキルの新規バージョンを公開",
           "01c5a17e01": "{{value0}} スキル",
           "01c5a17e02": "含まれるスキルを確認",
           "01c5a17e03": "{{value0}} ファイル · {{value1}}",
@@ -4974,7 +4974,7 @@
           "unlistedPublishingAs": "{{value0}} として公開します。リンクを持つ人は誰でもこれらのスキルを閲覧してインストールできます。",
           "unlistedLinkDetails": "リンクは検索や公開一覧には表示されません。無効にすると今後のアクセスをブロックしますが、インストール済みのコピーは残ります。",
           "bundleReady": "スキルバンドルのリンクができました",
-          "publishBundleVersion": "スキルバンドルの新しいバージョンを公開",
+          "publishBundleVersion": "スキルバンドルの新規バージョンを公開",
           "shareBundle": "スキルバンドルを共有",
           "publishingLink": "リンクを公開中…",
           "verifyingPackage": "パッケージを検証中…"
@@ -5049,7 +5049,7 @@
           "executableOne": "{{count}} 実行可能ファイル",
           "executableOther": "{{count}} 実行可能ファイル",
           "noExecutableContent": "スクリプトや実行可能ファイルはありません",
-          "newVersionDescriptionPlain": "既存のリンクに新しいバージョンを追加します。",
+          "newVersionDescriptionPlain": "既存のリンクに新規バージョンを追加します。",
           "accessSummaryShort": "限定公開リンク — リンクを持つ人は誰でもインストールできます。{{value0}} として公開します。",
           "accessSummaryPlain": "限定公開リンク — リンクを持つ人は誰でもインストールできます。"
         },
@@ -5858,7 +5858,7 @@
           "sidebarRowMissing": "対象はもう存在しません",
           "failedUnnestWorkspace": "ワークスペースの展開に失敗しました",
           "groupRenameFailed": "グループ名を変更できませんでした",
-          "groupRenameFailedDesc": "HiveCode はグループのホストで新しい名前を確認できませんでした。再接続後にグループを再確認してください。",
+          "groupRenameFailedDesc": "HiveCode はグループのホストで新規名前を確認できませんでした。再接続後にグループを再確認してください。",
           "addProjectToGroup": "{{value0}} にプロジェクトを追加"
         },
         "WorktreeMetaDialog": {
@@ -5881,11 +5881,11 @@
           "382fd11a3e": "ワークツリーの詳細の編集",
           "2174f17011": "保存",
           "61d6f612cf": "保存中…",
-          "a0d191b7a7": "このワークスペースの Issue のリンク、プルリクエストのリンク、メモを編集します。",
+          "a0d191b7a7": "このワークスペースの Issue のリンク、PR のリンク、メモを編集します。",
           "gitlabDescription": "このワークスペースの課題リンク、MR リンク、およびメモを編集します。",
           "gitlabMR": "GitLab MR",
           "gitlabPlaceholder": "MR ! または GitLab URL",
-          "gitlabHelp": "マージリクエストの URL を貼り付けるか、番号を入力してください。リンクを解除するには空欄にしてください。"
+          "gitlabHelp": "MR の URL を貼り付けるか、番号を入力してください。リンクを解除するには空欄にしてください。"
         },
         "WorktreeOpenInMenu": {
           "1417fd8380": "アプリをカスタマイズ…",
@@ -5952,7 +5952,7 @@
           "noneFound": "HiveCode 以外のワークツリーは見つかりませんでした",
           "tryDifferentSearch": "別の名前またはパスをお試しください。",
           "disableSource": "ソースを無効にするとワークツリーを個別に管理できます。",
-          "appearWhenDetected": "HiveCode が新しいワークツリーを検出すると、ここに表示されます。",
+          "appearWhenDetected": "HiveCode が新規ワークツリーを検出すると、ここに表示されます。",
           "openGlobalSettings": "グローバル設定で管理",
           "globalSettingsSources": "これらのソースにはグローバル設定があり、ここで上書きできます:"
         },
@@ -6019,8 +6019,8 @@
               "ead7b8ee15": "ファイルが変更されました。とにかく削除するには、強制削除を使用してください。",
               "905fc8efac": "Git はこのワークスペースをすでに削除しています。 HiveCode から削除するには、強制削除を使用します。",
               "0899ebdb28": "Git はすでにこのワークスペースを忘れていますが、そのディレクトリはまだディスク上にあります。孤立したディレクトリを削除するには、強制削除を使用します。",
-              "locked": "このワークスペースは Git によってロックされています。リポジトリで git ワークツリー unlock <ワークツリー-path> を実行してから、削除を再試行してください。",
-              "lockedReason": "このワークスペースは Git によってロックされています。Git の報告: {{value0}}。リポジトリで git ワークツリー unlock <ワークツリー-path> を実行してから、削除を再試行してください。",
+              "locked": "このワークスペースは Git によってロックされています。リポジトリで git worktree unlock <worktree-path> を実行してから、削除を再試行してください。",
+              "lockedReason": "このワークスペースは Git によってロックされています。Git の報告: {{value0}}。リポジトリで git worktree unlock <worktree-path> を実行してから、削除を再試行してください。",
               "unstoppedPty": "HiveCode はこのワークスペースのすべてのターミナルが終了したか確認できず、ファイルの削除前に停止しました。それでも削除するには「強制削除」を使用してください。",
               "unstoppedPtyLive": "このワークスペースには実行中のターミナルがあるため、HiveCode はファイルの削除前に停止しました。強制削除するとターミナルは終了し、保持している未コミットの作業は失われます。",
               "runningAgentSession": "Orca はこのワークスペースのすべてのエージェントセッションが閉じられたか確認できず、ファイルの削除前に停止しました。それでも削除するには「強制削除」を使用してください。",
@@ -6386,7 +6386,7 @@
           "sshHost": "ホストまたはエイリアス",
           "sshHostPlaceholder": "deploy@server:22",
           "username": "ユーザー名",
-          "usernamePlaceholder": "デプロイ",
+          "usernamePlaceholder": "deploy",
           "port": "ポート",
           "identityFile": "秘密鍵ファイル",
           "identityFilePlaceholder": "~/.ssh/id_ed25519 (オプション)",
@@ -6428,7 +6428,7 @@
           "fillFromSshConfig": "~/.ssh/config から入力…",
           "sshConfigPickerAddingAll": "ホストを追加中…",
           "sshConfigPickerAddAll": "{{value0}} 件すべてを HiveCode に追加",
-          "sshConfigPickerNoNewHosts": "追加する新しいホストはありません",
+          "sshConfigPickerNoNewHosts": "追加する新規ホストはありません",
           "sshConfigPickerAddAllEmpty": "すべて HiveCode に追加",
           "identityFileFromConfigHint": "意図的に空欄にしています。HiveCode は ~/.ssh/config が {{value0}} に対して解決するすべての鍵を使用します。1 つの鍵だけを使用するにはパスを入力してください。",
           "sshConfigPickerRetry": "再試行",
@@ -6651,14 +6651,14 @@
           "d9657ac204": "ターミナルセッションのシャットダウンリクエストが送信されました。",
           "e8f25bd903": "ターミナルクリーンアップを完了できませんでした。",
           "a702d4196e": "これにより、すべてのワークスペースのターミナルタブが閉じられ、現在のターミナルセッションのシャットダウンがリクエストされます。保存されていないターミナル作業は失われます。デーモン自体は実行を続け、新規ターミナルはすぐに開けます。この操作は取り消せません。",
-          "01d6b7c64e": "ターミナルを開くと Agent が再起動します。リモートホスト上のターミナルは影響を受けません。",
+          "01d6b7c64e": "ターミナルを開くとエージェントが再起動します。リモートホスト上のターミナルは影響を受けません。",
           "922548bc66": "ターミナルサービスを再起動しますか?"
         },
         "MacFolderAccessFixDialog": {
           "stepAllow": "ファイルとフォルダーで HiveCode を許可する",
           "openSystemSettings": "システム設定を開く",
           "stepRestart": "HiveCode のターミナルサービスを再起動",
-          "restartConsequence": "ターミナルを開くと Agent が再起動します。",
+          "restartConsequence": "ターミナルを開くとエージェントが再起動します。",
           "restarting": "再起動中…",
           "restart": "再起動",
           "restartFailed": "再起動に失敗しました。 「設定」→「ターミナル」→「セッションの管理」から再試行してください。",
@@ -6725,7 +6725,7 @@
           "d676c41fc6": "ローカルの Gemini CLI インストールから OAuth 認証情報を抽出して、Google で認証します。これは、HiveCode ではなく、Gemini CLI アプリに発行された認証情報を使用します。 Google が CLI を更新すると壊れる可能性があります。ご自身の責任でご使用ください。",
           "0c7f915b01": "Gemini CLI 認証情報を使用する",
           "973741a871": "既存の Gemini CLI セッションを利用可能な状態に保ちます。Gemini の認証情報では Antigravity にサインインできません。",
-          "0c64dc2a64": "Gemini CLI (レガシー)",
+          "0c64dc2a64": "Gemini",
           "db209ee572": "削除",
           "8a0f870153": "再認証",
           "3d245ef7d9": "Codex はこのサインインが古いと報告しました",
@@ -6871,7 +6871,7 @@
           "cliAccounts": "CLI アカウント",
           "cliAccountsDescription": "アカウントとサインイン状態は、デバイスおよび実行環境ごとに個別に管理されます。",
           "codexAccountTitle": "Codex アカウント",
-          "codexAttentionRequired": "Codex に対応が必要です。新しいセッションを開始する前に、問題のあるサインインを更新するか、設定を復元してください。",
+          "codexAttentionRequired": "Codex に対応が必要です。新規セッションを開始する前に、問題のあるサインインを更新するか、設定を復元してください。",
           "configure": "設定",
           "configured": "設定済み",
           "credentialsAndUsage": "認証情報と使用量",
@@ -7004,7 +7004,7 @@
           "codexSessionSourceInfo": "Codex 履歴のインポートについて",
           "codexSessionSourceTooltip": "HiveCode は分離されたホームで Codex を実行します。既存の Codex ホームを指定してセッション履歴をインポートします。空の場合、~/.codexを使用します。",
           "03e1a5081a": "{{value0}} 上",
-          "25a41a9aad": "このサーバーにインストールされている Agent を再検出",
+          "25a41a9aad": "このサーバーにインストールされているエージェントを再検出",
           "remoteDetectionFailed": "インストールされているエージェントを検出できませんでした。ホストへの接続を確認して、もう一度お試しください。",
           "retryDetection": "再試行",
           "storedDefaultUndetected": "既定として保存されていますが、現在は検出されていません",
@@ -7212,7 +7212,7 @@
           "de9b2f32f3": "有効化",
           "8f2675c2f3": "ファイルから {{value0}} 個の Cookie をインポートしました。",
           "5301857d88": "{{value0}} から",
-          "finishSteps": "コーディング Agent がログイン状態のままこのブラウザを操作できるようにします。以下の手順を完了してください。",
+          "finishSteps": "コーディングエージェントがログイン状態のままこのブラウザを操作できるようにします。以下の手順を完了してください。",
           "0289434ed6": "有効",
           "180a9abf3a": "CLI ステータスの読み込みに失敗しました。",
           "702488a5f7": "コーディングエージェントがログイン情報を使用してこのブラウザを操作できるようにします。以下の 3 つの手順を完了します。",
@@ -7355,7 +7355,7 @@
           "hideDetails": "詳細を隠す",
           "readFailed": "システム権限を確認できませんでした",
           "resetConfirmDescription": "ローカルの macOS 権限をリセットします。システム設定で、アクセス権を再度付与する必要があります。",
-          "resetConfirmTitle": "コンピューター操作のアクセス権をリセットしますか？",
+          "resetConfirmTitle": "コンピュータ操作のアクセス権をリセットしますか？",
           "retry": "再試行",
           "retryAfterFailure": "ローカルの権限確認を再試行して、現在の状態を確認してください。",
           "screenRecordingDescription": "macOS の「画面収録」権限で、ウィンドウのスクリーンショット撮影を許可します。",
@@ -7473,7 +7473,7 @@
           },
           "agentDashboard": {
             "title": "エージェントダッシュボード",
-            "description": "ワークツリー エージェントを監視するカンバンボード。ウィンドウ内またはポップアウトで表示できます。",
+            "description": "ワークツリーエージェントを監視するカンバンボード。ウィンドウ内またはポップアウトで表示できます。",
             "copy": "左サイドバーにエージェントダッシュボードのエントリを追加します。対応が必要なエージェント、作業中のエージェント、完了したエージェントを監視し、必要に応じてアイドル状態のエージェントも表示できます。",
             "toggleLabel": "エージェントダッシュボードの切り替え",
             "modeLabel": "開き方",
@@ -7509,7 +7509,7 @@
           "80c454e8a6": "これをプロバイダーのキャッシュ TTL と一致させます。"
         },
         "GeneralEditorSettingsSection": {
-          "f80603d293": "すべての markdown ビューで markdown ノートコントロールを表示し、Agent のハンドオフ操作にそれらのノートを含めます。",
+          "f80603d293": "すべての markdown ビューで markdown ノートコントロールを表示し、エージェントのハンドオフ操作にそれらのノートを含めます。",
           "4edc104f0f": "Markdown レビューノート",
           "5f02e6fb21": "markdown ファイルでローカル markdown レビューノートコントロールを表示します。",
           "51161d1647": "ファイルの編集時にミニマップの概要を表示します。",
@@ -7567,7 +7567,7 @@
           "editor_preview_tabs": "ファイルを参照するときにプレビュータブを再利用する",
           "editor_preview_tabs_description": "エクスプローラーでファイルをシングルクリックするか、Markdown ソースのリンクをたどると、新規タブを開くのではなく、グループごとに 1 つの斜体のプレビュータブが再利用されます。編集、ダブルクリック、または固定すると、そのタブは開いたままになります。これをオフにすると、すべてのファイルに独自のタブが与えられます。",
           "confirm_running_terminal_close": "実行中のターミナルを閉じる前に確認してください",
-          "confirm_running_terminal_close_description": "ターミナルを閉じるときに、実行中の Agent またはコマンドを停止する前に確認してください。"
+          "confirm_running_terminal_close_description": "ターミナルを閉じるときに、実行中のエージェントまたはコマンドを停止する前に確認してください。"
         },
         "GeneralSupportSection": {
           "af7d9f4396": "サポートありがとうございます!",
@@ -7737,7 +7737,7 @@
           "7c4e18d2f6": "このマシンで太字グリッチのキャプチャジェスチャーを有効にします。{{samplingShortcut}} でサンプリングバーストを開始し、{{captureShortcut}} でペインの証拠をディスクに保存します。",
           "b09f24a51d": "ターミナル描画診断",
           "f2c81d904a": "隠された実験的機能の設定",
-          "1014ddbfaf": "現在は何もしません。非表示の実験的なオプションの最初の枠として予約されています。",
+          "1014ddbfaf": "現在は何もしません。非表示の実験的機能オプションの最初の枠として予約されています。",
           "232cf83de8": "内部テスト用の限定公開の切り替えです。ここにある機能はサポートされません。",
           "3e9e827ca5": "非表示の実験的機能",
           "d0f914a528": "仮の切り替え"
@@ -8029,7 +8029,7 @@
           "76e02467b8": "カスタムファイルの変更",
           "d3756cf5bc": "無効",
           "ba07e60f38": "非表示のワークスペースを通知",
-          "e4b5e909ff": "オフの場合、サイドバーのフィルターメニューの「非表示」スイッチで隠したワークスペースは、未読ドットを表示せず、このコンピューターにもスマートフォンにも通知を送りません。"
+          "e4b5e909ff": "オフの場合、サイドバーのフィルターメニューの「非表示」スイッチで隠したワークスペースは、未読ドットを表示せず、このコンピュータにもスマートフォンにも通知を送りません。"
         },
         "OpenAiTranscriptionKeyDialog": {
           "fa83512e48": "キーの保存",
@@ -8068,7 +8068,7 @@
           "f79084947b": "新規アプリ"
         },
         "OrchestrationPane": {
-          "52e0634e2c": "コーディネーター エージェントに、ハンドオフ、ワークツリーハンドオーバー、および順次または並列の子エージェントにオーケストレーションを使用するように依頼します。",
+          "52e0634e2c": "コーディネーターエージェントに、ハンドオフ、ワークツリーハンドオーバー、および順次または並列の子エージェントにオーケストレーションを使用するように依頼します。",
           "ae79504732": "使い方",
           "7bc082f4de": "インストールコマンドのコピー",
           "832f1f3ee6": "独自のターミナルをご希望ですか?",
@@ -8481,7 +8481,7 @@
           "hostModelCapabilityProjectSetup": "プロジェクト設定",
           "hostModelCapabilityTaskSourceContext": "タスクソースコンテキスト",
           "hostModelCapabilityWorkspaceRunContext": "ワークスペース実行コンテキスト",
-          "3f67e8078a": "ここで保存済みサーバーを選ばない限り、新規プロジェクトはこのコンピューターに作成されます。既存のプロジェクト、ファイル、ターミナルはそれぞれのホストに残ります。",
+          "3f67e8078a": "ここで保存済みサーバーを選ばない限り、新規プロジェクトはこのコンピュータに作成されます。既存のプロジェクト、ファイル、ターミナルはそれぞれのホストに残ります。",
           "2c85efb3e8": "保存済みサーバーを選択すると、このブラウザはペアリング済みの HiveCode ランタイムを既定のホストとして使用します。",
           "serverConnected": "接続済み",
           "serverChecking": "確認中…",
@@ -8869,7 +8869,7 @@
           "d6a5f2ee5c": "~/.ssh/id_ed25519 (SSH エージェントの場合は空のままにします)",
           "63c0c145c1": "秘密鍵ファイル",
           "c94cfa634c": "ポート",
-          "47e082bc17": "デプロイ",
+          "47e082bc17": "deploy",
           "dc1dc52aaa": "ユーザー名",
           "2ee9bcd2e8": "サーバー、deploy@server:2222、ssh://server",
           "ce370ce674": "ホストまたはエイリアス *",
@@ -9751,7 +9751,7 @@
             },
             "userAgent": {
               "identity": "身元",
-              "userAgent": "ユーザー Agent",
+              "userAgent": "ユーザーエージェント",
               "native": "ネイティブ",
               "cleaned": "クリーン",
               "restart": "再起動"
@@ -9974,7 +9974,7 @@
             },
             "agentDashboard": {
               "title": "エージェントダッシュボード",
-              "description": "ワークツリー エージェントを監視するカンバンボード。ウィンドウ内またはポップアウトで表示できます。",
+              "description": "ワークツリーエージェントを監視するカンバンボード。ウィンドウ内またはポップアウトで表示できます。",
               "dashboard": "ダッシュボード",
               "agent": "エージェント",
               "kanban": "カンバン",
@@ -10349,11 +10349,11 @@
           "name": {
             "search": {
               "title": "マシン名",
-              "description": "他のデバイスやホストでこのコンピューターを表示する名前を選びます。",
+              "description": "他のデバイスやホストでこのコンピュータを表示する名前を選びます。",
               "machineName": "マシン名",
               "machine": "マシン",
               "hostname": "ホスト名",
-              "computer": "コンピューター",
+              "computer": "コンピュータ",
               "rename": "名前変更",
               "name": "名前"
             }
@@ -10514,7 +10514,7 @@
             "0534c76311": "HiveCode デスクトップ通知のマスタースイッチ。",
             "4a210b2f72": "通知を有効にする",
             "machines": "マシン",
-            "machinesDescription": "このコンピューターに通知を表示できるマシン（SSH マシンやペアリングしたサーバーなど）を選択します。",
+            "machinesDescription": "このコンピュータに通知を表示できるマシン（SSH マシンやペアリングしたサーバーなど）を選択します。",
             "host": "ホスト",
             "remote": "リモート",
             "ssh": "ssh",
@@ -11190,7 +11190,7 @@
           "a42f6fbdd8": "エージェントが作業している間、このコンピュータとディスプレイを起きたままにします。HiveCode は電源ポリシーに従い、蓋が閉じているときもこのデバイスを起きたままにするよう要求します。",
           "modeTitle": "コンピュータをスリープさせない",
           "modeDescriptionWindows": "オン、エージェント、オフから選択します。エージェントモードではエージェントの作業中にスリープを防ぎます。蓋を閉じたときの動作は、このデバイスの電源設定に従います。",
-          "modeDescriptionMac": "[オン]、[Agent]、または [オフ] を選択します。Agent モードは Agent の作業中のアイドルスリープを防止するため、蓋を開けたまま長時間の実行を完了できます。蓋を閉じると、この Mac はスリープします。",
+          "modeDescriptionMac": "[オン]、[Agent]、または [オフ] を選択します。エージェントモードはエージェントの作業中のアイドルスリープを防止するため、蓋を開けたまま長時間の実行を完了できます。蓋を閉じると、この Mac はスリープします。",
           "modeDescriptionDefault": "オン、エージェント、オフから選択します。エージェントモードではエージェントの作業中にスリープを防ぎます。HiveCode は蓋を閉じたときもスリープしないよう要求しますが、実際の動作はデバイスの電源ポリシーに従います。",
           "lidNoteMac": "蓋を開けたままアイドルスリープを防止します。蓋を閉じると、この Mac はスリープします。",
           "lidNoteWindows": "蓋を閉じる動作は、このデバイスの電源設定に従います。",
@@ -11225,8 +11225,8 @@
           "a68a642835": "HiveCode で作業中、待機中、完了の状態を表示します。オフにすると HiveCode 管理のフックを削除し、再インストールを停止します。"
         },
         "agent-workspace-trust-copy": {
-          "title": "HiveCode が Agent を起動するときにフォルダーを信頼する",
-          "description": "HiveCode が起動した Agent は「Do you trust this folder?」の確認を省略するため、プロジェクトの Agent のフックと設定がすぐに実行されます。この設定がオフの場合、各 Agent はフォルダーで初めて実行されるときに確認します。オーケストレーションのワーカー、オートメーション、スマートフォンから起動した Agent など、あなたが見ていない間に動く Agent は、そのターミナルで応答するまでこの確認で待機します。すでに信頼済みのフォルダーは信頼されたままです。"
+          "title": "HiveCode がエージェントを起動するときにフォルダーを信頼する",
+          "description": "HiveCode が起動したエージェントは「Do you trust this folder?」の確認を省略するため、プロジェクトのエージェントのフックと設定がすぐに実行されます。この設定がオフの場合、各エージェントはフォルダーで初めて実行されるときに確認します。オーケストレーションのワーカー、オートメーション、スマートフォンから起動したエージェントなど、あなたが見ていない間に動くエージェントは、そのターミナルで応答するまでこの確認で待機します。すでに信頼済みのフォルダーは信頼されたままです。"
         },
         "agent-generated-tab-title-copy": {
           "19ad21615a": "タブタイトルを自動生成",
@@ -11402,7 +11402,7 @@
           "sourceControlAiDefaults": "レシピ、プロンプト、ホスト型レビューの既定値は、このクライアントで共有されます。モデルの選択と検出は、エージェントが実行されるホストの範囲に限定されます。",
           "projectOnThisHost": "このホスト上のプロジェクト",
           "repositorySourceControlAi": "これらの上書き設定はこのプロジェクトのセットアップに適用され、変更するまではクライアントのソース管理 AI 既定値を継承します。",
-          "agentLaunchDefaults": "既定のAgent、コマンドの上書き、CLI 引数、起動環境は選択したホストに保存されます。",
+          "agentLaunchDefaults": "既定のエージェント、コマンドの上書き、CLI 引数、起動環境は選択したホストに保存されます。",
           "clientDefaultProjectScopes": "クライアントの既定値とプロジェクトのスコープ",
           "terminalQuickCommands": "コマンドはこのクライアントに保存され、全体またはプロジェクトのセットアップにスコープを設定して、選択したターミナルのコンテキストで実行されます。",
           "hostOverride": "ホストごとの上書き",
@@ -11768,8 +11768,8 @@
         },
         "MachineNameField": {
           "label": "マシン名",
-          "description": "他のデバイスやホストには「{{name}}」と表示されます。空欄にするとコンピューター自身の名前を使います。",
-          "pending": "他のデバイスやホストにはこの名前が表示されます。空欄にすると検出されたコンピューター名を使います。",
+          "description": "他のデバイスやホストには「{{name}}」と表示されます。空欄にするとコンピュータ自身の名前を使います。",
+          "pending": "他のデバイスやホストにはこの名前が表示されます。空欄にすると検出されたコンピュータ名を使います。",
           "placeholder": "自動検出"
         },
         "MobileRelayBetaAvailability": {
@@ -12267,7 +12267,7 @@
           "loadingBuilds": "バージョンを読み込み中…",
           "noBuilds": "バージョンが見つかりません",
           "refresh": "ビルド一覧を更新",
-          "cacheHint": "バージョン一覧は5分間キャッシュされます。新しいバージョンを確認するには一覧を更新してください。",
+          "cacheHint": "バージョン一覧は5分間キャッシュされます。新規バージョンを確認するには一覧を更新してください。",
           "switchTo": "ビルドに切り替え",
           "alreadyRunning": "現在実行中のビルドです。",
           "willSwitch": "{{value0}} → {{value1}}",
@@ -12344,7 +12344,7 @@
           "signedOut": "Artifacts やリモート接続などの HiveCode クラウド機能を使用するには、HiveCloud にログインしてください。",
           "checking": "アカウントの状態を確認中…",
           "account": "HiveCloud アカウント",
-          "signOut": "ログアウト",
+          "signOut": "サインアウト",
           "signInAgain": "もう一度ログイン",
           "signIn": "HiveCloud にログイン",
           "title": "アカウントとクラウド",
@@ -12545,7 +12545,7 @@
             "dialog": {
               "connectFailed": "接続に失敗しました",
               "title": "Bitbucket を接続",
-              "description": "Bitbucket Cloud の認証情報を使用してプルリクエストとビルド状態を参照します。HiveCode は保存前に認証情報を検証します。",
+              "description": "Bitbucket Cloud の認証情報を使用して PR とビルド状態を参照します。HiveCode は保存前に認証情報を検証します。",
               "remoteRuntime": "ここに保存する Bitbucket の認証情報は、このローカルマシンにのみ保存されます。リモートランタイムでは ORCA_BITBUCKET_* 環境変数を設定してください。",
               "environmentManaged": "Bitbucket は優先される ORCA_BITBUCKET_* 環境変数で設定済みです。HiveCode に認証情報を保存するには、その変数を解除してください。",
               "authModeLabel": "Bitbucket の認証方式",
@@ -12559,7 +12559,7 @@
               "apiTokenPlaceholder": "Atlassian API トークン",
               "baseUrl": "API ベース URL（任意）",
               "baseUrlPlaceholder": "https://api.bitbucket.org/2.0",
-              "tokenHint": "リポジトリ、プロジェクト、ワークスペースのアクセストークンは、それぞれの Bitbucket 設定ページで作成し、プルリクエストの読み取り権限が必要です。",
+              "tokenHint": "リポジトリ、プロジェクト、ワークスペースのアクセストークンは、それぞれの Bitbucket 設定ページで作成し、PR の読み取り権限が必要です。",
               "basicHint": "アカウント用の Atlassian API トークンを作成し、その所有者のメールアドレスと組み合わせてください。",
               "docsLink": "Bitbucket API トークンのドキュメント",
               "storageNote": "OS のキーチェーンが利用できる場合は暗号化してこのマシンに保存されます。ORCA_BITBUCKET_* 環境変数は常にここに保存した値より優先されます。",
@@ -12570,7 +12570,7 @@
           },
           "integration": {
             "card": {
-              "description": "Bitbucket Cloud のプルリクエストとビルド状態。",
+              "description": "Bitbucket Cloud の PR とビルド状態。",
               "edit": "認証情報を編集",
               "connect": "接続",
               "accountUnknown": "Bitbucket Cloud",
@@ -12578,7 +12578,7 @@
               "authModeBasic": "メールアドレスと API トークン",
               "disconnect": "Bitbucket の接続を解除",
               "envManaged": "環境変数で設定されています。HiveCode で認証情報を管理するには ORCA_BITBUCKET_* 変数を解除してください。",
-              "storedAuthFailed": "保存済みの Bitbucket 認証情報で認証できませんでした。編集するか、トークンにプルリクエストへのアクセス権があるか確認してください。",
+              "storedAuthFailed": "保存済みの Bitbucket 認証情報で認証できませんでした。編集するか、トークンに PR へのアクセス権があるか確認してください。",
               "storedCredential": "このマシンの HiveCode に保存されています。ORCA_BITBUCKET_* 環境変数が設定されている場合はそちらが優先されます。",
               "notConfigured": "Atlassian API トークンまたはアクセストークンで Bitbucket Cloud アカウントを接続します。ORCA_BITBUCKET_* 環境変数も使用でき、優先されます。",
               "disconnectFailed": "保存済みの Bitbucket 認証情報を削除できませんでした。",
@@ -12644,7 +12644,7 @@
         "NotificationHostToggles": {
           "offCount": "{{count}} 台オフ",
           "machines": "マシン",
-          "machinesDescription": "このコンピューターに通知を表示できるマシンを選択します。ペアリングしたサーバーのスイッチは、そのサーバー経由の作業にも適用されます。"
+          "machinesDescription": "このコンピュータに通知を表示できるマシンを選択します。ペアリングしたサーバーのスイッチは、そのサーバー経由の作業にも適用されます。"
         },
         "UnsealedCredentialNotice": {
           "body": "{{credential}} は暗号化されずに保存されています。このシステムには HiveCode が使える OS キーリングがありません。ディスクまたはそのバックアップを読み取れる人は、この認証情報も読み取れます。gnome-keyring または kwallet をインストールしてロックを解除し、もう一度保存して暗号化してください。"
@@ -12789,11 +12789,11 @@
         },
         "sshHostServer": {
           "sourceChanged": "古いバージョンの HiveCode がこのホストのプロジェクトを変更しました。再接続するには、その変更を管理対象サーバーに移動するか、サーバーのバージョンを維持してください。",
-          "deploying": "管理対象の HiveCode サーバーをセットアップ中…",
-          "converting": "このホストのプロジェクトを管理対象の HiveCode サーバーに移動中…",
-          "connecting": "管理対象の HiveCode サーバーに接続中…",
-          "updating": "管理対象サーバーを更新中…",
-          "starting": "管理対象サーバーを起動中…",
+          "deploying": "{{host}} で管理対象の HiveCode サーバーをセットアップ中…",
+          "converting": "このホストのプロジェクトを {{host}} の管理対象サーバーに移動中…",
+          "connecting": "{{host}} の管理対象 HiveCode サーバーに接続中…",
+          "updating": "{{host}} の管理対象 HiveCode サーバーを更新中…",
+          "starting": "{{host}} の管理対象 HiveCode サーバーを起動中…",
           "notServing": "HiveCode は管理対象サーバーが応答していることを確認できませんでした。",
           "hostNewer": "より上位バージョンの HiveCode で管理対象 HiveCode サーバーを実行しています。そのバージョンが維持されます。",
           "failureDetails": "詳細",
@@ -12867,7 +12867,7 @@
           "confirm": "セッションを終了",
           "confirmDescription": "この接続は Runtime へのアクセスを失います。ローカルペアリングと Runtime の所有権は変更されません。",
           "confirmTitle": "この Runtime セッションを終了しますか？",
-          "connectedAt": "接続日時",
+          "connectedAt": "接続済み",
           "currentDeviceTab": "ログインデバイス",
           "description": "登録済みの Runtime への Web、デスクトップ、モバイル接続を確認します。",
           "empty": "記録されている Runtime セッションはありません。",
@@ -12899,7 +12899,7 @@
         },
         "ZcodeCliSetupSection": {
           "title": "ZCode で GLM を使用する",
-          "description": "コーディング Agent として GLM を使用するにはサインインしてください。上記のクォータ API キーは使用状況の監視のみに使用されます。サインインとモデル選択は ZCode が独自に管理します。",
+          "description": "コーディングエージェントとして GLM を使用するにはサインインしてください。上記のクォータ API キーは使用状況の監視のみに使用されます。サインインとモデル選択は ZCode が独自に管理します。",
           "help": "ご利用のプランサイトのブラウザサインインを選択するか、ZCode のマスクされた API キー設定を使用してください。サインイン後、ZCode を起動し、/model で GLM モデルを選択します。",
           "zai": "Z.AI ブラウザサインイン",
           "bigmodel": "BigModel ブラウザサインイン",
@@ -12914,7 +12914,7 @@
         "SettingsHostScopePicker": {
           "label": "ホスト",
           "unavailable": "{{value0}} (利用不可)",
-          "description": "以下のアカウント、検出された Agent、ターミナルオプションはこのホストのものです。",
+          "description": "以下のアカウント、検出されたエージェント、ターミナルオプションはこのホストのものです。",
           "unavailableNotice": "このサーバーは保存されていないため、表示できるものがありません。設定の上部で別のホストを選択してください。"
         },
         "wslHostsExperimental": {
@@ -12993,7 +12993,7 @@
             },
             "7e4b2a19c0": "返信先の GitHub PR を特定できませんでした。",
             "430f1a62d4": "選択したスレッドをホスト上で解決できませんでした。",
-            "updateReactionFailed": "リアクションを更新できませんでした。",
+            "updateReactionFailed": "リ操作を更新できませんでした。",
             "gitlabMoreActions": "その他の MR 操作",
             "gitlabUnlink": "MR のリンクを解除",
             "gitlabLinkAnother": "別の MR をリンク"
@@ -13124,11 +13124,11 @@
             "closedToast": "{{value0}} がクローズされました",
             "9a41a687b7": "#{{pr}} までキューに追加 · {{count}} PR",
             "38a1bccb14": "#{{pr}} までキューに追加 · {{count}} PR",
-            "3de88351c5": "GitHub はこのプルリクエストと、その下にあるすべてのプルリクエストをマージキューに追加します。",
-            "a32fe6dba6": "GitHub はこのプルリクエストと、スタック内でその下にあるすべてのプルリクエストをマージします。",
-            "73e0e1819d": "スタックをキューに追加中...",
-            "e555a41d32": "スタックをマージ中...",
-            "markingReady": "レビュー準備完了に変更中...",
+            "3de88351c5": "GitHub はこの PR と、その下にあるすべての PR をマージキューに追加します。",
+            "a32fe6dba6": "GitHub はこの PR と、スタック内でその下にあるすべての PR をマージします。",
+            "73e0e1819d": "スタックをキューに追加中…",
+            "e555a41d32": "スタックをマージ中…",
+            "markingReady": "レビュー準備完了に変更中…",
             "markReady": "レビュー準備完了にする",
             "draftMoreActions": "その他の {{value0}} 操作",
             "closeDraft": "閉じる",
@@ -13798,7 +13798,7 @@
                   "5105b0e584": "承認が必要です",
                   "46dc85711b": "GitLab ではこの MR のマージ前に承認が必要です",
                   "893a999c8c": "変更要求",
-                  "c65408a99d": "レビュアーがこのマージリクエストに変更を要求しました",
+                  "c65408a99d": "レビュアーがこの MR に変更を要求しました",
                   "01ab632a21": "未解決のスレッド",
                   "4191fdfcec": "GitLab ではマージ前に未解決の議論を解決する必要があります",
                   "bf628700f6": "チェックの成功が必要",
@@ -13807,9 +13807,9 @@
                   "382c70faeb": "遅れ",
                   "2c61100b3a": "マージする前にブランチを更新する",
                   "195917574e": "確認中",
-                  "ff6db2db63": "GitLab がこのマージリクエストの状態を計算中です",
+                  "ff6db2db63": "GitLab がこの MR の状態を計算中です",
                   "4ecc0d90ee": "ブロック中",
-                  "a0f3de7023": "GitLab はこのマージリクエストがブロックされていると報告しています",
+                  "a0f3de7023": "GitLab はこの MR がブロックされていると報告しています",
                   "804ecf93e8": "GitLab は最終的なマージ状態をまだ報告していません",
                   "a5c049afe4": "GitLab はこの MR をマージ可能としています"
                 }
@@ -14146,11 +14146,11 @@
             "sessionDeleteFailed": "セッションを削除できませんでした",
             "resumeInChatConflict": "別のチャットがすでにこの会話を使用しています。",
             "resumeInChatTranscriptMissing": "この会話の履歴を読み込めないため、チャットで再開できません。",
-            "resumeInChatFailed": "このセッションを新しいチャットで再開できませんでした。",
+            "resumeInChatFailed": "このセッションを新規チャットで再開できませんでした。",
             "sessionsShownCompact": "{{value0}} 件表示",
             "shownRecent": "{{value0}}表示 · {{value1}}最近",
             "resumeInNewCliUnavailable": "このセッションは CLI で開けません。",
-            "resumeInNewCliHostTooOld": "このチャットを新しい CLI で再開するには、チャットを実行しているホストの HiveCode を更新してください。",
+            "resumeInNewCliHostTooOld": "このチャットを新規 CLI で再開するには、チャットを実行しているホストの HiveCode を更新してください。",
             "folderWorkspaceUnavailable": "フォルダーワークスペースは利用できなくなりました。"
           },
           "AiVaultPanelControls": {
@@ -14292,7 +14292,7 @@
             "deleteReasonUnsupportedAgent": "{{value0}} のセッションは HiveCode では削除できません。",
             "resumeInNewNativeChat": "新規ネイティブチャットで再開",
             "resumeInNewCli": "新規 CLI で再開",
-            "resumeInNewCliTooltipFork": "この会話を新しい CLI セッションにフォークします。",
+            "resumeInNewCliTooltipFork": "この会話を新規 CLI セッションにフォークします。",
             "resumeInNewCliTooltipChat": "ネイティブチャットはそのまま残ります。"
           },
           "AiVaultSessionDeleteDialog": {
@@ -14391,13 +14391,13 @@
                 "confirmation": {
                   "84f6f5b9eb": "対象：{{numbers}}。 ",
                   "541984b2eb": "#{{pr}} までキューに追加しますか？",
-                  "4809f55cdb": "{{included}}GitHub は {{count}} 件のプルリクエストをまとめてマージキューに追加します。キューがマージ方式を選択し、別々のグループでマージする場合があります。",
-                  "be8f2621be": "{{included}}GitHub は {{count}} 件のプルリクエストをまとめてマージキューに追加します。キューがマージ方式を選択し、別々のグループでマージする場合があります。",
+                  "4809f55cdb": "{{included}}GitHub は {{count}} 件の PR をまとめてマージキューに追加します。キューがマージ方式を選択し、別々のグループでマージする場合があります。",
+                  "be8f2621be": "{{included}}GitHub は {{count}} 件の PR をまとめてマージキューに追加します。キューがマージ方式を選択し、別々のグループでマージする場合があります。",
                   "92ca033e72": "{{count}} PR をキューに追加",
                   "478a527b15": "{{count}} PR をキューに追加",
                   "1feef35ca4": "#{{pr}} までマージしますか？",
-                  "c3e036c99f": "{{included}}GitHub は {{method}} を使用して {{count}} 件のプルリクエストを一括でマージします。マージできない場合は何もマージされません。",
-                  "369aba4b32": "{{included}}GitHub は {{method}} を使用して {{count}} 件のプルリクエストを一括でマージします。1 件でもマージできない場合はすべてマージされません。",
+                  "c3e036c99f": "{{included}}GitHub は {{method}} を使用して {{count}} 件の PR を一括でマージします。マージできない場合は何もマージされません。",
+                  "369aba4b32": "{{included}}GitHub は {{method}} を使用して {{count}} 件の PR を一括でマージします。1 件でもマージできない場合はすべてマージされません。",
                   "493c78f521": "{{count}} PR をマージ",
                   "eb7051d268": "{{count}} PR をマージ"
                 },
@@ -14458,7 +14458,7 @@
           "CreateHostedReviewComposerFields": {
             "90cabf6cfc": "この PR を #{{value0}} の上に積む",
             "ff81473a57": "GitHub Stack を作成するか、親の既存スタックを拡張します。",
-            "29732f2fb0": "新しい PR"
+            "29732f2fb0": "新規 PR"
           },
           "AiVaultSearchEvidence": {
             "sourceUnverifiable": "トランスクリプトの利用可能性を確認できませんでした",
@@ -14532,7 +14532,7 @@
           "hideAgents": "エージェントを非表示にする",
           "showMoreAgents": "{{value0}} 件のエージェントをさらに表示→",
           "yoloModeLabel": "Yolo モード",
-          "yoloPermissionsDescription": "Agent は確認なしでコマンドを実行しファイルを編集します。一部はサンドボックスも回避します。信頼できるプロジェクトでのみ使用してください。",
+          "yoloPermissionsDescription": "エージェントは確認なしでコマンドを実行しファイルを編集します。一部はサンドボックスも回避します。信頼できるプロジェクトでのみ使用してください。",
           "yoloPermissionsInfo": "エージェント権限情報",
           "yoloPermissionsLabel": "Yolo / 危険: 権限チェックをスキップ",
           "yoloPermissionsTooltip": "エージェントの権限チェックをスキップして割り込みを減らす"
@@ -14756,7 +14756,7 @@
           },
           "ProjectCombobox": {
             "empty": "検索条件に一致するプロジェクトはありません。",
-            "addProject": "新規プロジェクトを追加",
+            "addProject": "プロジェクトを追加",
             "label": "プロジェクト",
             "browse": "プロジェクトを参照",
             "listLabel": "プロジェクト",
@@ -14836,7 +14836,7 @@
           "pairingCodeReady": "ペアリングコードの準備ができました",
           "pairThisMac": "この Mac をペアリングします。",
           "pairThisPc": "この PC をペアリングします。",
-          "pairThisComputer": "このコンピューターをペアリングします。",
+          "pairThisComputer": "このコンピュータをペアリングします。",
           "androidHelp": {
             "guide": "インストールガイド"
           }
@@ -14994,7 +14994,7 @@
           "retryingTitle": "HiveCode Relay を再試行中…",
           "unavailableTitle": "このデスクトップでは HiveCode Relay を利用できません。",
           "title": "Relay のペアリングコードを作成できませんでした。",
-          "retryingBody": "新しいペアリングコードを作成しています。リモート接続では時間がかかる場合があります。",
+          "retryingBody": "新規ペアリングコードを作成しています。リモート接続では時間がかかる場合があります。",
           "unavailableBody": "Tailscale または同じ Wi‑Fi 経由でペアリングするには LAN を使用してください。",
           "body": "再試行するか、LAN を使用して Tailscale または同じ Wi‑Fi 経由でペアリングしてください。",
           "useLan": "LAN を使用",
@@ -15323,22 +15323,22 @@
                   "localized": {
                     "copy": {
                       "62bac8f43c": "2 つの異なる ワークツリー で同時に作業できます。それぞれが隔離されているため（同じプロジェクト内でも）、2 つの機能を並行して開発するのに最適です。",
-                      "908898c3ee": "HiveCode のブラウザーを使う",
+                      "908898c3ee": "HiveCode のブラウザを使う",
                       "43781563c3": "HiveCode を離れずに Web アプリを閲覧できます。任意の要素を選択し、正確なソースとスタイルをワンクリックでエージェントに送信できます。",
                       "29aa2c2077": "通知を有効にする",
                       "71bd9a8c95": "エージェントが完了したとき、対応が必要なとき、またはブロックされたときにすぐ確認できます。",
                       "46db810da8": "既定のエージェントを選択",
-                      "b8e5bae17f": "好みのエージェントをあらかじめ選択して、新しい作業をすばやく開始できます。",
+                      "b8e5bae17f": "好みのエージェントをあらかじめ選択して、新規作業をすばやく開始できます。",
                       "ad342dd4c6": "連携を接続",
                       "06fe30fdb0": "タスクからワンクリックでエージェントを起動し、PR の状態を継続して確認できます。",
                       "eddc532e58": "ワークスペース設定を自動化",
-                      "56049b74c2": "インストールと設定のコマンドを自動実行し、新しい ワークツリー をすぐにエージェントで使える状態にします。",
+                      "56049b74c2": "インストールと設定のコマンドを自動実行し、新規 ワークツリー をすぐにエージェントで使える状態にします。",
                       "2cf795433b": "複数のリポジトリで作業を開始",
                       "42525ba8a4": "主要なリポジトリを HiveCode に追加し、フォルダーを探さずにエージェント作業を開始できます。",
                       "workOnTwoTasks": "2つのタスクを同時に進める",
-                      "agentSkillsName": "Agent に HiveCode スキルを追加",
-                      "agentSkillsDescription": "Agent が HiveCode のブラウザを操作し、コンピューターを制御し、複数ステップの作業を調整するためのスキルをインストールします。",
-                      "7bcb4097fa": "HiveCode シェルコマンドを登録し、ブラウザー、コンピューター、オーケストレーションのワークフロー向けエージェントスキルをインストールします。",
+                      "agentSkillsName": "エージェントに HiveCode スキルを追加",
+                      "agentSkillsDescription": "エージェントが HiveCode のブラウザを操作し、コンピュータを制御し、複数ステップの作業を調整するためのスキルをインストールします。",
+                      "7bcb4097fa": "HiveCode シェルコマンドを登録し、ブラウザ、コンピュータ、オーケストレーションのワークフロー向けエージェントスキルをインストールします。",
                       "ec0a363633": "マルチタスク",
                       "fee5557b02": "HiveCode CLI を有効にする"
                     }
@@ -15577,7 +15577,7 @@
                   "connectingDisplay": "ディスプレイに接続中…",
                   "reconnect": "再接続",
                   "reconnectingDisplay": "ディスプレイに再接続中…",
-                  "startingEmulator": "エミュレーターを起動中…",
+                  "startingEmulator": "エミュレータを起動中…",
                   "webCodecsUnsupported": "このビルドは WebCodecs の H.264 デコードをサポートしていません。"
                 }
               }
@@ -15636,7 +15636,7 @@
             "6d950431d2": "非表示",
             "ebceac65a4": "セットアップ",
             "3f003507f4": "設定で完全なセットアップを開く",
-            "installSkillPrompt": "Agent にこのシミュレーターを操作させたいときは、HiveCode CLI スキルをインストールしてください。",
+            "installSkillPrompt": "エージェントにこのシミュレーターを操作させたいときは、HiveCode CLI スキルをインストールしてください。",
             "72736b051f": "エージェントにこのシミュレーターを操作させたい場合は、HiveCode CLI + スキルをセットアップしてください。"
           },
           "MobileEmulatorAgentSetupGuideSteps": {
@@ -15737,7 +15737,7 @@
           "8368d256ec": "combined-branch",
           "8f68ad9ca9": "{{value0}} AI {{value1}} を表示",
           "724a13568d": "（{{value0}}）",
-          "6094135eec": " 対 {{value0}}",
+          "6094135eec": " vs {{value0}}",
           "a4420ca1f7": "ラップオン",
           "dde325ddfe": "ラップオフ",
           "2e91bc89d1": "空白文字を表示",
@@ -16891,7 +16891,7 @@
           "search": "実行を検索…",
           "filters": "フィルター",
           "host": "ホスト",
-          "status": "ステータス",
+          "status": "状態",
           "refresh": "実行を更新",
           "successful24h": "成功 · 24時間",
           "failed24h": "失敗 · 24時間",
@@ -16899,7 +16899,7 @@
           "failed7d": "失敗 · 7日間",
           "historyUnavailableOne": "1件の自動化で実行履歴を利用できません。カウントには利用可能な履歴のみが含まれます。",
           "historyUnavailableMany": "{{count}}件の自動化で実行履歴を利用できません。カウントには利用可能な履歴のみが含まれます。",
-          "automation": "自動化",
+          "automation": "オートメーション",
           "triggered": "トリガー済み",
           "trigger": "トリガー",
           "loading": "実行を読み込み中…",
@@ -17134,9 +17134,9 @@
           "tableName": "名前",
           "tableProject": "プロジェクト",
           "tableHost": "ホスト",
-          "tableStatus": "ステータス",
+          "tableStatus": "状態",
           "tableActions": "操作",
-          "newAutomation": "新しい自動化",
+          "newAutomation": "新規自動化",
           "rowActions": "自動化の操作",
           "tableLastRun": "前回の実行",
           "noListMatches": "一致する自動化はありません。",
@@ -17273,7 +17273,7 @@
         "AutomationListSearchField": {
           "tooLong": "検索テキストが長すぎます — リストは未フィルタです",
           "label": "自動化を検索",
-          "placeholder": "検索...",
+          "placeholder": "検索…",
           "tooLongShort": "長すぎます",
           "clear": "検索をクリア"
         },
@@ -17298,8 +17298,8 @@
           "placeholder": "ホストを選択",
           "storedOn": "{authority} が保存してスケジュールします。",
           "unselected": "この自動化を保存してスケジュールするホストを選択します。",
-          "orphan": "ホストのない自動化は新しい自動化を保持できません。この自動化を作成するホストを選択してください。",
-          "unavailable": "そのホストはまだ新しい自動化を保持できません。これを作成する別のホストを選択してください。",
+          "orphan": "ホストのない自動化は新規自動化を保持できません。この自動化を作成するホストを選択してください。",
+          "unavailable": "そのホストはまだ新規自動化を保持できません。これを作成する別のホストを選択してください。",
           "stale": "このフォームを開いている間に {host} が変更されました。保存する前にもう一度選択してください。",
           "projectMismatch": "そのプロジェクトは {host} にありません。そのホスト上のプロジェクト、または別のホストを選択してください。",
           "noProjects": "{host} にはプロジェクトが設定されていません。そこに追加するか、別のホストを選択してください。",
@@ -17408,8 +17408,8 @@
         "extraAgentArgs": {
           "advanced": "詳細設定",
           "clear": "引数をクリア",
-          "unsupported": "この Agent は追加の引数にまだ対応していません。",
-          "label": "追加の Agent 引数",
+          "unsupported": "このエージェントは追加の引数にまだ対応していません。",
+          "label": "追加のエージェント引数",
           "needsFreshSession": "追加の引数を使うには、実行ごとに新しいセッションが必要です。",
           "useFreshSessions": "新しいセッションを使用",
           "helper": "新しいセッションごとに、このホストのデフォルト引数に追加されます。",
@@ -17488,8 +17488,8 @@
           "hiddenCount": "{{value0}} を非表示にしました",
           "hideAutomationCreated": "自動化で作成されたワークスペースを非表示",
           "hideCliCreated": "CLI が作成したものを非表示",
-          "hideOtherClientsAria": "共有リモートサーバー上の他の Orca クライアントで作成されたワークスペース内の Agent を非表示",
-          "hideOtherClients": "他のクライアントの Agent を非表示"
+          "hideOtherClientsAria": "共有リモートサーバー上の他の Orca クライアントで作成されたワークスペース内のエージェントを非表示",
+          "hideOtherClients": "他のクライアントのエージェントを非表示"
         },
         "ActivityThreadRow": {
           "clearNotification": "通知を消去"
@@ -17524,15 +17524,15 @@
           "goToWorkspace": "ワークスペースへ移動",
           "clear": "リストから消去",
           "agentSection": "Agent",
-          "markManyRead_one": "{{count}} 件の Agent に既読マークを付ける",
-          "markManyRead_other": "{{count}} 件の Agent に既読マークを付ける",
-          "markManyUnread_one": "{{count}} 件の Agent を未読としてマークする",
-          "markManyUnread_other": "{{count}} 件の Agent を未読としてマークする",
-          "clearMany_one": "{{count}} 件の Agent をリストから消去",
-          "clearMany_other": "{{count}} 件の Agent をリストから消去",
-          "markManyRead": "{{count}} 件の Agent に既読マークを付ける",
-          "markManyUnread": "{{count}} 件の Agent を未読としてマークする",
-          "clearMany": "{{count}} 件の Agent をリストから消去"
+          "markManyRead_one": "{{count}} 件のエージェントに既読マークを付ける",
+          "markManyRead_other": "{{count}} 件のエージェントに既読マークを付ける",
+          "markManyUnread_one": "{{count}} 件のエージェントを未読としてマークする",
+          "markManyUnread_other": "{{count}} 件のエージェントを未読としてマークする",
+          "clearMany_one": "{{count}} 件のエージェントをリストから消去",
+          "clearMany_other": "{{count}} 件のエージェントをリストから消去",
+          "markManyRead": "{{count}} 件のエージェントに既読マークを付ける",
+          "markManyUnread": "{{count}} 件のエージェントを未読としてマークする",
+          "clearMany": "{{count}} 件のエージェントをリストから消去"
         }
       },
       "confirmation": {
@@ -17747,7 +17747,7 @@
             "github": {
               "detail": {
                 "host": {
-                  "8d5cde4770": "プルリクエスト",
+                  "8d5cde4770": "PR",
                   "312ca15778": "GitHub 一覧"
                 }
               },
@@ -17761,7 +17761,7 @@
               "work": {
                 "item": {
                   "row": {
-                    "draftPullRequest": "ドラフトのプルリクエスト",
+                    "draftPullRequest": "ドラフトの PR",
                     "pullRequest": "PR",
                     "issue": "Issue"
                   }
@@ -18021,17 +18021,17 @@
         "copySuccess": "成果物のリンクをコピーしました",
         "copyFailed": "成果物のリンクをコピーできませんでした",
         "copyLink": "リンクをコピー",
-        "openInBrowser": "ブラウザーで開く",
+        "openInBrowser": "ブラウザで開く",
         "preview": "成果物のプレビュー",
         "previewUnavailable": "プレビューを利用できません",
-        "previewUnavailableDescription": "この成果物をブラウザーで開いて表示してください。",
+        "previewUnavailableDescription": "この成果物をブラウザで開いて表示してください。",
         "actions": "成果物の操作",
         "ArtifactActions": {
           "more": "その他の成果物操作"
         },
         "ArtifactCollection": {
           "loadMore": "さらに読み込む",
-          "noMatches": "一致する項目はありません"
+          "noMatches": "一致なし"
         },
         "ArtifactDetailHeader": {
           "publicLink": "このリンクを知っている人は誰でも表示できます",
@@ -18054,7 +18054,7 @@
           "name": "名前",
           "type": "種類",
           "size": "サイズ",
-          "updated": "更新日時",
+          "updated": "更新済み",
           "expires": "有効期限",
           "actions": "操作"
         },
@@ -18069,7 +18069,7 @@
         "label": "親ワークツリー",
         "noParent": "親なし",
         "description": "このワークスペースをサイドバー内の別のワークスペースの配下にネストします。ベースブランチは変更されません。",
-        "searchPlaceholder": "ワークスペースを検索...",
+        "searchPlaceholder": "ワークスペースを検索…",
         "noMatches": "一致する項目がありません。"
       },
       "BrowserCookieImportDisclosure": {
@@ -18078,8 +18078,8 @@
       },
       "NativeChatResumeOnRestartModal": {
         "title": "中断されたチャットを再開しますか?",
-        "body": "これらのチャットは、HiveCode が終了したときに作業中でした。再開すると、各チャットが完全なコンテキストとともに停止した場所から復元され、続行する前に何をしていたかを確認するよう Agent に要求されます。自分自身のプロンプトは再送信されません。",
-        "updateBody": "これらのチャットは、HiveCode がアップデートをインストールしたときに作業中でした。再開すると、各チャットが完全なコンテキストとともに停止した場所から復元され、続行する前に何をしていたかを確認するよう Agent に要求されます。自分自身のプロンプトは再送信されません。",
+        "body": "これらのチャットは、HiveCode が終了したときに作業中でした。再開すると、各チャットが完全なコンテキストとともに停止した場所から復元され、続行する前に何をしていたかを確認するようエージェントに要求されます。自分自身のプロンプトは再送信されません。",
+        "updateBody": "これらのチャットは、HiveCode がアップデートをインストールしたときに作業中でした。再開すると、各チャットが完全なコンテキストとともに停止した場所から復元され、続行する前に何をしていたかを確認するようエージェントに要求されます。自分自身のプロンプトは再送信されません。",
         "resuming": "再開中…",
         "untitled": "無題のチャット",
         "listLabel": "再開されるチャット",
@@ -18101,8 +18101,8 @@
         "activityApproval": "承認待ち: {{value0}}",
         "activityQuestion": "回答待ち: {{value0}}",
         "activityMidReply": "返信の途中でした",
-        "activitySubagentOne": "サブ Agent 実行中: {{value0}}",
-        "activitySubagentMany": "{{value0}} 個のサブ Agent が実行中",
+        "activitySubagentOne": "サブエージェント実行中: {{value0}}",
+        "activitySubagentMany": "{{value0}} 個のサブエージェントが実行中",
         "activityMonitorOne": "監視中: {{value0}}",
         "activityMonitorMany": "{{value0}} 個のバックグラウンドタスクを監視中",
         "selectWorkspace": "{{value0}} のチャットをすべて選択",
@@ -18136,9 +18136,9 @@
         "55c86654b7": "インストールコマンドをコピー",
         "53e1559f99": "手動インストールが必要です",
         "a7ac6ec78b": "HiveCode がシステムパッケージをダウンロードしました。ターミナルから更新を完了する前に HiveCode を終了してください。",
-        "82c6dbea00": "コマンドをコピーして HiveCode を終了し、HiveCode がインストールされているコンピューターのシステムターミナルで実行してください。完了後に HiveCode を再度開いてください。",
+        "82c6dbea00": "コマンドをコピーして HiveCode を終了し、HiveCode がインストールされているコンピュータのシステムターミナルで実行してください。完了後に HiveCode を再度開いてください。",
         "53c4b8e148": "特権インストールの要求に応答する利用可能な認証エージェントがありませんでした。",
-        "c732bcbf8f": "パッケージを確認中...",
+        "c732bcbf8f": "パッケージを確認中…",
         "aa57fa4f80": "コマンドをコピーしました。HiveCode を終了してシステムターミナルで実行し、{{value0}} をインストールしてから HiveCode を再度開いてください。",
         "b7e7c5bc95": "HiveCode はこのコマンドの作成時に、ダウンロードしたファイルをリリースのメタデータと照合します。システムパッケージ自体の署名は検証されず、その時点以降のファイルを HiveCode が保証することはできません。",
         "manualExplainer": "インストールコマンドをコピーして HiveCode を終了し、システムターミナルで実行してください。コマンドが完了したら HiveCode を再度開いてください。",
@@ -18212,7 +18212,7 @@
         "conflict": "このチャットは別の HiveCode ウィンドウまたはターミナルで開かれています。そちらで閉じてから再試行してください。",
         "ownershipUnknown": "このチャットはまだ再開できる状態ではありません。少し待ってから再試行してください。",
         "notAttached": "チャットが再接続されませんでした。再試行するか、開いて新しいターンを開始してください。",
-        "dispatchRejected": "Agent が “continue” メッセージを拒否しました。チャットを開いて自分で送信してください。",
+        "dispatchRejected": "エージェントが “continue” メッセージを拒否しました。チャットを開いて自分で送信してください。",
         "unsupported": "このチャットは HiveCode で再開できません。開いて停止位置を確認してください。",
         "fallback": "HiveCode はこのチャットを再開できませんでした。開いて手動で続けてください。"
       },
@@ -18233,8 +18233,8 @@
         "resumingTitleOne": "1 件のチャットを再開中",
         "resumingTitle": "{{value0}} 件のチャットを再開中",
         "description": "各チャットは全コンテキストとともに復元され、中断した箇所を確認するよう依頼されます。このダイアログは閉じても構いません。進行状況はステータスバーで確認できます。",
-        "finished": "これらのチャットは HiveCode が終了したときに作業中でした。HiveCode は各チャットを停止した時点から、すべてのコンテキストとともに復元し、続行する前に何をしていたかを確認するよう Agent に依頼しました。あなた自身のプロンプトは再送信されていません。",
-        "finishedUpdate": "これらのチャットは HiveCode がアップデートをインストールしたときに作業中でした。HiveCode は各チャットを停止した時点から、すべてのコンテキストとともに復元し、続行する前に何をしていたかを確認するよう Agent に依頼しました。あなた自身のプロンプトは再送信されていません。",
+        "finished": "これらのチャットは HiveCode が終了したときに作業中でした。HiveCode は各チャットを停止した時点から、すべてのコンテキストとともに復元し、続行する前に何をしていたかを確認するようエージェントに依頼しました。あなた自身のプロンプトは再送信されていません。",
+        "finishedUpdate": "これらのチャットは HiveCode がアップデートをインストールしたときに作業中でした。HiveCode は各チャットを停止した時点から、すべてのコンテキストとともに復元し、続行する前に何をしていたかを確認するようエージェントに依頼しました。あなた自身のプロンプトは再送信されていません。",
         "finishedPartial": "これらのチャットは HiveCode が終了したときに作業中でした。HiveCode が再開したチャットは停止した時点から、すべてのコンテキストとともに復元され、続行する前に何をしていたかを確認するよう依頼されました。あなた自身のプロンプトは再送信されていません。対応が必要なチャットや再開できるチャットは、この一覧で確認してください。",
         "finishedPartialUpdate": "これらのチャットは HiveCode がアップデートをインストールしたときに作業中でした。HiveCode が再開したチャットは停止した時点から、すべてのコンテキストとともに復元され、続行する前に何をしていたかを確認するよう依頼されました。あなた自身のプロンプトは再送信されていません。対応が必要なチャットや再開できるチャットは、この一覧で確認してください。"
       },
@@ -18275,7 +18275,7 @@
         "0ab71bb840": "A saved filter with this name already exists.",
         "42ce360813": "JQL",
         "7b21c59a26": "Delete filter",
-        "a62f9db53d": "Cancel",
+        "a62f9db53d": "キャンセル",
         "c77189bc0c": "Update filter",
         "19af906d12": "Save filter"
       }
@@ -18390,7 +18390,7 @@
         "copyOrcaSessionId": "HiveCode セッション ID をコピー",
         "orcaSessionIdCopied": "HiveCode セッション ID をコピーしました",
         "orcaSessionIdCopyFailed": "HiveCode セッション ID をコピーできませんでした",
-        "orcaSessionIdTooltip": "このチャットに対する HiveCode の ID です。Agent CLI 独自のセッション ID とは別のものです。Agent は HiveCode を通じて互いを指すときにこれを使います。"
+        "orcaSessionIdTooltip": "このチャットに対する HiveCode の ID です。Agent CLI 独自のセッション ID とは別のものです。エージェントは HiveCode を通じて互いを指すときにこれを使います。"
       },
       "failureWords": {
         "theAgent": "Agent",
@@ -18407,7 +18407,7 @@
         "claudeManagedNotSignedIn": "この Claude アカウントにサインインしていません。設定の Claude アカウントで再度サインインしてください。",
         "codexSystemNotSignedIn": "Codex にサインインしていません。`{{loginCommand}}` を実行してください。",
         "codexManagedNotSignedIn": "この Codex アカウントにサインインしていません。設定の Codex アカウントで再度サインインしてください。",
-        "cliMissing": "このチャットを実行しているコンピューターで {{agent}} が見つかりませんでした。インストールするか、[設定] → [Agent] の [コマンド] を確認してください。",
+        "cliMissing": "このチャットを実行しているコンピュータで {{agent}} が見つかりませんでした。インストールするか、[設定] → [Agent] の [コマンド] を確認してください。",
         "signInFirst": "先にサインインしてください。",
         "signInThenRunCommand": "サインインしてから、/{{command}} をもう一度実行してください。",
         "signInThenSend": "サインインしてから、メッセージをもう一度送信してください。",
@@ -18437,12 +18437,12 @@
         "attachmentUnsupportedType": "{{agent}} が受け付けるのは PNG、JPEG、GIF、WebP 画像のみのため、このメッセージは送信されませんでした。",
         "attachmentNotAFile": "このメッセージの画像がファイルではないため、メッセージは送信されませんでした。",
         "attachmentNoSource": "このメッセージの画像に送信するファイルがないため、メッセージは送信されませんでした。",
-        "attachmentInvalid": "このメッセージの添付ファイルは Agent に送信できません。",
+        "attachmentInvalid": "このメッセージの添付ファイルはエージェントに送信できません。",
         "attachmentUnreadable": "このメッセージの添付ファイルを読み取れなかったため、メッセージは送信されませんでした。",
         "emptyMessage": "このメッセージは空のため、送信されませんでした。",
-        "queueFull": "Agent を待っているメッセージが多すぎたため、このメッセージは送信されませんでした。",
-        "writeFailed": "HiveCode はこのメッセージを Agent に渡せなかったため、送信されませんでした。",
-        "cancelled": "このメッセージは Agent が処理を始める前に取り消されました。",
+        "queueFull": "エージェントを待機中メッセージが多すぎたため、このメッセージは送信されませんでした。",
+        "writeFailed": "HiveCode はこのメッセージをエージェントに渡せなかったため、送信されませんでした。",
+        "cancelled": "このメッセージはエージェントが処理を始める前に取り消されました。",
         "chatClosed": "このメッセージが送信される前にチャットが閉じられました。",
         "hostRestarted": "このメッセージが送信される前に HiveCode が再起動しました。",
         "notDelivered": "このメッセージは配信されませんでした。",
@@ -18456,7 +18456,7 @@
         "stopRefused": "{{agent}} は停止しませんでした。",
         "stopRefusedQuoted": "{{agent}} は停止しませんでした: {{detail}}。",
         "noTurnToStop": "{{agent}} には停止できる実行中のターンがありませんでした。",
-        "answerUnconfirmed": "回答は記録されましたが、Agent は確認しませんでした。",
+        "answerUnconfirmed": "回答は記録されましたが、エージェントは確認しませんでした。",
         "argumentsMissingValue": "保存された引数の {{option}} に値が必要です。",
         "argumentsMultipleValues": "保存された引数の {{option}} に複数の値が指定されています。",
         "argumentsPositionalPrompt": "保存された引数にプロンプトが含まれています。",
@@ -18471,47 +18471,47 @@
         "providerRetryNumberOf": "{{maxRetries}} 回中 {{attempt}} 回目の再試行です。",
         "providerRetryLastError": "直近のエラー: {{detail}}。",
         "previousExitUnverifiable": "以前の {{agent}} を停止できませんでした。",
-        "sessionNotRestored": "{{agent}} は以前のセッションを再開できなかったため、このチャットは新しいセッションで続行します。{{agent}} は以前のメッセージを覚えていません。",
-        "agentCommandNotSignedIn": "このチャットを実行しているコンピューターで `{{loginCommand}}` を使って {{agent}} にサインインしてください。",
-        "interactiveAgentNotSignedIn": "このチャットを実行しているコンピューターで `{{loginCommand}}` を起動し、`{{slashCommand}}` を使って {{agent}} にサインインしてください。",
+        "sessionNotRestored": "{{agent}} は以前のセッションを再開できなかったため、このチャットは新規セッションで続行します。{{agent}} は以前のメッセージを覚えていません。",
+        "agentCommandNotSignedIn": "このチャットを実行しているコンピュータで `{{loginCommand}}` を使って {{agent}} にサインインしてください。",
+        "interactiveAgentNotSignedIn": "このチャットを実行しているコンピュータで `{{loginCommand}}` を起動し、`{{slashCommand}}` を使って {{agent}} にサインインしてください。",
         "agentNotSignedIn": "{{agent}} にサインインしてください。",
         "thenSendAgain": "その後、メッセージをもう一度送信してください。",
         "runCommandWhenDone": "終わったら /{{command}} を実行してください。",
-        "commandAfterAnswer": "Agent の質問または承認に回答してから、/{{command}} を実行してください。",
+        "commandAfterAnswer": "エージェントの質問または承認に回答してから、/{{command}} を実行してください。",
         "providerExitedAnswer": "{{agent}} が停止したため、回答は送信されませんでした。続けるにはメッセージを送信してください。",
         "backgroundTaskNotStopped": "バックグラウンドタスクは停止されませんでした。",
         "backgroundTasksNotStopped": "バックグラウンドタスクは停止されませんでした。",
         "couldNotStop": "{{agent}} を停止できませんでした。",
-        "couldNotStopTheAgent": "Agent を停止できませんでした。"
+        "couldNotStopTheAgent": "エージェントを停止できませんでした。"
       },
       "writeNotice": {
         "notDoneReadHistory": "このチャットの履歴を読み込めませんでした。",
         "notDoneSend": "メッセージは送信されませんでした。",
         "tryAgainComposerSend": "もう一度送信してください。",
         "messageNotSaved": "メッセージを保存できませんでした。",
-        "notDoneStop": "Agent は停止されませんでした。",
+        "notDoneStop": "エージェントは停止されませんでした。",
         "notDoneStopTask": "バックグラウンドタスクは停止されませんでした。",
         "notDoneStopTasks": "バックグラウンドタスクは停止されませんでした。",
         "notDoneAnswer": "回答は送信されませんでした。",
         "notDoneOption": "設定は変更されませんでした。",
         "notDoneCommand": "コマンドは実行されませんでした。",
         "notDoneGoal": "目標は変更されませんでした。",
-        "restartFailed": "Agent を再起動できませんでした。",
-        "capacity": "このチャットを実行しているコンピューターの HiveCode がリクエストの上限に達しました。そのコンピューターで HiveCode を更新してから、もう一度お試しください。",
+        "restartFailed": "エージェントを再起動できませんでした。",
+        "capacity": "このチャットを実行しているコンピュータの HiveCode がリクエストの上限に達しました。そのコンピュータで HiveCode を更新してから、もう一度お試しください。",
         "outcomeUnknown": "HiveCode は何が起きたかを確認できませんでした。チャットを確認してください。",
-        "sendOutcomeLost": "HiveCode はメッセージが Agent に届いたことを確認できませんでした。チャットを確認し、必要であればもう一度送信してください。",
+        "sendOutcomeLost": "HiveCode はメッセージがエージェントに届いたことを確認できませんでした。チャットを確認し、必要であればもう一度送信してください。",
         "questionChanged": "この質問はすでに回答済みか、変更されています。",
         "historyUnreadable": "HiveCode はこのチャットの保存済み履歴を読み取れませんでした。",
         "historyUnusable": "このチャットを読み込めません。",
         "historyUnavailable": "HiveCode は現在このチャットの履歴を開けませんでした。",
-        "savedByNewerOrca": "チャットは新しいバージョンの HiveCode で保存されました。",
+        "savedByNewerOrca": "チャットは新規バージョンの HiveCode で保存されました。",
         "updateOrcaToKeepUsing": "引き続き使用するには、HiveCode を更新してください。",
-        "chatSavedByNewerOrca": "このチャットは新しいバージョンの Orca で保存されました。",
+        "chatSavedByNewerOrca": "このチャットは新規バージョンの Orca で保存されました。",
         "updateOrcaToOpenChat": "開くには Orca を更新してください。",
-        "unsupported": "このチャットを実行しているコンピューターに新しいバージョンの HiveCode が必要です。そのコンピューターで HiveCode を更新してから、もう一度お試しください。",
+        "unsupported": "このチャットを実行しているコンピュータに新規バージョンの HiveCode が必要です。そのコンピュータで HiveCode を更新してから、もう一度お試しください。",
         "notAvailable": "このチャットでは利用できません。",
-        "cannotRunHere": "Orca はここでこの Agent をチャットで実行できません。",
-        "unreachable": "HiveCode は Agent に接続できませんでした。",
+        "cannotRunHere": "Orca はここでこのエージェントをチャットで実行できません。",
+        "unreachable": "HiveCode はエージェントに接続できませんでした。",
         "recordFailed": "HiveCode はこれをチャットの履歴に保存できませんでした。",
         "attachmentExpired": "この添付ファイルは期限切れです。",
         "reattachFile": "削除してから、もう一度添付してください。",
@@ -18520,11 +18520,11 @@
         "clearUnfinished": "前回の /clear は完了しませんでした。",
         "commandRunning": "/compact または /clear がまだ実行中です。",
         "waitForCommand": "/compact または /clear が終わるまでお待ちください。",
-        "agentStarting": "Agent はまだ起動中です。",
-        "waitForStart": "Agent の起動が終わるまでお待ちください。",
-        "turnActive": "Agent はまだ応答中です。",
-        "waitForTurn": "Agent の応答が終わるまで待つか、Agent を停止してください。",
-        "promptPending": "Agent は質問または承認への回答を待っています。",
+        "agentStarting": "エージェントはまだ起動中です。",
+        "waitForStart": "エージェントの起動が終わるまでお待ちください。",
+        "turnActive": "エージェントはまだ応答中です。",
+        "waitForTurn": "エージェントの応答が終わるまで待つか、エージェントを停止してください。",
+        "promptPending": "エージェントは質問または承認への回答を待っています。",
         "answerFirst": "先に質問または承認に回答してください。",
         "backgroundTasksRunning": "バックグラウンドタスクがまだ実行中です。",
         "waitForBackgroundTasks": "バックグラウンドタスクが終わるまでお待ちください。",
@@ -18532,24 +18532,24 @@
         "settleEarlierMessage": "以前のメッセージが届くまで待つか、再試行してください。",
         "queueTooLarge": "キューで待機中のテキストが多すぎます。",
         "shrinkQueue": "キュー内のメッセージを削除するか、送信されるまで待ってから、もう一度お試しください。",
-        "optionRejected": "Agent はこの設定を受け入れませんでした。",
-        "goalsUnsupported": "この Agent は目標に対応していません。",
-        "agentRefused": "Agent がこれを拒否しました。",
-        "ownerUnproven": "このチャットの以前の Agent がまだ実行中の可能性があります。",
+        "optionRejected": "エージェントはこの設定を受け入れませんでした。",
+        "goalsUnsupported": "このエージェントは目標に対応していません。",
+        "agentRefused": "エージェントがこれを拒否しました。",
+        "ownerUnproven": "このチャットの以前のエージェントがまだ実行中の可能性があります。",
         "reopenChat": "もう一度確認するには、チャットを開き直してください。",
-        "terminalAgentHoldsChat": "このチャットはまだターミナルの Agent で開かれています。",
-        "quitTerminalAgent": "ここでチャットを続けるには、その Agent を終了してください。",
+        "terminalAgentHoldsChat": "このチャットはまだターミナルのエージェントで開かれています。",
+        "quitTerminalAgent": "ここでチャットを続けるには、そのエージェントを終了してください。",
         "hostReconciling": "HiveCode は再起動後、このチャットをまだ確認しています。",
         "waitMoment": "しばらくお待ちください。",
         "recordUnreadable": "HiveCode はこのチャットの保存済みの状態を読み取れませんでした。",
         "chatNotFound": "HiveCode はこのチャットを見つけられません。",
-        "startNewChat": "続けるには、新しいチャットを開始してください。",
+        "startNewChat": "続けるには、新規チャットを開始してください。",
         "tryAgain": "もう一度お試しください。",
-        "agentStillWorking": "Agent はまだ作業中です。",
+        "agentStillWorking": "エージェントはまだ作業中です。",
         "runClearWhenDone": "終わったら /clear を実行してください。",
-        "clearAfterAnswer": "Agent の質問または承認に回答してから、/clear を実行してください。",
+        "clearAfterAnswer": "エージェントの質問または承認に回答してから、/clear を実行してください。",
         "runCompactWhenDone": "終わったら /compact を実行してください。",
-        "compactAfterAnswer": "Agent の質問または承認に回答してから、/compact を実行してください。",
+        "compactAfterAnswer": "エージェントの質問または承認に回答してから、/compact を実行してください。",
         "clearAfterRetry": "以前のメッセージを再試行してから、/clear を実行してください。",
         "compactAfterRetry": "以前のメッセージを再試行してから、/compact を実行してください。",
         "clearAfterSending": "以前のメッセージはまだ送信中です。送信が終わったら /clear を実行してください。",
@@ -18728,8 +18728,8 @@
         "runWebSearchMany": "ウェブを{{value0}}回検索しました",
         "runIntegrationOne": "使用済み 1 連携",
         "runIntegrationMany": "{{value0}} 連携を使用しました",
-        "runAgentOne": "Agent を 1 人実行しました",
-        "runAgentMany": "{{value0}} Agent を実行しました",
+        "runAgentOne": "エージェントを 1 人実行しました",
+        "runAgentMany": "{{value0}} エージェントを実行しました",
         "runPlanOne": "計画を更新しました",
         "runPlanMany": "計画を{{value0}}回更新しました",
         "runToolOne": "使用した工具 1 個",
@@ -18750,8 +18750,8 @@
         "runLiveWebSearchMany": "ウェブを{{value0}}回検索しています",
         "runLiveIntegrationOne": "1 つの連携を使用する",
         "runLiveIntegrationMany": "{{value0}} 連携の使用",
-        "runLiveAgentOne": "1 つの Agent を実行中",
-        "runLiveAgentMany": "{{value0}} Agent を実行しています",
+        "runLiveAgentOne": "1 つのエージェントを実行中",
+        "runLiveAgentMany": "{{value0}} エージェントを実行しています",
         "runLivePlanOne": "計画を更新する",
         "runLivePlanMany": "計画を{{value0}}回更新しています",
         "runLiveToolOne": "1つのツールを使用する",
@@ -18763,7 +18763,7 @@
         "stopping": "停止中…",
         "queueAfterStop": "停止後に実行するメッセージをキューに追加",
         "sendAfterStop": "停止後に実行するメッセージを送信",
-        "thinking": "思考",
+        "thinking": "思考中",
         "workingFor": "{{value0}} 作業中",
         "workedFor": "{{value0}} 作業しました",
         "interruptedAfter": "{{value0}} 後に中断",
@@ -18831,7 +18831,7 @@
         "sending": "送信中…"
       },
       "approval": {
-        "needsNewerOrca": "このリクエストには新しいバージョンの Orca が必要です。",
+        "needsNewerOrca": "このリクエストには新規バージョンの Orca が必要です。",
         "title": "{{value0}} を許可しますか?",
         "allow": "許可する",
         "deny": "拒否",
@@ -18918,7 +18918,7 @@
         "countTasksOne": "1 タスク",
         "countTasksMany": "{{value0}} タスク",
         "headerTotal": "{{value0}} バックグラウンドタスク",
-        "stateWorking": "作業中",
+        "stateWorking": "実行中",
         "stateWorkingCount": "{{value0}} 実行中",
         "stateMonitoring": "監視中",
         "stateMonitoringCount": "{{value0}} 監視",
@@ -18953,8 +18953,8 @@
       "subagents": {
         "state": {
           "completed": "完了",
-          "working": "作業中",
-          "idle": "待機中",
+          "working": "実行中",
+          "idle": "idle",
           "failed": "失敗",
           "stopped": "停止",
           "unverifiable": "状態を取得できません",
@@ -18969,8 +18969,8 @@
         "ranOne": "1 子エージェントを実行しました",
         "ranN": "{{value0}} 子エージェントを実行しました",
         "tokens": "{{value0}} トークン",
-        "unnamed": "サブ Agent",
-        "writtenBy": "サブ Agent {{value0}} による出力"
+        "unnamed": "サブエージェント",
+        "writtenBy": "サブエージェント {{value0}} による出力"
       },
       "conversationCommand": {
         "pendingWork": "保留中の作業とメッセージが完了してからこのコマンドを使用してください。",
@@ -18978,13 +18978,13 @@
       },
       "drop": {
         "title": "ドロップしてこのチャットに添付します",
-        "subtitle": "ファイルは、Agent が読み取ることができるパスとしてメッセージに追加されます。"
+        "subtitle": "ファイルは、エージェントが読み取ることができるパスとしてメッセージに追加されます。"
       },
       "copyCode": "コードをコピーする",
       "wrapLines": "行を折り返す",
       "disableLineWrap": "行の折り返しを無効にする",
       "context": {
-        "unavailable": "コンテキストの使用量はまだ不明です。Agent が次に応答すると表示されます。",
+        "unavailable": "コンテキストの使用量はまだ不明です。エージェントが次に応答すると表示されます。",
         "summary": "コンテキスト: {{used}} / {{window}} トークン ({{percent}}%)、最後の応答から推定。",
         "used": "コンテキスト: {{used}} トークン使用済み、最後の応答から推定。",
         "unreported": "このセッションではコンテキストの使用量を表示できません。"
@@ -19056,15 +19056,15 @@
         "showFullMessage": "メッセージ全体を表示",
         "showLess": "折りたたむ",
         "fromSender": "送信元:",
-        "pausedSendFailedWaiting": "送信できませんでした。Agent の処理が終わったら「送信」を押して再試行してください。",
+        "pausedSendFailedWaiting": "送信できませんでした。エージェントの処理が終わったら「送信」を押して再試行してください。",
         "save": "保存",
         "editingMessage": "メッセージを編集中",
         "cancelEditing": "編集をキャンセル",
         "editChanged": "編集中にこのメッセージが変更されました。編集したテキストはチャット入力欄にあります。",
-        "editChangedPrompt": "編集中にこのメッセージが変更されました。Agent に回答すると、編集したテキストがチャット入力欄に表示されます。",
+        "editChangedPrompt": "編集中にこのメッセージが変更されました。エージェントに回答すると、編集したテキストがチャット入力欄に表示されます。",
         "editFailed": "このメッセージは編集できません。",
         "editGone": "このメッセージはすでに送信または削除されています。編集したテキストはチャット入力欄にあります。",
-        "editGonePrompt": "このメッセージはすでに送信または削除されています。Agent に回答すると、編集したテキストがチャット入力欄に表示されます。"
+        "editGonePrompt": "このメッセージはすでに送信または削除されています。エージェントに回答すると、編集したテキストがチャット入力欄に表示されます。"
       },
       "thought": "考えました",
       "thoughtForDuration": "{{duration}} 考えました",
@@ -19080,17 +19080,17 @@
       "interruptedContinue": {
         "continue": "続行",
         "failed": "このチャットを続行できませんでした。もう一度試すか、メッセージを送信してください。",
-        "explanation": "続行すると、Agent はまず最後の手順が完了したかどうかを確認します。"
+        "explanation": "続行すると、エージェントはまず最後の手順が完了したかどうかを確認します。"
       },
       "rewind": {
         "unsupported": "このチャットは以前のメッセージに戻れません。",
         "historyNotPaginated": "この古い Codex チャットは以前のメッセージに戻れません。「ここに巻き戻す」を使用するには、新規チャットを開始してください。",
-        "busy": "Agent がアイドル状態になり、このチャットであなたの対応を待つものがなくなると利用できます。",
+        "busy": "エージェントがアイドル状態になり、このチャットであなたの対応を待つものがなくなると利用できます。",
         "staleEpoch": "会話が変更されました。最新のメッセージを確認して、もう一度お試しください。",
         "invalidTarget": "会話をこのメッセージに戻すことはできません。何も変更されていません。",
         "historyLimit": "この会話は長すぎて巻き戻せません。何も変更されていません。",
-        "providerRefused": "Agent はこのメッセージに戻れませんでした。",
-        "proofMismatch": "Agent の履歴がこのチャットと一致しませんでした。続行する前に会話を確認してください。",
+        "providerRefused": "エージェントはこのメッセージに戻れませんでした。",
+        "proofMismatch": "エージェントの履歴がこのチャットと一致しませんでした。続行する前に会話を確認してください。",
         "outcomeUnknown": "HiveCode は会話が以前のメッセージに戻ったかどうかを確認できませんでした。次のメッセージが送信される前に確認します。",
         "outcomeUnknownReturned": "HiveCode は会話がこのメッセージに戻ったかどうかを確認できませんでした。メッセージは入力欄に戻っており、次のメッセージが送信される前に HiveCode が会話を確認します。",
         "timeout": "このメッセージに戻った後、チャットが更新されませんでした。最新の内容を確認するには、開き直してください。",
@@ -19105,7 +19105,7 @@
       },
       "visualUnavailable": "ビジュアライゼーションを利用できません",
       "visualLoading": "ビジュアライゼーションを読み込み中",
-      "visualOpenInNewTab": "新しいタブで開く",
+      "visualOpenInNewTab": "新規タブで開く",
       "handoff": {
         "agentOpen": "エージェントはターミナルで開いています。",
         "agentOpenOnHost": "エージェントは {{value0}} のターミナルで開いています。",
@@ -19142,8 +19142,8 @@
       "structuredSessionCloseFailedDescription": "プロバイダーを復旧できるように、ターミナルを開いたままにしました。",
       "structuredSessionLaunchFailed": "{{value0}} チャットを開けませんでした",
       "structuredSessionLaunchFailedDescription": "Orca は構造化された {{value0}} チャットを開けませんでした。詳細はログを確認してください。",
-      "newRowsAnnouncement": "離れている間に新しいメッセージが届きました",
-      "newRowsMarker": "新着",
+      "newRowsAnnouncement": "離れている間に新規メッセージが届きました",
+      "newRowsMarker": "新規",
       "claudeSignIn": {
         "signingIn": "サインイン中…"
       }
@@ -19424,7 +19424,7 @@
       }
     },
     "agentSessionContinuation": {
-      "dialogTitle": "別の Agent に引き継ぐ",
+      "dialogTitle": "別のエージェントに引き継ぐ",
       "dialogDescription": "この時点から新しいエージェントセッションを開始します。元のセッションは変更されません。",
       "untitledSession": "現在のセッション",
       "originalAgent": "元のエージェント: {{agent}}",
@@ -19449,7 +19449,7 @@
       "launchFailed": "新規 {{agent}} セッションを開始できませんでした。",
       "deliveryUnconfirmed": "HiveCode は {{agent}} がセッションコンテキストを受け取ったことを確認できませんでした。新規セッションを確認し、入力が空の場合は自分で貼り付けてください。",
       "copyPrompt": "プロンプトをコピー",
-      "handOffToAnotherAgent": "別の Agent に引き継ぐ"
+      "handOffToAnotherAgent": "別のエージェントに引き継ぐ"
     },
     "terminalPane": {
       "TerminalContextMenu": {
@@ -19481,7 +19481,7 @@
     "settings": {
       "TerminalInteraction": {
         "copyTrimsGutter": "コピー時に余白をトリミングする",
-        "copyTrimsGutterDescription": "左側のガターをドロップすると、Agent の出力が後ろに描画されるため、コピーされたテキストはインデントされません。選択した行ごとに共有されるインデントのみが削除されます。",
+        "copyTrimsGutterDescription": "左側のガターをドロップすると、エージェントの出力が後ろに描画されるため、コピーされたテキストはインデントされません。選択した行ごとに共有されるインデントのみが削除されます。",
         "copyOnSelectDescription": "ターミナルやチャットで選択したテキストをクリップボードに自動的にコピーします。"
       },
       "terminal": {
@@ -19501,10 +19501,10 @@
       },
       "nativeChat": {
         "queueFollowUpsTitle": "フォローアップをキューに入れる",
-        "queueFollowUpsCopy": "Agent の作業中に送信したメッセージは、今すぐ送信・編集・削除できるカードとして待機します。画像付きのメッセージはすぐに送信されます。",
+        "queueFollowUpsCopy": "エージェントの作業中に送信したメッセージは、今すぐ送信・編集・削除できるカードとして待機します。画像付きのメッセージはすぐに送信されます。",
         "queueFollowUpsToggleLabel": "フォローアップのキューを切り替え",
         "inlineVisualsTitle": "インライン表示",
-        "inlineVisualsCopy": "Agent が返信内でグラフ、図、モックアップを表示できるようにします。新しく開始したチャットに適用されます。",
+        "inlineVisualsCopy": "エージェントが返信内でグラフ、図、モックアップを表示できるようにします。新しく開始したチャットに適用されます。",
         "inlineVisualsToggleLabel": "インライン表示を切り替え",
         "behaviorTitle": "動作",
         "resumeSearchUpdate": "更新",
@@ -19619,7 +19619,7 @@
         "contextTerminal": "ターミナル出力",
         "contextWorktree": "ワークツリー",
         "executionQuality": "実行品質",
-        "hostWorkspaceRequired": "ブラウザーでタスクを開始するには、接続済みホストのワークスペースを選択してください。",
+        "hostWorkspaceRequired": "ブラウザでタスクを開始するには、接続済みホストのワークスペースを選択してください。",
         "hostWorkspaceUnavailable": "このワークスペースのホストは利用できません。タスクを開始する前に再接続してください。",
         "noInstalledAgents": "インストール済みのエージェントが見つかりません",
         "permission": "権限モード",
@@ -19682,17 +19682,17 @@
       "manageProjects": "プロジェクトを管理",
       "mascotAlt": "{{app}} アシスタント",
       "more": "もっと見る",
-      "newTask": "新しいタスク",
-      "newWorkspace": "新しいワークスペース",
+      "newTask": "新規タスク",
+      "newWorkspace": "新規ワークスペース",
       "newWorkspaceDescription": "ブランチとエージェントセッションを分離します",
-      "newWorkspaceForGroup": "スペースに新しいワークスペースを作成",
-      "newWorkspaceForProject": "新しいワークスペース",
+      "newWorkspaceForGroup": "スペースに新規ワークスペースを作成",
+      "newWorkspaceForProject": "新規ワークスペース",
       "nextCapability": "次の機能",
       "noContinue": "続きから再開できる作業はありません",
       "noContinueDescription": "ワークスペースを作成すると、ここからすぐに戻れます。",
       "noProjects": "プロジェクトはまだありません",
       "noProjectsDescription": "コードリポジトリを追加すると、ここにワークスペースが表示されます。",
-      "noSessions": "一時セッションはまだありません。新しいタスクを開始すると、ここに表示されます。",
+      "noSessions": "一時セッションはまだありません。新規タスクを開始すると、ここに表示されます。",
       "pinned": "ピン留め済み",
       "placeholderAutomation": "自動化したい反復作業を入力してください…",
       "placeholderCode": "完了したい開発タスクを入力してください…",
@@ -19701,7 +19701,7 @@
         "dismiss": "通知を閉じる",
         "installGit": "Git をインストール",
         "installGitHubCli": "GitHub CLI をインストール",
-        "learnMore": "詳細を見る"
+        "learnMore": "詳しく見る"
       },
       "previousCapability": "前の機能",
       "projectStats": "{{projects}} 件のプロジェクト · {{workspaces}} 件のワークスペース",
@@ -19751,7 +19751,7 @@
     },
     "hiveAccountSignIn": {
       "acceptTermsError": "最初に利用規約とプライバシーポリシーに同意してください。",
-      "and": "および",
+      "and": "と",
       "brandDescription": "ログイン後に Runtime、デバイス、セッションを管理できます。",
       "brandNote": "このウィンドウを閉じても、HiveCode のローカル機能は引き続き利用できます。",
       "brandTitle": "安全な接続、効率的なコラボレーション",
@@ -19797,7 +19797,7 @@
       "addWorkspace": "ワークスペースを追加",
       "advanced": "詳細設定と診断",
       "authMethod": "認可方法",
-      "azureDescription": "プルリクエストとビルド状況",
+      "azureDescription": "PR とビルド状況",
       "cancel": "キャンセル",
       "capabilities": "利用可能な機能",
       "checking": "確認中…",
@@ -19807,12 +19807,12 @@
       "connectedWorkspaces": "接続済みワークスペース",
       "connectionInfo": "接続情報",
       "done": "完了",
-      "giteaDescription": "プルリクエストとコミット状況",
-      "githubDescription": "プルリクエスト、イシュー、チェック",
-      "gitlabDescription": "マージリクエスト、イシュー、パイプライン",
+      "giteaDescription": "PR とコミット状況",
+      "githubDescription": "PR、Issue、チェック",
+      "gitlabDescription": "MR、Issue、パイプライン",
       "guide": "設定ガイド",
       "independentKeys": "各ワークスペースが独自のアクセスキーを管理します。",
-      "linearDescription": "イシューを閲覧・関連付け",
+      "linearDescription": "Issue を閲覧・関連付け",
       "linearSubtitle": "ワークスペースとアクセス権を管理",
       "location": "接続先",
       "manage": "管理",
@@ -19826,7 +19826,7 @@
       "recheck": "再確認",
       "removeAccess": "アクセス権を削除",
       "removeFailed": "アクセス権を削除できませんでした。再試行してください。",
-      "removeNotice": "アクセス権を削除しても、Linear のイシューは削除されません。",
+      "removeNotice": "アクセス権を削除しても、Linear の Issue は削除されません。",
       "scopeDescription": "認証情報と接続状態は現在の Runtime で管理されます。",
       "setup": "セットアップ",
       "subtitle": "コードプラットフォームとタスクツールを接続し、レビュー、ビルド、関連する作業を確認します。",
@@ -19870,9 +19870,9 @@
     },
     "remoteErrors": {
       "connectionFailure": "{{operation}}に失敗しました。接続を確認して、もう一度お試しください。",
-      "fastForward": "早送り",
-      "fastForwardLocalChanges": "早送りがブロックされました — ローカルの変更を先にコミットまたはスタッシュしてください。",
-      "fastForwardUntrackedFiles": "早送りがブロックされました — 未追跡のファイルを先に移動、削除、または追加してください。",
+      "fastForward": "fast-forward",
+      "fastForwardLocalChanges": "fast-forward がブロックされました — ローカルの変更を先にコミットまたはスタッシュしてください。",
+      "fastForwardUntrackedFiles": "fast-forward がブロックされました — 未追跡のファイルを先に移動、削除、または追加してください。",
       "fetch": "フェッチ",
       "forcePush": "強制プッシュ",
       "forcePushRemoteChanged": "強制プッシュが拒否されました — 前回のフェッチ以降にリモートが変更されました。先にフェッチしてから、もう一度お試しください。",
@@ -19881,7 +19881,7 @@
       "operationFailed": "リモート操作に失敗しました",
       "operationFailedDetail": "{{operation}}に失敗しました。{{detail}}",
       "prePushFailureSummary": "pre-push フックに失敗しました。",
-      "publishBranch": "ブランチの公開",
+      "publishBranch": "ブランチを公開",
       "publishFailed": "ブランチの公開に失敗しました。リモートへのアクセスを確認して、もう一度お試しください。",
       "pullExistingConflicts": "プルがブロックされました — 既存のマージ競合を先に解決してください。",
       "pullFreshConflicts": "マージ競合によりプルが停止しました。ソース管理で競合を解決してから、マージをコミットしてください。",
@@ -19913,7 +19913,7 @@
       "backToList": "セッション一覧に戻る",
       "backToProjects": "プロジェクトに戻る",
       "chooseWorkspace": "ワークスペースを選択",
-      "chooseWorktreeRepo": "新しいワークツリーのリポジトリとデバイスを選択してください。",
+      "chooseWorktreeRepo": "新規ワークツリーのリポジトリとデバイスを選択してください。",
       "clearSearch": "検索をクリア",
       "closeView": "セッションビューを閉じる",
       "collapseProjects": "プロジェクトペインを折りたたむ",
@@ -19950,7 +19950,7 @@
       "manageProjects": "プロジェクトを管理",
       "manageProjectsHint": "リポジトリ、ワークツリー、フォルダー、任意のグループを管理します。開発ツールを使用するにはワークスペースを開いてください。",
       "new": "新規セッション",
-      "newWorktree": "新しいワークツリー",
+      "newWorktree": "新規ワークツリー",
       "noMatches": "このビューにセッションはありません",
       "noProjects": "一致するプロジェクトはありません",
       "noScopes": "一致する範囲はありません",
@@ -20093,7 +20093,7 @@
       "signIn": "HiveCloud にログイン",
       "signInFailed": "HiveCloud へのログインに失敗しました。再試行するか、サービスの状態を確認してください。",
       "signInSuccess": "HiveCloud にログインしました",
-      "signOut": "ログアウト",
+      "signOut": "サインアウト",
       "signOutFailed": "HiveCloud からログアウトできませんでした。ファイルの権限を確認して再試行してください。",
       "signOutSuccess": "HiveCloud からログアウトしました",
       "statusUnknown": "接続状態を確認中",
@@ -20103,11 +20103,11 @@
       "themeSystem": "システム",
       "unavailable": "利用不可",
       "unreadCount": "未読 {{count}} 件",
-      "upToDate": "最新の状態です",
-      "updateAvailable": "アップデートがあります",
+      "upToDate": "最新",
+      "updateAvailable": "更新があります",
       "updateCheckFailed": "確認に失敗しました",
       "updateReady": "再起動の準備完了",
-      "updatesUnavailable": "利用できません",
+      "updatesUnavailable": "利用不可",
       "viewDetails": "詳細を表示",
       "workAccount": "仕事用アカウント",
       "working": "処理中"
@@ -20115,12 +20115,12 @@
     "taskUrlPreview": {
       "githubIssue": "GitHub Issue",
       "githubIssueCreateLabel": "GitHub Issue {{identifier}} からワークツリーを作成",
-      "githubPullRequest": "GitHub プルリクエスト",
-      "githubPullRequestCreateLabel": "GitHub プルリクエスト {{identifier}} からワークツリーを作成",
+      "githubPullRequest": "GitHub PR",
+      "githubPullRequestCreateLabel": "GitHub PR {{identifier}} からワークツリーを作成",
       "gitlabIssue": "GitLab Issue",
       "gitlabIssueCreateLabel": "GitLab Issue {{identifier}} からワークツリーを作成",
-      "gitlabMergeRequest": "GitLab マージリクエスト",
-      "gitlabMergeRequestCreateLabel": "GitLab マージリクエスト {{identifier}} からワークツリーを作成",
+      "gitlabMergeRequest": "GitLab MR",
+      "gitlabMergeRequestCreateLabel": "GitLab MR {{identifier}} からワークツリーを作成",
       "jiraIssueCreateLabel": "Jira Issue {{identifier}} からワークツリーを作成"
     },
     "worktreeCard": {
@@ -20166,11 +20166,11 @@
       "failed": "説明から概要を生成できませんでした。"
     },
     "agentCombobox": {
-      "clearSelection": "Agent の選択をクリア"
+      "clearSelection": "エージェントの選択をクリア"
     },
     "newWorkspace": {
       "agentOptional": "Agent [オプション]",
-      "createDescription": "プロジェクトとワークスペース名を選択します。開始する場合は Agent を選択してください。"
+      "createDescription": "プロジェクトとワークスペース名を選択します。開始する場合はエージェントを選択してください。"
     },
     "JiraIssueWorkspace": {
       "pendingChange": "別の Issue の変更が進行中です。"
@@ -20347,7 +20347,7 @@
     "reopenOnServer": {
       "action": "サーバーで再度開く",
       "pending": "再度開いています…",
-      "caveat": "このページの最後のアドレスでリモートホストに新しいページを開きます。ログインなどの一時的な状態は異なる場合があり、フォーム送信から開いたページは空白になります。",
+      "caveat": "このページの最後のアドレスでリモートホストに新規ページを開きます。ログインなどの一時的な状態は異なる場合があり、フォーム送信から開いたページは空白になります。",
       "failed": "リモートホストでこのページを開けませんでした。接続を確認して再試行してください。"
     },
     "sshRoute": {
@@ -20382,7 +20382,7 @@
     },
     "userAgentMigration": {
       "degradedDescription": "古いブラウザ ID の選択を検査できませんでした。ブラウザ設定でクリーンまたはネイティブを選択します。変更は再起動後に有効になります。",
-      "description": "プロファイルごとのユーザー Agent 設定が削除されました。ブラウザ設定でクリーンまたはネイティブを選択します。変更は再起動後に有効になります。",
+      "description": "プロファイルごとのユーザーエージェント設定が削除されました。ブラウザ設定でクリーンまたはネイティブを選択します。変更は再起動後に有効になります。",
       "title": "ブラウザ ID がアプリ全体に適用されるようになりました",
       "openSettings": "設定を開く"
     },
@@ -20410,7 +20410,7 @@
     "migrated": {
       "title": "エージェントが見つけやすくなりました",
       "description": "エージェントビューはサイドバーの専用タブになりました。アクティビティとフィルターはそのまま引き継がれます。",
-      "dismiss": "OK",
+      "dismiss": "了解",
       "action": "エージェントを開く"
     },
     "new": {
@@ -20424,7 +20424,7 @@
   "notifications": {
     "agentStatus": {
       "needsInput": "入力待ち",
-      "working": "処理中",
+      "working": "実行中",
       "stopped": "停止",
       "failed": "失敗",
       "finished": "完了"
@@ -20463,11 +20463,11 @@
   },
   "featureTips": {
     "nativeChatUpgrade": {
-      "eyebrow": "新機能",
+      "eyebrow": "新規",
       "title": "ネイティブチャットを刷新",
-      "intro": "対応 Agent の新しいチャットはアップグレード版のチャットビューで開きます。チャットと CLI の切り替えは右サイドバーの{{panel}}から:",
+      "intro": "対応エージェントの新規チャットはアップグレード版のチャットビューで開きます。チャットと CLI の切り替えは右サイドバーの{{panel}}から:",
       "resumeInNativeChat": "{{action}}: 対応する CLI の会話をネイティブチャットで開きます。",
-      "resumeInCli": "{{action}}: Claude/Codex のチャットを新しい CLI セッションに複製します。元のチャットは残ります。",
+      "resumeInCli": "{{action}}: Claude/Codex のチャットを新規 CLI セッションに複製します。元のチャットは残ります。",
       "settingsInstruction": "Chat UI の管理:",
       "settingsLink": "設定 → 実験的機能",
       "gotIt": "OK",
@@ -20479,7 +20479,7 @@
       "demoPrompt": "この差分の境界条件をレビューし、見つかった問題のテストを追加してください。",
       "startDictation": "ディクテーションを開始する",
       "agentPromptTitle": "エージェントのプロンプト",
-      "listening": "音声を聞き取り中...",
+      "listening": "音声を聞き取り中…",
       "focusPaneInstruction": "ターミナル、エディター、エージェントのプロンプトにフォーカスして、次のキーを押します：",
       "startInstruction": "で音声入力を開始します。停止するには",
       "stopInstruction": "を再度押してください。",
@@ -20491,7 +20491,7 @@
       "ageHours": "2時間前",
       "ageMinutes": "12分前",
       "ageYesterday": "1日前",
-      "agentsInstruction": "Agent も検索できます。「ログインタイムアウトを修正したセッションを探して」と頼んでみてください。",
+      "agentsInstruction": "エージェントも検索できます。「ログインタイムアウトを修正したセッションを探して」と頼んでみてください。",
       "consentInstruction": "いつでも以下で変更またはオフにできます:",
       "continueInBackground": "バックグラウンドで続行",
       "demoHit1Age": "3日前",
@@ -20518,9 +20518,9 @@
       "demoRoleUser": "ユーザー",
       "enableFailed": "セッション検索をオンにできませんでした。再試行してください。",
       "indexingDescription": "過去の Agent の会話を読み取り、検索できるようにしています。数分かかることがあります。",
-      "indexingTitle": "Agent セッションをインデックス作成中",
+      "indexingTitle": "エージェントセッションをインデックス作成中",
       "progressStarting": "セッションを探しています…",
-      "readyDescription": "このコンピュータ上のすべての Agent セッションを、会話内容から検索できるようになりました。",
+      "readyDescription": "このコンピュータ上のすべてのエージェントセッションを、会話内容から検索できるようになりました。",
       "readyTitle": "セッション検索の準備ができました",
       "readyToast": "セッション検索の準備ができました",
       "readyToastOpen": "オープン",
@@ -20530,7 +20530,7 @@
       "recent2Title": "ロックファイルの更新",
       "recent3Text": "メモの初版です。分野別にまとめています。",
       "recent3Title": "リリースノートの下書き",
-      "settingsLink": "設定 → Agent セッションの検索",
+      "settingsLink": "設定 → エージェントセッションの検索",
       "startSearching": "検索を開始"
     }
   },
@@ -20540,7 +20540,7 @@
   },
   "checksPanel": {
     "unlinked": {
-      "title": "プルリクエストのリンクを解除しました",
+      "title": "PR のリンクを解除しました",
       "description": "このワークスペースでは PR #{{number}} が非表示です。チェックとレビューの詳細を復元するには再度リンクしてください。",
       "relink": "PR #{{number}} をリンク"
     }
@@ -20568,7 +20568,7 @@
     "tryAgain": "再試行",
     "launchFailedMessage": "HiveCode はウィンドウを描画するプロセスを起動できませんでした。",
     "launchFailedDetail": "HiveCode は {{recoveryCount}} 回再試行しましたが、成功しませんでした。",
-    "processLimitDetail": "ユーザーアカウントのプロセス数が上限に達したため、システムが新しいプロセスの作成を拒否しました。暴走したターミナル、開発サーバー、Agent が原因であることがよくあります。いくつか終了してから「再試行」をクリックしてください。",
+    "processLimitDetail": "ユーザーアカウントのプロセス数が上限に達したため、システムが新規プロセスの作成を拒否しました。暴走したターミナル、開発サーバー、エージェントが原因であることがよくあります。いくつか終了してから「再試行」をクリックしてください。",
     "launchFailedGenericDetail": "システムが起動を拒否しました。メモリを空けるか他のアプリを終了してから「再試行」をクリックしてください。繰り返し発生する場合は HiveCode を再インストールしてください。",
     "lowCommitMessage": "Windows のメモリが不足しています。",
     "lowCommitDetail": "Windows にはアプリ用に {{availableMB}} MB のメモリしか残っていないため、再ロード後にウィンドウが再びメモリ不足になりました。",
@@ -20602,7 +20602,7 @@
       "sessionsOfLoaded": "{{value0}}/{{value1}} セッション",
       "showMoreSessions": "さらにセッションを表示",
       "loadingMoreSessions": "さらにセッションを読み込んでいます…",
-      "unsupportedAgent": "このコンピュータは、選択した Agent の履歴検索をサポートしていません。そのコンピュータで HiveCode を更新するか、別の Agent を選択します。",
+      "unsupportedAgent": "このコンピュータは、選択したエージェントの履歴検索をサポートしていません。そのコンピュータで HiveCode を更新するか、別のエージェントを選択します。",
       "titleOnly": "このコンピュータでは全文検索がオフのため、セッションのタイトルのみが照合されます。"
     }
   },
@@ -20623,14 +20623,14 @@
       "advanced": "詳細設定",
       "deleteIndexCopy": "検索データをクリアする",
       "deleteTitle": "このコンピュータ上の検索データを消去しますか?",
-      "deleteEnabled": "検索をオフにして、このコンピュータから検索可能なコピーを削除します。Agent セッションは影響を受けません。",
-      "deleteDisabled": "このコンピュータから検索可能なコピーを削除します。Agent セッションは影響を受けません。",
+      "deleteEnabled": "検索をオフにして、このコンピュータから検索可能なコピーを削除します。エージェントセッションは影響を受けません。",
+      "deleteDisabled": "このコンピュータから検索可能なコピーを削除します。エージェントセッションは影響を受けません。",
       "delete": "クリア",
       "cleared": "検索データがクリアされました。",
       "clearError": "検索データをクリアできませんでした。再試行。",
       "webUnsupported": "そのコンピュータ上の HiveCode デスクトップアプリからセッション検索をオンにします。",
-      "title": "Agent セッションの検索",
-      "description": "このコンピュータおよびペアになっている HiveCode サーバー上で、Agent の言動をすべて検索します。",
+      "title": "エージェントセッションの検索",
+      "description": "このコンピュータおよびペアになっている HiveCode サーバー上で、エージェントの言動をすべて検索します。",
       "searchDescription": "このコンピュータとペアリングされたサーバーのセッション検索をオンにするか、検索データをクリアします。",
       "indexComputers": "セッション内を検索",
       "computersConsent": "各コンピュータは、そのコンピュータのエージェントの会話全文と、ツール出力ごとに最大 3,072 文字を含む検索インデックスを保存します。内容はマスキングされません。アクセスを許可されたリモートクライアントはこのインデックスを検索し、一致するテキストを取得できます。各スイッチは、そのコンピュータにのみ適用されます。",
@@ -20646,16 +20646,16 @@
       "showMore": "{{count}} をもっと見る",
       "showFewer": "表示数を減らす",
       "openInSidebar": "サイドバーで開く",
-      "openInSidebarCopy": "覚えていることを入力するか、Agent に「ログインタイムアウトを修正したセッションを見つけてください」と尋ねます。",
+      "openInSidebarCopy": "覚えていることを入力するか、エージェントに「ログインタイムアウトを修正したセッションを見つけてください」と尋ねます。",
       "open": "オープン",
       "enableOnAll": "すべてのコンピュータで有効にする"
     }
   },
   "aiVault": {
     "subagents": {
-      "loading": "サブ Agent を読み込み中…",
-      "loadError": "すべてのサブ Agent をロードできませんでした。",
-      "empty": "サブ Agent が見つかりませんでした。"
+      "loading": "サブエージェントを読み込み中…",
+      "loadError": "すべてのサブエージェントをロードできませんでした。",
+      "empty": "サブエージェントが見つかりませんでした。"
     },
     "antigravityReferenceDescription": "このトランスクリプトを参照として使用して、新規 Antigravity CLI 会話を続けます。",
     "antigravityIdeToCli": "IDE → CLI",
@@ -20695,14 +20695,14 @@
     "namePlaceholder": "Webアプリと共通UI",
     "directories": "ディレクトリ",
     "pathHelp": "リポジトリ相対のディレクトリを1行に1つ入力してください。パス内の空白は保持されます。",
-    "coneHelp": "Gitはリポジトリのルートと、選択したディレクトリの親フォルダにあるファイルも保持します。",
+    "coneHelp": "Git はリポジトリのルートと、選択したディレクトリの親フォルダーにあるファイルも保持します。",
     "cancel": "キャンセル",
     "save": "プリセットを保存",
-    "new": "新しいスパースプリセット",
+    "new": "新規スパースプリセット",
     "edit": "スパースプリセットを編集",
-    "description": "新しいワークスペースでチェックアウトするフォルダを選択してください。",
+    "description": "新規ワークスペースでチェックアウトするフォルダーを選択してください。",
     "saveFailed": "プリセットを保存できませんでした。もう一度お試しください。",
-    "loading": "プリセットを読み込み中...",
+    "loading": "プリセットを読み込み中…",
     "details": "チェックアウトされるファイルは？",
     "finishEditing": "ワークスペースの作成を続けるには、プリセットを保存するかキャンセルしてください。",
     "pathInstructions": "リポジトリルートからの相対パスで、1行に1フォルダーずつ入力します。",
@@ -20728,17 +20728,17 @@
   },
   "accounts": {
     "managedData": {
-      "description": "HiveCode ホストのターミナルでこのコマンドを実行してアカウントを追加します。選択はそのホストでの新規 Agent 起動に適用されます。直接 SSH 接続とWindows上の WSL は独自の認証情報を使用します。",
+      "description": "HiveCode ホストのターミナルでこのコマンドを実行してアカウントを追加します。選択はそのホストでの新規エージェント起動に適用されます。直接 SSH 接続とWindows上の WSL は独自の認証情報を使用します。",
       "copied": "コピーしました",
       "add": "アカウント追加コマンドをコピー",
       "refresh": "アカウントを更新",
       "upgrade": "アカウントが表示されない場合はOrcaホストを更新または再起動してください。",
       "system": "システムの既定",
-      "active": "使用中",
+      "active": "アクティブ",
       "select": "選択",
       "remove": "削除",
       "removeTitle": "管理アカウントを削除しますか？",
-      "removeDescription": "まずこのプロファイルを使う Agent を停止してください。削除すると保存済みの認証情報と会話データが消去されます。システムのログインには影響しません。",
+      "removeDescription": "まずこのプロファイルを使うエージェントを停止してください。削除すると保存済みの認証情報と会話データが消去されます。システムのログインには影響しません。",
       "cancel": "キャンセル",
       "wslUnavailable": "この WSL 環境では管理対象の OpenCode と Devin アカウントを利用できません。起動時には環境自体の認証情報を使用します。"
     },
@@ -20773,7 +20773,7 @@
     },
     "wslAccountNotApplied": {
       "title": "{{distro}} ではアカウントの選択が適用されていません",
-      "description": "WSL 内の HiveCode が更新されるまで、そこの Agent はディストリビューションの既定の Claude と Codex アカウントを使用します。"
+      "description": "WSL 内の HiveCode が更新されるまで、そこのエージェントはディストリビューションの既定の Claude と Codex アカウントを使用します。"
     },
     "claude": {
       "added": "アカウントを追加しました。次に起動する Claude で使用するには、これを選択してください。",
@@ -20813,14 +20813,14 @@
     },
     "codexSharedServerBanner": {
       "title": "この Codex は他の Codex タブとサーバーを共有しています",
-      "body": "セッションが予期せず終了したり、Agent のステータスが間違ったりする可能性があります。",
+      "body": "セッションが予期せず終了したり、エージェントのステータスが間違ったりする可能性があります。",
       "openedBeforeUpdateBody": "このターミナルは、HiveCode が各 Codex に独自のサーバーを提供し始める前にオープンされました。",
       "oldTerminalDialogTitle": "この Codex がサーバーを共有する理由",
-      "oldTerminalDialogRisk": "サーバーを共有する Codex セッションが同時に終了する可能性があり、Agent のステータスが間違っている可能性があります。",
+      "oldTerminalDialogRisk": "サーバーを共有する Codex セッションが同時に終了する可能性があり、エージェントのステータスが間違っている可能性があります。",
       "oldTerminalDialogCause": "古いターミナルは依然として Codex サーバーを共有しています。新規ターミナルを開いて、別のサーバーで Codex を実行します。",
       "fix": "修理",
       "dialogTitle": "各 Codex タブに独自のサーバーを与える",
-      "dialogDescription": "ターミナルで直接開始された Codex セッションは、1 つのバックグラウンドサーバーを共有します。 HiveCode は、開始する Codex セッションを個別に保持します。セッションがサーバーを共有している場合、1 つを閉じると他のセッションも終了し、Agent のステータスが不正になる可能性があります。",
+      "dialogDescription": "ターミナルで直接開始された Codex セッションは、1 つのバックグラウンドサーバーを共有します。 HiveCode は、開始する Codex セッションを個別に保持します。セッションがサーバーを共有している場合、1 つを閉じると他のセッションも終了し、エージェントのステータスが不正になる可能性があります。",
       "copy": "コピー",
       "copied": "コピーしました",
       "done": "完了",
@@ -20860,7 +20860,7 @@
     "newerDaemonBanner": {
       "failedTitle": "このターミナルを再度開けませんでした",
       "title": "このターミナルは新規バージョンの HiveCode で開かれました",
-      "resumableBody": "作業を続けるには、ここで再度開いてください。Agent セッションが再開されます。",
+      "resumableBody": "作業を続けるには、ここで再度開いてください。エージェントセッションが再開されます。",
       "reopening": "再度開いています…",
       "tryAgain": "再試行",
       "reopenTerminal": "{{count}} 個のターミナルを再度開く",
@@ -20869,9 +20869,9 @@
       "reopened": "{{count}} 個のターミナルを再度開きました",
       "reopened_one": "{{count}} 個のターミナルを再度開きました",
       "reopened_other": "{{count}} 個のターミナルを再度開きました",
-      "resumed": "{{count}} 個の Agent セッションを再開しました。",
-      "resumed_one": "{{count}} 個の Agent セッションを再開しました。",
-      "resumed_other": "{{count}} 個の Agent セッションを再開しました。"
+      "resumed": "{{count}} 個のエージェントセッションを再開しました。",
+      "resumed_one": "{{count}} 個のエージェントセッションを再開しました。",
+      "resumed_other": "{{count}} 個のエージェントセッションを再開しました。"
     },
     "severedDaemonBanner": {
       "unknownCount": "実行中のターミナル",
@@ -20885,7 +20885,7 @@
       "restart": "ターミナルデーモンを再起動",
       "dismiss": "閉じる",
       "confirmTitle": "ターミナルデーモンを再起動しますか?",
-      "confirmBody": "再起動すると、{{sessions}} で実行中のすべてのプロセスが終了します。再開に対応している Agent は後で再開できますが、シェルなどのジョブは再開できず、再度開始する必要があります。Agent がアイドル状態のときに行ってください。",
+      "confirmBody": "再起動すると、{{sessions}} で実行中のすべてのプロセスが終了します。再開に対応しているエージェントは後で再開できますが、シェルなどのジョブは再開できず、再度開始する必要があります。エージェントがアイドル状態のときに行ってください。",
       "cancel": "キャンセル",
       "confirm": "再起動してプロセスを終了"
     }
@@ -20931,7 +20931,7 @@
       "refreshFailed": "ワークスペースリストを更新できませんでした",
       "review": "ネストされたワークツリーと共に削除…",
       "title": "ワークスペースとネストされたワークツリーを削除しますか？",
-      "description": "これにより「{{name}}」、以下に表示されるすべてのネストされたワークツリー、およびそれら内のすべてのファイル（コミットされていない変更を含む）が完全に削除されます。それらのターミナルと Agent は停止されます。",
+      "description": "これにより「{{name}}」、以下に表示されるすべてのネストされたワークツリー、およびそれら内のすべてのファイル（コミットされていない変更を含む）が完全に削除されます。それらのターミナルとエージェントは停止されます。",
       "detached": "分離 HEAD",
       "loading": "ネストされたワークツリーを確認中…",
       "order": "ネストされたワークツリーが先に削除されます。1つでも失敗すると削除は停止し、親は保持されます。ブランチは既存の削除設定に従います。",
@@ -20971,9 +20971,9 @@
     "agentCoverage": "エージェントの対応状況",
     "cliRegistrationNotice": "セットアップ時に、HiveCode CLI コマンドを PATH に登録するよう求められる場合があります。",
     "computerUseDescription": "要求に応じてアプリのウィンドウを確認し、クリック、文字入力、スクロールを行います。",
-    "computerUseExplanation": "コンピューター操作について",
+    "computerUseExplanation": "コンピュータ操作について",
     "computerUseExplanationBody": "要求に応じて、エージェントはスクリーンショットやアプリのインターフェースを確認し、対応するクリック、文字入力、スクロールを実行できます。アクセスはアプリ、実行環境、ローカルシステムの権限に依存します。",
-    "computerUseTitle": "コンピューター操作",
+    "computerUseTitle": "コンピュータ操作",
     "coverageCount": "検出されたエージェント {{value1}} 個のうち {{value0}} 個で、オーケストレーションスキルが見つかりました。",
     "coverageQualification": "スキルが見つかっても、そのパスの確認のみで、エージェントの一連の動作が検証されたわけではありません。",
     "coverageScopeUnavailable": "エージェントの検出とスキルの検索は異なる実行環境で行われているため、ここでは対応状況を比較できません。",
@@ -21061,7 +21061,7 @@
     "launchConfiguration": "起動設定",
     "localEnvironment": "ローカル {{platform}}",
     "manage": "エージェント管理",
-    "newerVersion": "現在のバージョンの方が新しい",
+    "newerVersion": "現在のバージョンの方が新規",
     "noInstallations": "この環境にインストール先が見つかりません。",
     "notDetected": "現在の環境では検出されていません",
     "openPreferences": "実行設定 →",
@@ -21091,7 +21091,7 @@
     "tabsLabel": "エージェント設定",
     "unknownInstallSource": "未検証の提供元",
     "unsupportedVersion": "非対応",
-    "upToDate": "最新です",
+    "upToDate": "最新",
     "updateAvailable": "更新があります",
     "upgrade": "更新",
     "upgradeAgent": "{{agent}} を更新",
@@ -21116,25 +21116,25 @@
   "deviceConnections": {
     "access": "アクセス管理",
     "accessDescription": "Cloud セッション、スマートフォンのペアリング、共有アクセスをここで管理します。取り消しは選択したアクセスの種類にのみ影響します。ログイン済みデバイスはアカウント設定で管理してください。",
-    "browserDesktop": "ブラウザまたは別のコンピューター",
+    "browserDesktop": "ブラウザまたは別のコンピュータ",
     "browserDesktopDescription": "ブラウザや別の HiveCode デスクトップ用に、取り消し可能なアクセスリンクを作成します。スマートフォンアプリには上の QR コードを使用してください。",
     "cloudMachines": "クラウドマシン",
     "cloudMachinesDescription": "ワークスペースのレシピから作成された環境を管理します。新規作成が無効でも、既存のマシンはクリーンアップできます。",
-    "description": "コンピューターの管理、このコンピューターへの接続、デバイス間アクセスの制御を行います。",
+    "description": "コンピュータの管理、このコンピュータへの接続、デバイス間アクセスの制御を行います。",
     "environments": "作業環境",
     "environmentsDescription": "ワークスペースの環境レシピを設定し、作成されたクラウドマシンを管理します。",
     "group": "デバイスと環境",
     "hosts": "自分のホスト",
-    "hostsDescription": "HiveCloud のコンピューターとペアリング済みホストがここに表示されます。別のホストはアドレスのペアリングまたは SSH で追加できます。",
+    "hostsDescription": "HiveCloud のコンピュータとペアリング済みホストがここに表示されます。別のホストはアドレスのペアリングまたは SSH で追加できます。",
     "syncingAccess": "HiveCloud アカウントのアクセスを同期中…",
-    "thisComputer": "このコンピューターに接続",
+    "thisComputer": "このコンピュータに接続",
     "title": "デバイスと接続"
   },
   "executionHost": {
     "localLinux": "ローカル Linux",
     "localMac": "ローカル Mac",
     "localWindows": "ローカル Windows",
-    "thisComputer": "このコンピューター"
+    "thisComputer": "このコンピュータ"
   },
   "phoneConnection": {
     "accountSettings": "アカウント設定",
@@ -21142,19 +21142,19 @@
     "authorizedDevices": "承認済みデバイスと接続",
     "back": "戻る",
     "cloud": "HiveCloud アカウント",
-    "cloudDescription": "ネットワークをまたいで接続するには、コンピューターとスマートフォンで同じ HiveCloud アカウントにログインしてください。",
-    "cloudInstructions": "スマートフォンで「コンピューターに接続」を開き、アカウント一覧からこのコンピューターを選択してください。このコンピューターで HiveCode を実行したままにしてください。",
+    "cloudDescription": "ネットワークをまたいで接続するには、コンピュータとスマートフォンで同じ HiveCloud アカウントにログインしてください。",
+    "cloudInstructions": "スマートフォンで「コンピュータに接続」を開き、アカウント一覧からこのコンピュータを選択してください。このコンピュータで HiveCode を実行したままにしてください。",
     "cloudSessions": "HiveCloud アクセスセッション",
-    "description": "HiveCloud または接続可能なコンピューターのアドレスでスマートフォンを接続します。",
+    "description": "HiveCloud または接続可能なコンピュータのアドレスでスマートフォンを接続します。",
     "devicesFailed": "承認済みデバイスを読み込めませんでした。",
     "diagnostics": "接続の診断",
     "direct": "直接接続アドレス",
     "directDescription": "HiveCloud へのログインは不要です。スマートフォンから LAN、VPN、または提供したネットワーク経由でこのアドレスに到達できる必要があります。",
-    "directInstructions": "LAN またはカスタムアドレスを選択してペアリングコードを生成し、スマートフォンの「コンピューターに接続」でスキャンしてください。",
+    "directInstructions": "LAN またはカスタムアドレスを選択してペアリングコードを生成し、スマートフォンの「コンピュータに接続」でスキャンしてください。",
     "help": "接続のヘルプ",
     "iosDownload": "iOS 版をダウンロード",
     "lastSeen": "最終確認",
-    "linkComputer": "このコンピューターをリンク",
+    "linkComputer": "このコンピュータをリンク",
     "loadingDevices": "承認済みデバイスを読み込み中…",
     "manage": "スマートフォン接続を管理",
     "method": "接続方法",
@@ -21162,7 +21162,7 @@
     "pairedDevices": "QR で承認したデバイス",
     "ready": "接続準備完了",
     "refresh": "接続状態を更新",
-    "relayRequired": "このコンピューターはオンラインですが、デバイス間アクセスの準備ができていません。接続の詳細を確認し、状態を更新してください。",
+    "relayRequired": "このコンピュータはオンラインですが、デバイス間アクセスの準備ができていません。接続の詳細を確認し、状態を更新してください。",
     "relayUnavailable": "Cloud アクセスを利用できません",
     "retryDevices": "再試行",
     "revokeDescription": "QR の承認を取り消すと、そのデバイスは切断されます。HiveCloud のアクセスセッションは上で個別に管理してください。",
@@ -21170,7 +21170,7 @@
     "screenPreferences": "スマートフォン画面の設定",
     "settingsDescription": "スマートフォン接続ページで HiveCloud 接続、アドレスのペアリング、承認済みデバイス、スマートフォンの設定を管理します。",
     "sidebarPolicy": "HiveCloud にログインすると、スマートフォン接続のサイドバー項目は非表示になります。設定から「デバイスと接続」をいつでも開けます。",
-    "thisComputer": "このコンピューター",
+    "thisComputer": "このコンピュータ",
     "title": "スマートフォン接続"
   },
   "runtimeCloudAlias": {
@@ -21183,21 +21183,21 @@
     "confirmDraft": "下書きの送信を確定",
     "confirmed": "クラウド名を確認しました",
     "conflict": "クラウド名が変更されました。下書きは保持されています。",
-    "currentComputer": "現在のコンピューター · ローカル実行",
+    "currentComputer": "現在のコンピュータ · ローカル実行",
     "discardDraft": "保持された下書きを破棄",
     "draft": "下書き: {{name}}",
     "editLocalNote": "ローカルメモを編集",
     "latestCloudName": "最後に確認できたクラウド名: {{name}}",
     "localNote": "ローカルメモ: {{name}}",
-    "localNoteDescription": "このメモは、このコンピューターにのみ保存されます。共有のクラウド名は Runtime 設定で変更します。",
+    "localNoteDescription": "このメモは、このコンピュータにのみ保存されます。共有のクラウド名は Runtime 設定で変更します。",
     "localNoteLabel": "ローカルメモ",
     "localNotes": "ローカルメモ: {{names}}",
     "orphanedDraft": "Runtime {{id}} の保持された下書き: {{name}}",
     "ownershipBlocked": "元の所有権を確認できません。下書きは保持されています。",
     "queued": "名前の変更が待機中",
     "rateLimited": "名前の変更は待機中です。しばらく待ってから再試行してください。",
-    "renameCurrentComputer": "HiveCloud で現在のコンピューターの名前を変更",
-    "reviewDraft": "下書きを新しい変更として送信する前に、現在のクラウド名を確認してください。",
+    "renameCurrentComputer": "HiveCloud で現在のコンピュータの名前を変更",
+    "reviewDraft": "下書きを新規変更として送信する前に、現在のクラウド名を確認してください。",
     "saveFailed": "Runtime 名を保存できませんでした。クラウド一覧を更新して、下書きを確認してください。",
     "storageUnavailable": "ローカルの下書き保存領域を読み取れないか保存できないため、名前を変更できません。既存の下書きは保持されています。",
     "submitting": "クラウド名を更新中",
@@ -21241,7 +21241,7 @@
     }
   },
   "web": {
-    "cloudLaunchFailure": "この Cloud 起動リンクは無効または期限切れです。HiveCloud から新しい起動を作成してください。",
+    "cloudLaunchFailure": "この Cloud 起動リンクは無効または期限切れです。HiveCloud から新規起動を作成してください。",
     "runtime": {
       "cloudWebSocket": "Cloud WSS",
       "nameSyncUnverified": "名前の同期を確認できませんでした。最後に確認できた名前を表示しています。"
@@ -21346,18 +21346,18 @@
       "retry": "再試行",
       "find": "保存済みフィルターを検索",
       "noMatch": "一致するフィルターはありません。",
-      "loadFailed": "Jiraの保存済みフィルターを読み込めませんでした。",
-      "saveFailed": "Jiraフィルターを保存できませんでした。"
+      "loadFailed": "Jira の保存済みフィルターを読み込めませんでした。",
+      "saveFailed": "Jira フィルターを保存できませんでした。"
     },
     "statusFilters": {
       "loadFailed": "Jira ステータスフィルターを読み込めませんでした。",
       "saveFailed": "Jira ステータスフィルターを保存できませんでした。",
       "manualQuery": "ステータスフィルターはプリセットビューに適用されます。使用するには検索をクリアしてください。",
-      "label": "ステータスで Jira 課題を絞り込む",
+      "label": "ステータスで Jira Issue を絞り込む",
       "clear": "ステータスをクリア",
       "jql": "ステータスフィルターの JQL",
       "editJql": "JQL として編集",
-      "catalogHint": "ステータスは読み込まれた課題から取得されます。このビューで他のステータスを表示するには、選択をクリアしてください。"
+      "catalogHint": "ステータスは読み込まれた Issue から取得されます。このビューで他のステータスを表示するには、選択をクリアしてください。"
     },
     "connect": {
       "scopedTokenGuide": "スコープ付きトークンには read:jira-work、write:jira-work、read:jira-user が必要です。Bearer 認証を使用するには、メールアドレスを空のままにします。",
