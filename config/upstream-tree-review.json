@@ -8159,7 +8159,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "53da0d1e6dbd8a6b26f5e467e3e6ef4ff7d13562"
+        "sha": "40b923c0e8167ab619eee7f5bb7ecfb59f6d0045"
       },
       "upstream": {
         "mode": "100644",
@@ -8167,11 +8167,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "53da0d1e6dbd8a6b26f5e467e3e6ef4ff7d13562"
+        "sha": "40b923c0e8167ab619eee7f5bb7ecfb59f6d0045"
       },
-      "reason": "Add exactly upstream markdown parser dependencies and snapshots while preserving product React Native patch, Metro, lucide and Node typings graph. Current frozen base/product/upstream identities were rechecked for mobile/pnpm-lock.yaml; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -12547,7 +12547,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "980d334919d11e6013a0f6c88159b67b40324bfa"
+        "sha": "2f886d1208985c2a0f90aee3d31b8d79eec5c7cd"
       },
       "upstream": {
         "mode": "100644",
@@ -12555,11 +12555,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "980d334919d11e6013a0f6c88159b67b40324bfa"
+        "sha": "2f886d1208985c2a0f90aee3d31b8d79eec5c7cd"
       },
-      "reason": "Absorb the incoming dependency graph and bind every patch hash and importer/package/snapshot reference to the actual merged patch bytes (SHA-256), retaining product importers and optional dependency policy. Frozen script-free install remains mandatory. Current frozen base/product/upstream identities were rechecked for pnpm-lock.yaml; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -12776,7 +12776,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "159e9dcda04801cf0577a160c72a6d4e548f1139"
+        "sha": "9133c53d8250e1898c11a17428e1d307efecd0a3"
       },
       "upstream": {
         "mode": "100644",
@@ -12784,11 +12784,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "159e9dcda04801cf0577a160c72a6d4e548f1139"
+        "sha": "9133c53d8250e1898c11a17428e1d307efecd0a3"
       },
-      "reason": "Regenerate bundled guide/projection from reviewed combined Hive/Jira canonical guides with the existing product generator; retain Hive Android UI and product branding, no upstream installer implementation copied.\n\nPost-prepare diagnostic repair: Regenerate the shipped guide bundle from the maintained Jira sources so both packaged guides include the executable-variable contract. Current frozen base/product/upstream identities were rechecked for src/cli/bundled-skill-guides.ts; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -32236,7 +32236,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "773ce2c96afbe2bec10ae11620b6829f26d7e9b7"
+        "sha": "b9739421cc9f93c76c980debc5fe282a69a7809a"
       },
       "upstream": {
         "mode": "100644",
@@ -32244,11 +32244,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "773ce2c96afbe2bec10ae11620b6829f26d7e9b7"
+        "sha": "b9739421cc9f93c76c980debc5fe282a69a7809a"
       },
-      "reason": "Resolve runtime locale by exact key: product semantic translations, candidate-consumer deletion proof, corrected Hive command casing, and reviewed new upstream keys.\n\nPost-prepare diagnostic repair: Regenerate the required English runtime catalog from maintained sources so current account, task and agent-launch UI keys resolve without restoring retired integrations. Regenerate the required English runtime catalog with the original collector: retain canonical settings.terminal.windows.administratorDocumentation value \"Read the guide\" because maintained consumers have no literal fallback reference. Exact output adds only this required key; preserve all prior keys and values. Current frozen base/product/upstream identities were rechecked for src/renderer/src/i18n/en-runtime-required.json; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -32351,7 +32351,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "f25850db2befb96bd2adc8fcfe96a61643effb60"
+        "sha": "f72ce600742aa0daa03aec3139e0612b3fc4de92"
       },
       "upstream": {
         "mode": "100644",
@@ -32359,11 +32359,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "f25850db2befb96bd2adc8fcfe96a61643effb60"
+        "sha": "f72ce600742aa0daa03aec3139e0612b3fc4de92"
       },
-      "reason": "Resolve en locale by exact key: product semantic translations, candidate-consumer deletion proof, corrected Hive command casing, and reviewed new upstream keys.\n\nPost-prepare diagnostic repair: Restore the missing en blank-terminal default-agent label and move the unavailable-workspace-host message into its actual nested lookup key, retaining all existing translated values. Current frozen base/product/upstream identities were rechecked for src/renderer/src/i18n/locales/en.json; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -32374,7 +32374,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "40a6d108bbc415011606861b1df8a39c4d8f8710"
+        "sha": "f9f4b0d2f89c51e2902d0cebdb2577af2800278f"
       },
       "upstream": {
         "mode": "100644",
@@ -32382,11 +32382,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "40a6d108bbc415011606861b1df8a39c4d8f8710"
+        "sha": "f9f4b0d2f89c51e2902d0cebdb2577af2800278f"
       },
-      "reason": "Resolve es locale by exact key: product semantic translations, candidate-consumer deletion proof, corrected Hive command casing, and reviewed new upstream keys.\n\nPost-prepare diagnostic repair: Restore the missing es blank-terminal default-agent label and move the unavailable-workspace-host message into its actual nested lookup key, retaining all existing translated values. Current frozen base/product/upstream identities were rechecked for src/renderer/src/i18n/locales/es.json; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -32397,7 +32397,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "c5040214e7be4d314c4e7eaae1a7b07db3157fde"
+        "sha": "807b4f3869bc45989ef14845781dddcbfb584c10"
       },
       "upstream": {
         "mode": "100644",
@@ -32405,11 +32405,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "c5040214e7be4d314c4e7eaae1a7b07db3157fde"
+        "sha": "807b4f3869bc45989ef14845781dddcbfb584c10"
       },
-      "reason": "Resolve fr locale by exact key: product semantic translations, candidate-consumer deletion proof, corrected Hive command casing, and reviewed new upstream keys.\n\nPost-prepare diagnostic repair: Restore the missing fr blank-terminal default-agent label and move the unavailable-workspace-host message into its actual nested lookup key, retaining all existing translated values. Current frozen base/product/upstream identities were rechecked for src/renderer/src/i18n/locales/fr.json; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -32420,7 +32420,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "99422852e7da4711bcf5e7b838ad1d0bbf260e43"
+        "sha": "43169e78d98c51651f8b8438bf5cd21907d5717e"
       },
       "upstream": {
         "mode": "100644",
@@ -32428,11 +32428,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "99422852e7da4711bcf5e7b838ad1d0bbf260e43"
+        "sha": "43169e78d98c51651f8b8438bf5cd21907d5717e"
       },
-      "reason": "Resolve ja locale by exact key: product semantic translations, candidate-consumer deletion proof, corrected Hive command casing, and reviewed new upstream keys.\n\nPost-prepare diagnostic repair: Place the maintained ja unavailable-workspace-host message under its actual nested lookup key, retaining its translated text and all other existing values. Current frozen base/product/upstream identities were rechecked for src/renderer/src/i18n/locales/ja.json; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -32443,7 +32443,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "63bd8d2e5d8b51fbd8fbeb7e653ad55cbcff7956"
+        "sha": "2471b1e3c3fcfebf8b197d34dacc477b06ef3cbc"
       },
       "upstream": {
         "mode": "100644",
@@ -32451,11 +32451,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "63bd8d2e5d8b51fbd8fbeb7e653ad55cbcff7956"
+        "sha": "2471b1e3c3fcfebf8b197d34dacc477b06ef3cbc"
       },
-      "reason": "Resolve ko locale by exact key: product semantic translations, candidate-consumer deletion proof, corrected Hive command casing, and reviewed new upstream keys.\n\nPost-prepare diagnostic repair: Place the maintained ko unavailable-workspace-host message under its actual nested lookup key, retaining its translated text and all other existing values. Current frozen base/product/upstream identities were rechecked for src/renderer/src/i18n/locales/ko.json; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -32466,7 +32466,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "c8b1bdcdf4d4e02c607d68375c158314f23d56ea"
+        "sha": "74b58257bd89c53300761140ae122ed9d579c5ca"
       },
       "upstream": {
         "mode": "100644",
@@ -32474,11 +32474,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "c8b1bdcdf4d4e02c607d68375c158314f23d56ea"
+        "sha": "74b58257bd89c53300761140ae122ed9d579c5ca"
       },
-      "reason": "Resolve zh locale by exact key: product semantic translations, candidate-consumer deletion proof, corrected Hive command casing, and reviewed new upstream keys.\n\nPost-prepare diagnostic repair: Restore the missing zh blank-terminal default-agent label and move the unavailable-workspace-host message into its actual nested lookup key, retaining all existing translated values. Current frozen base/product/upstream identities were rechecked for src/renderer/src/i18n/locales/zh.json; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -33402,7 +33402,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "a848dd654afafc0b1546f534820cb7c7172f9705"
+        "sha": "0c18c749545f4b61bc6c633dd526bc31368d2c91"
       },
       "upstream": {
         "mode": "100644",
@@ -33410,11 +33410,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "a848dd654afafc0b1546f534820cb7c7172f9705"
+        "sha": "0c18c749545f4b61bc6c633dd526bc31368d2c91"
       },
-      "reason": "Review src/renderer/src/ssh/ssh-host-server-status-copy.ts against frozen B/P/U identities. Boundary classification: unclassified; selected current-product-default to preserve HiveCode ownership while covering the upstream interval.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -34561,7 +34561,7 @@
       },
       "product": {
         "mode": "100644",
-        "sha": "b216855e669260c35b4fb181b6b2ab0b2dd2e80f"
+        "sha": "9c2320a02bdc875abc1b88d313f76f2e45626075"
       },
       "upstream": {
         "mode": "100644",
@@ -34569,11 +34569,11 @@
       },
       "result": {
         "mode": "100644",
-        "sha": "b216855e669260c35b4fb181b6b2ab0b2dd2e80f"
+        "sha": "9c2320a02bdc875abc1b88d313f76f2e45626075"
       },
-      "reason": "Preserve branded unreadable-history copy and add cancellation failure message. Current frozen base/product/upstream identities were rechecked for src/shared/agent-session-write-notice-copy.ts; retained decision source: prior-adaptation-shape.",
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
       "regressionTests": [
-        "pnpm run typecheck"
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     },
     {
@@ -36712,6 +36712,126 @@
       "reason": "Review vite.web.config.ts against frozen B/P/U identities. Boundary classification: unclassified; selected current-product-default to preserve HiveCode ownership while covering the upstream interval.",
       "regressionTests": [
         "pnpm run typecheck"
+      ]
+    },
+    {
+      "path": "config/hivecode-brand-allowlist.json",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "9b29ff7563eaba549e69666d6e50ce874122bc04"
+      },
+      "upstream": null,
+      "result": {
+        "mode": "100644",
+        "sha": "9b29ff7563eaba549e69666d6e50ce874122bc04"
+      },
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
+      "regressionTests": [
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
+      ]
+    },
+    {
+      "path": "resources/skills/current-manifest.json",
+      "base": {
+        "mode": "100644",
+        "sha": "94ee56f878873afb5b541a3237552868242c16a7"
+      },
+      "product": {
+        "mode": "100644",
+        "sha": "eb2c0a3be419763eb3c206b66ff48ce08847ae15"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "94ee56f878873afb5b541a3237552868242c16a7"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "eb2c0a3be419763eb3c206b66ff48ce08847ae15"
+      },
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
+      "regressionTests": [
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
+      ]
+    },
+    {
+      "path": "resources/skills/released-digests.json",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "50f9368c30c35052201582ae88f3ebda791801bd"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "20594c626a031890b5e43db9b682132c5feabb94"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "50f9368c30c35052201582ae88f3ebda791801bd"
+      },
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
+      "regressionTests": [
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
+      ]
+    },
+    {
+      "path": "src/main/skills/bundled-skill-install/bundled-skill-sources.ts",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "c53cf925ce61f91c9ea7e22ca88f04959a43afa4"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "5b3f5ff868840ac0705a65976abc30f488a2a14e"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "c53cf925ce61f91c9ea7e22ca88f04959a43afa4"
+      },
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
+      "regressionTests": [
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
+      ]
+    },
+    {
+      "path": "src/renderer/src/components/onboarding/OnboardingLanguageSwitcher.tsx",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "a12e545cb33bebf8d91c555a3f798511c540b0cd"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "5def3df44d144bbded774274206ca3a6454f21f1"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "a12e545cb33bebf8d91c555a3f798511c540b0cd"
+      },
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
+      "regressionTests": [
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
+      ]
+    },
+    {
+      "path": "src/renderer/src/i18n/locales/pt.json",
+      "base": null,
+      "product": {
+        "mode": "100644",
+        "sha": "58158cda9829912ef71795d9da4d0712dff568ed"
+      },
+      "upstream": {
+        "mode": "100644",
+        "sha": "669514f31abf8c96cdb3218c58bb94b2cc4f1676"
+      },
+      "result": {
+        "mode": "100644",
+        "sha": "58158cda9829912ef71795d9da4d0712dff568ed"
+      },
+      "reason": "Freeze the reviewed generated, dependency, or localization contract while retaining the synchronized product result.",
+      "regressionTests": [
+        "upstream sync gates: generated artifacts, localization, lockfiles, and brand boundary"
       ]
     }
   ]
