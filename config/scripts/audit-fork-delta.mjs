@@ -29,6 +29,7 @@ const ENDPOINT_PATTERN =
 function runGit(args) {
   return execFileSync('git', args, {
     encoding: 'utf8',
+    maxBuffer: 128 * 1024 * 1024,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true
   })

@@ -115,7 +115,7 @@ describe('explicit tree comparison for public root imports', () => {
         'src/shared/protocol.ts': 'new protocol',
         'config/product/identity.json': '{"product":"HiveCode"}'
       })
-      run({ base, head, git })
+      run({ base, head, git, root, snapshot })
     } finally {
       rmSync(root, { force: true, recursive: true })
     }
@@ -150,6 +150,36 @@ describe('explicit tree comparison for public root imports', () => {
   it('keeps default ancestry mode failing for unrelated histories', () => {
     withUnrelatedRoots(({ base, head, git }) => {
       expect(() => collectForkDelta({ base, head, git })).toThrow()
+    })
+  })
+  it('audits Git output above one MiB without truncation or leaking matched line bodies', () => {
+    withUnrelatedRoots(({ base, root, snapshot }) => {
+      const head = snapshot({
+        'large.txt': `${'private-content '.repeat(100000)}https://login.onorca.dev\n`
+      })
+      const output = execFileSync(
+        process.execPath,
+        [
+          fileURLToPath(new URL('./audit-fork-delta.mjs', import.meta.url)),
+          '--comparison',
+          'trees',
+          '--base',
+          base,
+          '--head',
+          head,
+          '--json'
+        ],
+        { cwd: root, encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] }
+      )
+      const report = JSON.parse(output)
+      expect(report.upstreamEndpointMatches).toEqual(['large.txt:1:login.onorca.dev'])
+      expect(report.changedFiles).toContainEqual({
+        status: 'A',
+        score: null,
+        path: 'large.txt',
+        oldPath: null
+      })
+      expect(output).not.toContain('private-content')
     })
   })
   it('regenerates both trusted CI deltas from actual public and upstream trees', () => {
