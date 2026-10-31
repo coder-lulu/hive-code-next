@@ -1,15 +1,27 @@
 {
   "schemaVersion": 1,
   "kind": "frozen-upstream-review",
-  "sourceProductSha": "0adb06d8b7a281ba8e8f9f7e0a72e7e47cb6a037",
+  "sourceProductSha": "9a5707f54ab6bc61efcc299def1c8ff591fe7b8e",
   "baseUpstreamSha": "8e350554480ac5b77d3050a2040541fd334dad7c",
-  "upstreamSha": "0c99ccb3da8f0c426de2af8356072a533c8f8479",
+  "upstreamSha": "852391da0f083a96aeba4d67fef7a8bc5dcf260f",
   "documentation": {
     "privateRepository": "coder-lulu/hive-code-docs",
-    "privateCommitSha": "7dc3f65618bf445a10ba2beaf643ebaecc9fc92e",
-    "receiptBlobSha": "0434ff325d7db6cd2b087fc05a7c7fc0c1ed073e",
+    "privateCommitSha": "bde3df25052cb8fdd3c7dc57ec3101a5d2072094",
+    "receiptBlobSha": "fe200c182b53253fed98d3f2818b54ad1e63179e",
     "authentication": "authenticated-private-github-repository",
     "documentationShas": [
+      "76cf164cf967d8088b9741ae95f3e0152a7605dd",
+      "2b00c571828b92e5e40e6e63063004bb08256d42",
+      "34f508fb11188112df4561d6fc36db55abfb6d8a",
+      "a1f7f976710682b5f781e1f79b65576510635ebe",
+      "dcaeaaa1fc5555f2264e373abb647eaba1537492",
+      "9323738978f802ae9d671fdaed7d74ec62c1f6e1",
+      "e9be993f476a3131062239b35be40e2f9e0a69e9",
+      "5b505a6e94479706160bd7ca8818732428d32bd5",
+      "f7ff1ee2ff74a4f45cf18892fb3f93bcbcf46933",
+      "1963ac0ea8a8aacd1dd047ebae2df1d9a032b9a3",
+      "8e61c440df4164b80d6f23a415dd91e2baf12c46",
+      "f78b5979ca2f6c9298f1af75355f7806eace7442",
       "d6caa43719c93faa95199157cab749c4c2fe3b66",
       "ca2148a30db409ccfc6e394bc53379b508e183e7",
       "a892fca5a126c87a9c925af94002586d653e1d37",
@@ -2696,16 +2708,16 @@
       {
         "path": "docs/reference/plugin-authoring.md",
         "privatePath": "reference/plugin-authoring.md",
-        "upstreamBlobSha": "6a70d7ca69fa585be82840bae8d9357f4b7356cd",
-        "privateBlobSha": "835c1665cacb9d5e6e57a0342f2009ceeff979b0",
-        "reason": "Private upstream plugin engineering reference only; product support and security validation are not asserted."
+        "upstreamBlobSha": "ae9f0bd9bbacbe1be2c5448a7928c387bb1cb425",
+        "privateBlobSha": "eeb669481ce471b93caea0e8b333918cd5bd366b",
+        "reason": "Refresh the upstream engineering reference for source-derived publishers, reserved owners, plugin CLI authoring and directory listing; preserve Orca protocol/version requirements and explicitly withhold HiveCode availability claims."
       },
       {
         "path": "docs/reference/plugin-catalog.md",
         "privatePath": "reference/plugin-catalog.md",
-        "upstreamBlobSha": "fcc9d08034557c90018260602ac7d5977f062c6e",
-        "privateBlobSha": "dc2863b5aa667f3d59bc3b8a9de285943e9994c9",
-        "reason": "Private upstream plugin engineering reference only; product support and security validation are not asserted."
+        "upstreamBlobSha": "c891602c3a4f1d7553703f76bad107f4177bed76",
+        "privateBlobSha": "eae9c251782744ff4a6dc4c6ef46b970a611988d",
+        "reason": "Document catalog-selected install identities and informational numeric owner IDs, including upstream catalog transfer and tag immutability policy; keep upstream catalog trust distinct from HiveCode endpoint ownership."
       },
       {
         "path": "docs/reference/plugin-host-api.md",
@@ -2715,18 +2727,25 @@
         "reason": "Private upstream plugin engineering reference only; product support and security validation are not asserted."
       },
       {
+        "path": "docs/reference/plugin-listing-policy.md",
+        "privatePath": "reference/plugin-listing-policy.md",
+        "upstreamBlobSha": "1f157380a12f2a4fa254a4c8e3563c5bf5dde35d",
+        "privateBlobSha": "a1eb47ad10badf39055e939a4070cc1971c1dd4c",
+        "reason": "Add the upstream-only listing policy covering free use, owner identity, impersonation, harmful code, tracking and removal; do not establish a HiveCode marketplace policy or publish private reference material."
+      },
+      {
         "path": "docs/reference/plugin-manifest.md",
         "privatePath": "reference/plugin-manifest.md",
-        "upstreamBlobSha": "6b62f7414f4e1cefb77af787f1686a256bfc8e85",
-        "privateBlobSha": "21288579e7b8256f19fa4fd7fbd6c84a4a9d4558",
-        "reason": "Private upstream plugin engineering reference only; product support and security validation are not asserted."
+        "upstreamBlobSha": "3cbb21e96b53bbcb59f80906dd9c867c16a3b590",
+        "privateBlobSha": "b01182ab20b3643e6b8d17a1db347328907a399d",
+        "reason": "Refresh the manifest reference with optional deprecated publisher and source-derived install identity; retain the third-party minimum engine requirement rather than introduce a second HiveCode product path."
       },
       {
         "path": "docs/reference/plugin-syntax.md",
         "privatePath": "reference/plugin-syntax.md",
-        "upstreamBlobSha": "f4878c3da81199b166976788bb3039282a1b8953",
-        "privateBlobSha": "6d94ef49913ad0ef470e093d7fb76f5049abeee0",
-        "reason": "Private upstream plugin engineering reference only; product support and security validation are not asserted."
+        "upstreamBlobSha": "fe7ec8d116eba4b312948c3e390e4207029af752",
+        "privateBlobSha": "1600aacd60f3b15556f9c0d7a11778dfb45520f3",
+        "reason": "Record enabled plugin grammar precedence, protected editor languages, JSP exception and deterministic syntax-ID tie breaking as upstream reference pending exact-candidate runtime validation."
       },
       {
         "path": "docs/reference/plugin-theme-tokens.md",
@@ -2752,16 +2771,16 @@
       {
         "path": "docs/schemas/plugins/orca-catalog.v2.schema.json",
         "privatePath": "schemas/plugins/orca-catalog.v2.schema.json",
-        "upstreamBlobSha": "3b3bf00c10e1dfcebb464924af2cc30aa47b8322",
-        "privateBlobSha": "3b3bf00c10e1dfcebb464924af2cc30aa47b8322",
-        "reason": "Private upstream plugin engineering reference only; product support and security validation are not asserted."
+        "upstreamBlobSha": "6a6e4d019f9c18c0691d10f8fe18cab58db106d4",
+        "privateBlobSha": "6a6e4d019f9c18c0691d10f8fe18cab58db106d4",
+        "reason": "Preserve the upstream schema identity and version annotations while adding the positive safe-integer ownerId field and correcting catalog install-identity descriptions."
       },
       {
         "path": "docs/schemas/plugins/orca-plugin.v2.schema.json",
         "privatePath": "schemas/plugins/orca-plugin.v2.schema.json",
-        "upstreamBlobSha": "69576d0a84e9fd931e3fd5f6e00f7c2b4bfb87e9",
-        "privateBlobSha": "69576d0a84e9fd931e3fd5f6e00f7c2b4bfb87e9",
-        "reason": "Private upstream plugin engineering reference only; product support and security validation are not asserted."
+        "upstreamBlobSha": "0fc85f7f64ba5f26809e61eca9be007e0be5155f",
+        "privateBlobSha": "0fc85f7f64ba5f26809e61eca9be007e0be5155f",
+        "reason": "Align the upstream protocol schema with optional deprecated publisher and source-derived identity; retain schema identifiers, field constraints and external engine-version documentation."
       },
       {
         "path": "docs/site/.gitignore",
@@ -2815,9 +2834,9 @@
       {
         "path": "docs/site/content/docs/agents/native-chat.mdx",
         "privatePath": "site/content/docs/agents/native-chat.mdx",
-        "upstreamBlobSha": "ee7a83b000734a8c732480f9e88d4f85cf440e49",
-        "privateBlobSha": "a65e80b6a271c334ec2db3ab34b1a373e3facff7",
-        "reason": "Adopt current conversation-resume guidance; remove obsolete version fallbacks and opt-in setup."
+        "upstreamBlobSha": "dfbd68108cc0344380a5ff8b4f632b38d2acc7da",
+        "privateBlobSha": "e4aa542491964f8fc0b7a76f556c009a9a303ff3",
+        "reason": "Preserve HiveCode agent, transcript and remote-continuation guidance; record global/per-agent Chat versus Terminal changes as an unverified upstream adaptation rather than assert merged UI availability."
       },
       {
         "path": "docs/site/content/docs/agents/supported.mdx",
@@ -2857,16 +2876,16 @@
       {
         "path": "docs/site/content/docs/cli/orchestration.mdx",
         "privatePath": "site/content/docs/cli/orchestration.mdx",
-        "upstreamBlobSha": "47725eeda8edf757e50ed3e21f7abb73e1d47626",
-        "privateBlobSha": "0a12d94a09e0b8f8e3a94f8cd29e23b025d0a0da",
-        "reason": "Apply the upstream guide correction; no private divergence."
+        "upstreamBlobSha": "37d7607fd2b9c3aacbb49d5838a12731ad145b4a",
+        "privateBlobSha": "039f887eb6234ae19be6ee3b28b641f8192bbe9b",
+        "reason": "Adapt upstream Grok launch preferences, consuming mailbox reads and asynchronous ask/wait/resume guidance with an explicit candidate-validation notice; preserve HiveCode identity and current-host ownership without adding mixed-product support."
       },
       {
         "path": "docs/site/content/docs/cli/reference.mdx",
         "privatePath": "site/content/docs/cli/reference.mdx",
-        "upstreamBlobSha": "b22528d6c762dd6bcf6bcab47a71c62bd35a2de8",
-        "privateBlobSha": "d24fb5dd3c22115e4f12f26c5e5ca1de2f7c69e8",
-        "reason": "Document explicit Git branch naming and collision suffix behavior while preserving product identity."
+        "upstreamBlobSha": "198814984cc9212588beb020ad2091bc8d5925a1",
+        "privateBlobSha": "965345da1a7391e2e5b099d554e73e47e2b7f76d",
+        "reason": "Add scoped upstream snapshot filtering, delta and screenshot-location guidance pending candidate validation; preserve HiveCode CLI and independent skill-installation text and correct the third-party GNOME Orca name."
       },
       {
         "path": "docs/site/content/docs/cli/skills.mdx",
@@ -2948,9 +2967,9 @@
       {
         "path": "docs/site/content/docs/settings.mdx",
         "privatePath": "site/content/docs/settings.mdx",
-        "upstreamBlobSha": "ca656d4c7bf6ac13c828553135209cde0e8d3619",
-        "privateBlobSha": "5cf46bf33dfbae902da942b05a8b396c91d422e9",
-        "reason": "Three-way merge preserves private product guidance while absorbing upstream corrections."
+        "upstreamBlobSha": "8d075036555bde6708dc71651ade3544c5cfbf5f",
+        "privateBlobSha": "002f1d6e67a440ae01c34dc818faa4e4f11c64c9",
+        "reason": "Record upstream Chat Providers navigation, inherited launch defaults and fresh-install Terminal default as pending HiveCode adaptation while retaining current product settings and avoiding a parallel implementation."
       },
       {
         "path": "docs/site/content/docs/ssh.mdx",
