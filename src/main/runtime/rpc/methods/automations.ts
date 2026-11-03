@@ -59,8 +59,7 @@ export const AUTOMATION_METHODS = [
     handler: async (params, context) => ({
       automation: await context.runtime.updateAutomation(params.id, params.updates, {
         expectedOwner: mutationOwner(params.id, params.expectedOwner, context),
-        destination: params.destination,
-        expectedWorkspaceMode: params.expectedWorkspaceMode
+        destination: params.destination
       })
     })
   }),

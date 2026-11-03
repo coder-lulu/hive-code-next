@@ -1,4 +1,3 @@
-// @protected-copy: notebook trust and kernel setup copy.
 import { useMemo } from 'react'
 import DOMPurify from 'dompurify'
 import { useTranslation } from 'react-i18next'

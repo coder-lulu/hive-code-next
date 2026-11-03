@@ -23,6 +23,14 @@ const documents: MarkdownDocument[] = [
 ]
 
 describe('getMarkdownDocCompletionContext', () => {
+  it('detects partial doc links', () => {
+    expect(getMarkdownDocCompletionContext('before [[se')).toEqual({ partial: 'se' })
+  })
+
+  it('supports an empty partial after opening brackets', () => {
+    expect(getMarkdownDocCompletionContext('[[')).toEqual({ partial: '' })
+  })
+
   it('rejects closed or malformed contexts', () => {
     expect(getMarkdownDocCompletionContext('[[done]]')).toBeNull()
     expect(getMarkdownDocCompletionContext('[[done|Alias')).toBeNull()
@@ -39,6 +47,15 @@ describe('getMarkdownDocCompletionContext', () => {
 })
 
 describe('getMarkdownDocCompletionDocuments', () => {
+  it('filters by name or relative path', () => {
+    expect(getMarkdownDocCompletionDocuments(documents, 'do')).toEqual([documents[0]])
+    expect(getMarkdownDocCompletionDocuments(documents, 'notes/pl')).toEqual([documents[1]])
+  })
+
+  it('normalizes Windows-style partial paths', () => {
+    expect(getMarkdownDocCompletionDocuments(documents, 'docs\\se')).toEqual([documents[0]])
+  })
+
   it('returns no documents for oversized pasted partials before reading documents', () => {
     const unreadableDocument = { ...documents[0] }
     Object.defineProperty(unreadableDocument, 'name', {

@@ -1,11 +1,10 @@
 import { randomInt, randomUUID } from 'node:crypto'
 import type { PersistedState } from '../../../shared/persisted-state-types'
 import {
-  parseChatUiLaunchTipAudience,
-  type ChatUiLaunchTipAudience
-} from '../../../shared/native-chat/chat-ui-launch-tip-audience'
-import { carriedChatUiLaunchSettings } from '../../../shared/native-chat/native-chat-providers'
-import { savedChatUiWithTerminalDefaultView } from '../applying-settings/terminal-settings-migrations'
+  createNewProfileNativeChatUpgradeTipAudience,
+  parseNativeChatUpgradeTipAudience,
+  type NativeChatUpgradeTipAudience
+} from '../../../shared/native-chat/native-chat-upgrade-tip-audience'
 
 import type { StoreRuntimeState } from './store-runtime-state'
 
@@ -31,49 +30,42 @@ export class LoadedCohortMigrationOperations {
     }
   }
 
-  /** Reads the retired Chat UI switch from the raw profile, before load strips it. */
-  captureChatUiLaunchTipAudience(savedProfile: unknown): ChatUiLaunchTipAudience {
-    const saved = isRecord(savedProfile) ? savedProfile.chatUiLaunchTipAudience : undefined
-    const kept = saved === undefined ? null : parseChatUiLaunchTipAudience(saved)
+  captureNativeChatUpgradeTipAudience(savedProfile: unknown): NativeChatUpgradeTipAudience {
+    const saved = isRecord(savedProfile) ? savedProfile.nativeChatUpgradeTipAudience : undefined
+    const kept = saved === undefined ? null : parseNativeChatUpgradeTipAudience(saved)
     if (kept) {
       return kept
     }
     // Persist this decision before later settings changes can alter the apparent audience.
     this.runtime.loadNeedsSave = true
     if (!isRecord(savedProfile)) {
-      return { version: 1, membership: 'excluded', basis: 'new-profile' }
+      return createNewProfileNativeChatUpgradeTipAudience()
     }
     if (saved !== undefined) {
-      // Never rederive a damaged audience record from current settings.
+      // Never rederive a damaged audience record from current Chat UI settings.
       return { version: 1, membership: 'excluded', basis: 'unreadable-record' }
     }
     const settings = isRecord(savedProfile.settings) ? savedProfile.settings : undefined
-    // Opt-ins saved with new tabs opening in the terminal were kept on the terminal, so they count as off.
-    const chatUiOn =
-      settings?.experimentalNativeChat === true && !savedChatUiWithTerminalDefaultView(settings)
-    return { version: 1, membership: 'eligible', basis: chatUiOn ? 'chat-ui-on' : 'chat-ui-off' }
-  }
-
-  /** Runs with the audience capture that first records the profile, so it applies once and in the same save. */
-  carryChatUiChoices(
-    state: PersistedState,
-    savedProfile: unknown,
-    audience: ChatUiLaunchTipAudience
-  ): PersistedState {
-    if (
-      !isRecord(savedProfile) ||
-      savedProfile.chatUiLaunchTipAudience !== undefined ||
-      (audience.basis !== 'chat-ui-on' && audience.basis !== 'chat-ui-off')
-    ) {
-      return state
+    const chatUi = settings?.experimentalNativeChat
+    if (chatUi === true) {
+      // The retired key proves the opt-in predates the upgrade; later opt-ins cannot establish membership.
+      if (!settings || !Object.hasOwn(settings, 'openAgentTabsInChatByDefault')) {
+        return { version: 1, membership: 'excluded', basis: 'chat-ui-on-unproven' }
+      }
+      return {
+        version: 1,
+        membership: 'eligible',
+        basis:
+          settings.openAgentTabsInChatByDefault !== true
+            ? 'chat-ui-on-terminal-default'
+            : 'chat-ui-on'
+      }
     }
-    const saved = isRecord(savedProfile.settings) ? savedProfile.settings : undefined
-    const launchSettings = carriedChatUiLaunchSettings(
-      saved?.nativeChatProviders,
-      audience.basis === 'chat-ui-on'
-    )
-    this.runtime.loadNeedsSave = true
-    return { ...state, settings: { ...state.settings, ...launchSettings } }
+    return {
+      version: 1,
+      membership: 'excluded',
+      basis: chatUi === false ? 'chat-ui-off' : 'chat-ui-unset'
+    }
   }
 
   migrateTelemetry(state: PersistedState, fileExistedOnLoad: boolean): PersistedState {

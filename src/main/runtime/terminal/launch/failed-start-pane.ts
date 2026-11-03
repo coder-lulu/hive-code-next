@@ -20,7 +20,6 @@ import { allocateTerminalPaneIdentity } from '../../runtime-terminal-pane-identi
 import { OrcaRuntimeWithCreateTerminal } from './terminal-create'
 import { mainOwnsTabLayout } from './main-owned-tab-layout'
 import { PaneOwnerContentionError } from '../../../ipc/pty/pane/pane-spawn-operation'
-import type { TerminalWorkspaceCreationEvidence } from './terminal-workspace-scope'
 
 export type FailedStartPane = { tabId: string; leafId: string }
 
@@ -134,7 +133,7 @@ export abstract class OrcaRuntimeWithFailedStartPanes extends OrcaRuntimeWithCre
   override createTerminal(
     worktreeSelector?: string,
     opts: dependencies.TerminalCreateOptions = {},
-    ...evidence: TerminalWorkspaceCreationEvidence
+    created?: dependencies.Worktree
   ): Promise<dependencies.RuntimeTerminalCreate> {
     // Keep main-owned failed panes visible regardless of which start step failed.
     if (
@@ -147,11 +146,11 @@ export abstract class OrcaRuntimeWithFailedStartPanes extends OrcaRuntimeWithCre
         (pane) =>
           opts.startFailure
             ? Promise.reject(opts.startFailure)
-            : super.createTerminal(worktreeSelector, { ...opts, ...pane }, ...evidence),
-        (pane, error) => this.keepFailedStartPane(worktreeSelector, pane, opts, error, ...evidence)
+            : super.createTerminal(worktreeSelector, { ...opts, ...pane }, created),
+        (pane, error) => this.keepFailedStartPane(worktreeSelector, created, pane, opts, error)
       )
     }
-    return super.createTerminal(worktreeSelector, opts, ...evidence)
+    return super.createTerminal(worktreeSelector, opts, created)
   }
 
   /** Start the window's saved first pane under its ids; host_not_owned preserves window starts when the switch is off or main does not own the tab. */
@@ -186,23 +185,19 @@ export abstract class OrcaRuntimeWithFailedStartPanes extends OrcaRuntimeWithCre
   /** Through main's create rules, so a pane the user closed meanwhile is refused, not restored. */
   private async keepFailedStartPane(
     worktreeSelector: string,
+    created: dependencies.Worktree | undefined,
     pane: FailedStartPane,
     { title, wslUserAct }: dependencies.TerminalCreateOptions,
-    error: unknown,
-    ...evidence: TerminalWorkspaceCreationEvidence
+    error: unknown
   ): Promise<void> {
     if (error instanceof PaneOwnerContentionError) {
       // Another owner's terminal runs in the pane; the window attaches to it.
       return
     }
-    // The failed start retains both its captured owner and the same user's act.
-    const workspace = await this.resolveTerminalWorkspaceLaunchScope(
-      worktreeSelector,
-      evidence[0],
-      { wslUserAct: wslUserAct === true },
-      evidence[1],
-      evidence[2]
-    )
+    // The failed start's own act: a user's start may wake the distro; background stays held.
+    const workspace = await this.resolveTerminalWorkspaceLaunchScope(worktreeSelector, created, {
+      wslUserAct: wslUserAct === true
+    })
     const create = { type: 'createTerminalTab' as const, workspace: workspace.id, ...pane }
     const reply = await this.applyLayoutCommand(title ? { ...create, title } : create)
     // `tab_exists`: the start wrote this pane before failing and kept it.

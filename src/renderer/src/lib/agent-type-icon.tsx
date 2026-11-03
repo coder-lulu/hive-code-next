@@ -7,22 +7,20 @@ import { agentTypeToIconAgent } from './agent-status'
 /** Status-row icon: known agents get their brand icon, any other OSC 7501 program its first letter. */
 export function AgentTypeIcon({
   agentType,
-  size = 14,
-  className
+  size = 14
 }: {
   agentType: AgentType | null | undefined
   size?: number
-  className?: string
 }): React.JSX.Element {
   const iconAgent = agentTypeToIconAgent(agentType)
   if (iconAgent) {
-    return <AgentIcon agent={iconAgent} size={size} className={className} />
+    return <AgentIcon agent={iconAgent} size={size} />
   }
   // Why: keep "?" for not-yet-identified agents rather than a letter for "unknown".
   if (!agentType || agentType === 'unknown') {
-    return <AgentIcon agent={null} size={size} className={className} />
+    return <AgentIcon agent={null} size={size} />
   }
-  return <AgentLetterIcon letter={programLetter(agentType)} size={size} className={className} />
+  return <AgentLetterIcon letter={programLetter(agentType)} size={size} />
 }
 
 /** OSC 7501 app ids may lead with `_.+-`; the first letter or digit is the readable one. */

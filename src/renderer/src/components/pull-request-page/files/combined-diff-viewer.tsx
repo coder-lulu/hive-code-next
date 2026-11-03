@@ -1,11 +1,8 @@
-import {
-  combinedDiffViewportAttributes,
-  combinedDiffRowAttributes
-} from '@/components/editor/combined-diff-viewport'
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type { editor as monacoEditor } from 'monaco-editor'
 import { translate } from '@/i18n/i18n'
+import { useAppStore } from '@/store'
 import { useDocumentDarkTheme } from '@/hooks/use-document-dark-theme'
 import { DiffSectionItem } from '@/components/editor/DiffSectionItem'
 import { CombinedDiffFileTree } from '../../editor/combined-diff/browse-files/combined-diff-file-tree'
@@ -50,6 +47,7 @@ export function PRFilesCombinedDiffViewer({
   onCommentAdded,
   onViewedChange
 }: PRFilesCombinedDiffViewerProps): React.JSX.Element {
+  const settings = useAppStore((s) => s.settings)
   const isDark = useDocumentDarkTheme()
   const diffEntrySignature = useMemo(
     () =>
@@ -331,11 +329,7 @@ export function PRFilesCombinedDiffViewer({
           onCollapsedChange={setFileTreeCollapsed}
           onNavigate={handleTreeNavigate}
         />
-        <div
-          {...combinedDiffViewportAttributes}
-          ref={scrollContainerRef}
-          className="min-w-0 flex-1 overflow-auto scrollbar-editor"
-        >
+        <div ref={scrollContainerRef} className="min-w-0 flex-1 overflow-auto scrollbar-editor">
           <div className="relative w-full" style={{ height: `${virtualizer.getTotalSize()}px` }}>
             {virtualizer.getVirtualItems().map((virtualItem) => {
               const section = sections[virtualItem.index]
@@ -345,7 +339,6 @@ export function PRFilesCombinedDiffViewer({
               return (
                 <div
                   key={virtualItem.key}
-                  {...combinedDiffRowAttributes}
                   data-index={virtualItem.index}
                   ref={virtualizer.measureElement}
                   className="absolute left-0 top-0 w-full"
@@ -357,6 +350,7 @@ export function PRFilesCombinedDiffViewer({
                     isBranchMode={false}
                     sideBySide={sideBySide}
                     isDark={isDark}
+                    settings={settings}
                     sectionHeight={sectionHeights[virtualItem.index]}
                     worktreeId={`github-pr:${repoId}:${prNumber}`}
                     inlineComments={inlineReviewComments}

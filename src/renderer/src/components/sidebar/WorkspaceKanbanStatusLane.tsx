@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import WorkspaceKanbanLaneCardList from './WorkspaceKanbanLaneCardList'
 import { serializeWorkspaceLaneFullIds } from './workspace-kanban-filtered-drop-index'
-import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 import { getWorkspaceStatusVisualMeta } from './workspace-status'
 import { translate } from '@/i18n/i18n'
 import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
@@ -89,7 +88,7 @@ function WorkspaceKanbanStatusLane({
       return undefined
     }
     return (
-      serializeWorkspaceLaneFullIds(fullWorktreeIds ?? items.map(getWorktreeHostIdentity)) ??
+      serializeWorkspaceLaneFullIds(fullWorktreeIds ?? items.map((worktree) => worktree.id)) ??
       undefined
     )
   }, [fullWorktreeIds, hasQuery, items])

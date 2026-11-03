@@ -3,7 +3,7 @@ import {
   type SidebarFeedNotice,
   type SidebarFeedReaderRead
 } from '../../../src/shared/sidebar-feed-client/sidebar-feed-reader'
-import type { UnvalidatedRpcRequestPort } from '../transport/unvalidated-rpc-request-port'
+import type { RpcClient } from '../transport/rpc-client'
 import { hostSidebarFeedTransport } from './host-sidebar-feed-operations'
 
 export type HostSidebarFeedTriggers = {
@@ -16,7 +16,7 @@ export type HostSidebarFeedTriggers = {
 const RETRY_DELAYS_MS = [1_000, 2_000, 4_000, 8_000, 16_000]
 
 export function createHostSidebarFeedReader(
-  client: UnvalidatedRpcRequestPort,
+  client: RpcClient,
   onRead: (read: SidebarFeedReaderRead) => void
 ): SidebarFeedReader {
   return new SidebarFeedReader(

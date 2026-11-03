@@ -1,7 +1,3 @@
-import {
-  ensureAgentLaunchPreferences,
-  type AgentLaunchPreferences
-} from '@/components/settings/use-host-agent-launch-preferences'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { OnboardingState } from '../../../shared/onboarding-state-types'
 import type { TuiAgent } from '../../../shared/tui-agent'
@@ -29,13 +25,13 @@ export type OnboardingFolderAgentLaunch = {
 }
 
 /** Keep planning beside launch: the eagerly imported startup builder cannot reach the launch graph without cycling through store root. */
-export async function resolveDismissedOnboardingFolderAgentLaunch(args: {
+export function resolveDismissedOnboardingFolderAgentLaunch(args: {
   store: ReturnType<typeof useAppStore.getState>
   onboarding: OnboardingState | null
   hasExistingProject: boolean
   executionHostId: string
   worktreeId: string
-}): Promise<OnboardingFolderAgentLaunch> {
+}): OnboardingFolderAgentLaunch {
   const agent = onboardingFolderDefaultAgent(args.store.settings)
   if (
     !agent ||
@@ -60,32 +56,11 @@ export async function resolveDismissedOnboardingFolderAgentLaunch(args: {
   if (!context) {
     return { agent, plan }
   }
-  let preferences: AgentLaunchPreferences
-  try {
-    preferences = await ensureAgentLaunchPreferences(args.store, {
-      kind: 'folder',
-      worktreeId: args.worktreeId
-    })
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      return { agent, plan }
-    }
-    throw error
-  }
-  const startup = buildOnboardingFolderAgentStartup(
-    args.store.settings
-      ? {
-          ...args.store.settings,
-          agentLaunchChoices:
-            preferences.agentLaunchChoices ?? args.store.settings.agentLaunchChoices
-        }
-      : null,
-    {
-      platform: context.resolvedLaunchPlatform,
-      shell: context.queuedShell,
-      isRemote: context.isRemote
-    }
-  )
+  const startup = buildOnboardingFolderAgentStartup(args.store.settings, {
+    platform: context.resolvedLaunchPlatform,
+    shell: context.queuedShell,
+    isRemote: context.isRemote
+  })
   return { agent, plan, startup }
 }
 

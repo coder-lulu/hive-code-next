@@ -100,14 +100,11 @@ describe('getDiff', () => {
 
     const result = await getDiff('/repo', 'src/file.ts', false)
 
-    expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(
-      ['cat-file', 'blob', '--', ':src/file.ts'],
-      {
-        cwd: '/repo',
-        maxBuffer: 10 * 1024 * 1024,
-        preferWslDirectGit: true
-      }
-    )
+    expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(['show', ':src/file.ts'], {
+      cwd: '/repo',
+      maxBuffer: 10 * 1024 * 1024,
+      preferWslDirectGit: true
+    })
     expect(readFileMock).toHaveBeenCalledWith(path.join('/repo', 'src/file.ts'))
     expect(result).toEqual({
       kind: 'text',
@@ -124,14 +121,11 @@ describe('getDiff', () => {
 
     await getDiff('/repo', 'src\\file.ts', false)
 
-    expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(
-      ['cat-file', 'blob', '--', ':src/file.ts'],
-      {
-        cwd: '/repo',
-        maxBuffer: 10 * 1024 * 1024,
-        preferWslDirectGit: true
-      }
-    )
+    expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(['show', ':src/file.ts'], {
+      cwd: '/repo',
+      maxBuffer: 10 * 1024 * 1024,
+      preferWslDirectGit: true
+    })
   })
 
   it('falls back to HEAD for unstaged diffs when the file is not in the index', async () => {
@@ -149,7 +143,7 @@ describe('getDiff', () => {
 
     expect(gitExecFileAsyncBufferMock).toHaveBeenNthCalledWith(
       2,
-      ['cat-file', 'blob', '--', 'HEAD:src/file.ts'],
+      ['show', '--end-of-options', 'HEAD:src/file.ts'],
       {
         cwd: '/repo',
         maxBuffer: 10 * 1024 * 1024,

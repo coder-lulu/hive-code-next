@@ -11,7 +11,7 @@ export const pairScanStyles = themedStyleSheet(() => ({
   backButton: {
     width: 36,
     height: 36,
-    borderRadius: radii.control,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing.sm
@@ -29,7 +29,7 @@ export const pairScanStyles = themedStyleSheet(() => ({
   stepBadge: {
     width: 22,
     height: 22,
-    borderRadius: radii.pill,
+    borderRadius: 11,
     backgroundColor: colors.bgRaised,
     alignItems: 'center',
     justifyContent: 'center'
@@ -45,14 +45,14 @@ export const pairScanStyles = themedStyleSheet(() => ({
   },
   cameraWrap: {
     flex: 1,
-    borderRadius: radii.surface,
+    borderRadius: radii.camera,
     overflow: 'hidden'
   },
   // Reserve the camera slot during paste mode so the bottom action cannot jump upward.
   cameraPlaceholder: {
     flex: 1,
     backgroundColor: colors.bgPanel,
-    borderRadius: radii.surface
+    borderRadius: radii.camera
   },
   camera: {
     ...StyleSheet.absoluteFillObject
@@ -76,28 +76,28 @@ export const pairScanStyles = themedStyleSheet(() => ({
     left: 0,
     borderTopWidth: 2.5,
     borderLeftWidth: 2.5,
-    borderTopLeftRadius: radii.mark
+    borderTopLeftRadius: 6
   },
   cornerTR: {
     top: 0,
     right: 0,
     borderTopWidth: 2.5,
     borderRightWidth: 2.5,
-    borderTopRightRadius: radii.mark
+    borderTopRightRadius: 6
   },
   cornerBL: {
     bottom: 0,
     left: 0,
     borderBottomWidth: 2.5,
     borderLeftWidth: 2.5,
-    borderBottomLeftRadius: radii.mark
+    borderBottomLeftRadius: 6
   },
   cornerBR: {
     bottom: 0,
     right: 0,
     borderBottomWidth: 2.5,
     borderRightWidth: 2.5,
-    borderBottomRightRadius: radii.mark
+    borderBottomRightRadius: 6
   },
   centered: {
     flex: 1,
@@ -143,7 +143,7 @@ export const pairScanStyles = themedStyleSheet(() => ({
     backgroundColor: colors.textPrimary,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm + 2,
-    borderRadius: radii.control
+    borderRadius: radii.button
   },
   primaryButtonText: {
     color: colors.bgBase,
@@ -157,7 +157,7 @@ export const pairScanStyles = themedStyleSheet(() => ({
     gap: spacing.xs,
     marginTop: spacing.md,
     paddingVertical: spacing.sm,
-    borderRadius: radii.control
+    borderRadius: radii.button
   },
   pasteButtonPressed: {
     opacity: 0.6
@@ -174,7 +174,7 @@ export const pairScanStyles = themedStyleSheet(() => ({
   secondaryButton: {
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
-    borderRadius: radii.control
+    borderRadius: radii.button
   },
   secondaryButtonText: {
     color: colors.textSecondary,

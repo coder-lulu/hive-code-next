@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { RpcFailure } from '../transport/types'
-import { translate } from '../i18n/mobile-i18n'
 import { resolveMobileFileTabDoc } from '../files/mobile-file-tab-doc'
 import { shouldIgnoreTrimWhitespace } from '../../../src/shared/diff-whitespace'
 import { useMobileSourceControlSettings } from '../source-control/mobile-source-control-settings'
@@ -117,10 +116,7 @@ export function useMobileSessionDocumentReaders(scope: MobileSessionTabApplicati
       } catch (err) {
         publish({
           status: 'error',
-          message: documentReadErrorMessage(
-            err,
-            translate('session.documentReaders.markdownFailed', "Couldn't load markdown")
-          )
+          message: documentReadErrorMessage(err, "Couldn't load markdown")
         })
       }
     },
@@ -150,7 +146,6 @@ export function useMobileSessionDocumentReaders(scope: MobileSessionTabApplicati
           worktreeId,
           relativePath: tab.relativePath,
           diffSource: tab.diffSource,
-          ...(tab.oldPath ? { oldPath: tab.oldPath } : {}),
           ignoreTrimWhitespace: shouldIgnoreTrimWhitespace(diffShowWhitespace)
         })
         publish(doc)
@@ -158,8 +153,8 @@ export function useMobileSessionDocumentReaders(scope: MobileSessionTabApplicati
         const previewMessage = documentReadErrorMessage(
           err,
           tab.diffSource === 'staged' || tab.diffSource === 'unstaged'
-            ? translate('session.documentReaders.diffFailed', "Couldn't load diff preview")
-            : translate('session.documentReaders.fileFailed', "Couldn't load file preview")
+            ? "Couldn't load diff preview"
+            : "Couldn't load file preview"
         )
         publish({ status: 'error', message: previewMessage })
       }
@@ -176,17 +171,14 @@ export function useMobileSessionDocumentReaders(scope: MobileSessionTabApplicati
 function documentReadErrorMessage(err: unknown, fallback: string): string {
   const message = err instanceof Error ? err.message : ''
   if (message === 'binary_file') {
-    return translate('files.filePreviewResponse.binaryUnavailable', 'Binary preview unavailable')
+    return 'Binary preview unavailable'
   }
   if (message === 'file_too_large') {
-    return translate('files.filePreviewResponse.fileTooLarge', 'File too large for mobile preview')
+    return 'File too large for mobile preview'
   }
   // Why: the host only serves workspace-relative paths; a desktop tab of an external file has none.
   if (message === 'invalid_relative_path') {
-    return translate(
-      'session.documentReaders.outsideWorkspace',
-      'This file is outside the workspace. Open it on desktop to view it.'
-    )
+    return 'This file is outside the workspace. Open it on desktop to view it.'
   }
   return fallback
 }

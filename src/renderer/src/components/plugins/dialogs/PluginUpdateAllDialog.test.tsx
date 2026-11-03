@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
 import { act } from 'react'
+import { APP_DISPLAY_NAME } from '@/product-brand'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -359,7 +360,7 @@ describe('PluginUpdateAllDialog', () => {
       orcaVersion: '1.4.0'
     })
 
-    expect(container.textContent).toContain('Needs Orca 9.0.0 or later')
+    expect(container.textContent).toContain(`Needs ${APP_DISPLAY_NAME} 9.0.0 or later`)
     const checkbox = container.querySelector<HTMLButtonElement>('#plugin-update-a')
     expect(checkbox?.disabled).toBe(true)
     expect(checkbox?.getAttribute('aria-checked')).toBe('false')

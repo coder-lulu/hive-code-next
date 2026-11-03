@@ -11,7 +11,7 @@ import {
   View
 } from 'react-native'
 import { FileText, Image as ImageIcon, X } from 'lucide-react-native'
-import { colors, concentricRadius, radii, spacing, pressedStyle } from '../../../theme/mobile-theme'
+import { colors, radii, spacing } from '../../../theme/mobile-theme'
 import { themedStyleSheet } from '../../../theme/themed-styles'
 import { useMobileColorScheme } from '../../../theme/use-mobile-color-scheme'
 import { formatPreviewByteLength } from '../../../files/mobile-file-preview-response'
@@ -19,8 +19,6 @@ import type { PendingNativeChatImage } from './mobile-native-chat-image-attachme
 import type { PendingNativeChatFile } from './mobile-native-chat-file-attachment'
 
 const THUMB_SIZE = 58
-// Items sit 12pt in from the composer box's edge (box padding plus strip padding).
-const ITEM_RADIUS = concentricRadius(radii.floating, 12)
 
 function composerFileMeta(
   file: Pick<PendingNativeChatFile, 'name' | 'mime' | 'byteLength'>,
@@ -129,12 +127,7 @@ export function MobileNativeChatComposerAttachments({
 function RemoveBadge({ label, onPress }: { label: string; onPress: () => void }) {
   useMobileColorScheme()
   return (
-    <Pressable
-      accessibilityLabel={label}
-      style={({ pressed }) => [styles.remove, pressed && pressedStyle]}
-      onPress={onPress}
-      hitSlop={8}
-    >
+    <Pressable accessibilityLabel={label} style={styles.remove} onPress={onPress} hitSlop={8}>
       <X size={11} color={colors.textPrimary} strokeWidth={3} />
     </Pressable>
   )
@@ -155,13 +148,13 @@ const styles = themedStyleSheet(() => ({
   thumb: {
     width: THUMB_SIZE,
     height: THUMB_SIZE,
-    borderRadius: ITEM_RADIUS,
+    borderRadius: radii.composerItem,
     backgroundColor: colors.composerControl
   },
   thumbImage: {
     width: '100%',
     height: '100%',
-    borderRadius: ITEM_RADIUS
+    borderRadius: radii.composerItem
   },
   fileCard: {
     height: THUMB_SIZE,
@@ -172,13 +165,13 @@ const styles = themedStyleSheet(() => ({
     gap: 9,
     paddingLeft: 10,
     paddingRight: spacing.md,
-    borderRadius: ITEM_RADIUS,
+    borderRadius: radii.composerItem,
     backgroundColor: colors.composerControl
   },
   fileIcon: {
     width: 32,
     height: 36,
-    borderRadius: concentricRadius(ITEM_RADIUS, 10),
+    borderRadius: 7,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bgRaised
@@ -199,7 +192,7 @@ const styles = themedStyleSheet(() => ({
   },
   uploading: {
     ...StyleSheet.absoluteFillObject,
-    borderRadius: ITEM_RADIUS,
+    borderRadius: radii.composerItem,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.45)'
@@ -211,7 +204,7 @@ const styles = themedStyleSheet(() => ({
     right: -5,
     width: 20,
     height: 20,
-    borderRadius: radii.pill,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bgRaised,

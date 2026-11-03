@@ -29,7 +29,7 @@ function harness() {
       executeAgentLaunch({
         intent,
         runtime: {
-          requireStore: () => ({ getSettings: readSettings }),
+          getClientSettings: readSettings,
           getStructuredAgentSessionCreateSupport: createSupport
         },
         surfaces: {

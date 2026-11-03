@@ -18,9 +18,9 @@ export function storedExtraAgentArgs(value: unknown): string | undefined {
 
 /** Validates a whole record, so a patch that only enables Reuse still sees stored extras. */
 export function assertAutomationExtraAgentArgs(
-  automation: Pick<Automation, 'agentId' | 'extraAgentArgs' | 'reuseSession' | 'surface'>
+  automation: Pick<Automation, 'agentId' | 'extraAgentArgs' | 'reuseSession'>
 ): void {
-  if (automation.surface === 'chat' || !hasExtraAgentArgs(automation.extraAgentArgs)) {
+  if (!hasExtraAgentArgs(automation.extraAgentArgs)) {
     return
   }
   if (automation.reuseSession) {

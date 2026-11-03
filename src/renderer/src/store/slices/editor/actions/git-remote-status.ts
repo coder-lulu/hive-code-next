@@ -13,8 +13,10 @@ export function createGitRemoteStatus(
   | 'remoteStatusesByWorktree'
   | 'setUpstreamStatus'
   | 'isRemoteOperationActive'
-  | 'remoteOperations'
+  | 'remoteOperationDepth'
+  | 'inFlightRemoteOpKind'
   | 'beginRemoteOperation'
+  | 'endRemoteOperation'
   | 'fetchUpstreamStatus'
 > {
   return {
@@ -32,19 +34,25 @@ export function createGitRemoteStatus(
         }
       }),
     isRemoteOperationActive: false,
-    remoteOperations: [],
-    beginRemoteOperation: (kind, worktreeId) => {
-      const operation = { kind, worktreeId }
+    remoteOperationDepth: 0,
+    inFlightRemoteOpKind: null,
+    beginRemoteOperation: (kind) =>
       set((s) => ({
-        remoteOperations: [...s.remoteOperations, operation],
-        isRemoteOperationActive: true
-      }))
-      return () =>
-        set((s) => {
-          const remoteOperations = s.remoteOperations.filter((entry) => entry !== operation)
-          return { remoteOperations, isRemoteOperationActive: remoteOperations.length > 0 }
-        })
-    },
+        remoteOperationDepth: s.remoteOperationDepth + 1,
+        isRemoteOperationActive: true,
+        // Why: last-write-wins on the kind; the UI blocks a second user-initiated op, so the most recent kind matches what the user is watching.
+        inFlightRemoteOpKind: kind ?? s.inFlightRemoteOpKind
+      })),
+    endRemoteOperation: () =>
+      set((s) => {
+        const next = Math.max(0, s.remoteOperationDepth - 1)
+        return {
+          remoteOperationDepth: next,
+          isRemoteOperationActive: next > 0,
+          // Why: keep the in-flight kind (its label/spinner) until depth reaches 0 and no remote op remains.
+          inFlightRemoteOpKind: next > 0 ? s.inFlightRemoteOpKind : null
+        }
+      }),
     fetchUpstreamStatus: async (worktreeId, worktreePath, connectionId, pushTarget, options) => {
       const runtimeTarget = tryResolveGitOperationTarget(get(), worktreeId, options)
       if (!runtimeTarget) {

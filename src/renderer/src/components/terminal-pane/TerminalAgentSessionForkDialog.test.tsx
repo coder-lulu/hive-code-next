@@ -53,7 +53,7 @@ function makeFork(): PreparedAgentSessionFork {
     prompt: 'fork prompt',
     agent: null,
     worktreeId: 'wt-1',
-    focusSource: vi.fn()
+    pane: {} as PreparedAgentSessionFork['pane']
   }
 }
 

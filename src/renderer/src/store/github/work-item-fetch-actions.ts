@@ -93,7 +93,6 @@ export const createWorkItemFetchActions = (
     const ownerHostId = getGitHubWorkItemSourceHostId(repo, options?.sourceContext)
     const cacheScope = getGitHubWorkItemSourceCacheScope(repo, options?.sourceContext)
     const key = workItemsCacheKey(repoId, limit, query, cacheScope)
-    const binding = requestState.githubTaskCache.capture(repo, options?.sourceContext)
     const cached = get().workItemsCache[key]
     if (!options?.force && isFresh(cached, WORK_ITEMS_CACHE_TTL)) {
       return cached.data ?? []
@@ -148,17 +147,11 @@ export const createWorkItemFetchActions = (
           repoPath,
           options?.sourceContext
         )
-        // Older search rows can't undo an accepted task record; newer ones still show.
-        const items: GitHubWorkItem[] = [
-          ...get().githubTaskCache.acceptSearch(
-            envelope.items.map((item) => ({
-              ...item,
-              repoId,
-              ...(repoHostId ? { repoHostId } : {})
-            })),
-            binding
-          )
-        ]
+        const items: GitHubWorkItem[] = envelope.items.map((item) => ({
+          ...item,
+          repoId,
+          ...(repoHostId ? { repoHostId } : {})
+        }))
         if (options?.requireComplete && (envelope.errors?.issues || envelope.errors?.prs)) {
           throw new Error('GitHub work-item fetch returned a partial result.')
         }

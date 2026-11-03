@@ -12,41 +12,20 @@ import {
   buildServeSimKeyboardFramesForKey,
   type ServeSimKeyboardFrame
 } from '../../../../shared/emulator-keyboard-frame'
-import type { ScrcpyKeyboard } from './use-emulator-control-stream'
 import {
-  pasteTextIntoAndroidEmulator,
   pasteTextIntoEmulatorKeyboard,
   type EmulatorKeyboardPasteResult
 } from './emulator-keyboard-paste'
 
-// Android keycode names (see android-input-mapping.ts) for the named keys; others type as text.
-const ANDROID_KEY_BUTTONS: Record<string, string> = {
-  Enter: 'enter',
-  Tab: 'tab',
-  Backspace: 'backspace',
-  Delete: 'forward_delete',
-  ArrowUp: 'dpad_up',
-  ArrowDown: 'dpad_down',
-  ArrowLeft: 'dpad_left',
-  ArrowRight: 'dpad_right',
-  Home: 'move_home',
-  End: 'move_end',
-  PageUp: 'page_up',
-  PageDown: 'page_down'
-}
-
 type UseEmulatorScreenKeyboardArgs = {
   cancelKeyboardFrames: () => void
   canInteract: boolean
-  /** Set for Android panes, which have no serve-sim socket for HID frames. */
-  scrcpyKeyboard: ScrcpyKeyboard | null
   sendKeyboardFrames: (frames: ServeSimKeyboardFrame[]) => boolean
 }
 
 export function useEmulatorScreenKeyboard({
   cancelKeyboardFrames,
   canInteract,
-  scrcpyKeyboard,
   sendKeyboardFrames
 }: UseEmulatorScreenKeyboardArgs) {
   const captureActiveRef = useRef(false)
@@ -118,25 +97,14 @@ export function useEmulatorScreenKeyboard({
         return
       }
 
-      // The HID table also decides which keys an Android pane accepts.
       const frames = buildServeSimKeyboardFramesForKey(event.key, { shift: event.shiftKey })
-      if (!frames) {
-        return
-      }
-      if (scrcpyKeyboard) {
-        const button = ANDROID_KEY_BUTTONS[event.key]
-        if (button) {
-          scrcpyKeyboard.sendKey(button, event.shiftKey)
-        } else {
-          void scrcpyKeyboard.sendText(event.key)
-        }
-      } else if (!sendKeyboardFrames(frames)) {
+      if (!frames || !sendKeyboardFrames(frames)) {
         return
       }
       event.preventDefault()
       event.stopPropagation()
     },
-    [canInteract, scrcpyKeyboard, sendKeyboardFrames, setCaptureActive]
+    [canInteract, sendKeyboardFrames, setCaptureActive]
   )
 
   const handlePaste = useCallback(
@@ -153,24 +121,21 @@ export function useEmulatorScreenKeyboard({
 
       cancelActivePaste()
       const pasteRequestId = pasteRequestIdRef.current
-      const paste = scrcpyKeyboard
-        ? pasteTextIntoAndroidEmulator({ sendText: scrcpyKeyboard.sendText, text })
-        : pasteTextIntoEmulatorKeyboard({
-            isCancelled: () =>
-              pasteRequestIdRef.current !== pasteRequestId ||
-              !captureActiveRef.current ||
-              !canInteractRef.current,
-            sendKeyboardFrames,
-            text
-          })
-      void paste.then((result) => {
+      void pasteTextIntoEmulatorKeyboard({
+        isCancelled: () =>
+          pasteRequestIdRef.current !== pasteRequestId ||
+          !captureActiveRef.current ||
+          !canInteractRef.current,
+        sendKeyboardFrames,
+        text
+      }).then((result) => {
         if (pasteRequestIdRef.current !== pasteRequestId && result.status !== 'cancelled') {
           return
         }
         showEmulatorKeyboardPasteResult(result)
       })
     },
-    [canInteract, cancelActivePaste, scrcpyKeyboard, sendKeyboardFrames]
+    [canInteract, cancelActivePaste, sendKeyboardFrames]
   )
 
   return {

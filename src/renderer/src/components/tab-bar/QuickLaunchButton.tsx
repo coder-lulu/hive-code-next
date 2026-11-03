@@ -1,4 +1,4 @@
-import { SubscribedAgentLaunchPickerMenu } from '@/components/agent/AgentLaunchPickerMenu'
+import { AgentLaunchPickerMenu } from '@/components/agent/AgentLaunchPickerMenu'
 import {
   agentPickerLaunchInputs,
   type AgentPickerEntry,
@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { launchAgentInNewTab } from '@/lib/launch-agent-in-new-tab'
 import { newAgentLaunchRequestId } from '@/lib/agent-launch-request-id'
 import { captureNativeChatComposerFocusIntent } from '@/components/native-chat/use-native-chat-composer-reveal-focus'
-import { agentLaunchPromptOwnership, newAgentPromptOutcome } from '@/lib/new-agent-prompt-outcome'
+import { newAgentPromptOutcome } from '@/lib/new-agent-prompt-outcome'
 import { activeAgentNotesSendFailureMessage } from '@/lib/active-agent-note-send-result'
 import { Settings as SettingsIcon } from 'lucide-react'
 import { AgentSurfaceLaunchButton } from '@/components/agent/AgentSurfaceLaunchButton'
@@ -21,8 +21,6 @@ import {
 import { getAgentCatalog, AgentIcon } from '@/lib/agent-catalog'
 import { useAppStore } from '@/store'
 import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
-import { useAgentMenuShortcutLabels } from './agent-menu-shortcut-labels'
-import type { AgentPickerInventorySource } from '../agent/use-agent-launch-picker-inventory'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { LaunchSource } from '../../../../shared/telemetry-events'
 import { translate } from '@/i18n/i18n'
@@ -80,7 +78,7 @@ export function useTabAgentMenuLaunch({
   const runLaunch = useCallback(
     (row: NewTabAgentMenuRow, draft?: AgentPickerDraft, pickerEntry?: AgentPickerEntry) => {
       if (disabled || row.kind === 'chat-unavailable') {
-        return false
+        return
       }
       const { agent } = row
       const entry = getCatalogEntry(agent)
@@ -98,8 +96,7 @@ export function useTabAgentMenuLaunch({
         ...(draft ? agentPickerLaunchInputs(draft, pickerEntry) : {}),
         worktreeId,
         groupId,
-        // A caller's prompt (notes) owns the launch; otherwise the picker panel's typed one.
-        ...(prompt !== undefined ? { prompt } : draft?.prompt ? { prompt: draft.prompt } : {}),
+        ...(prompt !== undefined ? { prompt } : {}),
         ...(promptDelivery !== undefined ? { promptDelivery } : {}),
         ...(launchSource !== undefined ? { launchSource } : {}),
         ...(onPromptDelivered !== undefined ? { onPromptDelivered } : {}),
@@ -114,7 +111,7 @@ export function useTabAgentMenuLaunch({
             { value0: label }
           )
         )
-        return false
+        return
       }
       if (onPromptHandedOff && result.promptDeliveryResult) {
         const outcome = newAgentPromptOutcome({ delivery: result.promptDeliveryResult })
@@ -138,13 +135,13 @@ export function useTabAgentMenuLaunch({
       }
       if (result.surface.kind === 'local-chat') {
         onFocusChat?.(result.surface.tabId)
-      } else if (result.surface.kind !== 'local-terminal') {
-        onFocusHostTerminal?.()
-      } else {
-        onFocusTerminal(result.surface.tabId)
+        return
       }
-      // A setup submission waits for actual prompt ownership, not just surface dispatch.
-      return !draft?.prompt || agentLaunchPromptOwnership(result.promptDeliveryResult)
+      if (result.surface.kind !== 'local-terminal') {
+        onFocusHostTerminal?.()
+        return
+      }
+      onFocusTerminal(result.surface.tabId)
     },
     [
       worktreeId,
@@ -176,14 +173,14 @@ export function ProjectedAgentMenuItems({
   disabled = false,
   model,
   runLaunch,
-  pickerInventory,
+  pickerEntries,
   onSelectPickerAgent,
   hidePickerSearch
 }: {
   disabled?: boolean
   model: NewTabAgentMenuModel
-  runLaunch: React.ComponentProps<typeof SubscribedAgentLaunchPickerMenu>['runLaunch']
-  pickerInventory?: AgentPickerInventorySource
+  runLaunch: (row: NewTabAgentMenuRow, draft?: AgentPickerDraft) => void
+  pickerEntries?: AgentPickerEntry[]
   onSelectPickerAgent?: (agent: AgentPickerEntry['agent']) => void
   hidePickerSearch?: boolean
 }): React.JSX.Element {
@@ -191,7 +188,6 @@ export function ProjectedAgentMenuItems({
   const openSettingsPage = useAppStore((s) => s.openSettingsPage)
   const openSettingsTarget = useAppStore((s) => s.openSettingsTarget)
   const newAgentShortcut = useOptionalShortcutLabel('tab.newAgent')
-  const shortcutLabels = useAgentMenuShortcutLabels(pickerInventory ? model : undefined)
   const openAgentSettings = useCallback(() => {
     openSettingsTarget({ pane: 'agents', repoId: null })
     openSettingsPage()
@@ -252,10 +248,10 @@ export function ProjectedAgentMenuItems({
                   )}
         </DropdownMenuItem>
       ) : null}
-      {pickerInventory ? (
-        <SubscribedAgentLaunchPickerMenu
-          shortcutLabels={shortcutLabels}
-          inventory={pickerInventory}
+      {pickerEntries ? (
+        <AgentLaunchPickerMenu
+          model={model}
+          entries={pickerEntries}
           runLaunch={runLaunch}
           onSelectAgent={onSelectPickerAgent}
           hideSearch={hidePickerSearch}

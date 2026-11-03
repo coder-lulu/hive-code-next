@@ -1,6 +1,6 @@
+import { getAccountsClaudeSearchEntries } from './accounts-claude-search'
 import { useState } from 'react'
 import {
-  getAccountsClaudeSearchEntries,
   getAccountsCodexSearchEntries,
   getAccountsMiniMaxSearchEntries,
   getAccountsOpencodeSearchEntries

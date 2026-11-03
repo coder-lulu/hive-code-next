@@ -326,7 +326,7 @@ describe('runHook', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = await createSetupRunnerScript(
+      const result = createSetupRunnerScript(
         {
           ...makeRepo(),
           path: 'C:\\Users\\jinwo\\git\\orca'

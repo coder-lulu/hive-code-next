@@ -1,9 +1,10 @@
 // One English table for Remote Orca Server pairing save failures: main builds the wire `message`, the renderer translates by code.
+import { APP_DISPLAY_NAME } from './brand'
+
 export const REMOTE_SERVER_PAIRING_FAILURE_COPY = {
   invalidPairingCode:
     'Invalid pairing code. Expected an orca://pair?... URL or bare pairing payload.',
-  selfPairingCode:
-    'This pairing code is for this Orca itself. Generate the code on the other computer instead.',
+  selfPairingCode: `This pairing code is for this ${APP_DISPLAY_NAME} itself. Generate the code on the other computer instead.`,
   managedDeployment:
     'Orca runs this server on an SSH host for you; its pairing cannot be replaced or removed here. To decommission it, run `orca environment stop --environment <name> --yes` or use Settings > Orca on your SSH hosts; for a host that is gone, run `orca environment forget --environment <name> --yes`.',
   sshAccessChangePending:

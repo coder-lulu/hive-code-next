@@ -46,7 +46,7 @@ export function removeRuntimeRegisteredLocalWorktree(
     args.repo.path,
     async (): Promise<RemoveWorktreeResult & { warning?: string }> =>
       // Recheck after queue wait: another client may already have accepted this deletion.
-      waitForPendingWorktreeRemoval(args.target.id, undefined, args.requestedDeleteBranch)
+      waitForPendingWorktreeRemoval(args.target.id)
         ? { removing: true }
         : acceptRuntimeRegisteredLocalWorktreeRemoval(args)
   )
@@ -66,8 +66,6 @@ async function acceptRuntimeRegisteredLocalWorktreeRemoval(args: {
   allowFailedArchiveHook: boolean
   allowUnverifiedPtyStop: boolean
   deleteBranch: boolean
-  /** Legacy callers join accepted policy; explicit requests must match it. */
-  requestedDeleteBranch?: boolean
   acquireWatcherRemoval: (path: string) => Promise<{ finish: (removed: boolean) => Promise<void> }>
   stopPtys: () => Promise<void>
   closeWatchers: (path: string) => Promise<void>
@@ -284,15 +282,12 @@ export async function finishRuntimeLocalWorktreeRemoval(
     // Removal overtakes earlier scans; invalidate their catalogs.
     runWorktreeChangeInvalidators(repo.id)
     completed = true
-    try {
-      await cleanupRemovedWorktreePushTarget(args)
-    } finally {
-      args.finishRemoval(removalResult, true, refreshed.head)
-    }
-    return removalResult ?? {}
   } finally {
     await gate.finish(completed)
   }
+  await cleanupRemovedWorktreePushTarget(args)
+  args.finishRemoval(removalResult, true, refreshed.head)
+  return removalResult ?? {}
 }
 
 export async function cleanupRemovedWorktreePushTarget(

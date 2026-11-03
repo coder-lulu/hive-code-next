@@ -53,7 +53,6 @@ export function BrowserMobileDriverOverlay({ driver, onTakeBack }: Props): React
     <div
       ref={setOverlayRef}
       role="dialog"
-      data-overlay-focus-scope="parent"
       aria-modal="true"
       aria-labelledby={OVERLAY_TITLE_ID}
       aria-live="assertive"

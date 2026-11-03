@@ -70,6 +70,12 @@ function typePath(path: string): void {
   })
 }
 
+function blurInput(): void {
+  act(() => {
+    getInput().dispatchEvent(new FocusEvent('focusout', { bubbles: true }))
+  })
+}
+
 function pressInputKey(key: string, options?: { isComposing?: boolean; keyCode?: number }): void {
   act(() => {
     const event = new KeyboardEvent('keydown', { key, bubbles: true })
@@ -105,6 +111,34 @@ async function clickBrowseAfterInputBlur(): Promise<void> {
 }
 
 describe('WorkspaceDirectorySetting', () => {
+  it('keeps typed workspace paths local until blur', () => {
+    const updateSettings = vi.fn()
+    renderWorkspaceDirectorySetting({ updateSettings })
+
+    typePath('o')
+    typePath('or')
+    typePath('orca-workspaces')
+
+    expect(updateSettings).not.toHaveBeenCalled()
+
+    blurInput()
+
+    expect(updateSettings).toHaveBeenCalledTimes(1)
+    expect(updateSettings).toHaveBeenCalledWith({ workspaceDir: 'orca-workspaces' })
+  })
+
+  it('commits Enter once even though Enter also blurs the input', () => {
+    const updateSettings = vi.fn()
+    renderWorkspaceDirectorySetting({ updateSettings })
+
+    typePath('orca-workspaces')
+    pressInputKey('Enter')
+    blurInput()
+
+    expect(updateSettings).toHaveBeenCalledTimes(1)
+    expect(updateSettings).toHaveBeenCalledWith({ workspaceDir: 'orca-workspaces' })
+  })
+
   it('does not commit Enter while IME composition is active', () => {
     const updateSettings = vi.fn()
     renderWorkspaceDirectorySetting({ updateSettings })
@@ -113,6 +147,18 @@ describe('WorkspaceDirectorySetting', () => {
     pressInputKey('Enter', { isComposing: true })
 
     expect(getInput().value).toBe('orca-workspaces')
+    expect(updateSettings).not.toHaveBeenCalled()
+  })
+
+  it('resets the draft on Escape without saving', () => {
+    const updateSettings = vi.fn()
+    renderWorkspaceDirectorySetting({ updateSettings })
+
+    typePath('orca-workspaces')
+    pressInputKey('Escape')
+    blurInput()
+
+    expect(getInput().value).toBe(getDefaultSettings('/tmp').workspaceDir)
     expect(updateSettings).not.toHaveBeenCalled()
   })
 
@@ -149,5 +195,18 @@ describe('WorkspaceDirectorySetting', () => {
 
     expect(getInput().value).toBe(getDefaultSettings('/tmp').workspaceDir)
     expect(updateSettings).not.toHaveBeenCalled()
+  })
+
+  it('allows retrying the same draft when the persisted value has not changed', () => {
+    const updateSettings = vi.fn()
+    renderWorkspaceDirectorySetting({ updateSettings })
+
+    typePath('orca-workspaces')
+    blurInput()
+    blurInput()
+
+    expect(updateSettings).toHaveBeenCalledTimes(2)
+    expect(updateSettings).toHaveBeenNthCalledWith(1, { workspaceDir: 'orca-workspaces' })
+    expect(updateSettings).toHaveBeenNthCalledWith(2, { workspaceDir: 'orca-workspaces' })
   })
 })

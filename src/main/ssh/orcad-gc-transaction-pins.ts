@@ -20,15 +20,13 @@ function transactionVersions(transaction: OrcadActivationTransaction): (string |
 }
 
 export async function readOrcadGcTransactionPins(
-  target: OrcadRemoteExecTarget & { remoteHome: string },
-  /** The caller holds the activation fence, so its presence says nothing about another owner. */
-  options: { callerHoldsFence?: boolean } = {}
+  target: OrcadRemoteExecTarget & { remoteHome: string }
 ): Promise<OrcadGcTransactionPins> {
   try {
     const transaction = await readOrcadActivationTransaction(target)
     if (!transaction) {
       // An unjournaled fence may be a transaction starting or an interrupted release.
-      return !options.callerHoldsFence && (await orcadActivationFenceExists(target))
+      return (await orcadActivationFenceExists(target))
         ? { state: 'keep-all' }
         : { state: 'pinned', dirNames: [] }
     }

@@ -21,8 +21,7 @@ const SESSION: WorktreeSidebarDragSession = {
   draggedIds: ['b'],
   draggedCopies: [],
   reorderDraggedIds: ['b'],
-  reorderDraggedKeys: ['b'],
-  reorderUnitDraggedKeys: ['b'],
+  reorderUnitDraggedIds: ['b'],
   rects: [{ worktreeId: 'b', groupIndex: 1, top: 48, bottom: 88 }],
   grab: null,
   anchor: null
@@ -187,7 +186,7 @@ describe('refreshWorktreeSidebarDragSession', () => {
     ).toBeNull()
     expect(
       refreshWorktreeSidebarDragSession({
-        session: { ...SESSION, reorderUnitDraggedKeys: ['missing'] },
+        session: { ...SESSION, reorderUnitDraggedIds: ['missing'] },
         groups: [{ key: 'repo:one', worktreeIds: ['a', 'b'] }],
         unitGroups: [{ key: 'repo:one', worktreeIds: ['a'], units: [] }],
         rects: []
@@ -212,8 +211,7 @@ describe('refreshWorktreeSidebarDragSession', () => {
       draggingWorktreeId: 'child',
       draggedIds: ['child'],
       reorderDraggedIds: ['child'],
-      reorderDraggedKeys: ['child'],
-      reorderUnitDraggedKeys: ['child']
+      reorderUnitDraggedIds: ['child']
     }
     const rects: WorktreeSidebarDragRect[] = [
       { worktreeId: 'parent', groupIndex: 0, top: 0, bottom: 80 },
@@ -274,8 +272,6 @@ function makeDragElement(
 ): HTMLElement {
   const attributes = new Map([
     ['data-worktree-drag-id', worktreeId],
-    // Rects key slots by host identity; these fixtures reuse the id string as that key.
-    ['data-worktree-host-identity', worktreeId],
     ['data-worktree-drag-group-key', groupKey],
     ['data-worktree-drag-group-index', groupIndex]
   ])

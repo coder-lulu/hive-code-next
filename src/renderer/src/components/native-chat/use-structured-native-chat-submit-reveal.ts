@@ -53,7 +53,7 @@ export function useStructuredNativeChatSubmitReveal(
         ...queuedMessages,
         steer: async () => undefined,
         resume: async () => false,
-        steerHead: () => false
+        steerNewest: () => false
       }
     }
     return {
@@ -63,8 +63,8 @@ export function useStructuredNativeChatSubmitReveal(
         return queuedMessages.steer(messageId)
       },
       resume: revealing(queuedMessages.resume),
-      steerHead: () => {
-        const steered = queuedMessages.steerHead()
+      steerNewest: () => {
+        const steered = queuedMessages.steerNewest()
         if (steered) {
           revealLatest()
         }

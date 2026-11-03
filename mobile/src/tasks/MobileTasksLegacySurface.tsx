@@ -1,6 +1,3 @@
-import { useState } from 'react'
-import { describeLoadError } from '../components/load-error-description'
-import { mobileTasksListShowsError } from './mobile-tasks-list-state'
 import type { ConnectionPresentationModel } from './use-mobile-tasks-connection-presentation'
 import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import {
@@ -11,11 +8,11 @@ import {
   AlertTriangle,
   colors,
   ActionSheetModal,
+  BottomDrawerModalHost,
   GitBranch,
   ConfirmModal,
   useMobileColorScheme
 } from './mobile-tasks-dependencies'
-import { BottomDrawerModalHost } from '../components/bottom-drawer/bottom-drawer-modal-host'
 import { styles } from './mobile-tasks-legacy-styles'
 import {
   getHostedReviewMergeMethodLabel,
@@ -28,11 +25,7 @@ import {
 import { renderMobileTasksChrome } from './mobile-tasks-screen-chrome'
 import { renderMobileTasksListSurface } from './mobile-tasks-list-surface'
 import {
-  mobileTasksSearchVisible,
-  renderMobileTasksSearchControl
-} from './mobile-tasks-search-control'
-import { renderMobileTasksFilterSheet } from './mobile-tasks-filter-sheet'
-import {
+  renderMobileTasksProviderPicker,
   renderMobileTasksRepoPicker,
   renderMobileTasksGitHubIssueSourcePicker,
   renderMobileTasksGitHubViewPicker,
@@ -41,7 +34,8 @@ import {
 } from './mobile-tasks-provider-pickers'
 import {
   renderMobileTasksGitHubProjectPicker,
-  renderMobileTasksGitHubProjectViewPicker
+  renderMobileTasksGitHubProjectViewPicker,
+  renderMobileTasksGitHubProjectSortPicker
 } from './mobile-tasks-github-project-pickers'
 import {
   renderMobileTasksGitHubProjectFieldsPicker,
@@ -54,7 +48,13 @@ import {
   renderMobileTasksLinearTeamPicker,
   renderMobileTasksLinearStatusPicker
 } from './mobile-tasks-filter-pickers'
-import { renderMobileTasksLinearDisplayPicker } from './mobile-tasks-list-display-pickers'
+import {
+  renderMobileTasksLinearViewPicker,
+  renderMobileTasksLinearGroupPicker,
+  renderMobileTasksLinearOrderPicker,
+  renderMobileTasksLinearDisplayPicker,
+  renderMobileTasksSortPicker
+} from './mobile-tasks-list-display-pickers'
 import {
   renderMobileTasksCreateDrawer,
   renderMobileTasksCreateTargetPicker,
@@ -75,18 +75,15 @@ import {
   renderMobileTasksSetupTrustDrawer,
   renderMobileTasksOrcaYamlTrustDrawer
 } from './mobile-tasks-workspace-trust-drawers'
-import { pressedStyle } from '../theme/mobile-theme'
 import {
   renderMobileTasksProjectMissingRepoDrawer,
   renderMobileTasksProjectDetailDrawer
 } from './mobile-tasks-project-detail-drawer'
-import { MobileTasksItemDetailDrawer } from './mobile-tasks-item-detail-drawer'
+import { renderMobileTasksItemDetailDrawer } from './mobile-tasks-item-detail-drawer'
 
 export function MobileTasksLegacySurface({ model }: { model: ConnectionPresentationModel }) {
   const colorScheme = useMobileColorScheme()
   const t = useMobileTranslation()
-  const [searchBarHeight, setSearchBarHeight] = useState(0)
-  const bottomBarHeight = mobileTasksSearchVisible(model) ? searchBarHeight : 0
   const {
     error,
     githubMode,
@@ -118,9 +115,9 @@ export function MobileTasksLegacySurface({ model }: { model: ConnectionPresentat
     <SafeAreaView style={styles.container} edges={['top']}>
       {renderMobileTasksChrome(model)}
 
-      {error && !mobileTasksListShowsError(model) ? (
+      {error ? (
         <View style={styles.errorBanner}>
-          <Text style={styles.errorText}>{describeLoadError(error, t).message}</Text>
+          <Text style={styles.errorText}>{error}</Text>
         </View>
       ) : null}
 
@@ -173,7 +170,7 @@ export function MobileTasksLegacySurface({ model }: { model: ConnectionPresentat
                     'Retry loading issues from {{source}}',
                     { source: `${sourceError.source.owner}/${sourceError.source.repo}` }
                   )}
-                  style={({ pressed }) => [styles.sourceErrorRetry, pressed && pressedStyle]}
+                  style={styles.sourceErrorRetry}
                   disabled={loading || isRetrying}
                   onPress={() => void retryGitHubIssueSourceFetch(sourceError.repoPath)}
                 >
@@ -203,12 +200,12 @@ export function MobileTasksLegacySurface({ model }: { model: ConnectionPresentat
         </View>
       ) : null}
 
-      {renderMobileTasksListSurface(model, colorScheme, bottomBarHeight)}
-
-      {renderMobileTasksSearchControl(model, setSearchBarHeight)}
+      {renderMobileTasksListSurface(model, colorScheme)}
 
       {/* iOS refuses stacked sibling native modals; layer Tasks sheets in one Modal by zIndex. */}
       <BottomDrawerModalHost>
+        {renderMobileTasksProviderPicker(model)}
+
         {renderMobileTasksRepoPicker(model)}
 
         {renderMobileTasksGitHubIssueSourcePicker(model)}
@@ -222,6 +219,8 @@ export function MobileTasksLegacySurface({ model }: { model: ConnectionPresentat
         {renderMobileTasksGitHubProjectPicker(model)}
 
         {renderMobileTasksGitHubProjectViewPicker(model)}
+
+        {renderMobileTasksGitHubProjectSortPicker(model)}
 
         {renderMobileTasksGitHubProjectFieldsPicker(model)}
 
@@ -239,9 +238,15 @@ export function MobileTasksLegacySurface({ model }: { model: ConnectionPresentat
 
         {renderMobileTasksLinearStatusPicker(model)}
 
+        {renderMobileTasksLinearViewPicker(model)}
+
+        {renderMobileTasksLinearGroupPicker(model)}
+
+        {renderMobileTasksLinearOrderPicker(model)}
+
         {renderMobileTasksLinearDisplayPicker(model)}
 
-        {renderMobileTasksFilterSheet(model)}
+        {renderMobileTasksSortPicker(model)}
 
         {renderMobileTasksCreateDrawer(model)}
 
@@ -271,7 +276,7 @@ export function MobileTasksLegacySurface({ model }: { model: ConnectionPresentat
 
         {renderMobileTasksProjectDetailDrawer(model)}
 
-        <MobileTasksItemDetailDrawer model={model} />
+        {renderMobileTasksItemDetailDrawer(model)}
 
         <ActionSheetModal
           visible={taskUiReady && mergeMethodProjectRow != null}

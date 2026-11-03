@@ -10,7 +10,6 @@ import type { OrchestrationDb } from '../orchestration-db'
 import { transitionLifecycleWithDb } from '../lifecycle-transition'
 import { taskNotFoundError, taskNotStartableError } from '../../task-dispatch-refusal'
 import { dispatchAssigneeOrcaSessionId } from '../../dispatch-assignee-orca-session-id'
-import { assertTakesNewWork } from '../worker-terminal/worker-terminal-transfer'
 
 export function createDispatchContext(
   this: OrchestrationDb,
@@ -21,8 +20,6 @@ export function createDispatchContext(
     assigneePaneKey?: string
     launchTokenHash?: string
     processIncarnation?: string
-    /** The assignee's serialized host scope, matching its worker-terminal custody row. */
-    hostScope?: string | null
     /** Who is dispatching, for nesting depth. Required so a new caller must decide. */
     creator: DispatchCreator
     maxDepth: number
@@ -42,7 +39,14 @@ export function createDispatchContext(
     )
   }
 
-  assertTakesNewWork(this, params, taskId)
+  // Lock the pane too so handle remint cannot admit a second dispatch.
+  const existing = this.findActiveDispatchForAssignee(assigneeHandle, assigneePaneKey)
+
+  if (existing) {
+    throw new Error(
+      `Terminal ${assigneeHandle} already has an active dispatch (${existing.id} for task ${existing.task_id})`
+    )
+  }
 
   // Accumulate failure_count across task retries.
   const prior = this.db

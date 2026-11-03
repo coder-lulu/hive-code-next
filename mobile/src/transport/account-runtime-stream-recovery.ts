@@ -1,3 +1,4 @@
+import { translate } from '../i18n/mobile-i18n'
 import type { HiveAccountRelayPool } from '../../../src/shared/hive-account-relay-pool'
 import { attachAccountRuntimeStream, type AccountRuntimeStream } from './account-runtime-rpc-stream'
 import { accountRuntimeRecovery, logAccountRuntimeRecovery } from './account-runtime-recovery'
@@ -45,7 +46,13 @@ export function recoverAccountRuntimeStream(
     const recovery = accountRuntimeRecovery(error, stream.retryAttempt)
     if (!recovery.retryable) {
       lifecycle.onEnded()
-      stream.listener({ type: 'error', message: '会话连接被拒绝，请检查访问权限后重试' })
+      stream.listener({
+        type: 'error',
+        message: translate(
+          'auto.mobile.src.transport.account.runtime.stream.recovery.6d18e1dae5',
+          'Session connection was denied. Check access permissions and try again.'
+        )
+      })
       return
     }
     stream.retryAttempt++
@@ -96,7 +103,10 @@ export function recoverAccountRuntimeStream(
         level: 'warn',
         code: 'liveness-timeout',
         path: 'relay',
-        message: '账号会话健康检查超时，正在恢复',
+        message: translate(
+          'auto.mobile.src.transport.account.runtime.stream.recovery.e1ccbe86ff',
+          'Account session health check timed out. Recovering.'
+        ),
         detail: `missedProbes=${evidence.missedProbes}; lastInboundAgeMs=${evidence.lastInboundAgeMs}`
       }),
     terminate: () => onClosed(new Error('Account subscription liveness timeout'))

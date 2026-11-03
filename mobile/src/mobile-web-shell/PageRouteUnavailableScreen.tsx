@@ -51,7 +51,7 @@ const styles = themedStyleSheet(() => ({
     backgroundColor: colors.bgRaised,
     paddingVertical: spacing.sm + 2,
     paddingHorizontal: spacing.lg,
-    borderRadius: radii.control
+    borderRadius: radii.button
   },
   buttonLabel: {
     fontSize: typography.bodySize,

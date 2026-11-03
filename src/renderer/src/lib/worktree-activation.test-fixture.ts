@@ -16,7 +16,10 @@ export function setLegacySetupScriptLaunchMode(
   mode: 'split-vertical' | 'split-horizontal' | 'new-tab' | null
 ): void {
   useAppStore.setState((state) => ({
-    settings: { ...(state.settings ?? getDefaultSettings('')), setupScriptLaunchMode: mode }
+    settings: {
+      ...(state.settings ?? getDefaultSettings('')),
+      setupScriptLaunchMode: mode ?? getDefaultSettings('').setupScriptLaunchMode
+    }
   }))
 }
 

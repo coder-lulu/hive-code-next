@@ -1,11 +1,28 @@
-import { themedStyleSheet, colors, radii, spacing, typography } from './mobile-tasks-dependencies'
+import {
+  StyleSheet,
+  themedStyleSheet,
+  colors,
+  spacing,
+  typography
+} from './mobile-tasks-dependencies'
 import {
   composerInputStyles,
   COMPOSER_TEXT_SIZE
 } from '../components/composer-input/composer-input-styles'
-import { LIST_ROW_PADDING } from '../components/list/ListGroup'
 
 export const mobileTasksDetailStyles = themedStyleSheet(() => ({
+  groupSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderSubtle,
+    marginHorizontal: spacing.md
+  },
+  repoPickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md
+  },
   repoPickerTextWrap: {
     flex: 1,
     minWidth: 0
@@ -41,67 +58,14 @@ export const mobileTasksDetailStyles = themedStyleSheet(() => ({
     color: colors.textMuted,
     marginTop: 2
   },
-  // Lines the header up with the row text of the groups below it.
-  itemHeader: {
-    paddingHorizontal: LIST_ROW_PADDING,
-    marginBottom: spacing.md,
-    gap: 2
-  },
-  itemKindRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6
-  },
-  itemKind: {
-    flex: 1,
-    fontSize: 13,
-    color: colors.textSecondary
-  },
-  itemTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    lineHeight: 21,
-    color: colors.textPrimary
-  },
-  itemMeta: {
-    fontSize: 13,
-    color: colors.textSecondary
-  },
-  itemActionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm
-  },
-  itemStartButton: {
-    flex: 1,
-    height: 40,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    borderRadius: radii.control,
-    backgroundColor: colors.textPrimary,
-    paddingHorizontal: spacing.md
-  },
-  itemStartButtonPressed: {
-    opacity: 0.85
-  },
-  itemStartButtonBusy: {
-    opacity: 0.6
-  },
-  itemStartText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: colors.bgBase
-  },
-  // Lines prose up with the row text of the groups above it.
-  itemSectionBody: {
-    paddingHorizontal: LIST_ROW_PADDING,
-    gap: spacing.sm
+  actionGroup: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
+    overflow: 'hidden'
   },
   detailGroup: {
-    backgroundColor: colors.sheetGroup,
-    borderRadius: radii.surface,
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
     padding: spacing.md,
     marginBottom: spacing.md,
     gap: spacing.md
@@ -146,14 +110,14 @@ export const mobileTasksDetailStyles = themedStyleSheet(() => ({
   detailChip: {
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    backgroundColor: colors.translucentFill,
-    borderRadius: radii.pill,
+    backgroundColor: colors.bgRaised,
+    borderRadius: 999,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2
   },
   detailChipSelected: {
     borderColor: colors.accentBlue,
-    backgroundColor: colors.translucentFill
+    backgroundColor: colors.bgRaised
   },
   detailChipText: {
     fontSize: 11,
@@ -167,7 +131,7 @@ export const mobileTasksDetailStyles = themedStyleSheet(() => ({
   issueTypeDot: {
     width: 7,
     height: 7,
-    borderRadius: radii.pill
+    borderRadius: 999
   },
   detailSection: {
     gap: spacing.xs

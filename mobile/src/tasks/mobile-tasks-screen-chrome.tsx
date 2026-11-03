@@ -1,113 +1,135 @@
-import type { ReactNode } from 'react'
 import type { ConnectionPresentationModel } from './use-mobile-tasks-connection-presentation'
-import { NavBar } from '../components/nav-bar/NavBar'
-import { NavBarButton } from '../components/nav-bar/NavBarButton'
-import { MobileSegmentedControl } from '../components/MobileSegmentedControl'
-import { View, ChevronLeft, StatusDot, RefreshCw } from './mobile-tasks-dependencies'
+import {
+  View,
+  Pressable,
+  ChevronLeft,
+  colors,
+  StatusDot,
+  Text,
+  RefreshCw,
+  Plus
+} from './mobile-tasks-dependencies'
 import { MobileTasksHostSubtitle } from './mobile-tasks-host-subtitle'
 import { styles } from './mobile-tasks-legacy-styles'
 import { renderMobileTasksProviderControls } from './mobile-tasks-provider-controls'
-import { selectMobileTasksProvider } from './mobile-tasks-provider-pickers'
-import type { Translate } from '../i18n/mobile-i18n'
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { renderMobileTasksSearchControl } from './mobile-tasks-search-control'
+import { translate } from '../i18n/mobile-i18n'
 
-function refreshLabels(t: Translate) {
+function refreshLabels() {
   return {
-    github: t('tasks.screenChrome.refreshGitHub', 'Refresh GitHub work'),
-    gitlab: t('tasks.screenChrome.refreshGitLab', 'Refresh GitLab work items'),
-    linear: t('tasks.screenChrome.refreshLinear', 'Refresh Linear'),
-    jira: t('tasks.screenChrome.refreshJira', 'Refresh Jira issues')
+    github: translate('tasks.screenChrome.refreshGitHub', 'Refresh GitHub work'),
+    gitlab: translate('tasks.screenChrome.refreshGitLab', 'Refresh GitLab work items'),
+    linear: translate('tasks.screenChrome.refreshLinear', 'Refresh Linear'),
+    jira: translate('tasks.screenChrome.refreshJira', 'Refresh Jira issues')
   }
 }
 
-// Bar, then the source switch, then one row of scope chips; search and New task sit at the bottom.
 export function renderMobileTasksChrome(model: ConnectionPresentationModel) {
-  const { provider, providerOptions, setTaskCopyFeedbackRootRef, taskUiReady } = model
+  const { setTaskCopyFeedbackRootRef } = model
   return (
     <View ref={setTaskCopyFeedbackRootRef} style={styles.topChrome}>
-      <MobileTasksStatusBar
-        model={model}
-        accessory={
-          <>
-            {providerOptions.length > 1 ? (
-              <MobileSegmentedControl
-                segments={providerOptions}
-                selected={provider}
-                onSelect={(next) => {
-                  if (next !== provider) {
-                    selectMobileTasksProvider(model, next)
-                  }
-                }}
-                disabled={!taskUiReady}
-                fill
-                testIDPrefix="mobile-tasks-provider-"
-                // Hold the row's space but hide the default sources until the desktop says which exist, so chips never reflow.
-                style={[styles.providerSwitch, !taskUiReady && { opacity: 0 }]}
-              />
-            ) : null}
+      {renderMobileTasksStatusBar(model)}
 
-            {renderMobileTasksProviderControls(model)}
-          </>
-        }
-      />
+      {renderMobileTasksProviderControls(model)}
+
+      {renderMobileTasksSearchControl(model)}
     </View>
   )
 }
 
-// These pages have no pull-to-refresh, so Refresh stays in the bar.
-export function MobileTasksStatusBar({
-  model,
-  accessory
-}: {
-  model: ConnectionPresentationModel
-  accessory: ReactNode
-}) {
+export function renderMobileTasksStatusBar(model: ConnectionPresentationModel) {
   const {
     connState,
     githubMode,
     githubProjectLoading,
     headerVerdict,
     hostId,
+    linearConnected,
     loading,
     provider,
     refreshGitHubProject,
     refreshTasks,
     refreshing,
     router,
+    setCreateBody,
+    setCreateTitle,
+    setLinearApiKeyDraft,
+    setLinearConnectError,
+    setLinearConnectState,
+    setShowCreateTask,
+    setShowLinearConnect,
+    showHeaderCreateTask,
     taskUiReady
   } = model
-  const t = useMobileTranslation()
   return (
-    <NavBar
-      leading={
-        <NavBarButton
-          icon={ChevronLeft}
-          onPress={() => router.back()}
-          accessibilityLabel={t('common.back', 'Back')}
-        />
-      }
-      title={t('tasks.screenChrome.title', 'Tasks')}
-      subtitle={
-        <>
+    <View style={styles.statusBar}>
+      <Pressable
+        style={styles.backButton}
+        onPress={() => router.back()}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={translate('common.back', 'Back')}
+      >
+        <ChevronLeft size={22} color={colors.textPrimary} />
+      </Pressable>
+      <View style={styles.titleWrap}>
+        <View style={styles.titleLine}>
           <StatusDot state={connState} verdict={headerVerdict} />
-          <MobileTasksHostSubtitle hostId={hostId} />
-        </>
-      }
-      trailing={
-        <NavBarButton
-          icon={RefreshCw}
-          accessibilityLabel={refreshLabels(t)[provider]}
-          disabled={!taskUiReady || loading || refreshing || githubProjectLoading}
+          <Text style={styles.title}>{translate('tasks.screenChrome.title', 'Tasks')}</Text>
+        </View>
+        <MobileTasksHostSubtitle hostId={hostId} />
+      </View>
+      <Pressable
+        style={styles.iconButton}
+        disabled={!taskUiReady || loading || refreshing || githubProjectLoading}
+        hitSlop={8}
+        accessibilityRole="button"
+        accessibilityLabel={refreshLabels()[provider]}
+        onPress={() => {
+          if (!taskUiReady) {
+            return
+          }
+          if (provider === 'github' && githubMode === 'project') {
+            refreshGitHubProject()
+            return
+          }
+          refreshTasks()
+        }}
+      >
+        <RefreshCw size={16} color={taskUiReady ? colors.textSecondary : colors.textMuted} />
+      </Pressable>
+      {showHeaderCreateTask ? (
+        <Pressable
+          style={styles.iconButton}
+          disabled={!taskUiReady}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={
+            provider === 'github'
+              ? translate('tasks.screenChrome.newGitHubIssue', 'New GitHub issue')
+              : linearConnected
+                ? translate('tasks.screenChrome.newLinearIssue', 'New Linear issue')
+                : translate('tasks.screenChrome.connectLinear', 'Connect Linear')
+          }
           onPress={() => {
-            if (provider === 'github' && githubMode === 'project') {
-              refreshGitHubProject()
+            if (!taskUiReady) {
               return
             }
-            refreshTasks()
+            if (provider === 'linear' && !linearConnected) {
+              setLinearApiKeyDraft('')
+              setLinearConnectState('idle')
+              setLinearConnectError('')
+              setShowLinearConnect(true)
+              return
+            }
+            setCreateTitle('')
+            setCreateBody('')
+            setShowCreateTask(true)
           }}
-        />
-      }
-      accessory={accessory}
-    />
+        >
+          <Plus size={16} color={taskUiReady ? colors.textSecondary : colors.textMuted} />
+        </Pressable>
+      ) : null}
+    </View>
   )
 }

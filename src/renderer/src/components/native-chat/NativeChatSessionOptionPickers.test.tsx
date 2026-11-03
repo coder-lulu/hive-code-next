@@ -3,19 +3,17 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { useState } from 'react'
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
-import { OMP_SESSION_OPTION_CATALOG } from '../../../../shared/agent-session/options/agent-session-option-catalog-omp'
+import { OMP_SESSION_OPTION_CATALOG } from '../../../../shared/agent-session-option-catalog-omp'
 import type { AcpThinkingOptionsFixtureModule } from '../../../../shared/acp-thinking-options.test-fixture-contract'
-import { structuredAgentSessionOptionView } from '../../../../shared/agent-session/options/structured-agent-session-option-view'
+import { structuredAgentSessionOptionView } from '../../../../shared/structured-agent-session-option-view'
 import {
   applyStructuredAgentSessionModelCatalog,
   applyStructuredAgentSessionOptions,
-  createStructuredAgentSessionOptionState,
-  structuredAgentSessionOptionPicks
-} from '../../../../shared/agent-session/options/structured-agent-session-options'
-import {
   canSetStructuredAgentSessionOption,
+  createStructuredAgentSessionOptionState,
+  structuredAgentSessionOptionPicks,
   structuredAgentSessionOptionSnapshot
-} from '../../../../shared/agent-session/options/structured-agent-session-option-snapshot'
+} from '../../../../shared/structured-agent-session-options'
 import type { SessionOptionDescriptor } from '../../../../shared/native-chat/input/native-chat-session-options'
 import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
 

@@ -145,7 +145,6 @@ describe.each(['darwin', 'linux', 'win32'] as const)('%s native-handle contract'
     it('keeps graceful and forced termination available until physical exit', () => {
       const fixture = createFixture()
       const originalKill = fixture.proc.kill
-      const terminateJob = vi.spyOn(ptyJob, 'terminatePtyJob').mockReturnValue('unavailable')
       const signal = vi.spyOn(process, 'kill').mockReturnValue(true)
       failIo(fixture, operation)
 
@@ -155,14 +154,7 @@ describe.each(['darwin', 'linux', 'win32'] as const)('%s native-handle contract'
       const forced = createFixture()
       failIo(forced, operation)
       forced.handle.forceKill()
-      if (platform === 'win32') {
-        // An unverified PID can be reused; the per-PTY job/native handle owns this process tree.
-        expect(signal).not.toHaveBeenCalled()
-        expect(terminateJob).toHaveBeenCalledExactlyOnceWith(forced.proc)
-        expect(forced.proc.kill).toHaveBeenCalledOnce()
-      } else {
-        expect(signal).toHaveBeenCalledWith(4242, 'SIGKILL')
-      }
+      expect(signal).toHaveBeenCalledWith(4242, 'SIGKILL')
 
       forced.proc._simulateExit(137)
       signal.mockClear()
@@ -176,7 +168,6 @@ describe.each(['darwin', 'linux', 'win32'] as const)('%s native-handle contract'
 
     it('reaps every session and native handle across 32 failed-I/O create/close cycles', async () => {
       const emulatorDispose = vi.spyOn(HeadlessEmulator.prototype, 'dispose')
-      const terminateJob = vi.spyOn(ptyJob, 'terminatePtyJob').mockReturnValue('unavailable')
       const signal = vi.spyOn(process, 'kill').mockReturnValue(true)
       let fixture = createFixture()
       const host = new TerminalHost({ spawnSubprocess: () => fixture.handle })
@@ -204,18 +195,9 @@ describe.each(['darwin', 'linux', 'win32'] as const)('%s native-handle contract'
             expect(host.listSessions()).toHaveLength(1)
             expect(fixture.proc.destroy).not.toHaveBeenCalled()
             expect(onExit).not.toHaveBeenCalled()
-            if (platform === 'win32') {
-              await vi.waitFor(() => expect(fixture.proc.kill).toHaveBeenCalledOnce(), {
-                interval: 1
-              })
-              expect(terminateJob).toHaveBeenCalledWith(fixture.proc)
-              // An unverified PID can be reused; the per-PTY job/native handle owns this process tree.
-              expect(signal).not.toHaveBeenCalled()
-            } else {
-              await vi.waitFor(() => expect(signal).toHaveBeenCalledWith(4242, 'SIGKILL'), {
-                interval: 1
-              })
-            }
+            await vi.waitFor(() => expect(signal).toHaveBeenCalledWith(4242, 'SIGKILL'), {
+              interval: 1
+            })
           } finally {
             fixture.proc._simulateExit(137)
             killFailure = await settled
@@ -223,13 +205,7 @@ describe.each(['darwin', 'linux', 'win32'] as const)('%s native-handle contract'
           expect(killFailure).toBeNull()
           expect(host.listSessions()).toHaveLength(0)
           expect(onExit).toHaveBeenCalledOnce()
-          if (platform === 'win32') {
-            // An unverified PID can be reused; job/native close owns the tree and must not be repeated by destroy.
-            expect(fixture.proc.destroy).not.toHaveBeenCalled()
-            expect(fixture.proc.kill).toHaveBeenCalledOnce()
-          } else {
-            expect(fixture.proc.destroy).toHaveBeenCalledOnce()
-          }
+          expect(fixture.proc.destroy).toHaveBeenCalledOnce()
           expect(emulatorDispose).toHaveBeenCalledTimes(index + 1)
         }
       } finally {

@@ -21,11 +21,13 @@ const SESSION_ID = 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee'
 let harness: SessionSearchIndexerHarness
 let currentRoots: SessionSearchIndexerHarness['roots']
 let originalSendDescriptor: PropertyDescriptor | undefined
-let entryMessageListener: ReturnType<typeof process.listeners>[number] | undefined
-const originalMessageListeners = new Set<ReturnType<typeof process.listeners>[number]>()
-const originalDisconnectListeners = new Set<ReturnType<typeof process.listeners>[number]>()
-const ownedMessageListeners = new Set<ReturnType<typeof process.listeners>[number]>()
-const ownedDisconnectListeners = new Set<ReturnType<typeof process.listeners>[number]>()
+const messageListeners = () => process.listeners('message')
+const disconnectListeners = () => process.listeners('disconnect')
+let entryMessageListener: ReturnType<typeof messageListeners>[number] | undefined
+const originalMessageListeners = new Set<ReturnType<typeof messageListeners>[number]>()
+const originalDisconnectListeners = new Set<ReturnType<typeof disconnectListeners>[number]>()
+const ownedMessageListeners = new Set<ReturnType<typeof messageListeners>[number]>()
+const ownedDisconnectListeners = new Set<ReturnType<typeof disconnectListeners>[number]>()
 const unrelatedParentFrames = vi.fn()
 const sent: AiVaultServiceChildMessage[] = []
 let nextId = 1
@@ -115,7 +117,11 @@ beforeAll(async () => {
         if (process.listeners('message').includes(replyListener)) {
           replyListener.call(
             process,
-            { type: 'sessionSearchRoots', id: message.id, roots: currentRoots },
+            {
+              type: 'sessionSearchRoots',
+              id: message.id,
+              roots: currentRoots
+            },
             undefined
           )
         }

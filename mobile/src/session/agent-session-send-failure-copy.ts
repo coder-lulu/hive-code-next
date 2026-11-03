@@ -1,7 +1,7 @@
 import type {
   AgentSessionFailureCopyId,
   AgentSessionFailureCopyValues
-} from '../../../src/shared/agent-session/failures/agent-session-failure-copy'
+} from '../../../src/shared/agent-session-failure-copy'
 import { translate } from '../i18n/mobile-i18n'
 
 export const SEND_FAILURE_COPY = {
@@ -132,7 +132,7 @@ export const SEND_FAILURE_COPY = {
   writeFailed: (values) =>
     translate(
       'session.failure.writeFailed',
-      "Orca couldn't hand this message to the agent, so it was not sent.",
+      "HiveCode couldn't hand this message to the agent, so it was not sent.",
       values
     ),
   cancelled: (values) =>
@@ -150,7 +150,7 @@ export const SEND_FAILURE_COPY = {
   hostRestarted: (values) =>
     translate(
       'session.failure.hostRestarted',
-      'Orca restarted before this message was sent.',
+      'HiveCode restarted before this message was sent.',
       values
     ),
   notDelivered: (values) =>

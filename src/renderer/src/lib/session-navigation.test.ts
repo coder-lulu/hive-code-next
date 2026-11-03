@@ -21,7 +21,7 @@ vi.mock('./worktree-activation', () => ({ activateAndRevealWorkspace: mocks.work
 vi.mock('./temporary-session-navigation', () => ({
   activateTemporarySessionInMain: mocks.floating
 }))
-vi.mock('./structured-agent-session-tab-activation', () => ({
+vi.mock('./agent-session/structured-agent-session-tab-activation', () => ({
   activateStructuredAgentSessionTab: mocks.structured
 }))
 vi.mock('./activate-tab-and-focus-pane', () => ({ activateTabAndFocusPane: mocks.focusPane }))
@@ -377,7 +377,7 @@ describe('activateSessionInWorkspace', () => {
     expect(mocks.structured).toHaveBeenCalledWith({
       worktreeId: 'workspace',
       tabId: 'unified',
-      executionHostId: 'runtime:peer'
+      target: { kind: 'environment', environmentId: 'peer' }
     })
     expect(mocks.focusPane).not.toHaveBeenCalled()
   })

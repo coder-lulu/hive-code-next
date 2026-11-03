@@ -1,4 +1,3 @@
-// @protected-copy: site permission Allow/Block prompt.
 import { BROWSER_SITE_PERMISSION_LOCAL_FILES_ORIGIN } from '../../../../shared/browser-site-permission'
 import type { BrowserPagePromptHandler } from './browser-page-prompts'
 import {

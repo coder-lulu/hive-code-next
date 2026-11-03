@@ -35,34 +35,17 @@
         "startedAt": 0
       }
     },
-    "0838aa6b9a92": {
+    "0be231dddda1": {
       "crash": {
         "$rpc": "null"
       },
       "elements": {
         "ChevronLeft": 1,
-        "CircleAlert": 1,
-        "Pressable": 3,
-        "RefreshCw": 1,
-        "SafeAreaView": 1,
-        "Text": 5,
-        "View": 7
-      },
-      "labels": ["Back", "Refresh agent sessions"],
-      "text": ["Agent Session History", "orca-history", "Unable to Load", "Unknown method", "Retry"]
-    },
-    "13401a70aba3": {
-      "crash": {
-        "$rpc": "null"
-      },
-      "elements": {
-        "ChevronLeft": 1,
-        "History": 1,
         "Pressable": 2,
         "RefreshCw": 1,
         "SafeAreaView": 1,
         "Text": 4,
-        "View": 7
+        "View": 4
       },
       "labels": ["Back", "Refresh agent sessions"],
       "text": [
@@ -70,28 +53,6 @@
         "orca-history",
         "Agent Session History Unavailable",
         "Update Orca on this host to browse agent session history."
-      ]
-    },
-    "13903935fd86": {
-      "crash": {
-        "$rpc": "null"
-      },
-      "elements": {
-        "ChevronLeft": 1,
-        "CircleAlert": 1,
-        "Pressable": 3,
-        "RefreshCw": 1,
-        "SafeAreaView": 1,
-        "Text": 5,
-        "View": 7
-      },
-      "labels": ["Back", "Refresh agent sessions"],
-      "text": [
-        "Agent Session History",
-        "orca-history",
-        "Unable to Load",
-        "Unable to reach host",
-        "Retry"
       ]
     },
     "14d0e2ecb181": {
@@ -125,27 +86,35 @@
         }
       }
     },
-    "1cf03bb642a1": {
+    "18ef6596b779": {
       "crash": {
         "$rpc": "null"
       },
       "elements": {
         "ChevronLeft": 1,
-        "CircleAlert": 1,
         "Pressable": 3,
         "RefreshCw": 1,
         "SafeAreaView": 1,
         "Text": 5,
-        "View": 7
+        "View": 4
       },
       "labels": ["Back", "Refresh agent sessions"],
-      "text": [
-        "Agent Session History",
-        "orca-history",
-        "Unable to Load",
-        "transport failure",
-        "Retry"
-      ]
+      "text": ["Agent Session History", "orca-history", "Unable to Load", "Retry"]
+    },
+    "22141179786a": {
+      "crash": {
+        "$rpc": "null"
+      },
+      "elements": {
+        "ChevronLeft": 1,
+        "Pressable": 3,
+        "RefreshCw": 1,
+        "SafeAreaView": 1,
+        "Text": 5,
+        "View": 4
+      },
+      "labels": ["Back", "Refresh agent sessions"],
+      "text": ["Agent Session History", "orca-history", "Unable to Load", "Unknown method", "Retry"]
     },
     "222a3ba1d974": {
       "name": "worktree.ps#1",
@@ -227,60 +196,6 @@
         }
       }
     },
-    "2b1f94c1f187": {
-      "crash": {
-        "$rpc": "null"
-      },
-      "elements": {
-        "ChevronLeft": 1,
-        "CircleAlert": 1,
-        "Pressable": 3,
-        "RefreshCw": 1,
-        "SafeAreaView": 1,
-        "Text": 5,
-        "View": 7
-      },
-      "labels": ["Back", "Refresh agent sessions"],
-      "text": [
-        "Agent Session History",
-        "orca-history",
-        "Unable to Load",
-        "The host sent a reply this app could not read (status.get)",
-        "Retry"
-      ]
-    },
-    "340f44014e68": {
-      "crash": {
-        "$rpc": "null"
-      },
-      "elements": {
-        "ChevronLeft": 1,
-        "CircleAlert": 1,
-        "Pressable": 3,
-        "RefreshCw": 1,
-        "SafeAreaView": 1,
-        "Text": 5,
-        "View": 7
-      },
-      "labels": ["Back", "Refresh agent sessions"],
-      "text": ["Agent Session History", "orca-history", "Unable to Load", "outer refused", "Retry"]
-    },
-    "3f48bd7d1369": {
-      "crash": {
-        "$rpc": "null"
-      },
-      "elements": {
-        "ActivityIndicator": 1,
-        "ChevronLeft": 1,
-        "Pressable": 2,
-        "RefreshCw": 1,
-        "SafeAreaView": 1,
-        "Text": 3,
-        "View": 7
-      },
-      "labels": ["Back", "Refresh agent sessions"],
-      "text": ["Agent Session History", "orca-history", "Loading agent sessions…"]
-    },
     "40fa6811eb00": {
       "name": "streams-registered-at-teardown",
       "ordinal": 10,
@@ -291,6 +206,21 @@
           "payload": "agentSession.subscribeStatus#1"
         }
       ]
+    },
+    "4af220e500d6": {
+      "crash": {
+        "$rpc": "null"
+      },
+      "elements": {
+        "ChevronLeft": 1,
+        "Pressable": 3,
+        "RefreshCw": 1,
+        "SafeAreaView": 1,
+        "Text": 5,
+        "View": 4
+      },
+      "labels": ["Back", "Refresh agent sessions"],
+      "text": ["Agent Session History", "orca-history", "Unable to Load", "outer refused", "Retry"]
     },
     "4d68bff46cff": {
       "name": "status.get#1",
@@ -510,6 +440,27 @@
         }
       ]
     },
+    "7f2073d8dcc1": {
+      "crash": {
+        "$rpc": "null"
+      },
+      "elements": {
+        "ChevronLeft": 1,
+        "Pressable": 3,
+        "RefreshCw": 1,
+        "SafeAreaView": 1,
+        "Text": 5,
+        "View": 4
+      },
+      "labels": ["Back", "Refresh agent sessions"],
+      "text": [
+        "Agent Session History",
+        "orca-history",
+        "Unable to Load",
+        "transport failure",
+        "Retry"
+      ]
+    },
     "81b771b56e59": {
       "name": "status.get#2",
       "ordinal": 6,
@@ -544,6 +495,27 @@
           }
         }
       }
+    },
+    "8cc4f2d607a6": {
+      "crash": {
+        "$rpc": "null"
+      },
+      "elements": {
+        "ChevronLeft": 1,
+        "Pressable": 3,
+        "RefreshCw": 1,
+        "SafeAreaView": 1,
+        "Text": 5,
+        "View": 4
+      },
+      "labels": ["Back", "Refresh agent sessions"],
+      "text": [
+        "Agent Session History",
+        "orca-history",
+        "Unable to Load",
+        "The host sent a reply this app could not read (status.get)",
+        "Retry"
+      ]
     },
     "98d7022b1300": {
       "name": "aiVault.listSessions#1",
@@ -613,28 +585,6 @@
       "ordinal": 7,
       "json": "{\"id\":\"frame-4\",\"deviceToken\":\"recording-device\",\"method\":\"status.get\"}"
     },
-    "a5cae06daad9": {
-      "crash": {
-        "$rpc": "null"
-      },
-      "elements": {
-        "ChevronLeft": 1,
-        "CircleAlert": 1,
-        "Pressable": 3,
-        "RefreshCw": 1,
-        "SafeAreaView": 1,
-        "Text": 5,
-        "View": 7
-      },
-      "labels": ["Back", "Refresh agent sessions"],
-      "text": [
-        "Agent Session History",
-        "orca-history",
-        "Unable to Load",
-        "Something went wrong. Try again.",
-        "Retry"
-      ]
-    },
     "acf501fa9958": {
       "name": "status.get#1",
       "ordinal": 2,
@@ -668,6 +618,27 @@
           }
         }
       }
+    },
+    "af9574769167": {
+      "crash": {
+        "$rpc": "null"
+      },
+      "elements": {
+        "ChevronLeft": 1,
+        "Pressable": 3,
+        "RefreshCw": 1,
+        "SafeAreaView": 1,
+        "Text": 5,
+        "View": 4
+      },
+      "labels": ["Back", "Refresh agent sessions"],
+      "text": [
+        "Agent Session History",
+        "orca-history",
+        "Unable to Load",
+        "Unable to reach host",
+        "Retry"
+      ]
     },
     "b51021287bd8": {
       "name": "status.get#2",
@@ -802,6 +773,22 @@
         }
       }
     },
+    "d22bb2f62cea": {
+      "crash": {
+        "$rpc": "null"
+      },
+      "elements": {
+        "ActivityIndicator": 1,
+        "ChevronLeft": 1,
+        "Pressable": 2,
+        "RefreshCw": 1,
+        "SafeAreaView": 1,
+        "Text": 2,
+        "View": 4
+      },
+      "labels": ["Back", "Refresh agent sessions"],
+      "text": ["Agent Session History", "orca-history"]
+    },
     "e28c488ce6b2": {
       "name": "agentSession.subscribeStatus#1",
       "ordinal": 1,
@@ -827,7 +814,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "3f48bd7d1369",
+          "state": "d22bb2f62cea",
           "effects": []
         }
       },
@@ -839,7 +826,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "3f48bd7d1369",
+          "state": "d22bb2f62cea",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -857,7 +844,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "3f48bd7d1369",
+          "state": "d22bb2f62cea",
           "effects": []
         }
       },
@@ -875,7 +862,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "3f48bd7d1369",
+          "state": "d22bb2f62cea",
           "effects": ["40fa6811eb00"]
         }
       },
@@ -887,7 +874,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "2b1f94c1f187",
+          "state": "8cc4f2d607a6",
           "effects": []
         }
       },
@@ -899,7 +886,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "2b1f94c1f187",
+          "state": "8cc4f2d607a6",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -911,7 +898,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "2b1f94c1f187",
+          "state": "8cc4f2d607a6",
           "effects": []
         }
       },
@@ -923,7 +910,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "2b1f94c1f187",
+          "state": "8cc4f2d607a6",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -935,7 +922,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "13401a70aba3",
+          "state": "0be231dddda1",
           "effects": []
         }
       },
@@ -947,7 +934,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "13401a70aba3",
+          "state": "0be231dddda1",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -959,7 +946,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "13401a70aba3",
+          "state": "0be231dddda1",
           "effects": []
         }
       },
@@ -971,7 +958,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "13401a70aba3",
+          "state": "0be231dddda1",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -983,7 +970,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "13401a70aba3",
+          "state": "0be231dddda1",
           "effects": []
         }
       },
@@ -995,7 +982,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "13401a70aba3",
+          "state": "0be231dddda1",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -1007,7 +994,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "340f44014e68",
+          "state": "4af220e500d6",
           "effects": []
         }
       },
@@ -1019,7 +1006,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "340f44014e68",
+          "state": "4af220e500d6",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -1031,7 +1018,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "13903935fd86",
+          "state": "af9574769167",
           "effects": []
         }
       },
@@ -1043,7 +1030,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "13903935fd86",
+          "state": "af9574769167",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -1055,7 +1042,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "0838aa6b9a92",
+          "state": "22141179786a",
           "effects": []
         }
       },
@@ -1067,7 +1054,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "0838aa6b9a92",
+          "state": "22141179786a",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -1079,7 +1066,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "1cf03bb642a1",
+          "state": "7f2073d8dcc1",
           "effects": []
         }
       },
@@ -1091,7 +1078,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "1cf03bb642a1",
+          "state": "7f2073d8dcc1",
           "effects": ["7e8b2964ad63"]
         }
       },
@@ -1103,7 +1090,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "a5cae06daad9",
+          "state": "18ef6596b779",
           "effects": []
         }
       },
@@ -1115,7 +1102,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "a5cae06daad9",
+          "state": "18ef6596b779",
           "effects": ["7e8b2964ad63"]
         }
       }

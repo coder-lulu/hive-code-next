@@ -24,10 +24,9 @@ import {
   updateNativeChatComposerDraft
 } from './native-chat-composer-draft-store'
 import { promptSkillRefs, promptText } from './native-chat-prompt-document'
-import { agentReferenceToken } from '../../../../shared/orchestration-agent-reference'
 import { changePrompt, promptEditor } from './native-chat-prompt-editor.test-support'
 import { dispatchNativeChatStructuredComposerText } from './native-chat-structured-composer-dispatch'
-import { structuredAgentSessionSendBody } from '../../../../shared/agent-session/requests/structured-agent-session-send-mutation'
+import { structuredAgentSessionSendBody } from '../../../../shared/structured-agent-session-send-mutation'
 import { resolveNativeChatPastedText } from './native-chat-composer-pasted-text-references'
 import {
   addNativeChatPendingAttachment,
@@ -39,16 +38,7 @@ import { nativeChatPastedTextOperations } from './native-chat-pasted-text-refere
 const clipboard = vi.hoisted(() => ({ text: vi.fn(), file: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
 const handles = new Map<string, NativeChatComposerHandle>()
-const notComposing = () => false
-function Field({
-  scope,
-  disabled = false,
-  isComposing = notComposing
-}: {
-  scope: string
-  disabled?: boolean
-  isComposing?: () => boolean
-}) {
+function Field({ scope, disabled = false }: { scope: string; disabled?: boolean }) {
   const input = useRef<NativeChatComposerInput>(null)
   const handle = useRef<NativeChatComposerHandle>(null)
   const root = useRef<HTMLDivElement>(null)
@@ -60,7 +50,7 @@ function Field({
   }, [draft.draft])
   useNativeChatComposerHandle(handle, {
     textareaRef: input,
-    isComposing,
+    isComposing: () => false,
     setDraft: draft.setDraft,
     setCaret: () => {},
     setActiveSuggestion: () => {},
@@ -295,37 +285,3 @@ it.each(['/clear', '@/same.txt'] as const)(
     expect(promptText(editor.state.doc)).toBe(`${before}@/same.txt`)
   }
 )
-
-it('lets the mounted input own mention acceptance and restores that editor focus only after insertion', () => {
-  let composing = false
-  const isComposing = () => composing
-  const reference = { label: 'Worker', address: 'term_worker', hostKey: 'local' }
-  const fields = (disabled: boolean) => (
-    <>
-      <Field scope="mention-owner" disabled={disabled} isComposing={isComposing} />
-      <Field scope="other-owner" />
-    </>
-  )
-  const view = render(fields(true))
-  const input = screen.getByRole('textbox', { name: 'mention-owner' })
-  const other = screen.getByRole('textbox', { name: 'other-owner' })
-  other.focus()
-  const handle = handles.get('mention-owner')!
-  expect(handle.acceptsText()).toBe(false)
-  act(() => expect(handle.insertAgentReferences([reference])).toBe(false))
-  expect(readNativeChatComposerDraft('mention-owner').text).toBe('')
-  expect(document.activeElement).toBe(other)
-  view.rerender(fields(false))
-  composing = true
-  expect(handle.acceptsText()).toBe(true)
-  act(() => expect(handle.insertAgentReferences([reference])).toBe(false))
-  expect(readNativeChatComposerDraft('mention-owner').text).toBe('')
-  expect(document.activeElement).toBe(other)
-  composing = false
-  act(() => expect(handle.insertAgentReferences([reference])).toBe(true))
-  expect(readNativeChatComposerDraft('mention-owner').text).toBe(
-    `${agentReferenceToken(reference)} `
-  )
-  expect(document.activeElement).toBe(input)
-  expect(readNativeChatComposerDraft('other-owner').text).toBe('')
-})

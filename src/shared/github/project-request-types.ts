@@ -2,10 +2,6 @@
 import type { GitHubProjectFieldMutationValue, GitHubProjectOwnerType } from './project-types'
 import type { GitHubIssueUpdate } from '../issue-mutation-types'
 
-/** Set by a click: it may start the stopped WSL distro gh lives in (E9). Loads that also run
- * unprompted (mount effects, restore) leave it unset. Local IPC only. */
-export type WakeWslDistroArg = { wakeWslDistro?: boolean }
-
 export type GetProjectViewTableArgs = {
   owner: string
   ownerType: GitHubProjectOwnerType
@@ -20,7 +16,7 @@ export type GetProjectViewTableArgs = {
   queryOverride?: string
 }
 
-export type ProjectWorkItemDetailsBySlugArgs = WakeWslDistroArg & {
+export type ProjectWorkItemDetailsBySlugArgs = {
   owner: string
   repo: string
   host?: string
@@ -28,7 +24,7 @@ export type ProjectWorkItemDetailsBySlugArgs = WakeWslDistroArg & {
   type: 'issue' | 'pr'
 }
 
-export type UpdateProjectItemFieldArgs = WakeWslDistroArg & {
+export type UpdateProjectItemFieldArgs = {
   projectId: string
   host?: string
   itemId: string
@@ -36,14 +32,14 @@ export type UpdateProjectItemFieldArgs = WakeWslDistroArg & {
   value: GitHubProjectFieldMutationValue
 }
 
-export type ClearProjectItemFieldArgs = WakeWslDistroArg & {
+export type ClearProjectItemFieldArgs = {
   projectId: string
   host?: string
   itemId: string
   fieldId: string
 }
 
-export type UpdateIssueBySlugArgs = WakeWslDistroArg & {
+export type UpdateIssueBySlugArgs = {
   owner: string
   repo: string
   host?: string
@@ -51,7 +47,7 @@ export type UpdateIssueBySlugArgs = WakeWslDistroArg & {
   updates: GitHubIssueUpdate & { body?: string }
 }
 
-export type UpdatePullRequestBySlugArgs = WakeWslDistroArg & {
+export type UpdatePullRequestBySlugArgs = {
   owner: string
   repo: string
   host?: string
@@ -59,7 +55,7 @@ export type UpdatePullRequestBySlugArgs = WakeWslDistroArg & {
   updates: { title?: string; body?: string; state?: 'open' | 'closed' }
 }
 
-export type AddIssueCommentBySlugArgs = WakeWslDistroArg & {
+export type AddIssueCommentBySlugArgs = {
   owner: string
   repo: string
   host?: string
@@ -67,7 +63,7 @@ export type AddIssueCommentBySlugArgs = WakeWslDistroArg & {
   body: string
 }
 
-export type UpdateIssueCommentBySlugArgs = WakeWslDistroArg & {
+export type UpdateIssueCommentBySlugArgs = {
   owner: string
   repo: string
   host?: string
@@ -75,7 +71,7 @@ export type UpdateIssueCommentBySlugArgs = WakeWslDistroArg & {
   body: string
 }
 
-export type DeleteIssueCommentBySlugArgs = WakeWslDistroArg & {
+export type DeleteIssueCommentBySlugArgs = {
   owner: string
   repo: string
   host?: string
@@ -101,7 +97,7 @@ export type ListIssueTypesBySlugArgs = {
   host?: string
 }
 
-export type UpdateIssueTypeBySlugArgs = WakeWslDistroArg & {
+export type UpdateIssueTypeBySlugArgs = {
   owner: string
   repo: string
   host?: string
@@ -110,19 +106,19 @@ export type UpdateIssueTypeBySlugArgs = WakeWslDistroArg & {
   issueTypeId: string | null
 }
 
-export type ResolveProjectRefArgs = WakeWslDistroArg & {
+export type ResolveProjectRefArgs = {
   input: string
   host?: string
 }
 
-export type ListProjectViewsArgs = WakeWslDistroArg & {
+export type ListProjectViewsArgs = {
   owner: string
   ownerType: GitHubProjectOwnerType
   projectNumber: number
   host?: string
 }
 
-export type ListAccessibleProjectsArgs = WakeWslDistroArg & {
+export type ListAccessibleProjectsArgs = {
   /** GitHub host (e.g. GHES); absent means github.com. */
   host?: string
 }

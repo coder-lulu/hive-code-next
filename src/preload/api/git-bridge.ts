@@ -63,7 +63,6 @@ export const gitApi: PreloadApi['git'] = {
     filePath: string
     staged: boolean
     compareAgainstHead?: boolean
-    oldPath?: string
     connectionId?: string
     wakeWslDistro?: boolean
   }) => ipcRenderer.invoke('git:diff', args),

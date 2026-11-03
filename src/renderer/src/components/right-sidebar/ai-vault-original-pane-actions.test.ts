@@ -1,10 +1,8 @@
 // @vitest-environment happy-dom
-import { cleanup, renderHook } from '@testing-library/react'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderHook } from '@testing-library/react'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
-  structured: vi.fn(async () => true),
-  findStructured: vi.fn((): object | null => null),
   activateAndRevealWorkspace: vi.fn<(workspaceId: string) => unknown>(),
   toastError: vi.fn<(message: string) => void>(),
   folderWorkspaces: new Array<{ id: string; projectGroupId: string; executionHostId: string }>()
@@ -15,10 +13,10 @@ vi.mock('@/lib/worktree-activation', () => ({
 }))
 vi.mock('@/lib/activate-tab-and-focus-pane', () => ({ activateTabAndFocusPane: vi.fn() }))
 vi.mock('@/lib/activate-ai-vault-structured-session', () => ({
-  activateAiVaultStructuredSession: mocks.structured
+  activateAiVaultStructuredSession: vi.fn()
 }))
 vi.mock('@/lib/agent-session/structured-agent-session-tab-activation', () => ({
-  findStructuredAgentSessionTab: mocks.findStructured
+  findStructuredAgentSessionTab: vi.fn(() => null)
 }))
 vi.mock('sonner', () => ({ toast: { error: mocks.toastError } }))
 vi.mock('@/store', () => {
@@ -46,16 +44,20 @@ function folder(executionHostId: string) {
   return { id: 'folder-1', projectGroupId: 'group-1', executionHostId }
 }
 
-beforeEach(() => {
-  vi.resetAllMocks()
-  mocks.folderWorkspaces = []
-  mocks.findStructured.mockReturnValue(null)
-  mocks.structured.mockResolvedValue(true)
-})
-
-afterEach(() => cleanup())
-
 describe('jumpToWorktree', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.folderWorkspaces = []
+  })
+
+  it('activates folder workspaces through the workspace activator', () => {
+    mocks.activateAndRevealWorkspace.mockReturnValue({ primaryTabId: null })
+    const { result } = renderHook(() => useAiVaultOriginalPaneActions())
+    result.current.jumpToWorktree('folder:folder-1')
+    expect(mocks.activateAndRevealWorkspace).toHaveBeenCalledWith('folder:folder-1')
+    expect(mocks.toastError).not.toHaveBeenCalled()
+  })
+
   it('leaves a refused folder to the toast folder activation already showed', () => {
     mocks.activateAndRevealWorkspace.mockReturnValue(false)
     mocks.folderWorkspaces = [folder('local')]

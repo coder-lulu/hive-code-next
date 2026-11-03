@@ -269,7 +269,6 @@ describe('Store', () => {
     expect(store.getSettings().notifications).toMatchObject({
       enabled: true,
       agentTaskComplete: true,
-      agentNeedsInput: true,
       terminalBell: false,
       suppressWhenFocused: true,
       customSoundPath: '/Users/kaylee/Downloads/Note_block_pling.ogg',

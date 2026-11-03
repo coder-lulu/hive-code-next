@@ -1,5 +1,3 @@
-import { DirectWorkItemSetupDialog } from './new-workspace/DirectWorkItemSetupDialog'
-import type { DirectWorkItemSetupRequest } from '@/lib/direct-work-item-setup'
 import { agentChoicePending } from '@/lib/host-chat-program'
 import type { AgentLaunchSurface } from '@/lib/agent-session-launch-plan'
 import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -43,7 +41,6 @@ const HostedAddRepoDialog = lazyWithRetry(() => import('@/components/sidebar/Add
 })
 
 type ComposerModalData = {
-  directSetup?: DirectWorkItemSetupRequest
   prefilledName?: string
   initialRepoId?: string
   initialEphemeralVmRecipeId?: string
@@ -68,12 +65,6 @@ export default function NewWorkspaceComposerModal(): React.JSX.Element | null {
 
   if (!visible) {
     return null
-  }
-
-  if (modalData?.directSetup) {
-    return (
-      <DirectWorkItemSetupDialog key={modalData.directSetup.id} request={modalData.directSetup} />
-    )
   }
 
   return <ComposerModalBody modalData={modalData ?? {}} onClose={closeModal} />

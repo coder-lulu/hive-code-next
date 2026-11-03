@@ -23,7 +23,7 @@ export function trackClaudeTaskNotificationDelivery(
   if (eventName === 'PostToolUse') {
     const toolName = readString(hookPayload, 'tool_name')
     const response = hookPayload['tool_response']
-    const launch = readClaudeBackgroundTaskLaunch(toolName, response, hookPayload['tool_input'])
+    const launch = readClaudeBackgroundTaskLaunch(toolName, response)
     if (launch) {
       const launched = tasks ?? new Map()
       state.claudeLaunchedBackgroundTasksByPaneKey.set(paneKey, launched)
@@ -57,22 +57,8 @@ export function trackClaudeTaskNotificationDelivery(
       settleClaudeTaskNotification(tasks, notification.taskId)
     }
     return knownTask || continuesWakeupTurn
-  } else if ((eventName === 'Stop' || eventName === 'StopFailure') && inventory.present) {
-    if (inventory.runningAgentWaitIds.length > 0) {
-      tasks ??= new Map()
-      state.claudeLaunchedBackgroundTasksByPaneKey.set(paneKey, tasks)
-      for (const id of inventory.runningAgentWaitIds) {
-        recordClaudeBackgroundTaskLaunch(tasks, {
-          id,
-          kind: 'shell',
-          awaitsAgents: true,
-          listedOnly: true
-        })
-      }
-    }
-    if (tasks) {
-      oweClaudeShellTaskNotifications(tasks, new Set(inventory.runningNonAgentTaskIds), Date.now())
-    }
+  } else if (tasks && (eventName === 'Stop' || eventName === 'StopFailure') && inventory.present) {
+    oweClaudeShellTaskNotifications(tasks, new Set(inventory.runningNonAgentTaskIds), Date.now())
   }
   return false
 }

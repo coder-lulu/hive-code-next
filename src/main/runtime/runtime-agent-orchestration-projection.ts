@@ -1,6 +1,6 @@
 import type { AgentStatusOrchestrationContext } from '../../shared/agent-status-types'
 import type { FleetAgentStatusEvidence } from '../../shared/orchestration-fleet-agent-status-evidence'
-import { creatorFirstParent, crewTaskDisplay } from './orchestration/crew/crew-rules'
+import { buildOrchestrationTaskDisplayMetadata } from '../../shared/orchestration-task-display'
 import { parsePaneKey } from '../../shared/stable-pane-id'
 import type { OrchestrationCompatibilityTerminalAuthority } from './runtime-terminal-contracts'
 import type { RuntimeLeafRecord, RuntimePtyWorktreeRecord } from './runtime-terminal-state-records'
@@ -166,7 +166,14 @@ export class RuntimeAgentOrchestrationProjection {
   ): AgentStatusOrchestrationContext {
     const { paneKey, evidence, deferAttention = false } = options
     const task = scope.task(dispatch.task_id, dispatch.run_id)
-    const display = crewTaskDisplay(task)
+    const display =
+      typeof task?.spec === 'string'
+        ? buildOrchestrationTaskDisplayMetadata({
+            spec: task.spec,
+            taskTitle: task.task_title,
+            displayName: task.display_name
+          })
+        : { taskTitle: '', displayName: '' }
     const owningRun =
       task?.run_id && task.run_id === dispatch.run_id ? scope.run(dispatch.run_id) : undefined
     const runCoordinatorHandle = owningRun?.coordinator_handle ?? undefined
@@ -204,8 +211,7 @@ export class RuntimeAgentOrchestrationProjection {
           currentCreatorPane &&
           storedCreatorPane.leafId === currentCreatorPane.leafId))
     )
-    const paneRuns = creatorPaneKey ? scope.paneRuns(creatorPaneKey) : []
-    const paneRun = paneRuns.find((run) => run.id === owningRun?.id) ?? paneRuns[0]
+    const paneRun = creatorPaneKey ? scope.pane(creatorPaneKey) : undefined
     const sameRunCreatorDispatch = Boolean(
       task?.creator_dispatch_id &&
       task.creator_dispatch_run_id === owningRun?.id &&
@@ -259,15 +265,15 @@ export class RuntimeAgentOrchestrationProjection {
         coordinator.paneKey === paneKey)
     // Why: a creator whose pane is gone still has a coordinator to nest under.
     const parent =
-      creatorFirstParent(
-        (creator?.handle || (creatorSession && creator?.paneKey)) &&
-          (!selfPane || creator?.paneKey !== selfPane) &&
-          creator?.handle !== handle
-          ? creator
-          : undefined,
-        coordinator,
-        coordinatorIsSelf || coordinator.paneKey === selfPane
-      ) ?? {}
+      (creator?.handle || (creatorSession && creator?.paneKey)) &&
+      (!selfPane || creator?.paneKey !== selfPane) &&
+      creator?.handle !== handle
+        ? creator
+        : coordinatorIsSelf
+          ? {}
+          : coordinator.paneKey === selfPane
+            ? {}
+            : coordinator
     const attention =
       !deferAttention && db && typeof db.getWorkerAttentionFacts === 'function'
         ? buildWorkerAttentionContext({ db, dispatch, task, evidence, now: scope.now })

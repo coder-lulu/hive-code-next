@@ -34,12 +34,17 @@ export class PtyPreListenerEvents {
     }
   }
 
-  acceptExit(code: number, cause: TerminalExitCause): void {
+  acceptExit(args: {
+    exitCode: number
+    signal?: number
+    hostReportsChildExitStatus: boolean
+  }): void {
+    const cause = resolveProcessExitCause(args)
     if (this.onExitCb) {
       this.flushData()
-      this.onExitCb(code, cause)
+      this.onExitCb(args.exitCode, cause)
     } else {
-      this.pendingExitCode = code
+      this.pendingExitCode = args.exitCode
       this.pendingExitCause = cause
     }
   }

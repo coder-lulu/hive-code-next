@@ -1,9 +1,11 @@
 import {
   FRAME_EVENTS,
   PANEL_CONTROL_MESSAGE_MAX_BYTES,
-  readPanelPongId
+  readPanelPongId,
+  type PluginFrameHello
 } from '../../../../shared/plugins/frames/plugin-frame-bridge'
 import {
+  PLUGIN_PROTOCOL_VERSION,
   pluginError,
   pluginEvent,
   pluginFailure,
@@ -16,7 +18,11 @@ import {
   type PluginRequest,
   type PluginResponse
 } from '../../../../shared/plugins/frames/plugin-protocol'
-import { PLUGIN_DECLARATIVE_MESSAGES } from '../../../../shared/plugins/declarative/plugin-declarative-message-names'
+import {
+  PLUGIN_HOST_API_MINOR,
+  pluginHostMethodsFor
+} from '../../../../shared/plugins/workers/plugin-host-api'
+import { PLUGIN_HOST_API_MAJOR } from '../../../../shared/plugins/workers/plugin-host-api-major'
 import {
   createPanelControlMessageBudget,
   createPanelMessageBudget,
@@ -24,22 +30,7 @@ import {
   type PanelMessageBudget
 } from '../../../../shared/plugins/frames/plugin-panel-message-budget'
 import { translate } from '@/i18n/i18n'
-import {
-  createPluginFrameGestureGate,
-  createPluginFrameLanes,
-  PLUGIN_FRAME_RENDER_WALK_LIMITS,
-  pluginFrameHello,
-  pluginFrameLaneFor,
-  type PluginFrameMessageContext,
-  type PluginFrameWindow
-} from './plugin-frame-host-lanes'
-
-export {
-  pluginFrameHello,
-  pluginWebviewFrameWindow,
-  type PluginFrameMessageContext,
-  type PluginFrameWindow
-} from './plugin-frame-host-lanes'
+import { currentPluginFrameTheme } from './plugin-panel-design-token-css'
 
 /** Main binds opaque frame sessions; frames never supply plugin identity. */
 
@@ -54,24 +45,13 @@ export type PluginFrameEditorChannel = {
   /** Claims a message before the shared budget (edits have their own); true when handled. */
   claim: (data: unknown) => boolean
   onReady: () => void
-  onEvent: (event: PluginEvent, context: PluginFrameMessageContext) => void
+  onEvent: (event: PluginEvent) => void
   onResponse: (response: PluginResponse) => void
-}
-
-/** A declarative panel's tree traffic; payloads are unparsed, the panel validates them. */
-export type PluginFrameDeclarativeChannel = {
-  onRender: (payload: unknown) => void
-  onError: (payload: unknown) => void
-  /** Any other `ui.*` message from the guest (state requests and writes), unvalidated. */
-  onGuestEvent?: (event: string, payload: unknown) => void
-  /** A render refused by its lane budget; `retryAfterMs` is null when retrying cannot help. */
-  onRefused?: (message: unknown, retryAfterMs: number | null) => void
 }
 
 export type PluginFrameHostOptions = {
   surface: 'panel' | 'editor'
-  declarative?: PluginFrameDeclarativeChannel
-  getFrameWindow: () => PluginFrameWindow | null
+  getFrameWindow: () => Window | null
   /** Null until main issues one; host calls answer `unavailable` meanwhile. */
   getSessionToken: () => string | null
   callHostMethod?: (call: PanelActionCall) => Promise<PluginHostCallOutcome>
@@ -83,14 +63,6 @@ export type PluginFrameHostOptions = {
   budget?: PanelMessageBudget
   /** Reserved liveness budget; defaults to the shared control-frame budget. */
   controlBudget?: PanelMessageBudget
-  /** `files.saveAs` lane; defaults to 64 MiB, a few per window. */
-  saveBudget?: PanelMessageBudget
-  /** `ui.render` lane: trees up to the declarative cap, re-rendered as the person types. */
-  renderBudget?: PanelMessageBudget
-  /** One-shot activation from a press on Orca's own controls (declarative panels). */
-  consumeHostActivation?: () => boolean
-  /** Called as a host call (`plugin.request` included) starts; the result runs when it settles. */
-  trackHostCall?: () => () => void
   now?: () => number
 }
 
@@ -110,45 +82,30 @@ export function callPanelActionViaPreload(call: PanelActionCall): Promise<Plugin
   return panelAction(call)
 }
 
-/** The srcdoc iframe path: a window `message` listener that only trusts the frame's own Window. */
-export function createPluginFrameMessageHandler(
-  options: PluginFrameHostOptions
-): (event: MessageEvent) => void {
-  const handle = createPluginFrameEnvelopeHandler(options)
-  return (event: MessageEvent): void => {
-    // Sandboxed srcdoc has null origin; validate the sending Window identity instead of event.origin.
-    if (!event.source || event.source !== options.getFrameWindow()) {
-      return
-    }
-    // Activation in a child frame also activates this window, so the host can read it directly.
-    // Activation in a child frame also activates this window; good enough for save chords, but
-    // typing anywhere in Orca sets it too, so user-gesture methods never trust it.
-    handle(event.data, {
-      userActivation: navigator.userActivation?.isActive === true,
-      transport: 'iframe'
-    })
+export function pluginFrameHello(surface: 'panel' | 'editor'): PluginFrameHello {
+  return {
+    protocol: PLUGIN_PROTOCOL_VERSION,
+    surface,
+    api: { major: PLUGIN_HOST_API_MAJOR, minor: PLUGIN_HOST_API_MINOR },
+    methods: pluginHostMethodsFor(surface),
+    theme: currentPluginFrameTheme()
   }
 }
 
-/** One handler for panel and editor frames on either transport: liveness, hello, host calls with
- *  cancel, editor traffic. Callers have already verified the message came from this frame. */
-export function createPluginFrameEnvelopeHandler(
+/** One listener for panel and editor frames: liveness, hello, host calls with cancel, editor traffic. */
+export function createPluginFrameMessageHandler(
   options: PluginFrameHostOptions
-): (data: unknown, context: PluginFrameMessageContext) => void {
+): (event: MessageEvent) => void {
   const budget = options.budget ?? createPanelMessageBudget()
   const controlBudget = options.controlBudget ?? createPanelControlMessageBudget()
-  const lanes = createPluginFrameLanes({ save: options.saveBudget, render: options.renderBudget })
   const now = options.now ?? (() => Date.now())
   const callHostMethod = options.callHostMethod ?? callPanelActionViaPreload
   // Ids the frame cancelled while main was still running the call; their answers are dropped.
   const inFlight = new Set<number>()
-  // A components panel's hidden guest never has a real press of its own; only Orca's grant counts.
-  const admitsGesture = createPluginFrameGestureGate(
-    options.declarative ? (options.consumeHostActivation ?? (() => false)) : undefined
-  )
-  return (data: unknown, context: PluginFrameMessageContext): void => {
+  return (event: MessageEvent): void => {
     const frameWindow = options.getFrameWindow()
-    if (!frameWindow) {
+    // Sandboxed srcdoc has null origin; validate the sending Window identity instead of event.origin.
+    if (!frameWindow || event.source !== frameWindow) {
       return
     }
     const post = (message: PluginEnvelope): void => {
@@ -159,12 +116,12 @@ export function createPluginFrameEnvelopeHandler(
       frameWindow.postMessage(message, '*')
     }
     // Reserve liveness for schema-valid pongs so saturated data traffic or malformed near-pongs cannot silence the watchdog.
-    const pongId = readPanelPongId(data)
+    const pongId = readPanelPongId(event.data)
     if (pongId !== null) {
       const timestamp = now()
       // One size walk at the smaller lane cap serves both budgets; larger pongs are refused.
       const pongBytes = structuredCloneMessageBytes(
-        data,
+        event.data,
         controlBudget.maxBytes ?? PANEL_CONTROL_MESSAGE_MAX_BYTES
       )
       // Meter data traffic too, but data refusal alone must not silence liveness.
@@ -174,22 +131,17 @@ export function createPluginFrameEnvelopeHandler(
       }
       return
     }
-    if (options.editor?.claim(data)) {
+    if (options.editor?.claim(event.data)) {
       return
     }
     // Budget before schema parsing so malformed floods cannot consume unmetered validation CPU.
     const timestamp = now()
-    const lane = pluginFrameLaneFor(data, lanes, budget)
-    const walk = lane === lanes.render ? PLUGIN_FRAME_RENDER_WALK_LIMITS : undefined
-    const refusal = lane.admit(timestamp, structuredCloneMessageBytes(data, lane.maxBytes, walk))
+    const refusal = budget.admit(
+      timestamp,
+      structuredCloneMessageBytes(event.data, budget.maxBytes)
+    )
     if (refusal) {
-      if (lane === lanes.render) {
-        options.declarative?.onRefused?.(
-          data,
-          refusal === 'oversized' ? null : (lane.retryAfterMs?.(timestamp) ?? 0)
-        )
-      }
-      const id = pluginRequestId(data)
+      const id = pluginRequestId(event.data)
       if (id !== null) {
         post(
           pluginFailure(
@@ -208,16 +160,16 @@ export function createPluginFrameEnvelopeHandler(
                     'auto.components.rightSidebar.pluginPanelBridgeHost.tooManyRequests',
                     'Too many requests.'
                   ),
-                  lane.retryAfterMs?.(timestamp)
+                  budget.retryAfterMs?.(timestamp)
                 )
           )
         )
       }
       return
     }
-    const message = readPluginEnvelope(data)
+    const message = readPluginEnvelope(event.data)
     if (!message) {
-      const id = pluginRequestId(data)
+      const id = pluginRequestId(event.data)
       if (id !== null) {
         post(pluginFailure(id, pluginError('invalid_request', 'malformed request envelope')))
       }
@@ -226,26 +178,10 @@ export function createPluginFrameEnvelopeHandler(
     switch (message.kind) {
       case 'evt':
         if (message.event === FRAME_EVENTS.ready) {
-          post(
-            pluginEvent(FRAME_EVENTS.hello, pluginFrameHello(options.surface, context.transport))
-          )
+          post(pluginEvent(FRAME_EVENTS.hello, pluginFrameHello(options.surface)))
           options.editor?.onReady()
-        } else if (message.event === PLUGIN_DECLARATIVE_MESSAGES.render) {
-          options.declarative?.onRender(message.payload)
-        } else if (message.event === PLUGIN_DECLARATIVE_MESSAGES.error) {
-          options.declarative?.onError(message.payload)
-        } else if (options.declarative && message.event.startsWith('ui.')) {
-          options.declarative.onGuestEvent?.(message.event, message.payload)
         } else {
-          // A guest's shell-posted chords are page-forgeable; only the preload's count there.
-          // Why subscribed passes: it only tells `plugin shot` the editor is wired.
-          if (
-            message.event === FRAME_EVENTS.editorSubscribed ||
-            context.transport !== 'guest' ||
-            context.trustedChord === true
-          ) {
-            options.editor?.onEvent(message, context)
-          }
+          options.editor?.onEvent(message)
         }
         return
       case 'res':
@@ -255,15 +191,11 @@ export function createPluginFrameEnvelopeHandler(
         inFlight.delete(message.id)
         return
       case 'req':
-        relayHostCall(message, post, context)
+        relayHostCall(message, post)
     }
   }
 
-  function relayHostCall(
-    request: PluginRequest,
-    post: (message: PluginEnvelope) => void,
-    context: PluginFrameMessageContext
-  ): void {
+  function relayHostCall(request: PluginRequest, post: (message: PluginEnvelope) => void): void {
     const respond = (response: PluginResponse): void => {
       if (inFlight.delete(request.id)) {
         post(response)
@@ -271,21 +203,10 @@ export function createPluginFrameEnvelopeHandler(
     }
     const sessionToken = options.getSessionToken()
     inFlight.add(request.id)
-    // Why here: frame code can post raw envelopes, so the shell's own check is only a fast path.
-    if (!admitsGesture(request.method, context)) {
-      respond(
-        pluginFailure(
-          request.id,
-          pluginError('not_permitted', `${request.method} needs a click or key press in the frame`)
-        )
-      )
-      return
-    }
     if (!sessionToken) {
       respond(pluginFailure(request.id, pluginError('unavailable', 'plugin session is not ready')))
       return
     }
-    const settled = options.trackHostCall?.()
     callHostMethod({ sessionToken, action: request.method, params: request.params })
       .then((outcome) => respond(pluginOutcomeResponse(request.id, outcome)))
       .catch((error: unknown) =>
@@ -296,6 +217,5 @@ export function createPluginFrameEnvelopeHandler(
           )
         )
       )
-      .finally(() => settled?.())
   }
 }

@@ -1,4 +1,3 @@
-import type { RuntimeTerminalCreate } from '../../../../shared/runtime-terminal-create-contract'
 /** Terminal launches create agent-first worktrees; structured launches create the workspace without an agent and add chat afterwards.
  * The executor chooses; setup, default tabs, provenance and lineage use the normal create path. */
 
@@ -53,7 +52,6 @@ export function agentLaunchWorkspaceFactory(
       const startupLaunchPreferences =
         startupAgent && toAgentLaunchPreferences(options, startupAgent)
       let promptRodeLaunchCommand = false
-      let startupTerminalCreation: RuntimeTerminalCreate | undefined
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: already validated by `AgentLaunch`; the executor only removed the reserved agent fields, so the rest of the payload is the parsed shape.
       const params = create as WorktreeCreateParams
       const { runtime } = context
@@ -73,9 +71,6 @@ export function agentLaunchWorkspaceFactory(
       // Reserved before creation so a retry can recover; a failed attempt has to release it.
       try {
         const result = await runtime.createManagedWorktree({
-          onStartupTerminalCreated: (terminal) => {
-            startupTerminalCreation = terminal
-          },
           ...buildManagedWorktreeCreateArgs(
             {
               ...(agentLaunchMovesHostWindow(context) ? params : withoutHostActivation(params)),
@@ -128,7 +123,6 @@ export function agentLaunchWorkspaceFactory(
           workspacePath: result.worktree.path,
           connectionId: repo.connectionId ?? null,
           startupTerminalHandle: result.startupTerminal?.handle,
-          startupTerminalCreation,
           ...(promptRodeLaunchCommand ? { promptRodeLaunchCommand } : {}),
           ...(result.startupTerminal?.paneKey
             ? { startupTerminalPaneKey: result.startupTerminal.paneKey }

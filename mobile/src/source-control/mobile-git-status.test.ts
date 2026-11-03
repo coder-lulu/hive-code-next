@@ -14,16 +14,34 @@ import {
 } from './mobile-git-status'
 
 const entries: MobileGitStatusEntry[] = [
-  { path: 'b.ts', status: 'modified', area: 'staged' },
-  { path: 'a.ts', status: 'modified', area: 'unstaged' },
-  { path: 'new.ts', status: 'untracked', area: 'untracked' }
+  {
+    path: 'b.ts',
+    status: 'modified',
+    area: 'staged',
+    submodule: undefined,
+    submoduleRoot: undefined
+  },
+  {
+    path: 'a.ts',
+    status: 'modified',
+    area: 'unstaged',
+    submodule: undefined,
+    submoduleRoot: undefined
+  },
+  {
+    path: 'new.ts',
+    status: 'untracked',
+    area: 'untracked',
+    submodule: undefined,
+    submoduleRoot: undefined
+  }
 ]
 
 describe('mobile source control status helpers', () => {
   it('builds sections in the mobile source control order', () => {
     const sections = buildMobileSourceControlSections(entries, 'changes-first')
 
-    expect(sections.map((section) => section.title)).toEqual(['Uncommitted', 'Staged'])
+    expect(sections.map((section) => section.title)).toEqual(['Changes', 'Staged Changes'])
   })
 
   it('computes actionable path sets', () => {
@@ -35,17 +53,27 @@ describe('mobile source control status helpers', () => {
 
   it('keeps unresolved conflicts out of stage actions', () => {
     const conflictedEntries: MobileGitStatusEntry[] = [
-      { path: 'ready.ts', status: 'modified', area: 'unstaged' },
+      {
+        path: 'ready.ts',
+        status: 'modified',
+        area: 'unstaged',
+        submodule: undefined,
+        submoduleRoot: undefined
+      },
       {
         path: 'conflicted.ts',
         status: 'modified',
         area: 'unstaged',
+        submodule: undefined,
+        submoduleRoot: undefined,
         conflictStatus: 'unresolved'
       },
       {
         path: 'resolved.ts',
         status: 'modified',
         area: 'unstaged',
+        submodule: undefined,
+        submoduleRoot: undefined,
         conflictStatus: 'resolved_locally'
       }
     ]
@@ -58,16 +86,30 @@ describe('mobile source control status helpers', () => {
 
   it('allows opening deleted files so pre-delete text/image diffs can load', () => {
     expect(
-      canOpenMobileGitStatusEntry({ path: 'deleted.png', status: 'deleted', area: 'unstaged' })
+      canOpenMobileGitStatusEntry({
+        path: 'deleted.png',
+        status: 'deleted',
+        area: 'unstaged',
+        submodule: undefined,
+        submoduleRoot: undefined
+      })
     ).toBe(true)
     expect(
-      canOpenMobileGitStatusEntry({ path: 'logo.png', status: 'modified', area: 'unstaged' })
+      canOpenMobileGitStatusEntry({
+        path: 'logo.png',
+        status: 'modified',
+        area: 'unstaged',
+        submodule: undefined,
+        submoduleRoot: undefined
+      })
     ).toBe(true)
     expect(
       canOpenMobileGitStatusEntry({
         path: 'conflict.ts',
         status: 'modified',
         area: 'unstaged',
+        submodule: undefined,
+        submoduleRoot: undefined,
         conflictStatus: 'unresolved'
       })
     ).toBe(false)
@@ -76,6 +118,8 @@ describe('mobile source control status helpers', () => {
         path: 'resolved.ts',
         status: 'modified',
         area: 'unstaged',
+        submodule: undefined,
+        submoduleRoot: undefined,
         conflictStatus: 'resolved_locally'
       })
     ).toBe(true)
@@ -84,20 +128,36 @@ describe('mobile source control status helpers', () => {
   it('pins conflicts into their own section ahead of changes, like desktop', () => {
     const sections = buildMobileSourceControlSections(
       [
-        { path: 'zeta.ts', status: 'modified', area: 'unstaged' },
+        {
+          path: 'zeta.ts',
+          status: 'modified',
+          area: 'unstaged',
+          submodule: undefined,
+          submoduleRoot: undefined
+        },
         {
           path: 'beta.ts',
           status: 'modified',
           area: 'unstaged',
+          submodule: undefined,
+          submoduleRoot: undefined,
           conflictStatus: 'resolved_locally'
         },
         {
           path: 'alpha.ts',
           status: 'modified',
           area: 'unstaged',
+          submodule: undefined,
+          submoduleRoot: undefined,
           conflictStatus: 'unresolved'
         },
-        { path: 'aardvark.ts', status: 'added', area: 'unstaged' }
+        {
+          path: 'aardvark.ts',
+          status: 'added',
+          area: 'unstaged',
+          submodule: undefined,
+          submoduleRoot: undefined
+        }
       ],
       'changes-first'
     )
@@ -106,7 +166,7 @@ describe('mobile source control status helpers', () => {
       sections.map((section) => [section.title, section.data.map((entry) => entry.path)])
     ).toEqual([
       ['Conflicts', ['alpha.ts', 'beta.ts']],
-      ['Uncommitted', ['aardvark.ts', 'zeta.ts']]
+      ['Changes', ['aardvark.ts', 'zeta.ts']]
     ])
   })
 

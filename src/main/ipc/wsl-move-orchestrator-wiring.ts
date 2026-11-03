@@ -10,7 +10,7 @@ import {
   type WslMoveOrchestratorRecord,
   type WslMoveOrchestratorUserAction
 } from '../../shared/wsl-move/wsl-move-orchestrator-types'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import { listWslMoveCutoverChain } from '../persistence/moving-wsl-projects/wsl-move-cutover-journal'
 import {
   moveProjectsToWslHost,
@@ -36,8 +36,7 @@ import {
 } from '../telemetry/wsl-move-orchestrator-telemetry'
 import { runTrackedWslMove } from '../telemetry/wsl-move-telemetry'
 import { readWslDistroRegistrations } from '../wsl/wsl-distro-registry-id'
-import { wslHostsAcceptNewWork, wslHostsGateOpen, wslHostsOptedIn } from '../wsl/wsl-host-gate'
-import { wslHostAddRefusal } from '../wsl/wsl-host-add-admission'
+import { wslHostsGateOpen } from '../wsl/wsl-host-gate'
 import { runAsWslUserAct } from '../wsl/wsl-unc-access-gate'
 import { getWslHostService } from '../wsl/wsl-host-service-instance'
 import { onWslHostUserAction } from '../wsl/wsl-host-user-actions'
@@ -47,7 +46,6 @@ import { createWslMoveUndoPorts } from './wsl-move-undo-wiring'
 import { isDistroInUse } from './wsl-move-distro-in-use'
 import { answerWslMoveSleptPanes, requestSleptPanes } from './wsl-move-orchestrator-slept-panes'
 import { wslHostRemovalPending } from './wsl-move-host-connect'
-import { wslMoveAutoMovesBridgeProjects } from '../../shared/wsl-move/wsl-move-rollout-stage'
 
 export const WSL_MOVE_ORCHESTRATOR_AUTO_ENV = 'ORCA_WSL_MOVE_AUTO'
 
@@ -101,11 +99,7 @@ function prepareHost(
       removalPending: () => wslHostRemovalPending(userDataPath, distro),
       hasHost: () => service.recordForEnvironment(environmentId) !== null,
       connect: () => service.connect(environmentId),
-      // Re-checked here: a block learned after the step began must still stop the add.
-      add: () =>
-        wslHostsAcceptNewWork()
-          ? service.add({ distro, startIfStopped: false })
-          : Promise.resolve(wslHostAddRefusal('disabled', 'newWorkPaused'))
+      add: () => service.add({ distro, startIfStopped: false })
     },
     distro,
     stillWanted
@@ -127,10 +121,7 @@ function createOrchestrator(
   return new WslMoveOrchestrator({
     now: () => Date.now(),
     appVersion: app.getVersion(),
-    // A block learned this run, or the setting turned off, stops automatic moves at once.
-    autoMoveEnabled: () =>
-      process.env[WSL_MOVE_ORCHESTRATOR_AUTO_ENV] !== '0' && wslHostsOptedIn(store.getSettings()),
-    autoMovesBridgeProjects: wslMoveAutoMovesBridgeProjects,
+    autoMoveEnabled: () => process.env[WSL_MOVE_ORCHESTRATOR_AUTO_ENV] !== '0',
     prepareHost: (distro, stillWanted) => prepareHost(userDataPath, distro, stillWanted),
     isDistroInUse: (distro) => isDistroInUse(store, userDataPath, distro),
     hostRemovalPending: (distro) => wslHostRemovalPending(userDataPath, distro),
@@ -214,7 +205,6 @@ export function registerWslMoveOrchestrator(
   }
   const isMainWindow = (sender: WebContents | undefined): boolean =>
     !!sender && getTrustedUIRendererWebContents()?.id === sender.id
-  // Not setting-gated: a move already in flight when the setting turns off stays visible.
   ipcMain.handle('wslMoveOrchestrator:list', (): WslMoveOrchestratorRecord[] =>
     orchestrator && wslHostsGateOpen() ? orchestrator.list() : []
   )
@@ -224,7 +214,7 @@ export function registerWslMoveOrchestrator(
     (event: { sender?: WebContents }, distro: unknown): void => {
       if (
         orchestrator &&
-        wslHostsOptedIn(store.getSettings()) &&
+        wslHostsGateOpen() &&
         isMainWindow(event.sender) &&
         typeof distro === 'string'
       ) {
@@ -248,8 +238,7 @@ export function registerWslMoveOrchestrator(
         return null
       }
       const action = USER_ACTIONS.find((candidate) => candidate === request.action)
-      // Retry starts a move; Restore and Not now stay available after a block or with the setting off.
-      if (!action || (action === 'retry' && !wslHostsOptedIn(store.getSettings()))) {
+      if (!action) {
         return null
       }
       const unsaved =

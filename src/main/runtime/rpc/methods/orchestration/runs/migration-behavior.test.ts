@@ -194,8 +194,7 @@ describe('orchestration migration behavior', () => {
         },
         runtime,
         db,
-        bindRunId: () => run.id,
-        taskDeps: undefined,
+        runId: run.id,
         task,
         orchestrationMutation: {
           callerFingerprint: 'caller',
@@ -242,8 +241,7 @@ describe('orchestration migration behavior', () => {
         },
         runtime,
         db,
-        bindRunId: () => run.id,
-        taskDeps: undefined,
+        runId: run.id,
         task,
         orchestrationMutation: {
           callerFingerprint: 'caller',
@@ -318,8 +316,7 @@ describe('orchestration migration behavior', () => {
       },
       runtime,
       db,
-      bindRunId: () => run.id,
-      taskDeps: undefined,
+      runId: run.id,
       task,
       orchestrationMutation: {
         callerFingerprint: 'caller',

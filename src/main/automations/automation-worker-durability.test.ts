@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { AutomationService } from './service'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import {
   createWorkerMaintenanceFixture,
   maintenanceBarrier

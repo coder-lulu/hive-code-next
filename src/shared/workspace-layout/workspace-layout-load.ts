@@ -12,8 +12,11 @@ import {
   type LayoutContentFacts
 } from './workspace-layout-beside'
 import { omitStoredFields, pickStoredFields } from './stored-record-fields'
-import { loadLeaves, unbindDuplicateTerminals } from './workspace-layout-load-bindings'
-import { retireLoadedLegacySurfaces } from './workspace-layout-load-retirement'
+import {
+  applyLegacySurfaceTombstones,
+  loadLeaves,
+  unbindDuplicateTerminals
+} from './workspace-layout-load-bindings'
 import { diffStoredSession } from './workspace-layout-load-report'
 import type {
   LoadedWorkspaceLayout,
@@ -22,7 +25,6 @@ import type {
 } from './workspace-layout-load-types'
 import { saveWorkspaceLayout } from './workspace-layout-save'
 import { loadWorkspace } from './workspace-layout-load-workspace'
-import { createRecordedLeafReader } from './workspace-layout-recorded-key-order'
 import type {
   LegacyLayoutPersistence,
   WorkspaceLayout,
@@ -46,35 +48,10 @@ function workspaceKeys(session: WorkspaceSessionState): string[] {
 /** Keep a terminal row in the workspace whose tab bar/group names it, falling back to its first occurrence. */
 function resolveTerminalHomes(session: WorkspaceSessionState): Map<string, string> {
   const homes = new Map<string, string>()
-  function* names(key: string): Generator<string> {
-    for (const entry of session.unifiedTabs?.[key] ?? []) {
-      if (entry.contentType === 'terminal') {
-        yield entry.entityId
-      }
-    }
-    for (const group of session.tabGroups?.[key] ?? []) {
-      yield* group.tabOrder
-    }
-  }
-  const naming = new Map<string, { seen: Set<string>; remaining: Generator<string> }>()
-  const namedByTabBar = (key: string, tabId: string): boolean => {
-    let index = naming.get(key)
-    if (!index) {
-      index = { seen: new Set(), remaining: names(key) }
-      naming.set(key, index)
-    }
-    if (index.seen.has(tabId)) {
-      return true
-    }
-    // Stop at the original first match; later groups need not even be read.
-    for (let next = index.remaining.next(); !next.done; next = index.remaining.next()) {
-      index.seen.add(next.value)
-      if (next.value === tabId) {
-        return true
-      }
-    }
-    return false
-  }
+  const namedByTabBar = (key: string, tabId: string): boolean =>
+    (session.unifiedTabs?.[key] ?? []).some(
+      (entry) => entry.contentType === 'terminal' && entry.entityId === tabId
+    ) || (session.tabGroups?.[key] ?? []).some((group) => group.tabOrder.includes(tabId))
   for (const [key, rows] of Object.entries(session.tabsByWorktree ?? {})) {
     for (const row of rows) {
       const home = homes.get(row.id)
@@ -127,13 +104,7 @@ function placeClosedTabs(
       carried.unplacedClosedTabs[tabId] = record
     } else {
       const entry = omitStoredFields(record, ['worktreeId'])
-      workspace.closedTerminalTabs ??= {}
-      Object.defineProperty(workspace.closedTerminalTabs, tabId, {
-        value: entry,
-        enumerable: true,
-        configurable: true,
-        writable: true
-      })
+      workspace.closedTerminalTabs = { ...workspace.closedTerminalTabs, [tabId]: entry }
     }
   }
 }
@@ -200,23 +171,19 @@ export function loadWorkspaceLayoutWithoutReport(
   }
   const terminalHomes = resolveTerminalHomes(session)
   const layouts = new Map<string, TerminalLayoutSnapshot>()
-  const recordedLeafId = createRecordedLeafReader(session)
   const canonicalTabIdBySubsumedTabId = new Map<string, string>()
   for (const key of workspaceKeys(session)) {
-    layout.workspaces[key] = loadWorkspace(
-      {
-        session,
-        hostId,
-        key,
-        terminalHomes,
-        context,
-        view: desktopView,
-        facts,
-        layouts,
-        canonicalTabIdBySubsumedTabId
-      },
-      recordedLeafId
-    )
+    layout.workspaces[key] = loadWorkspace({
+      session,
+      hostId,
+      key,
+      terminalHomes,
+      context,
+      view: desktopView,
+      facts,
+      layouts,
+      canonicalTabIdBySubsumedTabId
+    })
   }
   followSubsumedTabSelections(desktopView, canonicalTabIdBySubsumedTabId)
   const carried: CarriedSessionFields = {
@@ -233,6 +200,6 @@ export function loadWorkspaceLayoutWithoutReport(
   placeClosedTabs(session, layout, carried)
   loadLeaves(layout, { session, layouts }, { view: desktopView, facts, carried }, context)
   unbindDuplicateTerminals(layout)
-  layout = retireLoadedLegacySurfaces(layout, session, carried)
+  layout = applyLegacySurfaceTombstones(layout, session, carried)
   return { layout, desktopView, facts, carried }
 }

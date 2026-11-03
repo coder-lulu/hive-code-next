@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { PluginPanelSessions } from './plugin-panel-sessions'
 
 const binding = {
@@ -15,9 +15,7 @@ describe('PluginPanelSessions', () => {
     const token = sessions.issue('renderer:1', binding)
 
     expect(token).toHaveLength(43)
-    const resolved = sessions.resolve('renderer:1', token)
-    expect(resolved).toEqual({ ...binding, publicId: expect.stringMatching(/^[\w-]{12}$/) })
-    expect(resolved?.publicId).not.toContain(token.slice(0, 12))
+    expect(sessions.resolve('renderer:1', token)).toEqual(binding)
     expect(sessions.resolve('renderer:2', token)).toBeNull()
     expect(sessions.issue('renderer:1', binding)).toBe(token)
     expect(sessions.issue('renderer:1', { ...binding, rootDir: '/plugins/new' })).not.toBe(token)
@@ -38,18 +36,6 @@ describe('PluginPanelSessions', () => {
 
     expect(sessions.resolve('connection:one', first)).toBeNull()
     expect(sessions.resolve('connection:one', second)).toBeNull()
-    expect(sessions.resolve('connection:two', other)).toMatchObject(binding)
-  })
-
-  it('reports each closed session by its public id, never the token', () => {
-    const onClosed = vi.fn()
-    const sessions = new PluginPanelSessions(onClosed)
-    const token = sessions.issue('renderer:1', binding)
-    const { publicId } = sessions.resolve('renderer:1', token)!
-    sessions.revoke('renderer:1', token)
-    expect(onClosed).toHaveBeenCalledWith(publicId)
-    sessions.issue('renderer:1', binding)
-    sessions.clear()
-    expect(onClosed).toHaveBeenCalledTimes(2)
+    expect(sessions.resolve('connection:two', other)).toEqual(binding)
   })
 })

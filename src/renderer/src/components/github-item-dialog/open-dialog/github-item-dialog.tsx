@@ -1,6 +1,4 @@
-import { getTaskSourceCacheScope } from '../../../../../shared/task-source-context'
-import { GitHubWorkItemTargetContext } from '../load-item-details/github-work-item-target-context'
-import React, { useCallback, useEffect, useEffectEvent, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { useAllWorktrees } from '@/store/selectors'
 import { useAppStore } from '@/store'
@@ -15,23 +13,10 @@ import { GitHubItemDialogIssueHeader } from './github-item-dialog-issue-header'
 import { GitHubItemDialogPRHeader } from './github-item-dialog-pr-header'
 import { GitHubItemDialogPRTabs } from './github-item-dialog-pr-tabs'
 import { GHEditSection } from '../edit-item-fields/gh-edit-section'
-import { useGitHubWorkItemDetails } from '../load-item-details/use-github-work-item-details'
+import { useGitHubItemDialogDetails } from '../load-item-details/use-github-item-dialog-details'
 import { useGitHubItemDialogLinkCopy } from './use-github-item-dialog-link-copy'
 
-export default function GitHubItemDialog(props: GitHubItemDialogProps): React.JSX.Element {
-  const { workItem, sourceContext } = props
-  const key = [
-    props.repoId ?? workItem?.repoId,
-    props.repoPath,
-    workItem?.url,
-    workItem?.type,
-    workItem?.number,
-    sourceContext ? getTaskSourceCacheScope(sourceContext) : ''
-  ].join('\0')
-  return <GitHubItemDialogItem key={key} {...props} />
-}
-
-function GitHubItemDialogItem({
+export default function GitHubItemDialog({
   workItem,
   repoPath,
   repoId,
@@ -95,13 +80,6 @@ function GitHubItemDialogItem({
   )
 
   const {
-    targetContext,
-    refreshTask,
-    refreshing,
-    acceptedRefresh,
-    canRefreshTask,
-    refreshUnsupported,
-    showRefreshTask,
     tab,
     setTab,
     canUseDetailsRepoContext,
@@ -111,20 +89,18 @@ function GitHubItemDialogItem({
     error,
     detailsLoaded,
     displayWorkItem,
-    addressedWorkItem,
     appendOptimisticComment,
     invalidateCurrentDetailsCache,
     handlePRFileViewedChange,
     pendingViewedPaths,
     isIssuePage
-  } = useGitHubWorkItemDetails({
+  } = useGitHubItemDialogDetails({
     workItem,
     repoPath,
     effectiveRepoId,
     sourceContext,
     initialTab,
     projectOrigin,
-    onRefreshAccepted: (item: GitHubWorkItem) => setLocalLabels(item.labels),
     onReviewRequestsChange
   })
   const { linkCopied, setLinkCopyButtonRef, handleCopyWorkItemLink } =
@@ -136,16 +112,10 @@ function GitHubItemDialogItem({
     if (resolvedWorkItemState) {
       setLocalState(resolvedWorkItemState)
     }
-  }, [workItemId, resolvedWorkItemState])
-  // Chips follow the displayed item (its pending edits included), and only when its labels change.
-  const displayedLabels = displayWorkItem?.labels ?? workItemLabels
-  const syncLabels = useEffectEvent(() => {
-    if (displayedLabels) {
-      setLocalLabels(displayedLabels)
+    if (workItemLabels) {
+      setLocalLabels(workItemLabels)
     }
-  })
-  const displayedLabelsKey = displayedLabels?.join('\0')
-  useEffect(() => syncLabels(), [workItemId, displayedLabelsKey])
+  }, [workItemId, resolvedWorkItemState, workItemLabels])
 
   // Why: a just-closed Radix overlay can leave `pointer-events: none` on <body>, killing header button clicks; poll a few frames to clear it.
   useEffect(() => {
@@ -180,11 +150,7 @@ function GitHubItemDialogItem({
     <div className="flex h-full min-h-0 flex-col">
       {isIssuePage ? (
         <GitHubItemDialogIssueHeader
-          workItem={addressedWorkItem ?? workItem}
-          refreshTask={showRefreshTask ? refreshTask : undefined}
-          refreshing={refreshing}
-          canRefreshTask={canRefreshTask}
-          refreshUnsupported={refreshUnsupported}
+          workItem={workItem}
           backLabel={backLabel}
           onClose={onClose}
           linkCopied={linkCopied}
@@ -214,7 +180,7 @@ function GitHubItemDialogItem({
         />
       )}
 
-      {!error && !isIssuePage && (canUseDetailsRepoContext || projectOrigin) && (
+      {!isIssuePage && (canUseDetailsRepoContext || projectOrigin) && (
         <GHEditSection
           item={workItem}
           repoPath={repoPath}
@@ -238,8 +204,7 @@ function GitHubItemDialogItem({
           <div className="px-4 py-6 text-[12px] text-destructive">{error}</div>
         ) : isIssuePage ? (
           <GitHubItemDialogIssueBody
-            workItem={addressedWorkItem ?? workItem}
-            acceptedRefresh={acceptedRefresh}
+            workItem={workItem}
             displayWorkItem={displayWorkItem}
             repoPath={repoPath}
             effectiveRepoId={effectiveRepoId}
@@ -263,7 +228,7 @@ function GitHubItemDialogItem({
           />
         ) : (
           <GitHubItemDialogPRTabs
-            workItem={displayWorkItem ?? workItem}
+            workItem={workItem}
             displayWorkItem={displayWorkItem}
             repoPath={repoPath}
             effectiveRepoId={effectiveRepoId}
@@ -293,9 +258,7 @@ function GitHubItemDialogItem({
       data-testid="github-item-detail"
       className="flex h-full min-h-0 flex-col overflow-hidden rounded-md border border-border/50 bg-background shadow-sm"
     >
-      <GitHubWorkItemTargetContext.Provider value={targetContext}>
-        {content}
-      </GitHubWorkItemTargetContext.Provider>
+      {content}
     </div>
   )
 }

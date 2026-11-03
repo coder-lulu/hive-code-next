@@ -1,7 +1,7 @@
 import {
   agentSessionLeaseFixture,
   agentSessionRecordFixture
-} from '../../../../../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
+} from '../../../../../../shared/agent-session-record.test-fixture'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../../../orchestration/preamble', () => ({
@@ -18,7 +18,6 @@ const { deliverAndSettleWorkerStartReadiness } = await import('./worker-start-re
 function settle(delivered: 'accepted' | undefined) {
   const db = {
     getWorkerDispatch: () => ({ state: 'starting' }),
-    getLatestUnreadMessageSequence: () => undefined,
     markWorkerStartUnknown: vi.fn(() => ({
       stage: 'turn_start_unobserved',
       residual_resources: '[]'
@@ -48,6 +47,7 @@ function settle(delivered: 'accepted' | undefined) {
   const args = {
     runtime: {
       getNestedWorkerMaxDepth: () => 3,
+      getOrchestrationHeartbeatMinutes: () => 5,
       getTerminalOrchestrationCliCommand: () => 'orca'
     },
     db,
@@ -96,6 +96,13 @@ describe('a structured worker whose agent outlasts the preamble wait', () => {
     )
     expect(db.markWorkerDispatchReady).not.toHaveBeenCalled()
   })
+
+  it('is ready once the agent took the preamble within the wait', async () => {
+    const { db, receipt } = settle('accepted')
+
+    await expect(receipt).resolves.toMatchObject({ state: 'ready', turnStart: 'observed' })
+    expect(db.markWorkerStartUnknown).not.toHaveBeenCalled()
+  })
 })
 
 describe('a terminal worker whose preamble delivery waited out a held paste', () => {
@@ -117,6 +124,7 @@ describe('a terminal worker whose preamble delivery waited out a held paste', ()
       }))
       const runtime = {
         getNestedWorkerMaxDepth: () => 3,
+        getOrchestrationHeartbeatMinutes: () => 5,
         getTerminalOrchestrationCliCommand: () => 'orca',
         // A Windows Codex rescue held the writer for 40 s of the 50 s grace.
         sendTerminalAgentPrompt: async () => {
@@ -128,7 +136,6 @@ describe('a terminal worker whose preamble delivery waited out a held paste', ()
       }
       const db = {
         getWorkerDispatch: () => ({ state: 'starting' }),
-        getLatestUnreadMessageSequence: () => undefined,
         markWorkerDispatchReady: vi.fn(() => ({ state: 'ready', stage: 'ready' }))
       }
       const args = {

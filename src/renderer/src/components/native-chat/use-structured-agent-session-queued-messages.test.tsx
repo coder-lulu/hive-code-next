@@ -8,8 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   AgentSessionQueuedMessage,
   AgentSessionQueuedMessageDeleteResult
-} from '../../../../shared/agent-session/requests/agent-session-queued-message-wire'
-import type { AgentJournalSubmission } from '../../../../shared/agent-session/journal/agent-session-journal-types'
+} from '../../../../shared/agent-session-wire'
 import type { StructuredAgentSessionPendingSend } from './structured-agent-session-pending-sends'
 
 const rpc = vi.hoisted(() => vi.fn())
@@ -48,13 +47,8 @@ function createHarness(
     composerScopeKey?: string | undefined
     mutateResult?: (call: MutateCall) => unknown
     sending?: StructuredAgentSessionPendingSend[]
-    isWorking?: boolean
-    editCapable?: boolean
-    reorderCapable?: boolean
   } = {}
 ) {
-  const queuedMessages = overrides.queuedMessages ?? [draft('draft-1', 1), draft('draft-2', 2)]
-  const submissions: AgentJournalSubmission[] = []
   const mutateCalls: MutateCall[] = []
   const mutate = vi.fn(async (...call: MutateCall) => {
     mutateCalls.push(call)
@@ -72,11 +66,11 @@ function createHarness(
       capturePresentation: mutation.result.current.capturePresentation,
       admit: mutation.result.current.admit,
       enabled: overrides.enabled ?? true,
-      queuedMessages,
+      queuedMessages: overrides.queuedMessages ?? [draft('draft-1', 1), draft('draft-2', 2)],
       queuePause: null,
-      submissions,
+      submissions: [],
       hasPendingPrompt: false,
-      isWorking: overrides.isWorking ?? (overrides.sending?.length ?? 0) > 0,
+      isWorking: (overrides.sending?.length ?? 0) > 0,
       sending: overrides.sending,
       composerScopeKey: 'composerScopeKey' in overrides ? overrides.composerScopeKey : SCOPE,
       // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: each scripted answer is the result shape of the one mutate it responds to; generic erasure cannot express that.
@@ -84,8 +78,7 @@ function createHarness(
       editTransport: {
         target: { kind: 'local' },
         sessionId: 'session',
-        capable: overrides.editCapable ?? false,
-        reorderCapable: overrides.reorderCapable ?? false,
+        capable: false,
         write: mutation.result.current.write
       }
     })
@@ -191,100 +184,21 @@ describe('queued message actions', () => {
     )
   })
 
-  it('Cmd/Ctrl+Shift+Enter steers the head card and reports when there is none', async () => {
+  it('Cmd/Ctrl+Enter steers the newest card and reports when there is none', async () => {
     const harness = createHarness()
-    expect(harness.result.current.steerHead()).toBe(true)
+    expect(harness.result.current.steerNewest()).toBe(true)
     await waitFor(() =>
-      expect(harness.mutate).toHaveBeenCalledWith(
-        'agentSession.queuedMessageSend',
-        'agentSession.queuedMessageSend',
-        { messageId: 'draft-1' }
-      )
-    )
-    const empty = createHarness({ queuedMessages: [] })
-    expect(empty.result.current.steerHead()).toBe(false)
-    const disabled = createHarness({ enabled: false })
-    expect(disabled.result.current.steerHead()).toBe(false)
-  })
-
-  it.each(['pending', 'accepted'])(
-    'steers the displayed head during a %s reorder preview before publication',
-    async (phase) => {
-      const answer = Promise.withResolvers<unknown>()
-      rpc.mockReturnValue(answer.promise)
-      const harness = createHarness({ isWorking: true, reorderCapable: true })
-      let moved: Promise<void> | undefined
-      act(() => {
-        moved = harness.result.current.reorder?.move('draft-2', { beforeMessageId: 'draft-1' })
-      })
-      expect(harness.result.current.cards.map((card) => card.messageId)).toEqual([
-        'draft-2',
-        'draft-1'
-      ])
-      if (phase === 'accepted') {
-        await act(async () => {
-          answer.resolve({ ok: true, value: { messageId: 'draft-2', status: 'moved' } })
-          await moved
-        })
-      }
-      await act(async () => {
-        expect(harness.result.current.steerHead()).toBe(true)
-      })
-      answer.resolve({ ok: true, value: { messageId: 'draft-2', status: 'moved' } })
-      await act(async () => {
-        await moved
-      })
       expect(harness.mutate).toHaveBeenCalledWith(
         'agentSession.queuedMessageSend',
         'agentSession.queuedMessageSend',
         { messageId: 'draft-2' }
       )
-    }
-  )
-
-  it.each(['draft-1', 'draft-2'])(
-    'preserves the inline edit of %s and only blocks steering that card',
-    async (messageId) => {
-      rpc.mockResolvedValue({
-        ok: true,
-        value: {
-          status: 'held',
-          fingerprint: 'f'.repeat(64),
-          leaseDurationMs: 120_000,
-          remainingMs: 120_000
-        }
-      })
-      const harness = createHarness({ isWorking: true, editCapable: true })
-      await act(() => harness.result.current.edit(messageId))
-      expect(harness.result.current.editor?.messageId).toBe(messageId)
-      act(() => harness.result.current.editor?.change('unsaved revised text'))
-      let steered = true
-      await act(async () => {
-        steered = harness.result.current.steerHead()
-      })
-      const editedText = harness.result.current.editor?.text
-      act(() => harness.result.current.editor?.cancel())
-      expect(editedText).toBe('unsaved revised text')
-      expect(steered).toBe(messageId !== 'draft-1')
-      if (messageId === 'draft-1') {
-        expect(harness.mutate).not.toHaveBeenCalled()
-      } else {
-        expect(harness.mutate).toHaveBeenCalledWith(
-          'agentSession.queuedMessageSend',
-          'agentSession.queuedMessageSend',
-          { messageId: 'draft-1' }
-        )
-      }
-      if (messageId === 'draft-1') {
-        await act(async () => expect(harness.result.current.steerHead()).toBe(true))
-        expect(harness.mutate).toHaveBeenCalledWith(
-          'agentSession.queuedMessageSend',
-          'agentSession.queuedMessageSend',
-          { messageId: 'draft-1' }
-        )
-      }
-    }
-  )
+    )
+    const empty = createHarness({ queuedMessages: [] })
+    expect(empty.result.current.steerNewest()).toBe(false)
+    const disabled = createHarness({ enabled: false })
+    expect(disabled.result.current.steerNewest()).toBe(false)
+  })
 
   it.each(['current', 'obsolete'])('Delete already sent: %s', async (presentation) => {
     const answer = Promise.withResolvers<AgentSessionQueuedMessageDeleteResult>()

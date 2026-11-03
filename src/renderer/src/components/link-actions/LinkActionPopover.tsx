@@ -15,7 +15,7 @@ type LinkActionPopoverProps<TRequest extends LinkActionRequest> = {
   request: TRequest | null
   onClose: (dismissed?: TRequest) => void
   onPointerDownOutside?: (event: Event) => void
-  onOpenSettings?: (() => void) | null
+  onOpenSettings?: () => void
 }
 
 function ActionRow({
@@ -203,24 +203,22 @@ export function LinkActionPopover<TRequest extends LinkActionRequest>({
                 </TooltipContent>
               </Tooltip>
             ) : null}
-            {onOpenSettings !== null ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    aria-label={settingsLabel}
-                    className="text-muted-foreground"
-                    size="icon-xs"
-                    variant="ghost"
-                    onClick={openTerminalLinkSettings}
-                  >
-                    <Settings />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top" sideOffset={4}>
-                  {settingsLabel}
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  aria-label={settingsLabel}
+                  className="text-muted-foreground"
+                  size="icon-xs"
+                  variant="ghost"
+                  onClick={openTerminalLinkSettings}
+                >
+                  <Settings />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={4}>
+                {settingsLabel}
+              </TooltipContent>
+            </Tooltip>
           </div>
           <ActionRow
             action={request.primary}

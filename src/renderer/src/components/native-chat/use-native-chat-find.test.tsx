@@ -37,7 +37,6 @@ function composerHandle(): Composer {
       handle.element.focus()
       return true
     }),
-    insertAgentReferences: () => false,
     insertTypedText: vi.fn(() => true),
     appendText: vi.fn(),
     acceptsText: () => true,

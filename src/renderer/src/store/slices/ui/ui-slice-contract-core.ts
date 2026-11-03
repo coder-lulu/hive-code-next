@@ -21,7 +21,6 @@ import type {
 } from '../../../../../shared/session-list-scope'
 
 export type PendingSidebarWorktreeReveal = {
-  rowKey?: string
   worktreeId: string
   executionHostId?: ExecutionHostId
   behavior: 'auto' | 'smooth'
@@ -254,7 +253,6 @@ export type UISliceCore = {
   revealWorktreeInSidebar: (
     worktreeId: string,
     options?: {
-      rowKey?: string
       behavior?: PendingSidebarWorktreeReveal['behavior']
       highlight?: boolean
       beginRename?: boolean

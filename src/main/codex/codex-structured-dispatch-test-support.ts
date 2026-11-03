@@ -1,8 +1,10 @@
 import { acquireReadyCodexForTest } from './codex-structured-session-adapter-fixture'
 import { expect, vi } from 'vitest'
 import type { AgentChatPermissionChoice } from '../../shared/agent-chat-permission-mode'
-import type { AgentJournalMessageItem } from '../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentSessionJournalIdentity } from '../../shared/agent-session/journal/agent-session-journal-identity'
+import type {
+  AgentJournalMessageItem,
+  AgentSessionJournalIdentity
+} from '../../shared/agent-session-journal-types'
 import type {
   CodexAppServerConnection,
   CodexAppServerConnectionHandlers
@@ -10,13 +12,13 @@ import type {
 import type {
   CodexAppServerLaunch,
   openCodexAppServerConnection
-} from './app-server/codex-app-server-connection'
-import { CodexAppServerUnsupportedError } from './app-server/codex-app-server-session'
+} from './codex-app-server-connection'
+import { CodexAppServerUnsupportedError } from './codex-app-server-session'
 import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
 import { CodexStructuredSessionAdapter } from './codex-structured-session-adapter'
 import { codexTurnLifecycleFake } from './codex-turn-lifecycle-fake'
 import type { CodexStructuredSessionAdapterDeps } from './codex-structured-session-state'
-import { codexProviderHandle } from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 
 export const CODEX_TEST_THREAD_ID = 'thread-abc'
 
@@ -58,14 +60,10 @@ export function fakeCodexAppServer(routes: Record<string, CodexTestRoute> = {}):
       calls: [],
       pid: 4321,
       closed: false,
-      request: async (method, params, options) => {
+      request: async (method, params) => {
         connection.calls.push({ method, params })
         const route = routes[method] ?? (method === 'turn/steer' ? refuseUnroutedSteer : undefined)
-        const routed = route?.(params) ?? {}
-        const result = routed instanceof Promise ? await routed : routed
-        // The real dispatcher runs onReply at receipt, before the caller's continuation.
-        options?.onReply?.(result)
-        return result
+        return route?.(params) ?? {}
       },
       notify: () => {},
       respond: () => {},

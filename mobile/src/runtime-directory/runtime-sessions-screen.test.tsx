@@ -1,3 +1,4 @@
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -98,7 +99,9 @@ async function renderScreen(): Promise<ReactTestRenderer> {
 }
 
 function row(renderer: ReactTestRenderer, label: string) {
-  return renderer.root.findAllByType('FutureFeatureRow').find((item) => item.props.label === label)
+  return findAllByHostType(renderer.root, 'FutureFeatureRow').find(
+    (item) => item.props.label === label
+  )
 }
 
 describe('Runtime sessions account isolation', () => {
@@ -140,9 +143,9 @@ describe('Runtime sessions account isolation', () => {
     renderer = await renderScreen()
     expect(row(renderer, '手机 · Other')).toBeUndefined()
     expect(row(renderer, 'Runtime 会话')?.props.value).toBe('本页暂无此运行环境的会话')
-    const next = renderer.root
-      .findAllByType('FutureFeatureAction')
-      .find((action) => action.props.label === '下一页')!
+    const next = findAllByHostType(renderer.root, 'FutureFeatureAction').find(
+      (action) => action.props.label === '下一页'
+    )!
     expect(next.props.disabled).toBe(false)
   })
 
@@ -252,9 +255,9 @@ describe('Runtime sessions account isolation', () => {
     renderer = await renderScreen()
     expect(dependencies.listSessions).toHaveBeenCalledExactlyOnceWith(null)
     const action = (label: string) =>
-      renderer!.root
-        .findAllByType('FutureFeatureAction')
-        .find((item) => item.props.label === label)!
+      findAllByHostType(renderer!.root, 'FutureFeatureAction').find(
+        (item) => item.props.label === label
+      )!
     expect(action('上一页').props.disabled).toBe(true)
     await act(async () => action('下一页').props.onPress())
     expect(dependencies.listSessions).toHaveBeenLastCalledWith('second')

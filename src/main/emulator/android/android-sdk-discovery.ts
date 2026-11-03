@@ -1,11 +1,10 @@
 import { join } from 'node:path'
 
 export type AndroidSdkPaths = {
-  /** Null when only a standalone adb (e.g. distro android-tools) was found. */
-  sdkRoot: string | null
+  sdkRoot: string
   adb: string
-  /** Null without the SDK emulator package: physical devices work, AVDs are unavailable. */
-  emulator: string | null
+  emulator: string
+  avdmanager: string
 }
 
 export type DiscoverAndroidSdkOptions = {
@@ -13,26 +12,21 @@ export type DiscoverAndroidSdkOptions = {
   platform: NodeJS.Platform
   homedir: string
   exists: (path: string) => boolean
-  findAdbOnPath: () => string | null
 }
 
 export function discoverAndroidSdk(options: DiscoverAndroidSdkOptions): AndroidSdkPaths | null {
   const { env, platform, homedir, exists } = options
   const win32 = platform === 'win32'
 
-  const rootsWithAdb = candidateSdkRoots(env, platform, homedir)
-    .map((sdkRoot) => resolveToolPaths(sdkRoot, win32))
-    .filter((paths) => exists(paths.adb))
-  // Prefer a full SDK so AVDs stay available when an adb-only root comes first.
-  const full = rootsWithAdb.find((paths) => paths.emulator && exists(paths.emulator))
-  if (full) {
-    return full
+  for (const sdkRoot of candidateSdkRoots(env, platform, homedir)) {
+    const paths = resolveToolPaths(sdkRoot, win32)
+    // Both adb and the emulator binary are required for backend operations.
+    if (exists(paths.adb) && exists(paths.emulator)) {
+      return paths
+    }
   }
-  if (rootsWithAdb[0]) {
-    return { ...rootsWithAdb[0], emulator: null }
-  }
-  const adb = options.findAdbOnPath()
-  return adb ? { sdkRoot: null, adb, emulator: null } : null
+
+  return null
 }
 
 function candidateSdkRoots(
@@ -70,6 +64,13 @@ function resolveToolPaths(sdkRoot: string, win32: boolean): AndroidSdkPaths {
   return {
     sdkRoot,
     adb: join(sdkRoot, 'platform-tools', win32 ? 'adb.exe' : 'adb'),
-    emulator: join(sdkRoot, 'emulator', win32 ? 'emulator.exe' : 'emulator')
+    emulator: join(sdkRoot, 'emulator', win32 ? 'emulator.exe' : 'emulator'),
+    avdmanager: join(
+      sdkRoot,
+      'cmdline-tools',
+      'latest',
+      'bin',
+      win32 ? 'avdmanager.bat' : 'avdmanager'
+    )
   }
 }

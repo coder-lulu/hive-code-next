@@ -113,8 +113,7 @@ beforeEach(() => {
   clearWorktreeAgentExpansionStateForTests()
   seedWorktreeAgentExpansionStateForTests(WORKSPACE, {
     compactRootListExpanded: true,
-    expandedLineageParents: new Set(),
-    expandedIdleChildGroups: new Set()
+    collapsedLineageParents: new Set()
   })
 })
 

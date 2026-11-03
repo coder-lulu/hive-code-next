@@ -1,3 +1,4 @@
+import { applyProductCliBranding } from '@/product-brand'
 import { i18n, translate } from '@/i18n/i18n'
 
 export type SearchKeywordSpec = {
@@ -15,6 +16,7 @@ export function translateSearchKeyword(
   fallback: string,
   options?: Omit<SearchKeywordSpec, 'key' | 'fallback'>
 ): string[] {
+  fallback = applyProductCliBranding(fallback)
   if (options?.englishOnly || i18n.language === 'en') {
     return uniqueKeywords([fallback, ...(options?.aliases ?? [])])
   }

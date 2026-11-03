@@ -24,7 +24,7 @@ export function forwardMigrationDialState(args: {
 }): MigrationDialStateForwarder {
   let started = false
   let stopped = false
-  const forward = (next: ConnectionState): void => {
+  const unsubscribe = args.session.onStateChange((next) => {
     if (stopped || !DIAL_PHASES.includes(next)) {
       return
     }
@@ -34,10 +34,7 @@ export function forwardMigrationDialState(args: {
     }
     started = true
     args.publish(next)
-  }
-  const unsubscribe = args.session.onStateChange(forward)
-  // Why: a relay session starts in connecting without publishing it; idle would read Disconnected until the hello.
-  forward(args.session.getState())
+  })
   return {
     forwarded: () => started,
     stop: () => {

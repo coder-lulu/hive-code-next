@@ -79,7 +79,9 @@ describe('#8591 per-host delivery ordering', () => {
       return 'sched-1'
     })
 
-    let onData: ((data: unknown) => void) | null = null
+    let onData: (data: unknown) => void = () => {
+      throw new Error('Notification stream has not subscribed')
+    }
     const client = {
       subscribe: vi.fn((_m: string, _p: unknown, cb: (data: unknown) => void) => {
         onData = cb
@@ -159,7 +161,9 @@ describe('#8591 per-host delivery ordering', () => {
       return `sched-${shown}`
     })
 
-    let onData: ((data: unknown) => void) | null = null
+    let onData: (data: unknown) => void = () => {
+      throw new Error('Notification stream has not subscribed')
+    }
     const client = {
       subscribe: vi.fn((_m: string, _p: unknown, cb: (data: unknown) => void) => {
         onData = cb
@@ -214,7 +218,9 @@ describe('#8591 per-host delivery ordering', () => {
     // this host's notifications for the whole app lifetime — silently.
     getItemImpl = () => new Promise<string | null>(() => {})
 
-    let onData: ((data: unknown) => void) | null = null
+    let onData: (data: unknown) => void = () => {
+      throw new Error('Notification stream has not subscribed')
+    }
     const client = {
       subscribe: vi.fn((_m: string, _p: unknown, cb: (data: unknown) => void) => {
         onData = cb

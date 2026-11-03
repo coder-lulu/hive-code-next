@@ -1,5 +1,4 @@
-import { canShowRightSidebarForView } from '@/lib/right-sidebar-visibility'
-import { runBuiltInOrReplacement } from '@/lib/plugin-command-replacements'
+import { canShowRightSidebar } from '@/lib/right-sidebar-visibility'
 import { showTerminalShortcutCaptureNotification } from '@/lib/terminal-shortcut-capture-notification'
 import { TOGGLE_FLOATING_TERMINAL_EVENT } from '@/lib/floating-terminal'
 import { subscribeToUnpairedDeviceAuthNotification } from '../unpaired-device-auth-notification'
@@ -91,7 +90,11 @@ export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): voi
             label: translate('auto.hooks.useIpcEvents.6573cfe955', 'Open Mobile Settings'),
             onClick: () => {
               const store = useAppStore.getState()
-              store.openSettingsTarget({ pane: 'mobile', repoId: null })
+              store.openSettingsTarget({
+                pane: 'servers',
+                sectionId: 'devices-this-computer',
+                repoId: null
+              })
               store.openSettingsPage()
             }
           }
@@ -158,17 +161,17 @@ export function registerSettingsAndSidebarIpcBridge(unsubs: (() => void)[]): voi
 
   unsubs.push(
     window.api.ui.onToggleLeftSidebar(() => {
-      runBuiltInOrReplacement('sidebar.left.toggle', () => useAppStore.getState().toggleSidebar())
+      useAppStore.getState().toggleSidebar()
     })
   )
 
   unsubs.push(
     window.api.ui.onToggleRightSidebar(() => {
       const store = useAppStore.getState()
-      if (!canShowRightSidebarForView(store.activeView)) {
+      if (!canShowRightSidebar(store)) {
         return
       }
-      runBuiltInOrReplacement('sidebar.right.toggle', () => store.toggleRightSidebar())
+      store.toggleRightSidebar()
     })
   )
 

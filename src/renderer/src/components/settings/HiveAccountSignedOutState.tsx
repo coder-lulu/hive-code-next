@@ -128,7 +128,10 @@ export function HiveAccountNotice({
             <RefreshCw className={busy === 'refresh' ? 'animate-spin' : undefined} />
             {secureStorageIssue
               ? translate('auto.components.settings.orcaAccount.recheckSecureStorage', 'Recheck')
-              : translate('auto.components.settings.orcaAccount.retryConnection', 'Retry')}
+              : translate(
+                  'auto.components.settings.orcaAccount.retryConnection',
+                  'Retry connection'
+                )}
           </Button>
         ) : null}
       </div>

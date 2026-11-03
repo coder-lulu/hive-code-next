@@ -1,3 +1,4 @@
+import { launchRecordStore } from '../runtime/structured-agent-launch-composition.test-support'
 import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -18,7 +19,7 @@ import { nativeChatScratchFolderFor, nativeChatScratchRootFor } from './native-c
 import { buildClaudeChildProcessEnv } from '../claude/claude-child-process-environment'
 import { createCodexStructuredLaunchResolver } from '../runtime/structured-agent-launch-composition.test-support'
 import { agentSessionRecordFixture } from './agent-session-record-test-fixture'
-import type { AgentSessionJournalIdentity } from '../../shared/agent-session/journal/agent-session-journal-identity'
+import type { AgentSessionJournalIdentity } from '../../shared/agent-session-journal-types'
 import { resolveProviderChildEnv } from '../provider-process/provider-process-launch'
 import {
   NATIVE_CHAT_VISUALS_SKILL_NAME,
@@ -135,7 +136,7 @@ describe('preparing a chat for visuals', () => {
     const codex = async (withVisuals: boolean) =>
       resolveProviderChildEnv(
         await createCodexStructuredLaunchResolver({
-          store: { getRecord: () => record, pinLaunchDirectory: vi.fn() },
+          store: launchRecordStore(() => record, vi.fn()),
           resolveCommand: () => ({ command: 'codex', prefixArgs: [] }),
           resolveLaunchArgs: () => [],
           prepareVisuals: async () => (withVisuals ? visuals : null)

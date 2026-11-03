@@ -15,7 +15,7 @@ import {
   PAGE_READY_DEADLINE_MS,
   type MobileWebShellRuntime
 } from './mobile-web-shell-runtime'
-import { useMobileWebShellGates } from './use-mobile-web-shell-gates'
+import { readMobileWebShellReachability } from './mobile-web-shell-reachability'
 import { shellPageBackClaimed } from './shell-page-back-claim'
 import { recordShellLifecycleLine } from './shell-lifecycle-line-recorder'
 import {
@@ -46,7 +46,6 @@ export type MobileWebShellSessionView = {
   readonly pageRouteGrants: readonly { pathname: string; grants: readonly string[] }[]
   readonly routeGrants: readonly string[]
   readonly ownsHostArea: boolean
-  readonly hostStatus: ReturnType<typeof useMobileWebShellGates>
   // Explain fallback beside the running page without replacing it.
   readonly updateNotice: MobileWebShellUpdateNotice | null
   readonly retry: () => void
@@ -75,6 +74,7 @@ export function useMobileWebShellSession(args: {
   const { hostId, routePathname } = args
   const wide = args.wide === true
   const appNamesRoute = args.appNamesRoute !== false
+  const gates = useHostProtocolGates()
   const { client, state: connState } = useHostClient(hostId)
 
   const runtimeRef = useRef<MobileWebShellRuntime | null>(null)
@@ -249,16 +249,30 @@ export function useMobileWebShellSession(args: {
     dispatch(epochRef.current, { type: 'layout-changed', wide })
   }, [dispatch, wide])
 
-  const hostStatus = useMobileWebShellGates({
-    gates: useHostProtocolGates(),
-    connState,
-    client,
-    rearmKey: `${hostId}\0${routePathname}`,
-    onGates: useCallback(
-      (gates) => dispatch(epochRef.current, { type: 'gates-changed', gates }),
-      [dispatch]
-    )
-  })
+  const { statusPending, statusReadable, hostCapabilities, hostProtocolWindow } = gates
+  const reachability = readMobileWebShellReachability(connState, client)
+  useEffect(() => {
+    dispatch(epochRef.current, {
+      type: 'gates-changed',
+      gates: {
+        statusPending,
+        statusReadable,
+        reachability,
+        hostCapabilities,
+        hostStatus: hostProtocolWindow
+      }
+    })
+    // Host and pathname rebuild the session; re-arm even on an unchanged verdict or the fresh session would remain checking.
+  }, [
+    dispatch,
+    hostCapabilities,
+    hostId,
+    hostProtocolWindow,
+    reachability,
+    routePathname,
+    statusPending,
+    statusReadable
+  ])
 
   const retry = useCallback(() => {
     invalidate()
@@ -305,7 +319,6 @@ export function useMobileWebShellSession(args: {
     pageRouteGrants: sessionRef.current.pageRouteGrants,
     routeGrants: sessionRef.current.routeGrants,
     ownsHostArea: sessionRef.current.ownsHostArea,
-    hostStatus,
     updateNotice: sessionRef.current.updateNotice,
     retry,
     reportShellFailure,

@@ -1,9 +1,12 @@
 import type { DiffComment, MobileDiffReviewState } from '../../../src/shared/diff-comment-types'
 import type { MobileGitBranchCompareResult } from '../source-control/mobile-branch-compare'
 import type { MobileGitStatusResult } from '../source-control/mobile-git-status'
-import type { MobileGitChangedFile } from '../source-control/git-compare-reply-schema'
 import type { MobileDiffLine } from './mobile-diff-lines'
-import type { MobileDiffReviewQueueItem } from './mobile-diff-review-queue'
+import type { MobileDiffHunk } from './mobile-diff-hunks'
+import type {
+  MobileDiffReviewQueueFilter,
+  MobileDiffReviewQueueItem
+} from './mobile-diff-review-queue'
 import type { MobileDiffReviewFileDescriptor } from './mobile-diff-review-state'
 import type { MobileHighlightedDiffLine } from './mobile-file-syntax'
 import type { MobileReviewTerminalTab } from './review-terminal-reply-schema'
@@ -16,19 +19,11 @@ export type ReviewScreenState =
       status: MobileGitStatusResult
       branchCompare: MobileGitBranchCompareResult | null
       branchError?: string
-      /** Set when the screen shows one commit's files instead of the worktree's changes. */
-      commit?: MobileDiffReviewCommit
       comments: DiffComment[]
       reviewState: MobileDiffReviewState
     }
   | { kind: 'unavailable'; message: string }
   | { kind: 'error'; message: string }
-
-export type MobileDiffReviewCommit = {
-  commitOid: string
-  parentOid: string | null
-  entries: MobileGitChangedFile[]
-}
 
 export type ReviewDiffLine = MobileHighlightedDiffLine<MobileDiffLine>
 
@@ -39,6 +34,7 @@ export type ReviewDiffState =
       kind: 'ready'
       itemKey: string
       lines: ReviewDiffLine[]
+      hunks: MobileDiffHunk[]
       truncated: boolean
     }
   | { kind: 'binary'; itemKey: string }
@@ -57,17 +53,28 @@ export type SendSheetState =
 
 export type GitMutationMethod = 'git.stage' | 'git.unstage' | 'git.discard'
 
+export const REVIEW_FILTERS: MobileDiffReviewQueueFilter[] = [
+  'all',
+  'unreviewed',
+  'notes',
+  'unstaged',
+  'staged',
+  'branch'
+]
+
 export function firstReviewParam(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '')
 }
 
-/** Viewed state and notes track the worktree's changes; a commit's files have neither. */
+export function normalizeReviewFilterParam(value: string): MobileDiffReviewQueueFilter {
+  return REVIEW_FILTERS.includes(value as MobileDiffReviewQueueFilter)
+    ? (value as MobileDiffReviewQueueFilter)
+    : 'all'
+}
+
 export function reviewDescriptorFromItem(
   item: MobileDiffReviewQueueItem
-): MobileDiffReviewFileDescriptor | null {
-  if (item.scope === 'commit') {
-    return null
-  }
+): MobileDiffReviewFileDescriptor {
   return {
     key: item.key,
     filePath: item.filePath,
@@ -80,10 +87,12 @@ export function reviewDescriptorFromItem(
 export function nextReviewIndexAfterMarkReviewed({
   currentIndex,
   currentItemKey,
+  filter,
   filteredQueue
 }: {
   currentIndex: number
   currentItemKey: string
+  filter: MobileDiffReviewQueueFilter
   filteredQueue: readonly MobileDiffReviewQueueItem[]
 }): number | null {
   const nextIndex = filteredQueue.findIndex(
@@ -92,74 +101,11 @@ export function nextReviewIndexAfterMarkReviewed({
   const wrappedIndex = filteredQueue.findIndex(
     (item) => item.key !== currentItemKey && !item.isReviewed
   )
-  return nextIndex !== -1 ? nextIndex : wrappedIndex !== -1 ? wrappedIndex : null
-}
-
-/** "3 of 12 · 4 viewed" for files that can be viewed, "1 of 4 uncommitted" for files that are staged instead. */
-export function mobileDiffReviewPositionLabel({
-  scope,
-  position,
-  count,
-  viewedCount
-}: {
-  scope: MobileDiffReviewQueueItem['scope']
-  position: number
-  count: number
-  viewedCount: number
-}): string {
-  if (scope === 'unstaged') {
-    return translate(
-      'session.diffReviewScreenModel.positionUncommitted',
-      '{{position}} of {{count}} uncommitted',
-      { position, count }
-    )
+  const targetIndex = nextIndex !== -1 ? nextIndex : wrappedIndex !== -1 ? wrappedIndex : null
+  if (targetIndex === null) {
+    return null
   }
-  if (scope === 'commit') {
-    return translate(
-      'session.diffReviewScreenModel.positionInCommit',
-      '{{position}} of {{count}} in this commit',
-      { position, count }
-    )
-  }
-  return translate(
-    'session.diffReviewScreenModel.positionViewed',
-    '{{position}} of {{count}} · {{viewedCount}} viewed',
-    { position, count, viewedCount }
-  )
-}
-
-/** The jump-to-file sheet's subtitle: what is left in this section. */
-export function mobileDiffReviewFilesSubtitle({
-  scope,
-  count,
-  viewedCount
-}: {
-  scope: MobileDiffReviewQueueItem['scope'] | null
-  count: number
-  viewedCount: number
-}): string {
-  if (scope === 'commit') {
-    return count === 1
-      ? translate('session.diffReviewScreenModel.commitFiles_one', '{{count}} file', { count })
-      : translate('session.diffReviewScreenModel.commitFiles_other', '{{count}} files', { count })
-  }
-  if (scope === 'unstaged') {
-    return count === 1
-      ? translate('session.diffReviewScreenModel.uncommittedFiles_one', '{{count}} uncommitted', {
-          count
-        })
-      : translate('session.diffReviewScreenModel.uncommittedFiles_other', '{{count}} uncommitted', {
-          count
-        })
-  }
-  return translate(
-    'session.diffReviewScreenModel.viewedOfCount',
-    '{{viewedCount}} of {{count}} viewed',
-    {
-      viewedCount,
-      count
-    }
-  )
+  return filter === 'unreviewed' && targetIndex > currentIndex ? targetIndex - 1 : targetIndex
 }
 
 export function mobileReviewScopeLabel(item: MobileDiffReviewQueueItem): string {

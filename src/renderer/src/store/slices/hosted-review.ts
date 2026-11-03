@@ -19,10 +19,8 @@ import {
   findHostedReviewRepoForFetch,
   hasNewerHostedReviewCacheEntry,
   hostedReviewOwnerIpcArgs,
-  hostedReviewCallerSettlement,
   hostedReviewBranchLookupArgs,
   isFreshHostedReview,
-  requestHostedReviewForBranch,
   isStaleMergedGitHubReviewForHead,
   hostedReviewRepoOwnerTarget,
   shouldRefetchForLinkedHint,
@@ -71,11 +69,10 @@ export const createHostedReviewSlice: StateCreator<AppState, [], [], HostedRevie
   hostedReviewCache: {},
 
   getHostedReviewCreationEligibility: async (args) => {
-    const repo = findHostedReviewRepoForFetch(get().repos, args.repoPath, args)
+    const repo = findHostedReviewRepoByPath(get().repos, args.repoPath, args.repoId)
     const target = hostedReviewRepoOwnerTarget(repo)
     if (target.kind === 'environment') {
-      const { repoOwnerExecutionHostId: _ownerHostId, ...requestArgs } = args
-      const { repoPath: _repoPath, worktreePath, ...runtimeArgs } = requestArgs
+      const { repoPath: _repoPath, worktreePath, ...runtimeArgs } = args
       void _repoPath
       return callRuntimeRpc<HostedReviewCreationEligibility>(
         target,
@@ -175,17 +172,25 @@ export const createHostedReviewSlice: StateCreator<AppState, [], [], HostedRevie
     const linkedRefetch = shouldRefetchForLinkedHint(cached, hintKey)
     const scopedResultRefetch = shouldRefetchGitHubScopedResultForNoHint(cached, hintKey)
     const staleMergedHeadRefetch = isStaleMergedGitHubReviewForHead(cached, options?.currentHeadOid)
-    const needsRefetch = linkedRefetch || scopedResultRefetch || staleMergedHeadRefetch
-    if (!options?.userRefresh && !options?.force && !needsRefetch && isFreshHostedReview(cached)) {
+    if (
+      !options?.force &&
+      !linkedRefetch &&
+      !scopedResultRefetch &&
+      !staleMergedHeadRefetch &&
+      isFreshHostedReview(cached)
+    ) {
       return cached.data
     }
 
     const currentHeadOid = options?.currentHeadOid ?? null
     const inflightRequest = inflightHostedReviewRequests.get(requestKey)
-    const settleForCaller = hostedReviewCallerSettlement(
-      () => get().hostedReviewCache[cacheKey],
-      options
-    )
+    // A lookup started at another HEAD may return a merged PR this worktree has moved past.
+    const joinableInflightRequest =
+      currentHeadOid !== null &&
+      inflightRequest?.currentHeadOid != null &&
+      inflightRequest.currentHeadOid !== currentHeadOid
+        ? undefined
+        : inflightRequest
     const startRequest = (): Promise<HostedReviewInfo | null> => {
       const generation = nextLookupGeneration()
       const requestStartedAt = Date.now()
@@ -202,11 +207,20 @@ export const createHostedReviewSlice: StateCreator<AppState, [], [], HostedRevie
       const request = (async () => {
         try {
           const args = hostedReviewBranchLookupArgs(branch, options)
-          const { review, readOutcome } = await requestHostedReviewForBranch(
-            target,
-            { repo: repo?.id ?? options?.repoId ?? repoPath, repoPath, ...args },
-            { repoPath, ...hostedReviewOwnerIpcArgs(options), ...args }
-          )
+          const review =
+            target.kind === 'environment'
+              ? await callRuntimeRpc<HostedReviewInfo | null>(
+                  target,
+                  'hostedReview.forBranch',
+                  { repo: repo?.id ?? options?.repoId ?? repoPath, repoPath, ...args },
+                  // Remote git/gh, especially Windows paths, can be slow; main queue bounds concurrency so longer timeout cannot cause stampedes.
+                  { timeoutMs: 30_000 }
+                )
+              : await window.api.hostedReview.forBranch({
+                  repoPath,
+                  ...hostedReviewOwnerIpcArgs(options),
+                  ...args
+                })
           if (requestGenerations.get(cacheKey) === generation) {
             set((state) => {
               if (
@@ -237,11 +251,6 @@ export const createHostedReviewSlice: StateCreator<AppState, [], [], HostedRevie
                   data: review,
                   fetchedAt: Date.now(),
                   linkedReviewHintKey: hintKey,
-                  // Cache hits, fallbacks and older hosts' bare replies keep the newest one already seen.
-                  providerReadGeneration:
-                    readOutcome === 'provider'
-                      ? generation
-                      : state.hostedReviewCache[cacheKey]?.providerReadGeneration,
                   // Why: fallback PR hints come from this branch's PR cache; preserve that provenance separately from request identity.
                   ...(review?.provider === 'github' &&
                   options?.linkedGitHubPR == null &&
@@ -260,7 +269,12 @@ export const createHostedReviewSlice: StateCreator<AppState, [], [], HostedRevie
           // Transient timeout/rate-limit/git failures are not definitive misses: preserve last review and retry next visible poll instead of hiding for TTL.
           // A stopped WSL distro's refusal (E9) also lands here; it is logged too, and the review kept.
           console.error('Failed to fetch hosted review:', error)
-          throw error
+          const preserved = get().hostedReviewCache[cacheKey]
+          // Never preserve merged review after worktree leaves its valid head/contained line.
+          if (isStaleMergedGitHubReviewForHead(preserved, options?.currentHeadOid)) {
+            return null
+          }
+          return preserved?.data ?? null
         } finally {
           const activeRequest = inflightHostedReviewRequests.get(requestKey)
           if (activeRequest?.generation === generation) {
@@ -283,9 +297,10 @@ export const createHostedReviewSlice: StateCreator<AppState, [], [], HostedRevie
     }
 
     if (
-      !options?.userRefresh &&
       !options?.force &&
-      !needsRefetch &&
+      !linkedRefetch &&
+      !scopedResultRefetch &&
+      !staleMergedHeadRefetch &&
       options?.staleWhileRevalidate &&
       cached !== undefined &&
       cached.data !== null
@@ -295,10 +310,10 @@ export const createHostedReviewSlice: StateCreator<AppState, [], [], HostedRevie
       return cached.data
     }
 
-    if (inflightRequest && canJoinHostedReviewFlight(inflightRequest, options)) {
-      return settleForCaller(inflightRequest.promise)
+    if (joinableInflightRequest && canJoinHostedReviewFlight(joinableInflightRequest, options)) {
+      return joinableInflightRequest.promise
     }
 
-    return settleForCaller(startRequest())
+    return startRequest()
   }
 })

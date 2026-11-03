@@ -44,9 +44,9 @@ export function getAgentLabel(agentId: string): string {
 
 /** The field's error, or null when the draft's extras can be saved. */
 export function getDraftExtraAgentArgsError(
-  draft: Pick<AutomationDraft, 'agentId' | 'extraAgentArgs' | 'surface'>
+  draft: Pick<AutomationDraft, 'agentId' | 'extraAgentArgs'>
 ): string | null {
-  if (draft.surface === 'chat' || !hasExtraAgentArgs(draft.extraAgentArgs)) {
+  if (!hasExtraAgentArgs(draft.extraAgentArgs)) {
     return null
   }
   const parsed = parseExtraAgentArgs({
@@ -58,10 +58,9 @@ export function getDraftExtraAgentArgsError(
 
 /** Reuse can't carry extras; the field offers a switch instead of flipping it silently. */
 export function draftExtraAgentArgsNeedFreshSession(
-  draft: Pick<AutomationDraft, 'extraAgentArgs' | 'reuseSession' | 'workspaceMode' | 'surface'>
+  draft: Pick<AutomationDraft, 'extraAgentArgs' | 'reuseSession' | 'workspaceMode'>
 ): boolean {
   return (
-    draft.surface !== 'chat' &&
     hasExtraAgentArgs(draft.extraAgentArgs) &&
     draft.workspaceMode === 'existing' &&
     draft.reuseSession

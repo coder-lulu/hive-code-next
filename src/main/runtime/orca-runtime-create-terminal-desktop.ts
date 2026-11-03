@@ -26,12 +26,7 @@ export async function createDesktopTerminal(
   ).webContents
   const requestId = dependencies.randomUUID()
   // The renderer owns the PTY; fence the resolved request before handing it off over IPC.
-  opts.onPtySpawnDispatched?.({
-    worktreeId: null,
-    workspacePath: null,
-    connectionId: null,
-    cwd: opts.cwd
-  })
+  opts.onPtySpawnDispatched?.({})
   const reply = await new Promise<{ tabId: string; title: string }>((resolve, reject) => {
     const timer = setTimeout(() => {
       dependencies.getRuntimeDesktopSurface().removeIpcListener('terminal:tabCreateReply', handler)

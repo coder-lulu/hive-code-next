@@ -1,7 +1,9 @@
 import type * as ReactModule from 'react'
-import type { FolderWorkspace } from '../../../shared/folder-workspace-types'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { AUTOMATIONS_CHANGED_EVENT } from '@/lib/automations-changed-window-event'
 import { countUnchangedObserverHistoryReads } from './automation-dispatch-observer-test-probe'
+
+const mockDispatchEvent = vi.fn()
 
 const mockLaunchAgentBackgroundSession = vi.fn()
 const mockFindReusableAutomationSession = vi.fn()
@@ -48,9 +50,12 @@ const state = {
   activeTabId: 'tab-active',
   activeTabType: 'terminal' as const,
   repos: [{ id: 'repo-1', connectionId: null, executionHostId: null, path: '/repo' }] as TestRepo[],
-  folderWorkspaces: new Array<
-    Pick<FolderWorkspace, 'id' | 'name' | 'projectGroupId' | 'folderPath' | 'connectionId'>
-  >(),
+  folderWorkspaces: [] as {
+    id: string
+    projectGroupId: string
+    folderPath: string
+    connectionId: string | null
+  }[],
   projectGroups: [] as {
     id: string
     connectionId: string | null
@@ -225,7 +230,8 @@ describe('useAutomationDispatchEvents setup launch', () => {
           getState: mockSshGetState,
           connect: mockSshConnect
         }
-      }
+      },
+      dispatchEvent: mockDispatchEvent
     })
   })
 
@@ -250,10 +256,25 @@ describe('useAutomationDispatchEvents setup launch', () => {
     expect(state.setActiveWorktree).toHaveBeenCalledWith('wt-active', 'ssh:box')
   })
 
+  // The writer’s host-scoped event is sufficient; extra local emit would invalidate every catalog host.
+  it('leaves the automationsChanged event to the host that owns the write', async () => {
+    await registerAndDispatch()
+
+    expect(mockMarkDispatchResult).toHaveBeenCalled()
+    expect(
+      mockDispatchEvent.mock.calls.filter(([event]) => event?.type === AUTOMATIONS_CHANGED_EVENT)
+    ).toEqual([])
+  })
+
+  it('defaults legacy automations without a setup choice to skipping setup', async () => {
+    await registerAndDispatch(makeAutomation({ setupDecision: undefined }))
+
+    expect(mockCreateWorktree.mock.calls[0][3]).toBe('skip')
+    expect(mockLaunchAgentBackgroundSession).toHaveBeenCalled()
+  })
+
   it('creates a new-per-run workspace on the captured run host, and names none without one', async () => {
-    await registerAndDispatch(
-      makeAutomation({ runContext: { repoId: 'repo-1', hostId: 'local', path: '/repo' } })
-    )
+    await registerAndDispatch(makeAutomation({ runContext: { repoId: 'repo-1', hostId: 'local' } }))
     expect(mockCreateWorktree.mock.calls[0]?.at(-1)).toEqual(
       expect.objectContaining({ executionHostId: 'local' })
     )
@@ -262,6 +283,32 @@ describe('useAutomationDispatchEvents setup launch', () => {
     await registerAndDispatch()
     expect(mockCreateWorktree.mock.calls[0]?.at(-1)).toEqual(
       expect.objectContaining({ executionHostId: undefined })
+    )
+  })
+
+  // #34433: a runtime host records this as a label; `local` sends the badge's lookup back to this desktop.
+  it('offers the run as a label that names this desktop as its owner', async () => {
+    await registerAndDispatch(
+      makeAutomation({ runContext: { repoId: 'repo-1', hostId: 'ssh:box' } })
+    )
+
+    expect(mockCreateWorktree.mock.calls[0]?.at(-1)).toEqual(
+      expect.objectContaining({
+        clientAutomationProvenance: expect.objectContaining({ hostId: 'local' })
+      })
+    )
+  })
+
+  it('does not stamp the created workspace with an empty agent-launch fallback', async () => {
+    await registerAndDispatch()
+
+    expect(mockCreateWorktree.mock.calls[0][10]).toBeUndefined()
+    expect(mockLaunchAgentBackgroundSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent: 'claude',
+        prompt: 'run this',
+        worktreeId: 'wt-created'
+      })
     )
   })
 
@@ -309,7 +356,6 @@ describe('useAutomationDispatchEvents setup launch', () => {
     state.folderWorkspaces = [
       {
         id: 'fw-1',
-        name: folderWorkspace.displayName,
         projectGroupId: 'group-1',
         folderPath: '/srv/project',
         connectionId: 'ssh-folder'
@@ -324,7 +370,7 @@ describe('useAutomationDispatchEvents setup launch', () => {
         workspaceMode: 'existing',
         workspaceId: folderWorkspace.id,
         setupDecision: 'skip',
-        runContext: { repoId: 'repo-1', hostId: 'ssh:ssh-folder', path: '/srv/project/repo' }
+        runContext: { repoId: 'repo-1', hostId: 'ssh:ssh-folder' }
       })
     )
 
@@ -355,7 +401,6 @@ describe('useAutomationDispatchEvents setup launch', () => {
     state.folderWorkspaces = [
       {
         id: 'fw-local',
-        name: folderWorkspace.displayName,
         projectGroupId: 'group-local',
         folderPath: '/project',
         connectionId: null
@@ -368,7 +413,7 @@ describe('useAutomationDispatchEvents setup launch', () => {
       makeAutomation({
         workspaceMode: 'existing',
         workspaceId: folderWorkspace.id,
-        runContext: { repoId: 'repo-1', hostId: 'local', path: '/repo' }
+        runContext: { repoId: 'repo-1', hostId: 'local' }
       })
     )
 
@@ -388,7 +433,6 @@ describe('useAutomationDispatchEvents setup launch', () => {
     state.folderWorkspaces = [
       {
         id: 'fw-other',
-        name: folderWorkspace.displayName,
         projectGroupId: 'group-other',
         folderPath: '/srv/other',
         connectionId: 'ssh-other'
@@ -799,6 +843,15 @@ describe('useAutomationDispatchEvents setup launch', () => {
       )
     ).toHaveLength(1)
     errorSpy.mockRestore()
+  })
+
+  it('preserves a fresh reuse-enabled session as the future reuse seed', async () => {
+    mockFindReusableAutomationSession.mockReturnValue(null)
+
+    await registerAndDispatch(makeAutomation({ reuseSession: true }))
+
+    expect(mockReleaseTerminalOwnership).toHaveBeenCalledOnce()
+    expect(mockFinalizeTerminalOwnership).not.toHaveBeenCalled()
   })
 
   it('releases the launch runtime observers once when a kept-open run completes', async () => {

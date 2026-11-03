@@ -10,12 +10,8 @@ import type {
   HostedReviewProvider
 } from '../../../../../../shared/hosted-review'
 import type { PrimaryAction, PrimaryActionInputs } from '../../source-control-primary-action-types'
-import { resolveCrossWorktreeWaitingAction } from '../../source-control-primary-action'
 import { resolveCreatePrIntentEligibility } from './create-pr-intent-state'
-import {
-  canClickBlockedCreateReviewReason,
-  resolveBlockedCreateReviewNoticeMessage
-} from '../../source-control-create-review-blocked-action'
+import { canClickBlockedCreateReviewReason } from '../../source-control-create-review-blocked-action'
 
 export function resolveProvisionalHostedReviewProvider(input: {
   hostedReview?: Pick<HostedReviewInfo, 'provider'> | null
@@ -179,14 +175,11 @@ export function resolveDisabledCreatePrHeaderAction(
       case 'unsupported_provider':
       case 'base_not_on_remote':
       case null:
-        // A failed review lookup is not a branch problem, so name it instead.
-        title =
-          resolveBlockedCreateReviewNoticeMessage(hostedReviewCreation) ??
-          translate(
-            'auto.components.right.sidebar.source.control.primary.action.f0c6e2a581',
-            'This branch is not ready for a {{value0}} yet.',
-            { value0: copy.reviewLabel }
-          )
+        title = translate(
+          'auto.components.right.sidebar.source.control.primary.action.f0c6e2a581',
+          'This branch is not ready for a {{value0}} yet.',
+          { value0: copy.reviewLabel }
+        )
     }
   }
 
@@ -198,28 +191,25 @@ export function resolveDisabledCreatePrHeaderAction(
 }
 
 export function resolveCreatePrIntentInFlightPrimaryAction(
-  inputs?: PrimaryActionInputs
+  inputs?: Pick<PrimaryActionInputs, 'hostedReviewCreation'>
 ): PrimaryAction {
-  const waitingAction = inputs && resolveCrossWorktreeWaitingAction(inputs, 'create_pr_intent')
   const copy = localizedHostedReviewCopy(
     resolveSupportedHostedReviewCopyProvider(inputs?.hostedReviewCreation?.provider)
   )
 
-  return (
-    waitingAction ?? {
-      kind: 'create_pr_intent',
-      label: translate(
-        'auto.components.right.sidebar.source.control.primary.action.e7ffa46946',
-        'Create {{value0}}',
-        { value0: copy.shortLabel }
-      ),
-      title: translate(
-        'auto.components.right.sidebar.source.control.primary.action.d37e68f61d',
-        'Preparing branch for review…'
-      ),
-      disabled: true
-    }
-  )
+  return {
+    kind: 'create_pr_intent',
+    label: translate(
+      'auto.components.right.sidebar.source.control.primary.action.e7ffa46946',
+      'Create {{value0}}',
+      { value0: copy.shortLabel }
+    ),
+    title: translate(
+      'auto.components.right.sidebar.source.control.primary.action.d37e68f61d',
+      'Preparing branch for review…'
+    ),
+    disabled: true
+  }
 }
 
 export function resolveCreatePrIntentPrimaryAction(

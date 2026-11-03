@@ -1,3 +1,10 @@
+import nacl from 'tweetnacl'
+import { verifyDeviceProof } from '../../../shared/device-key-proof'
+import {
+  tokenOnlyCredentialSource,
+  type WebRuntimeCredentialSource
+} from './web-runtime-credential-source'
+import { pairedRuntimeConnectionFromOffer } from '../../../shared/paired-runtime-connection'
 import { it, expect, vi, beforeEach, afterEach } from 'vitest'
 import WebSocket, { WebSocketServer } from 'ws'
 import { WebRuntimeClient } from './web-runtime-client'
@@ -18,6 +25,19 @@ afterEach(() => vi.unstubAllGlobals())
 it('receives encrypted subscription binary frames over a paired web socket', async () => {
   vi.stubGlobal('WebSocket', WebSocket)
   const serverKeys = generateKeyPair()
+  const deviceKeys = nacl.sign.keyPair()
+  const devicePublicKeyB64 = Buffer.from(deviceKeys.publicKey).toString('base64')
+  const credential: WebRuntimeCredentialSource = {
+    ...tokenOnlyCredentialSource('token'),
+    nextPlan: () => ({
+      kind: 'device-key',
+      deviceId: 'paired-test-device',
+      key: {
+        publicKeyB64: devicePublicKeyB64,
+        sign: async (message: Uint8Array) => nacl.sign.detached(message, deviceKeys.secretKey)
+      }
+    })
+  }
   const frame = new Uint8Array([9, 8, 7])
   // host must match the 127.0.0.1 clients dial: a wildcard bind lets a foreign loopback listener claim the port and answer here.
   const wss = new WebSocketServer({ host: '127.0.0.1', port: 0 })
@@ -47,8 +67,22 @@ it('receives encrypted subscription binary frames over a paired web socket', asy
       if (!plaintext) {
         return
       }
-      const message = JSON.parse(plaintext) as { id?: string; type?: string }
+      const message = JSON.parse(plaintext) as {
+        id?: string
+        type?: string
+        deviceId?: string
+        deviceProofB64?: string
+      }
       if (message.type === 'e2ee_auth') {
+        expect(message.deviceId).toBe('paired-test-device')
+        expect(
+          verifyDeviceProof({
+            devicePublicKeyB64,
+            deviceProofB64: message.deviceProofB64,
+            purpose: 'auth',
+            transcriptHashB64: peer.transcriptHashB64
+          })
+        ).toBe(true)
         authenticated = true
         socket.send(
           peer.sealText(
@@ -80,12 +114,15 @@ it('receives encrypted subscription binary frames over a paired web socket', asy
   if (!address || typeof address !== 'object') {
     throw new Error('Expected local WebSocket test server address')
   }
-  let client: WebRuntimeClient | null = new WebRuntimeClient({
-    v: 2,
-    endpoint: `ws://127.0.0.1:${address.port}`,
-    deviceToken: 'token',
-    publicKeyB64: publicKeyToBase64(serverKeys.publicKey)
-  })
+  let client: WebRuntimeClient | null = new WebRuntimeClient(
+    pairedRuntimeConnectionFromOffer({
+      v: 2,
+      endpoint: `ws://127.0.0.1:${address.port}`,
+      deviceToken: 'token',
+      publicKeyB64: publicKeyToBase64(serverKeys.publicKey)
+    }),
+    { credential }
+  )
   try {
     const binaryFrame = new Promise<Uint8Array<ArrayBufferLike>>((resolve, reject) => {
       void client!

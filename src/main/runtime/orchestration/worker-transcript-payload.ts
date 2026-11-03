@@ -1,8 +1,5 @@
 import { createHash } from 'node:crypto'
-import type {
-  NativeChatBlock,
-  NativeChatMessage
-} from '../../../shared/native-chat/native-chat-types'
+import type { NativeChatBlock, NativeChatMessage } from '../../../shared/native-chat-types'
 import { boundSubagentEntryId } from '../../native-chat/subagent-entry-id-bounds'
 import { boundWorkerTranscriptActivityBlock } from './worker-transcript-activity-block-bounds'
 import { replaceDispatchCapabilities } from './worker-terminal-redaction'

@@ -75,7 +75,7 @@ describe('mobile OMP model discovery and picker choices', () => {
       currentValue: reportedModel,
       choices: [
         expect.objectContaining({ value: 'provider/new', label: 'New model' }),
-        { value: reportedModel, label: 'Custom Current', description: reportedModel }
+        { value: reportedModel, label: reportedModel }
       ]
     })
   })

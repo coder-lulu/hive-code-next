@@ -49,6 +49,15 @@ afterEach(async () => {
 })
 
 describe('Claude history discovery failures', () => {
+  it.each(['EACCES', 'EPERM', 'EIO', 'UNKNOWN'])(
+    'rejects an inaccessible root (%s)',
+    async (code) => {
+      state.blocked = projects
+      state.code = code
+      await expect(list([])).rejects.toMatchObject({ code })
+    }
+  )
+
   it('rejects an unreadable child instead of reporting that its sibling history disappeared', async () => {
     const sibling = join(projects, 'kept.jsonl')
     await writeFile(sibling, '')
@@ -69,4 +78,9 @@ describe('Claude history discovery failures', () => {
       await expect(list([])).resolves.toEqual([sibling])
     }
   )
+
+  it('accepts an absent history root', async () => {
+    await rm(projects, { recursive: true })
+    await expect(list([])).resolves.toEqual([])
+  })
 })

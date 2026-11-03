@@ -27,9 +27,9 @@ export function locateOrchestrationParty(
   try {
     party = resolveOrchestrationParty(address, deps.db)
   } catch (error) {
-    // Missing worker routing does not prove its conversation record was deleted.
+    // Only proven lost worker identity means gone; other resolution failures remain unreachable.
     if (error instanceof OrchestrationError && error.code === CODES.notLive) {
-      return { location: null }
+      return { location: null, lost: 'chat' }
     }
     throw error
   }
@@ -85,21 +85,7 @@ function locateSession(
   orcaSessionId: OrcaSessionId,
   records: AgentSessionRecordReader | null
 ): OrchestrationPartyLocationResult {
-  if (!records) {
-    return { location: null }
-  }
-  let record
-  try {
-    if (records.isSessionUnreadable?.(orcaSessionId)) {
-      return { location: null }
-    }
-    if (!records.getRecord(orcaSessionId)) {
-      return { location: null, lost: 'chat' }
-    }
-    record = lineageLiveSession(records, orcaSessionId)
-  } catch {
-    return { location: null }
-  }
+  const record = records ? lineageLiveSession(records, orcaSessionId) : null
   return record
     ? {
         location: {
@@ -108,5 +94,5 @@ function locateSession(
           worktreeId: record.location.workspaceId
         }
       }
-    : { location: null }
+    : { location: null, lost: 'chat' }
 }

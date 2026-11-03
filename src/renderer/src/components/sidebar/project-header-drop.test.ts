@@ -1,10 +1,10 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { getLogicalRepoOrderRankById } from '../../../../shared/project-section-order'
 
 import {
   applyAllRepoInsertAt,
-  computeProjectHeaderBucketDropPreview,
+  measureProjectHeaderDragRects,
   computeProjectHeaderDropPreview,
   getProjectGroupOrderForSidebarDrop,
   getProjectHeaderDragBucketKey,
@@ -12,6 +12,7 @@ import {
   mapSidebarProjectHeaderDropIndexToSiblingInsertIndex,
   mapSidebarRepoDropIndexToAllRepoInsertAt
 } from './project-header-drop'
+import { commitProjectHeaderDragDrop } from './project-header-drag-commit'
 import type { Row } from '../../../../shared/sidebar-list/row-types'
 import type { Repo } from '../../../../shared/repo-types'
 
@@ -343,109 +344,62 @@ describe('computeProjectHeaderDropPreview', () => {
   })
 })
 
-describe('computeProjectHeaderBucketDropPreview', () => {
-  const buckets = new Map<string, readonly string[]>([
-    ['group:group-a', ['a']],
-    ['group:group-b', ['b', 'c']],
-    ['ungrouped', ['loose']]
-  ])
-  const rects = [
-    {
-      repoId: 'a',
-      bucketKey: 'group:group-a',
-      headerIndex: 0,
-      top: 40,
-      bottom: 68,
-      sectionBottom: 180
-    },
-    {
-      repoId: 'b',
-      bucketKey: 'group:group-b',
-      headerIndex: 0,
-      top: 240,
-      bottom: 268,
-      sectionBottom: 290
-    },
-    {
-      repoId: 'c',
-      bucketKey: 'group:group-b',
-      headerIndex: 1,
-      top: 300,
-      bottom: 328,
-      sectionBottom: 360
-    },
-    {
-      repoId: 'loose',
-      bucketKey: 'ungrouped',
-      headerIndex: 0,
-      top: 440,
-      bottom: 468,
-      sectionBottom: 500
+describe('active project header drag boundaries', () => {
+  it.each(['group:group-a', 'ungrouped'])('measures only the initiating bucket %s', (bucketKey) => {
+    const container = document.createElement('div')
+    for (const [id, bucket] of [
+      ['a', 'group:group-a'],
+      ['b', 'group:group-b'],
+      ['loose', 'ungrouped']
+    ]) {
+      const header = document.createElement('div')
+      header.setAttribute('data-repo-header-id', id)
+      header.setAttribute('data-repo-header-bucket', bucket)
+      header.setAttribute('data-repo-header-index', '0')
+      container.append(header)
     }
-  ]
-  const dropZones = [
-    { bucketKey: 'group:group-a', top: 0, bottom: 28, sectionBottom: 200 },
-    { bucketKey: 'group:group-b', top: 200, bottom: 228, sectionBottom: 400 },
-    { bucketKey: 'ungrouped', top: 400, bottom: 428, sectionBottom: 520 }
-  ]
+    const rects = measureProjectHeaderDragRects(container, bucketKey)
+    expect(rects).toHaveLength(1)
+    expect(rects[0].bucketKey).toBe(bucketKey)
+    expect(rects[0].repoId).toBe(bucketKey === 'ungrouped' ? 'loose' : 'a')
+  })
 
-  it('uses the named group header under the pointer as the target bucket', () => {
-    expect(
-      computeProjectHeaderBucketDropPreview({
-        pointerY: 215,
-        containerTop: 0,
-        scrollTop: 0,
-        rects,
-        dropZones,
-        sidebarRepoHeaderIdsByBucket: buckets,
-        sourceBucketKey: 'group:group-a',
-        sourceExecutionHostId: 'local',
-        projectGroupHostIdByGroupId: new Map([
-          ['group-a', 'local'],
-          ['group-b', 'local']
-        ])
-      })
-    ).toEqual({
-      bucketKey: 'group:group-b',
-      sidebarRepoHeaderIds: ['b', 'c'],
-      dropIndex: 0,
-      dropIndicatorY: 236
+  it('does not commit through a surviving twin on another host', () => {
+    const repo: Repo = {
+      id: 'a',
+      path: '/a',
+      displayName: 'A',
+      badgeColor: '#000',
+      addedAt: 0,
+      executionHostId: 'local',
+      projectGroupId: 'group-a'
+    }
+    const twin: Repo = { ...repo, executionHostId: 'runtime:remote' }
+    const onCommitRepoOrder = vi.fn()
+    const onCommitProjectGroupOrder = vi.fn()
+    commitProjectHeaderDragDrop({
+      session: {
+        repo,
+        bucketKey: 'group:group-a',
+        sidebarRepoHeaderIds: ['a', 'b'],
+        pointerId: 1,
+        headerRects: [],
+        handleEl: document.createElement('div'),
+        startX: 0,
+        startY: 0,
+        latestPointerY: 0,
+        promoted: true
+      },
+      sidebarDropIndex: 2,
+      orderedRepoIds: ['a', 'b'],
+      repoById: new Map([['a', twin]]),
+      liveRepos: [twin],
+      usesProjectGroupOrdering: true,
+      onCommitRepoOrder,
+      onCommitProjectGroupOrder
     })
-  })
-
-  it('targets the explicit ungrouped drop zone', () => {
-    expect(
-      computeProjectHeaderBucketDropPreview({
-        pointerY: 415,
-        containerTop: 0,
-        scrollTop: 0,
-        rects,
-        dropZones,
-        sidebarRepoHeaderIdsByBucket: buckets,
-        sourceBucketKey: 'group:group-a',
-        sourceExecutionHostId: 'local',
-        projectGroupHostIdByGroupId: new Map([['group-a', 'local']])
-      })
-    ).toMatchObject({ bucketKey: 'ungrouped', dropIndex: 0 })
-  })
-
-  it('rejects a group drop zone owned by another host', () => {
-    expect(
-      computeProjectHeaderBucketDropPreview({
-        pointerY: 215,
-        containerTop: 0,
-        scrollTop: 0,
-        rects,
-        dropZones,
-        sidebarRepoHeaderIdsByBucket: buckets,
-        sourceBucketKey: 'group:group-a',
-        sourceExecutionHostId: 'local',
-        projectGroupHostIdByGroupId: new Map([
-          ['group-a', 'local'],
-          ['group-b', 'runtime:remote']
-        ])
-      })
-    ).toBeNull()
+    expect(onCommitRepoOrder).not.toHaveBeenCalled()
+    expect(onCommitProjectGroupOrder).not.toHaveBeenCalled()
   })
 })
 

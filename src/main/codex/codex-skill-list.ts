@@ -1,11 +1,11 @@
-import type { AgentSessionSlashCommand } from '../../shared/agent-session/agent-session-wire'
-import { structuredSlashCommands } from '../../shared/agent-session/view/structured-agent-session-composer'
+import type { AgentSessionSlashCommand } from '../../shared/agent-session-wire'
+import { structuredSlashCommands } from '../../shared/structured-agent-session-composer'
 import type { CodexAppServerConnection } from './app-server/codex-app-server-connection-types'
+import type { CodexAppServerRpc } from './codex-app-server-session'
 import {
-  type CodexAppServerRpc,
   CodexAppServerUnsupportedError,
   isCodexMethodNotFoundError
-} from './app-server/codex-app-server-session'
+} from './codex-app-server-session'
 import { isRecord } from '../../shared/agent-status-child-work-value-guards'
 
 export const CODEX_SKILLS_LIST_METHOD = 'skills/list'

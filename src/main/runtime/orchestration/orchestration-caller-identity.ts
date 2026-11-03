@@ -48,16 +48,7 @@ export function runCoordinatorKey(run: RunRow): OrchestrationCoordinatorKey {
   }
 }
 
-export function runBoundToCoordinator(
-  run: Pick<
-    RunRow,
-    | 'coordinator_pane_key'
-    | 'coordinator_orca_session_id'
-    | 'coordinator_orca_session_id_generation'
-    | 'consumer_generation'
-  >,
-  caller: OrchestrationCoordinatorKey
-): boolean {
+export function runBoundToCoordinator(run: RunRow, caller: OrchestrationCoordinatorKey): boolean {
   if (
     caller.paneKey !== null &&
     run.coordinator_pane_key !== null &&

@@ -1,5 +1,5 @@
 import { agentStartedTelemetry } from '../agent-launch/agent-started-telemetry'
-import type { AgentLaunchPreferences } from '../../shared/agent-session/agent-session-host-authority'
+import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
 import type { Repo } from '../../shared/repo-types'
 import type { TuiAgent } from '../../shared/tui-agent'
 import type { WorktreeStartupLaunch } from '../../shared/worktree/launch-types'
@@ -19,9 +19,17 @@ import {
 import { detectAgentsOnHost } from '../preflight/workspace-agent-detection'
 import type { RuntimeStore } from './runtime-store-contract'
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
+import type { SessionOptionValue } from '../../shared/native-chat/input/native-chat-session-options'
 
 export type WorktreeStartupDraftPaste = { agent: TuiAgent; content: string }
 export type WorktreeStartupFollowup = { agent: TuiAgent; prompt: string }
+export type WorktreeStartupInputs = {
+  agentArgs?: string | null
+  extraAgentArgs?: string
+  suppressStartupUpdatePrompt?: boolean
+  launchSource?: string
+  onPromptCarry?: (carried: boolean) => void
+}
 
 /** Require agent_started attribution on every host-built fresh launch. */
 type AttributedWorktreeStartupLaunch = WorktreeStartupLaunch & {
@@ -73,7 +81,11 @@ export async function resolveWorktreeStartupDraftAgent(
 }
 
 export async function buildWorktreeStartupForDraft(
-  environment: StartupEnvironment & { draft: string; requestedAgent?: TuiAgent }
+  environment: StartupEnvironment & {
+    draft: string
+    requestedAgent?: TuiAgent
+    sessionOptions?: Record<string, SessionOptionValue>
+  }
 ): Promise<{
   agent: TuiAgent
   startup: AttributedWorktreeStartupLaunch
@@ -97,7 +109,10 @@ export async function buildWorktreeStartupForDraft(
     platform,
     shell,
     isRemote: repoIsRemote(repo),
-    ...(environment.agentArgs !== undefined ? { agentArgs: environment.agentArgs } : {})
+    ...(environment.agentArgs !== undefined ? { agentArgs: environment.agentArgs } : {}),
+    ...(environment.extraAgentArgs ? { extraAgentArgs: environment.extraAgentArgs } : {}),
+    ...(environment.suppressStartupUpdatePrompt ? { suppressStartupUpdatePrompt: true } : {}),
+    sessionOptions: environment.sessionOptions
   })
   const telemetry = agentStartedTelemetry(agent, environment.launchSource)
   const draftPlan = buildAgentDraftLaunchPlan({ ...launchArgs, draft: content })
@@ -122,6 +137,9 @@ export async function buildWorktreeStartupForDraft(
     allowEmptyPromptLaunch: true
   })
   if (!startupPlan) {
+    if (environment.sessionOptions && Object.keys(environment.sessionOptions).length > 0) {
+      throw new Error(`Could not build launch command for ${agent}.`)
+    }
     return null
   }
   return {
@@ -224,13 +242,7 @@ export function resolveWorktreeCreateAgentStartup(
     agent: TuiAgent,
     prompt: string | undefined,
     preferences: AgentLaunchPreferences | undefined,
-    inputs: {
-      agentArgs?: string | null
-      extraAgentArgs?: string
-      suppressStartupUpdatePrompt?: boolean
-      launchSource?: string
-      onPromptCarry?: (carried: boolean) => void
-    }
+    inputs: WorktreeStartupInputs
   ) => {
     agent: TuiAgent
     startup: WorktreeStartupLaunch
@@ -241,17 +253,22 @@ export function resolveWorktreeCreateAgentStartup(
   if (args.startup || !args.startupAgent) {
     return null
   }
-  const built = build(args.startupAgent, args.startupPrompt, args.startupLaunchPreferences, {
+  return build(
+    args.startupAgent,
+    args.startupPrompt,
+    args.startupLaunchPreferences,
+    worktreeStartupInputs(args)
+  )
+}
+
+export function worktreeStartupInputs(
+  args: RuntimeManagedWorktreeCreateArgs
+): WorktreeStartupInputs {
+  return {
     ...(args.startupAgentArgs !== undefined ? { agentArgs: args.startupAgentArgs } : {}),
     ...(args.startupExtraAgentArgs ? { extraAgentArgs: args.startupExtraAgentArgs } : {}),
     ...(args.startupSuppressUpdatePrompt ? { suppressStartupUpdatePrompt: true } : {}),
     ...(args.startupLaunchSource ? { launchSource: args.startupLaunchSource } : {}),
     ...(args.onStartupPromptCarry ? { onPromptCarry: args.onStartupPromptCarry } : {})
-  })
-  return args.startupAccountEnv
-    ? {
-        ...built,
-        startup: { ...built.startup, env: { ...built.startup.env, ...args.startupAccountEnv } }
-      }
-    : built
+  }
 }

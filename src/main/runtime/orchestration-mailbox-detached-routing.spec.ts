@@ -16,7 +16,6 @@ import {
   TERMINAL_HANDLE
 } from './orchestration-mailbox-notification-test-harness'
 import { createRootDispatch } from './orchestration/db/root-dispatch-test-fixture'
-import { MessageWake } from './runtime-message-waiters'
 
 describe('orchestration detached mailbox routing', () => {
   afterEach(() => {
@@ -56,9 +55,11 @@ describe('orchestration detached mailbox routing', () => {
     expect(checked.messages).toEqual([expect.objectContaining({ id: message.id })])
     expect(db.getMessageById(message.id)).toMatchObject({
       to_handle: `dispatch:${dispatch.id}`,
-      read: 1,
+      read: 0,
       delivered_at: expect.any(String)
     })
+    await checkBoundMailbox(harness.runtime, { ack: checked.deliveryId! })
+    expect(db.getMessageById(message.id)?.read).toBe(1)
     db.close()
   })
 
@@ -87,7 +88,7 @@ describe('orchestration detached mailbox routing', () => {
     harness.runtime.notifyMessageArrived(TERMINAL_HANDLE, message.type)
     await Promise.resolve()
 
-    await expect(waiting).resolves.toBeInstanceOf(MessageWake)
+    await expect(waiting).resolves.toBe('notified')
     expect(pointerCount(harness.write)).toBe(0)
     expect(db.getMessageById(message.id)?.to_handle).toBe(`run:${runA.id}`)
     expect(db.getCurrentRunForPane(PANE_KEY)?.id).toBe(runB.id)
@@ -130,7 +131,7 @@ describe('orchestration detached mailbox routing', () => {
     })
 
     harness.runtime.notifyMessageArrived(TERMINAL_HANDLE, message.type)
-    await expect(waiting).resolves.toBeInstanceOf(MessageWake)
+    await expect(waiting).resolves.toBe('notified')
     expect(pointerCount(harness.write)).toBe(0)
     expect(db.getMessageById(message.id)?.to_handle).toBe(`dispatch:${dispatch.id}`)
 
@@ -147,13 +148,13 @@ describe('orchestration detached mailbox routing', () => {
     db.close()
   })
 
-  it('uses bounded ownership lookup for direct arrivals while the agent cannot take input', async () => {
+  it('uses bounded ownership lookup for direct arrivals while the agent is working', async () => {
     vi.useFakeTimers()
     const db = createDatabase('orca-mailbox-bounded-')
     const harness = createRuntime(db)
-    const run = createBoundRun(db, 'Permission Run')
+    const run = createBoundRun(db, 'Working Run')
     await harness.runtime.listTerminals()
-    harness.runtime.onPtyData(PTY_ID, '\x1b]0;Codex needs permission\x07', 1)
+    harness.runtime.onPtyData(PTY_ID, '\x1b]0;Codex working\x07', 1)
     const fullMailboxScan = vi.spyOn(db, 'getUndeliveredUnreadMessages')
     const message = insertDirectRunMessage(db, run.id, 'Direct coordinator status')
 
@@ -241,7 +242,7 @@ describe('orchestration detached mailbox routing', () => {
 
     harness.runtime.notifyMessageArrived(detachedHandle, message.type)
 
-    await expect(waiting).resolves.toBeInstanceOf(MessageWake)
+    await expect(waiting).resolves.toBe('notified')
     expect(db.getMessageById(message.id)?.to_handle).toBe(detachedHandle)
     db.close()
   })
@@ -284,8 +285,8 @@ describe('orchestration detached mailbox routing', () => {
     harness.runtime.notifyMessageArrived(detachedHandle, 'status')
 
     await expect(Promise.all([canonicalWait, directWait])).resolves.toEqual([
-      expect.any(MessageWake),
-      expect.any(MessageWake)
+      'notified',
+      'notified'
     ])
     expect(db.getMessageById(owned.id)?.to_handle).toBe(`run:${ownedRun.id}`)
     expect(db.getMessageById(direct.id)?.to_handle).toBe(detachedHandle)
@@ -369,7 +370,7 @@ describe('orchestration detached mailbox routing', () => {
 
     harness.runtime.notifyMessageArrived(TERMINAL_HANDLE, message.type)
 
-    await expect(waiting).resolves.toBeInstanceOf(MessageWake)
+    await expect(waiting).resolves.toBe('notified')
     expect(db.getMessageById(message.id)?.to_handle).toBe(`dispatch:${dispatch.id}`)
     db.close()
   })

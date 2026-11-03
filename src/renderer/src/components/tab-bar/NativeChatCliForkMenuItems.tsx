@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
-import { ContextMenuSeparator } from '@/components/ui/context-menu'
 import { useAppStore } from '@/store'
 import { AI_VAULT_AGENTS } from '../../../../shared/ai-vault-types'
 import { AiVaultSessionSurfaceSwitchMenuItems } from '../right-sidebar/AiVaultSessionSurfaceSwitchMenuItems'
@@ -14,13 +13,11 @@ export function NativeChatCliForkMenuItems({
   tab,
   nativeChat,
   leadingSeparator,
-  menuKind = 'context',
   onComplete
 }: {
   tab: { id: string; worktreeId: string }
   nativeChat: NativeChatTabSession
   leadingSeparator: boolean
-  menuKind?: 'context' | 'dropdown'
   onComplete?: () => void
 }): React.JSX.Element | null {
   const [subject] = useState(() =>
@@ -35,13 +32,12 @@ export function NativeChatCliForkMenuItems({
   if (!chat || !agent) {
     return null
   }
-  const Separator = menuKind === 'context' ? ContextMenuSeparator : DropdownMenuSeparator
   return (
     <>
-      {leadingSeparator ? <Separator /> : null}
+      {leadingSeparator ? <DropdownMenuSeparator /> : null}
       <AiVaultSessionSurfaceSwitchMenuItems
         action="switch"
-        menuKind={menuKind}
+        menuKind="dropdown"
         tooltipSide="right"
         cliPending={pending}
         onResumeInNewCli={(event) => {

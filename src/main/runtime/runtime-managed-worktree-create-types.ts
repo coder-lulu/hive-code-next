@@ -1,5 +1,4 @@
-import type { RuntimeTerminalCreate } from '../../shared/runtime-terminal-create-contract'
-import type { AgentLaunchPreferences } from '../../shared/agent-session/agent-session-host-authority'
+import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
 import type { CreateWorktreeArgs } from '../../shared/worktree/create-types'
 import type {
   AutomationWorkspaceProvenance,
@@ -68,11 +67,10 @@ export type RuntimeManagedWorktreeCreateArgs = {
   startupAgent?: TuiAgent
   terminalImageViewerSupported?: boolean
   startupLaunchPreferences?: AgentLaunchPreferences
+  startupLaunchToken?: string
   startupPrompt?: string
   /** Main-only: caller delivers any uncarried startupPrompt through a compatible typed line and receives delivery status. */
   onStartupPromptCarry?: (carried: boolean) => void
-  /** Main-only completed startup creation; never projected onto the worktree RPC result. */
-  onStartupTerminalCreated?: (terminal: RuntimeTerminalCreate) => void
   /** Per-launch inputs used when `startupAgent` is the created terminal surface. */
   startupAgentArgs?: string | null
   /** Main-internal: an automation's saved extras, merged over the startup agent's arguments. */
@@ -103,7 +101,6 @@ export type RuntimeManagedWorktreeCreateArgs = {
     envParentWorkspace?: string
     parentWorktree?: string
     cwdParentWorktree?: string
-    cwdParentAmbiguous?: true
     noParent?: boolean
     callerTerminalHandle?: string
     comment?: string

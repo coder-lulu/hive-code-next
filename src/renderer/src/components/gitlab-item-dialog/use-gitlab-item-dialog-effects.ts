@@ -50,14 +50,11 @@ export function useGitLabItemDetailsEffect(
 }
 
 export function useGitLabItemScopeResetEffect(
-  detailsOwner: string | null,
+  itemId: string | null,
   state: GitLabItemDialogState
 ): void {
   const {
-    setActionInFlight,
     setBodyDraft,
-    setCommentSubmitting,
-    setDetailsSaving,
     setEditingDetails,
     setExpandedJobId,
     setInlineCommentBody,
@@ -76,12 +73,8 @@ export function useGitLabItemScopeResetEffect(
     setTitleDraft
   } = state
   // Reset item-scoped provider state here; render already resets the top-level draft before paint.
-  // Busy flags too: a write for the previous target no longer releases them once the target changes.
   useEffect(() => {
     setEditingDetails(false)
-    setDetailsSaving(false)
-    setActionInFlight(null)
-    setCommentSubmitting(false)
     setTitleDraft('')
     setBodyDraft('')
     setLabelDraft('')
@@ -99,11 +92,8 @@ export function useGitLabItemScopeResetEffect(
     setJobTraceById({})
     setRetryingJobId(null)
   }, [
-    detailsOwner,
-    setActionInFlight,
+    itemId,
     setBodyDraft,
-    setCommentSubmitting,
-    setDetailsSaving,
     setEditingDetails,
     setExpandedJobId,
     setInlineCommentBody,

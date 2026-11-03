@@ -76,6 +76,7 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
           taskId: task.id,
           dispatchId: 'ctx_dryrun',
           canDispatchSubWorkers: previewDepth < maxDepth,
+          heartbeatIntervalMinutes: runtime.getOrchestrationHeartbeatMinutes(),
           taskSpec: task.spec,
           coordinatorHandle: orcaSessionIdOrHandle(params.from ?? 'coordinator', db),
           workerHandle: assignee ? orcaSessionIdOrHandle(assignee, db) : 'worker',
@@ -98,10 +99,8 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
         )
       }
 
-      // A structured worker's chat keeps the pane and process its custody is held under.
-      const sessionOnly = assigneeParty?.terminalHandle === null
-      const dispatchAuthority = sessionOnly ? null : runtime.getOrchestrationDispatchAuthority(to)
-      const assigneePaneKey = sessionOnly
+      const dispatchAuthority = chatAssignee ? null : runtime.getOrchestrationDispatchAuthority(to)
+      const assigneePaneKey = chatAssignee
         ? undefined
         : (dispatchAuthority?.paneKey ?? runtime.getTerminalPaneKey(to) ?? undefined)
       const processIncarnation =
@@ -142,7 +141,7 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
         }
       }
 
-      if (params.inject && !sessionOnly && (!assigneePaneKey || !processIncarnation)) {
+      if (params.inject && !chatAssignee && (!assigneePaneKey || !processIncarnation)) {
         throw new OrchestrationError(
           'stable_pane_required',
           `Terminal ${to} has no stable pane/process incarnation for lifecycle authority.`
@@ -156,18 +155,16 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
         assigneePaneKey,
         launchTokenHash: dispatchAuthority?.launchTokenHash ?? undefined,
         processIncarnation,
-        hostScope: dispatchAuthority?.hostScope
-          ? JSON.stringify(dispatchAuthority.hostScope)
-          : null,
         creator: resolveDispatchCreator(runtime, params.from, orchestrationCaller),
         maxDepth: runtime.getNestedWorkerMaxDepth()
       })
 
-      // Build after ctx so worker_done carries this Dispatch's real id.
+      // Build after ctx to put its real id in heartbeats and attribute liveness to this Dispatch.
       const preamble = buildDispatchPreamble({
         taskId: task.id,
         dispatchId: ctx.id,
         canDispatchSubWorkers: ctx.depth < runtime.getNestedWorkerMaxDepth(),
+        heartbeatIntervalMinutes: runtime.getOrchestrationHeartbeatMinutes(),
         taskSpec: task.spec,
         coordinatorHandle: orcaSessionIdOrHandle(params.from ?? 'coordinator', db),
         workerHandle: orcaSessionIdOrHandle(to, db),
@@ -184,8 +181,8 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
               db,
               dispatch: ctx,
               from: params.from,
-              senderSnapshot: (party, reported) =>
-                runtime.orchestrationSenderNames.snapshotOf(party, reported)
+              senderName: (party, reported) =>
+                runtime.orchestrationSenderNames.nameOf(party, reported)
             })
             await sendChatTask({ db, dispatch: ctx, from, preamble })
           } else {
@@ -246,6 +243,7 @@ export const ORCHESTRATION_DISPATCH_METHODS = [
           // Use the real Dispatch id for matching previews; use a placeholder before dispatch.
           dispatchId: ctx?.id ?? 'ctx_preview',
           canDispatchSubWorkers: (ctx?.depth ?? 1) < runtime.getNestedWorkerMaxDepth(),
+          heartbeatIntervalMinutes: runtime.getOrchestrationHeartbeatMinutes(),
           taskSpec: task.spec,
           coordinatorHandle: orcaSessionIdOrHandle(params.from ?? 'coordinator', db),
           workerHandle: orcaSessionIdOrHandle(workerHandle, db),

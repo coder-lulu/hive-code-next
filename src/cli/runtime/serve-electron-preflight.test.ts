@@ -1,23 +1,11 @@
-import { mkdtempSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
-import { createServer, type Socket } from 'node:net'
+import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { RuntimeMetadata } from '../../shared/runtime-bootstrap'
 import { readServeAbortPark, writeServeAbortPark } from '../../shared/serve-abort-park'
 import { preflightElectronServe, recordElectronServeStartupAbort } from './serve-electron-preflight'
-import * as metadataReader from './metadata'
 import { RuntimeClientError } from './types'
-
-vi.mock('./metadata', async (original) => {
-  const actual = await original<typeof metadataReader>()
-  return { ...actual, tryReadMetadata: vi.fn(actual.tryReadMetadata) }
-})
-
-let actualMetadata: typeof metadataReader
-beforeAll(async () => {
-  actualMetadata = await vi.importActual<typeof metadataReader>('./metadata')
-})
 
 const METADATA: RuntimeMetadata = {
   runtimeId: 'runtime-1',
@@ -28,7 +16,16 @@ const METADATA: RuntimeMetadata = {
 }
 
 function status(reachable: boolean, pid: number | null = 4242) {
-  return { reachable, legacyPidRunning: reachable, pid }
+  return {
+    id: 'local',
+    ok: true as const,
+    result: {
+      app: { running: reachable, pid },
+      runtime: { state: reachable ? 'ready' : 'stale_bootstrap', reachable, runtimeId: null },
+      graph: { state: 'not_running' }
+    },
+    _meta: { runtimeId: null }
+  }
 }
 
 describe('preflightElectronServe', () => {
@@ -57,7 +54,7 @@ describe('preflightElectronServe', () => {
   ) {
     return {
       readMetadata: () => (overrides.metadata === undefined ? METADATA : overrides.metadata),
-      readAdmission: vi.fn(async () => {
+      readStatus: vi.fn(async () => {
         if (overrides.statusError) {
           throw overrides.statusError
         }
@@ -178,80 +175,4 @@ describe('preflightElectronServe', () => {
       ).toBeNull()
     })
   })
-})
-
-// Real bootstrap/transport/listener coverage of the default admission dependency.
-describe.skipIf(process.platform === 'win32')('serve private admission snapshots', () => {
-  let root: string
-  let server: ReturnType<typeof createServer> | undefined
-  const sockets = new Set<Socket>()
-  beforeEach(() => {
-    root = mkdtempSync(join(tmpdir(), 'orca-serve-admission-'))
-    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
-  })
-  afterEach(async () => {
-    for (const socket of sockets) {
-      socket.destroy()
-    }
-    sockets.clear()
-    if (server) {
-      const listening = server
-      await new Promise<void>((resolve) => listening.close(() => resolve()))
-    }
-    server = undefined
-    vi.restoreAllMocks()
-    vi.mocked(metadataReader.tryReadMetadata).mockReset()
-    vi.mocked(metadataReader.tryReadMetadata).mockImplementation(actualMetadata.tryReadMetadata)
-    rmSync(root, { recursive: true, force: true })
-  })
-  function publish(pid = 2147483647, endpoint = join(root, 'runtime.sock')) {
-    const metadata = { ...METADATA, pid, transports: [{ kind: 'unix', endpoint }] }
-    writeFileSync(join(root, 'orca-runtime.json'), JSON.stringify(metadata))
-    return metadata
-  }
-  it('keeps the missing-M0 default path synchronous without a second read', () => {
-    expect(preflightElectronServe({}, root, { platform: 'linux' })).toBeNull()
-    expect(metadataReader.tryReadMetadata).toHaveBeenCalledTimes(1)
-  })
-  it.each([2147483647, process.pid])(
-    'retains launch permission for absent listener even with PID %s',
-    async (pid) => {
-      publish(pid)
-      await expect(preflightElectronServe({}, root, { platform: 'linux' })).resolves.toBeNull()
-      expect(metadataReader.tryReadMetadata).toHaveBeenCalledTimes(2)
-    }
-  )
-  it.each(['disappeared', 'replacement', 'incomplete'])(
-    'probes original M0 listener after M1 %s',
-    async (change) => {
-      const first = publish()
-      const listener = createServer((socket) => {
-        sockets.add(socket)
-        socket.once('close', () => sockets.delete(socket))
-        socket.resume()
-      })
-      server = listener
-      await new Promise<void>((resolve) => listener.listen(first.transports[0].endpoint, resolve))
-      vi.mocked(metadataReader.tryReadMetadata).mockImplementationOnce((path) => {
-        const m0 = actualMetadata.tryReadMetadata(path)
-        if (change === 'disappeared') {
-          unlinkSync(join(root, 'orca-runtime.json'))
-        } else {
-          publish(process.pid, join(root, 'new.sock'))
-          if (change === 'incomplete') {
-            writeFileSync(
-              join(root, 'orca-runtime.json'),
-              JSON.stringify({ ...first, authToken: null })
-            )
-          }
-        }
-        return m0
-      })
-      await expect(preflightElectronServe({}, root, { platform: 'linux' })).resolves.toBe(3)
-      expect(String(vi.mocked(process.stderr.write).mock.calls.at(-1)?.[0])).toContain(
-        change === 'replacement' ? `pid ${process.pid}` : 'pid 2147483647'
-      )
-      expect(metadataReader.tryReadMetadata).toHaveBeenCalledTimes(2)
-    }
-  )
 })

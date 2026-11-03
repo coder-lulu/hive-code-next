@@ -15,7 +15,6 @@ vi.mock('../storage/preferences', () => ({
 }))
 vi.mock('../transport/host-store', () => ({
   loadHosts: async () => [],
-  peekHosts: () => null,
   updateLastConnected: async () => {}
 }))
 vi.mock('../worktree/host-worktree-refresh', () => ({ startHostWorktreeRefresh: () => () => {} }))

@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 import type { PairingOffer } from '../../shared/pairing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -78,7 +79,7 @@ describe('PairedRuntimeBrowserHostLease', () => {
       browserHostGeneration: 4
     })
     expect(subscribeRemoteRuntimeRequestMock).toHaveBeenCalledWith(
-      pairing,
+      pairedRuntimeConnectionFromOffer(pairing),
       'browser.clientHost.attach',
       {
         authorityRuntimeId: 'runtime-a',
@@ -147,7 +148,7 @@ describe('PairedRuntimeBrowserHostLease', () => {
 
     await expect(starting).resolves.toMatchObject({ pageCommandProtocolVersion: 1 })
     expect(subscribeRemoteRuntimeRequestMock).toHaveBeenCalledWith(
-      pairing,
+      pairedRuntimeConnectionFromOffer(pairing),
       'browser.clientHost.attach',
       expect.objectContaining({ pageCommandProtocolVersion: 1 }),
       expect.any(Number),
@@ -192,7 +193,7 @@ describe('PairedRuntimeBrowserHostLease', () => {
 
     expect(getPageInventory).toHaveBeenCalledOnce()
     expect(subscribeRemoteRuntimeRequestMock).toHaveBeenCalledWith(
-      pairing,
+      pairedRuntimeConnectionFromOffer(pairing),
       'browser.clientHost.attach',
       expect.objectContaining({
         pageInventoryProtocolVersion: 1,
@@ -249,7 +250,7 @@ describe('PairedRuntimeBrowserHostLease', () => {
 
     await expect(starting).resolves.not.toHaveProperty('pageInventoryProtocolVersion')
     expect(subscribeRemoteRuntimeRequestMock).toHaveBeenCalledWith(
-      pairing,
+      pairedRuntimeConnectionFromOffer(pairing),
       'browser.clientHost.attach',
       expect.objectContaining({ pageInventoryProtocolVersion: 1, pageInventory: [] }),
       expect.any(Number),
@@ -701,7 +702,7 @@ function createLease(
   } = {}
 ): PairedRuntimeBrowserHostLease {
   return new PairedRuntimeBrowserHostLease({
-    connection: pairing,
+    connection: pairedRuntimeConnectionFromOffer(pairing),
     authorityRuntimeId: 'runtime-a',
     browserHostClientId: 'host-a',
     hostCapabilities: ['webview'],

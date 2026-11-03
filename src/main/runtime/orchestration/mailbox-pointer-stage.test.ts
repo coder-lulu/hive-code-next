@@ -9,12 +9,14 @@ import {
   type WriteSettlement
 } from '../../../shared/pty-write-settlement'
 
-const TERMINAL = {
+const LEAF = {
+  tabId: 'tab-1',
+  leafId: 'leaf-1',
   ptyId: 'pty-1',
-  handle: 'term-1',
-  paneKeys: ['tab-1:leaf-1'],
+  writable: true,
   lastAgentStatus: 'idle' as const,
-  lastAgentStatusObservedLive: true
+  lastAgentStatusObservedLive: true,
+  lastOscTitle: null
 }
 
 function pointerDeps(
@@ -23,14 +25,21 @@ function pointerDeps(
 ) {
   return {
     mailboxOwner: { resolve: () => 'run:run-1' },
-    deliveryTarget: { resolveTerminal: () => TERMINAL, deferForAbsenceProbe: () => false },
+    deliveryTarget: { resolveTerminalHandle: () => 'term-1', deferForAbsenceProbe: () => false },
     getDb: () => db,
-    getTerminal: () => TERMINAL,
+    getLeaf: () => LEAF,
+    getLeafKey: () => 'tab-1:leaf-1',
+    getLiveLeafForHandle: () => LEAF,
     // Hold the pane settled to isolate staging and Enter phases from the idle gate.
     isAgentSettledForDelivery: () => true,
     getMessageWaiters: () => undefined,
     getCliCommand: () => 'orca' as const,
-    resolveSubmitTarget: () => ({ terminal: TERMINAL, processIncarnation: 'inc-1' }),
+    getTerminalHandleForLeafKey: () => 'term-1',
+    resolveSubmitTarget: () => ({
+      leaf: LEAF,
+      terminalHandle: 'term-1',
+      processIncarnation: 'inc-1'
+    }),
     isLeafPtyProvenAbsent: async () => false,
     isPtyAwaitingUserInput: () => false,
     redriveMailbox: vi.fn(),
@@ -42,10 +51,11 @@ function stageArgs(db: OrchestrationDb, state: OrchestrationMailboxPointerState)
   return {
     deps: pointerDeps(db, () => WRITE_ACCEPTED),
     state,
-    terminal: TERMINAL,
+    leaf: LEAF,
     mailboxHandle: 'run:run-1',
     newestSequence: 1,
     enterDelayMs: 5,
+    leafKey: 'tab-1:leaf-1',
     settle: (ptyId: string, flight: never) => state.settleFlight(ptyId, flight),
     redrive: vi.fn()
   }
@@ -110,6 +120,26 @@ describe('mailbox pointer staging watermark', () => {
     db.close()
   })
 
+  it('keeps the watermark for the flight that owns the reservation', () => {
+    const db = new OrchestrationDb(':memory:')
+    const message = db.insertMessage({
+      runId: 'run_legacy_local',
+      from: 'a',
+      to: 'run:run-1',
+      subject: 's'
+    })
+    const state = new OrchestrationMailboxPointerState()
+    const args = stageArgs(db, state)
+    stageOrchestrationMailboxPointer({
+      ...args,
+      deps: { ...args.deps, writePty: () => WRITE_ACCEPTED },
+      messages: [{ id: message.id, type: 'status', sequence: 1 }]
+    } as never)
+
+    expect(state.hasActiveWatermark('run:run-1')).toBe(true)
+    db.close()
+  })
+
   it('drains a delivery parked behind the watermark when the write is refused', () => {
     const db = new OrchestrationDb(':memory:')
     const message = db.insertMessage({
@@ -158,18 +188,17 @@ describe('mailbox pointer staging watermark', () => {
     })
 
     const writePty = vi.fn(() => WRITE_ACCEPTED)
-    // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fixture supplies only the deps delivery reads.
     const delivery = new OrchestrationMailboxPointerDelivery<never>({
       ...pointerDeps(contended, writePty),
-      redriveMailbox: (handle: string) => delivery.deliver(TERMINAL, { mailboxHandle: handle })
+      redriveMailbox: (handle: string) => delivery.deliver(LEAF, { mailboxHandle: handle })
     } as never)
 
-    delivery.deliver(TERMINAL, { mailboxHandle: 'run:run-1', skipAbsenceProbe: true })
+    delivery.deliver(LEAF, { mailboxHandle: 'run:run-1', skipAbsenceProbe: true })
     await new Promise((resolve) => setImmediate(resolve))
     expect(writePty).not.toHaveBeenCalled()
 
     db.insertMessage({ runId: 'run_legacy_local', from: 'a', to: 'run:run-1', subject: 'second' })
-    delivery.deliver(TERMINAL, { mailboxHandle: 'run:run-1', skipAbsenceProbe: true })
+    delivery.deliver(LEAF, { mailboxHandle: 'run:run-1', skipAbsenceProbe: true })
     await new Promise((resolve) => setImmediate(resolve))
 
     expect(writePty.mock.calls.length).toBeGreaterThan(0)
@@ -182,10 +211,12 @@ describe('mailbox pointer staging watermark', () => {
     const message = db.insertMessage({ from: 'a', to: 'run:run-1', subject: 'mail' })
     const writePty = vi.fn((_ptyId: string, _data: string) => WRITE_ACCEPTED)
     const state = new OrchestrationMailboxPointerState()
+    const cursorLeaf = { ...LEAF, lastOscTitle: 'Cursor Agent' }
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the fixture supplies only the deps the staging path reads.
     stageOrchestrationMailboxPointer({
       ...stageArgs(db, state),
       deps: pointerDeps(db, writePty),
+      leaf: cursorLeaf,
       messages: [{ id: message.id, type: 'status', sequence: 1 }]
     } as never)
 
@@ -210,7 +241,7 @@ describe('retiring a pty mid-delivery', () => {
     try {
       const message = db.insertMessage({ from: 'a', to: 'run:run-1', subject: 'mail' })
       const delivery = new OrchestrationMailboxPointerDelivery(pointerDeps(db, writePty) as never)
-      delivery.deliver(TERMINAL, { mailboxHandle: 'run:run-1' })
+      delivery.deliver(LEAF, { mailboxHandle: 'run:run-1' })
 
       settlements[0]?.(WRITE_ACCEPTED)
       await vi.advanceTimersByTimeAsync(0)
@@ -244,7 +275,7 @@ describe('retiring a pty mid-delivery', () => {
     try {
       const message = db.insertMessage({ from: 'a', to: 'run:run-1', subject: 'mail' })
       const delivery = new OrchestrationMailboxPointerDelivery(pointerDeps(db, writePty) as never)
-      delivery.deliver(TERMINAL, { mailboxHandle: 'run:run-1' })
+      delivery.deliver(LEAF, { mailboxHandle: 'run:run-1' })
       settlements[0]?.(WRITE_ACCEPTED)
       await vi.advanceTimersByTimeAsync(0)
       expect(db.getMessageById(message.id)?.pointer_enter_pending).toBe(2)

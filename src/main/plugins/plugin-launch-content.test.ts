@@ -10,7 +10,6 @@ import {
 } from '../../shared/plugins/catalog/plugin-marketplace'
 import { bootstrapBundledPlugins, resolveBundledPluginRoot } from './plugin-bundled-bootstrap'
 import { inspectPluginInstallTree } from './installation/plugin-install-staging'
-import { PLUGIN_SCHEMA_NEWEST_SINCE } from '../../shared/plugins/installation/plugin-host-version'
 
 const launchRoot = join(process.cwd(), 'resources', 'plugins', 'launch')
 const temporaryRoots: string[] = []
@@ -52,22 +51,20 @@ describe('Phase 1 launch plugin content', () => {
       .filter((entry) => entry.isDirectory())
       .map((entry) => entry.name)
       .sort()
-    const shippedKeys = [
-      ...marketplace.plugins.map((plugin) => plugin.id),
-      ...(await readBundledPluginKeys())
-    ].sort()
-    expect(shippedKeys).toEqual(localPluginDirectories)
+    expect(marketplace.plugins.map((plugin) => plugin.id).sort()).toEqual(localPluginDirectories)
 
     const contributionKinds = new Set<string>()
-    for (const pluginKey of shippedKeys) {
+    for (const listing of marketplace.plugins) {
       const inspection = await inspectPluginInstallTree({
-        rootDir: join(launchRoot, pluginKey),
-        hostVersion: PLUGIN_SCHEMA_NEWEST_SINCE,
-        identity: { pluginKey }
+        rootDir: join(launchRoot, listing.id),
+        hostVersion: '1.4.0',
+        expectedPluginKey: listing.id
       })
-      expect(inspection, `${pluginKey} must pass the production install inspection`).toMatchObject({
-        ok: true
-      })
+      expect(inspection, `${listing.id} must pass the production install inspection`).toMatchObject(
+        {
+          ok: true
+        }
+      )
       if (!inspection.ok) {
         continue
       }
@@ -75,11 +72,8 @@ describe('Phase 1 launch plugin content', () => {
       if (contributes.vmRecipes.length > 0) {
         contributionKinds.add('vm-recipe')
       }
-      if (contributes.themes.length > 0) {
-        contributionKinds.add('theme')
-      }
     }
-    expect(contributionKinds).toEqual(new Set(['vm-recipe', 'theme']))
+    expect(contributionKinds).toEqual(new Set(['vm-recipe']))
   })
 
   it('publishes every bundled pack only when its release hash matches exact bytes', async () => {
@@ -89,7 +83,7 @@ describe('Phase 1 launch plugin content', () => {
     const result = await bootstrapBundledPlugins({
       root: launchRoot,
       userDataPath,
-      hostVersion: PLUGIN_SCHEMA_NEWEST_SINCE
+      hostVersion: '1.4.0'
     })
 
     expect(result.errors).toEqual([])
@@ -111,7 +105,7 @@ describe('Phase 1 launch plugin content', () => {
         appPath: join(resourcesPath, 'app.asar')
       }),
       userDataPath,
-      hostVersion: PLUGIN_SCHEMA_NEWEST_SINCE
+      hostVersion: '1.4.0'
     })
 
     expect(result.errors).toEqual([])

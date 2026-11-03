@@ -1,13 +1,11 @@
 import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
 import type { GitHubSlice } from './slice-types'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host'
-import { buildPRRefreshCandidate, findWorktreeReviewOwner } from './worktree-refresh'
+import type { Worktree } from '../../../../shared/worktree/types'
 import { getGitHubRepoLookupIndex } from '../slices/github-repo-lookup-index'
-import { issueCacheKey } from './cache-identity'
+import { issueCacheKey, prCacheKey } from './cache-identity'
 import { CACHE_TTL, evictStaleEntries } from './cache-policy'
 import { pruneExpiredPRRefreshStates } from './pr-refresh-state'
-import { pruneExpiredPRRefreshStartedEntries } from './pr-result-cache'
 import { settingsForGitHubRepoOwner } from './work-item-routing'
 import { selectWorktreesByRepo } from '../workspace-record-selectors'
 
@@ -16,7 +14,6 @@ export const createRefreshSweepActions = (
   get: Parameters<StateCreator<AppState>>[1]
 ): Pick<GitHubSlice, 'refreshAllGitHub' | 'refreshGitHubForWorktree'> => ({
   refreshAllGitHub: () => {
-    pruneExpiredPRRefreshStartedEntries()
     // Clear comments cache; evict stale entries to bound long-session growth across repos/branches.
     set((s) => {
       const next = {
@@ -77,22 +74,34 @@ export const createRefreshSweepActions = (
     }
   },
 
-  refreshGitHubForWorktree: (worktreeId, executionHostId) => {
+  refreshGitHubForWorktree: (worktreeId) => {
     const state = get()
-    const owner = findWorktreeReviewOwner(state, worktreeId, executionHostId)
-    if (!owner) {
+    let worktree: Worktree | undefined
+    for (const worktrees of Object.values(selectWorktreesByRepo(state))) {
+      worktree = worktrees.find((w) => w.id === worktreeId)
+      if (worktree) {
+        break
+      }
+    }
+    if (!worktree) {
       return
     }
-    const { worktree, repo } = owner
-    const candidate = buildPRRefreshCandidate(state, worktree, undefined, repo)
-    if (!candidate) {
-      return
-    }
-    const ownerHostId = getRepoExecutionHostId(candidate)
 
-    const branch = candidate.branch
+    const repo = state.repos.find((r) => r.id === worktree.repoId)
+    if (!repo) {
+      return
+    }
+
+    const branch = worktree.branch.replace(/^refs\/heads\//, '')
     const ownerSettings = settingsForGitHubRepoOwner(state.settings, repo)
-    const prKey = candidate.cacheKey
+    const prKey = prCacheKey(
+      repo.path,
+      repo.id,
+      branch,
+      ownerSettings,
+      repo.connectionId,
+      repo.executionHostId
+    )
     const issueKey = worktree.linkedIssue
       ? issueCacheKey(
           repo.path,
@@ -120,7 +129,7 @@ export const createRefreshSweepActions = (
     })
 
     if (!worktree.isBare && branch) {
-      get().enqueueGitHubPRRefresh(worktreeId, 'post-push', 100, ownerHostId)
+      get().enqueueGitHubPRRefresh(worktreeId, 'post-push', 100)
     }
     if ((state.worktreeCardProperties ?? []).includes('issue') && worktree.linkedIssue) {
       void get().fetchIssue(repo.path, worktree.linkedIssue, { repoId: repo.id })

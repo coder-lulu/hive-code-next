@@ -4,10 +4,10 @@
   "family": "session.terminal-inventory",
   "namedDeltas": [],
   "values": {
-    "475f23d61c0e": {
+    "34f7b35ae07c": {
       "name": "terminal.list#1",
       "ordinal": 2,
-      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"terminal.list\",\"params\":{\"worktree\":\"id:workspace-1\",\"includeVisualLayouts\":false,\"includePreview\":false}}"
+      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"terminal.list\",\"params\":{\"worktree\":\"id:workspace-1\",\"includeVisualLayouts\":false}}"
     },
     "6aa9d70c1c82": {
       "known": [],
@@ -19,7 +19,7 @@
       "settledAt": 0,
       "value": true
     },
-    "fd88f17223dd": {
+    "b499750a17bb": {
       "name": "terminal.list#1",
       "ordinal": 1,
       "args": [
@@ -30,7 +30,6 @@
         {
           "name": "params",
           "value": {
-            "includePreview": false,
             "includeVisualLayouts": false,
             "worktree": "id:workspace-1"
           }
@@ -62,8 +61,8 @@
       {
         "id": "kept",
         "observation": {
-          "sender": ["fd88f17223dd"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["b499750a17bb"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "no-empty": "84e5ca07cb7a"
           },

@@ -1,4 +1,3 @@
-import { capturedAutomationOwner } from './automation-captured-owner'
 import { useCallback, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
@@ -33,7 +32,6 @@ export function useAutomationsPagePresentationState({
   const {
     projectHostSetups,
     sshConnectionStates,
-    sshStateByEnvironment,
     runtimeStatusByEnvironmentId,
     sshTargetLabels,
     runtimeEnvironments,
@@ -52,12 +50,10 @@ export function useAutomationsPagePresentationState({
   const selectedRunNowAvailability = selectedRow
     ? getAutomationTargetAvailability({
         automation: selectedRow.automation,
-        capturedOwner: capturedAutomationOwner(list.capturedAutomationOwners, selectedRow.key),
         repo: selectedRepo,
         workspace: selectedWorktree,
         projectHostSetups,
         sshConnectionStates,
-        sshStateByEnvironment,
         runtimeStatusByEnvironmentId,
         automationHostTarget: automationHostTargetFor(selectedRow),
         sourceHostAvailability: automationSourceHostAvailabilityByRowKey.get(selectedRow.key)
@@ -66,7 +62,6 @@ export function useAutomationsPagePresentationState({
   const canSaveDraft =
     editingAutomationId === null ||
     !draftAtOpen ||
-    local.targetEdited ||
     JSON.stringify(draft) !== JSON.stringify(draftAtOpen) ||
     (editingAutomationId !== null &&
       local.editingHostStableKey !== destination.rowRecoveryHost(local.editingRowKey)?.stableKey)

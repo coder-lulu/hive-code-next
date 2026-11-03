@@ -72,7 +72,7 @@ describe('mobile session route', () => {
     ).toEqual({ hostId: 'host-1', worktreeId: 'repo::/tmp/wt' })
   })
 
-  it('mounts the host, then opens the session over its list', () => {
+  it('mounts the host before replacing it with the session route', () => {
     const harness = navigationHarness({ index: 0, routes: [{ name: 'index' }] })
     const push = vi.fn()
     const target = mobileSessionRouteTarget({
@@ -89,8 +89,9 @@ describe('mobile session route', () => {
     harness.setState(mountedHostState('host/one'))
 
     expect(harness.navigation.dispatch).toHaveBeenCalledWith({
-      type: 'PUSH',
+      type: 'REPLACE',
       target: '/h',
+      source: 'host-index',
       payload: target
     })
   })

@@ -1,13 +1,13 @@
 import type {
   AgentJournalItemBody,
   AgentJournalProducerLinkage,
-  AgentJournalRenderItem
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentJournalTurnScope } from '../../../shared/agent-session/journal/agent-session-journal-turn-scope'
+  AgentJournalRenderItem,
+  AgentJournalTurnScope
+} from '../../../shared/agent-session-journal-types'
 import {
   agentJournalLinkageFields,
   namesAgentJournalProducer
-} from '../../../shared/agent-session/journal/agent-session-journal-producer'
+} from '../../../shared/agent-session-journal-producer'
 import type { JournalRow } from './journal-row-schema'
 
 /** Centralize row markers: absence means live append/session producer, not missing propagation. */

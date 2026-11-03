@@ -3,8 +3,12 @@ import { useAppStore } from '@/store'
 import { makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
 import type { PendingWorktreeCreation } from './pending-worktree-creation'
 import { activateAndRevealWorktree } from './worktree-activation'
-import './worktree-initial-terminal-seeding'
-import { registerWorktreeActivationReset } from './worktree-activation.test-fixture'
+import { ensureWorktreeHasInitialTerminal } from './worktree-initial-terminal-seeding'
+import {
+  createMockStore,
+  createdTabStartups,
+  registerWorktreeActivationReset
+} from './worktree-activation.test-fixture'
 
 registerWorktreeActivationReset()
 
@@ -31,7 +35,40 @@ function creatingEntry(): PendingWorktreeCreation {
   }
 }
 
+function creatingStore() {
+  return createMockStore({
+    settings: {},
+    pendingWorktreeCreations: { 'creation-1': creatingEntry() }
+  })
+}
+
 describe('initial surface during worktree creation', () => {
+  it('does not seed a fallback shell when an unfinished checkout is opened', () => {
+    const store = creatingStore()
+    expect(ensureWorktreeHasInitialTerminal(store, 'wt-1')).toBeNull()
+    expect(store.createTab).not.toHaveBeenCalled()
+  })
+
+  it('lets the matching creation owner complete a blank-terminal request', () => {
+    const store = creatingStore()
+    expect(
+      ensureWorktreeHasInitialTerminal(store, 'wt-1', undefined, undefined, undefined, undefined, {
+        worktreeCreationId: 'creation-1'
+      })
+    ).toBe('tab-1')
+    expect(store.createTab).toHaveBeenCalledOnce()
+  })
+
+  it('does not block another workspace or an explicit agent launch', () => {
+    expect(ensureWorktreeHasInitialTerminal(creatingStore(), 'wt-other')).toBe('tab-1')
+    const store = creatingStore()
+    expect(
+      ensureWorktreeHasInitialTerminal(store, 'wt-1', { command: 'codex', launchAgent: 'codex' })
+    ).toBe('tab-1')
+    expect(store.createTab).toHaveBeenCalledOnce()
+    expect(createdTabStartups(store)['tab-1']).toEqual({ command: 'codex', launchAgent: 'codex' })
+  })
+
   it('shows the creation panel instead of an empty workspace when the row is opened early', () => {
     useAppStore.setState({
       activeView: 'tasks',

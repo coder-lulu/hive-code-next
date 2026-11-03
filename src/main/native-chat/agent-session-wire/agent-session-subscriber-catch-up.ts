@@ -3,16 +3,13 @@ import {
   type AgentSessionSlashCommand,
   type AgentSessionSubscribeEvent,
   type AgentSessionTurnActivity
-} from '../../../shared/agent-session/agent-session-wire'
+} from '../../../shared/agent-session-wire'
 import { sameJournalCursor } from '../agent-session-journal/journal-cursor'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import { emptyAgentSessionBatch } from './agent-session-empty-batch'
-import {
-  withPublishedWork,
-  withPublishedWorkResult,
-  type AgentSessionPublishedWork
-} from './agent-session-published-work'
+import { withPublishedWork, withPublishedWorkResult } from './agent-session-published-work'
 import { refreshPublishedWork } from './agent-session-work-refresh'
+import type { AgentSessionPublishedWork } from './agent-session-published-work'
 import type { StructuredAgentSessionCurrentWork } from './structured-agent-session-current-work'
 import {
   createAgentSessionCatchUpReader,
@@ -196,10 +193,7 @@ export function deliverToSubscriber(
     )
     subscriber.cursor = page.window.nextCursor
     if (!page.hasNewer || !port.isActive(subscriber)) {
-      // The contiguous page already carries current fields and changed submissions.
-      if (work && work.workViewKey() !== subscriber.workView) {
-        refreshPublishedWork(delivery, subscriber, journal, work, shared)
-      }
+      refreshPublishedWork(delivery, subscriber, journal, work, shared)
       return
     }
   }

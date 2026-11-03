@@ -1,5 +1,4 @@
-import { onLiveAccount } from './agent-model-catalog-running-account'
-import type { AgentSessionRecord } from '../../../shared/agent-session/lifecycle/agent-session-record'
+import type { AgentSessionRecord } from '../../../shared/agent-session-record'
 import type { AgentModelCatalogLiveListing } from './agent-model-catalog-store'
 import type {
   AgentModelCatalogServiceDeps,
@@ -106,9 +105,7 @@ export function createAgentModelCatalogLiveListings(
     if (saved && configuredDefault !== undefined) {
       // In report order, so the latest chat's resolution is the one kept.
       const recording = (recordingDefaults.get(fingerprint) ?? Promise.resolve())
-        .then(() =>
-          recordConfiguredDefault(deps, record, fingerprint, configuredDefault, current, saved.live)
-        )
+        .then(() => recordConfiguredDefault(deps, record, fingerprint, configuredDefault, current))
         .catch(() => {})
         .then(() => {
           if (recordingDefaults.get(fingerprint) === recording) {
@@ -124,13 +121,12 @@ export function createAgentModelCatalogLiveListings(
     captureSource,
     retireContext,
     providerStarted(record: AgentSessionRecord, source?: () => boolean) {
-      const liveRecord = onLiveAccount(deps, record)
       const receipt = leaseWorkspace(record.location.workspaceId)
       const current = () =>
         receipt.current() &&
         source?.() !== false &&
         deps.getRecord(record.sessionId)?.lease.runtimeFence === record.lease.runtimeFence
-      void sessionCatalogKey(liveRecord)
+      void sessionCatalogKey(record)
         .then((fingerprint) => {
           if (current()) {
             deps.store.expireFailure(fingerprint)
@@ -145,15 +141,9 @@ export function createAgentModelCatalogLiveListings(
       source?: () => boolean
     ) {
       const record = deps.getRecord(sessionId)
-      if (
-        !record ||
-        !deps.drivesRecord(record) ||
-        record.provider === 'pi' ||
-        independentAgentModelCatalog(record.provider)
-      ) {
+      if (!record || !deps.drivesRecord(record) || independentAgentModelCatalog(record.provider)) {
         return
       }
-      const liveRecord = onLiveAccount(deps, record)
       const receipt = leaseWorkspace(record.location.workspaceId)
       const current = () =>
         receipt.current() &&
@@ -165,9 +155,9 @@ export function createAgentModelCatalogLiveListings(
       }
       if (!deps.listsInChatFolder?.has(record.provider)) {
         void saveLiveListing(
-          liveRecord,
+          record,
           listing,
-          agentModelCatalogFingerprintForRecord(liveRecord),
+          agentModelCatalogFingerprintForRecord(record),
           current
         ).finally(receipt.release)
         return
@@ -175,7 +165,7 @@ export function createAgentModelCatalogLiveListings(
       // In report order: a folder lookup that resolves late must not let an older listing land last.
       const writing = (liveWrites.get(sessionId) ?? Promise.resolve())
         .then(async () =>
-          saveLiveListing(liveRecord, listing, await sessionCatalogKey(liveRecord), current)
+          saveLiveListing(record, listing, await sessionCatalogKey(record), current)
         )
         .catch((error: unknown) => {
           console.warn('[agent-model-catalog] could not save a chat model list:', error)

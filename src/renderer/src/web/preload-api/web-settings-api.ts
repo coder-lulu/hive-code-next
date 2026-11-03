@@ -74,7 +74,6 @@ export function createWebSettingsApi(): Partial<PreloadApi> {
           )
         }
         const localUpdates = { ...sanitizedUpdates }
-        delete localUpdates.nativeChatAutoContinueAfterUsageLimit
         if (runtimeEnvironment) {
           delete localUpdates.worktreeVisibilityDefaults
         }

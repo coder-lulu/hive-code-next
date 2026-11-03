@@ -1,7 +1,14 @@
-import { ExpectedRuntimeSourceSchema } from '../../../shared/runtime-rpc-envelope'
+import { z } from 'zod'
+import type { ExpectedRuntimeSource } from '../../../shared/runtime-rpc-envelope'
 import { getPublishedHostDescriptor } from '../host-descriptor'
 import type { RpcEnvelopeMeta, RpcRequest, RpcResponse } from './core'
 import { errorResponse } from './errors'
+
+const SourceField = z.string().min(1).max(4_096)
+const ExpectedRuntimeSourceSchema: z.ZodType<ExpectedRuntimeSource> = z.object({
+  sourceId: SourceField,
+  runtimeId: SourceField
+})
 
 /** Refuses, before any handler runs, a request whose client expects another runtime. */
 export function runtimeSourceFence(request: RpcRequest, meta: RpcEnvelopeMeta): RpcResponse | null {

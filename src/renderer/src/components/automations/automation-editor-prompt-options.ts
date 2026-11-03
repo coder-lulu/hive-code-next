@@ -1,10 +1,10 @@
 import type { editor } from 'monaco-editor'
 import { monacoFindOptions } from '@/components/editor/monaco-find-options'
-import type { MonacoTypographyOptions } from '@/lib/editor-typography'
 
 export function buildAutomationPromptEditorOptions(args: {
   ariaLabel: string
-  typography: MonacoTypographyOptions
+  fontFamily: string
+  fontSize: number
   placeholder: string
 }): editor.IStandaloneEditorConstructionOptions {
   return {
@@ -13,7 +13,8 @@ export function buildAutomationPromptEditorOptions(args: {
     contextmenu: true,
     dropIntoEditor: { enabled: false },
     folding: false,
-    ...args.typography,
+    fontFamily: args.fontFamily,
+    fontSize: args.fontSize,
     find: monacoFindOptions,
     glyphMargin: false,
     hover: { enabled: false },

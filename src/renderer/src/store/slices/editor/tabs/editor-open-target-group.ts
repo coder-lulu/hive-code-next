@@ -11,8 +11,6 @@ import {
 } from '@/lib/link-open-intent'
 import type { LinkPlacementState } from '@/lib/link-open-intent'
 import { collectTabGroupLayoutGroupIds } from '../../../../../../shared/workspace-layout/tab-group-moves'
-import { resolveLinkOpenSidePlacement } from '@/lib/adjacent-link-open-group'
-import type { TabSplitTarget } from '../../tabs/tabs-slice-contract'
 export {
   isLiveLinkOpenGroup as isLiveEditorOpenGroup,
   canOpenLinkInSourceGroup
@@ -127,7 +125,6 @@ export function liveLayoutGroupIds(
 
 export type EditorLinkOpenPlacement =
   | { kind: 'group'; groupId: string }
-  | { kind: 'split'; split: TabSplitTarget }
   | { kind: 'default' }
   | { kind: 'refused' }
 
@@ -164,24 +161,6 @@ export function resolveEditorLinkOpenPlacement(
     fileId,
     contentType: editorTabContentTypeForMode(mode)
   })
-  if (
-    groupId === source.groupId &&
-    !tabs.some(
-      (tab) =>
-        tab.groupId === groupId &&
-        tab.entityId === fileId &&
-        tab.contentType === editorTabContentTypeForMode(mode)
-    )
-  ) {
-    const placement = resolveLinkOpenSidePlacement({
-      layout,
-      groups: state.groupsByWorktree?.[worktreeId] ?? [],
-      sourceGroupId: source.groupId
-    })
-    if (placement && 'split' in placement) {
-      return { kind: 'split', split: placement.split }
-    }
-  }
   return groupId ? { kind: 'group', groupId } : { kind: 'default' }
 }
 

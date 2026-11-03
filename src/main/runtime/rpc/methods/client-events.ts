@@ -48,14 +48,7 @@ export const CLIENT_EVENT_METHODS = [
           return state ? [{ targetId: target.id, state }] : []
         })
         // Listen before snapshotting to close reload gaps without exposing HUB-private target configuration.
-        emit({
-          type: 'ready',
-          subscriptionId,
-          snapshot: {
-            sshStates,
-            nativeChatQueueFollowUps: runtime.getClientSettings().nativeChatQueueFollowUps
-          }
-        })
+        emit({ type: 'ready', subscriptionId, snapshot: { sshStates } })
       })
     }
   }),

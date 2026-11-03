@@ -1,4 +1,3 @@
-import type { TerminalReadinessCreation } from './launched-agent-composer-readiness'
 import { isShellProcess } from '../../shared/agent-detection'
 import { isExpectedAgentProcess } from '../../shared/agent-process-recognition'
 import {
@@ -51,19 +50,13 @@ export function pasteWorktreeStartupDraftWhenReady(
     .catch((error) => console.warn('[worktree-create] failed to paste startup draft:', error))
 }
 
-export type StartupFollowupPromptOptions = {
-  signal?: AbortSignal
-  agentLaunch?: boolean
-  terminalCreation?: TerminalReadinessCreation
-}
-
 /** A post-start agent's first prompt: its process in front can still drop typed text (#10336). */
 export async function deliverStartupFollowupPrompt(
   runtime: TerminalPromptRuntime,
   host: WorktreeStartupReadinessHost,
   handle: string,
   { agent, prompt }: WorktreeStartupFollowup,
-  options: StartupFollowupPromptOptions = {}
+  options: { signal?: AbortSignal; agentLaunch?: boolean } = {}
 ): Promise<boolean> {
   const { signal } = options
   try {
@@ -88,7 +81,6 @@ export async function deliverStartupFollowupPrompt(
       handle,
       agent,
       freshLaunch: true,
-      terminalCreation: options.terminalCreation,
       text: prompt,
       unprovableHost: 'write-if-shell-provable',
       ...(signal ? { signal } : {})

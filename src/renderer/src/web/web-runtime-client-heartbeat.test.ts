@@ -1,12 +1,13 @@
-import { createWebRuntimeTestSession } from './web-runtime-e2ee-test-peer'
-import type { RuntimeE2EEClientSession } from '../../../shared/runtime-e2ee-client-session'
+import { createPairedE2EEClientHandshake } from '../../../shared/paired-e2ee-client-handshake'
+import { DesktopMobileE2EEV2Session } from '../../../shared/runtime-e2ee-server-session'
+import { WEB_PAIRED_E2EE_PRIMITIVES } from './web-paired-e2ee-primitives'
 import { describe, expect, it, vi, afterEach, beforeEach } from 'vitest'
-import { WebRuntimeClient } from './web-runtime-client'
+import { WebRuntimeConnectionTransport } from './web-runtime-connection-transport'
 
 // Half-open WebSockets can stay OPEN without close/error; detect silence while visible and disarm timers while hidden.
 
 const fakeSockets: FakeWebSocket[] = []
-const clients: WebRuntimeClient[] = []
+const clients: WebRuntimeConnectionTransport[] = []
 let visibilityState: DocumentVisibilityState = 'visible'
 let nextIntervalId = 1
 const documentListeners = new Map<string, () => void>()
@@ -47,54 +48,50 @@ class FakeWebSocket {
   }
 }
 
-type HeartbeatInternals = {
-  ws: FakeWebSocket | null
-  state: string
-  session: RuntimeE2EEClientSession | null
-  lastInboundFrameAt: number
-  lastHeartbeatTickAt: number
-  heartbeatProbeSentAt: number | null
-  startHeartbeat: () => void
-  runHeartbeatTick: () => void
-  now: () => number
-  isDocumentVisible: () => boolean
-}
+type HeartbeatInternals = WebRuntimeConnectionTransport
 
-function makeConnectedClient(): {
-  client: WebRuntimeClient
-  internals: HeartbeatInternals
-  socket: FakeWebSocket
-  setNow: (ms: number) => void
-  setVisible: (visible: boolean) => void
-} {
+function makeConnectedClient() {
   let nowMs = 1_000
-  const client = new WebRuntimeClient({
-    v: 2,
-    endpoint: 'ws://127.0.0.1:6768',
-    deviceToken: 'token',
-    publicKeyB64: Buffer.alloc(32).toString('base64')
-  })
+  const keys = WEB_PAIRED_E2EE_PRIMITIVES.generateKeyPair()
+  const hostPublicKeyB64 = WEB_PAIRED_E2EE_PRIMITIVES.publicKeyToBase64(keys.publicKey)
+  const client = new WebRuntimeConnectionTransport(
+    {
+      endpoint: 'ws://127.0.0.1:6768',
+      hostPublicKeyB64,
+      credential: { kind: 'token', deviceToken: 'token' }
+    },
+    { now: () => nowMs, isDocumentVisible: () => visibilityState === 'visible' }
+  )
   clients.push(client)
-  const internals = client as unknown as HeartbeatInternals
-  // Override the protected time/visibility seams deterministically.
-  internals.now = () => nowMs
-  internals.isDocumentVisible = () => visibilityState === 'visible'
+  const internals = client
   const socket = fakeSockets[0]!
   socket.readyState = FakeWebSocket.OPEN
-  internals.ws = socket
-  internals.session = createWebRuntimeTestSession().client
+  const handshake = createPairedE2EEClientHandshake({
+    primitives: WEB_PAIRED_E2EE_PRIMITIVES,
+    hostPublicKeyB64,
+    framing: 'v2',
+    transport: 'direct'
+  })
+  const server = DesktopMobileE2EEV2Session.create({
+    hello: JSON.parse(handshake.helloText()),
+    serverSecretKey: keys.secretKey,
+    expectedContext: { transport: 'direct' }
+  })
+  if (!server || handshake.acceptReadyText(JSON.stringify(server.ready)) !== 'accepted') {
+    throw new Error('Heartbeat fixture handshake failed')
+  }
+  internals.handshake = handshake
   internals.state = 'connected'
-  internals.lastInboundFrameAt = nowMs
-  internals.lastHeartbeatTickAt = nowMs
-  internals.heartbeatProbeSentAt = null
+  internals.heartbeat.lastInboundFrameAt = nowMs
+  internals.heartbeat.lastHeartbeatTickAt = nowMs
   return {
     client,
     internals,
     socket,
-    setNow: (ms) => {
+    setNow: (ms: number) => {
       nowMs = ms
     },
-    setVisible: (visible) => {
+    setVisible: (visible: boolean) => {
       visibilityState = visible ? 'visible' : 'hidden'
     }
   }
@@ -147,14 +144,14 @@ describe('WebRuntimeClient liveness heartbeat', () => {
 
   // Advance tick boundaries with time so sinceLastTick models normal cadence, not suspension.
   function advanceOneTick(internals: HeartbeatInternals, setNow: (ms: number) => void): void {
-    const next = internals.now() + 10_000
+    const next = internals.heartbeat.lastHeartbeatTickAt + 10_000
     setNow(next)
   }
 
   it('disarms the heartbeat interval while hidden', () => {
     const { client, internals, setVisible } = makeConnectedClient()
 
-    internals.startHeartbeat()
+    internals.heartbeat.start()
     expect(setIntervalMock).toHaveBeenCalledWith(expect.any(Function), 10_000)
     expect(intervalCallbacks.size).toBe(1)
 
@@ -168,8 +165,8 @@ describe('WebRuntimeClient liveness heartbeat', () => {
 
   it('re-arms once and resets the tick clock but preserves the liveness baseline when visible again', () => {
     const { client, internals, setNow, setVisible } = makeConnectedClient()
-    internals.startHeartbeat()
-    internals.heartbeatProbeSentAt = 1_000
+    internals.heartbeat.start()
+    internals.heartbeat.heartbeatProbeSentAt = 1_000
 
     setVisible(false)
     dispatchVisibilityChange()
@@ -181,16 +178,16 @@ describe('WebRuntimeClient liveness heartbeat', () => {
     expect(setIntervalMock).toHaveBeenCalledTimes(2)
     expect(intervalCallbacks.size).toBe(1)
     // Visible re-arm preserves inbound baseline so hidden silence remains detectable on the next tick.
-    expect(internals.lastInboundFrameAt).toBe(1_000)
+    expect(internals.heartbeat.lastInboundFrameAt).toBe(1_000)
     // The tick clock resets so the parked hidden gap isn't misread as a suspended loop; the probe clears.
-    expect(internals.lastHeartbeatTickAt).toBe(601_000)
-    expect(internals.heartbeatProbeSentAt).toBeNull()
+    expect(internals.heartbeat.lastHeartbeatTickAt).toBe(601_000)
+    expect(internals.heartbeat.heartbeatProbeSentAt).toBeNull()
     client.close()
   })
 
   it('probes and then closes a connection that went silent while hidden, once visible again', () => {
     const { client, internals, socket, setNow, setVisible } = makeConnectedClient()
-    internals.startHeartbeat()
+    internals.heartbeat.start()
 
     // Model ten silent hidden minutes; preserved inbound baseline must prompt liveness detection on return.
     setVisible(false)
@@ -204,7 +201,7 @@ describe('WebRuntimeClient liveness heartbeat', () => {
     runActiveHeartbeatTick()
     expect(socket.close).not.toHaveBeenCalled()
     expect(socket.send).toHaveBeenCalledTimes(1)
-    expect(internals.heartbeatProbeSentAt).toBe(611_000)
+    expect(internals.heartbeat.heartbeatProbeSentAt).toBe(611_000)
 
     // Normal-cadence ticks: still within grace → no close yet.
     setNow(621_000)
@@ -220,7 +217,7 @@ describe('WebRuntimeClient liveness heartbeat', () => {
 
   it('keeps the visible heartbeat cadence unchanged', () => {
     const { client, internals, socket, setNow } = makeConnectedClient()
-    internals.startHeartbeat()
+    internals.heartbeat.start()
 
     setNow(11_000)
     runActiveHeartbeatTick()
@@ -231,13 +228,13 @@ describe('WebRuntimeClient liveness heartbeat', () => {
     setNow(31_000)
     runActiveHeartbeatTick()
     expect(socket.send).toHaveBeenCalledTimes(1)
-    expect(internals.heartbeatProbeSentAt).toBe(31_000)
+    expect(internals.heartbeat.heartbeatProbeSentAt).toBe(31_000)
     client.close()
   })
 
   it('cleans up the heartbeat interval and visibility listener on close', () => {
     const { client, internals } = makeConnectedClient()
-    internals.startHeartbeat()
+    internals.heartbeat.start()
     const visibilityListener = documentListeners.get('visibilitychange')
 
     client.close()
@@ -253,9 +250,9 @@ describe('WebRuntimeClient liveness heartbeat', () => {
   it('does nothing while the socket keeps receiving frames', () => {
     const { internals, socket } = makeConnectedClient()
     // Just under the idle threshold → no probe, no close.
-    internals.lastInboundFrameAt = internals.now() - 24_000
-    internals.lastHeartbeatTickAt = internals.now() - 10_000
-    internals.runHeartbeatTick()
+    internals.heartbeat.lastInboundFrameAt = internals.heartbeat.lastHeartbeatTickAt - 24_000
+    internals.heartbeat.lastHeartbeatTickAt = internals.heartbeat.lastHeartbeatTickAt - 10_000
+    internals.heartbeat.runTick()
     expect(socket.send).not.toHaveBeenCalled()
     expect(socket.close).not.toHaveBeenCalled()
   })
@@ -263,29 +260,29 @@ describe('WebRuntimeClient liveness heartbeat', () => {
   it('sends a status.get probe after the idle threshold of silence', () => {
     const { internals, socket, setNow } = makeConnectedClient()
     // Normal tick cadence distinguishes 30s inbound silence from loop suspension (idle threshold 25s).
-    internals.lastInboundFrameAt = 1_000
+    internals.heartbeat.lastInboundFrameAt = 1_000
     setNow(31_000)
-    internals.lastHeartbeatTickAt = 31_000 - 10_000
-    internals.runHeartbeatTick()
+    internals.heartbeat.lastHeartbeatTickAt = 31_000 - 10_000
+    internals.heartbeat.runTick()
     expect(socket.send).toHaveBeenCalledTimes(1)
     expect(socket.close).not.toHaveBeenCalled()
-    expect(internals.heartbeatProbeSentAt).toBe(31_000)
+    expect(internals.heartbeat.heartbeatProbeSentAt).toBe(31_000)
   })
 
   it('closes the socket only after a SENT probe goes unanswered (not raw silence)', () => {
     const { internals, socket, setNow } = makeConnectedClient()
     // Tick 1: 30s silence on normal cadence → probe sent.
-    internals.lastInboundFrameAt = 1_000
+    internals.heartbeat.lastInboundFrameAt = 1_000
     setNow(31_000)
-    internals.lastHeartbeatTickAt = 31_000 - 10_000
-    internals.runHeartbeatTick()
+    internals.heartbeat.lastHeartbeatTickAt = 31_000 - 10_000
+    internals.heartbeat.runTick()
     expect(socket.send).toHaveBeenCalledTimes(1)
     expect(socket.close).not.toHaveBeenCalled()
     // Tick 2 (normal cadence later): probe still unanswered past the grace
     // window (20s) → close + reconnect.
     setNow(31_000 + 21_000)
-    internals.lastHeartbeatTickAt = 31_000 + 21_000 - 10_000
-    internals.runHeartbeatTick()
+    internals.heartbeat.lastHeartbeatTickAt = 31_000 + 21_000 - 10_000
+    internals.heartbeat.runTick()
     expect(socket.close).toHaveBeenCalledTimes(1)
     expect(internals.ws).toBeNull()
   })
@@ -294,26 +291,26 @@ describe('WebRuntimeClient liveness heartbeat', () => {
     const { internals, socket, setNow, setVisible } = makeConnectedClient()
     // Tab goes hidden for 10 minutes; the tick loop is suspended meanwhile.
     setVisible(false)
-    internals.lastInboundFrameAt = 1_000
-    internals.lastHeartbeatTickAt = 1_000
+    internals.heartbeat.lastInboundFrameAt = 1_000
+    internals.heartbeat.lastHeartbeatTickAt = 1_000
     setNow(1_000 + 600_000)
     // First tick after resume: huge sinceLastTick re-baselines, no false close.
     setVisible(true)
-    internals.runHeartbeatTick()
+    internals.heartbeat.runTick()
     expect(socket.close).not.toHaveBeenCalled()
     // It re-baselined liveness, so it does not immediately probe either.
     expect(socket.send).not.toHaveBeenCalled()
-    expect(internals.heartbeatProbeSentAt).toBeNull()
-    expect(internals.lastInboundFrameAt).toBe(1_000 + 600_000)
+    expect(internals.heartbeat.heartbeatProbeSentAt).toBeNull()
+    expect(internals.heartbeat.lastInboundFrameAt).toBe(1_000 + 600_000)
   })
 
   it('skips probing while the tab is hidden (battery)', () => {
     const { internals, socket, setNow, setVisible } = makeConnectedClient()
     setVisible(false)
-    internals.lastInboundFrameAt = 1_000
-    internals.lastHeartbeatTickAt = 1_000
+    internals.heartbeat.lastInboundFrameAt = 1_000
+    internals.heartbeat.lastHeartbeatTickAt = 1_000
     setNow(1_000 + 30_000)
-    internals.runHeartbeatTick()
+    internals.heartbeat.runTick()
     expect(socket.send).not.toHaveBeenCalled()
     expect(socket.close).not.toHaveBeenCalled()
   })
@@ -321,27 +318,27 @@ describe('WebRuntimeClient liveness heartbeat', () => {
   it('does not probe when not in the connected state', () => {
     const { internals, socket, setNow } = makeConnectedClient()
     internals.state = 'handshaking'
-    internals.lastInboundFrameAt = 1_000
+    internals.heartbeat.lastInboundFrameAt = 1_000
     setNow(1_000 + 30_000)
-    internals.lastHeartbeatTickAt = 1_000 + 30_000 - 10_000
-    internals.runHeartbeatTick()
+    internals.heartbeat.lastHeartbeatTickAt = 1_000 + 30_000 - 10_000
+    internals.heartbeat.runTick()
     expect(socket.send).not.toHaveBeenCalled()
     expect(socket.close).not.toHaveBeenCalled()
   })
 
   it('resets liveness when an inbound frame arrives between ticks', () => {
     const { internals, socket, setNow } = makeConnectedClient()
-    internals.lastInboundFrameAt = 1_000
+    internals.heartbeat.lastInboundFrameAt = 1_000
     setNow(31_000)
-    internals.lastHeartbeatTickAt = 31_000 - 10_000
-    internals.runHeartbeatTick()
+    internals.heartbeat.lastHeartbeatTickAt = 31_000 - 10_000
+    internals.heartbeat.runTick()
     expect(socket.send).toHaveBeenCalledTimes(1)
     // A reply lands: onmessage stamps lastInboundFrameAt and clears the probe.
-    internals.lastInboundFrameAt = internals.now()
-    internals.heartbeatProbeSentAt = null
+    internals.heartbeat.lastInboundFrameAt = internals.heartbeat.lastHeartbeatTickAt
+    internals.heartbeat.heartbeatProbeSentAt = null
     advanceOneTick(internals, setNow) // 10s later → quiet again, well under idle
-    internals.lastHeartbeatTickAt = internals.now() - 10_000
-    internals.runHeartbeatTick()
+    internals.heartbeat.lastHeartbeatTickAt = internals.heartbeat.lastHeartbeatTickAt - 10_000
+    internals.heartbeat.runTick()
     expect(socket.send).toHaveBeenCalledTimes(1)
     expect(socket.close).not.toHaveBeenCalled()
   })

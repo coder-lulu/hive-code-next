@@ -1,10 +1,8 @@
-import type * as DrawerModule from '../components/bottom-drawer/BottomDrawer'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ConnectionPresentationModel } from './use-mobile-tasks-connection-presentation'
-import { BottomDrawer } from '../components/bottom-drawer/BottomDrawer'
-import { PickerModal, Pressable } from './mobile-tasks-dependencies'
+import { BottomDrawer, PickerModal, Pressable } from './mobile-tasks-dependencies'
 import { renderMobileTasksItemActions } from './mobile-tasks-item-actions'
 import { renderMobileTasksWorkspaceCreateTargetPicker } from './mobile-tasks-create-drawers'
 import { renderMobileTasksProjectDetailDrawer } from './mobile-tasks-project-detail-drawer'
@@ -18,9 +16,7 @@ vi.mock('./mobile-tasks-dependencies', () => ({
   PickerModal: 'PickerModal',
   TaskProviderLogo: 'TaskProviderLogo',
   ExternalLink: 'ExternalLink',
-  Check: 'Check',
   Copy: 'Copy',
-  MoreHorizontal: 'MoreHorizontal',
   RefreshCw: 'RefreshCw',
   X: 'X',
   GitBranch: 'GitBranch',
@@ -28,11 +24,6 @@ vi.mock('./mobile-tasks-dependencies', () => ({
   Linking: { openURL: vi.fn() }
 }))
 vi.mock('./mobile-tasks-legacy-styles', () => ({ styles: {} }))
-vi.mock(
-  '../components/list/ListGroup',
-  async () => (await import('../test-support/settings-chrome-test-double')).listGroupDouble
-)
-vi.mock('../components/nav-bar/NavBarButton', () => ({ NavBarButton: 'NavBarButton' }))
 vi.mock('./mobile-tasks-legacy-foundation', () => ({
   TASK_SECONDARY_DRAWER_Z_INDEX: 20,
   taskExternalOpenLabel: () => 'Open',
@@ -112,7 +103,7 @@ describe('Tasks create source handoffs', () => {
     'queues %s create or repository selection through the supplied handoff',
     (provider) => {
       const { state, presentation, handoff, close } = model(provider)
-      const rendered = mount(renderMobileTasksItemActions(presentation, vi.fn()))
+      const rendered = mount(renderMobileTasksItemActions(presentation))
       act(() => rendered.root.findAllByType(Pressable)[0].props.onPress())
       expect(close).toHaveBeenCalledOnce()
       expect(state.openWorkspaceCreate).not.toHaveBeenCalled()
@@ -137,8 +128,7 @@ describe('Tasks create source handoffs', () => {
   it('queues project row creation through the supplied drawer handoff', () => {
     const { state, presentation, handoff, close } = model('github')
     const rendered = mount(renderMobileTasksProjectDetailDrawer(presentation))
-    const createRow = rendered.root.findAll((node) => String(node.type) === 'ListRow')[0]
-    act(() => createRow.props.onPress())
+    act(() => rendered.root.findAllByType(Pressable)[0].props.onPress())
     expect(close).toHaveBeenCalledOnce()
     expect(state.createWorkspaceFromProjectRow).not.toHaveBeenCalled()
     act(() => handoff.drawerProps.onAfterClose())
@@ -147,11 +137,4 @@ describe('Tasks create source handoffs', () => {
       handoff.drawerProps.onAfterClose
     )
   })
-})
-
-vi.mock('../components/bottom-drawer/BottomDrawer', async () => {
-  const { BottomDrawer } = await vi.importMock<Pick<typeof DrawerModule, 'BottomDrawer'>>(
-    './mobile-tasks-dependencies'
-  )
-  return { BottomDrawer }
 })

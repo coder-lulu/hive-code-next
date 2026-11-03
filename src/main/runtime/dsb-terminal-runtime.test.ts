@@ -30,6 +30,19 @@ vi.mock('../git/worktree', () => ({
 }))
 
 describe('manually started DeepSeek Build terminals', () => {
+  it('publishes only the explicit PTY launch owner despite conflicting observed title', async () => {
+    const runtime = new OrcaRuntimeService(partialRuntimeStore(makeStore()))
+    runtime.setPtyController({
+      spawn: async () => ({ id: 'pty-explicit' }),
+      write: () => true,
+      kill: () => true,
+      getForegroundProcess: async () => null
+    })
+    const terminal = await runtime.createTerminal('path:/tmp/worktree-a', { launchAgent: 'codex' })
+    runtime.onPtyData('pty-explicit', '\x1b]0;DeepSeek Build\x07', Date.now())
+    expect(await runtime.showTerminal(terminal.handle)).toMatchObject({ launchAgent: 'codex' })
+    expect((await runtime.listTerminals()).terminals[0]).toMatchObject({ launchAgent: 'codex' })
+  })
   afterEach(() => vi.useRealTimers())
 
   it('publishes title-only identity from captured release PTY bytes', async () => {
@@ -99,6 +112,8 @@ describe('manually started DeepSeek Build terminals', () => {
       expect.objectContaining({ handle: terminal.handle, agentIdentity: 'dsb' })
     ])
     expect(JSON.parse(JSON.stringify(listing)).terminals[0].agentIdentity).toBe('dsb')
+    expect(listing.terminals[0]).not.toHaveProperty('launchAgent')
+    expect(await runtime.showTerminal(terminal.handle)).not.toHaveProperty('launchAgent')
 
     const submission = runtime.sendTerminalAgentPrompt(terminal.handle, 'review this', {
       inputKind: 'driving',

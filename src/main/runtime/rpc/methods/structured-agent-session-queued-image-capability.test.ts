@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, expect, it } from 'vitest'
-import type { AgentSessionQueuedMessage } from '../../../../shared/agent-session/requests/agent-session-queued-message-wire'
-import type { AgentSessionSubscribeEvent } from '../../../../shared/agent-session/agent-session-wire'
+import type {
+  AgentSessionQueuedMessage,
+  AgentSessionSubscribeEvent
+} from '../../../../shared/agent-session-wire'
 import {
   buildSubscriberFrame,
   type SubscriberFieldState

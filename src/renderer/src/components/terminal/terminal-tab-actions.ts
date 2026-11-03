@@ -47,11 +47,6 @@ export function closeTerminalTab(
     localPtyTeardownOwnedExternally?: boolean
     precomputedRetirementPlan?: TerminalTabRetirementPlan
     precomputedCloseState?: PrecomputedTerminalCloseState
-    /** The PTY the caller's own action already agreed to stop; only the tab's other work asks. */
-    consentedPtyId?: string
-    /** Keep the worktree selected when this empties it, for a caller about to open its replacement. */
-    preserveWorktreeSelection?: boolean
-    beforeClose?: () => boolean
     onClosed?: () => void
     onCancel?: () => void
   }
@@ -115,16 +110,10 @@ export function closeTerminalTab(
     guardRunningTerminalClose({
       terminalTabId,
       tabLabel: resolvePinnedTabLabel(state, owningWorktreeId, terminalTabId),
-      ...(options?.consentedPtyId ? { consentedPtyId: options.consentedPtyId } : {}),
       // Re-enter after consent to revalidate pinned, route, and precomputed state against the latest store.
       onClose: () => closeTerminalTab(tabId, { ...options, skipRunningProcessConfirm: true }),
       ...(options?.onCancel ? { onCancel: options.onCancel } : {})
     })
-    return
-  }
-
-  if (options?.beforeClose && !options.beforeClose()) {
-    options.onCancel?.()
     return
   }
 
@@ -157,7 +146,6 @@ export function closeTerminalTab(
         ? { captureRecentlyClosed: options.captureRecentlyClosed }
         : {}),
       remoteCloseOwnedByHost: true,
-      ...(options?.preserveWorktreeSelection ? { preserveWorktreeSelection: true } : {}),
       ...(options?.localPtyTeardownOwnedExternally
         ? { localPtyTeardownOwnedExternally: true }
         : {}),
@@ -216,17 +204,12 @@ export function closeTerminalTab(
     ...(options?.captureRecentlyClosed !== undefined
       ? { captureRecentlyClosed: options.captureRecentlyClosed }
       : {}),
-    ...(options?.preserveWorktreeSelection ? { preserveWorktreeSelection: true } : {}),
     ...(options?.localPtyTeardownOwnedExternally ? { localPtyTeardownOwnedExternally: true } : {}),
     ...(options?.precomputedRetirementPlan
       ? { precomputedRetirementPlan: options.precomputedRetirementPlan }
       : {})
   })
-  if (
-    !options?.preserveWorktreeSelection &&
-    terminalCountBeforeClose <= 1 &&
-    state.activeWorktreeId === owningWorktreeId
-  ) {
+  if (terminalCountBeforeClose <= 1 && state.activeWorktreeId === owningWorktreeId) {
     // Re-read after closeUnifiedTab repairs/deactivates the surface; stale state must not clobber it.
     const current = useAppStore.getState()
     if (current.activeWorktreeId === owningWorktreeId) {

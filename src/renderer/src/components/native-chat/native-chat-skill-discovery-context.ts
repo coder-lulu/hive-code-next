@@ -5,7 +5,6 @@ import type { RuntimeClientTarget } from '../../../../shared/runtime-client-targ
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { runtimeEnvironmentIdForWorkspaceOwner } from '@/lib/resolve-owner'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
-import { resolveWorkspaceDirectory } from '@/lib/workspace-directory'
 import {
   resolveNativeChatTabDirectory,
   resolveNativeChatTabDirectoryResolution,
@@ -102,24 +101,20 @@ export function isNativeChatSkillDiscoveryAwaitingDirectory(
   )
 }
 
-/** A launch panel has no tab yet: it scans the workspace the agent will start in. */
 export function resolveNativeChatSkillDiscoveryContext(
   state: NativeChatSkillStateInputs,
-  terminalTabId: string,
-  launchWorktreeId?: string
+  terminalTabId: string
 ): NativeChatSkillDiscoveryContext | null {
-  const worktreeId = launchWorktreeId ?? findNativeChatTab(state, terminalTabId)?.worktreeId ?? null
+  const worktreeId = findNativeChatTab(state, terminalTabId)?.worktreeId ?? null
   if (!worktreeId) {
     return null
   }
-  const hostId = getExecutionHostIdForWorktree(state, worktreeId)
-  const cwd = launchWorktreeId
-    ? resolveWorkspaceDirectory(state, launchWorktreeId, hostId)
-    : resolveNativeChatSkillDiscoveryCwd(state, terminalTabId)
+  const cwd = resolveNativeChatSkillDiscoveryCwd(state, terminalTabId)
   if (!cwd) {
     return null
   }
 
+  const hostId = getExecutionHostIdForWorktree(state, worktreeId)
   const parsedHost = parseExecutionHostId(hostId)
   if (parsedHost?.kind === 'ssh') {
     return {

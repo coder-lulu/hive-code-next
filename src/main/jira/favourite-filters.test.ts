@@ -97,6 +97,14 @@ describe('read-only Jira favourite filters', () => {
     expect(mocks.release).toHaveBeenCalledOnce()
   })
 
+  it('surfaces malformed payloads without clearing credentials or fetching each filter', async () => {
+    mocks.jiraRequest.mockResolvedValueOnce({ values: [filter] })
+    await expect(listFavouriteFilters('site-1')).rejects.toThrow('invalid favourite filter list')
+    expect(mocks.clearToken).not.toHaveBeenCalled()
+    expect(mocks.jiraRequest).toHaveBeenCalledOnce()
+    expect(mocks.release).toHaveBeenCalledOnce()
+  })
+
   it('propagates cancellation while queued without releasing an unacquired slot', async () => {
     const controller = new AbortController()
     controller.abort()

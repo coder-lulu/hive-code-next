@@ -27,12 +27,7 @@ const cursorUsageSummarySchema = z
     isUnlimited: z.unknown(),
     // The dashboard sends null for absent pools; optional-only schemas would reject the entire valid response.
     individualUsage: z
-      .object({
-        plan: cursorPoolSchema.nullish(),
-        // Team-limited accounts report the member's included allowance as `overall`.
-        overall: cursorPoolSchema.nullish(),
-        onDemand: cursorPoolSchema.nullish()
-      })
+      .object({ plan: cursorPoolSchema.nullish(), onDemand: cursorPoolSchema.nullish() })
       .partial()
       .nullish()
   })
@@ -109,14 +104,6 @@ function windowMinutesFor(startMs: number | null, endMs: number | null): number 
   return Math.max(1, Math.round((endMs - startMs) / 60_000))
 }
 
-// A disabled primary pool must not hide the fallback pool Cursor actually meters.
-function preferEnabledPool(
-  primary: CursorPool | null | undefined,
-  fallback: CursorPool | null | undefined
-): CursorPool | null | undefined {
-  return primary?.enabled === false && fallback?.enabled === true ? fallback : (primary ?? fallback)
-}
-
 // On-demand's raw allowance avoids rounding in its reported percentage.
 function poolPercent(
   pool: CursorPool | null | undefined,
@@ -145,7 +132,7 @@ export function mapCursorUsageSummary(summary: CursorUsageSummary): CursorUsageM
     resetDescription: description
   })
 
-  const plan = preferEnabledPool(summary.individualUsage?.plan, summary.individualUsage?.overall)
+  const plan = summary.individualUsage?.plan
   // Team-owned zero pools must not imply healthy quota or suppress legacy fallback.
   const planEnabled = plan?.enabled !== false
   const buckets: RateLimitBucket[] = []
@@ -158,7 +145,6 @@ export function mapCursorUsageSummary(summary: CursorUsageSummary): CursorUsageM
     buckets.push({ name: CURSOR_OTHER_MODELS_BUCKET_NAME, ...toWindow(otherModels) })
   }
 
-  // teamUsage.onDemand is team-wide spend, not this member's allowance, so it stays unmapped.
   const onDemand = summary.individualUsage?.onDemand
   const onDemandPercent =
     onDemand?.enabled === true ? poolPercent(onDemand, 'totalPercentUsed') : null

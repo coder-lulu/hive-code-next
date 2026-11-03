@@ -183,4 +183,12 @@ describe('finalizeView verticalGroupByFields normalization', () => {
       ])
     }
   })
+
+  it('omits the key entirely when the host never sent it (wire-compat shape)', () => {
+    const finalized = finalizeView(base, [])
+    expect(finalized.ok).toBe(true)
+    if (finalized.ok) {
+      expect('verticalGroupByFields' in finalized.view).toBe(false)
+    }
+  })
 })

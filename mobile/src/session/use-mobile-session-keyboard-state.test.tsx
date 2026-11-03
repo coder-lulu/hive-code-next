@@ -71,8 +71,6 @@ function Harness(): null {
     setShowCustomKeyModal: () => {},
     setKeyboardHeight: harness.setKeyboardHeight,
     activeHandleRef: { current: null },
-    visibleTerminalHandlesRef: { current: [] },
-    terminalPaneViewportsRef: { current: new Map() },
     clientRef: { current: null },
     deviceTokenRef: { current: null },
     showNativeChatRef: { current: false },

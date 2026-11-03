@@ -1,3 +1,4 @@
+import { launchRecordStore } from '../runtime/structured-agent-launch-composition.test-support'
 import {
   createClaudeStructuredLaunchResolver,
   createCodexStructuredLaunchResolver
@@ -48,7 +49,7 @@ describe('inline visuals launch preference', () => {
     const check = vi.fn(async (_flag: ClaudeCliFlag) => 'supported' as const)
     const record = agentSessionRecordFixture({ sessionId })
     const launch = await createClaudeStructuredLaunchResolver({
-      store: { getRecord: () => record, pinLaunchDirectory: vi.fn() },
+      store: launchRecordStore(() => record, vi.fn()),
       resolveWorkspacePath: async () => '/repo',
       resolveCommand: () => ({ command: '/bin/claude', prefixArgs: [] }),
       resolveAuthPolicy: () => ({ account: 'system' }),
@@ -81,15 +82,15 @@ describe('inline visuals launch preference', () => {
       })
     })
     const resolveLaunch = createCodexStructuredLaunchResolver({
-      store: {
-        getRecord: (sessionId) =>
+      store: launchRecordStore(
+        (sessionId) =>
           agentSessionRecordFixture({
             sessionId,
             provider: 'codex',
             accountHome: { variable: 'CODEX_HOME', path: '/home/codex' }
           }),
-        pinLaunchDirectory: vi.fn()
-      },
+        vi.fn()
+      ),
       resolveWorkspacePath: async () => '/repo',
       resolveCommand: () => ({ command: '/bin/codex', prefixArgs: [] }),
       resolveLaunchArgs: () => [],
@@ -132,10 +133,10 @@ describe('inline visuals launch preference', () => {
       )
       const disabledOpen = disabled.calls.find(({ method }) => method === 'thread/start')
       const scratchDirOverride = `shell_environment_policy.set.${NATIVE_CHAT_SCRATCH_DIR_ENV}`
-      expect(disabledOpen?.params?.config).not.toHaveProperty([
+      expect(disabledOpen?.params?.config ?? {}).not.toHaveProperty([
         'sandbox_workspace_write.writable_roots'
       ])
-      expect(disabledOpen?.params?.config).not.toHaveProperty([scratchDirOverride])
+      expect(disabledOpen?.params?.config ?? {}).not.toHaveProperty([scratchDirOverride])
       expect(existsSync(nativeChatScratchFolderFor(stateDirectory, 'disabled'))).toBe(false)
       expect(first.closed).toBe(false)
       expect(first.calls).toEqual(firstCalls)

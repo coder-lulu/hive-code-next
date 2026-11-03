@@ -190,20 +190,23 @@ export function getBranchConflictKind(
   const execOptions = gitExecOptions(path, options)
   const runLocalGit = (
     argv: string[],
-    commandOptions?: ExactRefProbeExecOptions & { stdin?: string }
+    commandOptions?: ExactRefProbeExecOptions & { stdin?: string },
+    captureWslLoginShellOutput = false
   ): Promise<{ stdout: string }> =>
     gitExecFileAsync(argv, {
       ...execOptions,
+      ...(captureWslLoginShellOutput ? { captureWslLoginShellOutput: true } : {}),
       ...(commandOptions?.maxBuffer === undefined ? {} : { maxBuffer: commandOptions.maxBuffer }),
       ...(commandOptions?.timeoutMs === undefined ? {} : { timeout: commandOptions.timeoutMs }),
       ...(commandOptions?.stdin === undefined ? {} : { stdin: commandOptions.stdin })
     })
   return getBranchConflictKindViaExec(
-    runLocalGit,
+    (argv, commandOptions) => runLocalGit(argv, commandOptions, argv[0] === 'for-each-ref'),
     branchName,
     allowedBaseRef,
     {},
-    runLocalGit,
+    // Fence login banners to preserve one stdout line per ref; quiet exit-code probes need no markers.
+    (argv, commandOptions) => runLocalGit(argv, commandOptions, true),
     allowLocalBranch
   )
 }

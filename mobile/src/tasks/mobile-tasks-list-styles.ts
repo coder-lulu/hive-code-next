@@ -1,22 +1,14 @@
-import { themedStyleSheet, colors, radii, spacing, StyleSheet } from './mobile-tasks-dependencies'
+import { themedStyleSheet, colors, radii, spacing } from './mobile-tasks-dependencies'
 
 export const mobileTasksListStyles = themedStyleSheet(() => ({
   taskRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md
+    paddingVertical: spacing.sm + 2
   },
   taskRowPressed: {
     backgroundColor: colors.bgRaised
-  },
-  taskRowCentered: {
-    alignItems: 'center'
-  },
-  taskRowSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.borderSubtle,
-    marginLeft: spacing.lg
   },
   taskIcon: {
     width: 20,
@@ -55,21 +47,16 @@ export const mobileTasksListStyles = themedStyleSheet(() => ({
   repoDot: {
     width: 7,
     height: 7,
-    borderRadius: radii.pill
+    borderRadius: 4
   },
   pickerRepoDot: {
     width: 9,
     height: 9,
-    borderRadius: radii.pill
+    borderRadius: 4.5
   },
   subtitle: {
     flex: 1,
     fontSize: 11,
-    color: colors.textSecondary
-  },
-  taskRowMeta: {
-    flex: 1,
-    fontSize: 12,
     color: colors.textSecondary
   },
   branchMetaRow: {
@@ -102,7 +89,7 @@ export const mobileTasksListStyles = themedStyleSheet(() => ({
     alignSelf: 'flex-start',
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    borderRadius: radii.pill,
+    borderRadius: radii.button,
     backgroundColor: colors.bgPanel,
     paddingHorizontal: spacing.xs + 2,
     paddingVertical: 2
@@ -124,7 +111,7 @@ export const mobileTasksListStyles = themedStyleSheet(() => ({
   statusPill: {
     maxWidth: 112,
     backgroundColor: colors.bgRaised,
-    borderRadius: radii.pill,
+    borderRadius: 999,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderWidth: 1,
@@ -133,7 +120,7 @@ export const mobileTasksListStyles = themedStyleSheet(() => ({
   statusPillSelf: {
     alignSelf: 'flex-start',
     backgroundColor: colors.bgRaised,
-    borderRadius: radii.pill,
+    borderRadius: 999,
     paddingHorizontal: spacing.sm,
     paddingVertical: 3,
     borderWidth: 1,
@@ -148,16 +135,15 @@ export const mobileTasksListStyles = themedStyleSheet(() => ({
   linearStateDot: {
     width: 7,
     height: 7,
-    borderRadius: radii.pill
+    borderRadius: 4
   },
   linearListTrailing: {
     alignItems: 'flex-end',
     gap: spacing.xs
   },
   taskRowTrailing: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.xs + 2
+    alignItems: 'flex-end',
+    gap: spacing.xs
   },
   statusText: {
     fontSize: 11,
@@ -183,7 +169,7 @@ export const mobileTasksListStyles = themedStyleSheet(() => ({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    borderRadius: radii.control,
+    borderRadius: radii.button,
     backgroundColor: colors.bgRaised,
     paddingVertical: spacing.sm
   },
@@ -198,7 +184,7 @@ export const mobileTasksListStyles = themedStyleSheet(() => ({
   paginationLabelButton: {
     flex: 1,
     alignItems: 'center',
-    borderRadius: radii.control,
+    borderRadius: radii.button,
     paddingHorizontal: spacing.xs,
     paddingVertical: spacing.sm
   }

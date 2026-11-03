@@ -1,9 +1,10 @@
+import { findAllByHostType, isHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AskPrompt } from '../../../src/shared/native-chat-ask'
-import { MobileNativeChatAsk } from './MobileNativeChatAsk'
-import { MobileNativeChatQuestion } from './MobileNativeChatQuestion'
+import type { AskPrompt } from '../../../src/shared/native-chat/input/native-chat-ask'
+import { MobileNativeChatAsk } from './native-chat/input/MobileNativeChatAsk'
+import { MobileNativeChatQuestion } from './native-chat/input/MobileNativeChatQuestion'
 
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
@@ -29,9 +30,9 @@ vi.mock('../theme/mobile-theme-provider', async () => {
 })
 
 function pressableWithText(renderer: ReactTestRenderer, label: string): ReactTestInstance {
-  const text = renderer.root
-    .findAllByType('Text')
-    .find((node) => String(node.props.children) === label)
+  const text = findAllByHostType(renderer.root, 'Text').find(
+    (node) => String(node.props.children) === label
+  )
   if (!text) {
     throw new Error(`No text labeled ${label}`)
   }
@@ -95,7 +96,7 @@ describe('native chat prompt cards', () => {
       pressableWithText(renderer!, 'Beta').props.onPress()
     })
     const submit = renderer!.root.find(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === '提交已选选项'
+      (node) => isHostType(node, 'Pressable') && node.props.accessibilityLabel === '提交已选选项'
     )
     await act(async () => submit.props.onPress())
 

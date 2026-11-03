@@ -2,7 +2,6 @@ import type { MessageType, OrchestrationDb, RunRow } from '../../../../orchestra
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import { interruptedAcknowledgedCheck } from '../routing'
 import { checkWorkerMailbox } from './check-worker'
-import { acknowledgedOnlyReceipt, handsOverBatch } from './mailbox-message-receipt'
 import { currentDispatchAssigneeRun } from './recipient-routing'
 import { callerHoldsDispatchPane, dispatchFenced } from './dispatch-mailbox-fence'
 import { orchestrationCallerIdentity } from '../runs/run-scope'
@@ -69,10 +68,6 @@ export async function checkRunPendingMail(args: {
     }
   }
   recordAcknowledged()
-  if (acknowledged && !params.wait) {
-    const result = acknowledgedOnlyReceipt({ runId: run.id }, acknowledged.delivery.id)
-    return { acknowledged: acknowledged.delivery.id, result }
-  }
   if (
     residual &&
     residual.run_id !== run.id &&
@@ -106,13 +101,8 @@ export async function checkRunPendingMail(args: {
           throw dispatchFenced()
         }
       },
-      recordMutationReceipt,
-      runAcknowledged: acknowledged?.delivery.id,
-      acknowledgeOnly: !params.wait
+      recordMutationReceipt
     })
-    if (handsOverBatch(result) || (residualAck && !params.wait)) {
-      return { acknowledged: result?.acknowledged ?? undefined, result }
-    }
     if (result?.acknowledged) {
       acknowledged = { delivery: { id: result.acknowledged } }
     }

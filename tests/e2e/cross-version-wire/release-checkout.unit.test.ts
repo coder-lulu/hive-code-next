@@ -1,5 +1,4 @@
 import { execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
 import {
   existsSync,
   mkdirSync,
@@ -12,9 +11,9 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { join, relative } from 'node:path'
 import { lock } from 'proper-lockfile'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest'
 import { forceTerminateProcessTree } from '@orca/process-host/process-tree-termination'
 import { spawnProcess } from '@orca/process-host'
 import {
@@ -25,6 +24,7 @@ import {
   type CheckoutStagingContext,
   type ReleaseCheckout
 } from './release-checkout'
+import { extractReleaseCheckoutTree } from './release-checkout-tree'
 const temporaryRoots: string[] = []
 const temporaryRefs: { ref: string; commit: string }[] = []
 
@@ -44,6 +44,29 @@ function temporaryCacheRoot(): string {
 function git(args: string[]): string {
   return execFileSync('git', args, { cwd: REPO_ROOT, encoding: 'utf8' }).trim()
 }
+
+function createCollisionMergeFixture(): string {
+  const directory = join(REPO_ROOT, 'logs', 'cross-version-checkout-fixtures')
+  mkdirSync(directory, { recursive: true })
+  const root = mkdtempSync(join(directory, 'git-'))
+  temporaryRoots.push(root)
+  vi.stubEnv('GIT_DIR', join(root, '.git'))
+  vi.stubEnv('GIT_WORK_TREE', root)
+  vi.stubEnv('GIT_INDEX_FILE', join(root, '.git', 'index'))
+  git(['init', '--quiet', '--initial-branch=main', root])
+  git(['config', 'user.name', 'Fixture'])
+  git(['config', 'user.email', 'fixture@example.invalid'])
+  const tree = git(['write-tree'])
+  const initial = git(['commit-tree', tree, '-m', 'root'])
+  const main = git(['commit-tree', tree, '-p', initial, '-m', 'main'])
+  const side = git(['commit-tree', tree, '-p', initial, '-m', 'side'])
+  const merge = git(['commit-tree', tree, '-p', main, '-p', side, '-m', 'merge'])
+  git(['update-ref', 'refs/heads/main', merge])
+  return merge
+}
+
+// The materializer contract needs a fixed local tree, independent of release-tag fetch policy.
+const CHECKOUT_REF = git(['rev-parse', 'HEAD'])
 
 function syntheticCheckout(): ReleaseCheckout {
   // Resolve macOS /var symlinks like vite-node for provenance comparisons.
@@ -263,57 +286,131 @@ afterEach(() => {
 })
 
 describe('release checkout materialization', () => {
-  it('keeps an import live while another colliding release label materializes', async () => {
-    // Squash-merged history has no merge parents; create two distinct refs with colliding labels.
-    const scope = `refs/orca-checkout-test/${randomUUID()}`
-    const firstRef = `${scope}/release`
-    const secondRef = `${scope}_release`
-    for (const [ref, revision] of [
-      [firstRef, 'HEAD'],
-      [secondRef, 'v1.4.190']
-    ]) {
-      const commit = git(['rev-parse', `${revision}^{commit}`])
-      git(['update-ref', ref, commit, '0'.repeat(40)])
-      temporaryRefs.push({ ref, commit })
-    }
-    expect(git(['rev-parse', `${firstRef}^{commit}`])).not.toBe(
-      git(['rev-parse', `${secondRef}^{commit}`])
-    )
-
+  it('single-flights concurrent consumers of one release identity', async () => {
     const cacheRoot = temporaryCacheRoot()
-    const options = { cacheRoot, testHooks: { populateStaging: populateMinimalStaging } }
-    const first = await materializeReleaseCheckout(firstRef, options)
-    const dependency = join(first.root, 'delayed-dependency.mjs')
-    const entry = join(first.root, 'delayed-entry.mjs')
-    const importStarted = join(cacheRoot, 'import-started')
-    const continueImport = join(cacheRoot, 'continue-import')
-    writeFileSync(dependency, "export const loaded = 'first-release'\n")
-    writeFileSync(
-      entry,
-      "import { existsSync, writeFileSync } from 'node:fs'\n" +
-        `writeFileSync(${JSON.stringify(importStarted)}, '')\n` +
-        `while (!existsSync(${JSON.stringify(continueImport)})) await new Promise((resolve) => setTimeout(resolve, 10))\n` +
-        "export const loaded = (await import('./delayed-dependency.mjs')).loaded\n"
-    )
+    let publications = 0
+    const options = {
+      cacheRoot,
+      testHooks: {
+        populateStaging: async (context: CheckoutStagingContext) => {
+          publications++
+          await populateMinimalStaging(context)
+        }
+      }
+    }
+    const checkouts = await Promise.all([
+      materializeReleaseCheckout(CHECKOUT_REF, options),
+      materializeReleaseCheckout(CHECKOUT_REF, options),
+      materializeReleaseCheckout(CHECKOUT_REF, options)
+    ])
 
-    const loading = importReleaseCheckoutModule(first, '/delayed-entry.mjs')
-    let second: ReleaseCheckout
-    try {
-      await waitForFile(importStarted, 5_000)
-      second = await materializeReleaseCheckout(secondRef, options)
-    } finally {
-      writeFileSync(continueImport, '')
+    expect(publications).toBe(1)
+
+    expect(new Set(checkouts.map(({ root }) => root))).toHaveLength(1)
+    expect(relative(cacheRoot, checkouts[0]!.root)).not.toMatch(/^\.\./)
+  })
+
+  describe('real baseline module loading', () => {
+    let cacheRoot: string
+    let checkout: ReleaseCheckout
+
+    beforeAll(async () => {
+      // Extraction is fixture preparation; the loader still imports actual code
+      // from the pinned checkout and resolves its dependencies inside that tree.
+      cacheRoot = temporaryCacheRoot()
+      checkout = await materializeReleaseCheckout(CHECKOUT_REF, {
+        cacheRoot,
+        testHooks: {
+          // The loader needs the actual shared subtree, not unrelated main and
+          // renderer files. Its disposable cache never enters the default cache.
+          populateStaging: async ({ staging }) => {
+            await extractReleaseCheckoutTree(REPO_ROOT, staging, CHECKOUT_REF, true, {
+              archivePaths: ['src/shared']
+            })
+          }
+        }
+      })
+    })
+
+    it('loads a baseline module whose source imports another checkout-root file', async () => {
+      const protocol = await importReleaseCheckoutModule(
+        checkout,
+        '/src/shared/protocol-version.ts'
+      )
+
+      expect(protocol.REMOTE_SERVER_UPDATE_CAPABILITY).toBe('updater.remote-control.v1')
+      expect(relative(cacheRoot, checkout.root)).not.toMatch(/^\.\./)
+    })
+  })
+
+  // Default cache root lets released source resolve packages from the repo's node_modules.
+  it('runs a released schema with an existing package dependency', async () => {
+    const checkout = await materializeReleaseCheckout('v1.4.221')
+    const schema = await importReleaseCheckoutModule(
+      checkout,
+      '/src/shared/agent-session-context-usage-schema.ts'
+    )
+    const isAdmissible = schema.isAdmissibleAgentSessionContextUsage
+    if (typeof isAdmissible !== 'function') {
+      throw new Error('v1.4.221 has no isAdmissibleAgentSessionContextUsage export')
     }
 
-    await expect(loading).resolves.toMatchObject({ loaded: 'first-release' })
-    expect(first.label).toBe(second.label)
-    expect(first.root).not.toBe(second.root)
+    expect(
+      isAdmissible({
+        window: { tokens: 200_000, capturedAt: 1 },
+        used: { kind: 'unknown', capturedAt: 1 }
+      })
+    ).toBe(true)
+    expect(isAdmissible({ window: { tokens: 0, capturedAt: 1 } })).toBe(false)
+    expect(isAdmissible({ used: { kind: 'invalid', capturedAt: 1 } })).toBe(false)
+  }, 180_000)
+
+  it('keeps an import live while another colliding release label materializes', async () => {
+    try {
+      const merge = createCollisionMergeFixture()
+      const firstRef = `${merge}~2`
+      const secondRef = `${merge}^2`
+      expect(git(['rev-parse', `${firstRef}^{commit}`])).not.toBe(
+        git(['rev-parse', `${secondRef}^{commit}`])
+      )
+
+      const cacheRoot = temporaryCacheRoot()
+      const options = { cacheRoot, testHooks: { populateStaging: populateMinimalStaging } }
+      const first = await materializeReleaseCheckout(firstRef, options)
+      const dependency = join(first.root, 'delayed-dependency.mjs')
+      const entry = join(first.root, 'delayed-entry.mjs')
+      const importStarted = join(cacheRoot, 'import-started')
+      const continueImport = join(cacheRoot, 'continue-import')
+      writeFileSync(dependency, "export const loaded = 'first-release'\n")
+      writeFileSync(
+        entry,
+        "import { existsSync, writeFileSync } from 'node:fs'\n" +
+          `writeFileSync(${JSON.stringify(importStarted)}, '')\n` +
+          `while (!existsSync(${JSON.stringify(continueImport)})) await new Promise((resolve) => setTimeout(resolve, 10))\n` +
+          "export const loaded = (await import('./delayed-dependency.mjs')).loaded\n"
+      )
+
+      const loading = importReleaseCheckoutModule(first, '/delayed-entry.mjs')
+      let second: ReleaseCheckout
+      try {
+        await waitForFile(importStarted, 5_000)
+        second = await materializeReleaseCheckout(secondRef, options)
+      } finally {
+        writeFileSync(continueImport, '')
+      }
+
+      await expect(loading).resolves.toMatchObject({ loaded: 'first-release' })
+      expect(first.label).toBe(second.label)
+      expect(first.root).not.toBe(second.root)
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('causally single-flights a rival process before publishing an in-use checkout', async () => {
     const cacheRoot = temporaryCacheRoot()
     const scratch = temporaryCacheRoot()
-    const published = await materializeReleaseCheckout('v1.4.190', {
+    const published = await materializeReleaseCheckout(CHECKOUT_REF, {
       cacheRoot,
       testHooks: { populateStaging: populateMinimalStaging }
     })
@@ -337,7 +434,7 @@ describe('release checkout materialization', () => {
     const stagingReady = new Promise<CheckoutStagingContext>((resolveStaging) => {
       acknowledgeStaging = resolveStaging
     })
-    const publisher = materializeReleaseCheckout('v1.4.190', {
+    const publisher = materializeReleaseCheckout(CHECKOUT_REF, {
       cacheRoot,
       testHooks: {
         lockOptions: COMPRESSED_LOCK_OPTIONS,
@@ -351,7 +448,7 @@ describe('release checkout materialization', () => {
     const active = await stagingReady
     const rival = startMaterializerChild(scratch, 'heartbeat-rival', {
       cacheRoot,
-      ref: 'v1.4.190',
+      ref: CHECKOUT_REF,
       resultPath,
       attemptMarker,
       acquiredMarker,
@@ -396,7 +493,7 @@ describe('release checkout materialization', () => {
     const stagingMarker = join(scratch, 'crashed-staging')
     const crashed = startMaterializerChild(scratch, 'crashing-publisher', {
       cacheRoot,
-      ref: 'v1.4.190',
+      ref: CHECKOUT_REF,
       stagingMarker,
       hangAfterStaging: true,
       lockOptions: COMPRESSED_LOCK_OPTIONS
@@ -418,7 +515,7 @@ describe('release checkout materialization', () => {
 
       const unrelated = join(crashedContext.staging, '..', '.staging-unrelated-live-owner')
       mkdirSync(unrelated)
-      const recovered = await materializeReleaseCheckout('v1.4.190', {
+      const recovered = await materializeReleaseCheckout(CHECKOUT_REF, {
         cacheRoot,
         testHooks: {
           lockOptions: COMPRESSED_LOCK_OPTIONS,
@@ -435,9 +532,56 @@ describe('release checkout materialization', () => {
       await stopMaterializerChild(crashed)
     }
   }, 30_000)
+
+  it('never stamps an incomplete tree produced through the injectable test seam', async () => {
+    const cacheRoot = temporaryCacheRoot()
+    await expect(
+      materializeReleaseCheckout(CHECKOUT_REF, {
+        cacheRoot,
+        testHooks: { populateStaging: async () => undefined }
+      })
+    ).rejects.toThrow(/missing the terminal stream protocol/)
+
+    let populated = 0
+    const recovered = await materializeReleaseCheckout(CHECKOUT_REF, {
+      cacheRoot,
+      testHooks: {
+        populateStaging: async (context) => {
+          populated++
+          await populateMinimalStaging(context)
+        }
+      }
+    })
+    expect(populated).toBe(1)
+    expect(existsSync(join(recovered.root, 'src', 'shared', 'terminal-stream-protocol.ts'))).toBe(
+      true
+    )
+  })
 })
 
 describe('release checkout module importer', () => {
+  it('hands the importer a raw absolute forward-slash specifier, never a file URL', async () => {
+    const checkout = syntheticCheckout()
+    const captured: string[] = []
+    const capture = (specifier: string): Promise<Record<string, unknown>> => {
+      captured.push(specifier)
+      return Promise.resolve({})
+    }
+
+    await importReleaseCheckoutModule(checkout, '/src/main/runtime/rpc/dispatcher.ts', capture)
+    await importReleaseCheckoutModule(checkout, '\\src\\shared\\protocol-version.ts', capture)
+
+    const normalizedRoot = checkout.root.split('\\').join('/')
+    expect(captured).toEqual([
+      `${normalizedRoot}/src/main/runtime/rpc/dispatcher.ts`,
+      `${normalizedRoot}/src/shared/protocol-version.ts`
+    ])
+    for (const specifier of captured) {
+      expect(specifier).not.toMatch(/^file:/)
+      expect(specifier).not.toContain('\\')
+    }
+  })
+
   it('refuses module paths that escape the checkout root', () => {
     const checkout = syntheticCheckout()
     const escape = /stay inside the release checkout/

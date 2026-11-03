@@ -119,7 +119,7 @@ export class RuntimePtyForegroundAgent {
     }
     let pending = this.identifies.get(ptyId)
     if (!pending) {
-      pending = this.identifyForeground(ptyId).finally(() => this.identifies.delete(ptyId))
+      pending = this.identify(ptyId).finally(() => this.identifies.delete(ptyId))
       this.identifies.set(ptyId, pending)
     }
     return withTimeoutResult(pending, TERMINAL_INTERACTIVE_WAIT_PROBE_TIMEOUT_MS).then((result) =>
@@ -174,11 +174,10 @@ export class RuntimePtyForegroundAgent {
     return true
   }
 
-  /** The agent now in the PTY's foreground, whoever launched it. */
-  async identifyForeground(ptyId: string): Promise<TerminalAgent | null> {
+  private async identify(ptyId: string): Promise<TerminalAgent | null> {
     const controller = this.deps.getController()
     const pty = this.deps.getPty(ptyId)
-    if (!controller || !pty?.connected) {
+    if (!controller || !pty?.connected || pty.launchAgent) {
       return null
     }
     const result = await this.read(ptyId)

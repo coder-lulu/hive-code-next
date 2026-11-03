@@ -1,6 +1,3 @@
-import { callGitHubTargetOperation } from '@/lib/github-work-item-target-request'
-import { requireActiveEnvironment } from './web-runtime-session'
-import { requireGitHubWorkItemTargetDetails } from '../../../../shared/github/work-item-target'
 import type { PreloadApi } from '../../../../preload/api-types'
 import {
   GITHUB_MARK_PR_READY_RUNTIME_CAPABILITY,
@@ -27,7 +24,7 @@ export function createGitHubApi(): WebGitHubApi {
       route<WebGitHubResult<'repoUpstream'>>(GITHUB_WEB_RPC_METHODS.repoUpstream, args),
     prForBranch: ({ wakeWslDistro: _wake, ...args }) =>
       route<WebGitHubResult<'prForBranch'>>(GITHUB_WEB_RPC_METHODS.prForBranch, args),
-    refreshPRNow: async ({ candidate, reason, userRefresh }) => {
+    refreshPRNow: async ({ candidate, reason }) => {
       const acceptMergedFallbackPR =
         candidate.linkedPRNumber == null &&
         candidate.fallbackPRNumber != null &&
@@ -40,7 +37,6 @@ export function createGitHubApi(): WebGitHubApi {
         fallbackPRNumber: candidate.fallbackPRNumber ?? null,
         currentHeadOid: candidate.currentHeadOid ?? null,
         ...(reason ? { reason } : {}),
-        ...(userRefresh === true ? { userRefresh: true } : {}),
         ...(acceptMergedFallbackPR ? { acceptMergedFallbackPR: true } : {})
       })
       return pr
@@ -57,25 +53,8 @@ export function createGitHubApi(): WebGitHubApi {
         ...args,
         ownerRepo
       }),
-    workItemDetails: async ({ ownerRepo, canonical = false, expectedGhAccount, ...args }) => {
-      const details = await callGitHubTargetOperation<WebGitHubResult<'workItemDetails'>>({
-        target: { kind: 'environment', environmentId: requireActiveEnvironment().id },
-        ownerRepo,
-        expectedGhAccount,
-        canonical,
-        read: true,
-        method: GITHUB_WEB_RPC_METHODS.workItemDetails,
-        params: { ...args, repo: args.repoId ? `id:${args.repoId}` : args.repoPath },
-        local: (exact) => route(GITHUB_WEB_RPC_METHODS.workItemDetails, { ...args, ...exact })
-      })
-      return ownerRepo && args.type
-        ? requireGitHubWorkItemTargetDetails(details, {
-            repository: ownerRepo,
-            type: args.type,
-            number: args.number
-          })
-        : details
-    },
+    workItemDetails: (args) =>
+      route<WebGitHubResult<'workItemDetails'>>(GITHUB_WEB_RPC_METHODS.workItemDetails, args),
     notifyWorkItemMutated: () => Promise.resolve(false),
     prFileContents: (args) =>
       route<WebGitHubResult<'prFileContents'>>(GITHUB_WEB_RPC_METHODS.prFileContents, args),
@@ -106,16 +85,8 @@ export function createGitHubApi(): WebGitHubApi {
         GITHUB_WEB_RPC_METHODS.resolveReviewThread,
         args
       ),
-    setPRFileViewed: ({ expectedGhAccount, ...args }) =>
-      expectedGhAccount === undefined
-        ? route<WebGitHubResult<'setPRFileViewed'>>(GITHUB_WEB_RPC_METHODS.setPRFileViewed, args)
-        : callGitHubTargetOperation<WebGitHubResult<'setPRFileViewed'>>({
-            target: { kind: 'environment', environmentId: requireActiveEnvironment().id },
-            expectedGhAccount,
-            method: GITHUB_WEB_RPC_METHODS.setPRFileViewed,
-            params: { ...args, repo: args.repoId ? `id:${args.repoId}` : args.repoPath },
-            local: (exact) => route(GITHUB_WEB_RPC_METHODS.setPRFileViewed, { ...args, ...exact })
-          }),
+    setPRFileViewed: (args) =>
+      route<WebGitHubResult<'setPRFileViewed'>>(GITHUB_WEB_RPC_METHODS.setPRFileViewed, args),
     updatePRTitle: (args) =>
       route<WebGitHubResult<'updatePRTitle'>>(GITHUB_WEB_RPC_METHODS.updatePRTitle, args),
     mergePR: (args) => route<WebGitHubResult<'mergePR'>>(GITHUB_WEB_RPC_METHODS.mergePR, args),
@@ -137,14 +108,8 @@ export function createGitHubApi(): WebGitHubApi {
       route<WebGitHubResult<'requestPRReviewers'>>(GITHUB_WEB_RPC_METHODS.requestPRReviewers, args),
     removePRReviewers: (args) =>
       route<WebGitHubResult<'removePRReviewers'>>(GITHUB_WEB_RPC_METHODS.removePRReviewers, args),
-    updateIssue: ({ ownerRepo, ...args }) =>
-      callGitHubTargetOperation<WebGitHubResult<'updateIssue'>>({
-        target: { kind: 'environment', environmentId: requireActiveEnvironment().id },
-        ownerRepo,
-        method: GITHUB_WEB_RPC_METHODS.updateIssue,
-        params: { ...args, repo: args.repoId ? `id:${args.repoId}` : args.repoPath },
-        local: (exact) => route(GITHUB_WEB_RPC_METHODS.updateIssue, { ...args, ...exact })
-      }),
+    updateIssue: (args) =>
+      route<WebGitHubResult<'updateIssue'>>(GITHUB_WEB_RPC_METHODS.updateIssue, args),
     addIssueComment: (args) =>
       route<WebGitHubResult<'addIssueComment'>>(GITHUB_WEB_RPC_METHODS.addIssueComment, args),
     addPRReviewCommentReply: (args) =>
@@ -154,24 +119,13 @@ export function createGitHubApi(): WebGitHubApi {
       ),
     addPRReviewComment: (args) =>
       route<WebGitHubResult<'addPRReviewComment'>>(GITHUB_WEB_RPC_METHODS.addPRReviewComment, args),
-    listLabels: ({ ownerRepo, expectedGhAccount, ...args }) =>
-      callGitHubTargetOperation<WebGitHubResult<'listLabels'>>({
-        target: { kind: 'environment', environmentId: requireActiveEnvironment().id },
-        ownerRepo,
-        expectedGhAccount,
-        method: GITHUB_WEB_RPC_METHODS.listLabels,
-        params: { ...args, repo: args.repoId ? `id:${args.repoId}` : args.repoPath },
-        local: (exact) => route(GITHUB_WEB_RPC_METHODS.listLabels, { ...args, ...exact })
-      }),
-    listAssignableUsers: ({ ownerRepo, expectedGhAccount, ...args }) =>
-      callGitHubTargetOperation<WebGitHubResult<'listAssignableUsers'>>({
-        target: { kind: 'environment', environmentId: requireActiveEnvironment().id },
-        ownerRepo,
-        expectedGhAccount,
-        method: GITHUB_WEB_RPC_METHODS.listAssignableUsers,
-        params: { ...args, repo: args.repoId ? `id:${args.repoId}` : args.repoPath },
-        local: (exact) => route(GITHUB_WEB_RPC_METHODS.listAssignableUsers, { ...args, ...exact })
-      }),
+    listLabels: (args) =>
+      route<WebGitHubResult<'listLabels'>>(GITHUB_WEB_RPC_METHODS.listLabels, args),
+    listAssignableUsers: (args) =>
+      route<WebGitHubResult<'listAssignableUsers'>>(
+        GITHUB_WEB_RPC_METHODS.listAssignableUsers,
+        args
+      ),
     onWorkItemMutated: () => noopUnsubscribe,
     checkOrcaStarred: () => Promise.resolve(null),
     starOrca: () => Promise.resolve(false),

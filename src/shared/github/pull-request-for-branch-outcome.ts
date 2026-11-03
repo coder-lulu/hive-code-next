@@ -13,12 +13,3 @@ export function normalizeGitHubPRForBranchOutcome(
   }
   return response ? { kind: 'found', pr: response, fetchedAt } : { kind: 'no-pr', fetchedAt }
 }
-
-export function githubPRTransportFailureOutcome(): PRRefreshOutcome {
-  return {
-    kind: 'upstream-error',
-    errorType: 'unknown',
-    message: 'GitHub pull request refresh failed.',
-    fetchedAt: Date.now()
-  }
-}

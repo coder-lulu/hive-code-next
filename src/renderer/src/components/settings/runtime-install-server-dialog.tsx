@@ -173,7 +173,7 @@ export function RuntimeInstallServerDialog({
                 className="cursor-pointer text-foreground underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 onClick={() => {
                   onOpenChange(false)
-                  openSettingsTarget({ pane: 'ssh', repoId: null })
+                  openSettingsTarget({ pane: 'servers', sectionId: 'devices-ssh', repoId: null })
                 }}
               >
                 {translate('auto.components.settings.serverList.addSshHost', 'Add an SSH host')}

@@ -36,9 +36,6 @@ export class DegradedDaemonOwnerRecovery {
     return result
   }
 
-  observesForeground = (id: string): boolean =>
-    this.routes.get(id)?.supportsForegroundObservation?.(id) === true
-
   getVerifiedRoute = (id: string): IPtyProvider | undefined =>
     this.attachResolver.getVerifiedRoute(id)
 
@@ -50,23 +47,7 @@ export class DegradedDaemonOwnerRecovery {
   async listProcesses(
     opts?: Parameters<IPtyProvider['listProcesses']>[0]
   ): Promise<PtyProcessInfo[]> {
-    const ids = opts?.targetOwnerOnly ? opts.ptyIds : undefined
-    // Only established routes skip owner resolution; stop and liveness proofs never take this path.
-    if (!ids || ids.some((id) => !this.routes.has(id))) {
-      return this.attachResolver.listProcesses(opts)
-    }
-    const owners = new Set(ids.map((id) => this.routes.get(id)!))
-    const rows = await Promise.all(
-      [...owners].map(async (owner) =>
-        (
-          await owner.listProcesses({
-            ptyIds: ids.filter((id) => this.routes.get(id) === owner),
-            targetOwnerOnly: true
-          })
-        ).filter((row) => ids.includes(row.id) && this.routes.get(row.id) === owner)
-      )
-    )
-    return rows.flat()
+    return this.attachResolver.listProcesses(opts)
   }
 
   async reconcileOnStartup(validWorktreeIds: Set<string>): Promise<{

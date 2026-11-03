@@ -1,7 +1,6 @@
 import { useCallback, useLayoutEffect, useMemo, useRef } from 'react'
 import type { RpcClient } from '../transport/rpc-client'
 import type { ConnectionState } from '../transport/types'
-import { translate } from '../i18n/mobile-i18n'
 
 export function useMobileResumeOperationOwnership(
   hostId: string,
@@ -30,12 +29,7 @@ export function useMobileResumeOperationOwnership(
         owner.client.getState() !== 'connected' ||
         owner.client.getGeneration?.() !== owner.generation
       ) {
-        throw new Error(
-          translate(
-            'agentHistory.resume.hostConnectionChanged',
-            'Host connection changed. Retry resume.'
-          )
-        )
+        throw new Error('Host connection changed. Retry resume.')
       }
     },
     [owner]

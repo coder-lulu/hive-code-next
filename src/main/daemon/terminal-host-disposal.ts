@@ -1,4 +1,3 @@
-import type { PendingTerminalCreation } from './terminal-creation-work'
 import { shutdownTerminalHostSessions } from './terminal-host-session-shutdown'
 import type { TerminalSessionTeardown } from './terminal-session-teardown'
 import type { Session } from './session'
@@ -11,7 +10,7 @@ type FinalCheckpoint = (
 ) => void
 
 type TerminalHostDisposalOptions = {
-  pendingCreations: ReadonlyMap<string, PendingTerminalCreation>
+  pendingCreations: ReadonlyMap<string, Promise<void>>
   sessionTeardown: TerminalSessionTeardown
   sessions: Map<string, Session>
   onFinalCheckpoint?: FinalCheckpoint
@@ -27,12 +26,7 @@ export async function disposeTerminalHostSessions({
 }: TerminalHostDisposalOptions): Promise<void> {
   if (pendingCreations.size > 0) {
     // No spawn may publish a session after teardown completes.
-    await Promise.all(
-      [...pendingCreations.values()].map(async (creation) => {
-        await creation.recover()
-        await creation.completion
-      })
-    )
+    await Promise.all(pendingCreations.values())
   }
   const existingTeardowns = sessionTeardown.requestImmediateAll()
   await Promise.all([

@@ -1,4 +1,3 @@
-import { linearIssueReadFailureMessage } from '../../../src/shared/integration-credential-errors'
 import type { GitHubWorkItem } from '../../../src/shared/github/work-item-types'
 import type { GitLabWorkItem } from '../../../src/shared/gitlab-types'
 import type { LinearIssue } from '../../../src/shared/linear/issue-types'
@@ -133,7 +132,7 @@ export async function fanOutSmartSearch(args: FanOutArgs): Promise<SmartFanOutRe
     fail(gitlab.reason)
   }
   if (linear.status === 'rejected') {
-    fail(new Error(linearIssueReadFailureMessage(linear.reason)))
+    fail(linear.reason)
   }
   if (jira.status === 'rejected') {
     fail(jira.reason)

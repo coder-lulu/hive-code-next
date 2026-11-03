@@ -19,8 +19,8 @@ import { writeAssignment } from './ci-shard-assignment.mjs'
 import { sealModuleCache, validateModuleCache } from './ci-unit-module-cache-contents.mjs'
 
 const ROOT = resolve(import.meta.dirname, '../..')
-const IDENTITY_REPORT = 'ci-shards/unit-module-cache-identity.json'
-const CACHE_REPORT = 'ci-shards/unit-module-cache.json'
+const IDENTITY_REPORT = 'logs/ci-shards/unit-module-cache-identity.json'
+const CACHE_REPORT = 'logs/ci-shards/unit-module-cache.json'
 const CACHE_FORMAT = '1.0.0-beta.8'
 
 function digestInputs(root, files) {

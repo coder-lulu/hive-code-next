@@ -10,9 +10,7 @@ export function useRetryPanesWhenWslHostReturns(
   ownerEnvironmentId: string | null,
   /** The owner's WSL host state, from the caller's own subscription (no listener of its own). */
   status: WslHostConnectionState | undefined,
-  paneTransports: { readonly current: ReadonlyMap<number, PtyTransport> },
-  /** Clears the stop's own error from the panes; their old refusal is no longer true. */
-  onHostReturned?: () => void
+  paneTransports: { readonly current: ReadonlyMap<number, PtyTransport> }
 ): void {
   const stoppedHost = useRef<string | null>(null)
   useEffect(() => {
@@ -24,18 +22,14 @@ export function useRetryPanesWhenWslHostReturns(
       return
     }
     stoppedHost.current = null
-    onHostReturned?.()
     for (const transport of paneTransports.current.values()) {
       // The card's rule: a pane with no server yet is still the workspace's; one on another never met this stop.
       const paneEnvironmentId = transport.getRuntimeEnvironmentId
         ? transport.getRuntimeEnvironmentId()
         : ownerEnvironmentId
       if (paneEnvironmentId == null || paneEnvironmentId === ownerEnvironmentId) {
-        // Why both: a refused connect left the pane idle, with no retry armed to resume.
-        if (!transport.retryRecovery?.()) {
-          transport.reopenAfterHostReturned?.()
-        }
+        transport.retryRecovery?.()
       }
     }
-  }, [status, ownerEnvironmentId, paneTransports, onHostReturned])
+  }, [status, ownerEnvironmentId, paneTransports])
 }

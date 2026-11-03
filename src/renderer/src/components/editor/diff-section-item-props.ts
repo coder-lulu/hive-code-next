@@ -1,4 +1,3 @@
-import type { WorkspaceResource } from '@/lib/workspace-copy-owner'
 import type { Dispatch, MutableRefObject, ReactNode, SetStateAction } from 'react'
 import type { editor as monacoEditor } from 'monaco-editor'
 import type { DecoratedDiffComment } from '../diff-comments/decorated-diff-comment'
@@ -10,10 +9,14 @@ export type DiffSectionItemProps = {
   isBranchMode: boolean
   sideBySide: boolean
   isDark: boolean
+  settings: {
+    terminalFontSize?: number
+    terminalFontFamily?: string
+    diffWordWrap?: boolean
+    diffShowWhitespace?: boolean
+  } | null
   sectionHeight: number | undefined
   worktreeId?: string
-  /** The combined diff's tab; its review notes belong to the copy it names. */
-  noteSource?: WorkspaceResource
   loadSection: (index: number) => void
   loadDeferredSection?: (index: number) => void
   retrySection: (index: number) => void

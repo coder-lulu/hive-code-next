@@ -1,11 +1,12 @@
 // @vitest-environment happy-dom
-import userEvent from '@testing-library/user-event'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { projectAgentLaunchSettings } from '../../../../shared/agent-launch-settings'
 import { createGlobalSettingsFixture } from '../../../../shared/global-settings-test-fixture'
-import { normalizeNativeChatProviderChoices } from '../../../../shared/native-chat/native-chat-providers'
-import { nativeChatPreferenceFor } from '../../../../shared/structured-native-chat-launch-route'
+import {
+  isNativeChatProviderDisplayedOn,
+  normalizeNativeChatProviderChoices
+} from '../../../../shared/native-chat/native-chat-providers'
 import { installManagedRuntime } from '@/runtime/managed-runtime-install-status'
 import { buildNewTabAgentMenuRows } from '@/lib/new-tab-agent-menu-rows'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
@@ -16,8 +17,8 @@ import type * as ManagedRuntimeInstallModule from '@/runtime/managed-runtime-ins
 import type * as SignInAreaModule from './AntigravityProviderSignInArea'
 import { TooltipProvider } from '../ui/tooltip'
 import { AgentCatalogRow } from './AgentCatalogRow'
+import { buildAgentOpensAs } from './native-chat-provider-choice'
 import { AgentLaunchSettingsCatalog } from './AgentLaunchSettingsCatalog'
-import { buildAgentOpensAs, saveNativeChatProviderChoice } from './native-chat-provider-choice'
 
 const store = vi.hoisted(
   (): { settings: unknown; localDetectedAgentIdsByContext: { host: TuiAgent[] | null } } => ({
@@ -62,13 +63,7 @@ vi.mock('@/lib/host-chat-program-acquisition', () => ({ useChatProgramFacts: () 
 vi.mock('@/lib/host-chat-program', async (importOriginal) => ({
   ...(await importOriginal<typeof HostChatProgramModule>()),
   agentChoiceOpensAsChat: () => false,
-  resolveChatProgramContext: (_state: unknown, workspace: { runtimeEnvironmentId?: string }) => ({
-    executionHostId: workspace.runtimeEnvironmentId
-      ? `runtime:${workspace.runtimeEnvironmentId}`
-      : 'local',
-    hostCapabilities: [],
-    runtimeId: null
-  }),
+  resolveChatProgramContext: () => ({}),
   // The host publishes Antigravity's downloaded chat program; its agy CLI is not installed.
   readChatProgram: (_store: unknown, agent: TuiAgent) =>
     (agent === 'antigravity' && inventory.chatAvailable) || inventory.nativePrograms.includes(agent)
@@ -107,8 +102,7 @@ afterEach(() => {
 function renderRow(
   agent: TuiAgent,
   settings: ReturnType<typeof createGlobalSettingsFixture>,
-  cliDetected: boolean,
-  chatRuntime?: React.ReactNode
+  cliDetected: boolean
 ) {
   const updateSettings = vi.fn()
   store.settings = settings
@@ -139,7 +133,6 @@ function renderRow(
         settings,
         updateSettings
       })}
-      chatRuntime={chatRuntime}
     />,
     { wrapper: TooltipProvider }
   )
@@ -150,33 +143,8 @@ const checked = (name: string): string | null | undefined =>
   screen.getByRole('radiogroup', { name }).querySelector('[aria-checked="true"]')?.textContent
 
 describe('agent row chat or CLI', () => {
-  it.each([
-    { agentDefaultSurface: undefined, override: undefined, expected: 'CLI' },
-    { agentDefaultSurface: 'terminal', override: undefined, expected: 'CLI' },
-    { agentDefaultSurface: 'chat', override: undefined, expected: 'Chat' },
-    { agentDefaultSurface: 'chat', override: false, expected: 'CLI' },
-    { agentDefaultSurface: 'terminal', override: true, expected: 'Chat' }
-  ] as const)(
-    'uses default $agentDefaultSurface and override $override in the agent row',
-    ({ agentDefaultSurface, override, expected }) => {
-      renderRow(
-        'codex',
-        createGlobalSettingsFixture({
-          agentDefaultSurface,
-          nativeChatProviders: override === undefined ? {} : { codex: override }
-        }),
-        true
-      )
-      expect(checked('Open Codex as')).toBe(expected)
-    }
-  )
-
   it('offers only Chat for an agent whose chat runs without its CLI', () => {
-    const updateSettings = renderRow(
-      'antigravity',
-      createGlobalSettingsFixture({ agentDefaultSurface: 'chat' }),
-      false
-    )
+    const updateSettings = renderRow('antigravity', createGlobalSettingsFixture({}), false)
     expect(checked('Open Antigravity as')).toBe('Chat')
     const cli = screen.getByRole('radio', { name: 'CLI' })
     expect(cli.getAttribute('aria-disabled')).toBe('true')
@@ -186,15 +154,15 @@ describe('agent row chat or CLI', () => {
     expect(document.querySelector('.opacity-70')).toBeNull()
   })
 
-  it('offers the inherited Terminal choice on fresh installs and no choice for a disabled agent', () => {
-    renderRow('claude', createGlobalSettingsFixture(), true)
-    expect(checked('Open Claude as')).toBe('CLI')
-    cleanup()
+  it('retains an explicit CLI preference and suppresses choice for a disabled agent', () => {
     renderRow(
       'claude',
-      createGlobalSettingsFixture({ agentDefaultSurface: 'chat', disabledTuiAgents: ['claude'] }),
+      createGlobalSettingsFixture({ nativeChatProviders: { claude: false } }),
       true
     )
+    expect(checked('Open Claude as')).toBe('CLI')
+    cleanup()
+    renderRow('claude', createGlobalSettingsFixture({ disabledTuiAgents: ['claude'] }), true)
     expect(screen.queryByRole('radiogroup', { name: 'Open Claude as' })).toBeNull()
   })
 
@@ -220,11 +188,11 @@ describe('agent row chat or CLI', () => {
     inventory.detected = null
     inventory.failed = true
     inventory.chatAvailable = false
-    const settings = createGlobalSettingsFixture({ agentDefaultSurface: 'chat' })
+    const settings = createGlobalSettingsFixture({})
     store.settings = settings
     const element = () => (
       <AgentLaunchSettingsCatalog
-        settings={projectAgentLaunchSettings(settings, 'darwin')}
+        settings={projectAgentLaunchSettings(settings)}
         mutate={vi.fn(async () => {})}
         detectionTarget={{ kind: 'local' }}
         hostName={null}
@@ -234,7 +202,7 @@ describe('agent row chat or CLI', () => {
     )
     const view = render(element(), { wrapper: TooltipProvider })
     expect(screen.queryByText('Chat runtime')).toBeNull()
-    const row = screen.getByRole('radiogroup', { name: 'Open Antigravity as' }).closest('.py-3')
+    const row = screen.getByRole('radiogroup', { name: 'Open Antigravity as' }).closest('article')
     if (!(row instanceof HTMLElement)) {
       throw new Error('Antigravity row is missing')
     }
@@ -262,7 +230,7 @@ describe('agent row chat or CLI', () => {
     expect(screen.getByText('Antigravity account')).toBeTruthy()
     inventory.chatAvailable = true
     view.rerender(element())
-    expect(screen.getByRole('radiogroup', { name: 'Open Antigravity as' }).closest('.py-3')).toBe(
+    expect(screen.getByRole('radiogroup', { name: 'Open Antigravity as' }).closest('article')).toBe(
       row
     )
     expect(document.getElementById('agents-installed')?.textContent).toContain('Antigravity')
@@ -277,18 +245,18 @@ describe('agent row chat or CLI', () => {
     inventory.chatAvailable = false
     view.rerender(element())
     expect(screen.queryByText('Antigravity account')).toBeNull()
-    expect(screen.getByRole('radiogroup', { name: 'Open Antigravity as' }).closest('.py-3')).toBe(
+    expect(screen.getByRole('radiogroup', { name: 'Open Antigravity as' }).closest('article')).toBe(
       row
     )
   })
 
   it('lists an agent whose chat runs without its CLI as installed, with Chat only', () => {
     vi.stubGlobal('api', { platform: { get: () => ({ platform: 'darwin' }) } })
-    const settings = createGlobalSettingsFixture({ agentDefaultSurface: 'chat' })
+    const settings = createGlobalSettingsFixture({})
     store.settings = settings
     render(
       <AgentLaunchSettingsCatalog
-        settings={projectAgentLaunchSettings(settings, 'darwin')}
+        settings={projectAgentLaunchSettings(settings)}
         mutate={vi.fn(async () => {})}
         detectionTarget={{ kind: 'local' }}
         hostName={null}
@@ -304,15 +272,6 @@ describe('agent row chat or CLI', () => {
     expect(group.querySelector('[aria-checked="false"]')?.getAttribute('aria-disabled')).toBe(
       'true'
     )
-    const row = group.closest('.py-3')
-    if (!(row instanceof HTMLElement)) {
-      throw new Error('Missing native-only row')
-    }
-    fireEvent.click(within(row).getByRole('button', { name: 'Expand agent settings' }))
-    expect(within(row).getByText('Model')).toBeTruthy()
-    expect(within(row).getByText('Reasoning effort')).toBeTruthy()
-    expect(within(row).queryByRole('textbox', { name: 'Arguments' })).toBeNull()
-    expect(within(row).queryByRole('textbox', { name: 'Command' })).toBeNull()
     expect(checked('Open Claude as')).toBe('Chat')
     expect(checked('Open Codex as')).toBe('Chat')
     vi.unstubAllGlobals()
@@ -321,7 +280,6 @@ describe('agent row chat or CLI', () => {
   it('retains saved client choices through missing inventory and writes the preference paired launches consume', async () => {
     for (const priorChoice of [false, true, undefined]) {
       const settings = createGlobalSettingsFixture({
-        agentDefaultSurface: 'chat',
         defaultTuiAgent: 'codex',
         nativeChatProviders: normalizeNativeChatProviderChoices(
           JSON.parse(JSON.stringify({ claude: false, codex: priorChoice }))
@@ -333,7 +291,7 @@ describe('agent row chat or CLI', () => {
       })
       const element = () => (
         <AgentLaunchSettingsCatalog
-          settings={projectAgentLaunchSettings(settings, 'darwin')}
+          settings={projectAgentLaunchSettings(settings)}
           mutate={vi.fn(async () => {})}
           detectionTarget={{ kind: 'local' }}
           hostName={null}
@@ -367,7 +325,9 @@ describe('agent row chat or CLI', () => {
             .getByRole('radio', { name: 'CLI' })
             .getAttribute('aria-disabled')
         ).not.toBe('true')
-        expect(nativeChatPreferenceFor(settings, 'codex')).toBe(priorChoice !== false)
+        expect(isNativeChatProviderDisplayedOn(settings, 'codex', observation.detected)).toBe(
+          priorChoice !== false
+        )
         expect(updateSettings).not.toHaveBeenCalled()
         expect(settings.defaultTuiAgent).toBe('codex')
       }
@@ -383,9 +343,7 @@ describe('agent row chat or CLI', () => {
       )
       await vi.waitFor(() => expect(updateSettings).toHaveBeenCalledOnce())
       view.rerender(element())
-      expect(settings.nativeChatProviders).toEqual(
-        priorChoice === false ? { claude: false } : { claude: false, codex: false }
-      )
+      expect(settings.nativeChatProviders).toEqual({ claude: false, codex: priorChoice === false })
       expect(pairedRows()).toEqual(
         priorChoice === false
           ? [{ kind: 'chat', agent: 'codex' }]
@@ -396,7 +354,7 @@ describe('agent row chat or CLI', () => {
   })
 
   it('serializes choices from different rows while an inventory update arrives during the save', async () => {
-    const settings = createGlobalSettingsFixture({ agentDefaultSurface: 'chat' })
+    const settings = createGlobalSettingsFixture({})
     store.settings = settings
     const save = Promise.withResolvers<void>()
     const updateSettings = vi.fn(async (updates: Partial<GlobalSettings>) => {
@@ -405,7 +363,7 @@ describe('agent row chat or CLI', () => {
     })
     const element = () => (
       <AgentLaunchSettingsCatalog
-        settings={projectAgentLaunchSettings(settings, 'darwin')}
+        settings={projectAgentLaunchSettings(settings)}
         mutate={vi.fn(async () => {})}
         detectionTarget={{ kind: 'local' }}
         hostName={null}
@@ -443,14 +401,14 @@ describe('agent row chat or CLI', () => {
     for (const { native, contextual, cliDisabled } of inventories) {
       inventory.detected = contextual
       store.localDetectedAgentIdsByContext.host = native
-      const settings = createGlobalSettingsFixture({ agentDefaultSurface: 'chat' })
+      const settings = createGlobalSettingsFixture({})
       store.settings = settings
       const updateSettings = vi.fn(async (updates: Partial<GlobalSettings>) => {
         Object.assign(settings, updates)
       })
       render(
         <AgentLaunchSettingsCatalog
-          settings={projectAgentLaunchSettings(settings, 'win32')}
+          settings={projectAgentLaunchSettings(settings)}
           mutate={vi.fn(async () => {})}
           detectionTarget={{ kind: 'local' }}
           hostName={null}
@@ -462,11 +420,11 @@ describe('agent row chat or CLI', () => {
       const group = screen.getByRole('radiogroup', { name: 'Open Claude as' })
       const cli = within(group).getByRole('radio', { name: 'CLI' })
       expect(cli.getAttribute('aria-disabled') === 'true').toBe(cliDisabled)
-      const row = group.closest('.py-3')
+      const row = group.closest('article')
       if (!(row instanceof HTMLElement)) {
         throw new Error('Claude row is missing')
       }
-      expect(within(row).queryByRole('button', { name: 'Default' }) !== null).toBe(
+      expect(within(row).queryByRole('button', { name: 'Set as default' }) !== null).toBe(
         contextual.includes('claude')
       )
       fireEvent.click(cli)
@@ -487,84 +445,4 @@ describe('agent row chat or CLI', () => {
       cleanup()
     }
   })
-})
-
-it.each(['chat', 'terminal'] as const)(
-  'stores only opposite overrides to default %s and retains saved IDs',
-  async (agentDefaultSurface) => {
-    const settings = createGlobalSettingsFixture({
-      agentDefaultSurface,
-      nativeChatProviders: { 'saved-agent': true, codex: false }
-    })
-    store.settings = settings
-    const updateSettings = vi.fn()
-    const write = (on: boolean) =>
-      saveNativeChatProviderChoice({
-        agent: 'claude',
-        on,
-        fallbackSettings: settings,
-        updateSettings
-      })
-    await write(agentDefaultSurface !== 'chat')
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      nativeChatProviders: {
-        'saved-agent': true,
-        codex: false,
-        claude: agentDefaultSurface !== 'chat'
-      }
-    })
-    await write(agentDefaultSurface === 'chat')
-    expect(updateSettings).toHaveBeenLastCalledWith({
-      nativeChatProviders: { 'saved-agent': true, codex: false }
-    })
-  }
-)
-
-it('offers the selected paired native-only program editor and writes effort without CLI controls', async () => {
-  inventory.detected = []
-  store.localDetectedAgentIdsByContext.host = ['claude', 'antigravity']
-  const settings = createGlobalSettingsFixture({
-    agentLaunchChoices: {},
-    agentPermissionDefault: 'own'
-  })
-  store.settings = settings
-  const mutate = vi.fn(async () => {})
-  const element = () => (
-    <AgentLaunchSettingsCatalog
-      settings={projectAgentLaunchSettings(settings, 'linux')}
-      mutate={mutate}
-      detectionTarget={{ kind: 'runtime', environmentId: 'paired-native' }}
-      hostName="Paired"
-      renderPermissions={() => null}
-    />
-  )
-  const view = render(element(), { wrapper: TooltipProvider })
-  const label = screen.getByText('Antigravity')
-  const row = label.closest('.py-3')
-  if (!(row instanceof HTMLElement)) {
-    throw new Error('Missing paired native-only row')
-  }
-  fireEvent.click(within(row).getByRole('button', { name: 'Expand agent settings' }))
-  expect(within(row).getByText('Model')).toBeTruthy()
-  expect(within(row).queryByRole('textbox', { name: 'Arguments' })).toBeNull()
-  expect(within(row).queryByRole('textbox', { name: 'Command' })).toBeNull()
-  expect(screen.queryByRole('radiogroup', { name: 'Open Antigravity as' })).toBeNull()
-  const effort = within(row).getByRole('button', { name: 'Reasoning effort: Default' })
-  await userEvent.click(effort)
-  const option = screen.getAllByRole('menuitemradio').find((item) => item.textContent === 'High')
-  if (!option) {
-    throw new Error('Missing paired effort option')
-  }
-  fireEvent.click(option)
-  await vi.waitFor(() => expect(mutate).toHaveBeenCalledOnce())
-  expect(mutate.mock.calls[0]).toEqual([
-    expect.objectContaining({
-      type: 'launch-choices',
-      agent: 'antigravity',
-      patch: { options: { effort: 'high' } }
-    })
-  ])
-  inventory.chatAvailable = false
-  view.rerender(element())
-  expect(within(row).queryByText('Model')).toBeNull()
 })

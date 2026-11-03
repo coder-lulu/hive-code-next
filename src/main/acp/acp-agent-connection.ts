@@ -6,10 +6,6 @@ import {
   type ProviderProcessExit
 } from '../provider-process/managed-provider-process'
 import type { ProviderProcessLaunch } from '../provider-process/provider-process-launch'
-import {
-  withProviderSpawnAbsence,
-  type ProviderSpawnAbsence
-} from '../provider-process/provider-executable-missing'
 import { AcpConnectionClosedError, AcpSignInPromptError } from './acp-errors'
 import { resolveAcpPeerOptions, type AcpPeerOptions } from './acp-peer-limits'
 import { AcpSessionRuntime, type AcpSessionRuntimeOptions } from './acp-session-runtime'
@@ -142,11 +138,9 @@ export class AcpAgentConnection extends AcpSessionRuntime {
       super.close(new AcpConnectionClosedError('The agent printed a sign-in link Orca cannot read'))
     child.stderr.on('error', (error) => super.close(error))
     managed.onExit((exit) => {
-      const error = withProviderSpawnAbsence(
+      const error =
         lifecycle.error ??
-          new AcpConnectionClosedError(managed.stderrTail().trim() || `${launch.command} exited`),
-        managed.spawnAbsence
-      )
+        new AcpConnectionClosedError(managed.stderrTail().trim() || `${launch.command} exited`)
       super.close(error)
       try {
         options.onExit?.(error, { expected: lifecycle.closing, exit })
@@ -166,11 +160,6 @@ export class AcpAgentConnection extends AcpSessionRuntime {
 
   get rootVerdict(): ManagedProviderProcess['rootVerdict'] {
     return this.managed.rootVerdict
-  }
-
-  /** What a spawn ENOENT proved absent: the agent's CLI or its launch folder. */
-  get spawnAbsence(): ProviderSpawnAbsence | null {
-    return this.managed.spawnAbsence
   }
 
   /** Null tree means no observation. */

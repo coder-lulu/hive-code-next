@@ -46,6 +46,11 @@ function mountTerminalClipboard(
   const { terminalInputSend } = modules.load<typeof MobileTerminalOperations>(
     'mobile/src/terminal/mobile-terminal-operations.ts'
   )
+  const takeover = modules.load<typeof import('../../../terminal/worker-terminal-takeover-report')>(
+    'mobile/src/terminal/worker-terminal-takeover-report.ts'
+  )
+  // The per-client report window is module state; a fresh recording must not inherit one.
+  takeover.resetWorkerTerminalTakeoverReportsForTest()
 
   const ptyModesRef = { current: new Map([[HANDLE, PTY_MODES]]) }
   let selection: ReturnType<typeof useAccessorySelection> | undefined
@@ -127,7 +132,10 @@ function mountTerminalClipboard(
       throw new Error(`Unknown terminal clipboard action: ${name}`)
     },
     state: () => ({ connectionId, pasteOutcome, crash: screen.crash() }),
-    dispose: () => screen.unmount()
+    dispose: () => {
+      takeover.resetWorkerTerminalTakeoverReportsForTest()
+      screen.unmount()
+    }
   }
 }
 
@@ -146,6 +154,10 @@ function mountTerminalInputSend(
   const { terminalInputSend } = modules.load<typeof MobileTerminalOperations>(
     'mobile/src/terminal/mobile-terminal-operations.ts'
   )
+  const takeover = modules.load<typeof import('../../../terminal/worker-terminal-takeover-report')>(
+    'mobile/src/terminal/worker-terminal-takeover-report.ts'
+  )
+  takeover.resetWorkerTerminalTakeoverReportsForTest()
 
   const activeHandleRef = { current: HANDLE }
   const sendingRef = { current: false }
@@ -222,6 +234,9 @@ function mountTerminalInputSend(
       liveAccepted,
       crash: screen.crash()
     }),
-    dispose: () => screen.unmount()
+    dispose: () => {
+      takeover.resetWorkerTerminalTakeoverReportsForTest()
+      screen.unmount()
+    }
   }
 }

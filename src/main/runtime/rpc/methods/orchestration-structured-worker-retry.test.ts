@@ -39,9 +39,7 @@ beforeEach(async () => {
   db = new OrchestrationDb(':memory:')
 })
 afterEach(async () => {
-  for (const { sessionId } of structuredWorkerIdentities.list()) {
-    releaseStructuredWorkerSession(sessionId)
-  }
+  releaseStructuredWorkerSession('dispatch-retry')
   setStructuredAgentSessionHost(null)
   await rig.dispose()
   db.close()
@@ -67,17 +65,9 @@ async function createWorker() {
     }),
     publishStructuredAgentSessionTab: async () => {},
     getNestedWorkerMaxDepth: () => 2,
+    getOrchestrationHeartbeatMinutes: () => 5,
     getTerminalOrchestrationCliCommand: () => 'orca',
-    orchestrationSenderNames: { snapshotOf: () => ({ name: 'Coordinator', agent: null }) },
-    captureStructuredAgentSessionPresentation: (id: string) => ({
-      raw: { worktreeId: 'workspace-1', tabId: `agent-session:${id}` },
-      saved: []
-    }),
-    currentLocalStructuredSessionPresentation: (id: string) => ({
-      worktreeId: 'workspace-1',
-      tabId: `agent-session:${id}`
-    }),
-    removeCapturedStructuredSessionSavedTabs: vi.fn(),
+    orchestrationSenderNames: { nameOf: () => 'Coordinator' },
     forgetStructuredSessionMail: vi.fn(),
     retireStructuredAgentSessionTabFromSnapshot: vi.fn(() => true)
   }
@@ -86,7 +76,8 @@ async function createWorker() {
     runtime,
     worktreeId: 'wt-7',
     agent: 'codex',
-    dispatchId: 'dispatch-retry'
+    dispatchId: 'dispatch-retry',
+    onJournalActivity: () => {}
   })
   const deliverPreamble = () =>
     deliverWorkerDispatchPreamble({
@@ -164,9 +155,5 @@ it('reports a preamble as undelivered after startup exhaustion and retires the f
   expect(rig.host.hasSession(sessionId)).toBe(false)
   expect(rig.store.listVisibleSessionIds()).not.toContain(sessionId)
   expect(workerRuntime.forgetStructuredSessionMail).toHaveBeenCalledWith(sessionId)
-  expect(workerRuntime.retireStructuredAgentSessionTabFromSnapshot).toHaveBeenCalledWith(
-    sessionId,
-    `agent-session:${sessionId}`,
-    'workspace-1'
-  )
+  expect(workerRuntime.retireStructuredAgentSessionTabFromSnapshot).toHaveBeenCalledWith(sessionId)
 })

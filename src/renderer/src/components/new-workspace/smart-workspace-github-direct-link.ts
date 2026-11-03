@@ -74,6 +74,7 @@ export async function resolveSmartWorkspaceGithubDirectLink({
   }
   const selectedSlug = await getRepoSlugCached(selectedRepo, githubSourceContext, repoSlugCache)
   if (!selectedSlug || sameSlug(selectedSlug, directLink.slug)) {
+    handledCrossRepoUrlRef.current = query
     const item = await lookupSmartGitHubSubmitItem({
       repoPath: selectedRepo.path,
       repoId: selectedRepo.id,
@@ -89,11 +90,7 @@ export async function resolveSmartWorkspaceGithubDirectLink({
       workItem: lookupGitHubWorkItemForSource,
       workItemByOwnerRepo: lookupGitHubWorkItemByOwnerRepoForSource
     })
-    // Why: a repo without a GitHub origin (e.g. upstream-only) has no slug, so a miss may be cross-repo.
-    if (item || selectedSlug) {
-      handledCrossRepoUrlRef.current = query
-      return { items: item ? [item] : [], prompt: null }
-    }
+    return { items: item ? [item] : [], prompt: null }
   }
   const matchingTarget = await findMatchingRepoForSlug(
     repos.map((repo) => ({

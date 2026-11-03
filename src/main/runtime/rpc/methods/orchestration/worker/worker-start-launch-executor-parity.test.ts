@@ -1,11 +1,10 @@
 import {
   agentSessionLeaseFixture,
   agentSessionRecordFixture
-} from '../../../../../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
+} from '../../../../../../shared/agent-session-record.test-fixture'
 /** Shared-executor starts must preserve durable effects/stage order, ask host support once and fail refused chats. */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { RuntimeTerminalCreate } from '../../../../../../shared/runtime-terminal-create-contract'
 import {
   downgradeAgentLaunchModeForHost,
   type AgentLaunchModeReceipt
@@ -47,30 +46,11 @@ const EXISTING = { id: 'wt_existing', repoId: 'repo_1' }
 
 function fakes() {
   const stages: string[] = []
-  const creation: RuntimeTerminalCreate = {
-    handle: 'term_startup',
-    worktreeId: 'wt_new',
-    title: null,
-    ptyId: 'pty-startup',
-    incarnationId: 'inc-startup',
-    isReattach: true,
-    agentSessionDisposition: 'adopted'
-  }
   const runtime = {
-    createManagedWorktree: vi.fn(
-      async (args: {
-        startupAgent?: string
-        onStartupTerminalCreated?: (terminal: RuntimeTerminalCreate) => void
-      }) => {
-        if (args.startupAgent) {
-          args.onStartupTerminalCreated?.(creation)
-        }
-        return {
-          worktree: { id: 'wt_new', repoId: 'repo_1' },
-          ...(args.startupAgent ? { startupTerminal: { handle: creation.handle } } : {})
-        }
-      }
-    ),
+    createManagedWorktree: vi.fn(async (args: { startupAgent?: string }) => ({
+      worktree: { id: 'wt_new', repoId: 'repo_1' },
+      ...(args.startupAgent ? { startupTerminal: { handle: 'term_startup' } } : {})
+    })),
     listTerminals: vi.fn(async (_selector: string) => ({
       terminals: [{ handle: 'term_startup', title: 'claude', tabId: 'tab_1', leafId: 'leaf_1' }]
     })),
@@ -90,7 +70,7 @@ function fakes() {
   }
   const failedStages: string[] = []
   const effects: WorkerEffect[] = []
-  return { runtime, db, stages, failedStages, effects, creation }
+  return { runtime, db, stages, failedStages, effects }
 }
 
 function place(
@@ -272,7 +252,6 @@ describe('a fresh worker through the launch executor', () => {
       }
     })
     expect(placed).not.toHaveProperty('warning')
-    expect(placed.terminalCreation).toBe(f.creation)
   })
 
   it('opens an existing worktree’s terminal worker as worker-<task>, leaving the sidebar alone', async () => {

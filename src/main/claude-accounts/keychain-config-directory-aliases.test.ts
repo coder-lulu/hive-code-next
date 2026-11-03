@@ -43,6 +43,15 @@ describe('Claude config directory Keychain aliases', () => {
     }
   )
 
+  it('retains the canonical alias for an existing directory', () => {
+    const configDir = join(linked, '.claude')
+    mkdirSync(configDir)
+    expect(claudeConfigDirKeychainAliases(configDir)).toEqual([
+      configDir,
+      join(canonical, '.claude')
+    ])
+  })
+
   it('keeps a missing path with parent traversal raw instead of guessing through a symlink', () => {
     const child = join(canonical, 'child')
     const childLink = join(directory, 'child-link')
@@ -52,6 +61,11 @@ describe('Claude config directory Keychain aliases', () => {
 
     expect(claudeConfigDirKeychainAliases(configDir)).toEqual([configDir])
     expect(existsSync(join(canonical, '.claude'))).toBe(false)
+  })
+
+  it('does not duplicate an already canonical missing path', () => {
+    const configDir = join(canonical, '.claude')
+    expect(claudeConfigDirKeychainAliases(configDir)).toEqual([configDir])
   })
 
   it.skipIf(process.platform === 'win32')('does not invent an alias for a broken symlink', () => {

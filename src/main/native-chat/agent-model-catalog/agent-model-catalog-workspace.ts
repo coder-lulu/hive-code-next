@@ -1,15 +1,12 @@
-import type { AgentSessionRecord } from '../../../shared/agent-session/lifecycle/agent-session-record'
+import type {
+  AgentSessionAccountHome,
+  AgentSessionRecord
+} from '../../../shared/agent-session-record'
 import type { AgentModelCatalogBinding } from './agent-model-catalog-snapshot'
 import { independentAgentModelCatalog } from './agent-model-catalog-discovery'
-import {
-  type AgentSessionAccountHome,
-  isLegacyAgentSessionAccountHome
-} from '../../../shared/agent-session/lifecycle/agent-session-account-home'
+import { isLegacyAgentSessionAccountHome } from '../../../shared/agent-session-account-home'
 import { isNativeLocalLocation } from '../../../shared/execution-host'
-import type {
-  AgentModelCatalogConfiguredChoice,
-  AgentModelCatalogListing
-} from './agent-model-catalog-entry'
+import type { AgentModelCatalogConfiguredChoice } from './agent-model-catalog-entry'
 import type { AgentModelCatalogStore } from './agent-model-catalog-store'
 
 export type AgentModelCatalogRecord = Pick<
@@ -85,8 +82,7 @@ export async function recordConfiguredDefault(
   record: AgentSessionRecord,
   fingerprint: string,
   choice: AgentModelCatalogConfiguredChoice | null,
-  current: () => boolean,
-  source?: AgentModelCatalogListing | null
+  current: () => boolean
 ): Promise<void> {
   const accountHome = record.accountHome
   if (!deps.workspaceMayOverrideDefaultModel) {
@@ -107,7 +103,7 @@ export async function recordConfiguredDefault(
     current() &&
     deps.getRecord(record.sessionId)?.lease.runtimeFence === record.lease.runtimeFence
   ) {
-    deps.store.recordConfiguredDefault(fingerprint, choice, source)
+    deps.store.recordConfiguredDefault(fingerprint, choice)
   }
 }
 

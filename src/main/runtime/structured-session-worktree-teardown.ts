@@ -13,15 +13,12 @@ import {
   observeStructuredSession,
   structuredSessionCloseSettled
 } from './structured-worker-authority'
-import {
-  closeStructuredAgentSessionChild,
-  captureStructuredSessionSurface,
-  retireCapturedStructuredSessionSurface,
-  type StructuredSessionSurfaceRuntime
-} from './agent-session/structured-agent-session-close'
+import { closeStructuredAgentSessionChild } from './agent-session/structured-agent-session-close'
+import { retireSettledStructuredWorkerTab } from './agent-session/structured-agent-session-tab-retirement'
 import type { WorktreePtyHostFence } from './worktree-pty-host-fence'
 import { getRepoIdFromWorktreeId } from '../../shared/worktree/id'
-import type { StructuredAgentId } from '../../shared/agent-session/lifecycle/agent-session-provider-handle'
+import type { OrcaRuntimeService } from './orca-runtime'
+import type { StructuredAgentId } from '../../shared/agent-session-provider-handle'
 
 export type StructuredSessionInWorkspace = {
   sessionId: string
@@ -33,7 +30,10 @@ export type UnclosedStructuredSession = StructuredSessionInWorkspace & {
   status: 'live' | 'unverifiable'
 }
 
-export type StructuredWorktreeSweepRuntime = StructuredSessionSurfaceRuntime
+export type StructuredWorktreeSweepRuntime = Pick<
+  OrcaRuntimeService,
+  'forgetStructuredSessionMail' | 'retireStructuredAgentSessionTabFromSnapshot'
+>
 
 /** Reuse the PTY fence type; null means local for both, but absent is deliberately local here rather than all hosts to avoid closing other hosts' chats. */
 export type StructuredSessionHostFence = WorktreePtyHostFence
@@ -164,18 +164,16 @@ export async function closeStructuredSessionsForWorktree(
     mayRefuse?: boolean
   } = {}
 ): Promise<void> {
-  const { runtime } = options
+  const { runtime, mayRefuse } = options
   // Omit afterClose: dispatch redrive/registry entries survive until separate settlement; resolving dispatch ids here would spend the sweep budget.
   for (const session of progress.sessions) {
     // Stop issuing at the deadline; in-flight provider round trips cannot be cancelled.
     if (Date.now() >= deadline) {
       return
     }
-    const host = getStructuredAgentSessionHost()
-    const surface = host ? captureStructuredSessionSurface(host, session.sessionId, runtime) : null
     const outcome = await closeStructuredAgentSessionChild(session.sessionId, {
       ...(runtime ? { runtime } : {}),
-      surface
+      restoreTabOnUnprovenClose: mayRefuse === true
     })
     if (outcome.stopped) {
       progress.closed += 1
@@ -183,9 +181,9 @@ export async function closeStructuredSessionsForWorktree(
       // Read post-attempt state; a thrown close may never have observed it.
       const status = observeStructuredSession(session.sessionId).status
       if (status === 'exited' || structuredSessionCloseSettled(session.sessionId)) {
-        if (host && surface) {
-          await retireCapturedStructuredSessionSurface(host, session.sessionId, surface, runtime)
-        }
+        // Exit evidence may land during rollback's tab-restore write; undo that restored reference before counting the child closed.
+        await dropDurableChatTabReference(session.sessionId)
+        retireSettledStructuredWorkerTab(session.sessionId, runtime)
         progress.closed += 1
       } else {
         progress.unstopped.push({ ...session, status })
@@ -204,14 +202,21 @@ export async function retireStructuredSessionTabsForWorktree(
   runtime?: StructuredWorktreeSweepRuntime
 ): Promise<void> {
   for (const session of sessions) {
-    const host = getStructuredAgentSessionHost()
-    if (host) {
-      await retireCapturedStructuredSessionSurface(
-        host,
-        session.sessionId,
-        captureStructuredSessionSurface(host, session.sessionId, runtime),
-        runtime
-      )
-    }
+    await dropDurableChatTabReference(session.sessionId)
+    retireSettledStructuredWorkerTab(session.sessionId, runtime)
+  }
+}
+
+/** Drop a tab restored by an unproven close when this sweep later proves exit; bookkeeping cannot fail settlement. */
+async function dropDurableChatTabReference(sessionId: string): Promise<void> {
+  const host = getStructuredAgentSessionHost()
+  try {
+    await host?.setSessionTabVisibility?.(sessionId, false)
+  } catch (error) {
+    host?.deps.logger.warn('dropping a removed workspace chat tab reference failed', {
+      scope: 'teardown-tab-drop',
+      sessionId,
+      error
+    })
   }
 }

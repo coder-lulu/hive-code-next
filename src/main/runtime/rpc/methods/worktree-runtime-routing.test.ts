@@ -1,4 +1,3 @@
-import { EVERY_AGENT_CHAT } from '../../../../shared/native-chat/every-agent-chat.test-fixture'
 import '../unused-default-rpc-methods.test-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from '../dispatcher'
@@ -105,7 +104,7 @@ describe('worktree.create with a startup agent', () => {
         run(),
       showRepo: vi.fn().mockResolvedValue(repo),
       // The chat default is on: `worktree.create` still answers with a terminal agent.
-      getClientSettings: () => ({ nativeChatProviders: EVERY_AGENT_CHAT }),
+      getClientSettings: () => ({ experimentalNativeChat: true }),
       getStructuredAgentSessionCreateSupport: vi.fn(async () => ({
         supported: true
       })),

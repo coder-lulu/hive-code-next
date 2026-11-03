@@ -59,7 +59,6 @@ export type ForgeReviewForBranchInput = ForgeProviderRepositoryContext & {
   fallbackReviewNumber?: number | null
   // GitHub-only merged-at-head visibility; other providers ignore this inspected HEAD.
   githubCurrentHeadOid?: string | null
-  userRefresh?: boolean
 }
 
 export type ForgeReviewByNumberInput = ForgeProviderRepositoryContext & {
@@ -176,7 +175,6 @@ const gitHubForgeProvider = {
       fallbackReviewNumber,
       {
         ...executionArgs[0],
-        ...(input.userRefresh === true ? { userRefresh: true } : {}),
         ...(fallbackReviewNumber !== null ? { acceptMergedFallbackPR: true } : {}),
         currentHeadOid: input.githubCurrentHeadOid ?? null
       }

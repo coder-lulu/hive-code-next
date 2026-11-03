@@ -6,8 +6,10 @@ import {
   CUSTOM_EDITOR_TOO_LARGE,
   isCustomEditorEditAttempt,
   readCustomEditorEdit,
+  readCustomEditorKeyChord,
   type CustomEditorDocument,
-  type CustomEditorEdit
+  type CustomEditorEdit,
+  type CustomEditorKeyChord
 } from '../../../../shared/plugins/frames/plugin-custom-editor-bridge'
 import { EDITOR_METHODS, FRAME_EVENTS } from '../../../../shared/plugins/frames/plugin-frame-bridge'
 import {
@@ -21,20 +23,53 @@ import {
   type PluginEnvelope,
   type PluginError
 } from '../../../../shared/plugins/frames/plugin-protocol'
+import type { PluginFrameEditorChannel } from '../right-sidebar/plugin-frame-host'
 import {
   createPanelMessageBudget,
-  structuredCloneMessageBytes
+  structuredCloneMessageBytes,
+  type PanelMessageBudget
 } from '../../../../shared/plugins/frames/plugin-panel-message-budget'
 
-import { handleCustomEditorFrameEvent } from './plugin-custom-editor-frame-events'
-import { createPendingOutsideMerge } from './plugin-custom-editor-outside-merge'
-import type {
-  CustomEditorBinaryDocument,
-  CustomEditorEditRefusal,
-  CustomEditorHost,
-  CustomEditorHostOptions,
-  CustomEditorUnappliedEdit
-} from './plugin-custom-editor-host-types'
+export type CustomEditorEditRefusal = 'oversized' | 'rate_limited'
+
+/** Why an edit has not reached the buffer: held for the rate limit, or lost for size. */
+export type CustomEditorUnappliedEdit = 'held' | 'lost' | null
+
+/** A binary editor's document; a new object means new bytes to send. */
+export type CustomEditorBinaryDocument = { bytes: Uint8Array<ArrayBuffer>; fileType: string }
+
+export type CustomEditorHostOptions = {
+  getFrameWindow: () => Window | null
+  /** The buffer as Orca holds it now. */
+  getDocument: () => { text: string; readOnly: boolean }
+  /** Binary editors only: the document's bytes, or null while they load. */
+  getBinaryDocument?: () => CustomEditorBinaryDocument | null
+  onEdit: (text: string) => void
+  /** Binary editors: the frame's full replacement; the host then treats it as what the frame holds. */
+  onBytesEdit?: (document: CustomEditorBinaryDocument) => void
+  onEditRefused?: (reason: CustomEditorEditRefusal) => void
+  /** The frame holds edits the buffer lacks, or caught up again. */
+  onUnappliedEdit?: (state: CustomEditorUnappliedEdit) => void
+  onKeyChord?: (chord: CustomEditorKeyChord) => void
+  /** The edit lane; every other message spends the frame's shared budget. */
+  budget?: PanelMessageBudget
+  now?: () => number
+  flushTimeoutMs?: number
+}
+
+export type CustomEditorHost = {
+  /** Plugged into the frame host for this editor's frame. */
+  channel: PluginFrameEditorChannel
+  /** Push the buffer when it changed outside the frame (reload, revert, Source edits). */
+  syncDocument: () => void
+  /** Waits for edits still in the frame's debounce window; false on timeout or when an edit
+   *  never reached the buffer, so a save must not mark the tab clean. */
+  flush: () => Promise<boolean>
+  /** The newest text either side holds: the frame's last edit or the buffer last sent. */
+  currentText: () => string
+  /** A new document mounted in the frame; it must announce ready again. */
+  reset: () => void
+}
 
 /** The frame only ever holds the document: Orca owns the buffer, dirty state and save. */
 export function createCustomEditorHost(options: CustomEditorHostOptions): CustomEditorHost {
@@ -58,14 +93,8 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
   // The newest edit refused for the rate limit, unparsed until applied; full-text, so it wins.
   let heldEdit: unknown = null
   let heldId: number | null = null
-  // Held edits a newer one replaced; they get that edit's answer, so success means committed.
-  let supersededIds: (number | null)[] = []
   let heldTimer: ReturnType<typeof setTimeout> | null = null
   let lostEdit = false
-  let mergesOutside = false
-  const outsideMerge = createPendingOutsideMerge()
-  // An oversized edit came after the held one, so applying the held one leaves it still lost.
-  let lostAfterHeld = false
   let unapplied: CustomEditorUnappliedEdit = null
 
   const reportUnapplied = (): void => {
@@ -89,7 +118,6 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
 
   const postDocument = (document: CustomEditorDocument, transfer: Transferable[] = []): void => {
     post(pluginEvent(FRAME_EVENTS.editorDocument, document), transfer)
-    options.onFrameProgress?.('delivered')
   }
 
   const pushBinaryDocument = (force: boolean, binary: CustomEditorBinaryDocument | null): void => {
@@ -154,8 +182,7 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
       options.onBytesEdit?.(frameBinary)
       return null
     }
-    // A merge's result always reaches the buffer, even when it equals the disk text just sent.
-    if (outsideMerge.accept(baseVersion, content.text) || content.text !== frameText) {
+    if (content.text !== frameText) {
       frameText = content.text
       options.onEdit(content.text)
     }
@@ -166,11 +193,8 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
   const receiveEdit = (data: unknown): void => {
     const message = readPluginEnvelope(data)
     const edit = message?.kind === 'req' ? readCustomEditorEdit(message.params) : null
-    const error = edit ? applyEdit(edit) : pluginError('invalid_params', 'malformed editor edit')
-    answer(pluginRequestId(data), error)
-    for (const id of supersededIds.splice(0)) {
-      answer(id, error)
-    }
+    const id = pluginRequestId(data)
+    answer(id, edit ? applyEdit(edit) : pluginError('invalid_params', 'malformed editor edit'))
   }
 
   const applyHeldEdit = (): void => {
@@ -179,23 +203,17 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
       heldTimer = null
     }
     const held = heldEdit
-    const stillLost = lostAfterHeld
     heldEdit = null
     heldId = null
-    lostAfterHeld = false
     if (held !== null) {
       receiveEdit(held)
-      lostEdit ||= stillLost
     }
     reportUnapplied()
   }
 
-  /** A newer full-document edit carries the held one's intent, so it shares that edit's answer. */
+  /** A newer full-document edit carries the held one's intent, so the held one succeeds. */
   const supersedeHeldEdit = (): void => {
-    if (heldEdit !== null) {
-      supersededIds.push(heldId)
-    }
-    lostAfterHeld = false
+    answer(heldId, null)
     heldEdit = null
     heldId = null
   }
@@ -203,8 +221,7 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
   const refuseEdit = (data: unknown, refusal: CustomEditorEditRefusal): void => {
     options.onEditRefused?.(refusal)
     if (refusal === 'oversized') {
-      // The held edit stays: an edit Orca refuses carries nothing to replace it with.
-      lostAfterHeld ||= heldEdit !== null
+      supersedeHeldEdit()
       lostEdit = true
       answer(pluginRequestId(data), CUSTOM_EDITOR_TOO_LARGE)
     } else {
@@ -234,8 +251,7 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
           now(),
           structuredCloneMessageBytes(data, CUSTOM_EDITOR_DOCUMENT_MAX_BYTES)
         )
-        // While a save waits, the edits it asked for commit at once; the rate limit resumes after.
-        if (refusal === 'oversized' || (refusal && pendingFlushes.size === 0)) {
+        if (refusal) {
           refuseEdit(data, refusal)
           return true
         }
@@ -249,10 +265,14 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
         ready = true
         pushDocument(true)
       },
-      onEvent(event, context) {
-        // Every event is handled; announcing merge support only adds the capability.
-        const merges = handleCustomEditorFrameEvent(event, context, options)
-        mergesOutside = mergesOutside || merges
+      onEvent(event) {
+        const chord =
+          event.event === FRAME_EVENTS.editorKeydown
+            ? readCustomEditorKeyChord(event.payload)
+            : null
+        if (chord) {
+          options.onKeyChord?.(chord)
+        }
       },
       onResponse(response) {
         pendingFlushes.get(response.id)?.(response.error === undefined)
@@ -262,24 +282,8 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
     syncDocument() {
       pushDocument(false)
     },
-    mergeOutsideChange(diskText, ancestorText) {
-      if (!ready || !mergesOutside || options.getBinaryDocument) {
-        return Promise.resolve(null)
-      }
-      version += 1
-      const ancestor = { kind: 'text' as const, text: ancestorText }
-      const { readOnly } = options.getDocument()
-      postDocument({ version, readOnly, content: { kind: 'text', text: diskText }, ancestor })
-      return outsideMerge.begin(version, flushTimeoutMs)
-    },
     flush() {
       if (!ready) {
-        return Promise.resolve(!lostEdit)
-      }
-      // Drain first: the frame answers only once its edits settle, and a held one would not.
-      applyHeldEdit()
-      // A read-only document takes no edits, and a frame without a window cannot answer.
-      if (options.getDocument().readOnly || !options.getFrameWindow()) {
         return Promise.resolve(!lostEdit)
       }
       const requestId = nextFlushId++
@@ -307,8 +311,6 @@ export function createCustomEditorHost(options: CustomEditorHostOptions): Custom
         applyHeldEdit()
       }
       ready = false
-      mergesOutside = false
-      outsideMerge.cancel()
       frameText = null
       frameReadOnly = null
       frameBinary = null

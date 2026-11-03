@@ -12,7 +12,6 @@ import {
   publishReleaseCheckout,
   type MaterializeReleaseCheckoutTestHooks
 } from './release-checkout-publication.ts'
-import { releaseModuleLocation } from './release-module-locations.ts'
 export type {
   CheckoutLockOptions,
   CheckoutLifecycleContext,
@@ -115,16 +114,13 @@ function checkoutModulePath(root: string, rootRelativePath: string): string {
 }
 
 // Pass raw absolute forward-slash paths: CI vite-node treats file:// URLs as root-relative ids (run 33049571360).
-// A module main moved loads from wherever this release defines it.
 export function importReleaseCheckoutModule(
   checkout: ReleaseCheckout,
   rootRelativePath: string,
   importModule: (specifier: string) => Promise<Record<string, unknown>> = (specifier) =>
     import(/* @vite-ignore */ specifier) as Promise<Record<string, unknown>>
 ): Promise<Record<string, unknown>> {
-  return importModule(
-    checkoutModulePath(checkout.root, releaseModuleLocation(checkout.root, rootRelativePath))
-  )
+  return importModule(checkoutModulePath(checkout.root, rootRelativePath))
 }
 
 /** An export a release module must define; callers name the shape they use, so a changed one fails the test. */

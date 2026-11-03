@@ -1,4 +1,4 @@
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
 import { getOtherProfileWorktreeIdsForHistoryGc } from '../orca-profiles/other-profile-workspace-catalog'
 

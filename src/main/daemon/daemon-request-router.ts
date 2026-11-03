@@ -124,7 +124,6 @@ export class DaemonRequestRouter {
         }
       case 'inspectProcess': {
         const options = {
-          ...(request.payload.foregroundOnly === true ? { foregroundOnly: true } : {}),
           ...(request.payload.expectedIncarnationId
             ? { expectedIncarnationId: request.payload.expectedIncarnationId }
             : {}),

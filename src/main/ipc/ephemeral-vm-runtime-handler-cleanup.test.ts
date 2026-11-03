@@ -206,8 +206,7 @@ it("retires a recipe server's session partition once its VM is destroyed (#33805
     })),
     removeWorkspaceSessionHost,
     getRemoteLayoutSnapshot: vi.fn(),
-    setRemoteLayoutSnapshot: vi.fn(),
-    setHostRepoCatalogSnapshot: vi.fn()
+    setRemoteLayoutSnapshot: vi.fn()
   } as never)
 
   await expect(

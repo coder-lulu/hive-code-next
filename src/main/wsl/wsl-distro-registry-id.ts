@@ -1,6 +1,5 @@
 /** Lxss registration GUID survives rename but changes on unregister/reimport, distinguishing replacement distros with reused names. */
 import { runProcess } from '@orca/process-host'
-import type { ProcessSpec } from '@orca/process-host/process-spec'
 import { windowsSystem32Binary } from '@orca/process-host/windows-system-binary'
 
 const LXSS_KEY = 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Lxss'
@@ -47,26 +46,15 @@ export function parseWslDistroRegistrations(output: string): WslDistroRegistrati
   return registrations
 }
 
-const DEFAULT_DISTRIBUTION_LINE = /^\s+DefaultDistribution\s+REG_SZ\s+\{?([0-9a-f-]{36})\}?\s*$/im
-
-/** The default distro's registration GUID from the Lxss root, lowercase and unbraced; null when unset. */
-export function parseDefaultWslDistroId(output: string): string | null {
-  return DEFAULT_DISTRIBUTION_LINE.exec(output)?.[1]?.toLowerCase() ?? null
-}
-
 export type RegQuery = (args: string[]) => Promise<{ code: number | null; stdout: string }>
 
-function regQuerySpec(args: string[]): ProcessSpec {
+const defaultRegQuery: RegQuery = (args) =>
   // Read registry with reg.exe, never PowerShell, matching openssh-default-shell.
-  return { program: windowsSystem32Binary('reg.exe'), args, timeoutMs: REG_QUERY_TIMEOUT_MS }
-}
-
-/** `reg query <Lxss> /s`, for readers that run it themselves. */
-export function lxssRegQuerySpec(): ProcessSpec {
-  return regQuerySpec(['query', LXSS_KEY, '/s'])
-}
-
-const defaultRegQuery: RegQuery = (args) => runProcess(regQuerySpec(args))
+  runProcess({
+    program: windowsSystem32Binary('reg.exe'),
+    args,
+    timeoutMs: REG_QUERY_TIMEOUT_MS
+  })
 
 /** Every registered distro, or null when the registry cannot be read. */
 export async function readWslDistroRegistrations(

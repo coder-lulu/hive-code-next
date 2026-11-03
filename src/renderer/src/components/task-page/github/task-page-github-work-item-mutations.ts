@@ -100,7 +100,7 @@ export function beginTaskPageGitHubWorkItemMutation(
   }
   const generation = nextTaskPageGitHubMutationGeneration(key)
 
-  if (built.kind === 'list' && !(args.settleAccepted && built.family === 'assignees')) {
+  if (built.kind === 'list') {
     const existing = getConfirmedListSnapshot(
       sourceScope,
       args.item.repoId,
@@ -115,7 +115,6 @@ export function beginTaskPageGitHubWorkItemMutation(
   }
 
   const op: PendingOp = {
-    settleAccepted: args.settleAccepted,
     generation,
     key,
     previous: built.previous,
@@ -134,14 +133,12 @@ export function beginTaskPageGitHubWorkItemMutation(
         : { reviewRequests: merged.reviewRequests }
       : built.next
 
-  if (!args.settleAccepted) {
-    args.patchWorkItem(args.item.id, composedFields, args.item.repoId, {
-      sourceContext: args.sourceContext
-    })
-  }
+  args.patchWorkItem(args.item.id, composedFields, args.item.repoId, {
+    sourceContext: args.sourceContext
+  })
 
   recomputeSoftHideForItem({
-    item: { ...args.item, ...merged, ...(args.settleAccepted ? built.next : {}) },
+    item: { ...args.item, ...merged },
     sourceScope,
     query: args.query,
     queryKey: args.queryKey,

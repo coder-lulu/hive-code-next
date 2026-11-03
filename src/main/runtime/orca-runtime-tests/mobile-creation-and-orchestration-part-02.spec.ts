@@ -9,7 +9,6 @@ import {
   store,
   syncSinglePty
 } from '../orca-runtime-test-fixtures.spec'
-import { MessageWake } from '../runtime-message-waiters'
 
 describe('OrcaRuntimeService', () => {
   it('delivers pending mail via notifyMessageArrived when the recipient is already idle', async () => {
@@ -78,6 +77,7 @@ describe('OrcaRuntimeService', () => {
         coordinator_handle: terminal.handle,
         coordinator_pane_key: `${terminal.tabId}:${terminal.leafId}`
       })
+      runtime.onPtyData('pty-1', '\x1b]0;Codex working\x07', 100)
       const message = db.insertMessage({
         from: 'term_worker',
         to: 'run:run_mailbox',
@@ -155,7 +155,7 @@ describe('OrcaRuntimeService', () => {
       })
       runtime.notifyMessageArrived('run:run_stale_waiter', 'worker_done')
 
-      await expect(staleWait).resolves.toBeInstanceOf(MessageWake)
+      await expect(staleWait).resolves.toBe('notified')
       expect(write).not.toHaveBeenCalled()
 
       db.insertMessage({
@@ -184,8 +184,105 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
-  // Mail follows the terminal: a window reload does not hold a live-idle terminal's restored mail.
-  it('points restored mail at the repair edge while the window reloads', async () => {
+  it('repoints on the retry edge when live idle won the send race', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new OrcaRuntimeService(store)
+      const db = new InMemoryOrchestrationMessages()
+      const write = vi.fn().mockReturnValue(true)
+      setInMemoryOrchestrationMessages(runtime, db)
+      runtime.setPtyController({
+        write,
+        writeWithSettlement: settledWriteStub(write),
+        kill: vi.fn(),
+        getForegroundProcess: async () => null
+      })
+      syncSinglePty(runtime)
+
+      const [terminal] = (await runtime.listTerminals()).terminals
+      bindSinglePtyRun(db, terminal.handle)
+      runtime.onPtyData('pty-1', '\x1b]0;Codex working\x07', 100)
+      db.insertMessage({
+        from: 'term_worker',
+        to: terminal.handle,
+        subject: 'settled at idle edge',
+        type: 'worker_done'
+      })
+      runtime.notifyMessageArrived(terminal.handle, 'worker_done')
+      await Promise.resolve()
+      expect(write).not.toHaveBeenCalled()
+
+      const leaf = [
+        ...(
+          runtime as unknown as {
+            leaves: Map<
+              string,
+              {
+                lastAgentStatus: string | null
+                lastAgentStatusObservedLive: boolean
+              }
+            >
+          }
+        ).leaves.values()
+      ][0]
+      leaf.lastAgentStatus = 'idle'
+      leaf.lastAgentStatusObservedLive = true
+
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(write).toHaveBeenCalledWith(
+        'pty-1',
+        expect.stringContaining('You have 1 orchestration message')
+      )
+      db.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('leaves later delivery to the idle edge instead of polling a working mailbox', async () => {
+    vi.useFakeTimers()
+    try {
+      const runtime = new OrcaRuntimeService(store)
+      const db = new InMemoryOrchestrationMessages()
+      const pendingReads = vi.spyOn(db, 'getUndeliveredUnreadMessages')
+      const write = vi.fn().mockReturnValue(true)
+      setInMemoryOrchestrationMessages(runtime, db)
+      runtime.setPtyController({
+        write,
+        writeWithSettlement: settledWriteStub(write),
+        kill: vi.fn(),
+        getForegroundProcess: async () => null
+      })
+      syncSinglePty(runtime)
+
+      const [terminal] = (await runtime.listTerminals()).terminals
+      bindSinglePtyRun(db, terminal.handle)
+      runtime.onPtyData('pty-1', '\x1b]0;Codex working\x07', 100)
+      db.insertMessage({
+        from: 'term_worker',
+        to: terminal.handle,
+        subject: 'wait for idle'
+      })
+      runtime.notifyMessageArrived(terminal.handle, 'status')
+      await Promise.resolve()
+
+      await vi.advanceTimersByTimeAsync(20_000)
+      expect(pendingReads).not.toHaveBeenCalled()
+      expect(pendingMailPointerRepoints(runtime)).toBe(0)
+
+      runtime.onPtyData('pty-1', '\x1b]0;Codex done\x07', 101)
+      expect(pendingReads).toHaveBeenCalledTimes(1)
+      expect(write).toHaveBeenCalledWith(
+        'pty-1',
+        expect.stringContaining('You have 1 orchestration message')
+      )
+      db.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('points restored mail when a live-idle PTY remounts after the repair edge', async () => {
     vi.useFakeTimers()
     try {
       const runtime = new OrcaRuntimeService(store)
@@ -213,6 +310,9 @@ describe('OrcaRuntimeService', () => {
       setInMemoryOrchestrationMessages(runtime, db)
 
       await vi.advanceTimersByTimeAsync(2_000)
+      expect(write).not.toHaveBeenCalled()
+
+      syncSinglePty(runtime)
       expect(write).toHaveBeenCalledWith(
         'pty-1',
         expect.stringContaining('You have 1 orchestration message')
@@ -380,7 +480,7 @@ describe('OrcaRuntimeService', () => {
     db.close()
   })
 
-  it('does not inject pending mail on notify when the recipient awaits permission', async () => {
+  it('does not inject pending mail on notify when the recipient is still working', async () => {
     const runtime = new OrcaRuntimeService(store)
     const db = new InMemoryOrchestrationMessages()
     const write = vi.fn().mockReturnValue(true)
@@ -395,11 +495,11 @@ describe('OrcaRuntimeService', () => {
 
     const [terminal] = (await runtime.listTerminals()).terminals
     bindSinglePtyRun(db, terminal.handle)
-    runtime.onPtyData('pty-1', '\x1b]0;Codex waiting for permission\x07', 100)
+    runtime.onPtyData('pty-1', '\x1b]0;Codex working\x07', 100)
     const message = db.insertMessage({
       from: 'sender',
       to: terminal.handle,
-      subject: 'while asking'
+      subject: 'while working'
     })
     write.mockClear()
 
@@ -407,7 +507,7 @@ describe('OrcaRuntimeService', () => {
     await Promise.resolve()
 
     expect(write).not.toHaveBeenCalled()
-    // Held rows must remain undelivered for a later edge; stamping without writing would lose delivery (#12584).
+    // Busy rows must remain undelivered for later idle; stamping without writing would lose delivery (#12584).
     expect(message.delivered_at).toBeNull()
     db.close()
   })

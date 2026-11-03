@@ -1,10 +1,10 @@
 import {
   AGENT_JOURNAL_THREAD_SCOPE,
   type AgentJournalItemBody,
+  type AgentJournalItemIdentity,
   type AgentJournalTurnLifecycle,
   type AgentJournalTurnLifecycleState
-} from '../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentJournalItemIdentity } from '../../shared/agent-session/journal/agent-session-journal-identity'
+} from '../../shared/agent-session-journal-types'
 import {
   journalLifecycleItemMutation,
   type JournalLifecycleIdentityMutationInput
@@ -16,7 +16,7 @@ import type {
 import { cancelledJournalPromptBody } from '../native-chat/agent-session-journal/journal-prompt-body-bounds'
 import type { CodexTurnOrdinals } from './codex-structured-item-translation'
 import type { CodexStructuredItemStreams } from './codex-structured-item-streams'
-import type { CodexStructuredSessionEvent } from './codex-structured-session-state'
+import type { CodexStructuredSessionEvent } from './codex-structured-session-adapter'
 import { codexCommandOutlivesTurn } from './codex-command-lifecycle'
 import {
   codexTurnLifecycleBody,

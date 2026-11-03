@@ -1,5 +1,3 @@
-import type { GhAccountBinding } from '../../shared/github/account-binding'
-import { OptionalGhAccountExpectation } from '../../shared/rpc-contract/github-repo-target-params'
 import { ipcMain } from 'electron'
 import type { GitHubOwnerRepo, GitHubPRFile } from '../../shared/github/pull-request-types'
 import type { GitHubCreateIssueFields } from '../../shared/issue-mutation-types'
@@ -14,7 +12,7 @@ import {
   listWorkItems
 } from '../github/client'
 import { getPRFileContents, getWorkItemDetails } from '../github/work-item-details'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import { dispatchWorkItem, type WorkItemArgs } from './github-work-item-args'
 import {
   assertRegisteredGitHubRepo,
@@ -181,30 +179,14 @@ export function registerGitHubWorkItemHandlers(store: Store): void {
 
   ipcMain.handle(
     'gh:workItemDetails',
-    (
-      _event,
-      args: WorkItemArgs & {
-        ownerRepo?: GitHubOwnerRepo
-        canonical?: boolean
-        expectedGhAccount?: GhAccountBinding | null
-      }
-    ) => {
+    (_event, args: WorkItemArgs & { ownerRepo?: GitHubOwnerRepo }) => {
       const repo = assertRegisteredGitHubRepo(args, store)
-      const expectedGhAccount = OptionalGhAccountExpectation.parse(args.expectedGhAccount)
       return dispatchWorkItem(
         args,
         repo,
-        expectedGhAccount !== undefined
-          ? (...params) =>
-              getWorkItemDetails(
-                ...params,
-                args.ownerRepo,
-                args.ownerRepo ? args.canonical === true : false,
-                expectedGhAccount
-              )
-          : args.ownerRepo
-            ? (...params) => getWorkItemDetails(...params, args.ownerRepo, args.canonical === true)
-            : getWorkItemDetails,
+        args.ownerRepo
+          ? (...params) => getWorkItemDetails(...params, args.ownerRepo)
+          : getWorkItemDetails,
         getGitHubLocalGitOptionArgs(store, repo)[0]
       )
     }

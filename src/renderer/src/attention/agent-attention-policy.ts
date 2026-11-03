@@ -11,8 +11,6 @@ export type AgentAttentionRequest = {
   settlesTurn: boolean
   /** Out-of-band proof the subject just produced work, used when no live session is visible. */
   hasFreshActivityEvidence: boolean
-  /** A dispatched worker finished: its coordinator gets the result, so the person gets nothing. */
-  coordinatorOnlyNews?: boolean
 }
 
 export type AgentAttentionUnreadWrite = {
@@ -32,12 +30,7 @@ export type AgentAttentionDeliveryRequest = {
 export type AgentAttentionDecision =
   | {
       admitted: false
-      cause:
-        | 'muted-workspace'
-        | 'coordinator-only-news'
-        | 'no-live-session'
-        | 'unknown-surface'
-        | 'superseded-surface'
+      cause: 'muted-workspace' | 'no-live-session' | 'unknown-surface' | 'superseded-surface'
     }
   | {
       admitted: true
@@ -60,9 +53,6 @@ export function resolveAgentAttention(
   // Muted workspaces get no unread, banner, sound or push.
   if (surface.isWorkspaceMuted(workspaceId)) {
     return { admitted: false, cause: 'muted-workspace' }
-  }
-  if (request.coordinatorOnlyNews) {
-    return { admitted: false, cause: 'coordinator-only-news' }
   }
   const subjectKey = request.subject.surfaceKey ?? null
   const hasLiveSession = surface.hasLiveSession(request.subject)

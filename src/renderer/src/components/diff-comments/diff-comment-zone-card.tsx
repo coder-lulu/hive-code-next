@@ -1,4 +1,3 @@
-import type { DiffCommentOwner } from '@/store/diff-comment-owner'
 import type { RefObject } from 'react'
 import type { Root } from 'react-dom/client'
 import { formatDiffComments } from '@/lib/diff-comments-format'
@@ -47,7 +46,6 @@ function getSingleCommentSendScopes(
 
 // Callbacks arrive as refs so the rendered props keep the decorator's identity semantics.
 export type DiffCommentZoneCardContext = {
-  owner: DiffCommentOwner | null
   worktreeId: string
   filePath: string
   activeGroupId: string
@@ -56,7 +54,7 @@ export type DiffCommentZoneCardContext = {
   onDeleteCommentRef: RefObject<(commentId: string) => void>
   onUpdateCommentRef: RefObject<((commentId: string, body: string) => Promise<boolean>) | undefined>
   clearDeliveredDiffComments: (
-    owner: DiffCommentOwner,
+    worktreeId: string,
     comments: readonly DiffCommentDeliverySnapshot[]
   ) => Promise<boolean>
 }
@@ -65,7 +63,6 @@ export function renderDiffCommentZoneCard(
   root: Root,
   comment: DecoratedDiffComment,
   {
-    owner,
     worktreeId,
     filePath,
     activeGroupId,
@@ -106,7 +103,6 @@ export function renderDiffCommentZoneCard(
         headerActions={
           worktreeId && comment.author === undefined ? (
             <NotesSendMenu
-              owner={owner}
               worktreeId={worktreeId}
               groupId={activeGroupId}
               modeIdParts={['diff-comment-note', worktreeId, filePath, comment.id]}
@@ -120,7 +116,7 @@ export function renderDiffCommentZoneCard(
                 'auto.components.diff.comments.diffCommentZoneCard.noteAlreadySent',
                 'Note already sent'
               )}
-              onDelivered={(notes) => void (owner && clearDeliveredDiffComments(owner, notes))}
+              onDelivered={(notes) => void clearDeliveredDiffComments(worktreeId, notes)}
             />
           ) : null
         }

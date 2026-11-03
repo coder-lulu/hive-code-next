@@ -61,6 +61,7 @@ function Harness(): null {
     hostId: 'host-a',
     worktreeId: 'wt-1',
     status: null,
+    branchLabel: 'main',
     commitMessage,
     stagedEntries: [],
     generatingMessage,
@@ -80,6 +81,8 @@ function Harness(): null {
     setShowActionSheet: vi.fn(),
     setLocalBranches: vi.fn(),
     setShowBranchPicker: vi.fn(),
+    setCreatedPrUrl: vi.fn(),
+    setCreatedPrWarning: vi.fn(),
     recordCommitFailure: vi.fn()
   })
   return null

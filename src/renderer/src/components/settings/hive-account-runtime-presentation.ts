@@ -192,7 +192,10 @@ export function resolveHiveAccountRuntimePresentation(
         'auto.components.settings.orcaAccount.runtimeIsolatedDescription',
         'This device must be linked again before cross-device access can resume.'
       ),
-      translate('auto.components.settings.orcaAccount.runtimeCredentialInvalid', 'Link invalid'),
+      translate(
+        'auto.components.settings.orcaAccount.runtimeCredentialInvalid',
+        'Connection credential invalid'
+      ),
       entry,
       { online: false, canClaim: false, canRetry: true }
     )
@@ -202,14 +205,17 @@ export function resolveHiveAccountRuntimePresentation(
     return presentation(
       'danger',
       translate(
-        'auto.components.settings.orcaAccount.runtimeCredentialInvalid',
+        'auto.components.settings.orcaAccount.runtimeCredentialInvalidTitle',
         'Connection credential invalid'
       ),
       translate(
         'auto.components.settings.orcaAccount.runtimeCredentialInvalidDescription',
         'Link this device again to restore cross-device access.'
       ),
-      translate('auto.components.settings.orcaAccount.runtimeCredentialInvalid', 'Link invalid'),
+      translate(
+        'auto.components.settings.orcaAccount.runtimeCredentialInvalid',
+        'Connection credential invalid'
+      ),
       entry,
       { online: false, canClaim: false, canRetry: true }
     )
@@ -246,7 +252,10 @@ export function resolveHiveAccountRuntimePresentation(
         'auto.components.settings.orcaAccount.runtimeRetryingDescription',
         'The Runtime connection was interrupted and HiveCode is retrying.'
       ),
-      translate('auto.components.settings.orcaAccount.runtimeInterrupted', 'Interrupted'),
+      translate(
+        'auto.components.settings.orcaAccount.runtimeInterrupted',
+        'Connection interrupted'
+      ),
       entry,
       { online: false, canClaim: false, canRetry: true }
     )
@@ -274,7 +283,7 @@ export function resolveHiveAccountRuntimePresentation(
     return presentation(
       'danger',
       translate(
-        'auto.components.settings.orcaAccount.runtimeInterrupted',
+        'auto.components.settings.orcaAccount.runtimeInterruptedTitle',
         'Connection interrupted'
       ),
       translate(

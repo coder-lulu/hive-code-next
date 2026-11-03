@@ -471,8 +471,14 @@ function GroupNode({
             type="button"
             className="desktop-home-tree-action desktop-home-tree-group-action"
             onClick={() => onCreateWorkspace(null, group)}
-            aria-label={translate('components.desktopHome.newWorkspaceForGroup', 'New workspace')}
-            title={translate('components.desktopHome.newWorkspaceForGroup', 'New workspace')}
+            aria-label={translate(
+              'components.desktopHome.newWorkspaceForGroup',
+              'New workspace in space'
+            )}
+            title={translate(
+              'components.desktopHome.newWorkspaceForGroup',
+              'New workspace in space'
+            )}
           >
             <Plus aria-hidden />
           </button>
@@ -535,7 +541,7 @@ function GroupNode({
               <Plus aria-hidden />
               {translate(
                 'components.desktopHome.emptyGroupDescription',
-                'This group has no workspaces yet'
+                'No workspaces in this group yet'
               )}
             </button>
           ) : null}

@@ -2,7 +2,6 @@ import { execFile } from 'node:child_process'
 import { platform } from 'node:os'
 import { commandContainsToken } from '../../shared/command-token-scanner'
 import { iterateProcessOutputLines } from '../../shared/process-output-field-scanner'
-import { PS_MAX_BUFFER_BYTES } from '../../shared/process-table-snapshot'
 
 export type ServeSimHelperProcess = {
   pid: number
@@ -16,21 +15,15 @@ type ServeSimHelperProcessLookupOptions = {
   includeOrphaned?: boolean
 }
 
-function readPs(args: string[]): Promise<string> {
+function execFileText(command: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    execFile(
-      'ps',
-      args,
-      { timeout: 5_000, maxBuffer: PS_MAX_BUFFER_BYTES },
-      (error, stdout, stderr) => {
-        // `ps -p` exits 1 silently when the PID is gone; anything else is a failed read, not an absent helper.
-        if (error && !(error.code === 1 && stdout.length === 0 && stderr.length === 0)) {
-          reject(error)
-          return
-        }
-        resolve(stdout.toString())
+    execFile(command, args, { timeout: 5_000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
+      if (error) {
+        reject(error)
+        return
       }
-    )
+      resolve(stdout.toString())
+    })
   })
 }
 
@@ -73,19 +66,18 @@ export async function listServeSimHelperProcessesForDevice(
   if (platform() !== 'darwin') {
     return []
   }
-  // The known PID is checked alone so attach never depends on reading the whole process table.
-  const args =
-    options.includeOrphaned === true
-      ? ['-axo', 'pid=,command=']
-      : options.helperPid !== undefined
-        ? ['-p', String(options.helperPid), '-o', 'pid=,command=']
-        : null
-  if (!args) {
+  const knownPid = options.helperPid
+  const includeOrphaned = options.includeOrphaned === true
+  const output = await execFileText('ps', ['-axo', 'pid=,command=']).catch(() => '')
+  if (!output) {
     return []
   }
-  return parseServeSimHelperProcesses(await readPs(args)).filter((helper) =>
-    commandTargetsDevice(helper.command, deviceUdid)
-  )
+  return parseServeSimHelperProcesses(output).filter((helper) => {
+    if (knownPid !== undefined && helper.pid === knownPid) {
+      return true
+    }
+    return includeOrphaned && commandTargetsDevice(helper.command, deviceUdid)
+  })
 }
 
 export async function killServeSimHelperProcessesForDevice(

@@ -1,11 +1,21 @@
 import { APP_DISPLAY_NAME } from '../shared/brand'
 import type { CliStatusCaller } from '../shared/orchestration-caller-status'
 import type { CliStatusResult } from '../shared/runtime-types'
-import { formatBrowserActionEffects } from './browser/browser-format'
 import { prepareComputerCliJsonResult } from './computer-format'
 import type { RuntimeRpcSuccess } from './runtime-client'
 
 export { formatCliError, reportCliError, type CliErrorContext } from './cli-error'
+
+export {
+  formatBrowserProfileList,
+  formatScreenshot,
+  formatSnapshot,
+  formatTabList,
+  formatTabListWithProfiles,
+  formatTabProfileClone,
+  formatTabProfileShow,
+  formatTabShow
+} from './browser-format'
 
 export {
   formatComputerAction,
@@ -66,7 +76,7 @@ export function printResult<TResult>(
     console.log(JSON.stringify(prepareComputerCliJsonResult(response), null, 2))
     return
   }
-  console.log(formatter(response.result) + formatBrowserActionEffects(response.result))
+  console.log(formatter(response.result))
 }
 
 export type HostListEntry = {

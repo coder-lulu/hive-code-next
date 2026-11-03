@@ -38,43 +38,13 @@ export const SHELL_FOREGROUND_PS_ARGS = [
   'pid=,ppid=,pgid=,tpgid=,stat=,command='
 ] as readonly string[]
 
-/** The name inside ps's `(comm)`, printed when argv was unreadable (another user's process, an exiting one, or a
- * recovery the fork budget withheld): its identity is unknown, so it never proves which program holds a terminal. */
-export function unreadableArgvName(command: string): string | null {
-  return /^\((.*)\)$/.exec(command.trim())?.[1] ?? null
-}
-
 /** Match shell-tier columns exactly: the full parser’s optional tty/start pair eats argv like python 3 app.py and misreads zombies.
  * Drop invalid rows, but reject empty captures so missing data cannot prove the shell exited. */
-export function parseShellForegroundRows(
-  stdout: string,
-  options?: { strict?: boolean }
-): ProcessTableRow[] {
+export function parseShellForegroundRows(stdout: string): ProcessTableRow[] {
   const rows: ProcessTableRow[] = []
   for (const rawLine of stdout.split(/\r?\n/)) {
-    // Strict keeps a blank-argv row: one process outside the foreground cannot void the capture, and readers
-    // treat a blank foreground member as unreadable.
-    const match = rawLine
-      .trim()
-      .match(
-        options?.strict
-          ? /^(\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)\s+(\S+)(?:\s+(.+))?$/
-          : /^(\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)\s+(\S+)\s+(.+)$/
-      )
+    const match = rawLine.trim().match(/^(\d+)\s+(\d+)\s+(-?\d+)\s+(-?\d+)\s+(\S+)\s+(.+)$/)
     const pid = match ? Number(match[1]) : 0
-    if (
-      options?.strict &&
-      rawLine.trim() &&
-      (!match ||
-        !Number.isSafeInteger(pid) ||
-        pid <= 0 ||
-        ![2, 3, 4].every((i) => Number.isSafeInteger(Number(match[i]))) ||
-        Number(match[2]) < 0 ||
-        Number(match[3]) < 0 ||
-        Number(match[4]) < -1)
-    ) {
-      throw new ProcessTableCaptureError('malformed_row')
-    }
     if (match && Number.isSafeInteger(pid) && pid > 0) {
       rows.push({
         pid,
@@ -82,7 +52,7 @@ export function parseShellForegroundRows(
         pgid: Number(match[3]),
         tpgid: Number(match[4]),
         stat: match[5],
-        command: match[6] ?? ''
+        command: match[6]
       })
     }
   }

@@ -7,7 +7,7 @@ import {
   fakeClaude,
   tick,
   USER_MESSAGE
-} from './structured/claude-structured-session-test-support'
+} from './claude-structured-session-test-support'
 
 it.each(['before-settlement', 'after-settlement'])(
   'retires result settings begun during an uncertain control: %s',

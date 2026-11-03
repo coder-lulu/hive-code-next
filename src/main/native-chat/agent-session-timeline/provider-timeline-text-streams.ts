@@ -5,9 +5,9 @@
 import {
   AGENT_JOURNAL_THREAD_SCOPE,
   type AgentJournalItemBody,
-  type AgentJournalProducerLinkage
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentJournalTurnScope } from '../../../shared/agent-session/journal/agent-session-journal-turn-scope'
+  type AgentJournalProducerLinkage,
+  type AgentJournalTurnScope
+} from '../../../shared/agent-session-journal-types'
 import {
   createAgentSessionDeltaCoalescer,
   type AgentSessionDeltaCoalescerDeps

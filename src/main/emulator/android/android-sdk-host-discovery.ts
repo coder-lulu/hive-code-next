@@ -1,7 +1,6 @@
 import { homedir, platform } from 'node:os'
 import { existsSync } from 'node:fs'
 import { discoverAndroidSdk, type AndroidSdkPaths } from './android-sdk-discovery'
-import { resolveExecutableCommand } from '../../../shared/node-cli-command-resolution'
 
 let configuredSdkPath: string | null = null
 
@@ -14,13 +13,7 @@ export function setConfiguredAndroidSdkPath(path: string | null): void {
 export function discoverAndroidSdkFromHost(): AndroidSdkPaths | null {
   const env = configuredSdkPath ? { ...process.env, ANDROID_HOME: configuredSdkPath } : process.env
   try {
-    return discoverAndroidSdk({
-      env,
-      platform: platform(),
-      homedir: homedir(),
-      exists: existsSync,
-      findAdbOnPath: () => resolveExecutableCommand('adb')
-    })
+    return discoverAndroidSdk({ env, platform: platform(), homedir: homedir(), exists: existsSync })
   } catch {
     return null
   }

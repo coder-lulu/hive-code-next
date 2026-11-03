@@ -11,7 +11,6 @@ import {
   temporaryDirectories,
   TERMINAL_HANDLE
 } from './orchestration-mailbox-notification-test-harness'
-import { ackThenCheck } from './orchestration-mailbox-ack-then-check.test-fixture'
 import { createRootDispatch } from './orchestration/db/root-dispatch-test-fixture'
 
 describe('orchestration mailbox filtered waiters', () => {
@@ -44,7 +43,10 @@ describe('orchestration mailbox filtered waiters', () => {
     expect(checked).toMatchObject({ runId: run.id, count: 50 })
     expect(checked.messages).not.toContainEqual(expect.objectContaining({ id: question.id }))
     expect(db.getMessageById(question.id)?.to_handle).toBe(`run:${run.id}`)
-    const next = await ackThenCheck(harness.runtime, checked.deliveryId!, { types: 'question' })
+    const next = await checkBoundMailbox(harness.runtime, {
+      ack: checked.deliveryId!,
+      types: 'question'
+    })
     expect(next.messages).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: question.id })])
     )
@@ -82,7 +84,10 @@ describe('orchestration mailbox filtered waiters', () => {
     expect(checked).toMatchObject({ runId: run.id, count: 50 })
     expect(checked.messages).not.toContainEqual(expect.objectContaining({ id: question.id }))
     expect(db.getMessageById(question.id)?.to_handle).toBe(`run:${run.id}`)
-    const next = await ackThenCheck(harness.runtime, checked.deliveryId!, { types: 'question' })
+    const next = await checkBoundMailbox(harness.runtime, {
+      ack: checked.deliveryId!,
+      types: 'question'
+    })
     expect(next.messages).toEqual(
       expect.arrayContaining([expect.objectContaining({ id: question.id })])
     )
@@ -115,7 +120,10 @@ describe('orchestration mailbox filtered waiters', () => {
     expect(checked).toMatchObject({ runId: run.id, dispatchId: dispatch.id, count: 50 })
     expect(checked.messages).not.toContainEqual(expect.objectContaining({ id: question.id }))
     expect(db.getMessageById(question.id)?.to_handle).toBe(`dispatch:${dispatch.id}`)
-    const next = await ackThenCheck(harness.runtime, checked.deliveryId!, { types: 'question' })
+    const next = await checkBoundMailbox(harness.runtime, {
+      ack: checked.deliveryId!,
+      types: 'question'
+    })
     expect(next.messages).toEqual([expect.objectContaining({ id: question.id })])
     db.close()
   })

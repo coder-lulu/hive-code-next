@@ -49,7 +49,7 @@ export type ResolvedCommand = {
   cwd: string | undefined
   wsl: WslPathInfo | null
   wslMode: 'direct-git' | 'login-shell' | 'non-login-shell' | null
-  /** Present only for a fenced (buffered) login-shell read. */
+  /** Present only when the caller opted into a fenced login-shell read. */
   captured?: WslCapturedLoginShellCommand
   termination?: WslProcessGroupTermination
 }
@@ -60,16 +60,11 @@ export function setDefaultWslDistroOverride(distro: string | null): void {
   defaultWslDistroOverride = distro
 }
 
-/** The distro a cwd-less gh/glab call falls back to when the host CLI is missing. */
-export function defaultWslCliDistro(): string | null {
-  return defaultWslDistroOverride ?? getDefaultWslDistro()
-}
-
 export function resolveDefaultWslCli(
   command: 'gh' | 'glab',
   args: string[]
 ): ResolvedCommand | null {
-  const distro = defaultWslCliDistro()
+  const distro = defaultWslDistroOverride ?? getDefaultWslDistro()
   return distro ? resolveCommand(command, args, undefined, distro) : null
 }
 

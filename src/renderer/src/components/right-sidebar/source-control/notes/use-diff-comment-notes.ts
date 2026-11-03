@@ -1,11 +1,9 @@
-import type { AppState } from '@/store'
-import { useOwnedDiffComments } from '../../../diff-comments/use-diff-comment-owner'
-import { withoutMarkdownReviewNotes } from '@/lib/markdown-review-notes-setting'
 import { useCallback, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { formatDiffComments } from '@/lib/diff-comments-format'
 import { describeClipboardWriteFailure } from '@/lib/clipboard-write-failure'
+import type { DiffCommentsClearOptions } from '@/store/slices/diffComments'
 import { useVisibleWorktreeDiffComments } from '../../../diff-comments/use-visible-worktree-diff-comments'
 import {
   countPendingDiffCommentsClear,
@@ -21,11 +19,15 @@ export function useSourceControlDiffCommentNotes({
   clearDiffCommentsForFile
 }: {
   activeWorktreeId: string | null
-  clearDiffComments: AppState['clearDiffComments']
-  clearDiffCommentsForFile: AppState['clearDiffCommentsForFile']
+  clearDiffComments: (worktreeId: string, options?: DiffCommentsClearOptions) => Promise<boolean>
+  clearDiffCommentsForFile: (
+    worktreeId: string,
+    filePath: string,
+    options?: DiffCommentsClearOptions
+  ) => Promise<boolean>
 }) {
   const { comments: diffCommentsForActive, markdownReviewNotesEnabled } =
-    useVisibleWorktreeDiffComments(activeWorktreeId, 'selection')
+    useVisibleWorktreeDiffComments(activeWorktreeId)
   const diffCommentCount = diffCommentsForActive.length
   // Index counts once so each row need not refilter every comment.
   const diffCommentCountByPath = useMemo(() => {
@@ -70,21 +72,13 @@ export function useSourceControlDiffCommentNotes({
     }
   }, [diffCommentsForActive, diffCommentsPrompt, showDiffCommentsCopied])
 
-  // Count the captured copy's notes, whichever twin is selected now; a copy gone since opening keeps its count so confirming reports the failure.
-  const ownedComments = useOwnedDiffComments(pendingDiffCommentsClear?.owner ?? null)
   const pendingDiffCommentsClearCount = useMemo(() => {
-    if (!pendingDiffCommentsClear || pendingDiffCommentsClear.worktreeId !== activeWorktreeId) {
-      return 0
-    }
-    if (!ownedComments) {
-      return pendingDiffCommentsClear.count
-    }
     return countPendingDiffCommentsClear(
       pendingDiffCommentsClear,
       activeWorktreeId,
-      markdownReviewNotesEnabled ? ownedComments : withoutMarkdownReviewNotes(ownedComments)
+      diffCommentsForActive
     )
-  }, [activeWorktreeId, markdownReviewNotesEnabled, ownedComments, pendingDiffCommentsClear])
+  }, [activeWorktreeId, diffCommentsForActive, pendingDiffCommentsClear])
 
   const resolvedPendingDiffCommentsClear = resolvePendingDiffCommentsClear({
     activeWorktreeId,
@@ -116,8 +110,8 @@ export function useSourceControlDiffCommentNotes({
     try {
       const ok =
         pending.kind === 'all'
-          ? await clearDiffComments(pending.owner, clearOptions)
-          : await clearDiffCommentsForFile(pending.owner, pending.filePath, clearOptions)
+          ? await clearDiffComments(pending.worktreeId, clearOptions)
+          : await clearDiffCommentsForFile(pending.worktreeId, pending.filePath, clearOptions)
       if (ok) {
         setPendingDiffCommentsClear(null)
       } else {

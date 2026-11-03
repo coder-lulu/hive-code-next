@@ -98,7 +98,7 @@ vi.mock('../../../resources/tray/hivecode-menu-barTemplate@2x.png?asset&asarUnpa
   default: '/assets/orca-menu-barTemplate@2x.png'
 }))
 
-vi.mock('../window/desktop-integration/app-icon', () => ({
+vi.mock('../app-icon', () => ({
   createAppIconImage: createAppIconImageMock
 }))
 

@@ -128,6 +128,24 @@ afterEach(() => {
 })
 
 describe('SidebarRepositoryFilterSection', () => {
+  it('focuses the search input when the submenu opens', async () => {
+    render()
+    openSubmenu()
+    await settle()
+
+    expect(searchInput()).not.toBeNull()
+    expect(document.activeElement).toBe(searchInput())
+  })
+
+  it('routes typing into the search box rather than menu typeahead', async () => {
+    render()
+    openSubmenu()
+    await settle()
+    typeIntoFocused('alp')
+
+    expect(searchInput()?.value).toBe('alp')
+  })
+
   it('resets the query when the panel is reopened', async () => {
     render()
     openSubmenu()
@@ -174,5 +192,12 @@ describe('SidebarRepositoryFilterSection', () => {
     })
 
     expect(searchInput()).toBeNull()
+  })
+
+  it('hides itself when only one project exists', () => {
+    setState({ repos: [REPOS[0]] })
+    render()
+
+    expect(document.querySelector('[data-slot="dropdown-menu-sub-trigger"]')).toBeNull()
   })
 })

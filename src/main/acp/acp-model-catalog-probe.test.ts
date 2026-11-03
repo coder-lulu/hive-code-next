@@ -12,7 +12,6 @@ import { AcpScriptedAgent } from './acp-scripted-agent.test-support'
 import { AgentModelCatalogListingStoppedError } from '../native-chat/agent-model-catalog/agent-model-catalog-failures'
 import type { ProviderProcessLaunch } from '../provider-process/provider-process-launch'
 import { openCodeAcpAccountBinding } from '../opencode/opencode-structured-account-home'
-import authRequired from './__fixtures__/session-new-auth-required.json'
 
 const PREFIX = ['run', '--', 'agent']
 const launcherSettings = (agent: string) => ({
@@ -38,7 +37,7 @@ const MODEL_STATE = {
       name: 'Grok Build',
       _meta: {
         supportsReasoningEffort: true,
-        // Reported model defaults take precedence over the menu's recommendation.
+        // A session pick must not become a catalog default.
         reasoningEffort: 'low',
         reasoningEfforts: [
           { value: 'low', id: 'fast', label: 'Fast' },
@@ -168,20 +167,6 @@ function scriptedOpenCode2(canDelete: boolean): {
 }
 
 describe('ACP model catalog probes', () => {
-  it('projects an agent-authored auth-required session/new error, retaining unknown for other failures', async () => {
-    const { agent, deps } = scriptedOpenCode2(true)
-    const { code, message, data } = authRequired.reply.error
-    agent.on('session/new', (frame) => agent.fail(frame, code, message, data))
-    const list = () =>
-      createAcpModelCatalogProbe(OPENCODE, deps)(
-        { kind: 'opencode', locator: { kind: 'unmanaged' } },
-        { workspacePath: '/work/project' }
-      )
-    await expect(list()).rejects.toMatchObject({ unavailable: { reason: 'notSignedIn' } })
-    agent.on('session/new', (frame) => agent.fail(frame, -32603, 'Internal error'))
-    await expect(list()).rejects.toMatchObject({ code: -32603 })
-  })
-
   it('lists Grok from initialize alone, under its pinned account, and closes the child', async () => {
     const { agent, deps, launches, closed } = scriptedGrok({ modelState: MODEL_STATE })
     deps.resolveCommandSettings = () => launcherSettings('grok')
@@ -207,26 +192,18 @@ describe('ACP model catalog probes', () => {
           { value: 'fast', label: 'Fast' },
           { value: 'deep', label: 'Deep' }
         ],
-        defaultEffort: 'deep',
-        declaredDefaultEffort: 'fast'
+        defaultEffort: 'deep'
       },
       {
         id: 'grok-mini',
         label: 'Grok Mini',
         isDefault: false,
-        declaredDefaultEffort: null,
         efforts: ['minimal', 'low', 'medium', 'high', 'xhigh'].map((value) => ({
           value,
           label: expect.any(String)
         }))
       },
-      {
-        id: 'grok-chat',
-        label: 'Grok Chat',
-        isDefault: false,
-        declaredDefaultEffort: null,
-        efforts: []
-      }
+      { id: 'grok-chat', label: 'Grok Chat', isDefault: false, efforts: [] }
     ])
   })
 
@@ -276,13 +253,7 @@ describe('ACP model catalog probes', () => {
       expect.objectContaining({ site: 'opencode-model-catalog-probe' })
     )
     expect(success.models).toEqual([
-      {
-        id: 'opencode/big-pickle',
-        label: 'opencode/Big Pickle',
-        isDefault: false,
-        declaredDefaultEffort: null,
-        efforts: []
-      }
+      { id: 'opencode/big-pickle', label: 'opencode/Big Pickle', isDefault: false, efforts: [] }
     ])
   })
 

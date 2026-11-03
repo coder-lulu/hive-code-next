@@ -1,9 +1,6 @@
 import type { RuntimeMobileSessionTabGroup } from '../../../../shared/runtime-types'
 import type { Tab, TabGroup, TabGroupLayoutNode } from '../../../../shared/tab-types'
-import {
-  structuredAgentSessionHostTabId,
-  isReopenedChatTabId
-} from '../../../../shared/agent-session/view/structured-agent-session-host-tab-id'
+import { structuredAgentSessionHostTabId } from '../../../../shared/structured-agent-session-host-tab-id'
 import {
   getActiveTabNavOrder,
   getGroupVisibleTabOrder,
@@ -194,12 +191,7 @@ export function buildMobileSessionGroupProjection(
       visibleOrder.map((item) => [
         item.tabId ?? item.id,
         item.type === 'agent-session'
-          ? (() => {
-              const actual = inputs.hostTabIds.get(item.tabId ?? item.id)
-              return actual && isReopenedChatTabId(actual)
-                ? actual
-                : structuredAgentSessionHostTabId(item.id)
-            })()
+          ? structuredAgentSessionHostTabId(item.id)
           : (item.tabId ?? item.id)
       ])
     )

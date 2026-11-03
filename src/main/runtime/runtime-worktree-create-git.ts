@@ -69,7 +69,8 @@ export async function canCheckoutExistingLocalBranch(
     const ref = `refs/heads/${name}`
     const { stdout } = await gitExecFileAsync(['for-each-ref', '--format=%(refname)', ref], {
       cwd: repoPath,
-      ...gitOptions
+      ...gitOptions,
+      captureWslLoginShellOutput: true
     })
     return stdout.split(/\r?\n/).includes(ref)
   }

@@ -1,9 +1,6 @@
 // Stored pane data uses leaf IDs within tabs and full pane keys in records; remint repeated IDs before loading into the partition-wide leaf map.
 
-import {
-  isPaneSleepRecord,
-  type SleepingAgentSessionRecord
-} from '../agent-session/lifecycle/agent-session-resume'
+import { isPaneSleepRecord, type SleepingAgentSessionRecord } from '../agent-session-resume'
 import type { TerminalLayoutSnapshot } from '../terminal-tab-types'
 import type { WorkspaceSessionState } from '../workspace-session-state-types'
 import { omitStoredFields } from './stored-record-fields'
@@ -12,7 +9,7 @@ import type {
   DesktopLayoutView,
   LayoutContentFacts
 } from './workspace-layout-beside'
-import { isRepeatingRelayPtyId } from './terminal-owner-invariants'
+import { isSameTerminal } from './terminal-owner-invariants'
 import { collectLayoutLeafIdsInOrder } from './terminal-pane-tree'
 import { updateLegacyPersistence } from './workspace-layout-legacy-persistence'
 import type { WorkspaceLayoutLoadContext } from './workspace-layout-load-types'
@@ -21,8 +18,7 @@ import {
   tabsInOrder,
   type LayoutLeaf,
   type LayoutTerminalPanes,
-  type WorkspaceLayoutModel,
-  type WorkspaceLayout
+  type WorkspaceLayoutModel
 } from './workspace-layout-model'
 import { retireExitedSurface } from './workspace-layout-removal'
 
@@ -110,7 +106,6 @@ export function loadLeaves(
     incarnations: { ...stored.session.terminalPtyIncarnationsByPaneKey }
   }
   const seen = new Set<string>()
-  const ownedLeaves = new Set<WorkspaceLayout>()
   for (const { workspace, tab } of terminalTabsInOrder(model)) {
     const layout = stored.layouts.get(tab.entityId)!
     const renamed = new Map<string, string>()
@@ -142,16 +137,7 @@ export function loadLeaves(
         }
       }
       if (Object.keys(leaf).length > 0) {
-        if (!ownedLeaves.has(workspace)) {
-          workspace.leaves = { ...workspace.leaves }
-          ownedLeaves.add(workspace)
-        }
-        Object.defineProperty(workspace.leaves, leafId, {
-          value: leaf,
-          enumerable: true,
-          configurable: true,
-          writable: true
-        })
+        workspace.leaves = { ...workspace.leaves, [leafId]: leaf }
       }
       const scrollback = {
         ...(layout.buffersByLeafId?.[storedId] !== undefined
@@ -171,31 +157,18 @@ export function loadLeaves(
 }
 
 export function unbindDuplicateTerminals(model: WorkspaceLayoutModel): void {
-  const owners = new Map<string, { missing: boolean; defined: Set<string> }>()
+  const owners: { ptyId: string; incarnationId?: string }[] = []
   for (const { workspace, tab } of terminalTabsInOrder(model)) {
     for (const leafId of collectLayoutLeafIdsInOrder(tab.panes.root)) {
       const leaf = workspace.leaves?.[leafId]
       if (leaf?.ptyId === undefined) {
         continue
       }
-      const accepted = owners.get(leaf.ptyId)
-      const incarnation = leaf.incarnationId
-      const duplicate =
-        accepted &&
-        ((incarnation !== undefined && accepted.defined.has(incarnation)) ||
-          ((incarnation === undefined || accepted.missing) && !isRepeatingRelayPtyId(leaf.ptyId)))
-      if (duplicate) {
+      const binding = { ptyId: leaf.ptyId, incarnationId: leaf.incarnationId }
+      if (owners.some((candidate) => isSameTerminal(candidate, binding))) {
         delete leaf.ptyId
       } else {
-        const bucket = accepted ?? { missing: false, defined: new Set<string>() }
-        if (incarnation === undefined) {
-          bucket.missing = true
-        } else {
-          bucket.defined.add(incarnation)
-        }
-        if (!accepted) {
-          owners.set(leaf.ptyId, bucket)
-        }
+        owners.push(binding)
       }
     }
   }

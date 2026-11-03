@@ -1,14 +1,6 @@
 import { blockedWslDistroForExec } from '../../wsl/wsl-background-exec-gate'
-import {
-  runAsWslUserAct,
-  WslDistroStoppedError,
-  WslDistroUnverifiableError
-} from '../../wsl/wsl-unc-access-gate'
-import {
-  defaultWslCliDistro,
-  resolveDefaultWslCli,
-  type ResolvedCommand
-} from './wsl-command-resolution'
+import { WslDistroStoppedError, WslDistroUnverifiableError } from '../../wsl/wsl-unc-access-gate'
+import { resolveDefaultWslCli, type ResolvedCommand } from './wsl-command-resolution'
 
 /**
  * The default distro's gh/glab for a cwd-less call whose host CLI is missing. Background work must
@@ -30,12 +22,4 @@ export async function resolveDefaultWslCliFallback(
     throw new WslDistroUnverifiableError(blocked.distro)
   }
   return resolved
-}
-
-/**
- * Runs a user's click (star, auth diagnosis, a project-board action) as a user act on the distro a
- * cwd-less gh/glab call would fall back to, so it may start that distro when it is stopped.
- */
-export function runAsDefaultWslCliUserAct<T>(act: () => Promise<T>): Promise<T> {
-  return runAsWslUserAct(process.platform === 'win32' ? defaultWslCliDistro() : null, act)
 }

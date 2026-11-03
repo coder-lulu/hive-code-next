@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 
-import { EVERY_AGENT_CHAT } from '../../../../shared/native-chat/every-agent-chat.test-fixture'
 import { cleanup, renderHook } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
@@ -42,7 +41,7 @@ vi.mock('../../store', () => {
         },
         terminalLayoutsByTabId: {},
         agentStatusByPaneKey: {},
-        settings: { nativeChatProviders: EVERY_AGENT_CHAT },
+        settings: { experimentalNativeChat: true },
         toggleTabViewMode
       })
     }
@@ -52,9 +51,7 @@ vi.mock('./native-chat-shortcut', () => ({
   isMacPlatform: () => true,
   matchesNativeChatToggleShortcut: () => true
 }))
-vi.mock('../../../../shared/native-chat/native-chat-availability', () => ({
-  canToggleNativeChat: () => true
-}))
+vi.mock('../../../../shared/native-chat-availability', () => ({ canToggleNativeChat: () => true }))
 vi.mock('../../../../shared/native-chat/transcript/native-chat-transcript-readability', () => ({
   isNativeChatTranscriptLocalReadable: () => true
 }))

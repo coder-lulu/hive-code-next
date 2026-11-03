@@ -3,11 +3,13 @@ import { bindPaneFirst, committingSpawn, registerBoundPty } from '../bind-first-
 import {
   OrcaRuntimeService,
   electronMocks,
-  waitForMobileSessionTabsEvents,
-  type RuntimeMobileSessionTabsResult,
-  type WorkspaceSessionState
+  waitForMobileSessionTabsEvents
 } from '../orca-runtime-test-mocks.spec'
-import type { SleepingAgentSessionRecord } from '../../../shared/agent-session/lifecycle/agent-session-resume'
+import type {
+  RuntimeMobileSessionTabsResult,
+  SleepingAgentSessionRecord,
+  WorkspaceSessionState
+} from '../orca-runtime-test-mocks.spec'
 import {
   HEADLESS_LEAF_ID,
   HEADLESS_SECOND_LEAF_ID,

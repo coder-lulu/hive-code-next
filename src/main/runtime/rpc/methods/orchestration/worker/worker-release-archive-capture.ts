@@ -8,7 +8,6 @@ import {
 import type { WorkerTerminalResourceRow } from '../../../../orchestration/worker-terminal-ownership'
 import { releaseUnknownRecovery, type WorkerReleaseReceipt } from './worker-release-completion'
 import { archiveSummary } from './worker-terminal-resource-presentation'
-import { captureWorkerResumeSession } from './worker-resume-session-capture'
 
 /** Freeze release output; unverifiable structured sessions finish release_unknown instead of retrying forever as requested. A fresh request may retry. */
 export async function captureWorkerReleaseArchive(
@@ -18,7 +17,6 @@ export async function captureWorkerReleaseArchive(
   }
 ): Promise<{ captured: WorkerOutputArchiveCapture } | { receipt: WorkerReleaseReceipt }> {
   const { db, resource, ...capture } = args
-  captureWorkerResumeSession(capture.runtime, db, resource, capture.attachedAtMs)
   try {
     return { captured: await captureWorkerOutputArchive(capture) }
   } catch (error) {

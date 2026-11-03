@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ChevronRight, ChevronsUpDown, LoaderCircle, Plus } from 'lucide-react'
-import { FolderIcon } from '@/components/FileTypeIcon'
+import { ChevronRight, ChevronsUpDown, Folder, LoaderCircle, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   Command,
@@ -217,11 +216,7 @@ export function SparseDirectoryPicker({
                     disabled={alreadySelected}
                     onSelect={() => commit(path)}
                   >
-                    <FolderIcon
-                      folderPath={entry.name}
-                      open={false}
-                      className="size-4 shrink-0 text-muted-foreground"
-                    />
+                    <Folder className="size-4 shrink-0 text-muted-foreground" />
                     <span className="flex-1 truncate font-mono text-xs">{entry.name}</span>
                     {alreadySelected ? (
                       <span className="text-[11px] text-muted-foreground">

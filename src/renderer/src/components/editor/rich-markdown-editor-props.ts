@@ -1,6 +1,5 @@
 import type React from 'react'
 import type { MarkdownDocument } from '../../../../shared/filesystem-entry-types'
-import type { EditorFileOperationProvenance } from '@/lib/editor-file-operation-owner'
 
 export type RichMarkdownEditorProps = {
   fileId: string
@@ -10,8 +9,6 @@ export type RichMarkdownEditorProps = {
   worktreeId: string
   externalSshTargetId?: string
   runtimeEnvironmentId?: string | null
-  /** The tab's captured owner; with the fields above it names the copy whose notes show. */
-  operationProvenance?: EditorFileOperationProvenance
   scrollCacheKey: string
   onContentChange: (content: string) => void
   onDirtyStateHint: (dirty: boolean) => void

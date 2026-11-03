@@ -30,14 +30,7 @@ import { listUnfinishedWslMoves } from '../persistence/moving-wsl-projects/wsl-m
 import { runTrackedWslMove } from '../telemetry/wsl-move-telemetry'
 import { runTrackedWslMoveUndo } from '../telemetry/wsl-move-undo-telemetry'
 import { isAnyWslMoveRunning } from '../persistence/moving-wsl-projects/wsl-move-running-moves'
-import {
-  wslHostsAcceptNewWork,
-  wslHostsGateOpen,
-  wslHostsOptedIn,
-  wslHostsServing
-} from '../wsl/wsl-host-gate'
-
-type WslHostsSetting = Parameters<typeof wslHostsOptedIn>[0]
+import { wslHostsGateOpen, wslHostsServing } from '../wsl/wsl-host-gate'
 import type { WslMoveUndoPorts } from './wsl-move-undo-wiring'
 import { releaseWslMovedProjectHere } from './wsl-move-release-here'
 
@@ -61,9 +54,7 @@ export function registerWslMoveHandlers(
   /** Built per call, only once the gate is open. */
   driverDeps?: () => WslMoveDriverDeps,
   /** Undo's reach into the host; absent, there is no host to stop. */
-  undoPorts: () => WslMoveUndoPorts = () => ({ stopHostCopies: async () => 'stopped' }),
-  /** The user's settings: the WSL hosts setting governs new moves; with it off, moved projects keep serving. */
-  readSettings: () => WslHostsSetting = () => ({ experimentalWslHosts: true })
+  undoPorts: () => WslMoveUndoPorts = () => ({ stopHostCopies: async () => 'stopped' })
 ): void {
   for (const channel of WSL_MOVE_HANDLER_CHANNELS) {
     ipcMain.removeHandler(channel)
@@ -96,23 +87,18 @@ export function registerWslMoveHandlers(
       )
     }
   )
-  registerWslMoveDriverHandlers(getUserDataPath, isMainWindowRenderer, driverDeps, readSettings)
+  registerWslMoveDriverHandlers(getUserDataPath, isMainWindowRenderer, driverDeps)
   registerWslMoveUseHereHandler(getUserDataPath, isMainWindowRenderer, undoPorts)
 }
 
 function registerWslMoveDriverHandlers(
   getUserDataPath: () => string,
   isMainWindowRenderer: (senderId: number) => boolean,
-  driverDeps: (() => WslMoveDriverDeps) | undefined,
-  readSettings: () => WslHostsSetting
+  driverDeps: (() => WslMoveDriverDeps) | undefined
 ): void {
-  // Gate first: with it closed, no dependency is built and nothing is read. A new move also needs
-  // no block learned this run; cancelling a running one never does.
-  const refuseUnlessOpen = (
-    event: RendererEvent,
-    gate: () => boolean = wslHostsAcceptNewWork
-  ): WslMoveRefusal | null => {
-    if (!gate() || !driverDeps) {
+  // Gate first: with it closed, no dependency is built and nothing is read.
+  const refuseUnlessOpen = (event: RendererEvent): WslMoveRefusal | null => {
+    if (!wslHostsGateOpen() || !driverDeps) {
       return { outcome: 'refused', code: 'wsl_move_unavailable' }
     }
     const sender = event.sender
@@ -120,18 +106,12 @@ function registerWslMoveDriverHandlers(
       ? null
       : { outcome: 'refused', code: 'wsl_move_unavailable', detail: 'not-main-window' }
   }
-  // A new move is new work: with the setting off it is refused, as serve-only refuses it.
-  const refuseNewMove = (event: RendererEvent): WslMoveRefusal | null =>
-    refuseUnlessOpen(event) ??
-    (wslHostsOptedIn(readSettings())
-      ? null
-      : { outcome: 'refused', code: 'wsl_move_unavailable', detail: 'wsl-hosts-off' })
   ipcMain.handle(
     'wslMove:preview',
     async (event: RendererEvent, request: unknown): Promise<WslMovePreview> => {
       const parsed = parseWslMoveRequest(request)
       return (
-        refuseNewMove(event) ??
+        refuseUnlessOpen(event) ??
         (parsed && driverDeps ? previewWslMove(driverDeps(), parsed) : invalidRequest())
       )
     }
@@ -141,7 +121,7 @@ function registerWslMoveDriverHandlers(
     async (event: RendererEvent, request: unknown): Promise<WslMoveResult> => {
       const parsed = parseWslMoveRequest(request)
       return (
-        refuseNewMove(event) ??
+        refuseUnlessOpen(event) ??
         (parsed && driverDeps
           ? runTrackedWslMove(driverDeps(), (deps) => moveProjectsToWslHost(deps, parsed))
           : invalidRequest())
@@ -156,9 +136,7 @@ function registerWslMoveDriverHandlers(
   ipcMain.handle(
     'wslMove:cancel',
     (event: RendererEvent, distro: unknown): boolean =>
-      refuseUnlessOpen(event, wslHostsGateOpen) === null &&
-      typeof distro === 'string' &&
-      cancelWslMove(distro)
+      refuseUnlessOpen(event) === null && typeof distro === 'string' && cancelWslMove(distro)
   )
 }
 

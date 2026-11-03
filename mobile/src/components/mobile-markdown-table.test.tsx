@@ -6,8 +6,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { describe, expect, it, vi } from 'vitest'
 import { MobileMarkdown } from './MobileMarkdown'
-import { createMobileMarkdownStyles } from './mobile-markdown-styles'
-import { lightTheme } from '../theme/mobile-theme'
+import { styles } from './mobile-markdown-styles'
 
 vi.mock('react-native', () => ({
   Linking: { openURL: () => Promise.resolve() },
@@ -28,7 +27,7 @@ function renderTableCellStyles(content: string): unknown[][] {
   act(() => {
     renderer = create(createElement(MobileMarkdown, { content }))
   })
-  const rowStyle = createMobileMarkdownStyles(lightTheme).tableRow
+  const rowStyle = styles.tableRow
   const rows = renderer!.root.findAll(
     (node) =>
       String(node.type) === 'View' && JSON.stringify(node.props.style) === JSON.stringify(rowStyle)

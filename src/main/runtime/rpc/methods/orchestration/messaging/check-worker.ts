@@ -1,9 +1,8 @@
-import type { MessageRow, MessageType, OrchestrationDb } from '../../../../orchestration/db'
-import type { MailboxDeliveryBatch } from '../../../../orchestration/db/messages/role-mailbox-delivery'
+import type { MessageType, OrchestrationDb } from '../../../../orchestration/db'
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import { OrchestrationError } from '../../../../orchestration/orchestration-error'
 import { formatMessageBanner } from '../../../../orchestration/formatter'
-import { acknowledgedOnlyReceipt, deliveryReceipt, exposeMessages } from './mailbox-message-receipt'
+import { exposeMessages } from './mailbox-message-receipt'
 import { routeAllMailboxPages } from '../schemas'
 import { asDispatchFence, callerHoldsDispatchPane, dispatchFenced } from './dispatch-mailbox-fence'
 import { interruptedAcknowledgedCheck } from '../routing'
@@ -31,10 +30,6 @@ export async function checkWorkerMailbox(args: {
   revalidateConsumer?: () => void
   deferDelivery?: () => boolean
   recordMutationReceipt?: (receipt: unknown) => void
-  /** An ack the enclosing Run check already applied, reported when this check applied none. */
-  runAcknowledged?: string
-  /** The caller's --ack came without --wait, so this check takes no new mail. */
-  acknowledgeOnly?: boolean
 }) {
   const {
     params,
@@ -195,36 +190,20 @@ export async function checkWorkerMailbox(args: {
     args.recordMutationReceipt?.(
       interruptedAcknowledgedCheck(deliveryRunId, acknowledged.delivery.id, 'outcome_unknown')
     )
-    if (args.acknowledgeOnly) {
-      return acknowledgedOnlyReceipt(mailboxIdentity, acknowledged.delivery.id)
-    }
   }
-  const formatted = (messages: MessageRow[]) =>
-    params.format || params.inject
-      ? { formatted: messages.map(formatMessageBanner).join('\n\n') }
-      : {}
   const showAll = params.all === true || (params.unread === false && params.peek !== true)
   const readPeek = () => db.getUnreadMessages(address, typeFilter)
-  const result = (batch: MailboxDeliveryBatch | undefined) =>
-    deliveryReceipt({
-      mailbox: mailboxIdentity,
-      batch,
-      acknowledged: acknowledged?.delivery.id ?? args.runAcknowledged,
-      format: params.format === true || params.inject === true
-    })
-  // The receipt commits with the take, so --retry-request can always replay a handed-over batch.
-  const takeDelivery = (wakeTypes?: MessageType[]) => {
+  const readDelivery = (wakeTypes?: MessageType[]) => {
     if (args.deferDelivery?.()) {
       return undefined
     }
     try {
-      return db.takeMailboxDelivery({
+      return db.getOrCreateMailboxDelivery({
         runId: deliveryRunId,
         mailboxHandle: address,
         consumerGeneration: workerMailbox.generation,
         consumerSource: activeDispatch ? 'dispatch' : 'attachment',
-        wakeTypes,
-        recordTaken: (taken) => args.recordMutationReceipt?.(result(taken))
+        wakeTypes
       })
     } catch (error) {
       throw asDispatchFence(error)
@@ -237,7 +216,9 @@ export async function checkWorkerMailbox(args: {
       messages: exposeMessages(messages),
       count: messages.length,
       acknowledged: acknowledged?.delivery.id ?? null,
-      ...formatted(messages)
+      ...(params.format || params.inject
+        ? { formatted: messages.map(formatMessageBanner).join('\n\n') }
+        : {})
     }
   }
   if (params.peek) {
@@ -248,13 +229,28 @@ export async function checkWorkerMailbox(args: {
         messages: exposeMessages(messages),
         count: messages.length,
         acknowledged: acknowledged?.delivery.id ?? null,
-        ...formatted(messages)
+        ...(params.format || params.inject
+          ? { formatted: messages.map(formatMessageBanner).join('\n\n') }
+          : {})
       }
     }
   } else {
-    const current = takeDelivery(params.wait ? typeFilter : args.wakeTypes)
+    const current = readDelivery(params.wait ? typeFilter : args.wakeTypes)
     if (current || !params.wait) {
-      return result(current)
+      return {
+        ...mailboxIdentity,
+        deliveryId: current?.delivery.id ?? null,
+        messages: exposeMessages(current?.messages ?? []),
+        count: current?.messages.length ?? 0,
+        replayed: current?.replayed ?? false,
+        acknowledged: acknowledged?.delivery.id ?? null,
+        timedOut: false,
+        cancelled: false,
+        connectionLost: false,
+        ...(params.format || params.inject
+          ? { formatted: current?.messages.map(formatMessageBanner).join('\n\n') ?? '' }
+          : {})
+      }
     }
   }
   // Binding can happen during recovery, before run-create/run-use can cancel this wait.
@@ -272,7 +268,10 @@ export async function checkWorkerMailbox(args: {
   }
   if (waitResult === 'timed_out' || waitResult === 'cancelled') {
     return {
-      ...result(undefined),
+      ...mailboxIdentity,
+      messages: [],
+      count: 0,
+      acknowledged: acknowledged?.delivery.id ?? null,
       timedOut: waitResult === 'timed_out',
       cancelled: waitResult === 'cancelled',
       connectionLost: waitResult === 'cancelled' && signal?.aborted === true
@@ -285,12 +284,21 @@ export async function checkWorkerMailbox(args: {
       messages: exposeMessages(arrived),
       count: arrived.length,
       acknowledged: acknowledged?.delivery.id ?? null,
-      ...formatted(arrived)
+      ...(params.format || params.inject
+        ? { formatted: arrived.map(formatMessageBanner).join('\n\n') }
+        : {})
     }
   }
-  const key = `${address}:${workerMailbox.generation}`
-  const batch = waitResult.share(key, () => takeDelivery(typeFilter))
-  // A waiter that shares another's take has no take transaction, so it receipts the batch on arrival.
-  args.recordMutationReceipt?.(result(batch))
-  return result(batch)
+  const arrived = readDelivery(typeFilter)
+  return {
+    ...mailboxIdentity,
+    deliveryId: arrived?.delivery.id ?? null,
+    messages: exposeMessages(arrived?.messages ?? []),
+    count: arrived?.messages.length ?? 0,
+    replayed: arrived?.replayed ?? false,
+    acknowledged: acknowledged?.delivery.id ?? null,
+    ...(params.format || params.inject
+      ? { formatted: arrived?.messages.map(formatMessageBanner).join('\n\n') ?? '' }
+      : {})
+  }
 }

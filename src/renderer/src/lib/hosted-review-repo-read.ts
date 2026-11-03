@@ -6,10 +6,7 @@ import type { Repo } from '../../../shared/repo-types'
 
 export function readHostedReviewForRepo(
   repo: Repo,
-  query: Omit<
-    HostedReviewForBranchArgs,
-    'repoPath' | 'repoId' | 'repoOwnerExecutionHostId' | 'reportReadOutcome'
-  >
+  query: Omit<HostedReviewForBranchArgs, 'repoPath' | 'repoId' | 'repoOwnerExecutionHostId'>
 ): Promise<HostedReviewInfo | null> {
   const args = { ...query, repoPath: repo.path, repoId: repo.id }
   const target = hostedReviewRepoOwnerTarget(repo)

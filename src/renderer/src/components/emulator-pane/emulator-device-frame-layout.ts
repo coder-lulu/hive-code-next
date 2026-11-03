@@ -1,15 +1,9 @@
-import type { z } from 'zod'
-import type { RotateOrientation } from '../../../../shared/rpc-contract/emulator-params'
-
 export type DeviceFrameKind = 'phone' | 'tablet'
 
 export type StreamSize = {
   width: number
   height: number
 }
-
-// The UI orientation serve-sim reports; its frames stay in the raw panel's portrait layout.
-export type EmulatorStreamOrientation = z.infer<typeof RotateOrientation>
 
 export type EmulatorDeviceVisualOrientation = 'portrait' | 'landscape'
 
@@ -34,7 +28,7 @@ export type DeviceFrameLayout = {
 export type VisualStreamGeometry = {
   aspectRatio: number
   size: StreamSize | null
-  streamRotation: -90 | 0 | 90 | 180
+  streamRotation: -90 | 0 | 90
 }
 
 const clamp = (value: number, min: number, max: number): number =>
@@ -63,24 +57,8 @@ export function resolveVisualScreenAspectRatio(
 
 export function resolveVisualStreamGeometry(
   streamSize: StreamSize | null,
-  visualOrientation: EmulatorDeviceVisualOrientation,
-  reportedOrientation?: EmulatorStreamOrientation | null
+  visualOrientation: EmulatorDeviceVisualOrientation
 ): VisualStreamGeometry {
-  if (streamSize && reportedOrientation) {
-    const { width, height } = streamSize
-    // Landscape-sized frames already carry upright pixels, matching serve-sim's own preview.
-    const streamRotation =
-      reportedOrientation === 'portrait_upside_down'
-        ? 180
-        : width <= height && reportedOrientation === 'landscape_left'
-          ? 90
-          : width <= height && reportedOrientation === 'landscape_right'
-            ? -90
-            : 0
-    const quarterTurn = Math.abs(streamRotation) === 90
-    const size = quarterTurn ? { width: height, height: width } : { width, height }
-    return { aspectRatio: size.width / size.height, size, streamRotation }
-  }
   // The physical frame/input rect must follow successful rotation even when serve-sim retains the old canvas dimensions.
   const width = streamSize?.width ?? 9
   const height = streamSize?.height ?? 19

@@ -1,17 +1,13 @@
 import type { OrchestrationDb } from './db'
 import type {
+  OrchestrationMailboxLeaf,
   OrchestrationMailboxOwner,
-  OrchestrationMailboxTerminal,
   RoutedOrchestrationMailbox
 } from './mailbox-owner'
 import type {
   OrchestrationMailboxPointerDelivery,
   OrchestrationMessageWaiter
 } from './mailbox-pointer-delivery'
-import {
-  hasUnfilteredOrchestrationWaiter,
-  selectOrchestrationPointerBatch
-} from './mailbox-pointer-eligibility'
 import type { OrchestrationStructuredMailboxPointerDelivery } from './structured-mailbox-pointer-delivery'
 
 type NotificationCoordinatorDependencies<TWaiter extends OrchestrationMessageWaiter> = {
@@ -20,14 +16,13 @@ type NotificationCoordinatorDependencies<TWaiter extends OrchestrationMessageWai
   /** Sibling lane for workers that ARE a structured session; it has no PTY to type into. */
   structuredPointerDelivery?: OrchestrationStructuredMailboxPointerDelivery<TWaiter>
   getDb: () => OrchestrationDb | null
-  getTerminalForHandle: (handle: string) => OrchestrationMailboxTerminal | null
+  getLiveLeafForHandle: (handle: string) => OrchestrationMailboxLeaf
   getPaneKeyForHandle: (handle: string) => string | undefined
   getMessageWaiters: (mailboxHandle: string) => ReadonlySet<TWaiter> | undefined
   hasTerminalHandle: (handle: string) => boolean
   deliverForHandle: (handle: string, reservedTypes?: ReadonlySet<string>) => void
   notifyMessageArrived: (handle: string, messageType: string) => void
-  /** Waiters resolved together share one wake, so they share the batch the first one takes. */
-  resolveMessageWaiters: (waiters: readonly TWaiter[]) => void
+  resolveMessageWaiter: (waiter: TWaiter) => void
 }
 
 export class OrchestrationMailboxNotificationCoordinator<
@@ -42,33 +37,12 @@ export class OrchestrationMailboxNotificationCoordinator<
     this.deps.pointerDelivery.deliverForHandle(handle, reservedTypes)
   }
 
-  deliverForTerminal(terminal: OrchestrationMailboxTerminal): void {
-    this.notifyForwarded(this.deps.mailboxOwner.routeForeignDirectMessages(terminal))
-    for (const mailboxHandle of this.deps.mailboxOwner.resolveAll(terminal)) {
-      this.deps.pointerDelivery.deliver(terminal, { mailboxHandle })
+  deliverForLeaf(leaf: OrchestrationMailboxLeaf): void {
+    this.notifyForwarded(this.deps.mailboxOwner.routeForeignDirectMessages(leaf))
+    const mailboxHandle = this.deps.mailboxOwner.resolve(leaf)
+    if (mailboxHandle) {
+      this.deps.pointerDelivery.deliver(leaf, { mailboxHandle })
     }
-  }
-
-  /** Whether delivery has work for this terminal: a pointer reservation to recover, or unread, undelivered mail no waiter or held batch claims. */
-  hasDeliverableMail(terminal: OrchestrationMailboxTerminal): boolean {
-    const db = this.deps.getDb()
-    return (
-      !!db &&
-      this.deps.mailboxOwner.resolveAll(terminal).some((mailboxHandle) => {
-        const waiters = this.deps.getMessageWaiters(mailboxHandle)
-        return (
-          // Mirrors deliver(): an unfiltered waiter preempts recovery too.
-          !hasUnfilteredOrchestrationWaiter(waiters) &&
-          (db.getPendingMailboxPointerMessages(mailboxHandle).length > 0 ||
-            selectOrchestrationPointerBatch({
-              db,
-              mailboxHandle,
-              waiters,
-              reservedTypes: undefined
-            }).messages.length > 0)
-        )
-      })
-    )
   }
 
   notifyMessageArrived(handle: string, messageType?: string): void {
@@ -95,7 +69,9 @@ export class OrchestrationMailboxNotificationCoordinator<
       queueMicrotask(() => this.deps.deliverForHandle(mailboxHandle, reservedTypes))
       return
     }
-    this.deps.resolveMessageWaiters(consumers)
+    for (const waiter of consumers) {
+      this.deps.resolveMessageWaiter(waiter)
+    }
   }
 
   wakeRoutedMessageWaiters(mailboxHandle: string, types: readonly string[]): void {
@@ -106,13 +82,14 @@ export class OrchestrationMailboxNotificationCoordinator<
     // Snapshot ownership before the routed rows wake and remove their waiters.
     queueMicrotask(() => {
       const liveWaiters = this.deps.getMessageWaiters(mailboxHandle)
-      this.deps.resolveMessageWaiters(
-        waiters.filter(
-          (waiter) =>
-            liveWaiters?.has(waiter) &&
-            (!waiter.typeFilter || types.some((type) => waiter.typeFilter?.includes(type)))
-        )
-      )
+      for (const waiter of waiters) {
+        if (
+          liveWaiters?.has(waiter) &&
+          (!waiter.typeFilter || types.some((type) => waiter.typeFilter?.includes(type)))
+        ) {
+          this.deps.resolveMessageWaiter(waiter)
+        }
+      }
     })
   }
 
@@ -134,15 +111,16 @@ export class OrchestrationMailboxNotificationCoordinator<
     if (!this.deps.hasTerminalHandle(handle)) {
       return this.resolveDetachedMailbox(handle)
     }
-    const terminal = this.deps.getTerminalForHandle(handle)
-    if (!terminal) {
+    try {
+      const leaf = this.deps.getLiveLeafForHandle(handle)
+      return {
+        mailboxHandle: this.deps.mailboxOwner.resolve(leaf, handle, {
+          requireRequestedMail: true
+        }),
+        forwarded: this.deps.mailboxOwner.routeForeignDirectMessages(leaf)
+      }
+    } catch {
       return this.resolveDetachedMailbox(handle)
-    }
-    return {
-      mailboxHandle: this.deps.mailboxOwner.resolve(terminal, handle, {
-        requireRequestedMail: true
-      }),
-      forwarded: this.deps.mailboxOwner.routeForeignDirectMessages(terminal)
     }
   }
 

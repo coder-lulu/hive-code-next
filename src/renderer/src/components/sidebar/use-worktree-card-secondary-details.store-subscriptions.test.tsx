@@ -3,7 +3,6 @@
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getWorktreeCardDetails } from '../../../../shared/worktree/card-properties'
 import { useAppStore } from '@/store'
 import { readStoreListenerCount } from '@/store/store-listener-census'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
@@ -11,6 +10,7 @@ import type { Worktree, WorkspaceAttachment } from '../../../../shared/worktree/
 import { usePromptCacheCountdownStartedAt } from './CacheTimer'
 import { useWorktreeCardSecondaryDetails } from './use-worktree-card-secondary-details'
 import { useWorktreeAgentRows } from './useWorktreeAgentRows'
+import { buildWorkspaceAttachmentEdits } from './worktree-attachment-editing'
 
 const mocks = vi.hoisted(() => ({ toastError: vi.fn() }))
 vi.mock('sonner', () => ({ toast: { error: mocks.toastError } }))
@@ -96,7 +96,7 @@ function secondaryDetailsArgs(settings: GlobalSettings) {
     linkedGiteaPR: null,
     newCardStyle: false,
     compactCards: false,
-    cardDetails: getWorktreeCardDetails([], { compactWorktreeCards: false, newCardStyle: false }),
+    cardProps: [],
     agentActivityDisplayMode: 'compact' as const,
     workspacePorts: [],
     openTaskPage: (() => {}) as never,
@@ -138,7 +138,98 @@ describe('useWorktreeCardSecondaryDetails store subscriptions', () => {
     unmount()
     expect(listenerCount()).toBe(baseline)
   })
-  it('unlinks the chosen sibling while retaining the selected review and other sources', async () => {
+
+  it('reads the cache TTL from the passed settings', () => {
+    let cacheTtlMs = -1
+    function Probe({ ttl }: { ttl: number }): null {
+      cacheTtlMs = useWorktreeCardSecondaryDetails(
+        secondaryDetailsArgs(makeSettings(ttl))
+      ).cacheTtlMs
+      return null
+    }
+
+    mount(<Probe ttl={300_000} />)
+    expect(cacheTtlMs).toBe(300_000)
+
+    act(() => root?.render(<Probe ttl={120_000} />))
+    expect(cacheTtlMs).toBe(120_000)
+  })
+
+  it('reports no TTL while the aggregate cache timer is suppressed', () => {
+    let cacheTtlMs = -1
+    function Probe(): null {
+      // compactCards suppresses the aggregate timer row.
+      cacheTtlMs = useWorktreeCardSecondaryDetails({
+        ...secondaryDetailsArgs(makeSettings(300_000)),
+        compactCards: true
+      }).cacheTtlMs
+      return null
+    }
+
+    mount(<Probe />)
+    expect(cacheTtlMs).toBe(0)
+  })
+
+  it('writes a suppression tombstone when the user unlinks a displayed GitHub PR', async () => {
+    const updateWorktreeMeta = vi.fn().mockResolvedValue({ ok: true })
+    let unlink: (() => Promise<void>) | null = null
+    function Probe(): null {
+      const details = useWorktreeCardSecondaryDetails({
+        ...secondaryDetailsArgs(makeSettings(300_000)),
+        worktree: { ...makeWorktree(), hostId: 'ssh:builder' },
+        prDisplay: {
+          provider: 'github',
+          number: 42,
+          title: 'Branch PR'
+        },
+        updateWorktreeMeta
+      })
+      unlink = details.handleUnlinkReview
+      return null
+    }
+
+    mount(<Probe />)
+    await act(() => unlink?.())
+
+    expect(updateWorktreeMeta).toHaveBeenCalledWith(
+      WORKTREE_ID,
+      { linkedPR: null, suppressedGitHubPR: 42 },
+      {
+        executionHostId: 'ssh:builder',
+        githubLinkBase: {
+          hostId: 'ssh:builder',
+          instanceId: null,
+          linkedPR: null,
+          suppressedGitHubPR: null
+        }
+      }
+    )
+  })
+
+  it('surfaces a failed GitHub unlink after the optimistic card update is reverted', async () => {
+    const updateWorktreeMeta = vi.fn().mockResolvedValue({
+      ok: false,
+      error: 'Update the remote runtime to unlink GitHub pull requests'
+    })
+    let unlink: (() => Promise<void>) | null = null
+    function Probe(): null {
+      const details = useWorktreeCardSecondaryDetails({
+        ...secondaryDetailsArgs(makeSettings(300_000)),
+        prDisplay: { provider: 'github', number: 42, title: 'Branch PR' },
+        updateWorktreeMeta
+      })
+      unlink = details.handleUnlinkReview
+      return null
+    }
+
+    mount(<Probe />)
+    await act(() => unlink?.())
+
+    expect(mocks.toastError).toHaveBeenCalledWith(
+      'Update the remote runtime to unlink GitHub pull requests'
+    )
+  })
+  it('edits the chosen sibling through the attachment editor while retaining the selected review', () => {
     const primary: WorkspaceAttachment = {
       provider: 'github',
       type: 'pr',
@@ -151,29 +242,9 @@ describe('useWorktreeCardSecondaryDetails store subscriptions', () => {
       number: 42,
       url: 'https://github.com/other/orca/pull/42'
     }
-    const updateWorktreeMeta = vi.fn().mockResolvedValue({ ok: true })
-    let unlink: ((item?: WorkspaceAttachment) => Promise<void>) | null = null
-    function Probe(): null {
-      const details = useWorktreeCardSecondaryDetails({
-        ...secondaryDetailsArgs(makeSettings(300_000)),
-        worktree: {
-          ...makeWorktree(),
-          hostId: 'ssh:builder',
-          linkedPR: 42,
-          linkedItems: [primary, sibling]
-        },
-        prDisplay: { provider: 'github', number: 42, title: 'Primary', url: primary.url },
-        updateWorktreeMeta
-      })
-      unlink = details.handleUnlinkReview
-      return null
-    }
-    mount(<Probe />)
-    await act(() => unlink?.(sibling))
-    expect(updateWorktreeMeta).toHaveBeenCalledWith(
-      WORKTREE_ID,
-      { linkedItemsBase: [primary, sibling], linkedItems: [primary] },
-      { executionHostId: 'ssh:builder' }
-    )
+    const initial = [primary, sibling]
+    const edits = buildWorkspaceAttachmentEdits({ initial, draft: [primary] })
+    expect(edits).toEqual({ linkedItemsBase: [primary, sibling], linkedItems: [primary] })
+    expect(initial).toEqual([primary, sibling])
   })
 })

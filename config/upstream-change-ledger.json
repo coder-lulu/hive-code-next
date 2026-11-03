@@ -163249,25 +163249,6 @@
         "src/main/runtime/worktree-agent-first-surface.test.ts",
         "pnpm run typecheck"
       ]
-    },
-    {
-      "upstreamSha": "b89cfbd09d6bb99e637a6f4f5bfcad5a4fcf3a12",
-      "type": "安全",
-      "applied": "已移植",
-      "dependencies": [],
-      "reviewReason": "Exact candidate review for b89cfbd09d6bb99e637a6f4f5bfcad5a4fcf3a12 (refactor: group desktop integration and lifecycle owners (#37600)): the frozen three-way tree receipt includes this upstream change through the reviewed candidate tree. Manual boundary paths were reviewed against HiveCode identity, account and endpoint ownership, updater authority, maintained capabilities, and wire and persistence contracts; preserve product-owned adaptations while absorbing the upstream behavior. Changed-path regressions and exact candidate gates remain the acceptance evidence.",
-      "adaptation": "Absorb the exact upstream change through the frozen candidate tree receipt while preserving HiveCode product-owned overlays and protocol contracts.",
-      "regressionTests": [
-        "src/main/active-view-preference.test.ts",
-        "src/main/agent-awake-service.test.ts",
-        "src/main/daemon/daemon-full-disk-access-status.test.ts",
-        "src/main/persistence/preferences/active-view-preference.test.ts",
-        "src/main/power/system-power-lifecycle.test.ts",
-        "src/main/runtime/runtime-repository-registration-controller.test.ts",
-        "src/main/startup/main-window-core-services.test.ts",
-        "src/main/window/createMainWindow-recovery-reload-watchdog.test.ts",
-        "pnpm run typecheck"
-      ]
     }
   ]
 }

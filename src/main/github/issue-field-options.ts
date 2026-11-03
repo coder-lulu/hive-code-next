@@ -1,4 +1,3 @@
-import type { GhAccountBinding } from '../../shared/github/account-binding'
 import type { GitHubAssignableUser, GitHubOwnerRepo } from '../../shared/github/pull-request-types'
 import type { IssueSourcePreference } from '../../shared/repo-types'
 import type { LocalGitExecOptions } from './gh-utils'
@@ -13,8 +12,7 @@ export async function listLabels(
   preference?: IssueSourcePreference,
   connectionId?: string | null,
   localGitOptions: LocalGitExecOptions = {},
-  repositoryOverride?: GitHubOwnerRepo | null,
-  expectedGhAccount?: GhAccountBinding | null
+  repositoryOverride?: GitHubOwnerRepo | null
 ): Promise<string[]> {
   const { ownerRepo, ghOptions } = await resolveGitHubRepoExecution(
     repoPath,
@@ -29,8 +27,7 @@ export async function listLabels(
           )
         ).source),
     connectionId,
-    localGitOptions,
-    expectedGhAccount
+    localGitOptions
   )
   if (!ownerRepo) {
     return []
@@ -63,8 +60,7 @@ export async function listAssignableUsers(
   preference?: IssueSourcePreference,
   connectionId?: string | null,
   localGitOptions: LocalGitExecOptions = {},
-  repositoryOverride?: GitHubOwnerRepo | null,
-  expectedGhAccount?: GhAccountBinding | null
+  repositoryOverride?: GitHubOwnerRepo | null
 ): Promise<GitHubAssignableUser[]> {
   const { ownerRepo, ghOptions } = await resolveGitHubRepoExecution(
     repoPath,
@@ -79,8 +75,7 @@ export async function listAssignableUsers(
           )
         ).source),
     connectionId,
-    localGitOptions,
-    expectedGhAccount
+    localGitOptions
   )
   if (!ownerRepo) {
     return []

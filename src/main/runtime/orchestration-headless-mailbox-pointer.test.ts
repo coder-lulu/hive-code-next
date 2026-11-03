@@ -2,6 +2,7 @@ import './rpc/unused-default-rpc-methods.test-fixture'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { OrchestrationDb } from './orchestration/db'
 import type { OrcaRuntimeService } from './orca-runtime'
+import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-types'
 import {
   createRuntime,
   PANE_KEY,
@@ -14,7 +15,7 @@ import {
 
 type Host = 'headless' | 'window-empty-graph' | 'window-graph-unavailable'
 
-// Mail follows the terminal: a headless serve, or a window with no pane for it, still points it.
+// A headless serve publishes no window leaves, so its terminals live only in the PTY lane.
 async function coordinator(host: Host = 'headless') {
   const db = new OrchestrationDb(':memory:')
   const { runtime, write } = createRuntime(db, { headless: host === 'headless' })
@@ -50,7 +51,7 @@ async function goIdle(runtime: OrcaRuntimeService): Promise<void> {
   await runtime.serializeMainTerminalBuffer(PTY_ID)
 }
 
-describe('orchestration mailbox pointer for a terminal no pane shows', () => {
+describe('headless orchestration mailbox pointer', () => {
   beforeEach(() => {
     vi.useFakeTimers()
   })
@@ -71,11 +72,16 @@ describe('orchestration mailbox pointer for a terminal no pane shows', () => {
     db.close()
   })
 
-  it('points a coordinator at mail that arrives mid-turn', async () => {
+  it('points a coordinator at mail that arrived while it worked once it goes idle', async () => {
     const { db, runtime, write, sendRunMail } = await coordinator()
     runtime.onPtyData(PTY_ID, '\x1b]0;Codex working\x07', 1)
     await runtime.serializeMainTerminalBuffer(PTY_ID)
     const message = sendRunMail()
+    await vi.advanceTimersByTimeAsync(0)
+    expect(pointerCount(write)).toBe(0)
+
+    runtime.onPtyData(PTY_ID, '\x1b]0;Codex done\x07', 2)
+    await runtime.serializeMainTerminalBuffer(PTY_ID)
     await vi.advanceTimersByTimeAsync(0)
     expect(pointerCount(write)).toBe(1)
     await vi.advanceTimersByTimeAsync(500)
@@ -86,29 +92,13 @@ describe('orchestration mailbox pointer for a terminal no pane shows', () => {
   it('waits for a name-only idle pane to go quiet before typing the pointer', async () => {
     const { db, runtime, write, sendRunMail } = await coordinator()
     sendRunMail()
-    runtime.onPtyData(PTY_ID, '\x1b]0;Codex\x07output\n', Date.now())
+    runtime.onPtyData(PTY_ID, '\x1b]0;⠋ Codex\x07working\n', Date.now())
+    runtime.onPtyData(PTY_ID, '\x1b]0;Codex\x07still working\n', Date.now())
     await runtime.serializeMainTerminalBuffer(PTY_ID)
     expect(pointerCount(write)).toBe(0)
 
     await vi.advanceTimersByTimeAsync(3_050)
     expect(pointerCount(write)).toBe(1)
-    db.close()
-  })
-
-  // A quiet retry armed before the prompt opened must not type into it on the retained working report.
-  it('does not type into a pane that turned to a permission prompt after a retry was armed', async () => {
-    const { db, runtime, write, sendRunMail } = await coordinator()
-    runtime.onPtyData(PTY_ID, '\x1b]0;Codex\x07output\n', Date.now())
-    runtime.onPtyData(
-      PTY_ID,
-      '\x1b]9999;{"state":"working","agentType":"codex"}\x07\x1b]0;Codex waiting for permission\x07',
-      Date.now()
-    )
-    await runtime.serializeMainTerminalBuffer(PTY_ID)
-    sendRunMail()
-
-    await vi.advanceTimersByTimeAsync(4_000)
-    expect(write).not.toHaveBeenCalled()
     db.close()
   })
 
@@ -156,8 +146,7 @@ describe('orchestration mailbox pointer for a terminal no pane shows', () => {
     db.close()
   })
 
-  // A serve window that retracted the pane is indistinguishable from STA-11630's unopened workspace.
-  it('points a PTY whose pane a serve window retracted before it closed', async () => {
+  it('does not revive a pane a serve window retracted before it closed', async () => {
     const { db, runtime, write, sendRunMail } = await coordinator()
     runtime.attachWindow(1)
     runtime.syncWindowGraph(1, {
@@ -176,22 +165,26 @@ describe('orchestration mailbox pointer for a terminal no pane shows', () => {
     })
     runtime.syncWindowGraph(1, { tabs: [], leaves: [] })
     runtime.markGraphUnavailable(1)
+    expect([runtime['authoritativeWindowId'], runtime['graphStatus']]).toEqual([
+      HEADLESS_RUNTIME_WINDOW_ID,
+      'ready'
+    ])
     await goIdle(runtime)
     sendRunMail()
-    await vi.advanceTimersByTimeAsync(0)
-    expect(pointerCount(write)).toBe(1)
+    await vi.advanceTimersByTimeAsync(3_500)
+    expect(pointerCount(write)).toBe(0)
     db.close()
   })
 
-  // STA-11630: a window that shows no pane for the terminal (its workspace is not open) must not hide its mail.
+  // A window's missing leaf means reload, crash or an unmounted pane, not a headless terminal.
   it.each(['window-empty-graph', 'window-graph-unavailable'] as const)(
-    'points a coordinator no pane shows on a %s host',
+    'does not type into a leafless PTY on a %s host',
     async (host) => {
       const { db, runtime, write, sendRunMail } = await coordinator(host)
       await goIdle(runtime)
       sendRunMail()
-      await vi.advanceTimersByTimeAsync(0)
-      expect(pointerCount(write)).toBe(1)
+      await vi.advanceTimersByTimeAsync(3_500)
+      expect(pointerCount(write)).toBe(0)
       db.close()
     }
   )

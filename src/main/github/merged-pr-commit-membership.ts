@@ -1,9 +1,10 @@
 import { ghExecFileAsync } from './gh-utils'
-import { githubReadExecutionScope } from './github-read-execution-scope'
 import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from './rate-limit'
-import { githubHostExecOptions, type GitHubRepoExecOptions } from './github-api-repository'
+import { githubHostExecOptions } from './github-api-repository'
 import { githubRepoIdentityKey } from '../../shared/github/repository-identity-key'
 import type { OwnerRepo } from './github-repository-identity'
+
+type GhExecOptions = Parameters<typeof ghExecFileAsync>[1]
 
 // Definitive merged-commit membership is immutable; errors expire sooner so later pushes can resolve unknowns.
 const MEMBERSHIP_CACHE_MAX_ENTRIES = 200
@@ -41,7 +42,7 @@ export async function isCommitPartOfMergedPR(args: {
   ownerRepo: OwnerRepo
   prNumber: number
   commitOid: string
-  ghOptions: GitHubRepoExecOptions
+  ghOptions: GhExecOptions
 }): Promise<MergedPRCommitMembership> {
   const oid = args.commitOid.trim().toLowerCase()
   if (!/^[0-9a-f]{4,64}$/.test(oid) || !Number.isInteger(args.prNumber)) {
@@ -49,8 +50,8 @@ export async function isCommitPartOfMergedPR(args: {
   }
   const owner = args.ownerRepo.owner
   const repo = args.ownerRepo.repo
+  const cacheKey = `${githubRepoIdentityKey(args.ownerRepo)}#${args.prNumber}@${oid}`
   const ghOptions = { ...args.ghOptions, ...githubHostExecOptions(args.ownerRepo) }
-  const cacheKey = `${githubReadExecutionScope(ghOptions)}\0${githubRepoIdentityKey(args.ownerRepo)}#${args.prNumber}@${oid}`
   const now = Date.now()
   pruneMergedPRCommitMembershipCache(now)
   const cached = membershipCache.get(cacheKey)

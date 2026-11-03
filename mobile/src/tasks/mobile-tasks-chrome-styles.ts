@@ -1,4 +1,11 @@
-import { themedStyleSheet, colors, radii, spacing, typography } from './mobile-tasks-dependencies'
+import {
+  StyleSheet,
+  themedStyleSheet,
+  colors,
+  radii,
+  spacing,
+  typography
+} from './mobile-tasks-dependencies'
 
 export const mobileTasksChromeStyles = themedStyleSheet(() => ({
   container: {
@@ -6,7 +13,38 @@ export const mobileTasksChromeStyles = themedStyleSheet(() => ({
     backgroundColor: colors.bgBase
   },
   topChrome: {
-    backgroundColor: colors.bgBase
+    backgroundColor: colors.bgPanel,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle
+  },
+  statusBar: {
+    minHeight: 38,
+    paddingTop: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  backButton: {
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.xs
+  },
+  titleWrap: {
+    flex: 1,
+    minWidth: 0
+  },
+  titleLine: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    minWidth: 0
+  },
+  title: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary
   },
   iconButton: {
     width: 32,
@@ -14,27 +52,68 @@ export const mobileTasksChromeStyles = themedStyleSheet(() => ({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  providerSwitch: {
-    marginHorizontal: spacing.md,
-    marginTop: spacing.sm,
-    backgroundColor: colors.bgPanel
-  },
-  // At least the screen's width, so chips that fit stretch to fill it.
   toolbar: {
-    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    paddingHorizontal: spacing.md
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs + 2
   },
-  filterSheetHeader: {
-    marginBottom: spacing.xs
+  toolbarScroll: {
+    borderTopWidth: 1,
+    borderTopColor: colors.borderSubtle
   },
-  filterFootnote: {
+  segmentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radii.button,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.xs
+  },
+  segmentIconButton: {
+    width: 32,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radii.button
+  },
+  segmentCountPill: {
+    minWidth: 32,
+    height: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.borderSubtle,
+    borderRadius: radii.button,
+    paddingHorizontal: spacing.sm
+  },
+  segmentRepoDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4
+  },
+  segmentButtonText: {
     fontSize: 12,
-    color: colors.textMuted,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm
+    fontWeight: '600',
+    color: colors.textPrimary
+  },
+  segmentSecondaryText: {
+    fontSize: 12,
+    color: colors.textSecondary
+  },
+  segmentDisabledText: {
+    color: colors.textMuted
+  },
+  searchBar: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.borderSubtle
   },
   errorBanner: {
     paddingHorizontal: spacing.lg,
@@ -78,7 +157,7 @@ export const mobileTasksChromeStyles = themedStyleSheet(() => ({
   sourceErrorRetry: {
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    borderRadius: radii.control,
+    borderRadius: radii.button,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs
   },
@@ -134,7 +213,7 @@ export const mobileTasksChromeStyles = themedStyleSheet(() => ({
   repoSectionDot: {
     width: 8,
     height: 8,
-    borderRadius: radii.pill
+    borderRadius: 4
   },
   repoSectionTitle: {
     flex: 1,

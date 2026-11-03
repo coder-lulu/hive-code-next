@@ -16,7 +16,6 @@ export type AcpStructuredConnection = Pick<
   | 'spawned'
   | 'pid'
   | 'exited'
-  | 'spawnAbsence'
   | 'stderrTail'
   | 'exitStatus'
   | 'onExit'

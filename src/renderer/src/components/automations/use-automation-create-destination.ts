@@ -29,7 +29,6 @@ export type AutomationCreateDestinationControl = {
   projects: readonly Repo[]
   /** Set when saving would move the record to another host; replaces the plain line. */
   moveWarning?: string | null
-  recordedProject?: { id: string; label: string }
 }
 
 export type AutomationCreateDestinationCheck =

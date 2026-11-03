@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentSessionLease } from '../../../shared/agent-session/lifecycle/agent-session-record'
+import type { AgentSessionLease } from '../../../shared/agent-session-record'
 import {
   agentSessionLeaseFixture,
   agentSessionRecordFixture
-} from '../../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
+} from '../../../shared/agent-session-record.test-fixture'
 import { agentSessionReplacedRuntimes } from './agent-session-replaced-runtime'
-import type { AgentSessionStoreState } from './records/agent-session-store-state'
+import type { AgentSessionStoreState } from '../agent-session-store-state'
 
 const SESSION = 'session-alpha-1'
 const OWNER = { hostId: 'local', pid: 4242, processStartTimeMs: 1, spawnToken: 'spawn-owner' }
@@ -15,8 +15,6 @@ function loaded(lease: Partial<AgentSessionLease>, runtimeEnd?: 'crash'): AgentS
     agentSessionLeaseFixture({ unreconciled: true, ...lease })
   )
   return {
-    schemaVersion: 1,
-    hostId: 'local',
     records: new Map([[SESSION, record]]),
     operations: new Map(),
     retiredClaimKeys: [],

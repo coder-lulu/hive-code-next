@@ -1,3 +1,9 @@
+import { toast } from 'sonner'
+import type { CliInstallStatus } from '../../../../shared/cli-install-types'
+import {
+  isOrcaCliAvailableOnPath,
+  showOrcaCliRegistrationPromptToast
+} from '@/lib/agent-skill-cli-prerequisite'
 // COMPAT(wsl-bridge): removed when WSL runs as an orcad host.
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import {
@@ -220,4 +226,87 @@ export function getSkillDiscoveryTargetForRuntime(
   return runtime.runtime === 'wsl'
     ? { runtime: 'wsl', wslDistro: runtime.wslDistro ?? null }
     : undefined
+}
+
+export function getWslCliDistroRequest(
+  runtime?: LocalAgentRuntime
+): { distro: string } | undefined {
+  return runtime?.runtime === 'wsl' && runtime.wslDistro?.trim()
+    ? { distro: runtime.wslDistro.trim() }
+    : undefined
+}
+
+export async function ensureWslCliAvailableForAgentSkillTerminal(
+  runtime?: LocalAgentRuntime
+): Promise<CliInstallStatus | null> {
+  const args = getWslCliDistroRequest(runtime)
+  try {
+    const status = await window.api.cli.getWslInstallStatus(args)
+    if (!status.supported) {
+      toast.warning(
+        translate(
+          'auto.components.settings.CliSkillRuntimeSetup.775a4cfbb8',
+          'WSL shell command registration is unavailable'
+        ),
+        {
+          description:
+            status.detail ??
+            translate(
+              'auto.components.settings.CliSkillRuntimeSetup.fc0fcf72fd',
+              'Register the WSL shell command before skill setup.'
+            )
+        }
+      )
+      return status
+    }
+    if (status.pathConfigured === null) {
+      toast.warning(
+        translate(
+          'auto.components.settings.CliSkillRuntimeSetup.windowsPathUnknown',
+          'WSL shell command PATH could not be checked'
+        ),
+        {
+          description:
+            status.detail ??
+            translate(
+              'auto.components.settings.CliSkillRuntimeSetup.refreshCliRegistration',
+              'Refresh CLI registration status and try again.'
+            )
+        }
+      )
+      return status
+    }
+    if (status.state !== 'installed' || status.pathConfigured === false) {
+      await showOrcaCliRegistrationPromptToast()
+      const next = await window.api.cli.installWsl(args)
+      if (!isOrcaCliAvailableOnPath(next)) {
+        toast.warning(
+          translate(
+            'auto.components.settings.CliSkillRuntimeSetup.3728a94fb6',
+            'WSL shell command needs attention'
+          ),
+          {
+            description:
+              next.detail ??
+              translate(
+                'auto.components.settings.CliSkillRuntimeSetup.fc0fcf72fd',
+                'Register the WSL shell command before skill setup.'
+              )
+          }
+        )
+      }
+      return next
+    }
+    return status
+  } catch (error) {
+    toast.error(
+      error instanceof Error
+        ? error.message
+        : translate(
+            'auto.components.settings.CliSkillRuntimeSetup.0ed08febc5',
+            'Failed to register the WSL shell command.'
+          )
+    )
+    return null
+  }
 }

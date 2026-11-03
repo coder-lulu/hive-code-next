@@ -1,5 +1,3 @@
-import { prepareStructuredWorkspaceAuthority } from './structured-workspace-authority'
-import type { AgentSessionExecutionLocation } from '../../../shared/agent-session/lifecycle/agent-session-record'
 import { OrcaRuntimeWithStructuredSessionAccountHome } from './structured-session-account-home'
 import {
   isNativeLocalLocation,
@@ -39,16 +37,6 @@ export abstract class StructuredSessionWorkspaceScope extends OrcaRuntimeWithStr
   protected abstract matchWorktreeSelector(
     ...args: Parameters<RuntimeWorkspaceSelectors['matchWorktreeSelector']>
   ): ReturnType<RuntimeWorkspaceSelectors['matchWorktreeSelector']>
-
-  protected abstract listRepoWorktreesForResolution(
-    ...args: Parameters<RuntimeWorkspaceCatalog['listRepoWorktreesForResolution']>
-  ): ReturnType<RuntimeWorkspaceCatalog['listRepoWorktreesForResolution']>
-
-  prepareStructuredAgentSessionRevealWorkspace(location: AgentSessionExecutionLocation) {
-    return prepareStructuredWorkspaceAuthority(this.requireStore(), location, (repo) =>
-      this.listRepoWorktreesForResolution(repo)
-    )
-  }
 
   protected async resolveStructuredAgentSessionLocation(worktreeSelector: string) {
     const target = await this.resolveRuntimeFileTarget(worktreeSelector)

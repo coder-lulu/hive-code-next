@@ -1,4 +1,3 @@
-import { richMarkdownViewport } from './rich-markdown-viewport'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { MutableRefObject } from 'react'
 import type { Editor } from '@tiptap/react'
@@ -117,20 +116,10 @@ export function useRichMarkdownReviewRailController({
       setReviewRailOpen(true)
       setActiveReviewCommentId(commentId)
       pulseRichMarkdownReviewNote(commentId)
-      const container = scrollContainerRef.current
-      if (!container) {
-        return
-      }
-      const viewport = richMarkdownViewport(container)
-      viewport.frame(() => {
-        viewport.frame(() => {
-          if (container !== scrollContainerRef.current) {
-            return
-          }
-          viewport.scroll(() =>
-            centerReviewNoteCard(container, notePositionsRef.current, commentId)
-          )
-        })
+      window.requestAnimationFrame(() => {
+        window.requestAnimationFrame(() =>
+          centerReviewNoteCard(scrollContainerRef.current, notePositionsRef.current, commentId)
+        )
       })
     },
     [pulseRichMarkdownReviewNote, scrollContainerRef]
@@ -176,7 +165,6 @@ export function useRichMarkdownReviewRailController({
       if (!editor || !container) {
         return
       }
-      const viewport = richMarkdownViewport(container)
       const ranges = getRichMarkdownAnnotationHighlightRangesForComment(
         editor,
         comment,
@@ -186,18 +174,16 @@ export function useRichMarkdownReviewRailController({
       if (!bounds) {
         return
       }
+      const maxPos = editor.state.doc.content.size
+      const startCoords = editor.view.coordsAtPos(Math.max(1, Math.min(bounds.from, maxPos)))
+      const endCoords = editor.view.coordsAtPos(Math.max(1, Math.min(bounds.to, maxPos)))
+      const containerRect = container.getBoundingClientRect()
+      const sourceTop = startCoords.top - containerRect.top + container.scrollTop
+      const sourceBottom = endCoords.bottom - containerRect.top + container.scrollTop
       setActiveReviewCommentId(comment.id)
-      viewport.scroll(() => {
-        const maxPos = editor.state.doc.content.size
-        const startCoords = editor.view.coordsAtPos(Math.max(1, Math.min(bounds.from, maxPos)))
-        const endCoords = editor.view.coordsAtPos(Math.max(1, Math.min(bounds.to, maxPos)))
-        const containerRect = container.getBoundingClientRect()
-        const sourceTop = startCoords.top - containerRect.top + container.scrollTop
-        const sourceBottom = endCoords.bottom - containerRect.top + container.scrollTop
-        const top = Math.max(0, (sourceTop + sourceBottom) / 2 - container.clientHeight / 2)
-        if (viewport.current() && container === scrollContainerRef.current && !editor.isDestroyed) {
-          container.scrollTo({ top, behavior: motionSafeScrollBehavior() })
-        }
+      container.scrollTo({
+        top: Math.max(0, (sourceTop + sourceBottom) / 2 - container.clientHeight / 2),
+        behavior: motionSafeScrollBehavior()
       })
       pulseRichMarkdownSourceRange({ from: bounds.from, to: bounds.to })
     },
@@ -276,6 +262,5 @@ function centerReviewNoteCard(
     return
   }
   const targetTop = cardTop - Math.max(0, (container.clientHeight - cardHeight) / 2)
-  const top = Math.max(0, targetTop)
-  container.scrollTo({ top, behavior: motionSafeScrollBehavior() })
+  container.scrollTo({ top: Math.max(0, targetTop), behavior: motionSafeScrollBehavior() })
 }

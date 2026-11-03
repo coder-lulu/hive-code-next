@@ -71,7 +71,7 @@ export type EditorSaveAndCloseDetail = {
 export type EditorSaveFileDetail = EditorSaveFileTarget & {
   claim: () => void
   resolve: () => void
-  reject: (reason: string | Error) => void
+  reject: (message: string) => void
 }
 
 export type EditorFileSavedDetail = {
@@ -214,7 +214,7 @@ export async function requestEditorFileSave(target: EditorSaveFileTarget): Promi
             claimed = true
           },
           resolve,
-          reject: (reason) => reject(reason instanceof Error ? reason : new Error(reason))
+          reject: (message) => reject(new Error(message))
         }
       })
     )

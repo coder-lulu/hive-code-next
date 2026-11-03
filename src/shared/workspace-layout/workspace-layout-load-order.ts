@@ -29,9 +29,8 @@ export function resolveGroupOrder(args: {
   const owners = resolveTabGroupOwners(args.candidates, args.storedGroups)
   const placed = new Set<string>()
   const groups: LayoutGroup[] = []
-  const firstGroup = new Map<string | undefined, LayoutGroup>()
   for (const stored of args.storedGroups) {
-    if (firstGroup.has(stored.id)) {
+    if (groups.some((group) => group.id === stored.id)) {
       continue
     }
     const tabOrder: string[] = []
@@ -41,17 +40,14 @@ export function resolveGroupOrder(args: {
         tabOrder.push(tabId)
       }
     }
-    const group = { id: stored.id, tabOrder }
-    groups.push(group)
-    firstGroup.set(stored.id, group)
+    groups.push({ id: stored.id, tabOrder })
   }
   const unplaced = args.candidates.filter((candidate) => !placed.has(candidate.id))
   for (const candidate of [...unplaced].sort(compareUnplaced)) {
-    let group = firstGroup.get(candidate.groupId) ?? groups[0]
+    let group = groups.find((entry) => entry.id === candidate.groupId) ?? groups[0]
     if (!group) {
       group = { id: args.mintId(rootGroupSeed(args.workspaceKey)), tabOrder: [] }
       groups.push(group)
-      firstGroup.set(group.id, group)
     }
     group.tabOrder.push(candidate.id)
   }

@@ -9,7 +9,6 @@ export type LegacyWorkerReadResult = {
 
 export type WorkerStartReceipt = {
   mode?: { detail: string }
-  run?: { id: string; objective: string; created: boolean }
   taskId: string
   dispatchId: string
   state: string
@@ -23,11 +22,6 @@ export type WorkerStartReceipt = {
 
 export function formatWorkerStart(value: WorkerStartReceipt): string {
   const lines = [`Worker ${value.dispatchId} [${value.state}] for ${value.taskId}`]
-  if (value.run) {
-    lines.push(
-      `${value.run.created ? 'Created and bound Run' : 'In Run'} ${value.run.id}: ${value.run.objective}`
-    )
-  }
   // Show the mode that actually ran so a fallback from the user's default is visible.
   if (value.mode) {
     lines.push(value.mode.detail)

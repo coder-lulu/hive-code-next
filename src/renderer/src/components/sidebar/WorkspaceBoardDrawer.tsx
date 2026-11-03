@@ -17,7 +17,8 @@ import { useWorkspaceKanbanOutsideDismiss } from './use-workspace-kanban-outside
 import { useWorkspaceKanbanDrawerLingering } from './use-workspace-kanban-drawer-lingering'
 
 const AgentDashboardPanel = lazyWithRetry(() => import('../dashboard/AgentDashboardPanel'))
-type Props = React.ComponentProps<typeof WorkspaceKanbanDrawer>
+type Props = React.ComponentProps<typeof WorkspaceKanbanDrawer> &
+  Pick<React.ComponentProps<typeof WorkspaceKanbanSheet>, 'leftSidebarStyle' | 'statusBarVisible'>
 
 export default function WorkspaceBoardDrawer(props: Props): React.JSX.Element | null {
   const lingering = useWorkspaceKanbanDrawerLingering(props.open)
@@ -116,7 +117,7 @@ function WorkspaceBoardDrawerContent(props: Props): React.JSX.Element {
         </SheetHeader>
         <TabsContent
           value="workspaces"
-          className="flex min-h-0 flex-col data-[state=inactive]:hidden"
+          className="relative flex min-h-0 flex-col data-[state=inactive]:hidden"
         >
           {activeView === 'workspaces' && (
             <WorkspaceKanbanDrawer

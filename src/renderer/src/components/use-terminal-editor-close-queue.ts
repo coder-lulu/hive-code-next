@@ -1,7 +1,6 @@
 import { useCallback } from 'react'
 import { useAppStore } from '../store'
 import { needsSavePromptOnClose } from '@/store/slices/editor/buffers/editor-buffer-close-rule'
-import { runAfterEditorFramesFlush } from './editor/editor-pending-flush'
 import { appendUniqueOpenFileIds } from './terminal/unsaved-close-queue'
 import { isPinnedActiveEditorTab } from './terminal-workspace-model'
 import { selectWorkspaceSurface } from '@/lib/workspace-surface-reveal'
@@ -127,15 +126,11 @@ export function useTerminalEditorCloseQueue(controller: TerminalEditorCloseFound
       if (activeWorktreeId && isPinnedActiveEditorTab(state, activeWorktreeId, fileId)) {
         return
       }
-      // Why: a custom editor frame may still hold edits the dirty check must see.
-      runAfterEditorFramesFlush(state, [fileId], () => {
-        const latest = useAppStore.getState()
-        if (needsSavePromptOnClose(latest, fileId)) {
-          queueEditorCloseRequests([fileId])
-          return
-        }
-        closeFile(fileId)
-      })
+      if (needsSavePromptOnClose(state, fileId)) {
+        queueEditorCloseRequests([fileId])
+        return
+      }
+      closeFile(fileId)
     },
     [activeWorktreeId, closeFile, queueEditorCloseRequests]
   )

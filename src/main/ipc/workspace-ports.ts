@@ -1,5 +1,5 @@
 import { BrowserWindow, ipcMain } from 'electron'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import { advertisedUrlWatcher, type AdvertisedUrlWatcher } from '../ports/advertised-url-watcher'
 import type {
   WorkspacePortAdvertisedUrlChangedEvent,

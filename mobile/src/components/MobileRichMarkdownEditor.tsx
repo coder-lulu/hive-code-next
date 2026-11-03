@@ -24,10 +24,9 @@ import {
   type RichMarkdownWebDocument
 } from './rich-markdown/rich-markdown-web-document-mount'
 import { useMobileRichMarkdownEditorController } from './use-mobile-rich-markdown-editor-controller'
-import {
-  noWorkspaceImage,
-  type RichMarkdownEditorApi,
-  type RichMarkdownUrlPromptKind
+import type {
+  RichMarkdownEditorApi,
+  RichMarkdownUrlPromptKind
 } from './rich-markdown/document-host-seams'
 import type {
   MobileRichMarkdownEditorMessage,
@@ -39,8 +38,6 @@ export type MobileRichMarkdownEditorComponentProps = Omit<
   'onOpenLink'
 > & {
   onOpenLink?: (url: string) => void
-  /** Loads a workspace-relative image path; without it those images stay unloaded. */
-  loadImageSource?: (path: string) => Promise<string>
 }
 
 export type MobileRichMarkdownEditorHandle = {
@@ -51,13 +48,7 @@ export type MobileRichMarkdownEditorHandle = {
 // Link/Image ask TextInputModal because both native shells’ window.prompt returns null (no dialog delegate).
 // Accept but never call onKeyboardInsetChange: page visualViewport and keyboard-occlusion already measure same cover, so callback would double-lift toolbar.
 function MobileRichMarkdownEditorWebInner(
-  {
-    content,
-    editable,
-    onChange,
-    onOpenLink,
-    loadImageSource
-  }: MobileRichMarkdownEditorComponentProps,
+  { content, editable, onChange, onOpenLink }: MobileRichMarkdownEditorComponentProps,
   ref: ForwardedRef<MobileRichMarkdownEditorHandle>
 ) {
   const t = useMobileTranslation()
@@ -67,7 +58,6 @@ function MobileRichMarkdownEditorWebInner(
   // Document reports ready synchronously during mount before documentRef exists; queue controller content/editable calls until handle arrives or editor stays empty.
   const beforeMountRef = useRef<((send: RichMarkdownEditorApi) => void)[]>([])
   const receiveRef = useRef<((message: MobileRichMarkdownEditorMessage) => void) | null>(null)
-  const loadImageSourceRef = useRef(loadImageSource)
   const [urlPromptKind, setUrlPromptKind] = useState<RichMarkdownUrlPromptKind | null>(null)
   // Settle promptForUrl once via submit/cancel/unmount so no command stays pending.
   const pendingUrlRef = useRef<((url: string | null) => void) | null>(null)
@@ -137,11 +127,6 @@ function MobileRichMarkdownEditorWebInner(
     receiveRef.current = handleMessage
   }, [handleMessage])
 
-  // Layout effect: the loader must be current before the controller's passive effects render markdown.
-  useLayoutEffect(() => {
-    loadImageSourceRef.current = loadImageSource
-  }, [loadImageSource])
-
   /** Closes the modal, keeping the answer for the moment the field no longer has the focus. */
   const answerUrlPrompt = useCallback((url: string | null) => {
     answeredUrlRef.current = url
@@ -177,8 +162,7 @@ function MobileRichMarkdownEditorWebInner(
     }
     const live = mountRichMarkdownWebDocument(host, {
       postToHost: (message) => receiveRef.current?.(message),
-      promptForUrl,
-      loadImageSource: (path) => (loadImageSourceRef.current ?? noWorkspaceImage)(path)
+      promptForUrl
     })
     documentRef.current = live
     for (const call of beforeMountRef.current) {

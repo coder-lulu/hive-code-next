@@ -1,6 +1,5 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
-import { observeOffscreenAnimation } from '@/lib/offscreen-animation-pause'
 
 const SPINNER_ANIMATION_NAME = 'agent-spinner-rotate'
 
@@ -27,16 +26,10 @@ function handleSpinnerAnimationStart(event: React.AnimationEvent<HTMLSpanElement
   }
 }
 
-// Offscreen rings drop their animation; the restart on reveal re-anchors phase via animationstart.
-function observeSpinner(el: HTMLSpanElement): () => void {
-  return observeOffscreenAnimation(el)
-}
-
 // CSS compositor rotation avoids JS input-thread work; callers provide size.
 export function AgentWorkingSpinner({ className }: { className?: string }): React.JSX.Element {
   return (
     <span
-      ref={observeSpinner}
       onAnimationStart={handleSpinnerAnimationStart}
       data-agent-spinner=""
       className={cn(

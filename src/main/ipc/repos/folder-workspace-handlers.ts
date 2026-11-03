@@ -1,6 +1,6 @@
 import type { BrowserWindow } from 'electron'
 import { ipcMain } from 'electron'
-import type { Store } from '../../persistence/loading-store/store'
+import type { Store } from '../../persistence'
 import type { FolderWorkspace } from '../../../shared/folder-workspace-types'
 import type { FolderWorkspacePathStatusRequest } from '../../../shared/folder-workspace-path-status'
 import {
@@ -18,7 +18,6 @@ import {
   parseProjectGroupIpcArgs
 } from './repo-ipc-arg-schemas'
 import { visibleFolderWorkspaces } from '../../ssh/orcad-retained-source'
-import { createFolderWorkspaceWithPluginHooks } from '../../plugins/hooks/workspace-create-plugin-hook'
 import {
   isLocalWslMoveRow,
   shouldDropWslMoveProjectUpdate
@@ -65,9 +64,10 @@ export function registerFolderWorkspaceHandlers(
         repos: store.getRepos()
       })
       assertFolderWorkspacePathUsable(status)
-      const workspace = await createFolderWorkspaceWithPluginHooks(args, (request) =>
-        store.createFolderWorkspace({ ...request, creatorProvenance: { kind: 'host' } })
-      )
+      const workspace = store.createFolderWorkspace({
+        ...args,
+        creatorProvenance: { kind: 'host' }
+      })
       notifyReposChanged(mainWindow)
       return workspace
     }

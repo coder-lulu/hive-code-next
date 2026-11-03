@@ -1,11 +1,11 @@
 vi.mock('../theme/mobile-theme-provider', async () => {
-  const { createLightThemeTestModule } = await import('../theme/mobile-theme.test-fixture')
+  const { createLightThemeTestModule } = await import('../../../theme/mobile-theme.test-fixture')
   return createLightThemeTestModule()
 })
 import { createElement, type ReactNode } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { NativeChatMessage } from '../../../../../src/shared/native-chat/native-chat-types'
+import type { NativeChatMessage } from '../../../../../src/shared/native-chat-types'
 import {
   MobileNativeChatVisualContext,
   type MobileNativeChatVisualRender

@@ -73,10 +73,13 @@ export function sessionStatusLabel(status: HiveRuntimeSession['status']): string
     case 'ACTIVE':
       return translate('auto.components.settings.runtimeSessions.statusActive', 'Active')
     case 'REVOKE_PENDING':
-      return translate('auto.components.settings.runtimeSessions.statusRevokePending', 'Ending')
+      return translate(
+        'auto.components.settings.runtimeSessions.statusRevokePending',
+        'Revocation pending'
+      )
     case 'CLOSED':
     case 'REVOKED':
-      return translate('auto.components.settings.runtimeSessions.statusRevoked', 'Ended')
+      return translate('auto.components.settings.runtimeSessions.statusRevoked', 'Revoked')
     case 'EXPIRED':
       return translate('auto.components.settings.runtimeSessions.statusExpired', 'Expired')
     case 'UNVERIFIABLE':

@@ -62,12 +62,12 @@ describe('isDefaultBranchWorkspace', () => {
     expect(isDefaultBranchWorkspace(detached, gitRepo)).toBe(false)
   })
 
-  it('returns false for a folder project root, which has no branch', () => {
+  it('returns true for a folder project root, which has no branch', () => {
     const folder = makeWorktree('folder')
     folder.isMainWorktree = true
     folder.branch = ''
     folder.head = ''
-    expect(isDefaultBranchWorkspace(folder, { kind: 'folder' })).toBe(false)
+    expect(isDefaultBranchWorkspace(folder, { kind: 'folder' })).toBe(true)
   })
 
   it('returns false for non-main worktrees even on the default branch', () => {

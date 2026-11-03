@@ -71,6 +71,8 @@ export function LinearAgentSkillPane(): React.JSX.Element {
       title={translate('auto.components.settings.LinearAgentSkillPane.skillTitle', 'Linear skill')}
       description={null}
       skillNames={[ORCA_LINEAR_SKILL_NAME]}
+      command={skillSetup.installCommand}
+      installedCommand={skillSetup.updateCommand}
       installedSkillNames={[skillSetup.updateSkillName]}
       installed={skillSetup.skillInstalled}
       loading={skillSetup.skillLoading}

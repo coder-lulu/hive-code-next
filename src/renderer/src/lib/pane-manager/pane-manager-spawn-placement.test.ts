@@ -18,7 +18,6 @@ const LEAF_C = '33333333-3333-4333-8333-333333333333'
 describe('PaneManager spawn placement hints', () => {
   let root: HTMLDivElement
   let onPaneCreated: Mock<NonNullable<PaneManagerOptions['onPaneCreated']>>
-  let onActivePaneChange: Mock<NonNullable<PaneManagerOptions['onActivePaneChange']>>
   let manager: InstanceType<typeof PaneManager>
 
   beforeEach(() => {
@@ -27,15 +26,13 @@ describe('PaneManager spawn placement hints', () => {
     root = document.createElement('div')
     document.body.appendChild(root)
     onPaneCreated = vi.fn()
-    onActivePaneChange = vi.fn()
-    manager = new PaneManager(root, { linkOpenHint: () => '', onPaneCreated, onActivePaneChange })
+    manager = new PaneManager(root, { linkOpenHint: () => '', onPaneCreated })
   })
 
   afterEach(() => {
     manager.destroy()
     root.remove()
     vi.unstubAllGlobals()
-    vi.restoreAllMocks()
   })
 
   it('publishes a split placed before a mounted subtree with its final order', () => {

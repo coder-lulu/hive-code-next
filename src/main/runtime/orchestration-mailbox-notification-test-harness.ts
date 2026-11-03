@@ -41,24 +41,12 @@ export function sqliteFor(db: OrchestrationDb): Database.Database {
   return (db as unknown as { db: Database.Database }).db
 }
 
-/** `rebind` then run-uses it, so the pane keeps only the new Run. */
-export function createBoundRun(
-  db: OrchestrationDb,
-  objective: string,
-  options: { rebind?: boolean } = {}
-) {
-  const run = db.createRun({
+export function createBoundRun(db: OrchestrationDb, objective: string) {
+  return db.createRun({
     objective,
     coordinatorHandle: TERMINAL_HANDLE,
     coordinatorPaneKey: PANE_KEY
   })
-  return options.rebind
-    ? db.bindRun({
-        runId: run.id,
-        coordinatorHandle: TERMINAL_HANDLE,
-        coordinatorPaneKey: PANE_KEY
-      })!
-    : run
 }
 
 export function insertDirectRunMessage(db: OrchestrationDb, runId: string, subject: string) {
@@ -267,8 +255,9 @@ export function registerSecondPane(
 
 export async function driveToLiveIdle(runtime: OrcaRuntimeService): Promise<void> {
   await runtime.listTerminals()
-  runtime.onPtyData(PTY_ID, '\x1b]0;Codex done\x07', 1)
-  // Await the model's write chain so the chunk is parsed.
+  runtime.onPtyData(PTY_ID, '\x1b]0;Codex working\x07', 1)
+  runtime.onPtyData(PTY_ID, '\x1b]0;Codex done\x07', 2)
+  // Await the model's write chain so both chunks are parsed.
   await runtime.serializeMainTerminalBuffer(PTY_ID)
 }
 

@@ -173,7 +173,6 @@ describe('structured Codex session options', () => {
           label: 'GPT Live',
           isDefault: true,
           defaultEffort: 'medium',
-          declaredDefaultEffort: 'medium',
           efforts: [
             { value: 'medium', label: 'Medium', description: 'Balanced' },
             { value: 'high', label: 'High', description: 'Deep reasoning' }
@@ -185,7 +184,6 @@ describe('structured Codex session options', () => {
           description: 'Fast',
           isDefault: false,
           defaultEffort: 'low',
-          declaredDefaultEffort: 'low',
           efforts: [{ value: 'low', label: 'Low', description: 'Quick reasoning' }]
         }
       ],

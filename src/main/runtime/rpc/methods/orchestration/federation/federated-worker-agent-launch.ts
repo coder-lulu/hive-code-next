@@ -1,7 +1,6 @@
-import type { RuntimeTerminalCreate } from '../../../../../../shared/runtime-terminal-create-contract'
 /** Execute terminalOnly on the receiving host with federation's agent-first worktree/background-terminal factories. The dispatch brief is delivered later. */
 
-import type { AgentLaunchPreferences } from '../../../../../../shared/agent-session/agent-session-host-authority'
+import type { AgentLaunchPreferences } from '../../../../../../shared/agent-session-host-authority'
 import type { TuiAgent } from '../../../../../../shared/tui-agent'
 import { executeAgentLaunch } from '../../../../../agent-launch/agent-launch-executor'
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
@@ -31,11 +30,7 @@ export async function launchFederatedWorkerAgent(args: {
   /** The created worktree's setup receipt, as soon as it exists, so a later failure reports it. */
   onSetup: (setup: WorkerSetupReceipt) => void
   onStage: (stage: 'worktree_create' | 'terminal_create') => void
-}): Promise<{
-  worktree: { id: string }
-  terminalHandle: string
-  terminalCreation?: RuntimeTerminalCreate
-}> {
+}): Promise<{ worktree: { id: string }; terminalHandle: string }> {
   const { runtime, db, params, effects } = args
   if (!args.agent) {
     // Validation refuses a fresh launch with no agent; this only narrows the type.
@@ -45,7 +40,6 @@ export async function launchFederatedWorkerAgent(args: {
   }
   const agent = args.agent
   let created: { id: string } | undefined
-  let terminalCreation: RuntimeTerminalCreate | undefined
   const launched = await executeAgentLaunch({
     runtime,
     intent: {
@@ -77,9 +71,6 @@ export async function launchFederatedWorkerAgent(args: {
         })
         const setupDecision = params.setup ?? 'run'
         const result = await runtime.createManagedWorktree({
-          onStartupTerminalCreated: (terminal) => {
-            terminalCreation = terminal
-          },
           repoSelector: repo,
           ...(await resolveWorkerWorktreeName(runtime, repo, params.name)),
           baseBranch: params.baseBranch,
@@ -147,8 +138,7 @@ export async function launchFederatedWorkerAgent(args: {
           presentation: 'background'
         })
         effects.push({ kind: 'terminal', role: 'agent', action: 'created', id: terminal.handle })
-        terminalCreation = terminal
-        return { handle: terminal.handle, terminalCreation: terminal }
+        return { handle: terminal.handle }
       }
     }
   })
@@ -156,5 +146,5 @@ export async function launchFederatedWorkerAgent(args: {
   if (!worktree) {
     throw new Error('Federated worker topology did not resolve.')
   }
-  return { worktree, terminalHandle: launched.outcome.handle, terminalCreation }
+  return { worktree, terminalHandle: launched.outcome.handle }
 }

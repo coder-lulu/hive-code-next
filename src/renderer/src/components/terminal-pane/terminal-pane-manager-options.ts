@@ -16,7 +16,8 @@ import { buildFontFamily } from '@/lib/monospace-font-family'
 import { buildWindowsPtyCompatibilityOptions } from '@/lib/pane-manager/windows-pty-compatibility'
 import { buildTerminalKeyboardProtocolOptions } from '@/lib/pane-manager/terminal-keyboard-protocol'
 import { resolvePaneKeyboardProtocolAgent } from './terminal-keyboard-protocol-pane-agent'
-import { UNRESOLVED_OWNER_HOST_ID } from '../../../../shared/execution-host'
+import { getConnectionId } from '@/lib/connection-context'
+import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { scheduleRuntimeGraphSync } from '@/runtime/sync-runtime-graph'
 import { acquireWebviewsDragPassthrough } from '../browser-pane/host-guest/webview-registry'
 import { handleTerminalWebLinkClick } from './terminal-web-link-click'
@@ -120,7 +121,7 @@ export function createTerminalPaneManagerOptions(
       ),
     terminalInlineImagesEnabled: () =>
       resolveTerminalInlineImagesEnabled(settingsRef.current?.terminalInlineImages),
-    terminalOptions: (paneId) => {
+    terminalOptions: () => {
       const currentSettings = settingsRef.current
       const terminalFontWeights = resolveTerminalFontWeights(
         currentSettings?.terminalFontWeight,
@@ -136,14 +137,13 @@ export function createTerminalPaneManagerOptions(
         ptyDeps.startup,
         currentTab?.launchAgent
       )
-      const owner = panePtyBindingsRef.current.get(paneId)?.getOwnerContext?.()
       const ptyBackendContext = {
         userAgent: navigator.userAgent,
         osRelease: platformInfo?.osRelease,
-        connectionId: owner?.connectionId,
+        connectionId: getConnectionId(worktreeId),
         cwd: context.startupCwd,
         shellOverride: currentTab?.shellOverride,
-        executionHostId: owner?.executionHostId ?? UNRESOLVED_OWNER_HOST_ID,
+        executionHostId: getExecutionHostIdForWorktree(storeState, worktreeId),
         tuiAgent: knownTuiAgent
       }
       return {

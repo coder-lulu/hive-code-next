@@ -99,16 +99,6 @@ function retainPreHandlerPtyExits(
   preHandlerPtyExit.set(ptyId, kept)
 }
 
-// The gap label describes the dropped first byte, so it can't survive head truncation.
-function truncatedHeadMeta(meta: PtyDataMeta, keptBytes: number): PtyDataMeta {
-  const next: PtyDataMeta = { ...meta }
-  if (typeof meta.rawLength === 'number') {
-    next.rawLength = keptBytes
-  }
-  delete next.gapEscapeState
-  return next
-}
-
 export function bufferPreHandlerPtyData(ptyId: string, data: string, meta?: PtyDataMeta): void {
   if (discardedPreHandlerPtyStates.has(ptyId)) {
     return
@@ -127,7 +117,9 @@ export function bufferPreHandlerPtyData(ptyId: string, data: string, meta?: PtyD
     warnedLostHandlerPtyIds.delete(evictedPtyId)
   }
   const bufferedMeta =
-    meta && chunk.data.length !== data.length ? truncatedHeadMeta(meta, chunk.bytes) : meta
+    meta && chunk.data.length !== data.length && typeof meta.rawLength === 'number'
+      ? { ...meta, rawLength: chunk.bytes }
+      : meta
   let state = preHandlerPtyData.get(ptyId)
   if (!state) {
     state = { chunks: [], head: 0, bytes: 0, sequence: 0 }

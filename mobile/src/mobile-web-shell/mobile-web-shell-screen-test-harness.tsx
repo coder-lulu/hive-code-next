@@ -24,7 +24,6 @@ export type ScreenDependencies = {
   reportPagePainted: Mock
   snapshotUnreadable: boolean
   storageRefreshes: number
-  appStateListeners: Set<(state: string) => void>
   openUrl: Mock
   push: Mock
   back: Mock
@@ -83,7 +82,6 @@ export function createScreenDependencies(): ScreenDependencies {
     reportPagePainted: vi.fn(),
     snapshotUnreadable: false,
     storageRefreshes: 0,
-    appStateListeners: new Set(),
     openUrl: vi.fn(),
     push: vi.fn(),
     back: vi.fn(),
@@ -126,7 +124,6 @@ export function resetScreenDependencies(dependencies: ScreenDependencies): void 
   dependencies.reportPagePainted.mockReset()
   dependencies.snapshotUnreadable = false
   dependencies.storageRefreshes = 0
-  dependencies.appStateListeners.clear()
   dependencies.downloadProgress = createDownloadProgressFeed()
   dependencies.lifecycle.length = 0
   dependencies.viewRenders = 0

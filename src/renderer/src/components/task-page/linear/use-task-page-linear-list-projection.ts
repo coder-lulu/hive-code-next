@@ -69,8 +69,7 @@ export function useTaskPageLinearListProjectionPrelude(model: TaskPageLinearList
   const linearIssueTotalPages =
     orderedLinearIssues.length === 0
       ? 1
-      : loadedLinearIssuePages +
-        (activeLinearIssueCanRequestMore && !activeLinearIssueError ? 1 : 0)
+      : loadedLinearIssuePages + (activeLinearIssueCanRequestMore ? 1 : 0)
   const visibleLinearIssuePage = Math.min(
     activeLinearIssuePage,
     Math.max(0, loadedLinearIssuePages - 1)
@@ -81,6 +80,7 @@ export function useTaskPageLinearListProjectionPrelude(model: TaskPageLinearList
   }, [orderedLinearIssues, visibleLinearIssuePage])
   const showLinearIssuePagination =
     orderedLinearIssues.length > 0 &&
+    !activeLinearIssueError &&
     linearIssueTotalPages > 1 &&
     !(activeLinearIssueLoading && activeLinearIssues.length === 0)
   const setActiveLinearIssuePage = useCallback(

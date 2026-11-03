@@ -59,7 +59,6 @@ vi.mock('@/i18n/i18n', async () => ({
 
 vi.mock('./ProjectGroupNameDialog', () => ({ ProjectGroupNameDialog: () => null }))
 vi.mock('./WorktreeParentPickerPopover', () => ({ WorktreeParentPickerPopover: () => null }))
-vi.mock('./WorktreeWslHostStartMenuItem', () => ({ WorktreeWslHostStartMenuItem: () => null }))
 
 const openInMenu = vi.hoisted(() => vi.fn(() => null))
 vi.mock('./WorktreeOpenInMenu', () => ({ WorktreeOpenInSubMenu: openInMenu }))
@@ -139,6 +138,22 @@ describe('WorktreeContextMenu Copy Worktree Name', () => {
       expect.objectContaining({ runtimeEnvironmentId: 'remote-owner' }),
       undefined
     )
+  })
+
+  it('copies the workspace display name', () => {
+    openMenu(worktreeFixture())
+
+    clickMenuItem('Copy Worktree Name')
+
+    expect(writeClipboardText).toHaveBeenCalledExactlyOnceWith('Fix authentication race')
+  })
+
+  it('falls back like every other name read when the custom name is blank', () => {
+    openMenu(worktreeFixture({ displayName: '' }))
+
+    clickMenuItem('Copy Worktree Name')
+
+    expect(writeClipboardText).toHaveBeenCalledExactlyOnceWith('feature/auth-race')
   })
 
   it.each([

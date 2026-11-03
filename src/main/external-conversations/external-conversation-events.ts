@@ -98,8 +98,7 @@ export class ConversationEvents {
         deliver: (item) => this.told(item),
         setTimer: (run, delayMs) => this.deps.setTimer(run, delayMs),
         started: (item) => this.started(item),
-        stopped: (item) => this.ended(item, agentMainAgentVerdict(item.row)),
-        everyLeadTurn: true
+        stopped: (item) => this.ended(item, agentMainAgentVerdict(item.row))
       })
       const unsubscribe = this.deps.onAgentPaneChange((change) => {
         this.settleRejected(change.paneKey)

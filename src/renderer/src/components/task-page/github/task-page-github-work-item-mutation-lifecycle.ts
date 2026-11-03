@@ -90,7 +90,7 @@ export function confirmTaskPageGitHubWorkItemMutation(
     return 'stale'
   }
   const { skipMeQualifiers, listOp, next } = pending
-  if (listOp && !pending.settleAccepted) {
+  if (listOp) {
     const snapshot =
       getConfirmedListSnapshot(key.sourceScope, key.repoId, key.itemId, listOp.family) ??
       freezeTaskPageGitHubUsers(
@@ -102,7 +102,7 @@ export function confirmTaskPageGitHubWorkItemMutation(
     const applied = applyTaskPageGitHubListOps(snapshot, [listOp])
     setConfirmedListSnapshot(key.sourceScope, key.repoId, key.itemId, listOp.family, applied)
   } else {
-    if (next.state !== undefined && !pending.settleAccepted) {
+    if (next.state !== undefined) {
       setLastConfirmedClientValue(key.sourceScope, key.repoId, key.itemId, 'state', next.state)
     }
     if (next.autoMergeEnabled !== undefined) {
@@ -116,14 +116,10 @@ export function confirmTaskPageGitHubWorkItemMutation(
     }
   }
   deletePendingTaskPageGitHubOp(key)
-  const item = pending.settleAccepted?.(true) ?? opts.item
-  if (!pending.settleAccepted) {
-    applyServerEntityIfPresent(key, opts)
-  }
+  applyServerEntityIfPresent(key, opts)
   const remaining = listPendingTaskPageGitHubOpsForItem(key.repoId, key.itemId, key.sourceScope)
-  const merged = getRegistryMergedTaskPageGitHubWorkItem(item, key.sourceScope)
-  // A record-owned edit already published every surviving operation; re-patching would write a stale list.
-  if (opts.patchWorkItem && !pending.settleAccepted && remaining.some((op) => op.listOp)) {
+  const merged = getRegistryMergedTaskPageGitHubWorkItem(opts.item, key.sourceScope)
+  if (opts.patchWorkItem && remaining.some((op) => op.listOp)) {
     opts.patchWorkItem(
       key.itemId,
       { assignees: merged.assignees, reviewRequests: merged.reviewRequests },
@@ -133,7 +129,7 @@ export function confirmTaskPageGitHubWorkItemMutation(
   }
   if (isTaskPageGitHubMutationQueryKeyCurrent(opts.queryKey)) {
     recomputeSoftHideForItem({
-      item: { ...item, ...merged },
+      item: { ...opts.item, ...merged },
       sourceScope: key.sourceScope,
       query: opts.query,
       queryKey: opts.queryKey,
@@ -167,10 +163,8 @@ export function rollbackTaskPageGitHubWorkItemMutation(args: {
   }
   const { skipMeQualifiers, listOp } = pending
   deletePendingTaskPageGitHubOp(args.key)
-  const item = pending.settleAccepted?.(false) ?? args.item
-  const merged = getRegistryMergedTaskPageGitHubWorkItem(item, args.key.sourceScope)
-  // A record-owned edit never wrote stored copies, so dropping its token is the whole rollback.
-  if (!pending.settleAccepted && listOp) {
+  const merged = getRegistryMergedTaskPageGitHubWorkItem(args.item, args.key.sourceScope)
+  if (listOp) {
     args.patchWorkItem(
       args.key.itemId,
       listOp.family === 'assignees'
@@ -179,7 +173,7 @@ export function rollbackTaskPageGitHubWorkItemMutation(args: {
       args.key.repoId,
       { sourceContext: args.sourceContext }
     )
-  } else if (!pending.settleAccepted) {
+  } else {
     const recomposed = getRegistryMergedTaskPageGitHubWorkItem(
       { ...args.item, ...pending.previous },
       args.key.sourceScope
@@ -194,10 +188,10 @@ export function rollbackTaskPageGitHubWorkItemMutation(args: {
       { sourceContext: args.sourceContext }
     )
   }
-  const after = getRegistryMergedTaskPageGitHubWorkItem(item, args.key.sourceScope)
+  const after = getRegistryMergedTaskPageGitHubWorkItem(args.item, args.key.sourceScope)
   if (isTaskPageGitHubMutationQueryKeyCurrent(args.queryKey)) {
     recomputeSoftHideForItem({
-      item: { ...item, ...after },
+      item: { ...args.item, ...after },
       sourceScope: args.key.sourceScope,
       query: args.query,
       queryKey: args.queryKey,

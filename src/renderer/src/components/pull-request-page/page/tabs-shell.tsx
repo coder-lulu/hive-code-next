@@ -23,7 +23,7 @@ import {
   patchCachedPRChecks,
   patchCachedPRReviewRequests,
   patchCachedWorkItemBody
-} from '@/components/github-item-dialog/load-item-details/work-item-details-cache'
+} from '../cache/work-item-details'
 import { ConversationTab } from '../conversation/tab'
 import { ChecksTab } from '../checks/tab'
 import { PRFilesCombinedDiffViewer } from '../files/combined-diff-viewer'
@@ -73,7 +73,7 @@ export function PullRequestPageTabs({
   localState: GitHubWorkItem['state']
   setLocalState: (state: GitHubWorkItem['state']) => void
   detailsCacheKey: string | null
-  pendingViewedPaths: ReadonlySet<string>
+  pendingViewedPaths: Set<string>
   invalidateCurrentDetailsCache: () => void
   appendOptimisticComment: (comment: PRComment) => void
   handlePRFileViewedChange: (path: string, viewed: boolean) => Promise<boolean>
@@ -120,7 +120,6 @@ export function PullRequestPageTabs({
       <div className="min-h-0 flex-1 overflow-y-auto scrollbar-sleek">
         <TabsContent value="conversation" className="mt-0">
           <ConversationTab
-            key={detailsCacheKey}
             item={displayWorkItem ?? workItem}
             repoPath={repoPath}
             repoId={effectiveRepoId}

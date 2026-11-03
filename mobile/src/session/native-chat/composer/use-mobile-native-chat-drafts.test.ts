@@ -1,7 +1,7 @@
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { NativeChatMessage } from '../../../../../src/shared/native-chat/native-chat-types'
+import type { NativeChatMessage } from '../../../../../src/shared/native-chat-types'
 import { useMobileNativeChatDrafts } from './use-mobile-native-chat-drafts'
 import {
   resetMobileNativeChatDraftStoreForTests,
@@ -335,7 +335,7 @@ describe('useMobileNativeChatDrafts', () => {
         createElement(Harness, { tabId: 'a', messages: [assistantTextMessage('a1', 'hi')] })
       )
     )
-    const origin = state?.captureSendOrigin('look at this', ['file:///a.jpg'])
+    const origin = state?.captureSendOrigin('look at this')
     act(() => {
       if (origin) {
         state?.acceptSend(origin, 'look at this', ['file:///a.jpg'])
@@ -366,7 +366,7 @@ describe('useMobileNativeChatDrafts', () => {
         createElement(Harness, { tabId: 'a', messages: [assistantTextMessage('a1', 'hi')] })
       )
     )
-    const origin = state?.captureSendOrigin('look at this', ['file:///a.jpg'])
+    const origin = state?.captureSendOrigin('look at this')
     act(() => {
       if (origin) {
         state?.acceptSend(origin, 'look at this', ['file:///a.jpg'])

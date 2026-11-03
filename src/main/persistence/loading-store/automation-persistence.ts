@@ -1,4 +1,3 @@
-import type { Repo } from '../../../shared/repo-types'
 import type { HostWorktreeTarget } from '../../../shared/worktree/host-qualified-identity'
 import type {
   Automation,
@@ -17,8 +16,7 @@ import type {
 import type {
   AutomationDestination,
   AutomationOwnerFenceOperation,
-  AutomationOwnerPrecondition,
-  AutomationUpdatePreconditions
+  AutomationOwnerPrecondition
 } from '../../../shared/automation-owner-precondition'
 import type { WorkspaceRunContext } from '../../../shared/task-source-context'
 import { getWorktreePathBasenameFromId } from '../../../shared/worktree/id'
@@ -147,7 +145,7 @@ export class AutomationPersistence {
 
   createAutomation(
     input: AutomationCreateInput,
-    options?: { destination?: AutomationDestination; resolvedRepo?: Repo }
+    options?: { destination?: AutomationDestination }
   ): Automation {
     return createAutomationOperation(getAutomationDefinitionOperations(this), input, options)
   }
@@ -155,7 +153,7 @@ export class AutomationPersistence {
   updateAutomation(
     id: string,
     updates: AutomationUpdateInput,
-    options?: AutomationUpdatePreconditions & { resolvedRepo?: Repo }
+    options?: { expectedOwner?: AutomationOwnerPrecondition; destination?: AutomationDestination }
   ): Automation {
     return updateAutomationOperation(getAutomationDefinitionOperations(this), id, updates, options)
   }

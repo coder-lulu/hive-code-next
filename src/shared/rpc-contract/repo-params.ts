@@ -1,9 +1,4 @@
 import { z } from 'zod'
-
-// Opt-in: a caller holding afterSnapshotId's repos gets `unchanged`; older hosts take no params and ignore it.
-export const RepoList = z.object({
-  afterSnapshotId: z.string().min(1).max(128).nullable().optional()
-})
 import {
   OptionalBoolean,
   OptionalFiniteNumber,
@@ -37,11 +32,8 @@ export const RepoSetBaseRef = z.object({
 
 export const RepoUpdate = createRepoUpdateSchema(RepoSelector.shape)
 
-/** See `repoHooksCheckIsBackground`: only `wakeWslDistro` may open a stopped WSL distro (E9). */
-export const RepoHooksCheck = RepoSelector.extend({
-  background: z.boolean().optional(),
-  wakeWslDistro: OptionalBoolean
-})
+/** `background`: a render-driven check, which must not open a stopped WSL distro (E9). Older hosts ignore it. */
+export const RepoHooksCheck = RepoSelector.extend({ background: z.boolean().optional() })
 
 export const RepoSearchRefs = z.object({
   repo: requiredString('Missing repo selector'),

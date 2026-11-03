@@ -254,10 +254,6 @@ export class AgentTransitionDetector {
     }
   }
 
-  phaseOf(paneKey: string): AgentPhase {
-    return this.panes.get(paneKey)?.phase ?? 'rest'
-  }
-
   /** Use the newest row to match the window's arrival-order projection. */
   latestRow(paneKey: string): AgentStatusIpcPayload | null {
     let latest: AgentStatusIpcPayload | null = null

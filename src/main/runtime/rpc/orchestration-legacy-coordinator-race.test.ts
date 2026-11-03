@@ -13,7 +13,6 @@ import type { RpcRequest, RpcResponse } from './core'
 import { RpcDispatcher } from './dispatcher'
 import { ORCHESTRATION_METHODS } from './methods/orchestration'
 import { createRootDispatch } from '../orchestration/db/root-dispatch-test-fixture'
-import { MessageWake } from '../runtime-message-waiters'
 
 const COORDINATOR_HANDLE = 'term_legacy_coord'
 const COORDINATOR_PANE = 'tab_coord:44444444-4444-4444-8444-444444444444'
@@ -471,7 +470,7 @@ describe('legacy coordinator takeover races', () => {
     vi.spyOn(harness.runtime, 'waitForMessage').mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveWait = () => resolve(new MessageWake())
+          resolveWait = () => resolve('notified')
           signalWaitStarted?.()
         })
     )
@@ -532,7 +531,7 @@ describe('legacy coordinator takeover races', () => {
     vi.spyOn(harness.runtime, 'waitForMessage').mockImplementation(
       () =>
         new Promise((resolve) => {
-          resolveWait = () => resolve(new MessageWake())
+          resolveWait = () => resolve('notified')
           signalWaitStarted?.()
         })
     )

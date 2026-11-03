@@ -2,8 +2,22 @@ import { githubProjectHost } from '../../../../shared/github/project-identity'
 import type { GitHubOwnerRepo } from '../../../../shared/github/pull-request-types'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 
-import { parseGitHubItemRepository } from '../../../../shared/github/work-item-target'
-export { parseGitHubItemRepository as parseOwnerRepoFromItemUrl } from '../../../../shared/github/work-item-target'
+// Why: the dialog lacks repository context, so recover its host-aware identity from the canonical item URL.
+export function parseOwnerRepoFromItemUrl(url: string): GitHubOwnerRepo | null {
+  try {
+    const parsed = new URL(url)
+    if ((parsed.protocol !== 'https:' && parsed.protocol !== 'http:') || !parsed.host) {
+      return null
+    }
+    const segments = parsed.pathname.split('/').filter(Boolean)
+    if (segments.length < 2) {
+      return null
+    }
+    return { owner: segments[0], repo: segments[1], host: parsed.host }
+  } catch {
+    return null
+  }
+}
 
 /** Project rows may belong to another repo; route mutations by their slug instead of the active workspace. */
 export type GitHubWorkItemProjectOrigin = {
@@ -32,7 +46,7 @@ export function resolvePullRequestRepo(
           host: projectOrigin.host
         }
       : null) ??
-    parseGitHubItemRepository(item.url)
+    parseOwnerRepoFromItemUrl(item.url)
   return repo ? { ...repo, host: githubProjectHost(repo.host) } : null
 }
 

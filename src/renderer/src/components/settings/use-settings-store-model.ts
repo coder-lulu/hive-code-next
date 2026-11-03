@@ -22,7 +22,7 @@ import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRunti
 import { useLinearProviderConnected } from '@/hooks/useLinearProviderConnected'
 import { useSkillFreshness } from '@/hooks/useSkillFreshness'
 import { getFallbackTerminalFonts, mergeFontSuggestions } from './SettingsConstants'
-import { useTerminalConfigImport } from './useTerminalConfigImport'
+import { useGhosttyImport } from './useGhosttyImport'
 import { useWarpThemeImport } from './useWarpThemeImport'
 import { getInitialMountedSectionIds } from './settings-load-performance'
 import {
@@ -134,7 +134,7 @@ export function useSettingsStoreModel() {
   const [scrollbackMode, setScrollbackMode] = useState<'preset' | 'custom'>('preset')
   const [prevScrollbackRows, setPrevScrollbackRows] = useState(settings?.terminalScrollbackRows)
   // Keep import state above sections so remounts cannot close the modal.
-  const terminalConfigImport = useTerminalConfigImport(updateSettings, settings)
+  const ghostty = useGhosttyImport(updateSettings, settings)
   const warpThemes = useWarpThemeImport(updateSettings, settings)
   const [fontSuggestions, setFontSuggestions] = useState<string[]>(
     mergeFontSuggestions([], getFallbackTerminalFonts())
@@ -233,7 +233,7 @@ export function useSettingsStoreModel() {
     setScrollbackMode,
     prevScrollbackRows,
     setPrevScrollbackRows,
-    terminalConfigImport,
+    ghostty,
     warpThemes,
     fontSuggestions,
     setFontSuggestions,

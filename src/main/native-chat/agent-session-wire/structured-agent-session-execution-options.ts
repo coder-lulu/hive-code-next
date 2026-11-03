@@ -1,11 +1,8 @@
 import {
   readAgentSessionExecutionOptions,
   type AgentSessionExecutionOptions
-} from '../../../shared/agent-session/options/agent-session-execution-options'
-import {
-  refuse,
-  type AgentSessionWireRefusal
-} from '../../../shared/agent-session/failures/agent-session-wire-refusals'
+} from '../../../shared/agent-session-execution-options'
+import { refuse, type AgentSessionWireRefusal } from '../../../shared/agent-session-wire'
 import type { AgentSessionTurnContext } from './structured-agent-session-turns'
 import { structuredAgentSessionOptionOverridesRefusal } from './structured-agent-session-options-read'
 

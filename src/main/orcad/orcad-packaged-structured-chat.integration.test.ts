@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 import { randomUUID } from 'node:crypto'
 import {
   chmodSync,
@@ -15,9 +16,9 @@ import { z } from 'zod'
 import { getDefaultPersistedState } from '../../shared/constants'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
 import { spawnProcess } from '@orca/process-host'
-import { computeAgentSessionPayloadFingerprint } from '../../shared/agent-session/lifecycle/agent-session-mutation-envelope'
-import type { AgentSessionSubscribeEvent } from '../../shared/agent-session/agent-session-wire'
-import type { AgentJournalRenderItem } from '../../shared/agent-session/journal/agent-session-journal-types'
+import { computeAgentSessionPayloadFingerprint } from '../../shared/agent-session-mutation-envelope'
+import type { AgentSessionSubscribeEvent } from '../../shared/agent-session-wire'
+import type { AgentJournalRenderItem } from '../../shared/agent-session-journal-types'
 import { parsePairingCode } from '../../shared/pairing'
 import type { PairingOffer } from '../../shared/pairing'
 import {
@@ -25,7 +26,7 @@ import {
   CLAUDE_STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
   STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
-} from '../../shared/agent-session/agent-session-runtime-capabilities'
+} from '../../shared/protocol-version'
 import {
   sendRemoteRuntimeRequest,
   subscribeRemoteRuntimeRequest,
@@ -133,13 +134,9 @@ function launch(slotDir: string, runtime: string, userData: string, home: string
   return { child, ready, stderr: () => stderr }
 }
 
-async function call<T>(
-  pairing: PairingOffer,
-  method: string,
-  params: unknown
-): Promise<T> {
+async function call<T>(pairing: PairingOffer, method: string, params: unknown): Promise<T> {
   const response = await sendRemoteRuntimeRequest<T>(
-    pairing,
+    pairedRuntimeConnectionFromOffer(pairing),
     method,
     params,
     20_000,
@@ -257,7 +254,7 @@ describe.skipIf(skip || process.platform === 'win32')('packaged plain-Node struc
       const observedText: string[] = []
       const errors: Error[] = []
       subscription = await subscribeRemoteRuntimeRequest<AgentSessionSubscribeEvent>(
-        pairing,
+        pairedRuntimeConnectionFromOffer(pairing),
         'agentSession.subscribe',
         { sessionId },
         20_000,

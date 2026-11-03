@@ -7,13 +7,7 @@ import path from 'node:path'
 import type { Locator, Page } from '@stablyai/playwright-test'
 import { test, expect } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
-import {
-  waitForActivePaneHookDescriptor,
-  waitForActivePanePtyId,
-  waitForActiveTerminalManager,
-  waitForPaneIdentitySnapshot
-} from './helpers/terminal'
-import { waitForPtyShellEcho } from './terminal-pty-readiness'
+import { waitForActivePaneHookDescriptor, waitForActiveTerminalManager } from './helpers/terminal'
 
 /** 30 user turns, so the rail is well past its 20-tick sampling cap. */
 const TRANSCRIPT_ROWS = 60
@@ -21,9 +15,7 @@ const SHOT_DIR = path.join(os.tmpdir(), 'orca-rail-validation-larvacean', 'shots
 
 async function enableNativeChatSetting(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const nextSettings = await window.api.settings.set({
-      nativeChatProviders: { claude: true, codex: true }
-    })
+    const nextSettings = await window.api.settings.set({ experimentalNativeChat: true })
     window.__store?.setState({ settings: nextSettings })
   })
 }
@@ -103,11 +95,7 @@ test.describe('Native chat message rail', () => {
     await ensureTerminalVisible(orcaPage)
     await waitForActiveTerminalManager(orcaPage, 30_000)
 
-    const boundPane = await waitForPaneIdentitySnapshot(orcaPage, 1)
-    const ptyId = await waitForActivePanePtyId(orcaPage)
-    await waitForPtyShellEcho(orcaPage, ptyId, 15_000)
     const descriptor = await waitForActivePaneHookDescriptor(orcaPage)
-    expect(descriptor.paneKey).toBe(`${boundPane.tabId}:${boundPane.activeLeafId}`)
     const [tabId] = descriptor.paneKey.split(':')
     const sessionId = `e2e-message-rail-${randomUUID()}`
     const scratchDir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-native-chat-rail-'))
@@ -192,10 +180,5 @@ test.describe('Native chat message rail', () => {
     }
 
     console.log(`[rail] shots=${SHOT_DIR}`)
-    const finalPane = await waitForPaneIdentitySnapshot(orcaPage, 1)
-    expect(finalPane.tabId).toBe(boundPane.tabId)
-    expect(finalPane.activeLeafId).toBe(boundPane.activeLeafId)
-    expect(finalPane.ptyIdsByLeafId).toEqual(boundPane.ptyIdsByLeafId)
-    await expect(orcaPage.locator('[data-native-chat-root="true"]')).toBeVisible()
   })
 })

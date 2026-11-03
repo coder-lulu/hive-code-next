@@ -1,4 +1,3 @@
-import { useGitHubTaskItems } from '@/hooks/useGitHubTaskItems'
 import type { TaskPageJiraCreationMetadataModel } from '../jira/use-task-page-jira-creation-metadata'
 import { getWorkItemRepo } from '@/lib/work-item-repo-row'
 import { useCallback, useMemo, useEffect } from 'react'
@@ -9,9 +8,9 @@ import { deriveAdvertisedTotalPages } from '../../../../../shared/work-item-empt
 import {
   GITHUB_PR_TASK_GRID_CLASS,
   GITHUB_TASK_GRID_CLASS,
-  PR_CHECKS_EAGER_PREFETCH_LIMIT
+  PR_CHECKS_EAGER_PREFETCH_LIMIT,
+  getTaskPageRepoSourceContext
 } from '../task-page-source-context'
-import { getTaskPageRepoSourceContext } from '../../../lib/task-repo-source-context'
 import { sameOptionalGitHubOwnerRepo } from './task-page-github-review-model'
 export function useTaskPageGitHubListProjection(model: TaskPageJiraCreationMetadataModel) {
   const {
@@ -40,8 +39,7 @@ export function useTaskPageGitHubListProjection(model: TaskPageJiraCreationMetad
     },
     [activeGithubTaskKind]
   )
-  const rawCurrentPageItems = useMemo(() => pages[currentPage] ?? [], [pages, currentPage])
-  const currentPageItems = useGitHubTaskItems(rawCurrentPageItems)
+  const currentPageItems = useMemo(() => pages[currentPage] ?? [], [pages, currentPage])
   const typeFilteredCurrentPageItems = useMemo(
     () => applyTypeFilter(currentPageItems),
     [applyTypeFilter, currentPageItems]

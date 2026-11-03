@@ -1,4 +1,3 @@
-import { readableWslDistroHoldText } from '../../shared/wsl-distro-stopped-hold'
 import { canCheckoutExistingLocalBranch } from '../runtime/runtime-worktree-create-git'
 /* eslint-disable max-lines */
 
@@ -7,7 +6,7 @@ import { getStoredRepoExecutionHostId } from '../repo-execution-host'
 import type { BrowserWindow } from 'electron'
 import { existsSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import type { GitAdmissionTier } from '../../shared/rpc-contract/git-admission-tier-params'
 import type { Repo } from '../../shared/repo-types'
 import type {
@@ -382,9 +381,7 @@ async function spawnLocalStartupAndSetupTerminals(args: {
       surface: terminal.surface
     }
   } catch (error) {
-    const message = readableWslDistroHoldText(
-      error instanceof Error ? error.message : String(error)
-    )
+    const message = error instanceof Error ? error.message : String(error)
     warning = `Failed to create the startup terminal for ${worktree.path}: ${message}`
     console.warn(`[worktree-create] ${warning}`)
     return { didSpawnSetup: false, warning }
@@ -417,9 +414,7 @@ async function spawnLocalStartupAndSetupTerminals(args: {
       )
       didSpawnSetup = true
     } catch (error) {
-      const message = readableWslDistroHoldText(
-        error instanceof Error ? error.message : String(error)
-      )
+      const message = error instanceof Error ? error.message : String(error)
       const nextWarning = `failed to create the setup terminal for ${worktree.path}: ${message}`
       warning = appendWorktreeCreateWarning(warning, nextWarning)
       console.warn(`[worktree-create] ${warning}`)
@@ -1701,7 +1696,7 @@ async function performLocalWorktreeCreate(
     if (setupScript && shouldLaunchSetup) {
       try {
         // Main generates setup scripts without executing them; generation failure leaves the created workspace usable.
-        setup = await createSetupRunnerScript(
+        setup = createSetupRunnerScript(
           repo,
           worktreePath,
           setupScript,

@@ -4,7 +4,8 @@ import {
   terminalAutoRestoreFitSchema,
   terminalBufferClearedSchema,
   terminalSendAcceptedSchema,
-  terminalViewportUpdatedSchema
+  terminalViewportUpdatedSchema,
+  terminalWriteUnreadReplySchema
 } from './terminal-reply-schema'
 
 // All terminal writers share object-result-or-null; changing it would change lost-ack handling for every input surface.
@@ -46,6 +47,17 @@ export const terminalAutoRestoreFitSave = bindDeferredRpcOperation(
     acceptance: 'object-result-or-null',
     barrier: 'after-caller-barrier',
     read: rpcResultVariant('terminal-auto-restore-fit', terminalAutoRestoreFitSchema)
+  })
+)
+
+// Takeover retry uses fixed failure copy; skip refusal instead of surfacing an unused host message.
+export const workerTerminalTakeoverReport = bindDeferredRpcOperation(
+  defineRpcOperation({
+    name: 'orchestration.worker-terminal-input-or-skip',
+    method: 'orchestration.workerTerminalUserInput',
+    acceptance: 'success-result-or-skip',
+    barrier: 'after-caller-barrier',
+    read: rpcResultVariant('worker-terminal-input-reported', terminalWriteUnreadReplySchema)
   })
 )
 

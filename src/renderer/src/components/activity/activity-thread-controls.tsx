@@ -19,12 +19,10 @@ export { ActivityThreadOptionsMenu } from './activity-thread-options-menu'
 
 export function EventTime({
   timestamp,
-  compact = false,
-  className
+  compact = false
 }: {
   timestamp: number
   compact?: boolean
-  className?: string
 }): React.JSX.Element {
   // Memoized rows ignore unrelated writes; refresh this leaf from the visibility-gated 30s clock, matching WorktreeCardAgents.
   const now = useNow(30_000)
@@ -36,8 +34,7 @@ export function EventTime({
           type="button"
           className={cn(
             'rounded text-muted-foreground hover:text-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none',
-            compact ? 'px-0 py-0 text-2xs tabular-nums' : 'px-1 py-0.5 text-xs',
-            className
+            compact ? 'px-0 py-0 text-[11px] tabular-nums' : 'px-1 py-0.5 text-xs'
           )}
           aria-label={absolute}
           onClick={(event) => event.stopPropagation()}

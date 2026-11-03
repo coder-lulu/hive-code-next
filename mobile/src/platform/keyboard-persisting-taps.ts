@@ -2,11 +2,8 @@ import { useCallback, useRef } from 'react'
 
 export type KeyboardPersistingTaps = 'always' | 'handled'
 
-// Why: native and test renderers have no DOM, so reaching HTMLElement there throws.
-const hasDom = (): boolean => typeof HTMLElement !== 'undefined'
-
-export function isTextField(element: Element | null): boolean {
-  if (!hasDom() || !(element instanceof HTMLElement)) {
+function isTextField(element: Element | null): boolean {
+  if (!(element instanceof HTMLElement)) {
     return false
   }
   return (
@@ -46,8 +43,7 @@ export function useKeyboardPersistingTaps(mode: KeyboardPersistingTaps) {
   return useCallback(
     (node: unknown) => {
       releaseRef.current?.()
-      releaseRef.current =
-        hasDom() && node instanceof HTMLElement ? keepTextFocusThroughTaps(node, mode) : null
+      releaseRef.current = node instanceof HTMLElement ? keepTextFocusThroughTaps(node, mode) : null
     },
     [mode]
   )

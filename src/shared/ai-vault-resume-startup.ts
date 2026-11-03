@@ -11,10 +11,10 @@ import {
   isResumableTuiAgent,
   type AgentProviderSessionMetadata,
   type SleepingAgentLaunchConfig
-} from './agent-session/lifecycle/agent-session-resume'
+} from './agent-session-resume'
 import { normalizeAiVaultResumeFilePath } from './ai-vault-resume-path'
 import {
-  resolveTuiAgentLaunchRawArgs,
+  resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv,
   type AgentLaunchProfileSettings
 } from './tui-agent-launch-defaults'
@@ -138,14 +138,7 @@ export function buildAiVaultLocalResumeStartup(
       platform,
       agentHostPlatform: args.host.agentHostPlatform,
       shell: liveShell,
-      agentArgs:
-        args.agentArgs ??
-        resolveTuiAgentLaunchRawArgs(
-          session.agent,
-          settings,
-          undefined,
-          resolveStartupShell(platform, liveShell)
-        ),
+      agentArgs: args.agentArgs ?? resolveTuiAgentLaunchArgs(session.agent, settings),
       agentEnv: {
         ...resolveTuiAgentLaunchEnv(session.agent, settings, platform),
         ...managedDataAccountResumeEnv(session)
@@ -224,12 +217,7 @@ export function buildAiVaultForkStartup(
     platform,
     agentHostPlatform: args.host.agentHostPlatform,
     shell: liveShell,
-    agentArgs: resolveTuiAgentLaunchRawArgs(
-      session.agent,
-      settings,
-      undefined,
-      resolveStartupShell(platform, liveShell)
-    ),
+    agentArgs: resolveTuiAgentLaunchArgs(session.agent, settings),
     agentEnv: resolveTuiAgentLaunchEnv(session.agent, settings, platform),
     resumeInLaunchCwd: true,
     fork: true
@@ -261,12 +249,7 @@ export function resolveAiVaultCopiedSessionAgentArgs(
   const { platform, liveShell } = args.host
   const shell = resolveStartupShell(platform, liveShell)
   const configuredArgs = isTuiAgent(session.agent)
-    ? resolveTuiAgentLaunchRawArgs(
-        session.agent,
-        settings,
-        undefined,
-        resolveStartupShell(platform, liveShell)
-      )
+    ? resolveTuiAgentLaunchArgs(session.agent, settings)
     : ''
   const configured = tokenizeStartupCommand(configuredArgs, shell)
   if (!configured.ok) {
@@ -313,7 +296,7 @@ export function assertAiVaultCopiedSessionStoreAllowed(args: AiVaultResumeStartu
       args.settings?.agentCmdOverrides?.[agent] ||
       getTuiAgentLaunchCommand(TUI_AGENT_CONFIG[agent], platform)
     const parsed = tokenizeStartupCommand(
-      `${command} ${resolveTuiAgentLaunchRawArgs(agent, args.settings, undefined, resolveStartupShell(platform, liveShell))}`,
+      `${command} ${resolveTuiAgentLaunchArgs(agent, args.settings)}`,
       resolveStartupShell(platform, liveShell)
     )
     if (!parsed.ok) {

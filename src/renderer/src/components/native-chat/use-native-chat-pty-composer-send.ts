@@ -1,6 +1,7 @@
-import { readNativeChatComposerDraft } from './native-chat-composer-draft-store'
-import { serializeNativeChatAgentReferences } from './native-chat-agent-reference-send'
-import { admitNativeChatPastedText } from './native-chat-composer-pasted-text-references'
+import {
+  admitNativeChatPastedText,
+  resolveNativeChatPastedText
+} from './native-chat-composer-pasted-text-references'
 import { useCallback, type Dispatch, type SetStateAction } from 'react'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import type { NativeChatLaunchDraft } from '@/lib/native-chat-launch-prompt'
@@ -19,7 +20,7 @@ import type { NativeChatResolvedTarget } from './native-chat-composer-target'
 import { isSlashCommandDraft } from '../../../../shared/native-chat/input/native-chat-slash-commands'
 import type { NativeChatPickerState } from './use-native-chat-picker-state'
 import type { NativeChatSendLifecycle } from './use-native-chat-send-lifecycle'
-import type { NativeChatPtySessionOptionsSurface } from '../../../../shared/native-chat/input/native-chat-pty-session-options'
+import type { NativeChatPtySessionOptionsSurface } from '../../../../shared/native-chat-pty-session-options'
 import type { NativeChatOptimisticSendOutcome } from './native-chat-composer-types'
 import {
   answerNativeChatCommandInComposer,
@@ -35,7 +36,7 @@ export function useNativeChatPtyComposerSend(args: {
   isDispatchingSessionOption: boolean
   launchDraft?: NativeChatLaunchDraft | null
   launchDraftResolved: boolean
-  readTerminalDraft?: () => string | null
+  readTerminalScreen?: () => string | null
   resolveTarget: () => NativeChatResolvedTarget | null
   classifySend: NativeChatPickerState['classifySend']
   onOptimisticSend?: (text: string, imagePaths?: string[]) => string | undefined
@@ -73,13 +74,12 @@ export function useNativeChatPtyComposerSend(args: {
     if (!admitNativeChatPastedText(args.draftScopeKey, text, args.setNotice)) {
       return
     }
-    const submitted = readNativeChatComposerDraft(args.draftScopeKey)
-    text = serializeNativeChatAgentReferences(text, submitted.document, submitted.pastedTextFiles)
+    text = resolveNativeChatPastedText(args.draftScopeKey, text)
     const { sendOptions: launchSendOptions } = resolveNativeChatLaunchDraftSend({
       launchDraft: args.launchDraft,
       launchDraftResolved: args.launchDraftResolved,
       agent: args.agent,
-      readInputLine: () => args.readTerminalDraft?.()
+      readScreen: () => args.readTerminalScreen?.()
     })
     let pendingId: string | undefined
     const sendOptions =
@@ -103,7 +103,7 @@ export function useNativeChatPtyComposerSend(args: {
     if (classification !== 'chat' && imagePaths.length === 0) {
       pendingHandle =
         args.agent === 'codex' && isSlashCommandDraft(text)
-          ? sendNativeChatTypedCommand(target.ptyId, text, launchSendOptions)
+          ? sendNativeChatTypedCommand(target.ptyId, text)
           : sendNativeChatMessage(target.ptyId, text, sendOptions)
     } else if (imagePaths.length > 0) {
       pendingHandle = sendNativeChatMessageWithImageAttachments(

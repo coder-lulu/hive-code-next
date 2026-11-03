@@ -36,7 +36,7 @@ vi.mock('./parser-runner', () => ({
 
 import { previewWarpThemeImport } from './index'
 import { parseWarpThemeYaml } from './parser'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 
 const VALID_THEME = `
 name: Duplicate

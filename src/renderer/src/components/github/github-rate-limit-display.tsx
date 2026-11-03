@@ -4,7 +4,6 @@ import { cn } from '@/lib/utils'
 import { installWindowVisibilityInterval } from '@/lib/window-visibility-interval'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
-import { isWslDistroNotRunningRefusal } from '../../../../shared/wsl-distro-not-running-refusal'
 import type {
   GetRateLimitResult,
   GitHubRateLimitSnapshot
@@ -89,15 +88,11 @@ export function useGitHubRateLimitSnapshot(
   const [hasError, setHasError] = useState(false)
   const [isFetching, setIsFetching] = useState(false)
   const latestToken = useRef(0)
-  const hasSnapshot = useRef(false)
   const autoRefresh = options?.autoRefresh ?? true
 
   const refresh = useCallback(
     async (force = false): Promise<void> => {
       const token = ++latestToken.current
-      // A stopped WSL distro (where the CLI lives) is no failure: keep the last numbers if any.
-      const keepsLastSnapshot = (error: unknown): boolean =>
-        hasSnapshot.current && isWslDistroNotRunningRefusal(error)
       setIsFetching(true)
       try {
         const params = force ? { force: true } : undefined
@@ -111,14 +106,13 @@ export function useGitHubRateLimitSnapshot(
           return
         }
         if (res?.ok) {
-          hasSnapshot.current = true
           setSnapshot(res.snapshot)
           setHasError(false)
-        } else if (!keepsLastSnapshot(res?.error)) {
+        } else {
           setHasError(true)
         }
-      } catch (error) {
-        if (token === latestToken.current && !keepsLastSnapshot(error)) {
+      } catch {
+        if (token === latestToken.current) {
           setHasError(true)
         }
       } finally {

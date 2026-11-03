@@ -1,6 +1,4 @@
 import { toast } from 'sonner'
-import { getConnectionExecutionHostId } from '../../../../../../shared/execution-host'
-import { getRuntimeTargetHostId } from '@/runtime/runtime-client-target'
 import type { AppState } from '../../../types'
 import { runtimeTargetForWorkspaceOwner } from '@/lib/resolve-owner'
 import type { RuntimeClientTarget } from '../../../../../../shared/runtime-client-target'
@@ -32,13 +30,4 @@ export function resolveGitOperationTarget(
     throw new Error(UNRESOLVED_GIT_HOST_ERROR)
   }
   return target
-}
-
-export function gitOperationExecutionHostId(
-  target: RuntimeClientTarget,
-  connectionId?: string | null
-): string {
-  return target.kind === 'environment'
-    ? getRuntimeTargetHostId(target)
-    : getConnectionExecutionHostId(connectionId)
 }

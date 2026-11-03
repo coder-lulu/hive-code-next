@@ -1,14 +1,9 @@
-import {
-  combinedDiffViewportAttributes,
-  combinedDiffRowAttributes
-} from '../../combined-diff-viewport'
 import type React from 'react'
 import { useMemo } from 'react'
 import type { Virtualizer } from '@tanstack/react-virtual'
 import { joinPath } from '@/lib/path'
 import type { OpenFile } from '@/store/slices/editor'
 import type { DiffComment } from '../../../../../../shared/diff-comment-types'
-import type { DiffCommentOwner } from '@/store/diff-comment-owner'
 import { DiffSectionItem } from '../../DiffSectionItem'
 import type { DiffSectionItemProps } from '../../diff-section-item-props'
 import { DiffNotesSendMenu } from '../../DiffNotesSendMenu'
@@ -20,7 +15,6 @@ import { translate } from '@/i18n/i18n'
 export function CombinedDiffSectionList({
   activeGroupId,
   canOpenWorkspaceFileBrowserForPath,
-  commentOwner,
   diffCommentsForWorktree,
   file,
   handleSectionSaveRef,
@@ -42,6 +36,7 @@ export function CombinedDiffSectionList({
   setScrollContainerRef,
   setSectionHeights,
   setSections,
+  settings,
   sideBySide,
   skippedConflictNotice,
   toggleSection,
@@ -49,7 +44,6 @@ export function CombinedDiffSectionList({
 }: {
   activeGroupId: string | undefined
   canOpenWorkspaceFileBrowserForPath: (path: string) => boolean
-  commentOwner: DiffCommentOwner | null
   diffCommentsForWorktree: DiffComment[]
   file: OpenFile
   handleSectionSaveRef: DiffSectionItemProps['handleSectionSaveRef']
@@ -71,6 +65,7 @@ export function CombinedDiffSectionList({
   setScrollContainerRef: (node: HTMLDivElement | null) => void
   setSectionHeights: React.Dispatch<React.SetStateAction<Record<number, number>>>
   setSections: React.Dispatch<React.SetStateAction<DiffSection[]>>
+  settings: DiffSectionItemProps['settings']
   sideBySide: boolean
   skippedConflictNotice: React.ReactNode
   toggleSection: (index: number) => void
@@ -87,7 +82,6 @@ export function CombinedDiffSectionList({
   return (
     <div className="relative min-w-0 flex-1">
       <div
-        {...combinedDiffViewportAttributes}
         ref={setScrollContainerRef}
         className="combined-diff-scroll-container h-full overflow-auto pr-5 scrollbar-editor"
         onWheel={markDirectScrollInput}
@@ -105,7 +99,7 @@ export function CombinedDiffSectionList({
               <div
                 key={virtualItem.key}
                 data-index={virtualItem.index}
-                {...combinedDiffRowAttributes}
+                data-combined-diff-section-row
                 data-combined-diff-section-key={section.key}
                 ref={virtualizer.measureElement}
                 className="absolute left-0 top-0 w-full"
@@ -118,9 +112,9 @@ export function CombinedDiffSectionList({
                   isBranchMode={isBranchMode}
                   sideBySide={sideBySide}
                   isDark={isDark}
+                  settings={settings}
                   sectionHeight={sectionHeights[virtualItem.index]}
                   worktreeId={file.worktreeId}
-                  noteSource={file}
                   loadSection={loadSection}
                   loadDeferredSection={loadDeferredSection}
                   retrySection={retrySection}
@@ -154,7 +148,6 @@ export function CombinedDiffSectionList({
                     const fileNoteCount = commentCountByFilePath.get(section.path) ?? 0
                     return fileNoteCount > 0 ? (
                       <DiffNotesSendMenu
-                        owner={commentOwner}
                         worktreeId={file.worktreeId}
                         groupId={activeGroupId ?? file.worktreeId}
                         comments={diffCommentsForWorktree}

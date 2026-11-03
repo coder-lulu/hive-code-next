@@ -1,19 +1,17 @@
 import { useContext } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { NativeChatMessage } from '../../../../../src/shared/native-chat/native-chat-types'
+import type { NativeChatMessage } from '../../../../../src/shared/native-chat-types'
 import { MobileNativeChatRowOverlaysHost } from './MobileNativeChatRowOverlaysHost'
 import {
   MobileNativeChatRowOverlaysContext,
   type MobileNativeChatRowOverlays
 } from './mobile-native-chat-row-overlays'
-import type { MobileNativeChatConversation } from '../use-mobile-native-chat-conversation-state'
+import type { MobileNativeChatConversation } from '../../use-mobile-native-chat-conversation-state'
 
-vi.mock('react-native', async () => ({
-  ...(await import('../../../test-support/react-native-motion-stub')).reactNativeMotionStub(),
+vi.mock('react-native', () => ({
   Image: 'Image',
   Modal: 'Modal',
-  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -23,7 +21,6 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 })
 }))
 vi.mock('lucide-react-native', () => ({ X: 'X' }))
-vi.mock('../../../platform/haptics', () => ({ triggerMediumImpact: vi.fn() }))
 vi.mock('./MobileNativeChatMessageActionsSheet', () => ({
   MobileNativeChatMessageActionsSheet: 'MessageActionsSheet'
 }))

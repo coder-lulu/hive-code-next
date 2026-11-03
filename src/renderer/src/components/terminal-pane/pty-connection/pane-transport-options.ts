@@ -80,7 +80,6 @@ function terminalShowsOutput(terminal: ConnectPanePtySession['pane']['terminal']
 export function buildPaneTransportOptions(session: ConnectPanePtySession): IpcPtyTransportOptions {
   const holdsInput = holdsInputUntilConnect(session)
   return {
-    onDrivingInputAttempt: (ptyId) => session.noteTerminalInputForPty(ptyId),
     terminalKittyKeyboardProtocol:
       session.pane.terminal.options.vtExtensions?.kittyKeyboard === true,
     cwd: session.deps.cwd,

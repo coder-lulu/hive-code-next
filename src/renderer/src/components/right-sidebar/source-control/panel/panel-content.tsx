@@ -201,7 +201,6 @@ export function SourceControlPanelContent(props: SourceControlPanelReadyProps) {
 
       {branchSummary?.status === 'ready' && hasFilteredBranchEntries && (
         <SourceControlBranchSection
-          activeOpenRowKeys={activeOpenRowKeys}
           branchSummary={branchSummary}
           filteredBranchEntries={filteredBranchEntries}
           totalBranchEntryCount={branchEntries.length}

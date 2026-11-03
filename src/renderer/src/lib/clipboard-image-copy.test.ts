@@ -63,4 +63,11 @@ describe('copyImageToClipboard', () => {
 
     expect(writeClipboardImage).not.toHaveBeenCalled()
   })
+
+  it('propagates a local clipboard write failure', async () => {
+    const error = new Error('Clipboard unavailable')
+    writeClipboardImage.mockRejectedValue(error)
+
+    await expect(copyImageToClipboard(png)).rejects.toBe(error)
+  })
 })

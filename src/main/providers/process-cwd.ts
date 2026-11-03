@@ -1,7 +1,7 @@
 import { execFile as execFileCb } from 'node:child_process'
 import { readlink } from 'node:fs/promises'
 import { LSOF_NONBLOCKING_ARGS } from '../../shared/lsof-nonblocking-args'
-import { readLibprocProcessFilePath } from '../../shared/libproc-addon'
+import { readLibprocProcessCwd } from '../../shared/libproc-addon'
 
 // Coalesce/cache per-PID cwd reads briefly so rapid pane actions cannot accumulate lsof subprocesses.
 const CACHE_TTL_MS = 1500
@@ -62,7 +62,7 @@ async function doResolve(pid: number): Promise<string> {
     /* fall through */
   }
 
-  const inProcess = await readLibprocProcessFilePath('cwd', pid)
+  const inProcess = readLibprocProcessCwd(pid)
   if (inProcess !== undefined) {
     return inProcess ?? ''
   }
@@ -83,13 +83,7 @@ async function doResolve(pid: number): Promise<string> {
   return ''
 }
 
-// lsof stuck on a dead mount outlives its timeout (SIGTERM waits for the syscall); one per pid, not one per poll.
-const liveLsofPids = new Set<number>()
-
 function readCwdWithLsof(pid: number): Promise<string> {
-  if (liveLsofPids.has(pid)) {
-    return Promise.reject(new Error('lsof for this pid has not exited'))
-  }
   return new Promise((resolve, reject) => {
     let settled = false
     let child: ReturnType<typeof execFileCb> | undefined
@@ -113,7 +107,6 @@ function readCwdWithLsof(pid: number): Promise<string> {
 
     // execFile timeout only sends a signal; bound a missing callback so shared lookup cannot remain cached forever.
     try {
-      liveLsofPids.add(pid)
       child = execFileCb(
         'lsof',
         [...LSOF_NONBLOCKING_ARGS, '-a', '-p', String(pid), '-d', 'cwd', '-Fn'],
@@ -122,8 +115,6 @@ function readCwdWithLsof(pid: number): Promise<string> {
           timeout: LSOF_TIMEOUT_MS
         },
         (error, stdout) => {
-          // execFile reports only once the child has exited.
-          liveLsofPids.delete(pid)
           if (error) {
             settle(() => reject(error))
             return
@@ -132,7 +123,6 @@ function readCwdWithLsof(pid: number): Promise<string> {
         }
       )
     } catch (error) {
-      liveLsofPids.delete(pid)
       settle(() => reject(error))
     }
   })

@@ -1,16 +1,13 @@
 import { foldAgentLeadStatus, type AgentLeadStatusResolution } from '../../agent-lead-status-fold'
 import { agentChildWorkLivenessFromEvidence } from '../../agent-status-child-work-liveness'
-import {
-  claudeLiveOwedTaskNotificationKinds,
-  claudeTasksAwaitAgents
-} from '../../claude-owed-task-notifications'
+import { claudeLiveOwedTaskNotificationKinds } from '../../claude-owed-task-notifications'
 import { claudeRosterHasWorkingSubagent } from '../../claude-subagent-roster'
 import type { ClaudeLeadTurnState, HookListenerState } from '../listener-state'
 import { mainAgentIdleSince } from '../main-agent-turn-state'
 
 /** Everything that can hold a pane whose main agent's own turn is over. */
 type ClaudePaneHoldEvidence = {
-  /** A sub-agent the roster tracks as working, or a shell waiting on worker agents. */
+  /** A sub-agent the roster tracks as working. */
   runningAgent: boolean
   /** A running shell or a scheduled session cron. */
   runningNonAgent: boolean
@@ -27,16 +24,13 @@ export function claudePaneHoldEvidence(
     paneKey
   )
 ): ClaudePaneHoldEvidence {
-  const launched = state.claudeLaunchedBackgroundTasksByPaneKey.get(paneKey)
   const owed = claudeLiveOwedTaskNotificationKinds(
-    launched,
+    state.claudeLaunchedBackgroundTasksByPaneKey.get(paneKey),
     mainAgent?.state === 'done',
     mainAgentIdleSince(state.claudeLeadStateByPaneKey.get(paneKey))
   )
   return {
-    runningAgent:
-      claudeRosterHasWorkingSubagent(state.claudeSubagentRosterByPaneKey.get(paneKey)) ||
-      claudeTasksAwaitAgents(launched),
+    runningAgent: claudeRosterHasWorkingSubagent(state.claudeSubagentRosterByPaneKey.get(paneKey)),
     runningNonAgent:
       state.claudeRunningNonAgentTaskPaneKeys.has(paneKey) ||
       state.claudeActiveSessionCronPaneKeys.has(paneKey),

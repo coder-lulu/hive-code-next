@@ -1,4 +1,3 @@
-import type { GhAccountBinding } from '../../shared/github/account-binding'
 import type { GitHubOwnerRepo } from '../../shared/github/pull-request-types'
 import type { GitHubPullRequestStateUpdate } from '../../shared/issue-mutation-types'
 import type { GitHubReactionContent } from '../../shared/github/comment-types'
@@ -6,7 +5,6 @@ import type { Repo } from '../../shared/repo-types'
 import type { LocalProjectGhExecOptions } from '../project-runtime-git-options'
 import {
   mergePR,
-  markPRDraft,
   markPRReadyForReview,
   removePRReviewers,
   requestPRReviewers,
@@ -89,7 +87,6 @@ export class RuntimeGitHubReviewMutationCommands {
       pullRequestId: string
       path: string
       viewed: boolean
-      expectedGhAccount?: GhAccountBinding | null
     }
   ): Promise<Awaited<ReturnType<typeof setPRFileViewed>>> {
     const repo = await this.deps.resolveRepo(repoSelector)
@@ -178,21 +175,6 @@ export class RuntimeGitHubReviewMutationCommands {
   ): Promise<Awaited<ReturnType<typeof markPRReadyForReview>>> {
     const repo = await this.deps.resolveRepo(repoSelector)
     return markPRReadyForReview(
-      repo.path,
-      prNumber,
-      getRepoRoutingConnectionId(repo),
-      prRepo ?? null,
-      ...this.deps.getLocalGitArgs(repo)
-    )
-  }
-
-  async markRepoPRDraft(
-    repoSelector: string,
-    prNumber: number,
-    prRepo?: GitHubOwnerRepo | null
-  ): Promise<Awaited<ReturnType<typeof markPRDraft>>> {
-    const repo = await this.deps.resolveRepo(repoSelector)
-    return markPRDraft(
       repo.path,
       prNumber,
       getRepoRoutingConnectionId(repo),

@@ -141,13 +141,9 @@ export function PluginLogsSection({
       title={translate('auto.components.settings.PluginDetailSections.logs', 'Logs')}
       count={
         state?.lines
-          ? translate(
-              'auto.components.settings.PluginSettingsRow.logCount',
-              'Last {{value0}} lines',
-              {
-                value0: lines.length
-              }
-            )
+          ? translate('components.plugins.detail.logs.lastLines', 'Last {{value0}} lines', {
+              value0: lines.length
+            })
           : undefined
       }
     >
@@ -164,7 +160,7 @@ export function PluginLogsSection({
             tabIndex={0}
             className="scrollbar-sleek max-h-44 overflow-auto bg-muted/40 px-3.5 py-2.5 font-mono text-2xs leading-5"
           >
-            {text || translate('auto.components.settings.PluginSettingsRow.noLogs', 'No logs yet')}
+            {text || translate('components.plugins.detail.logs.empty', 'No logs yet')}
           </pre>
           {text ? (
             <div className="flex justify-end border-t border-border px-2 py-1">

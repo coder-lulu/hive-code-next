@@ -269,7 +269,7 @@ function agentSessionRow(tab: LayoutContentTab, scope: Scope): RuntimeMobileSess
   }
   return {
     type: 'agent-session',
-    id: agentSessionRowId(tab.entityId, tab.id),
+    id: agentSessionRowId(tab.entityId),
     title:
       tab.customTitle?.trim() ||
       scope.facts.tabLabels[scope.key]?.[tab.id] ||

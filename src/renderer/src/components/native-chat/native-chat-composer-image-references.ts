@@ -13,8 +13,7 @@ import {
 } from './native-chat-pending-attachment-cache'
 import {
   imageReferenceInsertion,
-  imageReferenceToken,
-  withoutImageReference
+  imageReferenceToken
 } from '../../../../shared/native-chat/native-chat-image-reference'
 import { withoutImageReferenceNodes } from './native-chat-prompt-document-text'
 
@@ -48,7 +47,8 @@ export function removeImageReferences(
     return
   }
   const { text, document } = readNativeChatComposerDraft(scopeKey)
-  const kept = withoutImageReference(text, attachmentId)
+  const token = imageReferenceToken(attachmentId)
+  const kept = text.replaceAll(`${token} `, '').replaceAll(token, '')
   if (kept === text) {
     return
   }

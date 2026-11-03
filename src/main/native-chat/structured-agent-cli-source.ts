@@ -1,7 +1,7 @@
 import type { AgentStatusIpcPayload } from '../../shared/agent-status-types'
-import type { StructuredAgentSessionResumeSource } from '../../shared/agent-session/structured-agent-session-create'
-import type { StructuredAgentId } from '../../shared/agent-session/lifecycle/agent-session-provider-handle'
-import { agentSessionRefusalError } from '../../shared/agent-session/failures/agent-session-wire-refusals'
+import type { StructuredAgentSessionResumeSource } from '../../shared/structured-agent-session-create'
+import type { StructuredAgentId } from '../../shared/agent-session-provider-handle'
+import { agentSessionRefusalError } from '../../shared/agent-session-wire-refusals'
 import {
   adoptsCliConversations,
   chatAgentsShareConversations,
@@ -11,29 +11,15 @@ import { isWslUncPath } from '../../shared/wsl-paths'
 import { needsWslHostResolution } from './host-readable-transcript-path'
 import { parseSshTranscriptPath } from './ssh-transcript-path'
 
-type CliSource = NonNullable<StructuredAgentSessionResumeSource['cliSource']>
-export type StructuredAgentCliSourceRoute = 'native-local' | 'unsupported' | 'unknown'
-export type StructuredAgentCliSourceLocator =
-  | { kind: 'none' }
-  | { kind: 'matched'; transcriptPath?: string }
-  | { kind: 'absent' }
-
-export type StructuredAgentCliSourceEvidence = (
+export type StructuredAgentCliSourceEvidence =
   | { readonly rows: readonly Readonly<AgentStatusIpcPayload>[] }
   | { readonly error: unknown }
-) & {
-  readonly sourceRoute?: Readonly<CliSource & { route: StructuredAgentCliSourceRoute }>
-  readonly routeError?: unknown
-}
 
 export function captureStructuredAgentCliSource(
-  readRows: () => readonly AgentStatusIpcPayload[],
-  source?: CliSource,
-  readRoute?: (source: CliSource) => StructuredAgentCliSourceRoute
+  readRows: () => readonly AgentStatusIpcPayload[]
 ): StructuredAgentCliSourceEvidence {
-  let rows: StructuredAgentCliSourceEvidence
   try {
-    rows = {
+    return Object.freeze({
       rows: Object.freeze(
         readRows().map((row) =>
           Object.freeze({
@@ -44,34 +30,23 @@ export function captureStructuredAgentCliSource(
           })
         )
       )
-    }
-  } catch (error) {
-    rows = { error }
-  }
-  if (!source || !readRoute) {
-    return Object.freeze(rows)
-  }
-  try {
-    return Object.freeze({
-      ...rows,
-      sourceRoute: Object.freeze({ ...source, route: readRoute(source) })
     })
-  } catch (routeError) {
-    return Object.freeze({ ...rows, routeError })
+  } catch (error) {
+    return Object.freeze({ error })
   }
 }
 
-export function structuredAgentCliSourceFromEvidence(input: {
+export function structuredAgentCliSourcePathFromEvidence(input: {
   agent: StructuredAgentId
   resumeFrom: StructuredAgentSessionResumeSource
   workspaceId: string
   evidence?: StructuredAgentCliSourceEvidence
-}): StructuredAgentCliSourceLocator {
+}): string | undefined {
   const evidence = input.evidence
   if (input.resumeFrom.cliSource && evidence && 'error' in evidence) {
     throw evidence.error
   }
-  return resolveSource({
+  return structuredAgentCliSourcePath({
     ...input,
     rows: evidence && 'rows' in evidence ? evidence.rows : []
   })
@@ -84,20 +59,9 @@ export function structuredAgentCliSourcePath(input: {
   workspaceId: string
   rows: readonly AgentStatusIpcPayload[]
 }): string | undefined {
-  const source = resolveSource(input)
-  return source.kind === 'matched' ? source.transcriptPath : undefined
-}
-
-function resolveSource(input: {
-  agent: StructuredAgentId
-  resumeFrom: StructuredAgentSessionResumeSource
-  workspaceId: string
-  rows: readonly AgentStatusIpcPayload[]
-  evidence?: StructuredAgentCliSourceEvidence
-}): StructuredAgentCliSourceLocator {
   const source = input.resumeFrom.cliSource
   if (!source) {
-    return { kind: 'none' }
+    return undefined
   }
   const row = input.rows.find(
     (candidate) =>
@@ -114,26 +78,6 @@ function resolveSource(input: {
       candidate.providerSession?.id === input.resumeFrom.providerSessionId
   )
   if (!row) {
-    if (
-      source.workspaceId === input.workspaceId &&
-      !input.rows.some((candidate) => candidate.paneKey === source.paneKey)
-    ) {
-      const evidence = input.evidence
-      if (evidence && 'routeError' in evidence) {
-        throw evidence.routeError
-      }
-      const route = evidence?.sourceRoute
-      if (route?.workspaceId === source.workspaceId && route.paneKey === source.paneKey) {
-        if (route.route === 'native-local') {
-          return { kind: 'absent' }
-        }
-        if (route.route === 'unsupported') {
-          throw agentSessionRefusalError('structured_agent_session_unsupported', {
-            reason: 'hostUnsupported'
-          })
-        }
-      }
-    }
     throw agentSessionRefusalError(
       'agent_session_identity_required',
       { reason: 'transcriptUnreadable' },
@@ -149,5 +93,5 @@ function resolveSource(input: {
       reason: 'hostUnsupported'
     })
   }
-  return { kind: 'matched', ...(path ? { transcriptPath: path } : {}) }
+  return path || undefined
 }

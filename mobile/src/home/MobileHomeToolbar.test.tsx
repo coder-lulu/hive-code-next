@@ -1,3 +1,4 @@
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -106,6 +107,6 @@ describe('MobileHomeToolbar', () => {
     act(() => renderer!.root.findByProps({ accessibilityLabel: '返回' }).props.onPress())
     expect(back).toHaveBeenCalledOnce()
     expect(renderer!.root.findAllByProps({ accessibilityLabel: '打开导航菜单' })).toHaveLength(0)
-    expect(renderer!.root.findAllByType('ArrowLeft')).toHaveLength(1)
+    expect(findAllByHostType(renderer!.root, 'ArrowLeft')).toHaveLength(1)
   })
 })

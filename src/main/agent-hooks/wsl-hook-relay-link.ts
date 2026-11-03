@@ -1,13 +1,9 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
 import type { SshChannelMultiplexer } from '../ssh/ssh-channel-multiplexer'
-import {
-  AGENT_HOOK_NOTIFICATION_METHOD,
-  AGENT_HOOK_PANE_ROOT_METHOD
-} from '../../shared/agent-hook-relay'
+import { AGENT_HOOK_NOTIFICATION_METHOD } from '../../shared/agent-hook-relay'
 import { wslHookRelayConnectionId } from '../../shared/wsl-hook-relay-contract'
 import { CLAUDE_AGENT_VIEW_RELAY_METHOD } from '../../shared/claude-agent-view'
-import type { WslHookRelayManagerDeps } from './wsl-hook-relay-deps'
 
 export type WslRelayLinkOptions = {
   mux: SshChannelMultiplexer
@@ -17,8 +13,11 @@ export type WslRelayLinkOptions = {
   /** Runs before the link's first envelope: each link talks to a freshly started guest. */
   beginSession?: (connectionId: string) => void
   receiveClaudeAgentView?: (body: unknown) => unknown
-  /** The guest's other requests, answered by the manager's own handlers. */
-  requestHandlers: Pick<WslHookRelayManagerDeps, 'bindInterruptReconciliation' | 'resolvePaneRoot'>
+  bindInterruptReconciliation?: (
+    mux: SshChannelMultiplexer,
+    connectionId: string,
+    isCurrent: () => boolean
+  ) => () => void
   warn: (message: string) => void
   /** Notify once on mux or child death; a dead mux can otherwise silently discard hook events. */
   onDead: (reason: string) => void
@@ -32,13 +31,7 @@ export function wireWslRelayLink(options: WslRelayLinkOptions): void {
   mux.onRequest(CLAUDE_AGENT_VIEW_RELAY_METHOD, ({ body }) =>
     dead ? {} : (options.receiveClaudeAgentView?.(body) ?? {})
   )
-  const { resolvePaneRoot, bindInterruptReconciliation } = options.requestHandlers
-  mux.onRequest(AGENT_HOOK_PANE_ROOT_METHOD, ({ paneKey }) =>
-    dead || typeof paneKey !== 'string' || !resolvePaneRoot
-      ? {}
-      : resolvePaneRoot(connectionId, distro, paneKey)
-  )
-  const unbindInterrupt = bindInterruptReconciliation?.(mux, connectionId, () => !dead)
+  const unbindInterrupt = options.bindInterruptReconciliation?.(mux, connectionId, () => !dead)
 
   mux.onNotification((method, params) => {
     if (method !== AGENT_HOOK_NOTIFICATION_METHOD) {

@@ -50,9 +50,7 @@ test('Copy image puts the full-size image on the clipboard and keeps the preview
         return size
       })
     await orcaPage.evaluate(async ({ paneKey, worktreeId }) => {
-      const settings = await window.api.settings.set({
-        nativeChatProviders: { claude: true, codex: true }
-      })
+      const settings = await window.api.settings.set({ experimentalNativeChat: true })
       const store = window.__store
       if (!store) {
         throw new Error('Store unavailable')

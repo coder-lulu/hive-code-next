@@ -41,22 +41,14 @@ test.describe('Diff note edit', () => {
         if (!store) {
           throw new Error('window.__store is not available')
         }
-        // The seeded worktree is this app's own (local) copy.
-        return store.getState().addDiffComment(
-          {
-            kind: 'worktree',
-            worktreeId: wId,
-            authority: { endpoint: { kind: 'self' }, at: 'local' }
-          },
-          {
-            worktreeId: wId,
-            filePath: rel,
-            source: 'diff',
-            lineNumber: 1,
-            body,
-            side: 'modified'
-          }
-        )
+        return store.getState().addDiffComment({
+          worktreeId: wId,
+          filePath: rel,
+          source: 'diff',
+          lineNumber: 1,
+          body,
+          side: 'modified'
+        })
       },
       { wId: worktreeId, rel: relativePath, body: seededBody }
     )

@@ -3,9 +3,8 @@ import { constants } from 'node:fs'
 import { access, readlink, realpath, stat } from 'node:fs/promises'
 import { delimiter, isAbsolute, resolve } from 'node:path'
 import { promisify } from 'node:util'
-import { runProcess } from '@orca/process-host'
 import { LSOF_NONBLOCKING_ARGS } from './lsof-nonblocking-args'
-import { readLibprocProcessFilePath } from './libproc-addon'
+import { readLibprocProcessPath } from './libproc-addon'
 import { readPsStdoutInProcess } from './libproc-process-table'
 import { PS_MAX_BUFFER_BYTES } from './process-table-snapshot'
 
@@ -33,20 +32,19 @@ async function readExecutablePath(pid: number): Promise<string | null> {
   if (process.platform !== 'darwin') {
     return null
   }
-  const inProcess = await readLibprocProcessFilePath('executable', pid)
+  const inProcess = readLibprocProcessPath(pid)
   if (inProcess !== undefined) {
     return inProcess
   }
-  // execFile settles only once lsof exits, and SIGTERM cannot interrupt it in a dead mount; runProcess gives up.
-  const result = await runProcess({
-    program: '/usr/sbin/lsof',
-    args: [...LSOF_NONBLOCKING_ARGS, '-a', '-p', String(pid), '-d', 'txt', '-Fn'],
-    timeoutMs: PROCESS_READINESS_TIMEOUT_MS
-  })
-  if (result.timedOut || result.code !== 0) {
-    throw new Error(`lsof -p ${pid} failed${result.timedOut ? ' (timed out)' : ''}`)
-  }
-  return parseDarwinExecutablePath(result.stdout)
+  const { stdout } = await execFile(
+    '/usr/sbin/lsof',
+    [...LSOF_NONBLOCKING_ARGS, '-a', '-p', String(pid), '-d', 'txt', '-Fn'],
+    {
+      encoding: 'utf8',
+      timeout: PROCESS_READINESS_TIMEOUT_MS
+    }
+  )
+  return parseDarwinExecutablePath(stdout)
 }
 
 /** Rejects like execFile when ps exits nonzero, so callers keep their error paths. */

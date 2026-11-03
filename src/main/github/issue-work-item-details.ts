@@ -1,10 +1,6 @@
 import type { GitHubIssueTimelineItem, PRComment } from '../../shared/github/comment-types'
 import type { GitHubAssignableUser } from '../../shared/github/pull-request-types'
-import {
-  ISSUE_DETAILS_QUERY,
-  issueItemSchema,
-  type GraphQLIssueDetailsResponse
-} from './issue-details-query'
+import { z } from 'zod'
 import { mapIssueWorkItem } from './client/map/work-item'
 import { restIssueActor } from './client/map/issue-actor'
 import type { MainWorkItem } from './client/map/work-item-field-coercion'
@@ -13,6 +9,86 @@ import type { LocalGitExecOptions } from './gh-utils'
 import { githubHostExecOptions, type GitHubApiRepository } from './github-api-repository'
 import { getIssueTimelineItems } from './issue-timeline'
 import { noteRepositoryRateLimitSpend, repositoryRateLimitGuard } from './rate-limit'
+
+const ISSUE_DETAILS_QUERY = `query($owner: String!, $repo: String!, $number: Int!, $includeItem: Boolean!) {
+  repository(owner: $owner, name: $repo) {
+    issue(number: $number) {
+      number @include(if: $includeItem) title @include(if: $includeItem)
+      state @include(if: $includeItem)
+      url @include(if: $includeItem)
+      updatedAt @include(if: $includeItem)
+      author @include(if: $includeItem) { __typename login avatarUrl(size: 48) }
+      labels(first: 100) @include(if: $includeItem) {
+        nodes { name }
+        pageInfo { hasNextPage }
+      }
+      body
+      assignees(first: 50) {
+        nodes { login avatarUrl(size: 48) ... on User { name } }
+        pageInfo { hasNextPage }
+      }
+      participants(first: 100) {
+        nodes { login avatarUrl(size: 48) ... on User { name } }
+      }
+      comments(first: 100) {
+        nodes {
+          databaseId
+          body
+          createdAt
+          url
+          author {
+            login
+            avatarUrl(size: 48)
+            ... on Bot { __typename }
+          }
+        }
+      }
+    }
+  }
+}`
+
+const issueItemSchema = z.object({
+  number: z.number().int().positive(),
+  title: z.string(),
+  state: z.enum(['OPEN', 'CLOSED']),
+  url: z.string(),
+  updatedAt: z.string(),
+  author: z.object({ __typename: z.string(), login: z.string(), avatarUrl: z.string() }).nullable(),
+  assignees: z.object({
+    nodes: z.array(z.object({ login: z.string().min(1) })),
+    pageInfo: z.object({ hasNextPage: z.literal(false) })
+  }),
+  labels: z.object({
+    nodes: z.array(z.object({ name: z.string() })),
+    pageInfo: z.object({ hasNextPage: z.literal(false) })
+  })
+})
+
+type GraphQLIssueDetailsResponse = {
+  data?: {
+    repository?: {
+      issue?: {
+        body?: string | null
+        assignees?: { nodes?: (Partial<GitHubAssignableUser> | null)[] | null }
+        participants?: { nodes?: GitHubAssignableUser[] }
+        comments?: {
+          nodes?: {
+            databaseId?: number | null
+            body?: string | null
+            createdAt?: string | null
+            url?: string | null
+            author?: {
+              login?: string | null
+              avatarUrl?: string | null
+              __typename?: string
+            } | null
+          }[]
+        }
+      } | null
+    } | null
+  }
+  errors?: { message?: string }[]
+}
 
 export type CollapsedIssueDetails = {
   item?: MainWorkItem
@@ -30,8 +106,7 @@ export async function getIssueDetailsViaGraphQL(
   repository: GitHubApiRepository | null,
   connectionId?: string | null,
   localGitOptions: LocalGitExecOptions = {},
-  includeItem = false,
-  fresh = false
+  includeItem = false
 ): Promise<CollapsedIssueDetails | null> {
   const ghOptions = {
     ...ghRepoExecOptions(githubRepoContext(repoPath, connectionId, localGitOptions)),
@@ -68,14 +143,6 @@ export async function getIssueDetailsViaGraphQL(
     }
     const issue = parsed.data?.repository?.issue
     if (!issue) {
-      return null
-    }
-    if (
-      fresh &&
-      (typeof issue.body !== 'string' ||
-        !Array.isArray(issue.comments?.nodes) ||
-        issue.comments?.pageInfo?.hasNextPage !== false)
-    ) {
       return null
     }
     const itemData = includeItem ? issueItemSchema.safeParse(issue) : undefined
@@ -126,7 +193,7 @@ export async function getIssueDetailsViaGraphQL(
       assignees: assigneeUsers.map((assignee) => assignee.login),
       assigneeUsers,
       participants,
-      timelineItems: await getIssueTimelineItems(repository, issueNumber, ghOptions, fresh)
+      timelineItems: await getIssueTimelineItems(repository, issueNumber, ghOptions)
     }
   } catch {
     return null
@@ -138,8 +205,7 @@ export async function getIssueBodyAndComments(
   issueNumber: number,
   repository: GitHubApiRepository | null,
   connectionId?: string | null,
-  localGitOptions: LocalGitExecOptions = {},
-  fresh = false
+  localGitOptions: LocalGitExecOptions = {}
 ): Promise<Pick<CollapsedIssueDetails, 'body' | 'comments' | 'assignees' | 'timelineItems'>> {
   const ghOptions = {
     ...ghRepoExecOptions(githubRepoContext(repoPath, connectionId, localGitOptions)),
@@ -148,9 +214,6 @@ export async function getIssueBodyAndComments(
   try {
     if (repository) {
       if (repositoryRateLimitGuard(repository, 'core', ghOptions).blocked) {
-        if (fresh) {
-          throw new Error('GitHub details unavailable')
-        }
         return { body: '', comments: [], assignees: [], timelineItems: [] }
       }
       noteRepositoryRateLimitSpend(repository, 'core', 2, ghOptions)
@@ -158,7 +221,8 @@ export async function getIssueBodyAndComments(
         ghExecFileAsync(
           [
             'api',
-            ...(fresh ? [] : ['--cache', '60s']),
+            '--cache',
+            '60s',
             `repos/${repository.owner}/${repository.repo}/issues/${issueNumber}`
           ],
           ghOptions
@@ -166,13 +230,13 @@ export async function getIssueBodyAndComments(
         ghExecFileAsync(
           [
             'api',
-            ...(fresh ? [] : ['--cache', '60s']),
-            ...(fresh ? ['--paginate', '--slurp'] : []),
+            '--cache',
+            '60s',
             `repos/${repository.owner}/${repository.repo}/issues/${issueNumber}/comments?per_page=100`
           ],
           ghOptions
         ),
-        getIssueTimelineItems(repository, issueNumber, ghOptions, fresh)
+        getIssueTimelineItems(repository, issueNumber, ghOptions)
       ])
       const issue = JSON.parse(issueResult.stdout) as {
         body?: string | null
@@ -185,20 +249,17 @@ export async function getIssueBodyAndComments(
         created_at: string
         html_url: string
       }
-      if (fresh && !('body' in issue)) {
-        throw new Error('GitHub details unavailable')
-      }
-      // A slurped (paginated) read nests one array per page; an ordinary read is one page.
-      const parsedComments: RESTComment[][] | RESTComment[] = JSON.parse(commentsResult.stdout)
-      const comments = parsedComments.flat().map((comment): PRComment => ({
-        id: comment.id,
-        author: comment.user?.login ?? 'ghost',
-        authorAvatarUrl: comment.user?.avatar_url ?? '',
-        body: comment.body ?? '',
-        createdAt: comment.created_at,
-        url: comment.html_url,
-        isBot: comment.user?.type === 'Bot'
-      }))
+      const comments = (JSON.parse(commentsResult.stdout) as RESTComment[]).map(
+        (comment): PRComment => ({
+          id: comment.id,
+          author: comment.user?.login ?? 'ghost',
+          authorAvatarUrl: comment.user?.avatar_url ?? '',
+          body: comment.body ?? '',
+          createdAt: comment.created_at,
+          url: comment.html_url,
+          isBot: comment.user?.type === 'Bot'
+        })
+      )
       return {
         body: issue.body ?? '',
         comments,
@@ -238,10 +299,7 @@ export async function getIssueBodyAndComments(
       assignees: (data.assignees ?? []).map((assignee) => assignee.login),
       timelineItems: []
     }
-  } catch (error) {
-    if (fresh) {
-      throw error
-    }
+  } catch {
     return { body: '', comments: [], assignees: [], timelineItems: [] }
   }
 }

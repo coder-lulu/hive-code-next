@@ -2,22 +2,17 @@ import type { ConnectionPresentationModel } from './use-mobile-tasks-connection-
 import { translate } from '../i18n/mobile-i18n'
 import {
   View,
+  ActivityIndicator,
   colors,
   Text,
   Pressable,
   FlatList,
   spacing,
   ChevronDown,
+  triggerMediumImpact,
   TaskProviderLogo,
   type MobileColorScheme
 } from './mobile-tasks-dependencies'
-import { Inbox } from 'lucide-react-native'
-import {
-  MobileLoadErrorState,
-  MobileNoMatchState,
-  MobileStateView
-} from '../components/MobileStateView'
-import { clearMobileTasksSearch } from './mobile-tasks-search-control'
 import { styles } from './mobile-tasks-legacy-styles'
 import {
   projectGroupMeta,
@@ -27,7 +22,6 @@ import {
   projectRowStatusLabel
 } from './mobile-tasks-legacy-foundation'
 import type { GitHubProjectField, GitHubProjectRow } from './mobile-tasks-view-state-types'
-import { pressedStyle } from '../theme/mobile-theme'
 
 function isProjectFieldEmpty(row: GitHubProjectRow, field: GitHubProjectField): boolean {
   switch (field.dataType) {
@@ -65,8 +59,7 @@ function isProjectFieldEmpty(row: GitHubProjectRow, field: GitHubProjectField): 
 
 export function renderMobileTasksGitHubProjectList(
   model: ConnectionPresentationModel,
-  colorScheme: MobileColorScheme,
-  bottomBarHeight: number
+  colorScheme: MobileColorScheme
 ) {
   const {
     activeGitHubProject,
@@ -77,7 +70,6 @@ export function renderMobileTasksGitHubProjectList(
     githubProjectRepoSlugReady,
     githubProjectSummaryFields,
     githubProjectTable,
-    hasSearch,
     insets,
     refreshGitHubProject,
     setCollapsedGitHubProjectGroups,
@@ -88,22 +80,16 @@ export function renderMobileTasksGitHubProjectList(
   } = model
   const count = githubProjectSummaryFields.length - 4
   return githubProjectLoading ? (
-    <MobileStateView
-      loading
-      title={translate('tasks.githubProjectList.loading', 'Loading project…')}
-      bottomInset={bottomBarHeight}
-    />
+    <View style={styles.centered}>
+      <ActivityIndicator size="small" color={colors.textSecondary} />
+    </View>
   ) : !activeGitHubProject ? (
-    <View style={[styles.centered, { paddingBottom: bottomBarHeight }]}>
+    <View style={styles.centered}>
       <Text style={styles.emptyText}>
         {translate('tasks.githubProjectList.chooseProject', 'Choose a GitHub project')}
       </Text>
       <Pressable
-        style={({ pressed }) => [
-          styles.targetButton,
-          styles.centerActionButton,
-          pressed && pressedStyle
-        ]}
+        style={[styles.targetButton, styles.centerActionButton]}
         disabled={!taskUiReady}
         onPress={() => {
           if (!taskUiReady) {
@@ -118,46 +104,33 @@ export function renderMobileTasksGitHubProjectList(
       </Pressable>
     </View>
   ) : githubProjectError ? (
-    <MobileLoadErrorState
-      error={githubProjectError}
-      onRetry={() => void refreshGitHubProject()}
-      bottomInset={bottomBarHeight}
-    />
+    <View style={styles.centered}>
+      <Text style={styles.emptyText}>{githubProjectError}</Text>
+    </View>
   ) : githubProjectTable && !githubProjectRepoSlugReady ? (
-    <MobileStateView
-      loading
-      title={translate('tasks.githubProjectList.loading', 'Loading project…')}
-      bottomInset={bottomBarHeight}
-    />
-  ) : (!githubProjectTable || visibleGitHubProjectRows.length === 0) && hasSearch ? (
-    <MobileNoMatchState
-      message={translate('tasks.githubProjectList.noMatches', 'No project items match.')}
-      onClear={() => clearMobileTasksSearch(model)}
-      bottomInset={bottomBarHeight}
-    />
+    <View style={styles.centered}>
+      <ActivityIndicator size="small" color={colors.textSecondary} />
+    </View>
   ) : !githubProjectTable || visibleGitHubProjectRows.length === 0 ? (
-    <MobileStateView
-      icon={Inbox}
-      title={translate('tasks.githubProjectList.noItems', 'No project items')}
-      bottomInset={bottomBarHeight}
-    />
+    <View style={styles.centered}>
+      <Text style={styles.emptyText}>
+        {translate('tasks.githubProjectList.noItems', 'No project items')}
+      </Text>
+    </View>
   ) : (
     <FlatList
       data={githubProjectListEntries}
       extraData={colorScheme}
       keyExtractor={(entry) => (entry.type === 'group' ? `group:${entry.group.key}` : entry.row.id)}
       ItemSeparatorComponent={() => <View style={styles.separator} />}
-      contentContainerStyle={[
-        styles.list,
-        { paddingBottom: spacing.lg + Math.max(insets.bottom, bottomBarHeight) }
-      ]}
+      contentContainerStyle={[styles.list, { paddingBottom: spacing.lg + insets.bottom }]}
       refreshing={githubProjectLoading}
       onRefresh={refreshGitHubProject}
       renderItem={({ item: entry }) => {
         if (entry.type === 'group') {
           return (
             <Pressable
-              style={({ pressed }) => [styles.projectGroupHeader, pressed && pressedStyle]}
+              style={styles.projectGroupHeader}
               onPress={() =>
                 setCollapsedGitHubProjectGroups((current) => {
                   const next = new Set(current)
@@ -188,6 +161,7 @@ export function renderMobileTasksGitHubProjectList(
           <Pressable
             style={({ pressed }) => [styles.taskRow, pressed && styles.taskRowPressed]}
             onPress={() => {
+              triggerMediumImpact()
               setProjectRowItem(row)
             }}
           >

@@ -1,4 +1,3 @@
-import { EVERY_AGENT_CHAT } from '../../../shared/native-chat/every-agent-chat.test-fixture'
 import { describe, expect, it } from 'vitest'
 import { makePaneKey } from '../../../shared/stable-pane-id'
 import { setupTerminalCreateSurfacing } from './ipc-events-terminal-create-test-harness'
@@ -185,7 +184,7 @@ describe('useIpcEvents updater integration', () => {
     focusTerminalTabSurface.mockClear()
     storeState.settings = {
       ...storeState.settings,
-      nativeChatProviders: EVERY_AGENT_CHAT
+      experimentalNativeChat: true
     }
     requestTerminalCreateListenerRef.current({
       requestId: 'req-renderer-backed',
@@ -492,7 +491,7 @@ describe('useIpcEvents updater integration', () => {
     })
 
     createTab.mockClear()
-    storeState.settings.nativeChatProviders = {}
+    storeState.settings.experimentalNativeChat = false
     createTerminalListenerRef.current({
       worktreeId: 'wt-2',
       ptyId: 'pty-explicit-chat',
@@ -505,7 +504,7 @@ describe('useIpcEvents updater integration', () => {
       launchAgent: 'codex',
       viewMode: 'chat'
     })
-    storeState.settings.nativeChatProviders = EVERY_AGENT_CHAT
+    storeState.settings.experimentalNativeChat = true
 
     createTab.mockClear()
     setActiveView.mockClear()

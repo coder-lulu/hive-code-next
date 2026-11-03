@@ -14,22 +14,15 @@ import {
 } from './worker-terminal-attention-query'
 import {
   countWorkerTerminalInventory,
-  scanWorkerTerminalStates,
-  WORKER_TERMINAL_HANDED_ON_SQL
+  scanWorkerTerminalStates
 } from './worker-terminal-inventory-counts'
-import {
-  allowWorkerTerminalAutoClose,
-  getWorkerAutoCloseState,
-  keepWorkerTerminalOpen
-} from './worker-terminal-user-keep'
+import { markWorkerTerminalUserOwned } from './worker-terminal-user-takeover'
 
 export {
   countWorkerTerminalInventory,
   getWorkerAttentionFacts,
   getWorkerAttentionFactsForDispatches,
-  allowWorkerTerminalAutoClose,
-  getWorkerAutoCloseState,
-  keepWorkerTerminalOpen
+  markWorkerTerminalUserOwned
 }
 
 /** `databaseId` is the real order key; the timestamp fields only satisfy pre-v3 cursors. */
@@ -169,10 +162,8 @@ export function listWorkerTerminalResources(
               d.rowid AS database_id,
               ${orderExpression} AS created_at,
               COALESCE(w.state, 'unsupervised') AS worker_state,
-              CASE WHEN ${WORKER_TERMINAL_HANDED_ON_SQL} THEN NULL
-                ELSE COALESCE(w.agent_terminal_handle, d.assignee_handle) END AS agent_terminal_handle,
-              CASE WHEN ${WORKER_TERMINAL_HANDED_ON_SQL} THEN NULL
-                ELSE COALESCE(r.pane_key, d.assignee_pane_key) END AS pane_key,
+              COALESCE(w.agent_terminal_handle, d.assignee_handle) AS agent_terminal_handle,
+              COALESCE(r.pane_key, d.assignee_pane_key) AS pane_key,
               COALESCE(w.worktree_id, r.worktree_id) AS worktree_id,
               w.stage AS worker_stage,
               t.parent_id AS parent_task_id,
@@ -281,9 +272,7 @@ export function getWorkerTerminalOrderingKey(
 }
 
 export type WorkerTerminalListingMethods = {
-  allowWorkerTerminalAutoClose: typeof allowWorkerTerminalAutoClose
-  getWorkerAutoCloseState: typeof getWorkerAutoCloseState
-  keepWorkerTerminalOpen: typeof keepWorkerTerminalOpen
+  markWorkerTerminalUserOwned: typeof markWorkerTerminalUserOwned
   listWorkerTerminalReleaseBacklog: typeof listWorkerTerminalReleaseBacklog
   listWorkerTerminalResources: typeof listWorkerTerminalResources
   getWorkerTerminalListingSnapshot: typeof getWorkerTerminalListingSnapshot
@@ -295,9 +284,7 @@ export type WorkerTerminalListingMethods = {
 
 export function attachWorkerTerminalListing(ctor: { prototype: object }): void {
   Object.assign(ctor.prototype, {
-    allowWorkerTerminalAutoClose,
-    getWorkerAutoCloseState,
-    keepWorkerTerminalOpen,
+    markWorkerTerminalUserOwned,
     listWorkerTerminalReleaseBacklog,
     listWorkerTerminalResources,
     getWorkerTerminalListingSnapshot,

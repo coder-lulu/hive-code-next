@@ -19,7 +19,7 @@ public class OrcaMobileWebShellModule: Module {
     }.runOnQueue(.main)
 
     View(OrcaMobileWebShellView.self) {
-      Events("onLoadState", "onBridgeMessage", "onExternalNavigation", "onBackEdgeSwipe")
+      Events("onLoadState", "onBridgeMessage", "onExternalNavigation")
 
       Prop("generationDirectory") { (view: OrcaMobileWebShellView, value: String) in
         view.setGenerationDirectory(value)
@@ -31,10 +31,6 @@ public class OrcaMobileWebShellModule: Module {
 
       Prop("bridgeEnabled") { (view: OrcaMobileWebShellView, value: Bool) in
         view.setBridgeEnabled(value)
-      }
-
-      Prop("backEdgeSwipe") { (view: OrcaMobileWebShellView, value: Bool) in
-        view.setBackEdgeSwipe(value)
       }
 
       AsyncFunction("postBridgeMessage") {

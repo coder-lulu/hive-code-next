@@ -1,8 +1,8 @@
 import { UNFLUSHED_SETTLE_MS } from './transcript-watch-contract'
 import { subscribeOpenCodeNativeChatTranscript } from './transcript-opencode-subscribe'
-import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat/native-chat-agent-support'
+import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat-agent-support'
 import { extname } from 'node:path'
-import type { NativeChatMessage } from '../../shared/native-chat/native-chat-types'
+import type { NativeChatMessage } from '../../shared/native-chat-types'
 import {
   needsWslHostResolution,
   toHostReadableTranscriptPath,
@@ -58,8 +58,7 @@ function exactTranscriptPath(args: SubscribeNativeChatTranscriptArgs): string | 
 /** Return a live subscription while resolve/install retries; pending feedback must not claim settled history. */
 function subscribeViaResolvePoll(
   args: SubscribeNativeChatTranscriptArgs,
-  decode: (line: string, fallbackId: string) => NativeChatMessage | null,
-  initialRefusal: WslTranscriptFsError | null = null
+  decode: (line: string, fallbackId: string) => NativeChatMessage | null
 ): NativeChatTranscriptSubscription {
   let closed = false
   let installed: NativeChatTranscriptSubscription | null = null
@@ -97,16 +96,6 @@ function subscribeViaResolvePoll(
   if (args.onTranscriptPending) {
     settleTimer = setTimeout(settleUnflushed, UNFLUSHED_SETTLE_MS)
     settleTimer.unref?.()
-  }
-
-  function emitGateError(error: WslTranscriptFsError): void {
-    if (gateErrorEmitted || !args.onInitialSnapshot) {
-      return
-    }
-    gateErrorEmitted = true
-    settled = true
-    stopSettleTimer()
-    args.onInitialSnapshot([], false, 0, error.message)
   }
 
   function scheduleAttempt(): void {
@@ -170,8 +159,11 @@ function subscribeViaResolvePoll(
       }
       // Retry transient failures without escaping void runAttempt; show WSL refusal once while recovery continues.
       // Use instanceof: wslTranscriptFsRefusal rethrows unrelated errors and would kill this loop.
-      if (error instanceof WslTranscriptFsError) {
-        emitGateError(error)
+      if (error instanceof WslTranscriptFsError && !gateErrorEmitted && args.onInitialSnapshot) {
+        gateErrorEmitted = true
+        settled = true
+        stopSettleTimer()
+        args.onInitialSnapshot([], false, 0, error.message)
       }
       result = null
     }
@@ -189,10 +181,6 @@ function subscribeViaResolvePoll(
     scheduleAttempt()
   }
 
-  // A stopped distro shows its refusal now, not a pending transcript, while recovery continues.
-  if (initialRefusal && args.onInitialSnapshot) {
-    emitGateError(initialRefusal)
-  }
   if (exactPathNeedsWslResolution) {
     stopWslObservation = observeRunningWslDistros((runningDistros) =>
       runAttempt({ runningDistros: [...runningDistros] })
@@ -246,18 +234,17 @@ export async function subscribeNativeChatTranscript(
   }
 
   let installed: NativeChatTranscriptSubscription | null
-  let refusal: WslTranscriptFsError | null = null
   try {
     installed = await attemptInstall(args, decode, setupSignal)
   } catch (error) {
     setupSignal?.throwIfAborted()
     // Gate refusal must enter retry polling rather than fail subscription setup.
-    refusal = wslTranscriptFsRefusal(error) // rethrows non-gate failures
+    void wslTranscriptFsRefusal(error) // rethrows non-gate failures
     installed = null
   }
   if (installed) {
     return installed
   }
   setupSignal?.throwIfAborted()
-  return subscribeViaResolvePoll(args, decode, refusal)
+  return subscribeViaResolvePoll(args, decode)
 }

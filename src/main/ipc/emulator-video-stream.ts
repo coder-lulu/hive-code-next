@@ -66,14 +66,7 @@ export function registerEmulatorVideoStreamHandlers(): void {
           if (owner.isDestroyed()) {
             return
           }
-          if (videoEvent.type === 'end') {
-            stopSubscription(streamId, owner)
-            // Shares the MJPEG error channel; the renderer matches it by stream id.
-            owner.send('emulator:frameStreamError', {
-              streamId,
-              message: 'The Android video stream ended.'
-            })
-          } else if (videoEvent.type === 'meta') {
+          if (videoEvent.type === 'meta') {
             owner.send('emulator:videoStreamMeta', {
               streamId,
               deviceId: args.deviceId,

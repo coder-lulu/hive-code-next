@@ -1,3 +1,4 @@
+import { findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -54,7 +55,7 @@ describe('MobileRuntimeTaskSearch', () => {
     expect(filterButton.props.accessibilityState).toEqual({ selected: false })
     act(() => filterButton.props.onPress())
 
-    const picker = renderer!.root.findByType('PickerModal')
+    const picker = findByHostType(renderer!.root, 'PickerModal')
     expect(picker.props.visible).toBe(true)
     expect(picker.props.options).toEqual(MOBILE_TASK_EXECUTION_FILTER_OPTIONS)
     act(() => picker.props.onSelect('in-progress'))
@@ -76,7 +77,7 @@ describe('MobileRuntimeTaskSearch', () => {
       )
     })
 
-    expect(renderer!.root.findByType('TextInput').props.maxFontSizeMultiplier).toBe(1.3)
+    expect(findByHostType(renderer!.root, 'TextInput').props.maxFontSizeMultiplier).toBe(1.3)
     expect(
       renderer!.root.findByProps({ accessibilityLabel: '筛选任务状态，进行中' }).props
         .accessibilityState

@@ -173,17 +173,7 @@ describe('orchestration gate commands carry caller identity', () => {
     queueFixtures(
       callMock,
       okFixture('req_list', {
-        gates: [
-          {
-            id: 'gate_1',
-            task_id: 'task_1',
-            question: 'ship?',
-            options: '["yes","no"]',
-            status: 'pending',
-            resolution: null,
-            created_at: '2026-10-31 00:00:00'
-          }
-        ],
+        gates: [{ id: 'gate_1', task_id: 'task_1', question: 'ship?', status: 'pending' }],
         count: 1
       })
     )
@@ -191,15 +181,6 @@ describe('orchestration gate commands carry caller identity', () => {
     await main(['orchestration', 'gate-list', '--run', 'run_adopted', '--json'], '/tmp/repo')
 
     expect(process.exitCode).toBe(0)
-    expect(JSON.parse(String(logSpy.mock.calls[0]?.[0])).result.gates).toEqual([
-      {
-        id: 'gate_1',
-        taskId: 'task_1',
-        status: 'pending',
-        question: 'ship?',
-        options: '["yes","no"]'
-      }
-    ])
     expect(getTerminalHandleMock).not.toHaveBeenCalled()
     expect(paramsFor('orchestration.gateList')).toEqual(
       expect.objectContaining({ run: 'run_adopted', from: undefined })

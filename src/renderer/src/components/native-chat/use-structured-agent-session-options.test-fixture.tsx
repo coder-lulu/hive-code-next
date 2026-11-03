@@ -3,9 +3,9 @@
 import { renderHook } from '@testing-library/react'
 import { vi, type Mock } from 'vitest'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
-import type * as LaunchOptions from '@/lib/agent-session/launch/structured-agent-session-launch-options'
+import type * as LaunchOptions from '@/lib/structured-agent-session-launch-options'
 import type * as HostCapability from '@/runtime/structured-agent-session-host-capability'
-import type { SelectionOutcome } from '../../../../shared/agent-session/options/structured-agent-session-selection-operations'
+import type { SelectionOutcome } from '../../../../shared/structured-agent-session-selection-operations'
 
 type OptionsFixtureMocks = {
   call: Mock
@@ -84,11 +84,11 @@ vi.mock('./native-chat-session-option-settings-write', () => ({
   enqueueSessionOptionSettingsWrite: mocks.enqueue
 }))
 
-vi.mock('@/lib/agent-session/launch/structured-agent-session-launch-options', async () => {
+vi.mock('@/lib/structured-agent-session-launch-options', async () => {
   const { structuredSessionSelectionController } =
     await import('@/lib/structured-agent-session-selection-controller')
   const actual = await vi.importActual<typeof LaunchOptions>(
-    '@/lib/agent-session/launch/structured-agent-session-launch-options'
+    '@/lib/structured-agent-session-launch-options'
   )
   return {
     ...actual,
@@ -111,10 +111,7 @@ vi.mock('@/lib/agent-session/launch/structured-agent-session-launch-options', as
 })
 
 import type { SessionOptionDescriptor } from '../../../../shared/native-chat/input/native-chat-session-options'
-import {
-  useStructuredAgentSessionMutate,
-  type StructuredAgentSessionMutate
-} from './use-structured-agent-session-mutate'
+import type { StructuredAgentSessionMutate } from './use-structured-agent-session-mutate'
 import { useStructuredAgentSessionOptions } from './use-structured-agent-session-options'
 import { useStructuredAgentSessionSendOptions } from './use-structured-agent-session-send-options'
 
@@ -173,8 +170,6 @@ type RenderProps = {
   agent?: 'claude' | 'codex' | 'pi' | 'antigravity'
   providerStarting?: boolean
   paired?: boolean
-  /** Pass the production presentation scope, which is closed while transport is disabled. */
-  presentation?: boolean
 }
 
 const PROVISIONAL: RenderProps = { transportEnabled: false, fence: null, launch: 'new' }
@@ -189,12 +184,6 @@ function renderOptions(initial: RenderProps, mutate: StructuredAgentSessionMutat
   mocks.agent = initial.agent ?? 'codex'
   return renderHook(
     (props: RenderProps) => {
-      const { capturePresentation } = useStructuredAgentSessionMutate({
-        sessionId: props.sessionId ?? 'session-1',
-        target: props.paired ? PAIRED_TARGET : LOCAL_TARGET,
-        stateRef: { current: { fence: props.fence } },
-        enabled: props.transportEnabled
-      })
       const options = useStructuredAgentSessionOptions({
         agent: props.agent ?? 'codex',
         sessionId: props.sessionId ?? 'session-1',
@@ -207,7 +196,6 @@ function renderOptions(initial: RenderProps, mutate: StructuredAgentSessionMutat
         turnId: props.turnId ?? null,
         unloadedTurnRevisions: undefined,
         mutate,
-        ...(props.presentation ? { capturePresentation } : {}),
         ...(props.launch
           ? {
               launch: {

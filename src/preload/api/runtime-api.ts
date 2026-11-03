@@ -1,8 +1,3 @@
-import type {
-  CrewSubscriptionAttemptArgs,
-  CrewSubscriptionAttemptCallbacks,
-  CrewSubscriptionSetupResult
-} from '../../shared/runtime-environment-subscription-setup'
 import type { ManagedOrcadPreloadApi } from './managed-orcad-api'
 import type { WslHostsPreloadApi } from './wsl-hosts-api'
 import type { RuntimeHostStatusSnapshot } from '../../shared/runtime-host-status'
@@ -148,10 +143,6 @@ export type RuntimeApi = {
       expectedEnvironmentPairingRevision?: number
       expectedEnvironmentRuntimeId?: string
     }) => Promise<RuntimeRpcResponse<unknown>>
-    subscribeCrewAttempt?: (
-      args: CrewSubscriptionAttemptArgs,
-      callbacks: CrewSubscriptionAttemptCallbacks
-    ) => Promise<CrewSubscriptionSetupResult>
     cancelSubscription: (args: { subscriptionId: string }) => Promise<void>
     subscribe: (
       args: {

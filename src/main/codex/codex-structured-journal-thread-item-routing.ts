@@ -11,7 +11,7 @@ import {
   readCodexSubagentActivity
 } from './codex-subagent-activity'
 import { CODEX_JOURNAL_ADMITTED } from './codex-structured-journal-contracts'
-import type { CodexStructuredSessionEvent } from './codex-structured-session-state'
+import type { CodexStructuredSessionEvent } from './codex-structured-session-adapter'
 
 type ThreadItemEvent = Extract<CodexStructuredSessionEvent, { type: 'notification' }>
 

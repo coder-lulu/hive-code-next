@@ -1,14 +1,13 @@
 import './rpc/unused-default-rpc-methods.test-fixture'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { RpcDispatcher } from './rpc/dispatcher'
-import { ORCHESTRATION_CALLER_METHODS } from './rpc/methods/orchestration/caller-show'
 import { STRUCTURED_AGENT_SESSION_REVEAL_METHODS } from './rpc/methods/structured-agent-session-reveal'
 import {
   seedTestAgentSessionStoreFromNewerBuild,
   editPersistedTestAgentSessionStore
-} from './agent-session/records/agent-session-record-store-test-harness'
+} from './agent-session-record-store-test-harness'
 import { STRUCTURED_AGENT_SESSION_STATUS_METHODS } from './rpc/methods/structured-agent-session-status-stream'
-import { STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY } from '../../shared/agent-session/agent-session-runtime-capabilities'
+import { STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY } from '../../shared/protocol-version'
 import { folderWorkspaceKey } from '../../shared/workspace-scope'
 import { toSshExecutionHostId } from '../../shared/execution-host'
 import {
@@ -26,7 +25,7 @@ import {
   replaceSaved,
   savedIds
 } from './structured-agent-session-tab-authority.test-support'
-import { structuredAgentSessionTabId } from '../../shared/agent-session/view/structured-agent-session-projection'
+import { structuredAgentSessionTabId } from '../../shared/structured-agent-session-projection'
 import { chatTabCommandsSettled } from './session-layout-apply.test-fixture'
 import * as journalFactory from '../native-chat/agent-session-journal/journal-store-factory'
 import { discardStructuredWorkerSession } from './rpc/methods/orchestration-structured-worker-session'
@@ -142,7 +141,7 @@ it.each([false, true])(
     })
     const release = await holdStartup(rig)
     const publish = vi.spyOn(rig.host.deps.statusSink!, 'publish')
-    await closeStructuredAgentSessionChild(B, { runtime: rig.runtime })
+    await rig.host.setSessionTabVisibility(B, false)
     expect(rig.runtime.live(B)).toBe(false)
     publish.mockClear()
     await release()
@@ -156,11 +155,10 @@ it.each([false, true])(
   }
 )
 
-it('preserves windowless explicit failed-show insertion and retention', async () => {
-  layoutOwner.main = false
+it('preserves a later explicit failed-show reopen and refreshes its snapshot-derived lookup', async () => {
   const rig = await openAuthorityRuntime(await authorityProfile())
   const release = await holdStartup(rig)
-  await closeStructuredAgentSessionChild(B, { runtime: rig.runtime })
+  await rig.host.setSessionTabVisibility(B, false)
   const allow = rejectVisibility(rig)
   await rig.runtime.publishStructuredAgentSessionTab({
     workspaceId: rig.workspace,
@@ -172,15 +170,6 @@ it('preserves windowless explicit failed-show insertion and retention', async ()
   expect(rig.runtime.live(B)).toBe(true)
   await release()
   expect(savedIds(rig)).toContain(B)
-  await rig.runtime.publishStructuredAgentSessionTab({
-    workspaceId: rig.workspace,
-    sessionId: B,
-    agent: 'codex',
-    activate: true
-  })
-  await chatTabCommandsSettled()
-  expect(savedIds(rig)).toEqual([B])
-  expect(rig.store.isSessionTabVisible(B)).toBe(false)
   expect(rig.runtime.live(B)).toBe(true)
   const snapshot = rig.runtime.mobileSessionTabsByWorktree.get(rig.workspace)!
   rig.runtime.storeMobileSessionSnapshot(rig.workspace, { ...snapshot, tabs: [] })
@@ -191,13 +180,13 @@ it('preserves windowless explicit failed-show insertion and retention', async ()
   expect(rig.runtime.live(B)).toBe(false)
   allow()
   await rig.host.setSessionTabVisibility(B, true)
-  await closeStructuredAgentSessionChild(B, { runtime: rig.runtime })
+  await rig.host.setSessionTabVisibility(B, false)
   await chatTabCommandsSettled()
   expect(savedIds(rig)).toEqual([])
 })
 
 it.each([false, true])(
-  'leaves prior visibility and exact known/null ID untouched after unproven close, known=%s',
+  'retains exact known/null prior-ID rollback after unproven close, known=%s',
   async (known) => {
     const rig = await openAuthorityRuntime(await authorityProfile())
     if (known) {
@@ -211,7 +200,7 @@ it.each([false, true])(
     const result = await closeStructuredAgentSessionChild(B, { runtime: rig.runtime })
     expect(result).toMatchObject({ stopped: false, closeAttempted: true })
     expect(rig.store.getSessionTabId(B)).toBe(known ? 'known-tab' : null)
-    expect(rig.store.isSessionTabVisible(B)).toBe(true)
+    expect(rig.store.isSessionTabVisible(B)).toBe(known)
   }
 )
 
@@ -286,7 +275,7 @@ it.each([false, true])(
       finish = Promise.withResolvers<void>()
     const apply = rig.runtime.applyLayoutCommand.bind(rig.runtime)
     const issued: string[] = []
-    vi.spyOn(rig.runtime, 'applyLayoutCommand').mockImplementation(async (command, run) => {
+    vi.spyOn(rig.runtime, 'applyLayoutCommand').mockImplementation(async (command) => {
       if (command.type === 'openAgentSessionTab') {
         issued.push(command.sessionId)
         if (command.sessionId === B) {
@@ -294,12 +283,12 @@ it.each([false, true])(
           await finish.promise
         }
       }
-      return apply(command, run)
+      return apply(command)
     })
     const restore = release()
     await entered.promise
-    await closeStructuredAgentSessionChild(second, { runtime: rig.runtime })
-    await closeStructuredAgentSessionChild(B, { runtime: rig.runtime })
+    await rig.host.setSessionTabVisibility(second, false)
+    await rig.host.setSessionTabVisibility(B, false)
     if (reopened) {
       await rig.runtime.publishStructuredAgentSessionTab({
         workspaceId: rig.workspace,
@@ -483,7 +472,7 @@ it.each([false, true])(
   }
 )
 
-it('captured close retires only its qualified workspace and preserves unrelated mirrors', async () => {
+it('accepted hide retires every old local runtime row while preserving a foreign mirror', async () => {
   const rig = await openAuthorityRuntime(await authorityProfile())
   await rig.host.setSessionTabVisibility(B, true)
   rig.runtime.projectStructuredAgentSessionTab({
@@ -511,9 +500,9 @@ it('captured close retires only its qualified workspace and preserves unrelated 
     ...original,
     worktree: mirrorKey
   })
-  await closeStructuredAgentSessionChild(B, { runtime: rig.runtime })
+  await rig.host.setSessionTabVisibility(B, false)
   expect(rig.runtime.mobileSessionTabsByWorktree.get(rig.workspace)?.tabs).toEqual([])
-  expect(rig.runtime.mobileSessionTabsByWorktree.get(duplicateKey)?.tabs).toEqual(original.tabs)
+  expect(rig.runtime.mobileSessionTabsByWorktree.get(duplicateKey)?.tabs).toEqual([])
   expect(rig.runtime.mobileSessionTabsByWorktree.get(mirrorKey)).toBe(foreign)
   expect(rig.runtime.retireStructuredAgentSessionTabFromSnapshot(B)).toBe(false)
   expect(rig.runtime.mobileSessionTabsByWorktree.get(mirrorKey)).toBe(foreign)
@@ -546,105 +535,4 @@ it('read-only ordinary reveal remains live through held startup without promisin
   expect(savedIds(rig)).toEqual([B])
   expect(rig.runtime.live(B)).toBe(true)
   expect(rig.acquire).not.toHaveBeenCalled()
-})
-
-it.each([false, true])(
-  'caller-issued surface survives saved layout, hydration and physical restart; main=%s',
-  async (main) => {
-    layoutOwner.main = main
-    const rig = await openAuthorityRuntime(
-      await authorityProfile([B, C], { visible: [C], records: [B, C] })
-    )
-    await rig.runtime.restoreStructuredAgentSessionTabs()
-    await chatTabCommandsSettled()
-    const rpc = new RpcDispatcher({
-      runtime: rig.runtime,
-      methods: STRUCTURED_AGENT_SESSION_REVEAL_METHODS
-    })
-    const response = await rpc.dispatch(
-      {
-        id: 'reopen',
-        authToken: 'token',
-        method: 'agentSession.reveal',
-        params: { sessionId: B, navigation: 'caller' }
-      },
-      {
-        pairedDeviceId: 'phone',
-        clientKind: 'mobile',
-        clientCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY]
-      }
-    )
-    expect(response).toMatchObject({ ok: true, result: { ok: true } })
-    await chatTabCommandsSettled()
-    const id = rig.store.getSessionTabId(B)!
-    expect(id).toMatch(/^agent-chat-tab-v1-/)
-    const saved = rig.profile.getWorkspaceSession('local')
-    expect(
-      saved.unifiedTabs?.[rig.workspace]?.filter((tab) => tab.entityId === B).map((tab) => tab.id)
-    ).toEqual([id])
-    expect(saved.tabGroups?.[rig.workspace]?.some((group) => group.activeTabId === id)).toBe(false)
-    replaceSaved(rig, [B, C])
-    await rig.runtime.publishStructuredAgentSessionTab({
-      workspaceId: rig.workspace,
-      sessionId: B,
-      agent: 'codex',
-      activate: false,
-      navigation: 'caller'
-    })
-    await chatTabCommandsSettled()
-    expect(
-      rig.profile
-        .getWorkspaceSession('local')
-        .unifiedTabs?.[rig.workspace]?.filter((tab) => tab.entityId === B)
-        .map((tab) => tab.id)
-    ).toEqual([id])
-    const fresh = await physicalReload(rig)
-    expect(fresh.store.getSessionTabId(B)).toBe(id)
-    const inventory = await fresh.runtime.listMobileSessionTabs(`id:${rig.workspace}`)
-    expect(
-      inventory.tabs
-        .filter((tab) => tab.type === 'agent-session' && tab.sessionId === B)
-        .map((tab) => tab.id)
-    ).toEqual([id])
-    expect(
-      fresh.profile
-        .getWorkspaceSession('local')
-        .unifiedTabs?.[rig.workspace]?.filter((tab) => tab.entityId === B)
-        .map((tab) => tab.id)
-    ).toEqual([id])
-  }
-)
-
-it('installs the cold host before looking up a persisted chat', async () => {
-  const profile = await authorityProfile([B])
-  const runtime = new AuthorityRuntime(profile.profile)
-  const ensure = vi.spyOn(runtime, 'ensureStructuredAgentSessionHost')
-  const rpc = new RpcDispatcher({ runtime, methods: ORCHESTRATION_CALLER_METHODS })
-  const result = await rpc.dispatch(
-    {
-      id: 'cold-location',
-      authToken: 'token',
-      method: 'orchestration.partyLocation',
-      params: { address: `orca_session_id:${B}` }
-    },
-    { clientKind: 'runtime', clientCapabilities: [STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY] }
-  )
-  expect(ensure).toHaveBeenCalledOnce()
-  expect(result).toMatchObject({
-    ok: true,
-    result: { location: { kind: 'chat', sessionId: B, worktreeId: profile.workspace } }
-  })
-})
-
-it('does not admit saved cleanup when the current presentation scope becomes unreadable', async () => {
-  const rig = await openAuthorityRuntime(await authorityProfile([B]))
-  await rig.runtime.restoreStructuredAgentSessionTabs()
-  const surface = rig.runtime.captureStructuredAgentSessionPresentation(B)
-  await rig.host.setSessionTabVisibility(B, false)
-  vi.spyOn(rig.store, 'getConversation').mockImplementation(() => {
-    throw new Error('record unreadable')
-  })
-  rig.runtime.removeCapturedStructuredSessionSavedTabs(B, surface.saved)
-  await chatTabCommandsSettled()
-  expect(savedIds(rig)).toEqual([B])
 })

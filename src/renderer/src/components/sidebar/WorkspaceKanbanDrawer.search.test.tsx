@@ -39,7 +39,7 @@ type GridCapture = {
 type PointerDragCapture = {
   selectedWorktrees: readonly Worktree[]
   onDropWorktreesInStatus: (args: {
-    worktreeKeys: readonly string[]
+    worktreeIds: readonly string[]
     status: string
     dropIndex: number
   }) => void
@@ -205,7 +205,6 @@ function renderDrawer(open = true): void {
     root.render(
       <WorkspaceKanbanDrawer
         open={open}
-        statusBarVisible={true}
         dragPreview={false}
         preserveOpenForMenu={false}
         onOpenChange={vi.fn()}
@@ -309,7 +308,7 @@ describe('WorkspaceKanbanDrawer search', () => {
 
     act(() => {
       pointerDragState.current?.onDropWorktreesInStatus({
-        worktreeKeys: [getWorktreeHostIdentity(omega)],
+        worktreeIds: [omega.id],
         status: 'todo',
         dropIndex: 0
       })
@@ -317,7 +316,7 @@ describe('WorkspaceKanbanDrawer search', () => {
 
     expect(syncWorkspaceBoardTaskStatusesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        worktreeKeys: [getWorktreeHostIdentity(omega)],
+        worktreeIds: [omega.id],
         targetStatus: { id: 'todo', label: 'Todo' }
       })
     )
@@ -403,7 +402,7 @@ describe('WorkspaceKanbanDrawer search', () => {
     act(() => {
       // Descending order is Delta/Gamma/Beta/Alpha; filtered index zero above Gamma maps to full-lane index one.
       pointerDragState.current?.onDropWorktreesInStatus({
-        worktreeKeys: [getWorktreeHostIdentity(omega)],
+        worktreeIds: [omega.id],
         status: 'todo',
         dropIndex: 0
       })

@@ -1,4 +1,3 @@
-import type { TerminalIdentityReadContext } from '../query/terminal-identity-read-context'
 import { OrcaRuntimeWithBuildPtyTerminalSummary } from '../query/pty-terminal-summary'
 import type { PtyIncarnationHandleRecord } from '../../orca-runtime-core'
 import type {
@@ -11,6 +10,8 @@ import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../../shared/layout-owner-switc
 export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntimeWithBuildPtyTerminalSummary {
   protected abstract getLeafKey(tabId: string, leafId: string): string
 
+  protected abstract rejectWaitersForHandle(handle: string, code: string): void
+
   protected bindPtyIncarnationHandle(
     retained: PtyIncarnationHandleRecord,
     leaf: RuntimeLeafRecord
@@ -18,11 +19,11 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
     const leafKey = this.getLeafKey(leaf.tabId, leaf.leafId)
     if (retained.leafKey !== leafKey) {
       if (this.handleByLeafKey.get(retained.leafKey) === retained.handle) {
-        this.terminalIdentity.unbindLeaf(retained.leafKey)
+        this.handleByLeafKey.delete(retained.leafKey)
       }
-      this.terminalIdentity.setIncarnationLeaf(retained, leafKey)
+      retained.leafKey = leafKey
     }
-    this.terminalIdentity.setHandle(retained.handle, {
+    this.handles.set(retained.handle, {
       handle: retained.handle,
       runtimeId: this.runtimeId,
       rendererGraphEpoch: this.rendererGraphEpoch,
@@ -32,7 +33,7 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
       ptyId: leaf.ptyId,
       ptyGeneration: leaf.ptyGeneration
     })
-    this.terminalIdentity.bindLeaf(leafKey, retained.handle)
+    this.handleByLeafKey.set(leafKey, retained.handle)
   }
 
   protected invalidatePtyIncarnationHandle(ptyId: string): void {
@@ -40,19 +41,20 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
     if (!retained) {
       return
     }
-    this.terminalIdentity.removeIncarnation(ptyId)
+    this.handleByPtyIncarnation.delete(ptyId)
     if (this.handleByLeafKey.get(retained.leafKey) === retained.handle) {
-      this.terminalIdentity.unbindLeaf(retained.leafKey)
+      this.handleByLeafKey.delete(retained.leafKey)
     }
-    this.terminalIdentity.removeHandle(retained.handle)
-    this.terminalIdentity.removeSynthetic(retained.handle)
+    this.handles.delete(retained.handle)
+    this.syntheticTerminalHandles.delete(retained.handle)
+    this.rejectWaitersForHandle(retained.handle, 'terminal_handle_stale')
   }
 
   protected clearPtyIncarnationHandles(): void {
     for (const retained of this.handleByPtyIncarnation.values()) {
-      this.terminalIdentity.removeSynthetic(retained.handle)
+      this.syntheticTerminalHandles.delete(retained.handle)
     }
-    this.terminalIdentity.clearIncarnations()
+    this.handleByPtyIncarnation.clear()
   }
 
   protected reconcilePtyIncarnationHandles(): void {
@@ -64,23 +66,11 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
         retained.incarnationId !== null &&
         pty !== undefined &&
         pty.incarnationId !== retained.incarnationId
-      if (!pty || incarnationReplaced || leaves.length > 1) {
+      if (!pty || incarnationReplaced || leaves.length !== 1 || this.handleByPtyId.has(ptyId)) {
         this.invalidatePtyIncarnationHandle(ptyId)
         continue
       }
-      // No pane shows it: a known incarnation keeps naming the process for exit waits beside the
-      // terminal's own handle, and binds no surface; an unknown one proves nothing to keep.
-      if (leaves.length === 0) {
-        if (retained.incarnationId === null) {
-          this.invalidatePtyIncarnationHandle(ptyId)
-        }
-        continue
-      }
-      if (this.handleByPtyId.has(ptyId)) {
-        this.invalidatePtyIncarnationHandle(ptyId)
-        continue
-      }
-      this.terminalIdentity.setIncarnationProcess(retained, pty.incarnationId)
+      retained.incarnationId = pty.incarnationId
       this.bindPtyIncarnationHandle(retained, leaves[0])
     }
   }
@@ -94,7 +84,7 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
       return null
     }
     const leafKey = this.getLeafKey(leaf.tabId, leaf.leafId)
-    this.terminalIdentity.setHandle(preAllocated, {
+    this.handles.set(preAllocated, {
       handle: preAllocated,
       runtimeId: this.runtimeId,
       rendererGraphEpoch: this.rendererGraphEpoch,
@@ -104,40 +94,28 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
       ptyId: leaf.ptyId,
       ptyGeneration: leaf.ptyGeneration
     })
-    this.terminalIdentity.bindLeaf(leafKey, preAllocated)
+    this.handleByLeafKey.set(leafKey, preAllocated)
     return preAllocated
   }
 
-  protected issuePtyHandle(
-    pty: RuntimePtyWorktreeRecord,
-    context?: TerminalIdentityReadContext
-  ): string {
-    const handle = this.issuePtyHandleRecord(pty, context)
+  protected issuePtyHandle(pty: RuntimePtyWorktreeRecord): string {
+    const handle = this.issuePtyHandleRecord(pty)
     // An unbound terminal retains its issued pane stamp for recovery, including after replacement.
     const record = ORCA_LAYOUT_OWNER_IS_MAIN ? this.handles.get(handle) : undefined
-    const issuedForPaneKey = record && (context ? context.paneOf(pty) : this.paneOfPty(pty)).paneKey
+    const issuedForPaneKey = record && this.paneOfPty(pty).paneKey
     if (record && issuedForPaneKey && record.issuedForPaneKey !== issuedForPaneKey) {
-      this.terminalIdentity.setHandle(handle, { ...record, issuedForPaneKey })
+      this.handles.set(handle, { ...record, issuedForPaneKey })
     }
-    context?.changedHandle(handle)
-    context?.changedReverseBinding(pty.ptyId)
     return handle
   }
 
-  private issuePtyHandleRecord(
-    pty: RuntimePtyWorktreeRecord,
-    context?: TerminalIdentityReadContext
-  ): string {
+  private issuePtyHandleRecord(pty: RuntimePtyWorktreeRecord): string {
     const retained = this.handleByPtyIncarnation.get(pty.ptyId)
-    // A paneless alias only answers exit waits; the terminal itself gets its own handle, as unshown terminals do.
-    if (
-      retained?.incarnationId === pty.incarnationId &&
-      this.getLeavesForPty(pty.ptyId).length > 0
-    ) {
+    if (retained?.incarnationId === pty.incarnationId) {
       return retained.handle
     }
     const existingHandle =
-      this.handleByPtyId.get(pty.ptyId) ?? this.findHandleForPtyRecord(pty.ptyId, context)
+      this.handleByPtyId.get(pty.ptyId) ?? this.findHandleForPtyRecord(pty.ptyId)
     if (existingHandle) {
       const existingRecord = this.handles.get(existingHandle)
       if (
@@ -145,17 +123,17 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
         existingRecord.runtimeId === this.runtimeId &&
         existingRecord.ptyId === pty.ptyId
       ) {
-        this.setPtyHandle(pty.ptyId, existingHandle)
+        this.handleByPtyId.set(pty.ptyId, existingHandle)
         return existingHandle
       }
     }
 
     const handle = existingHandle ?? `term_${randomUUID()}`
     if (!existingHandle) {
-      this.terminalIdentity.addSynthetic(handle)
+      this.syntheticTerminalHandles.add(handle)
     }
     const syntheticId = `pty:${pty.ptyId}`
-    this.terminalIdentity.setHandle(handle, {
+    this.handles.set(handle, {
       handle,
       runtimeId: this.runtimeId,
       rendererGraphEpoch: this.rendererGraphEpoch,
@@ -165,20 +143,12 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
       ptyId: pty.ptyId,
       ptyGeneration: 0
     })
-    this.setPtyHandle(pty.ptyId, handle)
+    this.handleByPtyId.set(pty.ptyId, handle)
     return handle
   }
 
-  protected findHandleForPtyRecord(
-    ptyId: string,
-    context?: TerminalIdentityReadContext
-  ): string | null {
-    const candidates = context ? context.syntheticHandles(ptyId) : this.handles.keys()
-    for (const handle of candidates) {
-      const record = this.handles.get(handle)
-      if (!record) {
-        continue
-      }
+  protected findHandleForPtyRecord(ptyId: string): string | null {
+    for (const [handle, record] of this.handles) {
       if (
         record.runtimeId === this.runtimeId &&
         record.ptyId === ptyId &&
@@ -202,19 +172,13 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
       return
     }
     const record = this.handles.get(handle)
-    const retained = record?.ptyId ? this.handleByPtyIncarnation.get(record.ptyId) : undefined
-    this.terminalIdentity.unbindLeaf(leafKey)
-    this.terminalIdentity.removeHandle(handle)
-    // A pane-issued handle names its PTY incarnation, which outlives the pane: a late exit wait
-    // still reads that record until it is pruned or replaced. An unknown incarnation proves no
-    // continuity, so its alias goes with the pane.
-    if (retained?.handle === handle && retained.incarnationId !== null) {
-      return
+    if (record?.ptyId && this.handleByPtyIncarnation.get(record.ptyId)?.handle === handle) {
+      this.handleByPtyIncarnation.delete(record.ptyId)
     }
-    if (record?.ptyId && retained?.handle === handle) {
-      this.terminalIdentity.removeIncarnation(record.ptyId)
-    }
-    this.terminalIdentity.removeSynthetic(handle)
+    this.handleByLeafKey.delete(leafKey)
+    this.handles.delete(handle)
+    this.syntheticTerminalHandles.delete(handle)
+    this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
   }
 
   protected retainUnmountedPublishedPtyHandle(leafKey: string, ptyId: string): void {
@@ -247,7 +211,7 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
     if (!handle || !record || record.ptyId !== null || ptyId === null) {
       return false
     }
-    this.terminalIdentity.setHandle(handle, { ...record, ptyId, ptyGeneration })
+    this.handles.set(handle, { ...record, ptyId, ptyGeneration })
     return true
   }
 
@@ -258,61 +222,5 @@ export abstract class OrcaRuntimeWithBindPtyIncarnationHandle extends OrcaRuntim
         this.detachedPreAllocatedLeaves.set(leaf.ptyId, leaf)
       }
     }
-  }
-  protected issueHandle(leaf: RuntimeLeafRecord, context?: TerminalIdentityReadContext): string {
-    const retained = leaf.ptyId ? this.handleByPtyIncarnation.get(leaf.ptyId)?.handle : undefined
-    const handle = this.issueLeafHandleRecord(leaf)
-    if (retained) {
-      context?.changedHandle(retained)
-    }
-    context?.changedHandle(handle)
-    return handle
-  }
-
-  private issueLeafHandleRecord(leaf: RuntimeLeafRecord): string {
-    const leafKey = this.getLeafKey(leaf.tabId, leaf.leafId)
-    const existingHandle = this.handleByLeafKey.get(leafKey)
-    if (existingHandle) {
-      const existingRecord = this.handles.get(existingHandle)
-      if (
-        existingRecord &&
-        existingRecord.rendererGraphEpoch === this.rendererGraphEpoch &&
-        existingRecord.ptyId === leaf.ptyId &&
-        existingRecord.ptyGeneration === leaf.ptyGeneration
-      ) {
-        return existingHandle
-      }
-    }
-
-    const preAllocatedHandle = this.adoptPreAllocatedHandle(leaf)
-    if (preAllocatedHandle) {
-      return preAllocatedHandle
-    }
-    const incarnationId = leaf.ptyId ? (this.ptysById.get(leaf.ptyId)?.incarnationId ?? null) : null
-    const retained = leaf.ptyId ? this.handleByPtyIncarnation.get(leaf.ptyId) : undefined
-    if (retained && leaf.ptyId && retained.incarnationId !== incarnationId) {
-      this.invalidatePtyIncarnationHandle(leaf.ptyId)
-    } else if (retained) {
-      this.bindPtyIncarnationHandle(retained, leaf)
-      return retained.handle
-    }
-    const handle = `term_${randomUUID()}`
-    this.terminalIdentity.addSynthetic(handle)
-    this.terminalIdentity.setHandle(handle, {
-      handle,
-      runtimeId: this.runtimeId,
-      rendererGraphEpoch: this.rendererGraphEpoch,
-      worktreeId: leaf.worktreeId,
-      tabId: leaf.tabId,
-      leafId: leaf.leafId,
-      ptyId: leaf.ptyId,
-      ptyGeneration: leaf.ptyGeneration
-    })
-    this.terminalIdentity.bindLeaf(leafKey, handle)
-    if (leaf.ptyId) {
-      this.terminalIdentity.setIncarnation(leaf.ptyId, { handle, incarnationId, leafKey })
-      this.wakeMailForNewPtyHandle(leaf.ptyId)
-    }
-    return handle
   }
 }

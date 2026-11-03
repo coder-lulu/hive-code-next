@@ -80,7 +80,7 @@ describe('submodule diff routing', () => {
       if (args[0] === 'config' && args.includes('.gitmodules')) {
         // Declare the submodule only in its parent so recursion terminates.
         return Promise.resolve({
-          stdout: options?.cwd === PARENT ? 'submodule.flutter_mine.path\nflutter_mine\0' : ''
+          stdout: options?.cwd === PARENT ? 'submodule.flutter_mine.path flutter_mine\n' : ''
         })
       }
       if (args[0] === 'ls-files') {
@@ -119,11 +119,11 @@ describe('submodule diff routing', () => {
     const result = await getDiff(PARENT, 'flutter_mine/lib/main.dart', false)
 
     expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(
-      ['cat-file', 'blob', '--', `${OLD_OID}:lib/main.dart`],
+      ['show', '--end-of-options', `${OLD_OID}:lib/main.dart`],
       { cwd: SUBMODULE, maxBuffer: 10 * 1024 * 1024, preferWslDirectGit: true }
     )
     expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(
-      ['cat-file', 'blob', '--', `${NEW_OID}:lib/main.dart`],
+      ['show', '--end-of-options', `${NEW_OID}:lib/main.dart`],
       { cwd: SUBMODULE, maxBuffer: 10 * 1024 * 1024, preferWslDirectGit: true }
     )
     expect(result.kind).toBe('text')
@@ -135,7 +135,7 @@ describe('submodule diff routing', () => {
     gitExecFileAsyncMock.mockImplementation((args: string[], options?: { cwd?: string }) => {
       if (args[0] === 'config' && args.includes('.gitmodules')) {
         return Promise.resolve({
-          stdout: options?.cwd === PARENT ? 'submodule.flutter_mine.path\nflutter_mine\0' : ''
+          stdout: options?.cwd === PARENT ? 'submodule.flutter_mine.path flutter_mine\n' : ''
         })
       }
       if (args[0] === 'ls-files') {
@@ -163,11 +163,11 @@ describe('submodule diff routing', () => {
     const result = await getDiff(PARENT, 'flutter_mine/lib/main.dart', true)
 
     expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(
-      ['cat-file', 'blob', '--', `${OLD_OID}:lib/main.dart`],
+      ['show', '--end-of-options', `${OLD_OID}:lib/main.dart`],
       { cwd: SUBMODULE, maxBuffer: 10 * 1024 * 1024, preferWslDirectGit: true }
     )
     expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(
-      ['cat-file', 'blob', '--', `${NEW_OID}:lib/main.dart`],
+      ['show', '--end-of-options', `${NEW_OID}:lib/main.dart`],
       { cwd: SUBMODULE, maxBuffer: 10 * 1024 * 1024, preferWslDirectGit: true }
     )
     expect(result.kind).toBe('text')
@@ -179,7 +179,7 @@ describe('submodule diff routing', () => {
     gitExecFileAsyncMock.mockImplementation((args: string[], options?: { cwd?: string }) => {
       if (args[0] === 'config' && args.includes('.gitmodules')) {
         return Promise.resolve({
-          stdout: options?.cwd === PARENT ? 'submodule.flutter_mine.path\nflutter_mine\0' : ''
+          stdout: options?.cwd === PARENT ? 'submodule.flutter_mine.path flutter_mine\n' : ''
         })
       }
       if (args[0] === 'ls-files') {
@@ -195,14 +195,11 @@ describe('submodule diff routing', () => {
 
     const result = await getDiff(PARENT, 'flutter_mine/lib/main.dart', false)
 
-    expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(
-      ['cat-file', 'blob', '--', ':lib/main.dart'],
-      {
-        cwd: SUBMODULE,
-        maxBuffer: 10 * 1024 * 1024,
-        preferWslDirectGit: true
-      }
-    )
+    expect(gitExecFileAsyncBufferMock).toHaveBeenCalledWith(['show', ':lib/main.dart'], {
+      cwd: SUBMODULE,
+      maxBuffer: 10 * 1024 * 1024,
+      preferWslDirectGit: true
+    })
     expect(readFileMock).toHaveBeenCalledWith(path.join(SUBMODULE, 'lib/main.dart'))
     expect(result.kind).toBe('text')
     expect(result.originalContent).toBe('old\n')
@@ -213,7 +210,7 @@ describe('submodule diff routing', () => {
     gitExecFileAsyncMock.mockImplementation((args: string[], options?: { cwd?: string }) => {
       if (args[0] === 'config' && args.includes('.gitmodules')) {
         return Promise.resolve({
-          stdout: options?.cwd === PARENT ? 'submodule.evil.path\n../evil\0' : ''
+          stdout: options?.cwd === PARENT ? 'submodule.evil.path ../evil\n' : ''
         })
       }
       return Promise.resolve({ stdout: '' })
@@ -226,7 +223,7 @@ describe('submodule diff routing', () => {
     gitExecFileAsyncMock.mockImplementation((args: string[], options?: { cwd?: string }) => {
       if (args[0] === 'config' && args.includes('.gitmodules')) {
         return Promise.resolve({
-          stdout: options?.cwd === PARENT ? 'submodule.evil.path\n../evil\0' : ''
+          stdout: options?.cwd === PARENT ? 'submodule.evil.path ../evil\n' : ''
         })
       }
       return Promise.resolve({ stdout: '' })
@@ -262,8 +259,8 @@ describe('listSubmodulePaths', () => {
       Promise.resolve({
         stdout:
           options?.wslDistro === 'debian'
-            ? 'submodule.lib.path\ndebian-lib\0'
-            : 'submodule.lib.path\nubuntu-lib\0'
+            ? 'submodule.lib.path debian-lib\n'
+            : 'submodule.lib.path ubuntu-lib\n'
       })
     )
 
@@ -275,12 +272,6 @@ describe('listSubmodulePaths', () => {
     ])
 
     expect(gitExecFileAsyncMock).toHaveBeenCalledTimes(2)
-  })
-
-  it('reads submodule names and paths that contain spaces', async () => {
-    gitExecFileAsyncMock.mockResolvedValue({ stdout: 'submodule.my lib.path\nmy lib\0' })
-
-    await expect(listSubmodulePaths('/repo')).resolves.toEqual(['my lib'])
   })
 })
 

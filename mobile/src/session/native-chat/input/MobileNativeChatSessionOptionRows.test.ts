@@ -8,8 +8,8 @@ import {
   findByHostType
 } from '../../../test-support/react-test-renderer-host-nodes'
 
-vi.mock('../theme/mobile-theme-provider', async () => {
-  const { lightTheme } = await import('../theme/mobile-theme')
+vi.mock('../../../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../../../theme/mobile-theme')
   return {
     useMobileTheme: () => lightTheme,
     useMobileThemeStyles: (factory: (theme: typeof lightTheme) => unknown) => factory(lightTheme)
@@ -19,10 +19,10 @@ vi.mock('../theme/mobile-theme-provider', async () => {
 vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
+  Switch: 'Switch',
   Text: 'Text',
   View: 'View'
 }))
-vi.mock('../../../components/MobileSwitch', () => ({ MobileSwitch: 'Switch' }))
 vi.mock('lucide-react-native', () => ({
   Check: 'Check',
   ChevronDown: 'ChevronDown',

@@ -9,11 +9,7 @@ import {
   type PluginCatalogType
 } from '../../../../../shared/plugins/catalog/plugin-catalog-release'
 import { compareAppVersions } from '../../../../../shared/app-version'
-import {
-  gitRepositoryOwnerLabel,
-  splitQualifiedPluginKey
-} from '../../../../../shared/plugins/catalog/plugin-marketplace'
-import { isPublicCatalogListing } from './plugin-public-catalog'
+import { gitRepositoryOwnerLabel } from '../../../../../shared/plugins/catalog/plugin-marketplace'
 import { pluginDisplayNameFromKey } from './plugin-display-name'
 import { sanitizePluginDisplayText } from '../../../../../shared/plugins/manifest/plugin-display-text'
 import type { PluginAutoUpdateState } from '../../../../../shared/plugins/catalog/plugin-update-policy'
@@ -47,9 +43,6 @@ export type PluginListEntry = {
   verifiedSource: PluginVerifiedSource
   /** Other catalogs listing this installed plugin; none of them can update or replace it. */
   alsoListedBy: readonly string[]
-  /** Listed by (and if installed, installed from) the official or community catalog, so a public
-   *  install count may show. Never for dev, local or Git installs. */
-  installCountEligible?: boolean
 }
 
 export type PluginVerifiedSource =
@@ -194,9 +187,7 @@ export function pluginListEntryFromListing(
     name:
       listingText(listing.name ?? listing.release?.name) ??
       pluginDisplayNameFromKey(listing.pluginKey),
-    // Why the key: it is what an install records, and a catalog's owner is not every entry's author.
-    publisher:
-      splitQualifiedPluginKey(listing.pluginKey)?.publisher || listing.marketplaceOwner || null,
+    publisher: listing.marketplaceOwner || null,
     version: catalogVersion(listing),
     description: listingText(listing.description),
     official: listing.official,
@@ -285,11 +276,6 @@ export function buildPluginListEntries(
         autoUpdates
       })
       const own = ownCatalog && plugin.source?.marketplace ? listing : null
-      // Why bundled too: it ships the official catalog's release, never local bytes.
-      entry.installCountEligible =
-        !plugin.isDev &&
-        ((plugin.source?.kind === 'marketplace' && isPublicCatalogListing(own, catalogById)) ||
-          (plugin.bundled && isPublicCatalogListing(listing, catalogById)))
       entry.alsoListedBy = (listingsByKey.get(plugin.pluginKey) ?? [])
         .filter((candidate) => candidate !== own)
         .map((candidate) => candidate.marketplaceName)
@@ -311,14 +297,13 @@ export function buildPluginListEntries(
     }),
     available: [...listingsByKey.entries()]
       .filter(([pluginKey]) => !installedKeys.has(pluginKey))
-      .map(([pluginKey, candidates]) => ({
-        ...pluginListEntryFromListing(
+      .map(([pluginKey, candidates]) =>
+        pluginListEntryFromListing(
           candidates[0],
           catalogIdsOf(pluginKey),
           catalogById.get(candidates[0].marketplaceSourceId)?.source.url ?? null
-        ),
-        installCountEligible: isPublicCatalogListing(candidates[0], catalogById)
-      }))
+        )
+      )
   }
 }
 

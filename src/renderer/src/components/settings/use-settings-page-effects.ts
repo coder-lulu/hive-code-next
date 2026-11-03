@@ -38,7 +38,7 @@ export function useSettingsPageEffects(
     setMountedSectionIds,
     setQuickCommandAddIntentSignal,
     setRemoteServerAddIntentSignal,
-    consumeSettingsNavigation,
+    setSettingsHostChoice,
     setSettingsProjectHostSelection,
     setSshHostAddIntentSignal,
     setPendingNavRequestTick,
@@ -168,11 +168,6 @@ export function useSettingsPageEffects(
       settingsNavigationTarget.repoId,
       repoIdToRepresentative
     )
-    if (settingsNavigationTarget.intent === 'toggle' && activeSectionId === paneSectionId) {
-      clearSettingsTarget()
-      void closeSettingsPageWithPromptGuard()
-      return
-    }
     // Select the repo’s host before scrolling so host-specific anchors exist.
     const targetRepoId = resolveSettingsTargetRepoId(
       settingsNavigationTarget,
@@ -194,7 +189,9 @@ export function useSettingsPageEffects(
         )
       }
     }
-    consumeSettingsNavigation(settingsNavigationTarget)
+    if (settingsNavigationTarget.hostScope) {
+      setSettingsHostChoice(settingsNavigationTarget.hostScope)
+    }
     pendingNavSectionRef.current = paneSectionId
     pendingScrollTargetRef.current = getSettingsDeepLinkScrollTargetId(
       settingsNavigationTarget,
@@ -230,9 +227,7 @@ export function useSettingsPageEffects(
     setPendingNavRequestTick((tick) => tick + 1)
     clearSettingsTarget()
   }, [
-    activeSectionId,
     clearSettingsTarget,
-    closeSettingsPageWithPromptGuard,
     pendingNavSectionRef,
     pendingScrollTargetRef,
     repoIdToHostSelection,
@@ -242,7 +237,7 @@ export function useSettingsPageEffects(
     setPendingNavRequestTick,
     setQuickCommandAddIntentSignal,
     setRemoteServerAddIntentSignal,
-    consumeSettingsNavigation,
+    setSettingsHostChoice,
     setSettingsProjectHostSelection,
     setSshHostAddIntentSignal,
     settings,

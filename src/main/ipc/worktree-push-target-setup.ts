@@ -1,6 +1,5 @@
 import type { GitPushTarget } from '../../shared/worktree/types'
 import { findGitRemoteNameByFetchUrl } from '../../shared/git-remote-url-index'
-import { getGitCurrentBranchName } from '../../shared/git-current-branch'
 import { sameGitHubRemoteUrl, type GitRemoteExec } from './worktree-push-target-cleanup'
 import {
   buildNarrowForkFetchRefspec,
@@ -43,7 +42,13 @@ export async function resolveCheckedOutBranchName(
   execGit: GitRemoteExec,
   repoPath: string
 ): Promise<string | null> {
-  return getGitCurrentBranchName((args) => execGit(args, repoPath))
+  try {
+    const { stdout } = await execGit(['symbolic-ref', '--short', 'HEAD'], repoPath)
+    const branch = stdout.trim()
+    return branch.length > 0 ? branch : null
+  } catch {
+    return null
+  }
 }
 
 export async function ensureUniqueRemoteName(

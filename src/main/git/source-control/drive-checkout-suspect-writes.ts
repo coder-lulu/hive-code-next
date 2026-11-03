@@ -22,7 +22,11 @@ async function listMergedTrackedPaths(
     worktreePath,
     options
   )) {
-    const { stdout } = await gitExecFileAsync(args, gitOptionsForWorktree(worktreePath, options))
+    const { stdout } = await gitExecFileAsync(args, {
+      ...gitOptionsForWorktree(worktreePath, options),
+      // Why: buffered NUL records must not carry the WSL login shell's rc banner.
+      captureWslLoginShellOutput: true
+    })
     for (const record of stdout.split('\0')) {
       const match = /^\d+ [0-9a-f]+ 0\t(.+)$/s.exec(record)
       if (match) {

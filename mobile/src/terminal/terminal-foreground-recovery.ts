@@ -9,7 +9,6 @@ export type TerminalForegroundRecoveryOutcome = 'recovered' | 'deferred' | 'skip
 
 type TerminalForegroundRecoveryOptions = {
   activeHandleRef: RefObject<string | null>
-  visibleTerminalHandlesRef?: RefObject<readonly string[]>
   terminalRefs: RefObject<Map<string, TerminalWebViewHandle>>
   initializedHandlesRef: RefObject<Set<string>>
   connStateRef: RefObject<ConnectionState>
@@ -33,7 +32,6 @@ export function shouldRecoverTerminalOnAppStateChange(
 
 export function recoverActiveTerminalAfterForeground({
   activeHandleRef,
-  visibleTerminalHandlesRef,
   terminalRefs,
   initializedHandlesRef,
   connStateRef,
@@ -51,28 +49,28 @@ export function recoverActiveTerminalAfterForeground({
   if (initializedMountedHandles.length === 0) {
     return 'skipped'
   }
-  const visible =
-    visibleTerminalHandlesRef?.current ?? (activeHandleRef.current ? [activeHandleRef.current] : [])
-  const recovering = visible.filter((handle) => initializedMountedHandles.includes(handle))
+  const handle = activeHandleRef.current
+  const shouldRecoverActive =
+    !!handle && terminalRefs.current.has(handle) && initializedHandlesRef.current.has(handle)
 
   // Opacity-hidden WebViews can also lose iOS backing stores; their next activation must accept replay.
   for (const initializedHandle of initializedMountedHandles) {
     initializedHandlesRef.current.delete(initializedHandle)
   }
 
-  for (const handle of recovering) {
-    unsubscribeTerminal(handle)
-    schedule(() => {
-      if (connStateRef.current !== 'connected') {
-        return
-      }
-      const stillVisible = visibleTerminalHandlesRef
-        ? visibleTerminalHandlesRef.current.includes(handle)
-        : activeHandleRef.current === handle
-      if (stillVisible && terminalRefs.current.has(handle)) {
-        subscribeToTerminal(handle)
-      }
-    }, delayMs)
+  if (!shouldRecoverActive || !handle) {
+    return 'recovered'
   }
+
+  unsubscribeTerminal(handle)
+  schedule(() => {
+    if (connStateRef.current !== 'connected') {
+      return
+    }
+    if (activeHandleRef.current !== handle || !terminalRefs.current.has(handle)) {
+      return
+    }
+    subscribeToTerminal(handle)
+  }, delayMs)
   return 'recovered'
 }

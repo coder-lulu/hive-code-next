@@ -1,6 +1,8 @@
 import './rpc/unused-default-rpc-methods.test-fixture'
 
 import { describe, expect, it, vi } from 'vitest'
+import { APP_DISPLAY_NAME, PRIMARY_CLI_COMMAND } from '../../shared/brand'
+import { escapeRegex } from '../../shared/string-utils'
 import { formatOrcaSessionAddress } from '../../shared/orca-session-address'
 import { testOrcaSessionId } from '../../shared/orca-session-address-test-fixture'
 import { idOf } from './rpc/orchestration-session-caller-test-fixture'
@@ -106,9 +108,9 @@ describe('a chat as the assignee of orchestration dispatch', () => {
     })
     const task = turnText(worker.turns[0]!)
     expect(task).toContain('build it')
-    expect(task).toContain(`Your Orca session ID is: ${WORKER}`)
+    expect(task).toContain(`Your ${APP_DISPLAY_NAME} session ID is: ${WORKER}`)
     expect(task).toContain('The coordinator cannot see this chat')
-    expect(task).toContain('More supervised work arrives in this chat')
+    expect(task).toContain('it will send this chat a fresh')
     expect(task).not.toContain('this terminal')
     expect(task).not.toMatch(/exit the shell/i)
     expect(task).not.toMatch(/address/i)
@@ -209,7 +211,7 @@ describe('a chat as the assignee of orchestration dispatch', () => {
 
     expect(error).toMatchObject({
       code: 'terminal_is_coordinator',
-      message: expect.stringContaining("is this coordinator's own Orca session ID")
+      message: expect.stringContaining(`is this coordinator's own ${APP_DISPLAY_NAME} session ID`)
     })
     expect(dispatchCount()).toEqual({ n: 0 })
     expect(db.getTask(taskId)?.status).toBe('ready')
@@ -234,7 +236,7 @@ describe('a chat as the assignee of orchestration dispatch', () => {
     expect(dispatchCount()).toEqual({ n: 0 })
   })
 
-  it("hands the chat its coordinator's mail to the Dispatch whole, so its own check has nothing left", async () => {
+  it("points the chat at its coordinator's mail to the Dispatch, which its own check reads", async () => {
     await openChat(COORDINATOR)
     const worker = await openChat(PEER_CHAT)
     const { taskId } = await coordinatorRunAndTask()
@@ -253,12 +255,14 @@ describe('a chat as the assignee of orchestration dispatch', () => {
 
     await vi.waitFor(() => expect(worker.turns).toHaveLength(1), WAIT)
     expect(turnText(worker.turns[0]!)).toMatch(
-      /Subject: also check the tests\n\[Reply: orca(-dev)? orchestration reply --id msg_\w+ --body "\.\.\."\]/
+      new RegExp(
+        `^You have 1 orchestration message\\. Run \`${escapeRegex(PRIMARY_CLI_COMMAND)} orchestration check\`\\.$`
+      )
     )
     expect(await queuedCardTexts(PEER_CHAT)).toEqual([])
     await settleTurn(PEER_CHAT, 0)
     expect(await call('orchestration.check', {}, { sessionId: PEER_CHAT })).toMatchObject({
-      messages: []
+      messages: [expect.objectContaining({ subject: 'also check the tests' })]
     })
   })
 

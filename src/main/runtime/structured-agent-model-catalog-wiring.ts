@@ -1,10 +1,5 @@
-import type { AgentModelCatalogRunningAccountDeps } from '../native-chat/agent-model-catalog/agent-model-catalog-running-account'
-import type { StructuredAgentSessionHost } from '../native-chat/agent-session-wire/structured-agent-session-host'
-import { agentSessionPinnedLaunchDirectory } from './agent-session/records/agent-session-record-launch-directory'
-import {
-  agentModelCatalogStore,
-  type AgentModelCatalogProbe
-} from '../native-chat/agent-model-catalog/agent-model-catalog-store'
+import { agentSessionPinnedLaunchDirectory } from './agent-session-record-launch-directory'
+import { agentModelCatalogStore } from '../native-chat/agent-model-catalog/agent-model-catalog-store'
 import { createAgentModelCatalogFilePersistence } from '../native-chat/agent-model-catalog/agent-model-catalog-persistence'
 import {
   createAgentModelCatalogService,
@@ -15,7 +10,8 @@ import {
   agentReadsProjectModelConfig,
   workspaceMayOverrideDefaultModel
 } from '../native-chat/agent-model-catalog/agent-project-model-override'
-import type { AgentSessionRecordStore } from './agent-session/records/agent-session-record-store'
+import type { AgentModelCatalogProbe } from '../native-chat/agent-model-catalog/agent-model-catalog-store'
+import type { AgentSessionRecordStore } from './agent-session-record-store'
 import type {
   StructuredAgentModelCatalogContext,
   StructuredAgentRuntimeRegistration
@@ -71,7 +67,6 @@ export async function modelCatalogHostDeps(input: {
   store: Pick<AgentSessionRecordStore, 'getRecord' | 'getConversation' | 'listConversations'>
   agents: Pick<StructuredAgentRegistry, 'definition'>
   registrations: readonly CatalogRegistration[]
-  host: () => StructuredAgentSessionHost | null
   deps: StructuredAgentModelCatalogContext['deps']
   environment: StructuredAgentModelCatalogContext['environment']
 }): Promise<{ modelCatalog?: AgentModelCatalogService }> {
@@ -86,7 +81,6 @@ export async function modelCatalogHostDeps(input: {
     getRecord: (sessionId) => input.store.getRecord(sessionId) ?? undefined,
     drivesRecord: (record) => agentDrivesSession(input.agents, record),
     resolveAccountHome: deps.resolveAgentAccountHome,
-    ...structuredAgentModelCatalogAccountReads(input.host),
     recordWorkspacePath: async (record) =>
       agentSessionPinnedLaunchDirectory(record) ??
       (await deps.resolveWorkspacePath(record.location.workspaceId).catch(() => null)),
@@ -100,15 +94,6 @@ export async function modelCatalogHostDeps(input: {
     })
   })
   return { modelCatalog }
-}
-
-/** Capture the constructing runtime's host lazily; global installation is a separate lifetime. */
-export function structuredAgentModelCatalogAccountReads(
-  readHost: () => Pick<StructuredAgentSessionHost, 'childAccountHome'> | null
-): Pick<AgentModelCatalogRunningAccountDeps, 'liveAccountHome'> {
-  return {
-    liveAccountHome: (id) => readHost()?.childAccountHome(id)
-  }
 }
 
 /** The installed host lists what a changed account or agent setting made cold; with no host yet,

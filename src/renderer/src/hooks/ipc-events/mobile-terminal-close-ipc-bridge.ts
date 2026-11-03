@@ -131,21 +131,12 @@ export function registerMobileAndTerminalCloseIpcBridge(
 
   unsubs.push(
     window.api.ui.onOpenDiffFromMobile(
-      ({
-        worktreeId,
-        filePath,
-        relativePath,
-        staged,
-        runtimeEnvironmentId,
-        navigation,
-        oldPath
-      }) => {
+      ({ worktreeId, filePath, relativePath, staged, runtimeEnvironmentId, navigation }) => {
         openRuntimeEditorTab(worktreeId, navigation, (store, selection) =>
           // Why: mobile renders diffs from metadata; the editor-local Changes shortcut would send plain markdown back to mobile.
           store.openDiff(worktreeId, filePath, relativePath, detectLanguage(relativePath), staged, {
             runtimeEnvironmentId,
-            selection,
-            ...(oldPath ? { oldPath } : {})
+            selection
           })
         )
       }

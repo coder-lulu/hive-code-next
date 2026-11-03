@@ -7,11 +7,6 @@ import type { Repo } from '../../shared/repo-types'
 import type { Automation, AutomationRun } from '../../shared/automations-types'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import type { AutomationsChangedPayload } from '../../shared/runtime-client-events'
-import {
-  createTranscriptPane,
-  TRANSCRIPT_PANE_PTY_ID
-} from '../runtime/agent-transcript-pane-test-harness'
-import { createRuntimeAutomationRunTerminalObserver } from './runtime-terminal-run-observer'
 import { AutomationService } from './service'
 import type {
   AutomationRunCompletionObservation,
@@ -103,7 +98,6 @@ describe('authority-owned automation run completion', () => {
     const store = await createStore()
     const automation = createAutomation(store)
     const service = new AutomationService(store, {
-      allowRemoteHostScheduling: true,
       headlessDispatcher: async () => ({ ...LAUNCH_TARGET }),
       terminalObserver: createObserver(async () => ({ status: 'completed', error: null }))
     })
@@ -120,7 +114,6 @@ describe('authority-owned automation run completion', () => {
     const store = await createStore()
     const automation = createAutomation(store)
     const service = new AutomationService(store, {
-      allowRemoteHostScheduling: true,
       headlessDispatcher: async () => ({ ...LAUNCH_TARGET }),
       terminalObserver: createObserver(
         async () => ({ status: 'completed' }),
@@ -137,17 +130,11 @@ describe('authority-owned automation run completion', () => {
     const store = await createStore()
     const automation = createAutomation(store)
     const logged = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { runtime, handle } = await createTranscriptPane({
-      paneTitle: 'shell',
-      foregroundProcess: 'bash',
-      data: ''
-    })
-    runtime.onPtyExit(TRANSCRIPT_PANE_PTY_ID, 137, 'inc-1', { providerExitObserved: true })
-    const observer = createRuntimeAutomationRunTerminalObserver(runtime)
     const service = new AutomationService(store, {
-      allowRemoteHostScheduling: true,
       headlessDispatcher: async () => ({ ...LAUNCH_TARGET }),
-      terminalObserver: { ...observer, resolveRunTerminal: () => handle }
+      terminalObserver: createObserver(async () => {
+        throw new Error('terminal_handle_stale')
+      })
     })
 
     const run = await service.runNow(automation.id)
@@ -158,7 +145,7 @@ describe('authority-owned automation run completion', () => {
     expect(readRun(store, automation.id, run.id).error).toBe(
       `${APP_DISPLAY_NAME} stopped watching this run before it reported completion.`
     )
-    expect(logged.mock.calls.flat().map(String).join(' ')).toContain('terminal_exited')
+    expect(logged.mock.calls.flat().map(String).join(' ')).toContain('terminal_handle_stale')
     logged.mockRestore()
     service.stop()
   })
@@ -244,7 +231,6 @@ describe('authority-owned automation run completion', () => {
     const automation = createAutomation(store)
     let resolveObservation: ((value: AutomationRunCompletionObservation) => void) | null = null
     const service = new AutomationService(store, {
-      allowRemoteHostScheduling: true,
       headlessDispatcher: async () => ({ ...LAUNCH_TARGET }),
       terminalObserver: createObserver(
         () =>
@@ -283,7 +269,6 @@ describe('authority-owned automation run completion', () => {
     const automation = createAutomation(store)
     const aborted: boolean[] = []
     const service = new AutomationService(store, {
-      allowRemoteHostScheduling: true,
       headlessDispatcher: async () => ({ ...LAUNCH_TARGET }),
       terminalObserver: createObserver(
         (signal) =>
@@ -308,7 +293,6 @@ describe('authority-owned automation run completion', () => {
     const automation = createAutomation(store)
     const publish = vi.fn()
     const service = new AutomationService(store, {
-      allowRemoteHostScheduling: true,
       headlessDispatcher: async () => ({ ...LAUNCH_TARGET }),
       onAutomationsChanged: publish
     })
@@ -337,7 +321,6 @@ describe('automationsChanged publication', () => {
     const automation = createAutomation(store)
     const seen: { payload: AutomationsChangedPayload; status: string | undefined }[] = []
     const service = new AutomationService(store, {
-      allowRemoteHostScheduling: true,
       headlessDispatcher: async () => ({ ...LAUNCH_TARGET }),
       onAutomationsChanged: (payload) => {
         seen.push({

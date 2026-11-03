@@ -1,5 +1,12 @@
-import { themedStyleSheet, StyleSheet, colors, radii, spacing } from './mobile-tasks-dependencies'
-import { concentricRadius } from '../theme/mobile-theme'
+import {
+  themedStyleSheet,
+  StyleSheet,
+  Platform,
+  colors,
+  radii,
+  spacing,
+  typography
+} from './mobile-tasks-dependencies'
 import { FIELD_MIN_HEIGHT } from '../components/composer-input/composer-input-styles'
 
 export const mobileTasksProjectPickerStyles = themedStyleSheet(() => ({
@@ -12,7 +19,7 @@ export const mobileTasksProjectPickerStyles = themedStyleSheet(() => ({
     maxHeight: '100%',
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    borderRadius: radii.surface,
+    borderRadius: radii.card,
     backgroundColor: colors.bgPanel,
     overflow: 'hidden'
   },
@@ -38,21 +45,21 @@ export const mobileTasksProjectPickerStyles = themedStyleSheet(() => ({
   boardCard: {
     margin: spacing.sm,
     marginBottom: 0,
-    borderRadius: concentricRadius(radii.surface, spacing.sm),
+    borderRadius: radii.card,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
     backgroundColor: colors.bgBase,
     padding: spacing.md
   },
   repoPickerGroup: {
-    backgroundColor: colors.sheetGroup,
-    borderRadius: radii.surface,
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
     overflow: 'hidden'
   },
   pagePickerList: {
     maxHeight: 420,
-    backgroundColor: colors.sheetGroup,
-    borderRadius: radii.surface
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12
   },
   projectPickerControls: {
     gap: spacing.sm,
@@ -67,8 +74,8 @@ export const mobileTasksProjectPickerStyles = themedStyleSheet(() => ({
     marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: colors.statusAmber,
-    borderRadius: radii.surface,
-    backgroundColor: colors.sheetGroup
+    borderRadius: radii.card,
+    backgroundColor: colors.bgPanel
   },
   projectWarningTextWrap: {
     flex: 1,
@@ -131,7 +138,7 @@ export const mobileTasksProjectPickerStyles = themedStyleSheet(() => ({
     maxWidth: '100%',
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    borderRadius: radii.pill,
+    borderRadius: 999,
     backgroundColor: colors.bgPanel,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2
@@ -156,9 +163,63 @@ export const mobileTasksProjectPickerStyles = themedStyleSheet(() => ({
     alignItems: 'center',
     justifyContent: 'center'
   },
-  pickerStack: {
-    gap: spacing.md,
-    marginBottom: spacing.md
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderSubtle
+  },
+  pickerRowSelected: {
+    backgroundColor: colors.bgRaised
+  },
+  pickerRowContent: {
+    flex: 1,
+    minWidth: 0
+  },
+  pickerRowLabel: {
+    fontSize: typography.bodySize,
+    color: colors.textPrimary
+  },
+  pickerRowSubtitle: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 1
+  },
+  pickerRowWithAction: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  },
+  pickerRowMain: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md
+  },
+  pickerCheck: {
+    width: 18,
+    alignItems: 'center'
+  },
+  pickerContent: {
+    flex: 1,
+    minWidth: 0
+  },
+  pickerLabel: {
+    fontSize: typography.bodySize,
+    color: colors.textPrimary
+  },
+  monoText: {
+    fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' })
+  },
+  pickerSubtitle: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 1
   },
   iconActionButton: {
     width: 44,

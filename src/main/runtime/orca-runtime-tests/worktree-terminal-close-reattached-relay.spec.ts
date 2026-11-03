@@ -75,11 +75,7 @@ describe('closing a workspace whose relay terminal was reattached from an earlie
     await expect(
       runtime.closeTerminalsForWorktree(`id:${TEST_WORKTREE_ID}`)
     ).resolves.not.toHaveProperty('ptyStopVerdict')
-    expect(runtime.getPtyLivenessVerdict(REATTACHED_PTY_ID)).toEqual({
-      status: 'exited',
-      incarnationId: INCARNATION_ID,
-      cause: { kind: 'unknown', reason: 'cause_unreported' }
-    })
+    expect(runtime.getPtyLivenessVerdict(REATTACHED_PTY_ID)).toEqual({ status: 'exited' })
   })
 
   it('accepts the host exit even when the stop confirmation carries no incarnation', async () => {
@@ -99,11 +95,7 @@ describe('closing a workspace whose relay terminal was reattached from an earlie
     await expect(runtime.closeTerminalsForWorktree(`id:${TEST_WORKTREE_ID}`)).resolves.toEqual(
       expect.not.objectContaining({ ptyStopVerdict: expect.anything() })
     )
-    expect(runtime.getPtyLivenessVerdict(REATTACHED_PTY_ID)).toEqual({
-      status: 'exited',
-      incarnationId: INCARNATION_ID,
-      cause: { kind: 'exited', exitCode: 1 }
-    })
+    expect(runtime.getPtyLivenessVerdict(REATTACHED_PTY_ID)).toEqual({ status: 'exited' })
   })
 
   it('keeps the exit when the reattach registration lands after the stop', async () => {
@@ -124,11 +116,7 @@ describe('closing a workspace whose relay terminal was reattached from an earlie
     await expect(
       runtime.closeTerminalsForWorktree(`id:${TEST_WORKTREE_ID}`)
     ).resolves.not.toHaveProperty('ptyStopVerdict')
-    expect(runtime.getPtyLivenessVerdict(REATTACHED_PTY_ID)).toEqual({
-      status: 'exited',
-      incarnationId: INCARNATION_ID,
-      cause: { kind: 'unknown', reason: 'cause_unreported' }
-    })
+    expect(runtime.getPtyLivenessVerdict(REATTACHED_PTY_ID)).toEqual({ status: 'exited' })
   })
 
   it('still doubts a retained SSH record whose exit was never confirmed', async () => {

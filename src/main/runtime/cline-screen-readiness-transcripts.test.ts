@@ -335,11 +335,7 @@ describe('ZCode captured composer readiness', () => {
       expect(getSyntheticAgentTerminalTitle('zcode', 'waiting')).toBe('ZCode - action required')
       expect(shouldDriveSyntheticAgentTitleFromHook('zcode', 'working')).toBe(true)
       expect(
-        hasExplicitIdleTitle({
-          lastAgentStatus: 'idle',
-          lastOutputAt: Date.now(),
-          lastOscTitle: 'ZCode ready'
-        })
+        hasExplicitIdleTitle({ lastAgentStatus: 'idle', lastOutputAt: Date.now() }, 'ZCode ready')
       ).toBe(true)
     })
 

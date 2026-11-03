@@ -111,7 +111,6 @@ export function EditorMarkdownFileSurface({
               worktreeId={activeFile.worktreeId}
               externalSshTargetId={activeFile.externalSshTargetId}
               runtimeEnvironmentId={activeFile.runtimeEnvironmentId}
-              operationProvenance={activeFile.operationProvenance}
               scrollCacheKey={`${editorViewStateKey}:rich`}
               onContentChange={onContentChange}
               onDirtyStateHint={handleDirtyStateHint}

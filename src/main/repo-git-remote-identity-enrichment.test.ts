@@ -146,10 +146,8 @@ describe('enrichMissingRepoGitRemoteIdentities', () => {
           updatedAt: 0
         }
       ],
-      // The user opted in to WSL hosts (Stage 1), so reads follow the project's runtime.
       getSettings: () => ({
-        localWindowsRuntimeDefault: { kind: 'wsl' as const, distro: 'Ubuntu' },
-        experimentalWslHosts: true
+        localWindowsRuntimeDefault: { kind: 'wsl' as const, distro: 'Ubuntu' }
       })
     }
     return { repo, store }

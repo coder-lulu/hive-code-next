@@ -1,8 +1,8 @@
-import { agentSessionFailureSentence } from '../../../src/shared/agent-session/failures/agent-session-failure-words'
+import { agentSessionFailureSentence } from '../../../src/shared/agent-session-failure-words'
 import type {
   AgentSessionWriteNoticePart,
   AgentSessionWriteNoticeSentence
-} from '../../../src/shared/agent-session/failures/agent-session-write-notice-copy'
+} from '../../../src/shared/agent-session-write-notice-copy'
 import { translate } from '../i18n/mobile-i18n'
 import { sayMobileAgentSessionFailure } from './agent-session-failure-copy'
 
@@ -35,17 +35,17 @@ const SENTENCES: Record<AgentSessionWriteNoticeSentence, () => string> = {
   capacity: () =>
     translate(
       'session.writeNotice.capacity',
-      'Orca on the computer running this chat has hit a request limit. Update Orca there, then try again.'
+      'HiveCode on the computer running this chat has hit a request limit. Update HiveCode there, then try again.'
     ),
   outcomeUnknown: () =>
     translate(
       'session.writeNotice.outcomeUnknown',
-      "Orca couldn't confirm what happened. Check the chat."
+      "HiveCode couldn't confirm what happened. Check the chat."
     ),
   sendOutcomeLost: () =>
     translate(
       'session.writeNotice.sendOutcomeLost',
-      "Orca couldn't confirm your message reached the agent. Check the chat, then send it again if needed."
+      "HiveCode couldn't confirm your message reached the agent. Check the chat, then send it again if needed."
     ),
   continuationSuperseded: () =>
     translate(
@@ -62,35 +62,45 @@ const SENTENCES: Record<AgentSessionWriteNoticeSentence, () => string> = {
   historyUnreadable: () =>
     translate(
       'session.writeNotice.historyUnreadable',
-      "Orca couldn't read this chat's saved history."
+      "HiveCode couldn't read this chat's saved history."
     ),
   historyUnusable: () =>
     translate('session.writeNotice.historyUnusable', 'Unable to load this chat.'),
   historyUnavailable: () =>
     translate(
       'session.writeNotice.historyUnavailable',
-      "Orca couldn't open this chat's history right now."
+      "HiveCode couldn't open this chat's history right now."
     ),
   savedByNewerOrca: () =>
-    translate('session.writeNotice.savedByNewerOrca', 'Chats were saved by a newer Orca.'),
+    translate('session.writeNotice.savedByNewerHiveCode', 'Chats were saved by a newer HiveCode.'),
   updateOrcaToKeepUsing: () =>
-    translate('session.writeNotice.updateOrcaToKeepUsing', 'Update Orca to keep using them.'),
+    translate(
+      'session.writeNotice.updateHiveCodeToKeepUsing',
+      'Update HiveCode to keep using them.'
+    ),
   chatSavedByNewerOrca: () =>
-    translate('session.writeNotice.chatSavedByNewerOrca', 'This chat was saved by a newer Orca.'),
+    translate(
+      'session.writeNotice.chatSavedByNewerHiveCode',
+      'This chat was saved by a newer HiveCode.'
+    ),
   updateOrcaToOpenChat: () =>
-    translate('session.writeNotice.updateOrcaToOpenChat', 'Update Orca to open it.'),
+    translate('session.writeNotice.updateHiveCodeToOpenChat', 'Update HiveCode to open it.'),
   unsupported: () =>
     translate(
       'session.writeNotice.unsupported',
-      'This needs a newer Orca on the computer running this chat. Update Orca there, then try again.'
+      'This needs a newer HiveCode on the computer running this chat. Update HiveCode there, then try again.'
     ),
   notAvailable: () =>
     translate('session.writeNotice.notAvailable', "This isn't available in this chat."),
   cannotRunHere: () =>
-    translate('session.writeNotice.cannotRunHere', "Orca can't run this agent in a chat here."),
-  unreachable: () => translate('session.writeNotice.unreachable', "Orca couldn't reach the agent."),
+    translate('session.writeNotice.cannotRunHere', "HiveCode can't run this agent in a chat here."),
+  unreachable: () =>
+    translate('session.writeNotice.unreachable', "HiveCode couldn't reach the agent."),
   recordFailed: () =>
-    translate('session.writeNotice.recordFailed', "Orca couldn't save this to the chat's history."),
+    translate(
+      'session.writeNotice.recordFailed',
+      "HiveCode couldn't save this to the chat's history."
+    ),
   attachmentExpired: () =>
     translate('session.writeNotice.attachmentExpired', 'This attachment expired.'),
   reattachFile: () =>
@@ -221,20 +231,16 @@ const SENTENCES: Record<AgentSessionWriteNoticeSentence, () => string> = {
   hostReconciling: () =>
     translate(
       'session.writeNotice.hostReconciling',
-      'Orca is still checking on this chat after restarting.'
+      'HiveCode is still checking on this chat after restarting.'
     ),
   waitMoment: () => translate('session.writeNotice.waitMoment', 'Wait a moment.'),
   recordUnreadable: () =>
     translate(
       'session.writeNotice.recordUnreadable',
-      "Orca couldn't read this chat's saved state."
+      "HiveCode couldn't read this chat's saved state."
     ),
-  mailOwnerUnconfirmed: () =>
-    translate(
-      'session.writeNotice.mailOwnerUnconfirmed',
-      "Orca couldn't confirm this message is still meant for this chat."
-    ),
-  chatNotFound: () => translate('session.writeNotice.chatNotFound', "Orca can't find this chat."),
+  chatNotFound: () =>
+    translate('session.writeNotice.chatNotFound', "HiveCode can't find this chat."),
   startNewChat: () =>
     translate('session.writeNotice.startNewChat', 'Start a new chat to continue.'),
   tryAgain: () => translate('session.writeNotice.tryAgain', 'Try again.')

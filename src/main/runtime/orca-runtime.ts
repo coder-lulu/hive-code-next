@@ -1,7 +1,6 @@
 import { conversationRecordReader } from './orchestration/structured-session-lineage'
 import type { RuntimeLinearCommandSurface } from './runtime-linear-command-surface'
 import { installRuntimeLinearCommandSurface } from './runtime-linear-command-surface'
-import { publishNativeChatFollowUpChanges } from './runtime-native-chat-follow-up-events'
 import { publishWorkspaceViewChanges } from './runtime-workspace-view-change-events'
 import {
   OrcaRuntimeWithSidebarTemporal,
@@ -20,8 +19,8 @@ import type {
   AgentLaunchPaneVerdict
 } from '../../shared/agent-launch-pane-verdict'
 import { registerWorktreeChangeInvalidator } from '../ipc/worktree-change-invalidators'
-import type { AgentSessionRecordStore } from './agent-session/records/agent-session-record-store'
-import { peekOpenedAgentSessionRecordStore } from './agent-session/records/agent-session-record-store-slot'
+import type { AgentSessionRecordStore } from './agent-session-record-store'
+import { peekOpenedAgentSessionRecordStore } from './agent-session-record-store-slot'
 import { createAgentLaunchRecordWarmupGate } from './agent-launch-record-warmup-gate'
 import { WorkspaceLayoutStream, type WorkspaceLayoutReads } from './workspace-layout-stream'
 import type { RemoteLayoutSnapshot } from '../../shared/remote-layout-snapshot'
@@ -37,11 +36,7 @@ import type { RuntimeReferenceFindParams } from '../../shared/runtime-reference-
 import { getRepoExecutionHostId } from '../../shared/execution-host'
 import type { LayoutApplyReply } from '../../shared/workspace-layout/workspace-layout-command-types'
 import { rekeyMovedPaneOwners } from './moved-pane-owner-rekey'
-import {
-  applyWindowLayoutCommand,
-  type WindowLayoutCommand,
-  type LayoutCommandRunOptions
-} from './runtime-layout-apply'
+import { applyWindowLayoutCommand, type WindowLayoutCommand } from './runtime-layout-apply'
 import type { TerminalCreateOptions } from './runtime-terminal-contracts'
 import {
   installStructuredAgentAvailability,
@@ -58,8 +53,6 @@ import { sidebarInputsFeedDomains } from './sidebar-inputs/sidebar-inputs-feed-d
 import { requireSwitchedOn } from './sidebar-inputs/require-switched-on'
 import { HEADLESS_RUNTIME_WINDOW_ID } from '../../shared/runtime-session-contracts'
 import { getHostDisplayLabelOverrides } from '../../shared/host-setting-overrides'
-import type { OrchestrationDb } from './orchestration/db'
-import { continueRestoredWorkerMailSoon } from './rpc/methods/orchestration/messaging/settled-worker-follow-through'
 
 const OrcaRuntimeSidebarBase: typeof OrcaRuntimeWithAgentTransitions = ORCA_SIDEBAR_INPUTS_IS_MAIN
   ? OrcaRuntimeWithSidebarTemporal
@@ -174,7 +167,6 @@ class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
     registerDetectedWorktreeScanInvalidation()
     registerWorktreeChangeInvalidator((repoId) => this.invalidateWorktreeCatalog(repoId))
     publishWorkspaceViewChanges(this.store, (event) => this.emitClientEvent(event))
-    publishNativeChatFollowUpChanges(this.store, (event) => this.emitClientEvent(event))
   }
 
   private structuredAgentAvailability?: ReturnType<typeof installStructuredAgentAvailability>
@@ -243,10 +235,6 @@ class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
     this.workspaceLayoutStream.markLiveTitlesDirty()
   }
 
-  protected continueRestoredWorkerMail(db: OrchestrationDb): void {
-    continueRestoredWorkerMailSoon(this, db, () => this._orchestrationDb === db)
-  }
-
   /** Read-only layout stream; layout.subscribe is not advertised yet. */
   subscribeWorkspaceLayouts(
     listener: Parameters<WorkspaceLayoutStream['subscribe']>[0]
@@ -260,10 +248,7 @@ class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
   }
 
   /** Apply a window command to the partitions that hold its tab. */
-  async applyLayoutCommand(
-    command: WindowLayoutCommand,
-    run?: Pick<LayoutCommandRunOptions, 'admit'>
-  ): Promise<LayoutApplyReply> {
+  async applyLayoutCommand(command: WindowLayoutCommand): Promise<LayoutApplyReply> {
     // Wait for live terminal placement before creating the first workspace surface.
     const placing = this.livePlacementSettledFor(command)
     const apply = (): Promise<LayoutApplyReply> =>
@@ -275,7 +260,7 @@ class OrcaRuntimeService extends OrcaRuntimeSidebarBase {
             : [this.tryGetWorkspaceSessionHostIdForWorktree(worktreeId) ?? []].flat(),
         command,
         (move) => rekeyMovedPaneOwners(this, move),
-        { ...this.layoutCommandRun(command), ...run }
+        this.layoutCommandRun(command)
       )
     // Order sleep/wake after previously accepted hook statuses.
     const reply = await (ORCA_LAYOUT_OWNER_IS_MAIN && ['sleep', 'wake'].includes(command.type)
@@ -320,6 +305,11 @@ export type {
 } from './runtime-terminal-contracts'
 export type { MessageWaitResult } from './runtime-message-waiters'
 export type { AccountsSnapshot, CodexRateLimitResetRpcResult } from './runtime-account-controller'
+export type {
+  MobileNotificationDispatchEvent,
+  MobileNotificationDismissEvent,
+  MobileNotificationEvent
+} from './runtime-mobile-notification-controller'
 export type { RuntimeTerminalDataMeta } from './runtime-terminal-stream-consumers'
 export type { RemoteFetchResult, RemoteTrackingBase } from './runtime-remote-fetch-controller'
 export {

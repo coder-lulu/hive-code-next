@@ -1,13 +1,6 @@
 import { Pressable, Text, View } from 'react-native'
 import { Check } from 'lucide-react-native'
-import {
-  colors,
-  concentricRadius,
-  radii,
-  spacing,
-  typography,
-  pressedStyle
-} from '../../../theme/mobile-theme'
+import { colors, radii, spacing, typography } from '../../../theme/mobile-theme'
 import { themedStyleSheet } from '../../../theme/themed-styles'
 import { useMobileColorScheme } from '../../../theme/use-mobile-color-scheme'
 
@@ -31,11 +24,7 @@ export function MobileNativeChatAskOptionRow({
     <Pressable
       accessibilityRole={multi ? 'checkbox' : 'radio'}
       accessibilityState={{ checked: selected, disabled }}
-      style={({ pressed }) => [
-        styles.option,
-        selected && styles.optionSelected,
-        pressed && pressedStyle
-      ]}
+      style={[styles.option, selected && styles.optionSelected]}
       disabled={disabled}
       onPress={onPress}
     >
@@ -67,7 +56,7 @@ const styles = themedStyleSheet(() => ({
     alignItems: 'center',
     gap: spacing.sm,
     padding: spacing.sm,
-    borderRadius: concentricRadius(radii.surface, spacing.xs),
+    borderRadius: radii.card,
     backgroundColor: colors.bgRaised,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
@@ -85,10 +74,10 @@ const styles = themedStyleSheet(() => ({
     justifyContent: 'center'
   },
   checkCircle: {
-    borderRadius: radii.pill
+    borderRadius: 9
   },
   checkSquare: {
-    borderRadius: radii.mark
+    borderRadius: 4
   },
   checkOn: {
     backgroundColor: colors.statusGreen,

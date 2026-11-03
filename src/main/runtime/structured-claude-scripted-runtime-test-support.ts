@@ -4,10 +4,7 @@ import {
   CLAUDE_CLI_FLAG_PROBE_BUDGET_MS,
   createClaudeCliFlagSupport
 } from '../claude/claude-cli-flag-support'
-import {
-  providerDiagnostic,
-  withProviderDiagnostic
-} from '../../shared/agent-session/failures/agent-session-failure'
+import { providerDiagnostic, withProviderDiagnostic } from '../../shared/agent-session-failure'
 import { mkdir, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -25,7 +22,7 @@ import type { StructuredAgentSessionHost } from '../native-chat/agent-session-wi
 import {
   ensureStructuredAgentSessionHost,
   stopStructuredAgentSessionRuntime
-} from './agent-session/structured-agent-session-runtime'
+} from './structured-agent-session-runtime'
 import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 
 /** The error a real CLI's exit reaches the adapter as: Orca's message, the stderr as a log detail. */
@@ -165,7 +162,6 @@ export function createScriptedClaudeRuntime(sessionIds: readonly string[]) {
           announce()
           return Promise.resolve(initialized)
         },
-        renameSession: () => Promise.resolve(),
         getContextUsage: () => {
           child.calls.push('get_context_usage')
           return Promise.resolve({})

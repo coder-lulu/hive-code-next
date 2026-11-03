@@ -38,9 +38,6 @@ export type OrchestrationCheckOutput = {
   count: number
   formatted?: string
   deliveryId?: string | null
-  // Older runtimes omit it and replay the batch until an explicit --ack.
-  deliveryAcknowledged?: boolean
-  acknowledged?: string | null
   timedOut?: boolean
   cancelled?: boolean
   connectionLost?: boolean
@@ -84,11 +81,7 @@ export function formatOrchestrationCheckText(
         ? '[LEGACY RECOVERY REPLAY — MAY HAVE BEEN SEEN]\n'
         : '[LEGACY COMPATIBILITY]\n'
     : ''
-  const deliveryNotice =
-    formatCurrentDeliveryNotice(prepared.legacyCompatibility?.currentDelivery) +
-    (prepared.deliveryAcknowledged !== true
-      ? formatUnacknowledgedDeliveryNotice(prepared.deliveryId)
-      : '')
+  const deliveryNotice = formatCurrentDeliveryNotice(prepared.legacyCompatibility?.currentDelivery)
   if (prepared.formatted) {
     return `${legacyHeader}${prepared.deliveryId ? `Delivery ${prepared.deliveryId}\n` : ''}${prepared.formatted}${deliveryNotice}`
   }
@@ -102,23 +95,19 @@ export function formatOrchestrationCheckText(
         : 'Wait cancelled; no messages were consumed.'
       return `${legacyHeader}${cancelled}${deliveryNotice}`
     }
-    const empty = prepared.acknowledged ? `Acknowledged ${prepared.acknowledged}.` : 'No messages.'
-    return `${legacyHeader}${empty}${deliveryNotice}`
+    return `${legacyHeader}No messages.${deliveryNotice}`
   }
-  // Current hosts acknowledge the batch on read, so plain text must carry every body and payload.
-  const rendered = formatLegacyAwareCheckMessages(
-    prepared.messages,
-    checkedTerminal,
-    compatibilityActive
-  )
+  const rendered = prepared.messages
+    .map(
+      (message) =>
+        `${message.id}${formatMessageReadOnlyTag(
+          message,
+          compatibilityActive
+        )} [${message.type ?? 'status'}] from=${message.from_handle} "${message.subject}"`
+    )
+    .join('\n')
   const output = prepared.deliveryId ? `Delivery ${prepared.deliveryId}\n${rendered}` : rendered
   return `${legacyHeader}${output}${deliveryNotice}`
-}
-
-export function formatUnacknowledgedDeliveryNotice(deliveryId: string | null | undefined): string {
-  return deliveryId
-    ? `\nThis Orca version does not acknowledge batches automatically. After handling every message, rerun this check with --ack ${deliveryId}.`
-    : ''
 }
 
 export function prepareOrchestrationCheckOutput<T extends OrchestrationCheckOutput>(

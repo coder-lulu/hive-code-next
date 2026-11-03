@@ -1,12 +1,7 @@
 import type { NodeRuntimeTarget } from '../../../shared/node-runtime-pin'
 import type { ServeReadiness } from '../../server/serve-readiness'
 import { readOrcadActivationRecord } from '../activation/orcad-activation-record-store'
-import {
-  orcadSlotDir,
-  resolveOrcadSlotIdentity,
-  type OrcadSlotOptions
-} from '../../ssh/orcad-recovery-slot'
-import { probeActiveOrcadReadiness } from '../../ssh/orcad-active-readiness'
+import { orcadSlotDir, type OrcadSlotOptions } from '../../ssh/orcad-recovery-slot'
 import { gcOldOrcadVersions } from '../install/orcad-remote-gc'
 import { nodeRuntimeStorePins } from '../../ssh/pinned-runtime-host-target'
 
@@ -24,7 +19,6 @@ export type ManagedOrcadPruneArgs = {
   serverTarget: NodeRuntimeTarget
   activeVersion: string
   readiness: ServeReadiness
-  keepStagedWithinDays?: number
 }
 
 /** True only when GC ran and left no stale version dir behind. */
@@ -44,9 +38,6 @@ export async function pruneManagedOrcadVersions(args: ManagedOrcadPruneArgs): Pr
       liveDaemonVersion,
       // Default and compat builds share one runtime store.
       nodeRuntimePins: nodeRuntimeStorePins(args.serverTarget),
-      ...(args.keepStagedWithinDays !== undefined
-        ? { keepStagedWithinDays: args.keepStagedWithinDays }
-        : {}),
       signal: args.slot.signal
     })
   } catch (error) {
@@ -55,45 +46,3 @@ export async function pruneManagedOrcadVersions(args: ManagedOrcadPruneArgs): Pr
     return false
   }
 }
-
-/** GC otherwise runs only after an activation, so each deferred release left its staged slot behind (#34149). */
-export async function pruneSupersededOrcadCandidates(
-  slot: OrcadSlotOptions,
-  serverTarget: NodeRuntimeTarget,
-  candidateVersion: string
-): Promise<void> {
-  let readiness: ServeReadiness
-  try {
-    const active = (await readOrcadActivationRecord(slot)).active
-    if (!active) {
-      return
-    }
-    readiness = await probeOrcadSlotReadiness(slot, active)
-  } catch (error) {
-    // Without the incumbent's daemon version a staged tree may still be executing.
-    console.warn('[orcad-gc] Skipped pruning staged orcad versions:', error)
-    return
-  }
-  await pruneManagedOrcadVersions({
-    slot,
-    serverTarget,
-    activeVersion: candidateVersion,
-    readiness,
-    keepStagedWithinDays: STAGED_BUILD_KEEP_DAYS
-  })
-}
-
-/** Readiness of the orcad serving `version`, which names its live terminal daemon's build. */
-export async function probeOrcadSlotReadiness(
-  slot: OrcadSlotOptions,
-  version: string
-): Promise<ServeReadiness> {
-  const identity = await resolveOrcadSlotIdentity(slot, version)
-  return probeActiveOrcadReadiness(
-    { ...slot, remoteInstallDir: identity.remoteDir },
-    { buildHash: identity.buildHash, fullVersion: identity.version }
-  )
-}
-
-// Desktops on different releases share hosts; without a grace period each re-uploads what the other pruned.
-const STAGED_BUILD_KEEP_DAYS = 3

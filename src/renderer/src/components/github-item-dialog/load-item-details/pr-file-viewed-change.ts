@@ -1,82 +1,24 @@
-import type { RuntimeClientTarget } from '../../../../../shared/runtime-client-target'
-import type { GhAccountBinding } from '../../../../../shared/github/account-binding'
 import { toast } from 'sonner'
 import { setPRFileViewedForRepo } from '@/components/github/github-work-item-comment-mutations'
 import { resolvePullRequestRepo } from '@/components/github/github-work-item-identity'
 import { translate } from '@/i18n/i18n'
+import type { GitHubPRFileViewedState } from '../../../../../shared/github/pull-request-types'
 import type { GitHubWorkItem } from '../../../../../shared/github/work-item-types'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import type { GitHubItemDialogProjectOrigin } from './github-item-dialog-types'
-import {
-  EMPTY_VIEWED_PATHS,
-  patchCachedPRFileViewedState,
-  touchWorkItemDetailsCache,
-  workItemDetailsCache
-} from './work-item-details-cache'
-
-function beginWorkItemViewed(key: string, path: string, viewed: boolean) {
-  const entry = workItemDetailsCache.get(key)
-  if (!entry?.details) {
-    return null
-  }
-  const owner = entry.viewed ?? { requests: new Map<string, object>(), paths: EMPTY_VIEWED_PATHS }
-  if (owner.requests.has(path)) {
-    return null
-  }
-  const request = {}
-  owner.requests.set(path, request)
-  owner.paths = new Set(owner.requests.keys())
-  touchWorkItemDetailsCache(key, { ...entry, viewed: owner })
-  const previous = patchCachedPRFileViewedState(key, path, viewed ? 'VIEWED' : 'UNVIEWED')
-  const optimisticFile = workItemDetailsCache
-    .get(key)
-    ?.details?.files?.find((file) => file.path === path)
-  const ownsPath = () =>
-    workItemDetailsCache.get(key)?.viewed === owner && owner.requests.get(path) === request
-  let finished = false
-  return {
-    ownsPath,
-    rollback: () => {
-      if (
-        previous &&
-        ownsPath() &&
-        workItemDetailsCache.get(key)?.details?.files?.find((file) => file.path === path) ===
-          optimisticFile
-      ) {
-        patchCachedPRFileViewedState(key, path, previous)
-      }
-    },
-    finish: () => {
-      if (finished) {
-        return
-      }
-      finished = true
-      if (owner.requests.get(path) !== request) {
-        return
-      }
-      owner.requests.delete(path)
-      owner.paths = new Set(owner.requests.keys())
-      const current = workItemDetailsCache.get(key)
-      if (current?.viewed === owner) {
-        touchWorkItemDetailsCache(key, current)
-      }
-    }
-  }
-}
+import { patchCachedPRFileViewedState } from './work-item-details-cache'
 
 export async function syncPRFileViewedState(args: {
   canUseDetailsRepoContext: boolean
-  effectiveRepoId?: string | null
   pullRequestId: string | undefined
   workItem: GitHubWorkItem | null
   detailsCacheKey: string | null
   repoPath: string | null
   sourceContext?: TaskSourceContext | null
   projectOrigin?: GitHubItemDialogProjectOrigin
-  expectedGhAccount?: GhAccountBinding | null
-  target?: RuntimeClientTarget
   path: string
   viewed: boolean
+  setPendingViewedPaths: (updater: (prev: Set<string>) => Set<string>) => void
 }): Promise<boolean> {
   const {
     canUseDetailsRepoContext,
@@ -87,7 +29,8 @@ export async function syncPRFileViewedState(args: {
     sourceContext,
     projectOrigin,
     path,
-    viewed
+    viewed,
+    setPendingViewedPaths
   } = args
   if (!canUseDetailsRepoContext || !pullRequestId || !workItem || workItem.type !== 'pr') {
     toast.error(
@@ -98,25 +41,26 @@ export async function syncPRFileViewedState(args: {
     )
     return false
   }
-  const claim = detailsCacheKey ? beginWorkItemViewed(detailsCacheKey, path, viewed) : null
-  if (!claim) {
-    return false
-  }
+  setPendingViewedPaths((prev) => new Set(prev).add(path))
+  const nextState: GitHubPRFileViewedState = viewed ? 'VIEWED' : 'UNVIEWED'
+  const previousState = detailsCacheKey
+    ? patchCachedPRFileViewedState(detailsCacheKey, path, nextState)
+    : undefined
   try {
     const ok = await setPRFileViewedForRepo({
-      repoId: args.effectiveRepoId ?? workItem.repoId,
+      repoId: workItem.repoId,
       repoPath: repoPath ?? '',
       sourceContext,
       prNumber: workItem.number,
       prRepo: resolvePullRequestRepo(workItem, projectOrigin),
-      expectedGhAccount: args.expectedGhAccount,
-      target: args.target,
       pullRequestId,
       path,
       viewed
     })
     if (!ok) {
-      claim.rollback()
+      if (detailsCacheKey && previousState) {
+        patchCachedPRFileViewedState(detailsCacheKey, path, previousState)
+      }
       toast.error(
         translate(
           'auto.components.GitHubItemDialog.b7bf31b8de',
@@ -128,7 +72,9 @@ export async function syncPRFileViewedState(args: {
     return true
   } catch (err) {
     // Why: an RPC timeout or IPC throw must roll the optimistic patch back, else the shared cache keeps claiming the file is viewed.
-    claim.rollback()
+    if (detailsCacheKey && previousState) {
+      patchCachedPRFileViewedState(detailsCacheKey, path, previousState)
+    }
     toast.error(
       err instanceof Error
         ? err.message
@@ -139,6 +85,10 @@ export async function syncPRFileViewedState(args: {
     )
     return false
   } finally {
-    claim.finish()
+    setPendingViewedPaths((prev) => {
+      const next = new Set(prev)
+      next.delete(path)
+      return next
+    })
   }
 }

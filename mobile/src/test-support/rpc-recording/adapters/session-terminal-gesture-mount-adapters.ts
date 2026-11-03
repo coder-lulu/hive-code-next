@@ -32,6 +32,11 @@ export function sessionTerminalGestureMountAdapters(
       const useTerminalInput = modules.load<
         typeof import('../../../session/use-mobile-session-terminal-input')
       >('mobile/src/session/use-mobile-session-terminal-input.ts').useMobileSessionTerminalInput
+      const takeover = modules.load<
+        typeof import('../../../terminal/worker-terminal-takeover-report')
+      >('mobile/src/terminal/worker-terminal-takeover-report.ts')
+      // The per-client report window is module state; a fresh recording must not inherit one.
+      takeover.resetWorkerTerminalTakeoverReportsForTest()
 
       const buckets = { current: new Map<string, TerminalGestureInputBucket>() }
       const queues = { current: new Map<string, TerminalGestureInputQueue>() }
@@ -92,7 +97,10 @@ export function sessionTerminalGestureMountAdapters(
           bucketTokens: buckets.current.get(HANDLE)?.tokens ?? null,
           crash: screen.crash()
         }),
-        dispose: () => screen.unmount()
+        dispose: () => {
+          takeover.resetWorkerTerminalTakeoverReportsForTest()
+          screen.unmount()
+        }
       }
     }
   }

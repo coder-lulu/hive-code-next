@@ -1,9 +1,5 @@
 import { pairedRuntimeConnectionFromOffer } from '../../../../shared/paired-runtime-connection'
-import {
-  createWebRuntimeSubscriptionApiControl,
-  type WebRuntimeSubscriptionRegistration
-} from './web-runtime-crew-subscription'
-const pendingSubscriptions = new Map<string, WebRuntimeSubscriptionRegistration>()
+const pendingSubscriptions = new Map<string, AbortController>()
 import type { PreloadApi } from '../../../../preload/api-types'
 import { parseHostAccessLink } from '../../../../shared/remote-pairing-address'
 import { verifyRemotePairingRuntimeStatus } from '../../../../shared/remote-pairing-verification'
@@ -231,7 +227,9 @@ export function createRuntimeEnvironmentsApi(): NonNullable<
         expectedEnvironmentPairingRevision,
         expectedEnvironmentRuntimeId
       ),
-    ...createWebRuntimeSubscriptionApiControl(pendingSubscriptions),
+    cancelSubscription: async ({ subscriptionId }) => {
+      pendingSubscriptions.get(subscriptionId)?.abort()
+    },
     subscribe: async (
       { selector, method, params, timeoutMs, subscriptionId, expectedEnvironmentPairingRevision },
       callbacks
@@ -244,7 +242,7 @@ export function createRuntimeEnvironmentsApi(): NonNullable<
         if (pendingSubscriptions.has(subscriptionId)) {
           throw new Error('Subscription id already exists')
         }
-        pendingSubscriptions.set(subscriptionId, { controller })
+        pendingSubscriptions.set(subscriptionId, controller)
       }
       let subscription
       try {
@@ -287,7 +285,7 @@ export function createRuntimeEnvironmentsApi(): NonNullable<
           controller.signal
         )
       } finally {
-        if (subscriptionId && pendingSubscriptions.get(subscriptionId)?.controller === controller) {
+        if (subscriptionId && pendingSubscriptions.get(subscriptionId) === controller) {
           pendingSubscriptions.delete(subscriptionId)
         }
       }

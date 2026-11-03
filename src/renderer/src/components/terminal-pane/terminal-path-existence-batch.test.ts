@@ -1,5 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
 import { createTerminalPathExistenceBatch } from '@/components/terminal-pane/terminal-path-existence-batch'
+import { requirePathExistenceResults } from '../../../../shared/path-existence-batch'
 const remote = vi.hoisted(() => vi.fn())
 vi.mock('@/runtime/runtime-path-existence-batch', () => ({ runtimePathsExist: remote }))
 const context = {
@@ -76,4 +77,13 @@ it('rejects transport failure without turning it into a missing path', async () 
     ])
   ).rejects.toThrow('connection closed')
   expect(remote).toHaveBeenCalledTimes(1)
+})
+it.each([
+  { rows: [{ exists: true, error: 'denied' }] },
+  { rows: [{ exists: 'yes', error: 'denied' }] },
+  { rows: [{ exists: false }, {}] }
+])('rejects ambiguous or incomplete wire results $rows', ({ rows }) => {
+  expect(() => requirePathExistenceResults(rows, rows.length)).toThrow(
+    'Invalid path existence response'
+  )
 })

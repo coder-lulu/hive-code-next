@@ -21,9 +21,7 @@ const state = vi.hoisted(() => ({
   setContextualToursBlockingSurfaceVisible: vi.fn()
 }))
 vi.mock('@/store', () => ({
-  useAppStore: Object.assign((selector: (value: typeof state) => unknown) => selector(state), {
-    getState: () => state
-  })
+  useAppStore: (selector: (value: typeof state) => unknown) => selector(state)
 }))
 
 type Args = Parameters<typeof useSidebarRevealRequests>[0]

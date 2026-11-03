@@ -129,9 +129,6 @@ export function projectFleetNextAction(
   if (worker.workerStage === 'released') {
     return { kind: 'none', argv: [] }
   }
-  if (worker.resource?.autoReleaseAt) {
-    return { kind: 'none', argv: [] }
-  }
   if (worker.terminalState === 'reclaimable') {
     return {
       kind: 'release',
@@ -146,11 +143,9 @@ export function projectFleetNextAction(
   ) {
     return { kind: 'none', argv: [] }
   }
-  // Settled workers owe only the release of a terminal they still own and nobody kept open; worker-show would repeat the settlement.
-  if (SETTLED_WORKER_STATES.has(worker.workerState)) {
-    return worker.resource?.ownershipState === 'owned' &&
-      worker.resource.releaseState !== 'released' &&
-      worker.resource.releaseState !== 'retained'
+  // Settled workers still owning terminals need release; worker-show would repeat the settlement.
+  if (SETTLED_WORKER_STATES.has(worker.workerState) && worker.resource) {
+    return worker.resource.ownershipState === 'owned' && worker.resource.releaseState !== 'released'
       ? {
           kind: 'release',
           argv: ['orchestration', 'worker-release', '--dispatch', worker.dispatchId]
@@ -254,7 +249,6 @@ export function projectOrchestrationFleetWorker(
       lastObservedAt: evidence ? evidence.clock.at : null
     },
     resource: projectResource(worker),
-    ...(worker.resource?.autoReleaseAt ? { autoReleaseAt: worker.resource.autoReleaseAt } : {}),
     nextAction: projectFleetNextAction(worker, liveness),
     attention: projectOrchestrationFleetAttention({
       isRoot: worker.parentTaskId === null,

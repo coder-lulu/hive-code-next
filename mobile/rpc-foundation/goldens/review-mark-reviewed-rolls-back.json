@@ -120,12 +120,14 @@
         }
       }
     },
-    "eb79a9b3682a": {
-      "status": "fulfilled",
+    "b914541ed9b0": {
+      "status": "rejected",
       "startedAt": 0,
       "settledAt": 0,
-      "value": {
-        "$rpc": "undefined"
+      "error": {
+        "category": "Error",
+        "message": "Workspace is locked",
+        "isRpcDeliveryUnknown": false
       }
     }
   },
@@ -138,7 +140,7 @@
           "sender": ["8efeb57ebe41"],
           "payloads": ["81c9edeaad86"],
           "settlements": {
-            "mark-reviewed": "eb79a9b3682a"
+            "mark-reviewed": "b914541ed9b0"
           },
           "state": "6bdf0d77510f",
           "effects": []

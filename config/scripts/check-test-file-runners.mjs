@@ -23,12 +23,6 @@ const NON_UNIT_TEST_RUNNERS = [
     mirrors: ["testDir: './e2e'", "testMatch: '**/*.spec.ts'"]
   },
   {
-    name: 'component fixtures Playwright',
-    include: ['tests/component-fixtures/**/*.spec.ts'],
-    sources: ['tests/component-fixtures/playwright.config.ts'],
-    mirrors: ["testDir: '.'", "testMatch: '*.spec.ts'"]
-  },
-  {
     name: 'computer-use e2e',
     include: ['tests/e2e/computer-*.e2e.ts'],
     sources: ['tests/e2e/vitest.config.ts'],
@@ -57,26 +51,48 @@ const NON_UNIT_TEST_RUNNERS = [
   },
   {
     name: 'mobile',
-    include: ['mobile/src/**/*.test.ts', 'mobile/src/**/*.test.tsx', 'mobile/scripts/**/*.test.ts'],
+    include: [
+      'mobile/src/**/*.test.ts',
+      'mobile/src/**/*.test.tsx',
+      'mobile/scripts/**/*.test.ts',
+      'mobile/scripts/**/*.test.mjs'
+    ],
     sources: ['mobile/vitest.config.ts'],
     mirrors: [
       'root: import.meta.dirname',
-      "'src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts'"
+      "'src/**/*.test.ts'",
+      "'src/**/*.test.tsx'",
+      "'scripts/**/*.test.ts'",
+      "'scripts/**/*.test.mjs'"
     ]
   },
-  ...['connector', 'push', 'relay'].map((app) => ({
+  {
+    name: 'Hive account Relay private cell (pnpm test:integration:relay-cell)',
+    manual: true,
+    include: ['tests/e2e/hiverelay/hive-account-relay-private-cell.integration.test.ts'],
+    sources: ['config/vitest.hiverelay-cell.config.ts', 'package.json'],
+    mirrors: [
+      "include: ['tests/e2e/hiverelay/hive-account-relay-private-cell.integration.test.ts']",
+      'vitest run --config config/vitest.hiverelay-cell.config.ts'
+    ]
+  },
+  {
+    name: 'HiveCode installer (pnpm --dir packages/hivecode-install test)',
+    include: ['packages/hivecode-install/test/*.test.mjs'],
+    sources: ['packages/hivecode-install/package.json'],
+    mirrors: ['node --test test/*.test.mjs']
+  },
+  ...['connector', 'push'].map((app) => ({
     name: `cloud ${app}`,
     include: [`cloud/apps/${app}/src/**/*.test.ts`],
     sources: [`cloud/apps/${app}/vitest.config.ts`],
     mirrors: ["include: ['src/**/*.test.ts']"]
   })),
   ...[
-    'cloud/apps/relay-fence-broker',
     'cloud/packages/cloud-database',
     'cloud/packages/connector-contract',
     'cloud/packages/postgres-schema',
-    'cloud/packages/push-contract',
-    'cloud/packages/relay-contract'
+    'cloud/packages/push-contract'
   ].map((dir) => ({
     name: dir,
     include: [`${dir}/${VITEST_DEFAULT_INCLUDE}`],
@@ -85,22 +101,12 @@ const NON_UNIT_TEST_RUNNERS = [
   })),
   {
     name: 'cloud node:test',
-    include: [
-      'cloud/dev/scripts/run-relay-tests.test.mjs',
-      '.github/actions/cloud-sql-rollout-lease/*.test.mjs'
-    ],
+    include: ['cloud/dev/scripts/*.test.mjs', '.github/actions/cloud-sql-rollout-lease/*.test.mjs'],
     sources: ['cloud/package.json'],
     mirrors: [
-      'dev/scripts/run-relay-tests.test.mjs',
+      'node --test dev/scripts/*.test.mjs',
       '../.github/actions/cloud-sql-rollout-lease/*.test.mjs'
     ]
-  },
-  {
-    // `orca plugin test` runs every example's own tests in Node; the unit test drives it.
-    name: 'example plugin tests (orca plugin test)',
-    include: ['examples/plugins/*/src/**/*.test.ts', 'examples/plugins/*/src/**/*.test.tsx'],
-    sources: ['src/cli/plugin-authoring/plugin-test-runner.test.ts'],
-    mirrors: ['readdirSync(EXAMPLES)']
   },
   {
     name: 'docs site',

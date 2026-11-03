@@ -175,7 +175,9 @@ describe('createRemoteRuntimePtyTransport', () => {
       tabId: 'tab-1',
       leafId: '11111111-1111-4111-8111-111111111111'
     })
-    const result = await transport.connect({ url: '', callbacks: {} })
+    const onError = vi.fn()
+    const result = await transport.connect({ url: '', callbacks: { onError } })
+    expect(onError).not.toHaveBeenCalled()
     expect(result).toMatchObject({
       id: 'remote:env-1@@term-remote',
       savedResumeDecision: decision,

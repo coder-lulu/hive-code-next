@@ -88,10 +88,7 @@ export function applyStructuredSessionTabSnapshots(
         },
         changedAgentPaneKeys
       ),
-    { frames: [] },
-    undefined,
-    false,
-    snapshots.map(({ worktree }) => worktree)
+    { frames: [] }
   )
   settleStructuredSessionMirror()
   const { setTabLabel } = useAppStore.getState()

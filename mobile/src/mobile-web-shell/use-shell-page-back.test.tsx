@@ -28,9 +28,8 @@ function Screen(props: {
   claimed: boolean
   sendBack: () => boolean
   setOptions: (options: { gestureEnabled: boolean }) => void
-  parent?: { setOptions: (options: { gestureEnabled: boolean }) => void }
 }): null {
-  useShellPageBack({ parent: undefined, ...props, isFocused: () => true })
+  useShellPageBack({ ...props, isFocused: () => true })
   return null
 }
 
@@ -54,7 +53,6 @@ function render(props: {
   claimed: boolean
   sendBack: () => boolean
   setOptions: (options: { gestureEnabled: boolean }) => void
-  parent?: { setOptions: (options: { gestureEnabled: boolean }) => void }
 }): ReactTestRenderer {
   let tree!: ReactTestRenderer
   act(() => {
@@ -135,23 +133,6 @@ describe('the shell taking the device Back key for a page that claimed it', () =
       tree.update(createElement(Screen, { claimed: false, sendBack: () => true, setOptions }))
     })
     expect(setOptions).toHaveBeenLastCalledWith({ gestureEnabled: true })
-  })
-
-  // A pushed session releasing its claim must not hand the host's swipe back while its list still claims.
-  it("keeps the parent screen's swipe off until the last claim under it ends", () => {
-    native.platform.os = 'ios'
-    const parent = { setOptions: vi.fn() }
-    const screen = (claimed: boolean) =>
-      createElement(Screen, { claimed, sendBack: () => true, setOptions: vi.fn(), parent })
-    const list = render({ claimed: true, sendBack: () => true, setOptions: vi.fn(), parent })
-    const session = render({ claimed: true, sendBack: () => true, setOptions: vi.fn(), parent })
-    expect(parent.setOptions).toHaveBeenLastCalledWith({ gestureEnabled: false })
-
-    act(() => session.update(screen(false)))
-    expect(parent.setOptions).toHaveBeenLastCalledWith({ gestureEnabled: false })
-
-    act(() => list.update(screen(false)))
-    expect(parent.setOptions).toHaveBeenLastCalledWith({ gestureEnabled: true })
   })
 
   it('writes no gesture option on Android, where the stack has no swipe to take', () => {

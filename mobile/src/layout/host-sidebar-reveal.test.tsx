@@ -9,17 +9,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createFakeBridgePortPair } from '../mobile-web-shell/bridge/bridge-port-pair-test-harness'
 import { RpcClientProvider } from '../transport/client-context.web'
 import type { MobileSessionController } from '../session/use-mobile-session-controller'
-import { useSessionTitleCard } from '../session/use-session-title-card'
 import { MobileSessionHeader } from '../session/MobileSessionHeader'
 import HostGroupLayout from '../../app/h/_layout'
 
 vi.mock('react-native', () => ({
-  Animated: { View: 'View' },
   View: 'View',
   Text: 'Text',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
-  useWindowDimensions: () => ({ width: 1024, height: 768 }),
   Platform: {
     OS: 'web',
     select: (values: Record<string, unknown>) => values.web ?? values.default
@@ -51,7 +48,6 @@ vi.mock('./responsive-layout', () => ({
   useResponsiveLayout: () => ({ isWideLayout: true, width: 1024 })
 }))
 vi.mock('../storage/preferences', () => ({
-  HOST_SIDEBAR_DEFAULT_WIDTH: 320,
   HOST_SIDEBAR_MIN_WIDTH: 240,
   HOST_SIDEBAR_MAX_WIDTH: 480,
   loadHostSidebarWidth: async () => 320,
@@ -69,16 +65,9 @@ vi.mock('../host-screen/HostScreen', () => ({
 }))
 vi.mock('../navigation/host-stack', () => ({
   HostStack: () =>
-    createElement(MobileSessionHeader, {
-      controller: headerController(),
-      details: useSessionTitleCard(false, false)
-    })
+    createElement(MobileSessionHeader, { controller: headerController(), backInRail: false })
 }))
 vi.mock('../components/MobileAgentIcon', () => ({ MobileAgentIcon: () => null }))
-vi.mock('./use-top-chrome-space', () => ({ useTopChromeSpace: () => ({}) }))
-vi.mock('../session/MobileSessionHeaderMoreMenu', () => ({
-  MobileSessionHeaderMoreMenu: () => null
-}))
 vi.mock('../platform/haptics', () => ({ triggerMediumImpact: () => {} }))
 vi.mock('../transport/host-client-hooks', () => ({
   useDisconnectHostClient: vi.fn(),
@@ -100,11 +89,11 @@ function headerController(): MobileSessionController {
     isFolderWorkspaceRoute: true,
     isFloatingWorkspaceRoute: true,
     connState: 'connected',
-    presentedConnState: 'connected',
     worktreeName: 'Workspace',
     visibleTabs: [],
     showConnectionRetry: false,
     terminalSummary: 'Claude',
+    showHeaderMoreButton: false,
     requestLeaveSession: vi.fn()
   }
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: This header fixture supplies every rendered field; no tab or panel actions are exercised.

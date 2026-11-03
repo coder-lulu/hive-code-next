@@ -88,14 +88,10 @@ export function CommitArea({
       ? isCreatingPr
       : primaryAction.kind === 'commit'
         ? isCommitting
-        : isRemoteOperationActive &&
-          primaryHostsRemoteOperation &&
-          !primaryAction.isWaitingForRemoteOperation
+        : isRemoteOperationActive && primaryHostsRemoteOperation
   // Spin the chevron for operations absent from the primary; otherwise no-op Fetch has no immediate feedback.
   const showChevronSpinner =
-    (isCommitting || isCreatingPr || isRemoteOperationActive) &&
-    !showSpinner &&
-    !primaryAction.isWaitingForRemoteOperation
+    (isCommitting || isCreatingPr || isRemoteOperationActive) && !showSpinner
   const commitFailureSummary = useMemo(
     () => (commitError ? summarizeCommitFailure(commitError) : null),
     [commitError]

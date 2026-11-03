@@ -45,12 +45,7 @@ export async function beginPtySpawn(
   if (startup) {
     await startup
   }
-  ctx.cwd = ctx.deps.resolvePtySpawnStartupCwd(
-    args.worktreeId,
-    args.cwd,
-    undefined,
-    args.connectionId
-  )
+  ctx.cwd = ctx.deps.resolvePtySpawnStartupCwd(args.worktreeId, args.cwd)
   // Inherited producers and replacements already own this acquisition and must never await themselves.
   if (
     ctx.paneSpawnOperation ||

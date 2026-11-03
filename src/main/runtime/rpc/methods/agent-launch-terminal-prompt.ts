@@ -7,7 +7,6 @@ import type { RuntimeTerminalWait } from '../../../../shared/runtime-terminal-co
 import { isAgentPromptStalledError } from '../../agent-prompt-submission-verification'
 import {
   waitForLaunchedAgentComposer,
-  type TerminalReadinessCreation,
   type LaunchedAgentReadinessRuntime
 } from '../../launched-agent-composer-readiness'
 import type { OrcaRuntimeService } from '../../orca-runtime'
@@ -41,8 +40,7 @@ async function waitThroughBlockingPrompts(
   agent: TuiAgent,
   freshLaunch: boolean,
   clock: ReadinessClock,
-  signal: AbortSignal | undefined,
-  terminalCreation?: TerminalReadinessCreation
+  signal: AbortSignal | undefined
 ): Promise<RuntimeTerminalWait | undefined> {
   const deadline = clock.now() + AGENT_READY_TIMEOUT_MS
   for (;;) {
@@ -50,14 +48,7 @@ async function waitThroughBlockingPrompts(
     // land past the deadline.
     const timeoutMs = Math.max(1, deadline - clock.now())
     const wait = freshLaunch
-      ? await waitForLaunchedAgentComposer(
-          runtime,
-          handle,
-          agent,
-          timeoutMs,
-          signal,
-          terminalCreation
-        )
+      ? await waitForLaunchedAgentComposer(runtime, handle, agent, timeoutMs, signal)
       : // A reused pane was not freshly launched: its composer marker may be long gone.
         await runtime.waitForTerminal(handle, {
           condition: 'tui-idle',
@@ -77,18 +68,9 @@ export function waitForStartedAgentReady(
   runtime: LaunchedAgentReadinessRuntime,
   handle: string,
   agent: TuiAgent,
-  signal?: AbortSignal,
-  terminalCreation?: TerminalReadinessCreation
+  signal?: AbortSignal
 ): Promise<RuntimeTerminalWait | undefined> {
-  return waitThroughBlockingPrompts(
-    runtime,
-    handle,
-    agent,
-    true,
-    REAL_CLOCK,
-    signal,
-    terminalCreation
-  )
+  return waitThroughBlockingPrompts(runtime, handle, agent, true, REAL_CLOCK, signal)
 }
 
 /** Report whether text reached the pane without failing an already-running launch.
@@ -99,7 +81,6 @@ export async function deliverTerminalAgentLaunchPrompt(args: {
   agent: TuiAgent
   /** False for a reused terminal, whose agent was already running before this launch. */
   freshLaunch: boolean
-  terminalCreation?: TerminalReadinessCreation
   text: string
   /** See `createLaunchedAgentWriteGuard`; default `refuse`. */
   unprovableHost?: UnprovableHostPolicy
@@ -123,8 +104,7 @@ export async function deliverTerminalAgentLaunchPrompt(args: {
       args.agent,
       args.freshLaunch,
       args.clock ?? REAL_CLOCK,
-      args.signal,
-      args.terminalCreation
+      args.signal
     )
     // An unsatisfied wait does not authorize pasting into a dialog, dead process or unready agent.
     if (wait && !wait.satisfied) {

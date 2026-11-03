@@ -3,6 +3,8 @@ import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import { HiveAccountSettingsPane } from './HiveAccountSettingsPane'
 import type { HiveAccountSettingsContentProps } from './HiveAccountSettingsContent'
 import { RuntimeEnvironmentsPane } from './RuntimeEnvironmentsPane'
+import { RuntimeServersPageProvider } from './runtime-servers-page-context'
+import { RuntimeServersHeaderActions } from './runtime-servers-header-actions'
 import { SshPane } from './SshPane'
 import { MobileCloudConnection } from '../mobile/MobileCloudConnection'
 import { MobileConnectionPreferences } from '../mobile/MobileConnectionPreferences'
@@ -41,9 +43,11 @@ export function DeviceConnectionsPane(props: DeviceConnectionsPaneProps): React.
     store.openSettingsTarget({ pane: 'orca-account', repoId: null })
   }
   return (
-    <HiveAccountSettingsPane onOpenRuntimeDetails={openAccount}>
-      {(account) => <DeviceConnectionsContent {...props} account={account} />}
-    </HiveAccountSettingsPane>
+    <RuntimeServersPageProvider>
+      <HiveAccountSettingsPane onOpenRuntimeDetails={openAccount}>
+        {(account) => <DeviceConnectionsContent {...props} account={account} />}
+      </HiveAccountSettingsPane>
+    </RuntimeServersPageProvider>
   )
 }
 
@@ -167,6 +171,9 @@ function DeviceConnectionsContent({
                 {translate('auto.components.settings.orcaAccount.signIn', 'Sign in to HiveCloud')}
               </Button>
             ) : null}
+            <div className="flex justify-end">
+              <RuntimeServersHeaderActions canGeneratePairingUrl={false} />
+            </div>
             <RuntimeEnvironmentsPane
               settings={props.settings}
               setActiveRuntimeEnvironmentPreference={props.setActiveRuntimeEnvironmentPreference}

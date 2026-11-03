@@ -31,8 +31,6 @@ function fixture(launch: HeadlessAutomationDispatchLaunch) {
 }
 
 const terminal = {
-  sessionKind: 'terminal' as const,
-  chatSessionId: null,
   workspaceId: 'launched-workspace',
   terminalSessionId: 'launched-tab',
   terminalPaneKey: 'launched-pane',

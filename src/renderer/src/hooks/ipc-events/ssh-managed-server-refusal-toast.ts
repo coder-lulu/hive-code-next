@@ -29,7 +29,7 @@ export function toastSshHostMoveRefused(
       label: translate('auto.components.settings.moveAnyway.action', 'Move anyway…'),
       onClick: () => {
         const store = useAppStore.getState()
-        store.openSettingsTarget({ pane: 'ssh', repoId: null })
+        store.openSettingsTarget({ pane: 'servers', sectionId: 'devices-ssh', repoId: null })
         store.openSettingsPage()
       }
     }

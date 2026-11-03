@@ -1,6 +1,7 @@
 import type { ConnectionPresentationModel } from './use-mobile-tasks-connection-presentation'
 import {
   PickerModal,
+  BottomDrawer,
   View,
   Text,
   Pressable,
@@ -8,7 +9,6 @@ import {
   colors,
   ScrollView
 } from './mobile-tasks-dependencies'
-import { BottomDrawer } from '../components/bottom-drawer/BottomDrawer'
 import {
   normalizeGitHubPreset,
   getTaskPresetQuery,

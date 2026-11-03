@@ -72,7 +72,7 @@ export function installPanePtyVisibilityBind(session: ConnectPanePtySession): vo
         return false
       }
     }
-    session.bindProcessExitState(ptyId, options.replacePtyId)
+    session.bindProcessExitState(ptyId, replacementPtyId)
     if (session.activePanePtyBinding && session.activePanePtyBinding !== ptyId) {
       session.reportPanePtyVisibility(session.activePanePtyBinding, false)
     }

@@ -233,7 +233,7 @@ export class WslHookRelayManager {
     const mux = new SshChannelMultiplexer(transport)
     state.mux = mux
     wireWslRelayLink({
-      requestHandlers: this.deps,
+      bindInterruptReconciliation: this.deps.bindInterruptReconciliation,
       mux,
       child,
       distro: state.distro,

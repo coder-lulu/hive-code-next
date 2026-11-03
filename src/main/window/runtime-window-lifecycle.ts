@@ -193,23 +193,14 @@ export function registerRuntimeWindowLifecycle(
         ...(position ? { position } : {})
       }),
     revealEditorTab: (reveal) => send('ui:revealEditorTabFromRuntime', reveal),
-    openDiff: (
-      worktreeId,
-      filePath,
-      relativePath,
-      staged,
-      runtimeEnvironmentId?,
-      navigation?,
-      oldPath?
-    ) =>
+    openDiff: (worktreeId, filePath, relativePath, staged, runtimeEnvironmentId?, navigation?) =>
       send('ui:openDiffFromMobile', {
         worktreeId,
         filePath,
         relativePath,
         staged,
         runtimeEnvironmentId,
-        ...(navigation ? { navigation } : {}),
-        ...(oldPath ? { oldPath } : {})
+        ...(navigation ? { navigation } : {})
       }),
     closeTerminal: (tabId) => send('ui:closeTerminal', { kind: 'tab', tabId }),
     closeTerminalPane: (tabId, leafId) => send('ui:closeTerminal', { kind: 'pane', tabId, leafId }),
@@ -227,9 +218,7 @@ export function registerRuntimeWindowLifecycle(
       send('runtime:browserDriverChanged', { browserPageId, driver }),
     browserRemoteViewersChanged: (browserPageId, hasRemoteViewers) =>
       send('runtime:browserRemoteViewersChanged', { browserPageId, hasRemoteViewers }),
-    clientHostedBrowserRowsChanged: (event) =>
-      send('runtime:clientHostedBrowserRowsChanged', event),
-    claudeAccountSelected: (change) => send('claudeAccounts:selectedElsewhere', change)
+    clientHostedBrowserRowsChanged: (event) => send('runtime:clientHostedBrowserRowsChanged', event)
   })
   // Switch point: the window reads its sidebar from main's feed and re-reads on each notice.
   const detachSidebarInputsNotices = ORCA_SIDEBAR_INPUTS_IS_MAIN

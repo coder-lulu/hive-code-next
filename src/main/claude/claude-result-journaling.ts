@@ -1,17 +1,16 @@
 import { writeClaudeTerminalFailure } from './claude-terminal-failure'
 import type { ClaudeContextFacts } from './claude-context-facts'
-import { claudeCommandEnd } from './claude-command-turn'
+import { claudeCommandResultEnd } from './claude-command-turn'
 import type { ClaudeMessageJournalContext } from './claude-message-journaling'
-import type { ClaudeJournalPrompts } from './structured/journal/claude-structured-journal-prompts'
+import type { ClaudeJournalPrompts } from './claude-structured-journal-prompts'
 import {
   claudeProviderFrameKind,
   claudeResultFailure,
   isSettledClaudeResultKind
-} from './structured/launch/claude-structured-provider-fallback'
+} from './claude-structured-provider-fallback'
 import { claudeTurnEndForResult } from './claude-turn-lifecycle-item'
 import { claudeFrameParentRef, isRootClaudeFrame } from './claude-turn-opening'
 import type { ClaudeGoalBackgroundWork } from './claude-background-task-tracker'
-import type { ClaudeJournalTranslatorDeps } from './claude-journal-translator-contract'
 
 export type ClaudeResultJournalContext = Pick<
   ClaudeMessageJournalContext,
@@ -28,20 +27,6 @@ export type ClaudeResultJournalContext = Pick<
   prompts: ClaudeJournalPrompts
   context: ClaudeContextFacts
   goalBackgroundWork: () => ClaudeGoalBackgroundWork
-  acceptStartupFailure?: ClaudeJournalTranslatorDeps['acceptStartupFailure']
-}
-
-const namesClaudeInput = (value: unknown): boolean => typeof value === 'string' && value !== ''
-
-/** Input it answered (receipts, a resumed turn) or model round-trips mean the result is a turn's own. */
-function claudeResultShowsTurnWork(message: Record<string, unknown>): boolean {
-  return (
-    namesClaudeInput(message.user_message_uuid) ||
-    (Array.isArray(message.user_message_uuids) &&
-      message.user_message_uuids.some(namesClaudeInput)) ||
-    namesClaudeInput(message.resume_reason) ||
-    (typeof message.num_turns === 'number' && message.num_turns > 0)
-  )
 }
 
 export function journalClaudeResult(
@@ -57,8 +42,7 @@ export function journalClaudeResult(
     assistantFailures,
     usageLimits,
     threadGoal,
-    goalBackgroundWork,
-    acceptStartupFailure
+    goalBackgroundWork
   }: ClaudeResultJournalContext,
   message: Record<string, unknown>,
   observedAt: number
@@ -75,41 +59,22 @@ export function journalClaudeResult(
   if (settlesTurn) {
     prompts.retryPendingCancellations()
   }
-  const command = settlesTurn ? turn.command : null
-  const commandResult = command ? claudeCommandEnd(command, message, observedAt) : null
-  if (command && !commandResult) {
+  const commandEnd = settlesTurn ? claudeCommandResultEnd(turn, sink, message, observedAt) : null
+  if (commandEnd === 'another-input') {
     return
   }
   const failure = claudeResultFailure(message, leftToStop)
-  // A command's quota cause needs its own failed verdict, not only a failed envelope.
-  const compactionFailure =
-    command &&
-    commandResult?.end.outcome === 'failure' &&
-    !leftToStop &&
-    (command.failed !== null || failure !== null)
-      ? { ...command.failed, rejections: command.rejections }
-      : undefined
   const usageLimit = settlesTurn
-    ? usageLimits.result(message, !command && failure !== null, usageEvidence, compactionFailure)
+    ? usageLimits.result(message, failure !== null, usageEvidence)
     : null
-  // A sign-in notice from the hidden reply outranks quota, as on an ordinary send. Claude also
-  // labels a 403 access denial authentication_failed; its result, not sign-in guidance, says why.
-  const notice = compactionFailure && message.api_error_status !== 403 ? command?.notice : null
-  const terminalFailure = notice || usageLimit
-  if (command && commandResult?.row && !terminalFailure) {
-    sink.appendItem(command.resultIdentity, commandResult.row, { turnScope: endedTurnScope })
-  }
-  if (terminalFailure && endedTurnIdentity) {
-    writeClaudeTerminalFailure(sink, endedTurnIdentity, terminalFailure)
+  if (usageLimit && endedTurnIdentity) {
+    writeClaudeTerminalFailure(sink, endedTurnIdentity, usageLimit)
   }
   if (settlesTurn) {
     turn.suppressReopenOnFailure(message.is_error === true)
     corrections.abandon()
     streamedText.finish({ completedAt: observedAt })
-    context.settle(
-      message,
-      commandResult?.end ?? claudeTurnEndForResult(message, observedAt, leftToStop)
-    )
+    context.settle(message, commandEnd ?? claudeTurnEndForResult(message, observedAt, leftToStop))
     streamedBlocks.clear()
     streamedText.settle()
   }
@@ -127,22 +92,10 @@ export function journalClaudeResult(
     sink.publish()
   }
   const kind = claudeProviderFrameKind(message)
-  if (terminalFailure && endedTurnIdentity) {
+  if (usageLimit && endedTurnIdentity) {
     return
   }
   const alreadyShown = assistantFailures.resultAlreadyShown(message)
-  // Only a still-starting acquisition that fails its open with this failure may take over its row.
-  if (
-    failure &&
-    settlesTurn &&
-    endedTurnIdentity === null &&
-    !usageLimit &&
-    !alreadyShown &&
-    !claudeResultShowsTurnWork(message) &&
-    acceptStartupFailure?.(message) === true
-  ) {
-    return
-  }
   if ((failure || !isSettledClaudeResultKind(kind)) && !alreadyShown) {
     providerFallback.append(
       kind,

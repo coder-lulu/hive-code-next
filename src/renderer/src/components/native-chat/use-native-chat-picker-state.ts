@@ -15,24 +15,23 @@ import {
   type SetStateAction
 } from 'react'
 import type { AgentType } from '../../../../shared/agent-status-types'
-import { getNativeChatAgentProfile } from '../../../../shared/native-chat/native-chat-agent-profiles'
-
+import { getNativeChatAgentProfile } from '../../../../shared/native-chat-agent-profiles'
+import type {
+  NativeChatSessionSkill,
+  SlashCommandSuggestion
+} from '../../../../shared/native-chat/input/native-chat-slash-commands'
 import {
   applyMentionSuggestion,
+  applyPickerSuggestion,
+  classifyNativeChatSend,
   deriveComposerAutocomplete,
   editReplacesTriggerToken,
   isSkillPickerTriggered,
-  type ComposerAutocomplete
-} from '../../../../shared/native-chat/input/native-chat-composer-autocomplete'
-import { applyPickerSuggestion } from '../../../../shared/native-chat/input/native-chat-picker-triggers'
-import {
-  classifyNativeChatSend,
-  type NativeChatSendClassification,
-  type NativeChatSessionSkill,
-  type SlashCommandSuggestion
-} from '../../../../shared/native-chat/input/native-chat-slash-commands'
-import type { NativeChatPickerItem } from '../../../../shared/native-chat/input/native-chat-picker-items'
-import { nativeChatPickerCommands } from '../../../../shared/native-chat/input/native-chat-skill-visibility'
+  type ComposerAutocomplete,
+  type NativeChatPickerItem,
+  type NativeChatSendClassification
+} from '../../../../shared/native-chat-composer-autocomplete'
+import { nativeChatPickerCommands } from '../../../../shared/native-chat-skill-visibility'
 import { useNativeChatSkills } from './use-native-chat-skills'
 import {
   emitNativeChatPickerItemAccepted,
@@ -57,8 +56,6 @@ export type NativeChatPickerState = {
 export function useNativeChatPickerState(args: {
   agent: AgentType
   terminalTabId: string
-  /** A launch panel's workspace, whose skills it lists before any tab exists. */
-  launchWorktreeId?: string
   draftScopeKey: string
   draft: string
   caret: number
@@ -81,7 +78,6 @@ export function useNativeChatPickerState(args: {
   const {
     agent,
     terminalTabId,
-    launchWorktreeId,
     draftScopeKey,
     draft,
     caret,
@@ -104,12 +100,7 @@ export function useNativeChatPickerState(args: {
     disabledRef.current = disabled
   }, [disabled])
   const skillPickerTriggered = !disabled && isSkillPickerTriggered(draft.slice(0, caret), profile)
-  const discovery = useNativeChatSkills(
-    agent,
-    terminalTabId,
-    skillPickerTriggered,
-    launchWorktreeId
-  )
+  const discovery = useNativeChatSkills(agent, terminalTabId, skillPickerTriggered)
   const pickerCommands = useMemo(
     () => nativeChatPickerCommands(agent, agentCommands, discovery.skills),
     [agent, agentCommands, discovery.skills]

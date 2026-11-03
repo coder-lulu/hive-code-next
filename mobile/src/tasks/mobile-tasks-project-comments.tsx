@@ -26,7 +26,6 @@ import {
   renderCommentReactions,
   projectRowType
 } from './mobile-tasks-legacy-foundation'
-import { pressedStyle } from '../theme/mobile-theme'
 
 function resolvedCommentCountLabel(count: number): string {
   return count === 1
@@ -85,7 +84,7 @@ export function renderMobileTasksProjectComments(model: ConnectionPresentationMo
             return (
               <Pressable
                 key={groupId}
-                style={({ pressed }) => [styles.resolvedCommentSummary, pressed && pressedStyle]}
+                style={styles.resolvedCommentSummary}
                 onPress={() =>
                   setExpandedResolvedCommentGroups((current) => {
                     const next = new Set(current)
@@ -194,10 +193,7 @@ export function renderMobileTasksProjectComments(model: ConnectionPresentationMo
                         <View style={[styles.inlineActionRow, styles.stackedInput]}>
                           {projectRowType(projectRowItem) === 'pr' && comment.threadId ? (
                             <Pressable
-                              style={({ pressed }) => [
-                                styles.inlineSaveButtonCompact,
-                                pressed && pressedStyle
-                              ]}
+                              style={styles.inlineSaveButtonCompact}
                               disabled={projectMutating}
                               onPress={() =>
                                 void toggleProjectGitHubReviewThread(projectRowItem, comment)
@@ -214,10 +210,7 @@ export function renderMobileTasksProjectComments(model: ConnectionPresentationMo
                             </Pressable>
                           ) : null}
                           <Pressable
-                            style={({ pressed }) => [
-                              styles.inlineSaveButtonCompact,
-                              pressed && pressedStyle
-                            ]}
+                            style={styles.inlineSaveButtonCompact}
                             disabled={projectMutating}
                             onPress={() => {
                               setProjectEditingCommentId(commentId)
@@ -229,10 +222,7 @@ export function renderMobileTasksProjectComments(model: ConnectionPresentationMo
                             </Text>
                           </Pressable>
                           <Pressable
-                            style={({ pressed }) => [
-                              styles.inlineSaveButtonCompact,
-                              pressed && pressedStyle
-                            ]}
+                            style={styles.inlineSaveButtonCompact}
                             disabled={projectMutating}
                             onPress={() => void deleteProjectRowComment(projectRowItem, comment)}
                           >

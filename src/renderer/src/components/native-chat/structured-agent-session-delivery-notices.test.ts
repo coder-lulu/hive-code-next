@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentSessionFailureFact } from '../../../../shared/agent-session/failures/agent-session-failure'
+import type { AgentSessionFailureFact } from '../../../../shared/agent-session-failure'
 import type {
   AgentJournalRenderItem,
   AgentJournalSubmission
-} from '../../../../shared/agent-session/journal/agent-session-journal-types'
-import { agentSessionFailureWords } from '../../../../shared/agent-session/failures/agent-session-failure-words'
+} from '../../../../shared/agent-session-journal-types'
+import { agentSessionFailureWords } from '../../../../shared/agent-session-failure-words'
 import {
   agentJournalItemKey,
   agentJournalSubmissionKey
-} from '../../../../shared/agent-session/journal/agent-session-journal-item-key'
-import { structuredAgentSessionStartFailureRowIdentity } from '../../../../shared/agent-session/failures/structured-agent-session-start-failure-row-key'
-import { structuredAgentSessionDeliveryNotices } from './structured-agent-session-delivery-notices'
-import { agentSessionVisibleFailureFacts } from '../../../../shared/agent-session/failures/agent-session-visible-failures'
+} from '../../../../shared/agent-session-journal-item-key'
+import { structuredAgentSessionStartFailureRowIdentity } from '../../../../shared/structured-agent-session-start-failure-row-key'
+import {
+  structuredAgentSessionDeliveryNotices,
+  structuredAgentSessionStartFailureFacts
+} from './structured-agent-session-delivery-notices'
 import type { StructuredAgentSessionPendingSend } from './structured-agent-session-pending-sends'
 
 const SENDING = 'Sending…'
@@ -73,35 +75,11 @@ function texts(map: ReturnType<typeof notices>): Record<string, string> {
 }
 
 describe('the line under each of the chat own messages', () => {
-  it('keeps sending through either reply/journal ordering until the host resolves it', () => {
-    const sending = { [agentJournalSubmissionKey('a')]: SENDING }
-    const echo = pending('a', 'sending')
-    const recordedEcho = pending('a', 'recorded')
-    const hostPending = row('a', 'pending')
-    for (const input of [
-      { pending: [echo] },
-      { pending: [recordedEcho] },
-      { pending: [recordedEcho], submissions: [hostPending] },
-      { pending: [echo], submissions: [hostPending] },
-      { submissions: [hostPending] }
-    ]) {
-      expect(texts(notices(input))).toEqual(sending)
-    }
-    for (const phase of ['sending', 'recorded'] as const) {
-      for (const state of ['accepted', 'unknown'] as const) {
-        expect(
-          texts(notices({ pending: [pending('a', phase)], submissions: [row('a', state)] }))
-        ).toEqual({})
-      }
-      expect(
-        texts(
-          notices({
-            pending: [pending('a', phase)],
-            submissions: [row('a', 'rejected', { reason: 'Not accepted' })]
-          })
-        )
-      ).toEqual({ [agentJournalSubmissionKey('a')]: 'Not accepted' })
-    }
+  it('says only that a message on its way is sending', () => {
+    expect(texts(notices({ pending: [pending('a', 'sending')] }))).toEqual({
+      [agentJournalSubmissionKey('a')]: SENDING
+    })
+    expect(texts(notices({ pending: [pending('c', 'recorded')] }))).toEqual({})
   })
 
   it("says nothing on a message the host recorded but couldn't confirm, as the common pattern", () => {
@@ -175,7 +153,7 @@ describe('the line under each of the chat own messages', () => {
 
     it('reads only the start-failure rows', () => {
       expect(
-        agentSessionVisibleFailureFacts([
+        structuredAgentSessionStartFailureFacts([
           statusRow(startRowKey, startFailed),
           statusRow(agentJournalSubmissionKey('exit-row'), { kind: 'providerExited' })
         ])
@@ -183,7 +161,7 @@ describe('the line under each of the chat own messages', () => {
     })
 
     it('says only that it was not sent, and words a rejection no row states in full', () => {
-      const facts = agentSessionVisibleFailureFacts([statusRow(startRowKey, startFailed)])
+      const facts = structuredAgentSessionStartFailureFacts([statusRow(startRowKey, startFailed)])
       const recorded = (id: string) =>
         row(id, 'rejected', { reason: 'Written by the host.', rejection: startFailed })
       expect(
@@ -194,8 +172,7 @@ describe('the line under each of the chat own messages', () => {
           })
         )
       ).toEqual({
-        [agentJournalSubmissionKey('first')]: 'Your message was not sent.',
-        [agentJournalSubmissionKey('later')]: SENDING
+        [agentJournalSubmissionKey('first')]: 'Your message was not sent.'
       })
       expect(texts(notices({ submissions: [recorded('first')] }))).toEqual({
         [agentJournalSubmissionKey('first')]: "Claude couldn't start. Start a new chat to continue."

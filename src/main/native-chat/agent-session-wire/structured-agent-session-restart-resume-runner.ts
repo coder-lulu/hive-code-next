@@ -1,7 +1,9 @@
 // Manual/automatic Resume share admission and send a continuation, never replaying the original prompt.
 
-import { isAgentSessionRefusalError } from '../../../shared/agent-session/failures/agent-session-wire-refusals'
-import type { AgentSessionAnyRefusalDetails } from '../../../shared/agent-session/failures/agent-session-refusal-details'
+import {
+  isAgentSessionRefusalError,
+  type AgentSessionAnyRefusalDetails
+} from '../../../shared/agent-session-wire-refusals'
 import { availableParallelism } from 'node:os'
 import { PrioritySemaphore } from '../../../shared/priority-semaphore'
 import type { StructuredAgentSessionResumeCandidate } from './structured-agent-session-restart-resume-set'

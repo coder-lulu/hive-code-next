@@ -83,9 +83,7 @@ export async function runTerminalBinarySubscription(args: TerminalSubscriptionAr
     if (closed || !sendBinary) {
       return
     }
-    sendBinary(encodeTerminalStreamFrame({ opcode, streamId, seq: frameSeq, payload }), {
-      compressible: true
-    })
+    sendBinary(encodeTerminalStreamFrame({ opcode, streamId, seq: frameSeq, payload }))
   }
   outputBatcher = createTerminalOutputBatcher((data, meta) => {
     if (meta?.cwd !== undefined) {

@@ -161,11 +161,39 @@ function findElementByClassSubstring(
   return findElementByClassSubstring(element.props?.children, classNameSubstring)
 }
 
+function findButtonTexts(node: unknown): string[] {
+  if (node == null || typeof node === 'string' || typeof node === 'number') {
+    return []
+  }
+  if (Array.isArray(node)) {
+    return node.flatMap(findButtonTexts)
+  }
+  const element = node as ReactElementLike
+  const typeName = getTypeName(element)
+  if (typeName === 'WarpThemeImportButton') {
+    return ['Import from Warp']
+  }
+  if (typeName === 'YamlThemeImportButton') {
+    return ['Import from YAML']
+  }
+  return [...findButtonTexts(element.props?.children), ...findButtonTexts(element.props?.action)]
+}
+
 describe('TerminalThemeCatalogSection', () => {
   beforeEach(() => {
     themeTarget = 'dark'
     resetTerminalThemeTargetMemoryForTests()
     vi.clearAllMocks()
+  })
+
+  it('renders one theme picker and one preview for the active target', () => {
+    const element = renderCatalog(makeSettings({ terminalUseSeparateLightTheme: false }), vi.fn())
+
+    expect(countElementsByTypeName(element, 'ThemePicker')).toBe(1)
+    expect(countElementsByTypeName(element, 'TerminalSettingsPreview')).toBe(1)
+    expect(findElementByTypeName(element, 'TerminalSettingsPreview')?.props?.modeOverride).toBe(
+      'dark'
+    )
   })
 
   it('opens on the active light theme when the system appearance is light', () => {
@@ -206,13 +234,12 @@ describe('TerminalThemeCatalogSection', () => {
     })
   })
 
-  it('clears only the light slot overrides when selecting a light theme', () => {
+  it('clears imported color overrides when selecting a light theme', () => {
     const updateSettings = vi.fn()
     const element = renderCatalog(
       makeSettings({
         terminalUseSeparateLightTheme: true,
-        terminalColorOverrides: { background: '#111111' },
-        terminalColorOverridesLight: { background: '#eeeeee' }
+        terminalColorOverrides: { background: '#111111' }
       }),
       updateSettings,
       'light'
@@ -224,7 +251,7 @@ describe('TerminalThemeCatalogSection', () => {
 
     expect(updateSettings.mock.calls[0]?.[0]).toStrictEqual({
       terminalThemeLight: 'GitHub Light',
-      terminalColorOverridesLight: undefined
+      terminalColorOverrides: undefined
     })
   })
 
@@ -271,6 +298,17 @@ describe('TerminalThemeCatalogSection', () => {
 
     expect(picker?.props?.selectedTheme).toBe('GitHub Light')
     expect(preview?.props?.modeOverride).toBe('light')
+  })
+
+  it('keeps the light target enabled while separate light theme is disabled', () => {
+    const element = renderCatalog(makeSettings({ terminalUseSeparateLightTheme: false }), vi.fn())
+    const targetControl = findElementByTypeName(element, 'SettingsSegmentedControl')
+    const options = targetControl?.props?.options as readonly {
+      value: string
+      disabled?: boolean
+    }[]
+
+    expect(options.find((option) => option.value === 'light')?.disabled).toBeUndefined()
   })
 
   it('uses the preferred target when opened from a light-specific search', () => {
@@ -395,5 +433,20 @@ describe('TerminalThemeCatalogSection', () => {
     updateDarkDividerColor('#000000')
 
     expect(updateSettings).toHaveBeenCalledWith({ terminalDividerColorDark: '#000000' })
+  })
+
+  it('passes imported theme highlight signals into the shared picker', () => {
+    const element = renderCatalog()
+    const picker = findElementByTypeName(element, 'ThemePicker')
+
+    expect(picker?.props?.importedHighlightSignal).toBe(7)
+  })
+})
+
+describe('Terminal theme imports', () => {
+  it('renders the Warp and YAML import buttons inside the combined theme catalog', () => {
+    const buttonTexts = findButtonTexts(renderCatalog())
+
+    expect(buttonTexts).toEqual(['Import from Warp', 'Import from YAML'])
   })
 })

@@ -1,4 +1,3 @@
-import type { TerminalForegroundObservation } from '../../shared/terminal-foreground-observation'
 import { pruneRetiredPtyIncarnations } from '../../shared/retired-pty-incarnations'
 import { getInspectableTerminalHostSession } from './terminal-host-session-access'
 import { isShellProcess } from '../../shared/agent-detection'
@@ -21,7 +20,6 @@ import { SessionNotFoundError } from './types'
 import type { PtyProcessInspectionOptions } from '../providers/pty-process-inspection'
 
 export type TerminalHostProcessInspection = {
-  foregroundObservation?: TerminalForegroundObservation
   foregroundProcess: string | null
   hasChildProcesses: boolean
   childProcessEvidence?: PtyChildProcessVerdict
@@ -38,7 +36,6 @@ export async function inspectTerminalHostProcess(args: {
   session: Session | null
   currentSession?: () => Session | undefined
   expectedIncarnationId?: string
-  foregroundOnly?: boolean
   /** The caller is a self-correcting poll that only reads the process name, never evidence. */
   steadyState?: boolean
   ignoreDetached?: boolean
@@ -56,8 +53,7 @@ export async function inspectTerminalHostProcess(args: {
     ) {
       return {
         foregroundProcess: null,
-        hasChildProcesses: args.foregroundOnly === true,
-        ...(args.foregroundOnly === true ? { childProcessEvidence: 'unverifiable' as const } : {}),
+        hasChildProcesses: false,
         foregroundProcessEvidence: {
           authorityGeneration: args.authorityGeneration,
           observationEpoch: args.nextObservationEpoch(),
@@ -74,26 +70,6 @@ export async function inspectTerminalHostProcess(args: {
 
   const incarnationMatches =
     !expectedIncarnationId || expectedIncarnationId === session.incarnationId
-  if (args.foregroundOnly === true) {
-    const requestedAt = Date.now()
-    const sample = incarnationMatches
-      ? await session.observeForeground()
-      : { verdict: 'unverifiable' as const, reason: 'incarnation_mismatch' }
-    const current = session.isAlive && (!args.currentSession || args.currentSession() === session)
-    return {
-      foregroundProcess: current && sample.verdict === 'observed' ? sample.processName : null,
-      hasChildProcesses: true,
-      childProcessEvidence: 'unverifiable',
-      foregroundObservation: {
-        ptyId: sessionId,
-        ptyIncarnationId: session.incarnationId,
-        authorityGeneration: args.authorityGeneration,
-        observationEpoch: args.nextObservationEpoch(),
-        capturedAgeMs: Math.max(0, Date.now() - requestedAt),
-        ...(current ? sample : { verdict: 'unverifiable' as const, reason: 'session_changed' })
-      }
-    }
-  }
   if (args.steadyState === true && incarnationMatches) {
     const anchored = await readAnchoredForeground(session)
     if (anchored !== null) {

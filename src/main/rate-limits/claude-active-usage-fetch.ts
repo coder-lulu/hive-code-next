@@ -15,12 +15,6 @@ import { CLAUDE_PROFILE_MISSING_MESSAGE } from '../../shared/claude-profile-rout
 export async function fetchActiveClaudeRateLimits(
   options?: ClaudeRateLimitFetchOptions
 ): Promise<ProviderRateLimits> {
-  if (options?.authPreparation?.managedRefreshDeferredByLivePty)
-    {return makeClaudeUsageResult('error', 'Waiting for Claude session', {
-      failureKind: 'stale-token',
-      deferredByLiveClaudeSession: true,
-      attemptedSources: []
-    })}
   const usageError = options?.authPreparation?.usageError
   if (usageError) {
     return makeClaudeUsageResult('error', usageError, {

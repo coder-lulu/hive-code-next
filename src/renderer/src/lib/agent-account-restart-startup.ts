@@ -13,15 +13,15 @@ import { runtimeEnvironmentIdUnlessTwin } from '@/lib/resolve-owner'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import { repoMatchesHostIdentity } from '@/store/slices/repo-host-identity'
 import { makePaneKey } from '../../../shared/stable-pane-id'
+import { normalizeAgentProviderSession } from '../../../shared/agent-session-resume'
 import {
-  normalizeAgentProviderSession,
-  type AgentProviderSessionMetadata,
-  type SleepingAgentLaunchConfig
-} from '../../../shared/agent-session/lifecycle/agent-session-resume'
-import {
-  resolveTuiAgentLaunchRawArgs,
+  resolveTuiAgentLaunchArgs,
   resolveTuiAgentLaunchEnv
 } from '../../../shared/tui-agent-launch-defaults'
+import type {
+  AgentProviderSessionMetadata,
+  SleepingAgentLaunchConfig
+} from '../../../shared/agent-session-resume'
 import type { AccountRestartAgent } from '@/store/terminals/terminal-contracts'
 import type { ProjectExecutionRuntimeResolution } from '../../../shared/project-execution-runtime'
 import { resolveAgentLaunchCommand } from '../../../shared/tui-agent-launch-command'
@@ -90,12 +90,7 @@ export function resolveAgentAccountRestartResumeStartup(
       launchConfig !== undefined
         ? launchConfig.agentArgs
         : unrecordedLaunchUsesDefaults
-          ? resolveTuiAgentLaunchRawArgs(
-              agent,
-              state.settings,
-              undefined,
-              resolveStartupShell(resumeTarget.platform, resumeTarget.shell)
-            )
+          ? resolveTuiAgentLaunchArgs(agent, state.settings)
           : null,
     agentEnv:
       launchConfig !== undefined

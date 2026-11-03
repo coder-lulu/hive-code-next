@@ -16,39 +16,28 @@ import type { CodexManagedAccount } from '../../shared/managed-account-types'
 import { CodexRuntimeHomeWslCore } from './runtime-home-service-wsl-core'
 
 export abstract class CodexRuntimeHomeWsl extends CodexRuntimeHomeWslCore {
-  protected getPreparedWslRateLimitHomePath(
-    target: CodexAccountSelectionTarget,
-    pinnedWslDistro?: string
-  ): string | null {
-    // Unpinned polls pin the resolved default, as they always read that distro's lane.
-    const distro = pinnedWslDistro ?? this.resolveWslDefaultTarget(target).wslDistro?.trim()
-    return this.getWslCodexHomePathForSelection(target, { pinnedWslDistro: distro || undefined })
+  protected getPreparedWslRateLimitHomePath(target: CodexAccountSelectionTarget): string | null {
+    return this.getWslCodexHomePathForSelection(target)
   }
 
-  /**
-   * `probeHome: false` never runs wsl.exe for the guest home: an uncached one reads as unknown.
-   * `pinnedWslDistro` names the distro for paths, probes and the account lane, as launch's target does.
-   */
+  /** `probeHome: false` never runs wsl.exe for the guest home: an uncached one reads as unknown. */
   protected getWslCodexHomePathForSelection(
     target: CodexAccountSelectionTarget,
-    options: { probeHome?: boolean; pinnedWslDistro?: string } = {}
+    options: { probeHome?: boolean } = {}
   ): string | null {
     const settings = this.store.getSettings()
-    const pathTarget: CodexAccountSelectionTarget = options.pinnedWslDistro
-      ? { runtime: 'wsl', wslDistro: options.pinnedWslDistro }
-      : this.resolveWslDefaultTarget(target)
-    // A pin names the distro, so the account is that distro's lane, exactly as launch reads it.
     const account = this.getActiveAccount(
       settings.codexManagedAccounts,
-      getSelectedCodexAccountIdForTarget(settings, options.pinnedWslDistro ? pathTarget : target)
+      getSelectedCodexAccountIdForTarget(settings, target)
     )
     if (account) {
-      const accountHome = this.getWslLaunchCodexHomePath(account, pathTarget.wslDistro?.trim())
+      const targetDistro = this.resolveWslDefaultTarget(target).wslDistro?.trim()
+      const accountHome = this.getWslLaunchCodexHomePath(account, targetDistro)
       if (accountHome) {
         return accountHome
       }
     }
-    return this.getWslSystemCodexHomePath(options.pinnedWslDistro ? pathTarget : target, options)
+    return this.getWslSystemCodexHomePath(target, options)
   }
 
   protected getWslLaunchCodexHomePath(

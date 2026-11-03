@@ -4,34 +4,23 @@ import type { Repo } from '../../../../shared/repo-types'
 import type { LegacyAutomationPartitionContext } from '../../../../shared/automation-legacy-list-partition'
 import type { StableAutomationAuthorityRef } from '../../../../shared/automation-owner-ref'
 import { automationAuthorityCatalogKey } from './automation-host-catalog-types'
-import {
-  getRepoExecutionHostId,
-  getRepoSshConnectionId,
-  parseExecutionHostId
-} from '../../../../shared/execution-host'
+import { getRepoExecutionHostId, parseExecutionHostId } from '../../../../shared/execution-host'
 
-type RepoConnection = Pick<Repo, 'connectionId' | 'executionHostId'>
+type RepoConnection = Pick<Repo, 'connectionId'>
 
-export type AutomationAuthorityRepoTables = ReadonlyMap<
-  string,
-  ReadonlyMap<string, readonly RepoConnection[]>
->
+export type AutomationAuthorityRepoTables = ReadonlyMap<string, ReadonlyMap<string, RepoConnection>>
 
 /** Mirrors the authority's own rule: `undefined` = not in this table, `null` = local, string = SSH. */
 export function repoConnectionIdIn(
-  repoTable: ReadonlyMap<string, readonly RepoConnection[]>,
-  selectedConnectionId?: string | null
+  repoTable: ReadonlyMap<string, RepoConnection>
 ): (repoId: string) => string | null | undefined {
   return (repoId) => {
-    const candidates = (repoTable.get(repoId) ?? []).filter(
-      (repo) =>
-        selectedConnectionId === undefined || getRepoSshConnectionId(repo) === selectedConnectionId
-    )
-    return candidates.length === 1 ? getRepoSshConnectionId(candidates[0]) : undefined
+    const repo = repoTable.get(repoId)
+    return repo ? repo.connectionId?.trim() || null : undefined
   }
 }
 
-const EMPTY_REPO_TABLE: ReadonlyMap<string, readonly RepoConnection[]> = new Map()
+const EMPTY_REPO_TABLE: ReadonlyMap<string, RepoConnection> = new Map()
 
 function repoOwningAuthority(repo: Repo): StableAutomationAuthorityRef {
   const host = parseExecutionHostId(getRepoExecutionHostId(repo))
@@ -45,15 +34,15 @@ function repoOwningAuthority(repo: Repo): StableAutomationAuthorityRef {
 export function groupReposByAutomationAuthority(
   repos: readonly Repo[]
 ): AutomationAuthorityRepoTables {
-  const tables = new Map<string, Map<string, RepoConnection[]>>()
+  const tables = new Map<string, Map<string, RepoConnection>>()
   for (const repo of repos) {
     const key = automationAuthorityCatalogKey(repoOwningAuthority(repo))
     let table = tables.get(key)
     if (!table) {
-      table = new Map<string, RepoConnection[]>()
+      table = new Map<string, RepoConnection>()
       tables.set(key, table)
     }
-    table.set(repo.id, [...(table.get(repo.id) ?? []), repo])
+    table.set(repo.id, repo)
   }
   return tables
 }

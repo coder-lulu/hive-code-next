@@ -43,7 +43,15 @@ vi.mock('react-native', () => ({
 
 vi.mock('lucide-react-native', () => ({ ChevronLeft: 'ChevronLeft' }))
 
-vi.mock('../components/bottom-drawer/BottomDrawer', () => ({
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
+
+vi.mock('../components/BottomDrawer', () => ({
   BottomDrawer: ({ children }: { children: ReactNode }) => children
 }))
 

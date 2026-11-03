@@ -27,12 +27,6 @@ export const HOST_STACK_SCREENS = [
     }
   },
   {
-    name: '[hostId]/automations',
-    get title() {
-      return translate('navigation.hostStackScreens.automations', 'Automations')
-    }
-  },
-  {
     name: '[hostId]/session/[worktreeId]',
     get title() {
       return translate('navigation.hostStackScreens.terminal', 'Terminal')

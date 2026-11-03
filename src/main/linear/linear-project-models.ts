@@ -1,4 +1,3 @@
-import { LINEAR_AUTHENTICATION_ERROR } from '../../shared/integration-credential-errors'
 import type { LinearIssue } from '../../shared/linear/issue-types'
 import type {
   LinearCustomViewModel,
@@ -66,7 +65,7 @@ export function workspaceError(
       workspaceId: entry.workspace.id,
       workspaceName: entry.workspace.organizationName,
       type: 'auth',
-      message: LINEAR_AUTHENTICATION_ERROR
+      message: 'Linear authentication expired for this workspace.'
     }
   }
 

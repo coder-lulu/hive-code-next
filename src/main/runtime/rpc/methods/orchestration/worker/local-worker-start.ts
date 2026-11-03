@@ -28,7 +28,7 @@ import {
 import { failWorkerStartWithReceipt } from './worker-start-receipt'
 import { assertExplicitWorkerUsable } from './explicit-worker-terminal-validation'
 import { resolveDispatchAssigneeParty } from '../../../../orchestration/orchestration-party'
-import { chatAssigneeOf, chatWorkerMode } from '../chat-assignee-admission'
+import { CHAT_WORKER_AUTHORITY, chatAssigneeOf, chatWorkerMode } from '../chat-assignee-admission'
 import { recordCreatedWorkerTerminalCustody } from './created-worker-terminal-custody'
 import { releaseRetriedWorkerTerminal } from './retried-worker-terminal-release'
 import { requireWorkerAuthority, type WorkerEffect } from './worker-topology'
@@ -36,16 +36,12 @@ import { prepareLocalWorkerStart } from './worker-start-validation'
 import { deliverAndSettleWorkerStartReadiness } from './worker-start-readiness-settlement'
 import type { WorkerStartMutation } from './worker-start-mutation'
 import { prepareWorkerStartCard } from '../../../../orchestration/worker-start-card'
-import { rebindReusedStructuredWorker } from '../../orchestration-structured-worker-session'
-import { placedWorkerParty, type WorkerFollowUp } from './worker-follow-up-placement'
 
 export async function startLocalWorker(args: {
   params: WorkerStartInput
   runtime: OrcaRuntimeService
   db: OrchestrationDb
-  /** Called only once effect-free validation passes, so a refused start binds no new Run. */
-  bindRun: () => RunRow
-  taskDeps: string[] | undefined
+  run: RunRow
   coordinator: OrchestrationCallerIdentity | null
   callerSession?: OrchestrationSessionCaller
   existingTask?: TaskRow
@@ -54,9 +50,8 @@ export async function startLocalWorker(args: {
   mode: WorkerStartModeReceipt
   /** Set when a worker starts its own helper; the helper reports to this Dispatch. */
   helperCreator?: DispatchContextRow
-  followUp?: WorkerFollowUp
 }): Promise<unknown> {
-  const { runtime, db, coordinator, callerSession, orchestrationMutation } = args
+  const { runtime, db, run, coordinator, callerSession, orchestrationMutation } = args
   const recordStart = prepareWorkerStartCard(runtime, callerSession)
   // `--terminal` names a party: a chat by its `/clear` root address, as its Dispatch does.
   const terminal = args.params.terminal && resolveDispatchAssigneeParty(args.params.terminal, db)
@@ -138,10 +133,8 @@ export async function startLocalWorker(args: {
   const hostMode = resolveWorkerStartModeOnHost(runtime, args.mode, resolvedWorktree?.id, agent)
   let mode = chatWorkerMode(await hostMode, chat)
 
-  const run = args.bindRun()
   const started = createLocalWorkerStartDispatch(args, {
     params,
-    run,
     requestedWorktree,
     createsWorktree,
     mode,
@@ -162,9 +155,6 @@ export async function startLocalWorker(args: {
   let terminalHandle = params.terminal
   let placed: Awaited<ReturnType<typeof placeWorkerAgent>> | undefined
   let failedStage = 'terminal_create'
-  const onStage = (stage: string) => {
-    failedStage = stage
-  }
   let result: unknown
   try {
     placed = await placeWorkerAgent({
@@ -180,15 +170,15 @@ export async function startLocalWorker(args: {
       agent,
       launchPreferences: launch.preferences,
       effects,
-      onStage,
-      followUp: args.followUp
+      onStage: (stage) => {
+        failedStage = stage
+      }
     })
     // New worktrees resolve host support after creation, so the final mode receipt may differ from preflight.
     mode = placed.mode
     resolvedWorktree = placed.worktree
     terminalHandle = placed.terminalHandle
     const { structuredSession, setupReceipt } = placed
-    const { workerChat, external, created, authority } = placedWorkerParty(placed, chat, terminal)
     const setupStage = {
       db,
       dispatchId: started.dispatch.id,
@@ -197,7 +187,7 @@ export async function startLocalWorker(args: {
       setup: setupReceipt,
       effects
     }
-    recordCreatedWorkerTerminalCustody(runtime, setupStage, created && !structuredSession)
+    recordCreatedWorkerTerminalCustody(runtime, setupStage, !params.terminal && !structuredSession)
     if (persistGatedSetupSpawnFailure(setupStage)) {
       failedStage = 'setup_start'
       throw new Error('Setup terminal failed to start before the gated agent launch.')
@@ -215,13 +205,12 @@ export async function startLocalWorker(args: {
           effects,
           timeoutMs: Math.max(0, readinessDeadline - Date.now())
         })
-      : workerChat
+      : chat
         ? // A chat takes its task as a queued send whatever it is doing, so nothing is waited on.
           null
         : await waitForWorkerAgentReady(runtime, terminalHandle, {
             agent,
             reusesTerminal: Boolean(params.terminal),
-            creation: placed.terminalCreation,
             timeoutMs: params.timeoutMs ?? 60_000
           })
     if (wait) {
@@ -239,7 +228,10 @@ export async function startLocalWorker(args: {
         )
       }
     }
-    const terminalAuthority = authority ?? requireWorkerAuthority(runtime, terminalHandle)
+    // A chat has no pane or process; its Dispatch names it by its Orca session ID alone.
+    const terminalAuthority = chat
+      ? CHAT_WORKER_AUTHORITY
+      : requireWorkerAuthority(runtime, terminalHandle)
     db.prepareStartingWorkerAuthority({
       dispatchId: started.dispatch.id,
       handle: terminalHandle,
@@ -247,17 +239,14 @@ export async function startLocalWorker(args: {
       worktreeId: resolvedWorktree.id,
       effects,
       setupState: setupReceipt.state,
-      terminalOwnership: external ? 'external' : 'created'
+      terminalOwnership: params.terminal ? 'external' : 'created'
     })
-    if (workerChat) {
-      rebindReusedStructuredWorker(terminalHandle, db)
-    }
 
     result = await deliverAndSettleWorkerStartReadiness({
       runtime,
       db,
       run,
-      task: placed.extraSpec ? { ...task, spec: `${task.spec}\n\n${placed.extraSpec}` } : task,
+      task,
       dispatchId: started.dispatch.id,
       dispatchDepth: started.dispatch.depth,
       structuredSession,
@@ -266,7 +255,7 @@ export async function startLocalWorker(args: {
       devMode: params.devMode,
       requestId: orchestrationMutation?.requestId ?? started.dispatch.id,
       agent: agent ?? null,
-      launchedAgent: external || workerChat ? null : (agent ?? null),
+      launchedAgent: params.terminal ? null : (agent ?? null),
       setupReceipt,
       launchReceipt: launch.receipt,
       mode,
@@ -274,7 +263,9 @@ export async function startLocalWorker(args: {
       readinessDeadline,
       effects,
       terminalRevealWarning: placed.warning,
-      onStage
+      onStage: (stage) => {
+        failedStage = stage
+      }
     })
   } catch (error) {
     result = await failWorkerStartWithReceipt({
@@ -302,8 +293,7 @@ export async function startLocalWorker(args: {
     recordStart({
       dispatchId: started.dispatch.id,
       workerAddress: terminalHandle,
-      task: task.spec,
-      agent: agent ?? null
+      task: task.spec
     })
   }
   return result

@@ -160,21 +160,13 @@ export type ProfileStateRepairChoiceDialogDeps = {
   translate: ProfileStateDialogTranslate
 }
 
-/** Confirm the selected repair sources; false quits unchanged. */
+/** Confirm replacement with older sections; false quits unchanged. */
 export async function chooseProfileStateRepair(
   deps: ProfileStateRepairChoiceDialogDeps
 ): Promise<boolean> {
   const format = deps.formatTime ?? ((time: Date) => time.toLocaleString())
-  const lines = deps.sections.map((repair) => {
-    const { domain, backupCreatedAtMs } = repair
+  const lines = deps.sections.map(({ domain, backupCreatedAtMs }) => {
     const [section] = profileStateSectionLabels([domain], deps.translate)
-    if ('source' in repair) {
-      return deps.translate(
-        'profileState.repairChoice.sectionKeptCurrent',
-        '{{section}}: your current runs will be kept',
-        { section }
-      )
-    }
     return backupCreatedAtMs === undefined
       ? deps.translate(
           'profileState.repairChoice.sectionStartsEmpty',

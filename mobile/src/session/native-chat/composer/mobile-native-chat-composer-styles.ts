@@ -7,11 +7,11 @@ export const COMPOSER_INSET_TOP = 6
 
 export const mobileNativeChatComposerStyles = themedStyleSheet(() => ({
   composerInset: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: 10,
     paddingTop: COMPOSER_INSET_TOP,
     paddingBottom: spacing.sm
   },
-  bar: composerInputStyles.box,
+  bar: { ...composerInputStyles.box, ...composerInputStyles.docked },
   dictationMeter: {
     flexDirection: 'row',
     alignItems: 'center',

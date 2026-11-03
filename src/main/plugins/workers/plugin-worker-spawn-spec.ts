@@ -16,8 +16,6 @@ export function buildPluginWorkerSpawnSpec(
     // Dev roots survive manifest changes; include revision to prevent stale worker reuse.
     manifestRevision: JSON.stringify(plugin.manifest),
     reviewedContentHash: plugin.contentHash ?? plugin.consentContentHash ?? null,
-    ...(plugin.isDev ? { devRevision: plugin.devRevision ?? null } : {}),
-    ...(plugin.manifest.contributes.hooks.length > 0 ? { keepWarm: true as const } : {}),
     grantedCapabilities
   }
 }
@@ -31,8 +29,7 @@ export function pluginWorkerSpawnSpecsEqual(
     left.rootDir !== right.rootDir ||
     left.mainEntry !== right.mainEntry ||
     left.manifestRevision !== right.manifestRevision ||
-    (left.reviewedContentHash ?? null) !== (right.reviewedContentHash ?? null) ||
-    (left.devRevision ?? null) !== (right.devRevision ?? null)
+    (left.reviewedContentHash ?? null) !== (right.reviewedContentHash ?? null)
   ) {
     return false
   }

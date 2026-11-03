@@ -119,8 +119,7 @@ export function screenModuleMocks(dependencies: ScreenDependencies) {
       useNavigation: () => ({
         setOptions: dependencies.setScreenOptions,
         dispatch: dependencies.dispatch,
-        isFocused: () => dependencies.screenFocused,
-        getParent: () => undefined
+        isFocused: () => dependencies.screenFocused
       }),
       useNavigationContainerRef: () => ({ getRootState: () => dependencies.rootState }),
       useFocusEffect: (effect: () => undefined | (() => void)) => React.useEffect(effect, [effect])

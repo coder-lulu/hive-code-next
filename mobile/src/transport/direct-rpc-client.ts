@@ -18,7 +18,6 @@ import {
 } from './rpc-client-stream-registry'
 import {
   DECISIVE_PROBE_TIMEOUT_MS,
-  livenessProbeFrame,
   RpcSessionLivenessWatchdog
 } from './rpc-session-liveness-watchdog'
 import { isStaleForegroundDial } from './rpc-stale-dial'
@@ -308,8 +307,10 @@ export class DirectRpcClient implements RpcClient {
   }
 
   private sendLivenessProbe(): boolean {
-    const frame = livenessProbeFrame(`${LIVENESS_REQUEST_ID_PREFIX}${this.nextId()}`)
-    return this.getState() === 'connected' && this.sendFrame(frame)
+    return (
+      this.getState() === 'connected' &&
+      this.sendFrame({ id: `${LIVENESS_REQUEST_ID_PREFIX}${this.nextId()}`, method: 'status.get' })
+    )
   }
 
   private waitForConnected(timeoutMs?: number): Promise<void> {

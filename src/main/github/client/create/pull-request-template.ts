@@ -35,6 +35,7 @@ export async function findOpenPRByHeadBase(args: {
     ],
     {
       ...ghRepoExecOptions(context),
+      ...(args.connectionId ? {} : localGitOptions),
       ...githubHostExecOptions(args.repo)
     }
   )

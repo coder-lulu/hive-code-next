@@ -62,7 +62,6 @@ export function installSessionReconcileDispose(session: ConnectPanePtySession): 
   }
 
   return {
-    getOwnerContext: () => session.ownerContext,
     syncProcessTracking() {
       session.agentCompletionCoordinator.startProcessTracking()
       // Why: the hidden-delivery gate must follow every pane visibility flip.
@@ -180,7 +179,7 @@ export function installSessionReconcileDispose(session: ConnectPanePtySession): 
       // Why: park/reconnect/remount doesn't advance the recovery epoch, so invalidate this xterm or its delayed retry could hit the next instance.
       session.terminalRecoveryInstance.unregister()
       session.unregisterUndeliverableWriteHandler()
-      session.unsubscribeFitOverrideChange()
+      session.unsubscribeRemoteDesktopActivationClaim()
       session.cancelHiddenOutputSnapshotScrollRestore()
       session.liveScrollbackRestore?.dispose()
       session.liveScrollbackRestore = null

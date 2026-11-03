@@ -1,5 +1,4 @@
 import { windowsLongPathGitArgs } from '../../shared/windows-long-path-git-args'
-import { checkoutWorkersGitArgs } from './checkout-workers-git-args'
 import { waitForPromiseWithSignal } from '../../shared/abort-signal-reason'
 import { resolveWorktreeAddBaseRef } from '../../shared/worktree/base-ref'
 import type { AddWorktreeOptions, AddWorktreeResult, GitWorktreeExecOptions } from './worktree'
@@ -45,8 +44,6 @@ export async function prepareWorktreeCreateCheckout(
   try {
     await withRepoRefMaintenancePaused('worktree-prepare', () =>
       runWithGitReadCacheInvalidation(async () => {
-        // Overlaps preparation; never rejects.
-        const checkoutWorkersArgs = checkoutWorkersGitArgs(repoPath, options)
         const effectiveBase = await resolveWorktreeAddBaseRef(baseBranch, (qualifiedRef) =>
           hasWorktreeBaseCommitRef(repoPath, qualifiedRef, options)
         )
@@ -76,13 +73,7 @@ export async function prepareWorktreeCreateCheckout(
           }
           // Materialize with reset to defer user post-checkout hooks until submission.
           await gitExecFileAsync(
-            [
-              ...(await checkoutWorkersArgs),
-              ...windowsLongPathGitArgs(worktreePath),
-              'reset',
-              '--hard',
-              materializationBase
-            ],
+            [...windowsLongPathGitArgs(worktreePath), 'reset', '--hard', materializationBase],
             { ...gitExecOptions(worktreePath, options), timeout: resolveWorktreeAddTimeoutMs() }
           )
           await verifyWorktreePreparationLockAtPath(lockPath, lockReason, options.signal)
@@ -199,13 +190,7 @@ export async function finalizePreparedWorktree(
       if (preparedHeadReset) {
         await verifyOwnership()
         await gitExecFileAsync(
-          [
-            ...(await checkoutWorkersGitArgs(preparedPath, finalizeGitOptions)),
-            ...windowsLongPathGitArgs(preparedPath),
-            'reset',
-            '--hard',
-            targetHead
-          ],
+          [...windowsLongPathGitArgs(preparedPath), 'reset', '--hard', targetHead],
           gitExecOptions(preparedPath, finalizeGitOptions)
         )
       }

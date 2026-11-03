@@ -21,6 +21,7 @@ import {
   buildEditorExternalWatchEventHandler as createExternalWatchEventHandler,
   EXTERNAL_MUTATION_DEBOUNCE_MS
 } from './editor-external-watch-event-reconciliation'
+import { getEditorExternalWatchTargetKey as getWatchedTargetKey } from './editor-external-watch-targets'
 import { useAppStore } from '@/store'
 import { createTestStore } from '@/store/slices/store-test-helpers'
 import {
@@ -32,6 +33,44 @@ import {
   recordSelfWrite
 } from '@/components/editor/editor-self-write-registry'
 import { __clearEditorPathMovesForTests } from '@/components/editor/editor-path-move-inflight'
+
+describe('getWatchedTargetKey', () => {
+  it('changes when a worktree gains an SSH connection id', () => {
+    expect(
+      getWatchedTargetKey({
+        worktreeId: 'wt-1',
+        worktreePath: '/repo',
+        connectionId: undefined,
+        runtimeEnvironmentId: null
+      })
+    ).not.toBe(
+      getWatchedTargetKey({
+        worktreeId: 'wt-1',
+        worktreePath: '/repo',
+        connectionId: 'conn-1',
+        runtimeEnvironmentId: null
+      })
+    )
+  })
+
+  it('changes when the active runtime environment changes', () => {
+    expect(
+      getWatchedTargetKey({
+        worktreeId: 'wt-1',
+        worktreePath: '/repo',
+        connectionId: undefined,
+        runtimeEnvironmentId: null
+      })
+    ).not.toBe(
+      getWatchedTargetKey({
+        worktreeId: 'wt-1',
+        worktreePath: '/repo',
+        connectionId: undefined,
+        runtimeEnvironmentId: 'env-1'
+      })
+    )
+  })
+})
 
 describe('createExternalWatchEventHandler tombstone coalescing', () => {
   const setExternalMutation = vi.fn()

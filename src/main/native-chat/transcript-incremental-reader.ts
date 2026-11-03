@@ -1,7 +1,4 @@
-import type {
-  NativeChatMessage,
-  NativeChatTurnLifecycle
-} from '../../shared/native-chat/native-chat-types'
+import type { NativeChatMessage, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
 import { transcriptFallbackId } from './transcript-fallback-id'
 import { extendTranscriptBoundary } from './transcript-file-version'
 import { inTranscriptFileOrder } from './transcript-file-order'

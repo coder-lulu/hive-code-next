@@ -1,8 +1,4 @@
-import {
-  uniqueDraggedIds,
-  uniqueDraggedKeys,
-  type DraggedWorktreeCopies
-} from './dragged-worktree-copies'
+import { uniqueDraggedIds, type DraggedWorktreeCopies } from './dragged-worktree-copies'
 import { useCallback } from 'react'
 import type React from 'react'
 import { getWorkspaceKanbanSidebarDropTarget } from '../../workspace-kanban-sidebar-drop'
@@ -51,38 +47,28 @@ export function useWorktreeNativeDrag(args: {
       draggedCopies: DraggedWorktreeCopies
     ) => {
       const draggedIds = draggedCopies.map((copy) => copy.id)
-      // Why the row's identity: a selection can hold both same-id copies; the pressed card is the one dragged.
-      const worktreeKey =
-        event.currentTarget
-          .closest<HTMLElement>('[data-worktree-host-identity]')
-          ?.getAttribute('data-worktree-host-identity') ??
-        uniqueDraggedKeys(draggedCopies.filter((copy) => copy.id === worktreeId))[0]
-      const sourceGroupKey = worktreeKey
-        ? (ctx.worktreeDragGroups.find((group) => group.worktreeIds.includes(worktreeKey))?.key ??
-          null)
-        : null
-      if (!worktreeKey || !sourceGroupKey) {
+      const sourceGroupKey =
+        ctx.worktreeDragGroups.find((group) => group.worktreeIds.includes(worktreeId))?.key ?? null
+      if (!sourceGroupKey) {
         return
       }
       const reorderDraggedCopies = session.getReorderDraggedCopies(draggedCopies)
       const reorderDraggedIds = uniqueDraggedIds(reorderDraggedCopies)
-      const reorderDraggedKeys = uniqueDraggedKeys(reorderDraggedCopies)
-      const reorderUnitDraggedKeys = session.getReorderUnitDraggedKeys(
+      const reorderUnitDraggedIds = session.getReorderUnitDraggedIds(
         sourceGroupKey,
-        reorderDraggedKeys
+        reorderDraggedIds
       )
       const rects = scrollRef.current
         ? getWorktreeSidebarDragRectsForGroup(scrollRef.current, sourceGroupKey)
         : []
       const sourceRect = event.currentTarget.getBoundingClientRect()
       session.worktreeDragSessionRef.current = {
-        draggingWorktreeId: worktreeKey,
+        draggingWorktreeId: worktreeId,
         sourceGroupKey,
         draggedIds,
         draggedCopies: reorderDraggedCopies,
         reorderDraggedIds,
-        reorderDraggedKeys,
-        reorderUnitDraggedKeys,
+        reorderUnitDraggedIds,
         rects,
         grab: getWorktreeSidebarDragGrab({
           offsetY: event.clientY - sourceRect.top,
@@ -91,7 +77,7 @@ export function useWorktreeNativeDrag(args: {
         anchor: null
       }
       setWorktreeDragState({
-        draggingWorktreeId: worktreeKey,
+        draggingWorktreeId: worktreeId,
         sourceGroupKey,
         lineageDropTargetId: null,
         dropIndex: null,
@@ -138,7 +124,7 @@ export function useWorktreeNativeDrag(args: {
           ? ctx.computeWorktreeStatusDrop({
               pointerY: event.clientY,
               status: target.status,
-              draggedKeys: dragSession.reorderDraggedKeys
+              draggedIds: dragSession.reorderDraggedIds
             })
           : null
         if (statusDrop) {
@@ -211,7 +197,7 @@ export function useWorktreeNativeDrag(args: {
           ? ctx.computeWorktreeStatusDrop({
               pointerY: event.clientY,
               status: target.status,
-              draggedKeys: dragSession.reorderDraggedKeys
+              draggedIds: dragSession.reorderDraggedIds
             })
           : null
         if (target.status && statusDrop) {
@@ -233,7 +219,7 @@ export function useWorktreeNativeDrag(args: {
       ctx.onReorderWorktrees({
         groups: ctx.worktreeDragGroups,
         sourceGroupKey: dragSession.sourceGroupKey,
-        draggedKeys: dragSession.reorderDraggedKeys,
+        draggedIds: dragSession.reorderDraggedIds,
         dropIndex: getFullDropIndexForWorktreeDragUnit({
           groups: ctx.worktreeDragUnitGroups,
           sourceGroupKey: dragSession.sourceGroupKey,

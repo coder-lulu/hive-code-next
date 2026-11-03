@@ -17,7 +17,6 @@ export type PrimaryAction = {
   label: string
   title: string
   disabled: boolean
-  isWaitingForRemoteOperation?: boolean
 }
 
 export type PrimaryActionInputs = {
@@ -29,7 +28,6 @@ export type PrimaryActionInputs = {
   hasUnresolvedConflicts: boolean
   isCommitting: boolean
   isRemoteOperationActive: boolean
-  isRemoteOperationInAnotherWorktree?: boolean
   upstreamStatus: GitUpstreamStatus | undefined
   prState?: PRState | null
   isPRStateLoading?: boolean

@@ -13,6 +13,7 @@ import {
   createManagedAuth,
   createStore,
   getRuntimeCodexHomePath,
+  getSystemCodexHomePath,
   setupRuntimeHomeTest,
   teardownRuntimeHomeTest,
   testState
@@ -187,6 +188,18 @@ describe('resolveHostCodexHomePathForLaunchReadOnly', () => {
     expect(sideEffects.accountBridge).not.toHaveBeenCalled()
   })
 
+  it('system-default real home: answers null (real ~/.codex) with zero side effects, matching launch prep', async () => {
+    const { service, store, sideEffects } = await createServiceWithSpies(
+      createSettings({ realHomeRoutable: true })
+    )
+
+    const readOnlyHome = service.resolveHostCodexHomePathForLaunchReadOnly()
+    expect(readOnlyHome).toBeNull()
+    expectNoSideEffects(sideEffects, store)
+
+    expect(service.prepareForCodexLaunch()).toBe(readOnlyHome)
+  })
+
   it('shared runtime home: answers the mirror with zero side effects, then matches launch prep', async () => {
     const { service, store, sideEffects } = await createServiceWithSpies(
       createSettings({ realHomeRoutable: false })
@@ -252,5 +265,18 @@ describe('resolveHostCodexHomePathForLaunchReadOnly', () => {
 
     lstatFaults.release(markerPath)
     expect(service.resolveHostCodexHomePathForLaunchReadOnly()).toBe(managedHomePath)
+  })
+
+  it('shares the create-path null-to-system-home mapping', async () => {
+    const { service } = await createServiceWithSpies(createSettings({ realHomeRoutable: true }))
+    const { resolveStructuredCodexAccountHomePath } =
+      await import('../runtime/structured-agent-account-home')
+    await expect(
+      resolveStructuredCodexAccountHomePath({
+        launchEnv: {},
+        resolveLaunchHome: (input) =>
+          service.resolveHostCodexHomePathForLaunchReadOnly(input.launchEnv)
+      })
+    ).resolves.toBe(getSystemCodexHomePath())
   })
 })

@@ -32,10 +32,8 @@ function resolveFallbackPlatform(): NodeJS.Platform | 'unknown' {
   }
 }
 
-export async function resolveClientEnvironmentFooter(
-  overrides: { shell?: string } = {}
-): Promise<string> {
-  return formatClientEnvironmentFooter({ ...(await resolveClientEnvironmentInfo()), ...overrides })
+export async function resolveClientEnvironmentFooter(): Promise<string> {
+  return formatClientEnvironmentFooter(await resolveClientEnvironmentInfo())
 }
 
 async function resolveAppVersion(): Promise<string> {

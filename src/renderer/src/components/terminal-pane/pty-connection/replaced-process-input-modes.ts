@@ -9,8 +9,6 @@ export function bindReplacedProcessInputModes(session: ConnectPanePtySession): v
   session.groundInputModesForNewProcess = (): void => {
     session.inputModeOwnerIncarnationId = null
     session.writeInputModeGround(PROCESS_BOUNDARY_GROUND)
-    // The new process never subscribed to mode 2031; a reconnect catch-up would land in its input.
-    session.clearPaneMode2031State()
   }
 
   // Call before the process's replay is written, so its own bytes re-arm only what it set.

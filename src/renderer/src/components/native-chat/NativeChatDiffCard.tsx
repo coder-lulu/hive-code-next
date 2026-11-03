@@ -50,8 +50,8 @@ function DiffRow({ line, gutterWidth }: { line: NativeChatEditLine; gutterWidth:
     <div
       className={cn(
         'flex items-start',
-        line.kind === 'add' && 'bg-[var(--diff-added-background)]',
-        line.kind === 'del' && 'bg-[var(--diff-removed-background)]'
+        line.kind === 'add' && 'bg-[var(--diff-added-ground)]',
+        line.kind === 'del' && 'bg-[var(--diff-removed-ground)]'
       )}
     >
       {gutterWidth > 0 ? (

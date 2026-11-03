@@ -12,11 +12,8 @@ import {
   type GitHistoryOptions,
   type GitHistoryResult
 } from './git-history-types'
-import { getGitCurrentBranchName } from './git-current-branch'
-import { isBaseOfItself, resolveBranchRange } from './git-history-branch-range'
 
 export type {
-  GitHistoryBranchRange,
   GitHistoryExecutor,
   GitHistoryGraphColorId,
   GitHistoryItem,
@@ -96,27 +93,27 @@ async function resolveCurrentRef(
   cwd: string,
   headOid: string
 ): Promise<{ currentRef: GitHistoryItemRef; branchName: string | null }> {
-  const branchName = await getGitCurrentBranchName((args) => git(args, cwd))
-  if (branchName) {
-    return {
-      branchName,
-      currentRef: {
-        id: `refs/heads/${branchName}`,
-        name: branchName,
-        revision: headOid,
-        category: 'branches'
+  try {
+    const { stdout } = await git(['symbolic-ref', '--quiet', '--short', 'HEAD'], cwd)
+    const branchName = stdout.trim()
+    if (branchName) {
+      return {
+        branchName,
+        currentRef: {
+          id: `refs/heads/${branchName}`,
+          name: branchName,
+          revision: headOid,
+          category: 'branches'
+        }
       }
     }
+  } catch {
+    // Detached HEAD.
   }
 
   return {
     branchName: null,
-    currentRef: {
-      id: headOid,
-      name: shortGitHash(headOid),
-      revision: headOid,
-      category: 'commits'
-    }
+    currentRef: { id: headOid, name: shortGitHash(headOid), revision: headOid, category: 'commits' }
   }
 }
 
@@ -191,19 +188,8 @@ export async function loadGitHistoryFromExecutor(
       ? rawBaseRef
       : undefined
 
-  // The base may equal the upstream here (a branch tracking main), unlike the graph's comparison base.
-  const branchBase =
-    options.branchOnly &&
-    rawBaseRef?.revision &&
-    !(await isBaseOfItself(git, cwd, rawBaseRef, currentRef))
-      ? await resolveBranchRange(git, cwd, headOid, rawBaseRef)
-      : undefined
-
   // Keep upstream/base as comparison metadata so old workspaces do not gain fetched commits outside their HEAD history.
-  const historyRevisions = branchBase
-    ? [headOid, `^${branchBase.range.baseRef.revision}`]
-    : [headOid]
-  const skip = clampHistorySkip(options.skip)
+  const historyRevisions = [headOid]
 
   let mergeBase: string | undefined
   if (remoteRef?.revision && currentRef.revision && remoteRef.revision !== currentRef.revision) {
@@ -224,8 +210,6 @@ export async function loadGitHistoryFromExecutor(
       '-z',
       '--topo-order',
       '--decorate=full',
-      ...(branchBase ? ['--shortstat'] : []),
-      ...(skip > 0 ? [`--skip=${skip}`] : []),
       `-n${limit + 1}`,
       ...historyRevisions
     ],
@@ -233,11 +217,6 @@ export async function loadGitHistoryFromExecutor(
   )
   const parsed = parseGitHistoryLog(stdout)
   const items = parsed.slice(0, limit)
-  if (branchBase) {
-    for (const item of items) {
-      item.pushed = branchBase.unpushedIds ? !branchBase.unpushedIds.has(item.id) : false
-    }
-  }
   const hasIncomingChanges =
     Boolean(remoteRef?.revision && mergeBase) && remoteRef?.revision !== mergeBase
   const hasOutgoingChanges =
@@ -253,12 +232,6 @@ export async function loadGitHistoryFromExecutor(
     hasIncomingChanges,
     hasOutgoingChanges,
     hasMore: parsed.length > limit,
-    limit,
-    ...(branchBase ? { branch: branchBase.range } : {}),
-    ...(options.skip !== undefined ? { skip } : {})
+    limit
   }
-}
-
-function clampHistorySkip(skip: number | undefined): number {
-  return Number.isFinite(skip) ? Math.max(0, Math.trunc(skip ?? 0)) : 0
 }

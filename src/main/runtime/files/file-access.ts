@@ -89,15 +89,11 @@ export class RuntimeFileAccess {
     worktreeSelector: string,
     relativePath: string,
     staged: boolean,
-    navigation?: RuntimeNavigationTarget,
-    oldPath?: string
+    navigation?: RuntimeNavigationTarget
   ): Promise<RuntimeFileOpenResult> {
     const target = await this.host.resolveRuntimeFileTarget(worktreeSelector)
     const { worktree } = target
     if (!isSafeMobileRelativePath(relativePath)) {
-      throw new Error('invalid_relative_path')
-    }
-    if (oldPath !== undefined && !isSafeMobileRelativePath(oldPath)) {
       throw new Error('invalid_relative_path')
     }
     const kind = isMobileBinaryPath(relativePath)
@@ -112,8 +108,7 @@ export class RuntimeFileAccess {
       relativePath,
       staged,
       runtimeOwnerForTarget(target),
-      navigation,
-      ...(oldPath ? ([oldPath] as const) : [])
+      navigation
     )
     return { worktree: worktree.id, relativePath, kind, opened: true }
   }

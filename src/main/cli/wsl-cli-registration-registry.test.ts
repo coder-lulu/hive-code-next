@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
-  forgetWslCliRegistration,
   getWslCliRegistrationCandidates,
   recordWslCliRegistrationObservations,
   recordWslCliRegistrationRemoved
@@ -76,15 +75,13 @@ describe('WSL CLI registration registry', () => {
     await expect(
       getWslCliRegistrationCandidates(userDataPath, ['Fedora'], {
         now: 2_000,
-        negativeInspectionTtlMs: 10_000,
-        inspectableDistros: ['Fedora']
+        negativeInspectionTtlMs: 10_000
       })
     ).resolves.toEqual([])
     await expect(
       getWslCliRegistrationCandidates(userDataPath, ['Fedora'], {
         now: 12_000,
-        negativeInspectionTtlMs: 10_000,
-        inspectableDistros: ['Fedora']
+        negativeInspectionTtlMs: 10_000
       })
     ).resolves.toEqual(['Fedora'])
   })
@@ -101,9 +98,7 @@ describe('WSL CLI registration registry', () => {
 
     // Reads join the write queue, so startup cannot observe a half-updated registry.
     await expect(
-      getWslCliRegistrationCandidates(userDataPath, ['Ubuntu', 'Debian'], {
-        inspectableDistros: ['Ubuntu', 'Debian']
-      })
+      getWslCliRegistrationCandidates(userDataPath, ['Ubuntu', 'Debian'])
     ).resolves.toEqual(['Ubuntu', 'Debian'])
     await updates
     const state = JSON.parse(
@@ -117,9 +112,7 @@ describe('WSL CLI registration registry', () => {
     await writeFile(join(userDataPath, 'wsl-cli-registrations.json'), '{broken', 'utf8')
 
     await expect(
-      getWslCliRegistrationCandidates(userDataPath, ['Ubuntu', 'Debian'], {
-        inspectableDistros: ['Ubuntu', 'Debian']
-      })
+      getWslCliRegistrationCandidates(userDataPath, ['Ubuntu', 'Debian'])
     ).resolves.toEqual(['Ubuntu', 'Debian'])
   })
 
@@ -132,29 +125,6 @@ describe('WSL CLI registration registry', () => {
     await expect(getWslCliRegistrationCandidates(userDataPath, ['Ubuntu'])).resolves.toEqual([])
   })
 
-  it('forgets every entry of a deleted distro and leaves the others', async () => {
-    const reconciled = { target: 'C:\\Orca\\resources\\bin\\orca.exe', appVersion: '1.4.244' }
-    await recordWslCliRegistrationObservations(
-      userDataPath,
-      [
-        { distro: 'orca-uqa-1029', inspected: true, managed: true, reconciled },
-        { distro: 'Ubuntu', inspected: true, managed: true, reconciled }
-      ],
-      { now: 1_000 }
-    )
-
-    await forgetWslCliRegistration(userDataPath, 'ORCA-UQA-1029')
-
-    expect(
-      JSON.parse(await readFile(join(userDataPath, 'wsl-cli-registrations.json'), 'utf8'))
-    ).toEqual({
-      schemaVersion: 2,
-      registeredDistros: ['Ubuntu'],
-      inspectionTimes: { ubuntu: 1_000 },
-      reconciliations: { ubuntu: reconciled }
-    })
-  })
-
   it('periodically re-inspects a negative entry so restored distros are discovered', async () => {
     await recordWslCliRegistrationObservations(
       userDataPath,
@@ -165,15 +135,13 @@ describe('WSL CLI registration registry', () => {
     await expect(
       getWslCliRegistrationCandidates(userDataPath, ['Ubuntu'], {
         now: 1_001,
-        negativeInspectionTtlMs: 10_000,
-        inspectableDistros: ['Ubuntu']
+        negativeInspectionTtlMs: 10_000
       })
     ).resolves.toEqual([])
     await expect(
       getWslCliRegistrationCandidates(userDataPath, ['Ubuntu'], {
         now: 11_001,
-        negativeInspectionTtlMs: 10_000,
-        inspectableDistros: ['Ubuntu']
+        negativeInspectionTtlMs: 10_000
       })
     ).resolves.toEqual(['Ubuntu'])
   })
@@ -192,8 +160,7 @@ describe('WSL CLI registration registry', () => {
     await expect(
       getWslCliRegistrationCandidates(userDataPath, ['Ubuntu', 'Debian'], {
         now: 1,
-        negativeInspectionTtlMs: 1_000_000,
-        inspectableDistros: ['Ubuntu', 'Debian']
+        negativeInspectionTtlMs: 1_000_000
       })
     ).resolves.toEqual(['Ubuntu', 'Debian'])
   })
@@ -219,24 +186,5 @@ describe('WSL CLI registration registry', () => {
     expect(state.registeredDistros).toEqual(['Managed Oldest'])
     expect(Object.keys(state.inspectionTimes).length).toBeLessThanOrEqual(65)
     expect(state.inspectionTimes['managed oldest']).toBe(0)
-  })
-
-  it("never inspects a distro Orca has no record of: the user's own distros get no guest command", async () => {
-    await expect(
-      getWslCliRegistrationCandidates(userDataPath, ['Ubuntu', 'MyDevBox'], {
-        inspectableDistros: ['Ubuntu']
-      })
-    ).resolves.toEqual(['Ubuntu'])
-    await expect(getWslCliRegistrationCandidates(userDataPath, ['MyDevBox'])).resolves.toEqual([])
-  })
-
-  it("still reconciles a distro carrying Orca's own registration record", async () => {
-    await recordWslCliRegistrationObservations(userDataPath, [
-      { distro: 'Ubuntu', inspected: true, managed: true, reconciled: null }
-    ])
-
-    await expect(getWslCliRegistrationCandidates(userDataPath, ['Ubuntu'])).resolves.toEqual([
-      'Ubuntu'
-    ])
   })
 })

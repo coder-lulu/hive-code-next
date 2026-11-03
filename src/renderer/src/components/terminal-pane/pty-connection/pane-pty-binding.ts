@@ -1,9 +1,7 @@
 import type { IDisposable } from '@xterm/xterm'
-import type { resolveTerminalPaneOwnerContext } from '../terminal-pane-owner-context'
 import type { HasPty } from '../terminal-dead-session-reconcile'
 
 export type PanePtyBinding = IDisposable & {
-  getOwnerContext: () => ReturnType<typeof resolveTerminalPaneOwnerContext>
   syncProcessTracking: () => void
   noteVisibilityResume: () => void
   reassertPtySizeAfterWindowWake: () => void

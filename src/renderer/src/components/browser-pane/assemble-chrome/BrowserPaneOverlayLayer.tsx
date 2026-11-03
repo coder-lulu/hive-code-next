@@ -200,20 +200,14 @@ const BrowserPaneOverlayLayer = memo(function BrowserPaneOverlayLayer({
       {browserTabs.map((browserTab) => {
         const assignment = assignments.get(browserTab.id)
         const isActive = Boolean(isWorktreeActive && assignment && assignment.isActiveInGroup)
-        const inFocusedGroup =
-          knownFocusedGroupId !== undefined && assignment?.groupId === knownFocusedGroupId
         const chromeShortcutScope: BrowserChromeShortcutScope = !isActive
           ? 'inactive'
           : // Why: 'focused' means the main window's focused split, so a floating browser answers only its own chords.
-            isFloatingWorkspace
-            ? inFocusedGroup
-              ? 'owned-target-focused'
-              : 'owned-target'
-            : knownFocusedGroupId === undefined
-              ? 'owned-target'
-              : inFocusedGroup
-                ? 'focused'
-                : 'inactive'
+            isFloatingWorkspace || knownFocusedGroupId === undefined
+            ? 'owned-target'
+            : assignment?.groupId === knownFocusedGroupId
+              ? 'focused'
+              : 'inactive'
         return (
           <BrowserOverlaySlot
             key={browserTab.id}

@@ -1,10 +1,10 @@
-import { agentSessionConversationView } from '../../../shared/agent-session/lifecycle/agent-session-conversation-view'
+import { agentSessionConversationView } from '../../../shared/agent-session-conversation-view'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentSessionRecord } from '../../../shared/agent-session/lifecycle/agent-session-record'
+import type { AgentSessionRecord } from '../../../shared/agent-session-record'
 import {
   agentSessionLeaseFixture,
   agentSessionRecordFixture
-} from '../../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
+} from '../../../shared/agent-session-record.test-fixture'
 import { testOrcaSessionId } from '../../../shared/orca-session-address-test-fixture'
 import { OrchestrationDb } from './db'
 import { createRootDispatch } from './db/root-dispatch-test-fixture'
@@ -91,43 +91,11 @@ describe('where a sender opens', () => {
     expect(locate(`orca_session_id:${ROOT}`, { records: clearedChat() })).toEqual({
       location: { kind: 'chat', sessionId: LIVE, worktreeId: 'wt-chat' }
     })
-    expect(locate(`orca_session_id:${ROOT}`)).toEqual({ location: null })
+    expect(locate(`orca_session_id:${ROOT}`)).toEqual({ location: null, lost: 'chat' })
   })
 
-  it('distinguishes a missing root from an unreadable record, missing successor or cycle', () => {
-    const records = clearedChat()
-    const getRecord = records.getRecord
-    expect(
-      locate(`orca_session_id:${ROOT}`, {
-        records: { ...records, getRecord: () => null, isSessionUnreadable: () => true }
-      })
-    ).toEqual({ location: null })
-    expect(
-      locate(`orca_session_id:${ROOT}`, {
-        records: { ...records, getRecord: () => null }
-      })
-    ).toEqual({ location: null, lost: 'chat' })
-    expect(
-      locate(`orca_session_id:${ROOT}`, {
-        records: {
-          ...records,
-          getRecord: () => {
-            throw new Error('unreadable')
-          }
-        }
-      })
-    ).toEqual({ location: null })
-    expect(
-      locate(`orca_session_id:${ROOT}`, {
-        records: { ...records, getRecord: (id) => (id === ROOT ? getRecord(id) : null) }
-      })
-    ).toEqual({ location: null })
-    const root = getRecord(ROOT)
-    expect(
-      locate(`orca_session_id:${ROOT}`, {
-        records: { ...records, getRecord: () => root }
-      })
-    ).toEqual({ location: null })
+  it('opens a terminal this run issued at its handle', () => {
+    expect(locate('term_now')).toEqual({ location: { kind: 'terminal', handle: 'term_now' } })
   })
 
   it('finds a terminal from an earlier run through the pane its mail was sent from', () => {
@@ -186,7 +154,7 @@ describe('where a sender opens', () => {
     resolveParty.mockImplementationOnce(() => {
       throw new OrchestrationError(CODES.notLive, 'lost its identity')
     })
-    expect(locate(`orca_session_id:${ROOT}`)).toEqual({ location: null })
+    expect(locate(`orca_session_id:${ROOT}`)).toEqual({ location: null, lost: 'chat' })
     resolveParty.mockImplementationOnce(() => {
       throw new Error('database is locked')
     })

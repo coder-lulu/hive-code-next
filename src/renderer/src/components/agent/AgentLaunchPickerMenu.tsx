@@ -1,16 +1,13 @@
-import { memo, useId, useRef, useState, type ComponentProps, type PointerEvent } from 'react'
+import { useId, useRef, useState, type PointerEvent } from 'react'
 import { Input } from '@/components/ui/input'
 import { DropdownMenuItem, DropdownMenuShortcut } from '@/components/ui/dropdown-menu'
 import { AgentIcon } from '@/lib/agent-catalog'
+import { useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
-import { useUiLanguageRevision } from '@/i18n/use-ui-language-revision'
 import { AgentLaunchSetupButton } from './AgentLaunchSetupButton'
+import type { NewTabAgentMenuModel } from '../tab-bar/use-new-tab-agent-menu-rows'
 import { chatUnavailableLabel } from '../tab-bar/tab-agent-row-presentation'
 import type { NewTabAgentMenuRow } from '../../../../shared/agent-launch-picker-rows'
-import {
-  useAgentPickerInventoryEntries,
-  type AgentPickerInventorySource
-} from './use-agent-launch-picker-inventory'
 import {
   searchAgentPickerSetups,
   type AgentPickerDraft,
@@ -29,11 +26,7 @@ export function pickerLaunchRow(
   }
 }
 
-type Launch = (
-  row: NewTabAgentMenuRow,
-  draft?: AgentPickerDraft,
-  entry?: AgentPickerEntry
-) => boolean | void | Promise<boolean>
+type Launch = (row: NewTabAgentMenuRow, draft?: AgentPickerDraft, entry?: AgentPickerEntry) => void
 
 function keepSetupFocus(event: PointerEvent<HTMLDivElement>) {
   // Radix row hover must not steal focus from the row's portaled setup or its nested controls.
@@ -43,14 +36,14 @@ function keepSetupFocus(event: PointerEvent<HTMLDivElement>) {
 }
 
 export function AgentLaunchPickerMenu({
+  model,
   disabled,
   runLaunch,
   entries,
   hideSearch,
-  onSelectAgent,
-  shortcutLabels
+  onSelectAgent
 }: {
-  shortcutLabels?: ReadonlyMap<AgentPickerEntry['agent'], string>
+  model: NewTabAgentMenuModel
   disabled?: boolean
   runLaunch: Launch
   entries: AgentPickerEntry[]
@@ -60,6 +53,7 @@ export function AgentLaunchPickerMenu({
   const [query, setQuery] = useState('')
   const [openSetup, setOpenSetup] = useState<string | null>(null)
   const root = useRef<HTMLDivElement>(null)
+  const shortcut = useOptionalShortcutLabel('tab.newAgent')
   const setups = searchAgentPickerSetups(entries, query)
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const visible = entries.filter((entry) =>
@@ -101,8 +95,11 @@ export function AgentLaunchPickerMenu({
           openSetup={openSetup}
           onSetupOpenChange={setOpenSetup}
           label={setup.label}
-          initialModel={setup.choices.model}
-          initialEffort={setup.choices.options?.effort}
+          initial={{
+            agent: setup.entry.agent,
+            surface: setup.entry.defaultSurface,
+            choices: setup.choices
+          }}
           onSelectAgent={onSelectAgent}
           disabled={disabled}
           runLaunch={runLaunch}
@@ -117,7 +114,11 @@ export function AgentLaunchPickerMenu({
           disabled={disabled}
           runLaunch={runLaunch}
           onSelectAgent={onSelectAgent}
-          shortcut={shortcutLabels?.get(entry.agent)}
+          shortcut={
+            model.state === 'settled' && model.defaultTuiAgent === entry.agent
+              ? (shortcut ?? undefined)
+              : undefined
+          }
         />
       ))}
       {!visible.length && !setups.length ? (
@@ -132,25 +133,12 @@ export function AgentLaunchPickerMenu({
   )
 }
 
-// Subscribe here so inventory updates do not re-render the tab bar.
-export function SubscribedAgentLaunchPickerMenu({
-  inventory,
-  ...props
-}: Omit<ComponentProps<typeof AgentLaunchPickerMenu>, 'entries'> & {
-  inventory: AgentPickerInventorySource
-}) {
-  const entries = useAgentPickerInventoryEntries(inventory)
-  return <AgentLaunchPickerMenu {...props} entries={entries} />
-}
-
-// Why: catalog and seed reads land one agent at a time after the menu opens; only that row re-renders.
-const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
+function AgentPickerMenuRow({
   entry,
   openSetup,
   onSetupOpenChange,
   label = entry.label,
-  initialModel,
-  initialEffort,
+  initial,
   disabled,
   runLaunch,
   shortcut,
@@ -160,27 +148,15 @@ const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
   openSetup: string | null
   onSetupOpenChange: (id: string | null) => void
   label?: string
-  initialModel?: string
-  initialEffort?: string
+  initial?: AgentPickerDraft
   disabled?: boolean
   runLaunch: Launch
   shortcut?: string
   onSelectAgent?: (agent: AgentPickerEntry['agent']) => void
 }) {
-  useUiLanguageRevision()
-  const initial: AgentPickerDraft | undefined = initialModel
-    ? {
-        agent: entry.agent,
-        surface: entry.defaultSurface,
-        choices: {
-          model: initialModel,
-          ...(initialEffort ? { options: { effort: initialEffort } } : {})
-        }
-      }
-    : undefined
   const setupId = useId()
   const item = useRef<HTMLDivElement>(null)
-  const dismissing = useRef(false)
+  const configured = useRef<AgentPickerDraft | undefined>(undefined)
   const unavailable = entry.rows.find((row) => row.kind === 'chat-unavailable')
   return (
     <AgentLaunchSetupButton
@@ -196,25 +172,17 @@ const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
         }
       }}
       onUse={(draft) => {
-        const result = runLaunch(pickerLaunchRow(entry, draft.surface), draft, entry)
-        if (result !== false) {
-          // The row click dismisses Radix only; the operation above owns acceptance.
-          dismissing.current = true
-          item.current?.click()
-        }
-        return result
+        configured.current = draft
+        item.current?.click()
       }}
       renderAnchor={(trigger) => (
         <DropdownMenuItem
           ref={item}
           variant="launch"
           disabled={disabled || !entry.surfaces.length}
-          onSelect={(event) => {
-            if (dismissing.current) {
-              dismissing.current = false
-              return
-            }
-            const draft = initial
+          onSelect={() => {
+            const draft = configured.current ?? initial
+            configured.current = undefined
             const surface = draft?.surface ?? entry.defaultSurface
             const row = draft
               ? pickerLaunchRow(entry, surface)
@@ -223,9 +191,10 @@ const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
                     ? row.kind === 'chat'
                     : row.kind === 'terminal' || row.kind === 'cli'
                 ) ?? pickerLaunchRow(entry, surface))
-            const result = draft ? runLaunch(row, draft, entry) : runLaunch(row, undefined)
-            if (result === false) {
-              event.preventDefault()
+            if (draft) {
+              runLaunch(row, draft, entry)
+            } else {
+              runLaunch(row, undefined)
             }
           }}
           onKeyDown={(event) => {
@@ -238,7 +207,7 @@ const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
           onPointerLeave={keepSetupFocus}
         >
           <AgentIcon agent={entry.agent} size={14} />
-          <span className="min-w-0 flex-1 truncate">{label}</span>
+          <span className="flex-1">{label}</span>
           {shortcut ? <DropdownMenuShortcut>{shortcut}</DropdownMenuShortcut> : null}
           {unavailable?.kind === 'chat-unavailable' && !entry.surfaces.includes('chat') ? (
             <span className="text-xs text-muted-foreground">
@@ -250,4 +219,4 @@ const AgentPickerMenuRow = memo(function AgentPickerMenuRow({
       )}
     />
   )
-})
+}

@@ -49,8 +49,7 @@ describe('workspace kanban pointer drag selection identity', () => {
       })
     ).toEqual({
       worktreeIds: ['shared'],
-      worktreeIdentities: ['ssh:host-b|shared'],
-      worktreeKeys: ['ssh:host-b|shared']
+      worktreeIdentities: ['ssh:host-b|shared']
     })
   })
 
@@ -67,8 +66,7 @@ describe('workspace kanban pointer drag selection identity', () => {
       })
     ).toEqual({
       worktreeIds: ['shared', 'shared'],
-      worktreeIdentities: ['local|shared', 'ssh:host-b|shared'],
-      worktreeKeys: ['local|shared', 'ssh:host-b|shared']
+      worktreeIdentities: ['local|shared', 'ssh:host-b|shared']
     })
   })
 })

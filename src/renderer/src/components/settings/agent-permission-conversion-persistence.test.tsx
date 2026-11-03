@@ -8,15 +8,18 @@ import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { useAppStore } from '../../store'
 import { AgentsPane } from './AgentsPane'
-import { AGENTS_INSTALLED_SECTION_ID } from './agents-search'
 import { persist, runtimeCall } from './__fixtures__/settings-persistence-test-fixture'
 import { permissionNotice } from './__fixtures__/permission-notice-test-fixture'
 import { TooltipProvider } from '../ui/tooltip'
 import {
   measureSettingsWork,
   expectSettingsWorkScale
-} from '../../../../shared/global-settings-test-fixture'
-import { resolveTuiAgentLaunchArgs } from '../../../../shared/tui-agent-launch-defaults'
+} from '../../../../shared/agent-launch-settings-work.test-helper'
+import {
+  resolveTuiAgentLaunchArgs,
+  resolveTuiAgentLaunchEnv
+} from '../../../../shared/tui-agent-launch-defaults'
+import { getAgentCatalog } from '@/lib/agent-catalog'
 
 vi.mock('sonner', () => ({
   toast: { error: vi.fn(), success: vi.fn(), info: vi.fn(), dismiss: vi.fn() }
@@ -78,9 +81,7 @@ beforeEach(() => {
   if (!settings) {
     throw new Error('Missing settings fixture')
   }
-  useAppStore.setState({
-    settings: { ...settings, agentLaunchChoices: undefined, agentPermissionDefault: 'ask' }
-  })
+  useAppStore.setState({ settings: { ...settings, agentPermissionDefault: 'ask' } })
 })
 
 function AgentsHarness() {
@@ -100,21 +101,28 @@ function AgentsHarness() {
   )
 }
 
-function argumentsInput(label: string): HTMLTextAreaElement {
-  // Scoped to the Installed list; the Open agents as previews also show agent names.
-  const list = document.getElementById(AGENTS_INSTALLED_SECTION_ID)
-  if (!list) {
-    throw new Error('Missing Installed list')
+function configurationSection(label: string): HTMLElement {
+  const advanced = screen.getByRole('tab', { name: 'Advanced configuration' })
+  if (advanced.getAttribute('aria-selected') !== 'true') {
+    fireEvent.mouseDown(advanced, { button: 0 })
   }
-  const row = within(list).getByText(label, { selector: 'span' }).closest('div.py-3')
+  const agent = getAgentCatalog().find((candidate) => candidate.label === label)
+  if (!agent) {
+    throw new Error(`Missing catalog agent ${label}`)
+  }
+  const row = document.getElementById(`agent-config-${agent.id}`)
   if (!(row instanceof HTMLElement)) {
-    throw new Error('Missing agent row')
+    throw new Error('Missing agent configuration section')
   }
-  const expand = within(row).queryByRole('button', { name: 'Expand agent settings' })
-  if (expand) {
-    fireEvent.click(expand)
+  if (row.hidden) {
+    fireEvent.click(screen.getByRole('combobox', { name: 'Choose an agent' }))
+    fireEvent.click(screen.getByRole('option', { name: label }))
   }
-  const input = within(row).getByRole('textbox', { name: 'Arguments' })
+  return row
+}
+
+function argumentsInput(label: string): HTMLTextAreaElement {
+  const input = within(configurationSection(label)).getByRole('textbox', { name: 'Arguments' })
   if (!(input instanceof HTMLTextAreaElement)) {
     throw new Error('Missing Arguments input')
   }
@@ -126,78 +134,57 @@ it.each(
     `${'--model opus '.repeat(n)}--dangerously-skip-permissions`,
     `--dangerously-skip-permissions ${'--model opus '.repeat(n).trim()}`
   ])
-)('retires the acknowledged recipe %s before chip removal and neutral events', async (recipe) => {
+)('keeps generated permissions out of saved user arguments: %s', async (recipe) => {
   const models = recipe.replace('--dangerously-skip-permissions', '').trim()
   savedArguments(models, 'full-access')
   render(<AgentsHarness />)
   const input = argumentsInput('Claude')
-  expect(screen.getByRole('button', { name: 'Claude permissions' }).getAttribute('data-size')).toBe(
-    'xs'
-  )
-  const remove = () =>
-    screen.getByRole('button', { name: /Remove .* and use Claude's own settings/ })
-  fireEvent.click(remove())
-  await waitFor(() => expect(persist).toHaveBeenCalledTimes(1))
-  const user = userEvent.setup()
-  await user.click(input)
-  await user.clear(input)
-  fireEvent.change(input, { target: { value: recipe } })
-  const before = feedback.length
-  await user.keyboard('{Enter}')
-  await waitFor(() => expect(toast.success).toHaveBeenCalledTimes(1))
-  expect(persist).toHaveBeenCalledTimes(2)
-  const imports = feedback.slice(before)
-  expect(imports.map((work) => work.text)).toEqual([recipe, recipe])
-  for (const work of imports) {
-    expect(work.chars).toBeLessThanOrEqual(36 * recipe.length + 12000)
-  }
-  const key = recipe.startsWith('--dangerously') ? 'leading' : 'tail',
-    total = imports.reduce(
-      (sum, work) =>
-        sum + work.chars + work.entries + work.visits + work.bytes + 42 * recipe.length,
-      0
-    )
-  expectSettingsWorkScale(`feedback-${key}`, recipe.length > 1000 ? 200 : 20, [total])
-  expect(useAppStore.getState().settings?.agentPermissionOverrides?.claude).toBe('full-access')
-  expect(resolveTuiAgentLaunchArgs('claude', useAppStore.getState().settings ?? {})).toBe(
-    `--dangerously-skip-permissions ${models}`
-  )
   expect(input.value).toBe(models)
-  fireEvent.click(remove())
-  await waitFor(() => expect(persist).toHaveBeenCalledTimes(3))
-  await user.click(input)
-  await user.tab()
-  await user.click(input)
-  await user.keyboard('{Enter}')
-  expect(persist).toHaveBeenCalledTimes(3)
-  expect(toast.success).toHaveBeenCalledTimes(1)
-  expect(useAppStore.getState().settings?.agentPermissionOverrides?.claude).toBe('own')
-  await user.click(input)
-  await user.type(input, ' --dangerously-skip-permissions')
-  await user.keyboard('{Escape}')
-  expect(input.value).toBe(models)
-  await user.tab()
-  fireEvent.change(input, { target: { value: `  ${models}  ` } })
+  const ordinary = `${models} --verbose`
+  fireEvent.change(input, { target: { value: ordinary } })
+  fireEvent.keyDown(input, { key: 'Enter' })
   fireEvent.blur(input)
-  expect(input.value).toBe(models)
+  await waitFor(() => expect(persist).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(input.readOnly).toBe(false))
+  expect(useAppStore.getState().settings?.agentDefaultArgs?.claude).toBe(ordinary)
+  await pickGlobalPermission('Own settings')
+  await waitFor(() => expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('own'))
+  expect(resolveTuiAgentLaunchArgs('claude', useAppStore.getState().settings)).toBe(ordinary)
+  configurationSection('Claude')
+  fireEvent.change(input, { target: { value: recipe } })
+  fireEvent.keyDown(input, { key: 'Enter' })
+  fireEvent.blur(input)
+  await waitFor(() => expect(persist).toHaveBeenCalledTimes(3))
+  await waitFor(() => expect(input.readOnly).toBe(false))
+  expect(useAppStore.getState().settings?.agentDefaultArgs?.claude).toBe(recipe)
+  expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('own')
+  expect(resolveTuiAgentLaunchArgs('claude', useAppStore.getState().settings)).toBe(recipe)
+  expect(feedback).toEqual([])
+  expect(toast.success).not.toHaveBeenCalled()
+  fireEvent.blur(input)
+  fireEvent.keyDown(input, { key: 'Enter' })
+  fireEvent.change(input, { target: { value: `${recipe} --discard` } })
+  fireEvent.keyDown(input, { key: 'Escape' })
+  expect(input.value).toBe(recipe)
+  fireEvent.change(input, { target: { value: `  ${recipe}  ` } })
+  fireEvent.blur(input)
+  expect(input.value).toBe(recipe)
   expect(persist).toHaveBeenCalledTimes(3)
 })
 
-it.each(['none', '×', 'Backspace'] as const)(
-  'keeps dirty Arguments and explicit %s permission removal in order',
-  async (removal) => {
+it.each(['blur', 'reset', 'none'] as const)(
+  'preserves ordered raw Arguments and saved policy when %s rejects',
+  async (failure) => {
     savedArguments('--model sonnet', 'full-access')
-    const own = removal === 'Backspace' ? deferredSave() : null
+    const blur = deferredSave()
+    const reset = deferredSave()
     render(<AgentsHarness />)
-    const user = userEvent.setup()
     const input = argumentsInput('Claude')
-    const chip = screen.getByRole('button', { name: /Remove .* and use Claude's own settings/ })
-    await user.click(input)
-    await user.keyboard('{Home}{Shift>}{ArrowRight}{/Shift}{Backspace}')
-    expect(document.activeElement).toBe(input)
+    input.focus()
     fireEvent.change(input, { target: { value: '--permission-mode auto --model opus' } })
     input.setSelectionRange(0, 0)
     for (const modifiers of [
+      {},
       { ctrlKey: true },
       { altKey: true },
       { metaKey: true },
@@ -206,63 +193,43 @@ it.each(['none', '×', 'Backspace'] as const)(
       fireEvent.keyDown(input, { key: 'Backspace', ...modifiers })
       expect(document.activeElement).toBe(input)
     }
-    await user.keyboard('{Home}{Backspace}')
-    expect(document.activeElement).toBe(chip)
-    fireEvent.keyDown(chip, { key: 'Backspace', repeat: true })
     expect(persist).not.toHaveBeenCalled()
-    expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('full-access')
-    await user.tab()
-    expect(document.activeElement).toBe(input)
-    await user.tab({ shift: true })
-    expect(document.activeElement).toBe(chip)
-    expect(persist).not.toHaveBeenCalled()
-    if (removal === 'none') {
-      await user.tab({ shift: true })
-      await waitFor(() => expect(input.value).toBe('--model opus'))
-      expect(useAppStore.getState().settings?.agentPermissionOverrides?.claude).toBe('auto')
-      expect(toast.success).toHaveBeenCalledTimes(1)
-      return
-    }
-    await (removal === '×' ? user.click(chip) : user.keyboard('{Backspace}'))
-    expect(document.activeElement).toBe(input)
-    expect(input.value).toBe('--model opus')
+    fireEvent.blur(input)
     await waitFor(() => expect(persist).toHaveBeenCalledTimes(1))
-    const raw = own ? deferredSave() : null
-    const reset = own ? deferredSave() : null
-    await user.tab()
-    if (own && raw && reset) {
-      expect(input.readOnly).toBe(true)
-      expect(chip).toHaveProperty('disabled', true)
-      const row = input.closest('div.py-3')
-      if (!(row instanceof HTMLElement)) {
-        throw new Error('Missing row')
-      }
-      await user.click(within(row).getByRole('button', { name: 'Reset' }))
-      await act(async () => own.resolve())
-      await waitFor(() => expect(persist).toHaveBeenCalledTimes(2))
-      expect(input.value).toBe('--model opus')
-      await act(async () => raw.resolve())
-      await waitFor(() => expect(persist).toHaveBeenCalledTimes(3))
-      await act(async () => reset.reject(new Error('unknown acknowledgement')))
-      await waitFor(() => expect(input.readOnly).toBe(false))
-      expect(input.value).toBe('--model opus')
-      expect(toast.success).not.toHaveBeenCalled()
-      expect(toast.error).toHaveBeenCalledTimes(1)
-      await user.click(within(row).getByRole('button', { name: 'Reset' }))
-      await waitFor(() => expect(input.value).toBe(''))
-    } else {
-      await waitFor(() => expect(persist).toHaveBeenCalledTimes(2))
-      await waitFor(() => expect(input.readOnly).toBe(false))
-      expect(useAppStore.getState().settings?.agentDefaultArgs?.claude).toBe('--model opus')
+    const field = input.parentElement?.parentElement
+    if (!field) {
+      throw new Error('Missing Arguments field')
     }
-    const settings = useAppStore.getState().settings
-    expect(settings?.agentPermissionOverrides?.claude).toBe('own')
-    expect(resolveTuiAgentLaunchArgs('claude', settings ?? {})).toBe(own ? '' : '--model opus')
+    const resetButton = within(field).getByRole('button', { name: 'Reset' })
+    fireEvent.click(resetButton)
+    fireEvent.blur(input)
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(persist).toHaveBeenCalledTimes(1)
+    await act(async () => (failure === 'blur' ? blur.reject(new Error('offline')) : blur.resolve()))
+    await waitFor(() => expect(persist).toHaveBeenCalledTimes(2))
+    expect(input.readOnly).toBe(true)
+    expect(input.value).toBe('--permission-mode auto --model opus')
+    if (failure === 'reset') {
+      act(() => savedArguments('', 'full-access'))
+      expect(input.isConnected).toBe(true)
+      await act(async () => reset.reject(new Error('offline')))
+      await waitFor(() => expect(input.readOnly).toBe(false))
+      expect(input.value).toBe('--permission-mode auto --model opus')
+      fireEvent.click(resetButton)
+      await waitFor(() => expect(persist).toHaveBeenCalledTimes(3))
+    } else {
+      await act(async () => reset.resolve())
+    }
+    await waitFor(() => expect(input.readOnly).toBe(false))
+    expect(input.value).toBe('')
+    expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('full-access')
+    expect(useAppStore.getState().settings?.agentPermissionOverrides?.claude).toBeUndefined()
     expect(toast.success).not.toHaveBeenCalled()
+    expect(toast.error).toHaveBeenCalledTimes(failure === 'none' ? 0 : 1)
   }
 )
 
-it('retains failed conversion through the ordinary callback and announces only the saved retry', async () => {
+it('retains failed raw Arguments across publication and retries without changing typed intent', async () => {
   savedArguments('--model opus')
   const save = deferredSave()
   render(<AgentsHarness />)
@@ -277,19 +244,16 @@ it('retains failed conversion through the ordinary callback and announces only t
   expect(toast.error).toHaveBeenCalledExactlyOnceWith(
     'Claude settings could not be saved. Try again.'
   )
-  expect(toast.success).not.toHaveBeenCalled()
-  expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('ask')
-  expect(useAppStore.getState().settings?.agentPermissionOverrides?.claude).toBeUndefined()
   expect(input.value).toBe('--permission-mode auto --model opus')
+  expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('ask')
   fireEvent.blur(input)
-  await waitFor(() =>
-    expect(toast.success).toHaveBeenCalledWith(
-      'Claude set to Approve for me in terminals and new chats.'
-    )
+  await waitFor(() => expect(persist).toHaveBeenCalledTimes(2))
+  await waitFor(() => expect(input.readOnly).toBe(false))
+  expect(useAppStore.getState().settings?.agentDefaultArgs?.claude).toBe(
+    '--permission-mode auto --model opus'
   )
-  expect(useAppStore.getState().settings?.agentPermissionOverrides?.claude).toBe('auto')
-  expect(useAppStore.getState().settings?.agentDefaultArgs?.claude).toBe('--model opus')
-  await waitFor(() => expect(input.value).toBe('--model opus'))
+  expect(useAppStore.getState().settings?.agentPermissionOverrides?.claude).toBeUndefined()
+  expect(toast.success).not.toHaveBeenCalled()
   act(() => savedArguments('--later'))
   expect(input.value).toBe('--later')
   fireEvent.change(input, { target: { value: '--dirty' } })
@@ -299,16 +263,17 @@ it('retains failed conversion through the ordinary callback and announces only t
   expect(input.value).toBe('')
 })
 
-it('describes terminal-only conversion without claiming new native chats', async () => {
+it('keeps terminal-only permission text without granting a typed permission', async () => {
   render(<AgentsHarness />)
   const input = argumentsInput('Gemini')
   fireEvent.change(input, { target: { value: '--yolo' } })
   fireEvent.blur(input)
-  await waitFor(() =>
-    expect(toast.success).toHaveBeenCalledWith('Gemini set to Full access in terminals.')
-  )
-  expect(useAppStore.getState().settings?.agentPermissionOverrides?.gemini).toBe('full-access')
-  expect(useAppStore.getState().settings?.agentDefaultArgs?.gemini).toBe('')
+  await waitFor(() => expect(persist).toHaveBeenCalledTimes(1))
+  expect(useAppStore.getState().settings?.agentDefaultArgs?.gemini).toBe('--yolo')
+  expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('ask')
+  expect(useAppStore.getState().settings?.agentPermissionOverrides?.gemini).toBeUndefined()
+  expect(resolveTuiAgentLaunchArgs('gemini', useAppStore.getState().settings)).toContain('--yolo')
+  expect(toast.success).not.toHaveBeenCalled()
 })
 
 function savedArguments(value: string, choice: 'ask' | 'full-access' = 'ask') {
@@ -330,8 +295,8 @@ function savedEnvironment(env: Record<string, string>, agent = 'claude') {
     settings: { ...settings, agentDefaultEnv: { ...settings.agentDefaultEnv, [agent]: env } }
   })
 }
-function environmentInput(value: string): HTMLInputElement {
-  const input = screen.getByDisplayValue(value)
+function environmentInput(value: string, label = 'Claude'): HTMLInputElement {
+  const input = within(configurationSection(label)).getByDisplayValue(value)
   if (!(input instanceof HTMLInputElement)) {
     throw new Error('Missing Environment input')
   }
@@ -408,7 +373,7 @@ it.each(['blur', 'reset'])('retains ordered Environment work when %s rejects', a
   await user.click(input)
   await user.clear(input)
   await user.type(input, 'A=draft')
-  const row = input.closest('div.py-3')
+  const row = input.parentElement
   if (!(row instanceof HTMLElement)) {
     throw new Error('Missing row')
   }
@@ -434,9 +399,8 @@ it.each(['blur', 'reset'])('retains ordered Environment work when %s rejects', a
   } else {
     await act(async () => reset.resolve())
   }
-  await waitFor(() => expect(input.readOnly).toBe(false))
+  await waitFor(() => expect(input.value).toBe(''))
   expect(input.isConnected).toBe(true)
-  expect(input.value).toBe('')
   expect(useAppStore.getState().settings?.agentDefaultEnv?.claude).toEqual({})
   expect(persist).toHaveBeenCalledTimes(2)
   expect(toast.error).toHaveBeenCalledTimes(1)
@@ -485,23 +449,46 @@ it.each(['darwin', 'win32'].flatMap((platform) => [20, 200].map((n) => [platform
   }
 )
 
-it('imports then removes Goose carrier through one whole edit per acknowledgement', async () => {
+it('keeps generated Goose policy out of user env and preserves explicit carrier text', async () => {
   savedEnvironment({ OTHER: 'keep' }, 'goose')
+  useAppStore.setState(({ settings }) => ({
+    settings: settings && { ...settings, agentPermissionDefault: 'full-access' }
+  }))
   render(<AgentsHarness />)
-  const input = environmentInput('OTHER=keep')
+  const input = environmentInput('OTHER=keep', 'Goose')
+  fireEvent.change(input, { target: { value: 'OTHER=next' } })
+  fireEvent.blur(input)
+  await waitFor(() => expect(persist).toHaveBeenCalledTimes(1))
+  await waitFor(() => expect(input.readOnly).toBe(false))
+  expect(useAppStore.getState().settings?.agentDefaultEnv?.goose).toEqual({ OTHER: 'next' })
+  await pickGlobalPermission('Own settings')
+  await waitFor(() => expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('own'))
+  expect(resolveTuiAgentLaunchEnv('goose', useAppStore.getState().settings)).toEqual({
+    OTHER: 'next'
+  })
+  configurationSection('Goose')
   fireEvent.change(input, { target: { value: 'OTHER=next GOOSE_MODE=auto' } })
   fireEvent.blur(input)
-  await waitFor(() =>
-    expect(useAppStore.getState().settings?.agentPermissionOverrides?.goose).toBe('full-access')
-  )
-  expect(useAppStore.getState().settings?.agentDefaultEnv?.goose).toEqual({ OTHER: 'next' })
+  await waitFor(() => expect(persist).toHaveBeenCalledTimes(3))
+  await waitFor(() => expect(input.readOnly).toBe(false))
+  expect(useAppStore.getState().settings?.agentDefaultEnv?.goose).toEqual({
+    OTHER: 'next',
+    GOOSE_MODE: 'auto'
+  })
+  expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('own')
+  expect(useAppStore.getState().settings?.agentPermissionOverrides?.goose).toBeUndefined()
+  expect(resolveTuiAgentLaunchEnv('goose', useAppStore.getState().settings)).toEqual({
+    OTHER: 'next',
+    GOOSE_MODE: 'auto'
+  })
   fireEvent.change(input, { target: { value: 'OTHER=last' } })
   fireEvent.blur(input)
   await waitFor(() =>
-    expect(useAppStore.getState().settings?.agentPermissionOverrides?.goose).toBe('own')
+    expect(useAppStore.getState().settings?.agentDefaultEnv?.goose).toEqual({ OTHER: 'last' })
   )
-  expect(useAppStore.getState().settings?.agentDefaultEnv?.goose).toEqual({ OTHER: 'last' })
-  expect(persist).toHaveBeenCalledTimes(2)
+  expect(useAppStore.getState().settings?.agentPermissionDefault).toBe('own')
+  expect(useAppStore.getState().settings?.agentPermissionOverrides?.goose).toBeUndefined()
+  expect(persist).toHaveBeenCalledTimes(4)
 })
 
 it.each([20, 200])('keeps Goose Environment editable after Reset/reopen (%i)', async (n) => {
@@ -520,9 +507,10 @@ it.each([20, 200])('keeps Goose Environment editable after Reset/reopen (%i)', a
   }))
   render(<AgentsHarness />)
   const input = environmentInput(
-    `goose_mode=lowercase-is-distinct QA_GOOS_KEEP=keep QA_EDITOR_ONE=one ${stringifyFixture(extra)}`
+    `goose_mode=lowercase-is-distinct QA_GOOS_KEEP=keep QA_EDITOR_ONE=one ${stringifyFixture(extra)}`,
+    'Goose'
   )
-  const row = input.closest('div.py-3')
+  const row = input.parentElement
   if (!(row instanceof HTMLElement)) {
     throw new Error('Missing Goose row')
   }
@@ -532,8 +520,8 @@ it.each([20, 200])('keeps Goose Environment editable after Reset/reopen (%i)', a
   await waitFor(() =>
     expect(within(row).getByPlaceholderText('No default environment')).toHaveProperty('value', '')
   )
-  fireEvent.click(within(row).getByRole('button', { name: 'Collapse agent settings' }))
-  fireEvent.click(within(row).getByRole('button', { name: 'Expand agent settings' }))
+  fireEvent.mouseDown(screen.getByRole('tab', { name: 'Run preferences' }), { button: 0 })
+  configurationSection('Goose')
   const empty = within(row).getByPlaceholderText('No default environment')
   fireEvent.change(empty, {
     target: { value: `QA_AFTER_RESET=yes ${stringifyFixture(extra)}` }
@@ -568,8 +556,16 @@ const uiWork = { entries: 0, bytes: 0 }
 const envWork = { entries: 0, bytes: 0 }
 
 async function pickGlobalPermission(name: string) {
+  const preferences = screen.getByRole('tab', { name: 'Run preferences' })
+  if (preferences.getAttribute('aria-selected') !== 'true') {
+    fireEvent.mouseDown(preferences, { button: 0 })
+  }
+  const section = document.getElementById('agent-permissions')
+  if (!section) {
+    throw new Error('Missing permissions section')
+  }
   const user = userEvent.setup()
-  await user.click(screen.getByRole('button', { name: 'Permissions' }))
+  await user.click(within(section).getByRole('button'))
   await user.click(await screen.findByRole('menuitemradio', { name: new RegExp(name) }))
 }
 
@@ -643,7 +639,7 @@ it.each([false, true])(
         (external ? ['claude', 'cursor', 'grok'] : ['claude', 'codex', 'cursor', 'grok']).map(
           (agent) => ({
             method: 'settings.mutateAgentLaunch',
-            params: { type: 'permission', agent, choice: 'default' }
+            params: { type: 'permissions', agent, mode: 'default' }
           })
         )
       )
@@ -686,35 +682,3 @@ it.each([false, true])(
     }
   }
 )
-
-it('writes local launch choices through the durable RPC as one dirty-text transaction', async () => {
-  useAppStore.setState(({ settings }) => ({
-    settings: settings && {
-      ...settings,
-      agentLaunchChoices: { claude: { model: 'opus', options: { effort: 'high' } } },
-      agentDefaultArgs: { claude: '--verbose' }
-    }
-  }))
-  render(<AgentsHarness />)
-  const input = argumentsInput('Claude')
-  fireEvent.change(input, { target: { value: '--model sonnet --verbose' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Remove --model opus' }))
-  await waitFor(() => expect(input.value).toBe('--model sonnet --verbose'))
-  await waitFor(() => expect(runtimeCall).toHaveBeenCalledTimes(1))
-  expect(runtimeCall.mock.calls[0]?.[0]).toMatchObject({
-    method: 'settings.mutateAgentLaunch',
-    params: {
-      type: 'launch-choices',
-      agent: 'claude',
-      patch: { model: null },
-      userArgs: '--model sonnet --verbose'
-    }
-  })
-  await waitFor(() =>
-    expect(screen.queryByRole('button', { name: 'Remove --model opus' })).toBeNull()
-  )
-  expect(persist).toHaveBeenCalledTimes(1)
-  expect(useAppStore.getState().settings?.agentLaunchChoices?.claude).toEqual({
-    options: { effort: 'high' }
-  })
-})

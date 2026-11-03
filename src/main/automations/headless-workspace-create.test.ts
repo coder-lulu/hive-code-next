@@ -13,11 +13,6 @@ const repo: Repo = {
   badgeColor: '#000',
   addedAt: 1,
   kind: 'git',
-  hookSettings: {
-    mode: 'auto',
-    scripts: { setup: 'echo setup', archive: '' },
-    setupRunPolicy: 'ask'
-  },
   executionHostId: 'ssh:ssh-target-1'
 }
 
@@ -70,7 +65,7 @@ describe('headless automation workspace create args', () => {
     })
 
     expect(args).toMatchObject({
-      repoSelector: { selector: 'id:repo-1', hostId: 'ssh:ssh-target-1' },
+      repoSelector: 'repo-1',
       name: 'auto-nightly-review-run-20260102T0304',
       baseBranch: 'origin/main',
       setupDecision: 'skip',
@@ -94,16 +89,4 @@ describe('headless automation workspace create args', () => {
       }
     })
   })
-  it.each(['run', 'skip', undefined] as const)(
-    'forwards saved %s for Terminal creation, retaining legacy skip',
-    (setupDecision) => {
-      const args = buildHeadlessAutomationWorktreeCreateArgs({
-        automation: { ...automation, setupDecision },
-        repo,
-        run: { id: 'run-1', title: 'Nightly review', scheduledFor: 1 },
-        createdAt: 1
-      })
-      expect(args.setupDecision).toBe(setupDecision ?? 'skip')
-    }
-  )
 })

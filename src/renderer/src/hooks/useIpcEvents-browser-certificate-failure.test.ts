@@ -51,6 +51,22 @@ describe('browser certificate failures while a runtime environment is active', (
 
     expect(setBrowserPageCertificateFailure).not.toHaveBeenCalled()
   })
+
+  it('stores a local page failure when no runtime environment is active', async () => {
+    const setBrowserPageCertificateFailure = vi.fn()
+    const harness = await loadIpcEventsHarness(
+      createHarnessStoreState({
+        tabsByWorktree: {},
+        setBrowserPageCertificateFailure,
+        remoteBrowserPageHandlesByPageId: {}
+      })
+    )
+    harness.useIpcEvents()
+
+    harness.certificateFailureChanged({ browserPageId: 'page-1', failure: FAILURE })
+
+    expect(setBrowserPageCertificateFailure).toHaveBeenCalledWith('page-1', FAILURE)
+  })
 })
 
 type AudioStateEvent = { browserPageId: string; audible: boolean }
@@ -75,7 +91,7 @@ describe('browser audio state', () => {
         setBrowserPageAudible,
         settings: {
           terminalFontSize: 13,
-          nativeChatProviders: { claude: false, codex: false },
+          experimentalNativeChat: false,
           activeRuntimeEnvironmentId: 'env-a'
         }
       }),
@@ -111,7 +127,7 @@ function storeStateWithRuntime(
     remoteBrowserPageHandlesByPageId,
     settings: {
       terminalFontSize: 13,
-      nativeChatProviders: { claude: false, codex: false },
+      experimentalNativeChat: false,
       activeRuntimeEnvironmentId: 'env-a'
     }
   })

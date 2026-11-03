@@ -1,10 +1,8 @@
-import type { GhAccountBinding } from '../../shared/github/account-binding'
-import { OptionalGhAccountExpectation } from '../../shared/rpc-contract/github-repo-target-params'
 import { ipcMain } from 'electron'
 import type { GitHubOwnerRepo } from '../../shared/github/pull-request-types'
 import type { TaskSourceContext } from '../../shared/task-source-context'
 import { addPRReviewComment, addPRReviewCommentReply, setPRFileViewed } from '../github/client'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import {
   assertRegisteredGitHubRepo,
   getGitHubLocalGitOptionArgs,
@@ -25,7 +23,6 @@ export function registerGitHubPRReviewHandlers(store: Store): void {
         pullRequestId: string
         path: string
         viewed: boolean
-        expectedGhAccount?: GhAccountBinding | null
       }
     ) => {
       const repo = assertRegisteredGitHubRepo(args, store)
@@ -39,7 +36,6 @@ export function registerGitHubPRReviewHandlers(store: Store): void {
       if (!args.pullRequestId?.trim() || !args.path?.trim()) {
         return false
       }
-      const expectedGhAccount = OptionalGhAccountExpectation.parse(args.expectedGhAccount)
       const ok = await setPRFileViewed({
         repoPath: repo.path,
         connectionId: getGitHubRepoConnectionId(repo),
@@ -47,8 +43,7 @@ export function registerGitHubPRReviewHandlers(store: Store): void {
         prRepo: args.prRepo ?? null,
         pullRequestId: args.pullRequestId.trim(),
         path: args.path,
-        viewed: Boolean(args.viewed),
-        ...(expectedGhAccount !== undefined ? { expectedGhAccount } : {})
+        viewed: Boolean(args.viewed)
       })
       if (ok) {
         broadcastGitHubWorkItemMutation(

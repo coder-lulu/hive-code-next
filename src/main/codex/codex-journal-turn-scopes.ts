@@ -1,8 +1,10 @@
 // Child rows follow the active primary turn; their own turns are not drawn in the timeline.
 
-import { agentJournalItemKey } from '../../shared/agent-session/journal/agent-session-journal-item-key'
-import { AGENT_JOURNAL_THREAD_SCOPE } from '../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentJournalTurnScope } from '../../shared/agent-session/journal/agent-session-journal-turn-scope'
+import { agentJournalItemKey } from '../../shared/agent-session-journal-item-key'
+import {
+  AGENT_JOURNAL_THREAD_SCOPE,
+  type AgentJournalTurnScope
+} from '../../shared/agent-session-journal-types'
 import { codexTurnLifecycleIdentity } from './codex-structured-journal-translation-turns'
 
 export class CodexJournalTurnScopes {

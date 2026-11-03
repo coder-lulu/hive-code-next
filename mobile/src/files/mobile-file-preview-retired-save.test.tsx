@@ -12,7 +12,6 @@ const transport = vi.hoisted(() => ({
 }))
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Animated: { View: 'View' },
   Alert: { alert: vi.fn() },
   BackHandler: { addEventListener: () => ({ remove: () => {} }) },
   Image: 'Image',
@@ -40,13 +39,12 @@ vi.mock('../transport/host-client-hooks', () => ({
   useForceReconnect: () => null,
   useHostClient: () => ({ client: transport, state: 'connected', clientId: 'client' })
 }))
-vi.mock('../components/bottom-drawer/BottomDrawer', () => ({
+vi.mock('../components/BottomDrawer', () => ({
   BottomDrawer: ({ visible, children }: { visible: boolean; children: ReactNode }) =>
     visible ? children : null
 }))
 vi.mock('./MobileFileMediaPreview', () => ({ MobileFileMediaPreview: () => null }))
 vi.mock('./MobileFileMarkdownPreview', () => ({ MobileFileMarkdownPreview: () => null }))
-vi.mock('../components/MobileSourceCopyButton', () => ({ MobileSourceCopyButton: () => null }))
 vi.mock('./MobileFilePreviewSourceText', () => ({ MobileFilePreviewSourceText: () => null }))
 
 const route = {

@@ -6,7 +6,6 @@ vi.mock('../format', () => ({ printResult: printResultMock }))
 vi.mock('../selectors', () => ({ getTerminalHandle: vi.fn() }))
 
 import { ORCHESTRATION_HANDLERS } from './orchestration'
-import { orchestrationTestContext } from './orchestration-handler-test-context'
 
 afterEach(() => {
   callMock.mockReset()
@@ -29,21 +28,19 @@ it('accepts an explicitly attested legacy worker-server settlement', async () =>
   }
   callMock.mockResolvedValueOnce({ result })
 
-  await ORCHESTRATION_HANDLERS['orchestration send'](
-    orchestrationTestContext(
-      callMock,
-      new Map<string, string | boolean>([
-        ['full', true],
-        ['from', 'term_worker'],
-        ['subject', 'done'],
-        ['type', 'worker_done'],
-        ['task-id', 'task_legacy'],
-        ['dispatch-id', 'ctx_legacy'],
-        ['outcome', 'succeeded']
-      ]),
-      true
-    )
-  )
+  await ORCHESTRATION_HANDLERS['orchestration send']({
+    flags: new Map([
+      ['from', 'term_worker'],
+      ['subject', 'done'],
+      ['type', 'worker_done'],
+      ['task-id', 'task_legacy'],
+      ['dispatch-id', 'ctx_legacy'],
+      ['outcome', 'succeeded']
+    ]),
+    client: { call: callMock },
+    cwd: '/tmp/repo',
+    json: true
+  } as never)
 
   expect(callMock).toHaveBeenCalledOnce()
   expect(callMock).toHaveBeenCalledWith(
@@ -79,21 +76,19 @@ it('rejects an unattested relay settlement', async () => {
   })
 
   await expect(
-    ORCHESTRATION_HANDLERS['orchestration send'](
-      orchestrationTestContext(
-        callMock,
-        new Map<string, string | boolean>([
-          ['full', true],
-          ['from', 'term_worker'],
-          ['subject', 'done'],
-          ['type', 'worker_done'],
-          ['task-id', 'task_legacy'],
-          ['dispatch-id', 'ctx_legacy'],
-          ['outcome', 'succeeded']
-        ]),
-        true
-      )
-    )
+    ORCHESTRATION_HANDLERS['orchestration send']({
+      flags: new Map([
+        ['from', 'term_worker'],
+        ['subject', 'done'],
+        ['type', 'worker_done'],
+        ['task-id', 'task_legacy'],
+        ['dispatch-id', 'ctx_legacy'],
+        ['outcome', 'succeeded']
+      ]),
+      client: { call: callMock },
+      cwd: '/tmp/repo',
+      json: true
+    } as never)
   ).rejects.toMatchObject({ code: 'operation_unknown' })
   expect(callMock).toHaveBeenCalledOnce()
   expect(printResultMock).not.toHaveBeenCalled()

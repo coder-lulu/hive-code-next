@@ -3,20 +3,12 @@ import { act, create as createRenderer, type ReactTestRenderer } from 'react-tes
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// Banner and chevron motion run on Reanimated and Animated, which these mocks leave out.
-vi.mock('../components/AutoHeight', () => ({
-  Presence: ({ children }: { children: unknown }) => children || null,
-  AutoHeight: ({ children }: { children: unknown }) => children
-}))
-vi.mock('../components/DisclosureChevron', () => ({
-  DisclosureChevron: ({ children }: { children: unknown }) => children
-}))
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
-  Animated: { SectionList: 'SectionList' },
+  SectionList: 'SectionList',
   StyleSheet: { create: (styles: unknown) => styles },
   Text: 'Text',
   View: 'View'
@@ -30,6 +22,11 @@ vi.mock('lucide-react-native', () => ({
 vi.mock('../components/AuthFailedBanner', () => ({ AuthFailedBanner: 'AuthFailedBanner' }))
 vi.mock('../components/HostDiagnosticsLink', () => ({ HostDiagnosticsLink: 'HostDiagnosticsLink' }))
 vi.mock('../components/MobileRepoIcon', () => ({ MobileRepoIcon: 'MobileRepoIcon' }))
+vi.mock('../components/MobileSearchField', () => ({ MobileSearchField: 'MobileSearchField' }))
+vi.mock('../components/NewWorkspaceFab', () => ({
+  NewWorkspaceFab: 'NewWorkspaceFab',
+  FAB_SIZE: 56
+}))
 vi.mock('../components/WorktreeListRow', () => ({ WorktreeListRow: 'WorktreeListRow' }))
 
 import { HostWorkspaceList } from './host-workspace-list'
@@ -87,11 +84,12 @@ function listWith(rows: number) {
       catalogError: null,
       view: { ...INITIAL_MOBILE_VIEW, groupBy: 'none' },
       search: '',
+      showSearch: false,
       worktreesLoaded: true
     }
   }
   // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: every row and header below the notice is mocked to a host string here, so the list reads only the fields named above.
-  return { controller, bottomBarHeight: 0 } as unknown as Parameters<typeof HostWorkspaceList>[0]
+  return { controller } as unknown as Parameters<typeof HostWorkspaceList>[0]
 }
 
 function render(rows: number): ReactTestRenderer {

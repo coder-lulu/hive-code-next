@@ -46,14 +46,9 @@ export function getCheckRunTabIdentity(check: PRCheckDetail): string {
   return `name:${check.name}`
 }
 
-export function buildCheckRunDetailsTabId(
-  worktreeId: string,
-  check: PRCheckDetail,
-  ownerScope?: string | null
-): string {
+export function buildCheckRunDetailsTabId(worktreeId: string, check: PRCheckDetail): string {
   // Keep tab identity stable across PR head refreshes; contextKey belongs to tab state.
-  const scope = ownerScope ? `@${ownerScope}` : ''
-  return `${worktreeId}::check-details${scope}::${getCheckRunTabIdentity(check)}`
+  return `${worktreeId}::check-details::${getCheckRunTabIdentity(check)}`
 }
 
 export function getCheckRunDetailsTabLabel(check: PRCheckDetail): string {

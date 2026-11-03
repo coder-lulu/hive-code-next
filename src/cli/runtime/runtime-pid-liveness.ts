@@ -1,4 +1,3 @@
-// Only the private offline compatibility policy uses this unqualified legacy PID observation.
 export function isProcessRunning(pid: number | null | undefined): boolean {
   if (!pid || pid <= 0) {
     return false
@@ -7,6 +6,7 @@ export function isProcessRunning(pid: number | null | undefined): boolean {
     process.kill(pid, 0)
     return true
   } catch (error) {
+    // Only ESRCH proves absence; EPERM indicates a live PID under another uid.
     return !(error instanceof Error && 'code' in error && error.code === 'ESRCH')
   }
 }

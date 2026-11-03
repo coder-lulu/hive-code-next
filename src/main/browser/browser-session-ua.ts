@@ -66,8 +66,7 @@ export function installBrowserSessionUserAgentPolicy(
   sess: Session,
   resolveRequestUserAgent?: BrowserSessionRequestUserAgentResolver
 ): () => void {
-  const googleAuthUa = googleAuthUserAgent()
-  const processUa = getBrowserProcessUserAgentIdentity().userAgent
+  const firefoxUa = googleAuthUserAgent()
   const applyUserAgentPolicy = (details: Electron.OnBeforeSendHeadersListenerDetails): void => {
     const headers = details.requestHeaders
     const requestUserAgent = currentUserAgent(headers)
@@ -77,14 +76,13 @@ export function installBrowserSessionUserAgentPolicy(
     } catch {
       // The request can race guest teardown; the header and manager state still provide a fallback.
     }
+    // Native mode must keep its process identity on auth requests.
     if (
+      getBrowserProcessUserAgentIdentity().mode === 'clean' &&
       shouldUseGoogleAuthIdentity(details.url, details.referrer ?? '', details.resourceType ?? '')
     ) {
-      // Chromium's own hints match the Electron UA; hints under any other UA came from an override.
-      if (requestUserAgent !== googleAuthUa && requestUserAgent !== processUa) {
-        stripClientHints(headers)
-      }
-      setUserAgentHeader(headers, googleAuthUa)
+      setUserAgentHeader(headers, firefoxUa)
+      stripClientHints(headers)
       return
     }
     const identity = resolveRequestUserAgent?.({
@@ -100,7 +98,9 @@ export function installBrowserSessionUserAgentPolicy(
       return
     }
     setUserAgentHeader(headers, identity.userAgent)
-    if (identity.kind === 'mobile') {
+    if (identity.kind === 'google-auth') {
+      stripClientHints(headers)
+    } else if (identity.kind === 'mobile') {
       applyUserAgentMetadataHeaders(headers, identity.userAgentMetadata)
     }
   }

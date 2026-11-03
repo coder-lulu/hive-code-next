@@ -43,9 +43,9 @@ export async function installOrcadBundle(
   },
   fullVersion: string,
   remoteDir: string
-): Promise<'uploaded' | 'reused'> {
+): Promise<void> {
   if (options.recordedNodeRuntimeProbe && (await cachedOrcadSlotInstalled(options, remoteDir))) {
-    return 'reused'
+    return
   }
   // Existing slot bytes are unusable without their referenced runtime.
   await ensureRemoteOrcadNodeRuntime({
@@ -66,7 +66,7 @@ export async function installOrcadBundle(
       signal: options.signal
     })
   ) {
-    return 'reused'
+    return
   }
   // Persist the token so a relaunch can prove ownership of an interrupted upload lock.
   const token = randomUUID()
@@ -95,7 +95,7 @@ export async function installOrcadBundle(
         signal: options.signal
       })
     ) {
-      return 'reused'
+      return
     }
     await uploadRemoteInstallDirectory(
       options.conn,
@@ -127,7 +127,6 @@ export async function installOrcadBundle(
       signal: options.signal,
       releaseLock: false
     })
-    return 'uploaded'
   } catch (error) {
     preserveInstallLock = isUnconfirmedSshCommandTermination(error)
     throw error

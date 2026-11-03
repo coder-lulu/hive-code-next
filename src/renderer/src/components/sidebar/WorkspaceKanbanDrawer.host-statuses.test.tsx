@@ -151,7 +151,6 @@ function renderDrawer(): void {
     root.render(
       <WorkspaceKanbanDrawer
         open={true}
-        statusBarVisible={true}
         dragPreview={false}
         preserveOpenForMenu={false}
         onOpenChange={vi.fn()}

@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { parsePluginManifest } from '../manifest/plugin-manifest'
-import {
-  PLUGIN_EDITOR_FRAME_SINCE,
-  PLUGIN_MANIFEST_V2_SINCE
-} from '../manifest/plugin-schema-field-docs'
-import { PLUGIN_SCHEMA_NEWEST_SINCE } from '../installation/plugin-host-version'
+import { PLUGIN_MANIFEST_V2_SINCE } from '../manifest/plugin-schema-field-docs'
 import { pluginCatalogReleaseEntry } from '../catalog/plugin-catalog-release'
 import { pluginCatalogTypes } from '../catalog/plugin-catalog-types'
 import { pluginContributionSummary } from './plugin-contribution-summary'
@@ -42,6 +38,10 @@ function parsed(overrides: Record<string, unknown> = {}) {
 }
 
 describe('contributes.customEditors', () => {
+  it('accepts a sandboxed-ui editor and defaults every other point', () => {
+    expect(parsed().contributes.customEditors).toEqual([{ ...excalidraw, filenames: [] }])
+  })
+
   it('accepts a bytes editor, which edits like a text one', () => {
     const spreadsheet = {
       id: 'spreadsheet',
@@ -67,24 +67,10 @@ describe('contributes.customEditors', () => {
     ).toMatchObject({ ok: false })
   })
 
-  it('accepts frame isolated or any, needing engines.orca >=1.4.248', () => {
-    const isolated = { ...excalidraw, frame: 'isolated' }
-    const floor = { engines: { orca: `>=${PLUGIN_EDITOR_FRAME_SINCE}` } }
-    expect(
-      parsed({ ...floor, contributes: { customEditors: [isolated] } }).contributes.customEditors[0]
-        ?.frame
-    ).toBe('isolated')
-    expect(PLUGIN_EDITOR_FRAME_SINCE).toBe('1.4.248')
-    expect(PLUGIN_SCHEMA_NEWEST_SINCE).toBe(PLUGIN_EDITOR_FRAME_SINCE)
-    const tooOld = parsePluginManifest(manifest({ contributes: { customEditors: [isolated] } }))
-    expect(tooOld).toMatchObject({ ok: false })
-    expect(tooOld.ok ? '' : tooOld.error).toContain(PLUGIN_EDITOR_FRAME_SINCE)
+  it('refuses the retired readonly field', () => {
     expect(
       parsePluginManifest(
-        manifest({
-          ...floor,
-          contributes: { customEditors: [{ ...excalidraw, frame: 'webview' }] }
-        })
+        manifest({ contributes: { customEditors: [{ ...excalidraw, readonly: true }] } })
       )
     ).toMatchObject({ ok: false })
   })

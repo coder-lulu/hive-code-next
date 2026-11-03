@@ -2,7 +2,7 @@ import { APP_DISPLAY_NAME } from '@/product-brand'
 import {
   lowerActionArgumentChoices,
   demoteActionArgumentChoices
-} from '../../../../../../shared/source-control-action-argument-document'
+} from '../../../../../../shared/source-control-action-argument-choices'
 import {
   sourceControlActionSelectedPreferences,
   sourceControlActionExecutionArgs

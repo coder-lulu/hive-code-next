@@ -23,18 +23,11 @@ export type HostStackReplaceAction = Readonly<{
   payload: HostStackRouteTarget
 }>
 
-export type HostStackPushAction = Readonly<{
-  type: 'PUSH'
-  target: string
-  payload: HostStackRouteTarget
-}>
-
 export type HostStackRootNavigation = {
   addListener: (event: 'state', listener: () => void) => () => void
   dispatch: (
     action:
       | HostStackReplaceAction
-      | HostStackPushAction
       | Readonly<{
           type: 'SET_PARAMS'
           target: string
@@ -54,7 +47,7 @@ export type HostStackRouteHref = Readonly<{
 }>
 
 export type HostStackRouter = {
-  push: (route: HostStackHostRoute | HostStackRouteHref) => void
+  push: (route: HostStackHostRoute) => void
   replace: (route: HostStackRouteHref) => void
 }
 
@@ -68,19 +61,6 @@ export type PendingHostStackNavigation = Readonly<{
   hostId: string
   controller: HostStackNavigationController
 }>
-
-export const HOST_SESSION_ROUTE = '[hostId]/session/[worktreeId]'
-
-// A session keeps its host's list beneath it so Back lands there; other targets take the list's place.
-function opensOverHostList(target: HostStackRouteTarget): boolean {
-  return target.name === HOST_SESSION_ROUTE
-}
-
-const SETTLED_NAVIGATION: HostStackNavigationController = {
-  cancel: () => {},
-  isActive: () => false,
-  retarget: () => {}
-}
 
 export function hostStackHostRoute(hostId: string): HostStackHostRoute {
   return `/h/${encodeURIComponent(hostId)}`
@@ -138,7 +118,7 @@ function mountedHostStack(
   return { key: hostState.key, routeKey: hostRoute.key }
 }
 
-// Mount the host first, then open the target after its stack commits; a cold nested push otherwise resolves to a blank index without hostId.
+// Mount the host first, then replace after its stack commits; a cold nested push otherwise resolves to a blank index without hostId.
 export function navigateToHostStackRoute(
   navigation: HostStackRootNavigation,
   router: HostStackRouter,
@@ -161,16 +141,7 @@ export function navigateToHostStackRoute(
       source: focused.key,
       payload: { params: target.params }
     })
-    return SETTLED_NAVIGATION
-  }
-  // Already inside this host: pushing the host route again would stack a second list.
-  if (
-    opensOverHostList(target) &&
-    hostState?.key &&
-    hostParamMatches(focused?.params?.hostId, hostId)
-  ) {
-    navigation.dispatch({ type: 'PUSH', target: hostState.key, payload: target })
-    return SETTLED_NAVIGATION
+    return { cancel: () => {}, isActive: () => false, retarget: () => {} }
   }
 
   let active = true
@@ -200,31 +171,21 @@ export function navigateToHostStackRoute(
       dispose()
       return
     }
-    const overHostList = opensOverHostList(selectedTarget)
     const hostStack = hostContainer && mountedHostStack(hostContainer, hostId)
     if (!hostStack) {
       if (hostContainer && hostParamMatches(hostContainer.params?.hostId, hostId)) {
         dispose()
-        const href = hostStackRouteHref(selectedTarget)
-        if (overHostList) {
-          router.push(href)
-        } else {
-          router.replace(href)
-        }
+        router.replace(hostStackRouteHref(selectedTarget))
       }
       return
     }
     dispose()
-    navigation.dispatch(
-      overHostList
-        ? { type: 'PUSH', target: hostStack.key, payload: selectedTarget }
-        : {
-            type: 'REPLACE',
-            target: hostStack.key,
-            source: hostStack.routeKey,
-            payload: selectedTarget
-          }
-    )
+    navigation.dispatch({
+      type: 'REPLACE',
+      target: hostStack.key,
+      source: hostStack.routeKey,
+      payload: selectedTarget
+    })
   }
 
   try {

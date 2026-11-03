@@ -1,4 +1,3 @@
-import { capturedAutomationOwner } from './automation-captured-owner'
 import { toast } from 'sonner'
 import type { AutomationRun } from '../../../../shared/automations-types'
 import { translate } from '@/i18n/i18n'
@@ -17,40 +16,10 @@ export function createAutomationRunActions({
   destination,
   sourceAvailability,
   pageRefresh
-}: {
-  store: Pick<
-    AutomationsPageActionContext['store'],
-    | 'projectHostSetups'
-    | 'sshConnectionStates'
-    | 'sshStateByEnvironment'
-    | 'runtimeStatusByEnvironmentId'
-    | 'repoForRow'
-    | 'worktreeForRow'
-  >
-  local: Pick<
-    AutomationsPageActionContext['local'],
-    'rerunRunIdsInFlightRef' | 'setRerunRunIdsInFlight'
-  >
-  destination: Pick<
-    AutomationsPageActionContext['destination'],
-    | 'automationHostTargetFor'
-    | 'automationDispatchContext'
-    | 'reportOwnerAction'
-    | 'invalidateRowHost'
-  >
-  sourceAvailability: Pick<
-    AutomationsPageActionContext['sourceAvailability'],
-    'automationSourceHostAvailabilityByRowKey'
-  >
-  pageRefresh: Pick<
-    AutomationsPageActionContext['pageRefresh'],
-    'hydratePersistedUIState' | 'refresh'
-  >
-}) {
+}: AutomationsPageActionContext) {
   const {
     projectHostSetups,
     sshConnectionStates,
-    sshStateByEnvironment,
     runtimeStatusByEnvironmentId,
     repoForRow,
     worktreeForRow
@@ -72,12 +41,10 @@ export function createAutomationRunActions({
     const rowHostTarget = automationHostTargetFor(row)
     const availability = getAutomationTargetAvailability({
       automation: row.automation,
-      capturedOwner: capturedAutomationOwner(automationDispatchContext.capturedOwners, row.key),
       repo,
       workspace,
       projectHostSetups,
       sshConnectionStates,
-      sshStateByEnvironment,
       runtimeStatusByEnvironmentId,
       automationHostTarget: rowHostTarget,
       sourceHostAvailability: automationSourceHostAvailabilityByRowKey.get(row.key)

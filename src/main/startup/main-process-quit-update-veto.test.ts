@@ -11,10 +11,7 @@ const dependencyExports: [string, string[]][] = [
   ['../agent-hooks/server', ['agentHookServer']],
   ['../agent-hooks/wsl-hook-relay-manager', ['wslHookRelayManager']],
   ['../agent-hooks/managed-agent-hook-controls', ['removeManagedAgentHooksAsync']],
-  [
-    '../runtime/agent-session/structured-agent-session-runtime',
-    ['stopStructuredAgentSessionRuntime']
-  ],
+  ['../runtime/structured-agent-session-runtime', ['stopStructuredAgentSessionRuntime']],
   [
     '../runtime/agent-session/structured-agent-session-runtime-teardown',
     ['setStructuredAgentSessionTeardownTrigger']
@@ -33,19 +30,19 @@ const dependencyExports: [string, string[]][] = [
   ['../codex/codex-account-session-bridge', ['stopCodexAccountSessionBridges']],
   ['../git/local-repo-ref-maintenance', ['awaitPackedRefsLockRelease']],
   ['../worktree-background-removal', ['stopBackgroundWorktreeRemovals']],
-  ['./quit/quit-teardown-deadline', ['settleTeardownWithinDeadline', 'settleWithinMs']],
-  ['./quit/quit-teardown-start-gate', ['quitTeardownStartGate']],
+  ['../quit-teardown-deadline', ['settleTeardownWithinDeadline', 'settleWithinMs']],
+  ['../quit-teardown-start-gate', ['quitTeardownStartGate']],
   ['../dock/unread-badge', ['setUnreadDockBadgeCount']],
   ['../tray/system-tray', ['destroySystemTray']],
   ['../telemetry/client', ['shutdownTelemetry']],
   ['../observability', ['shutdownObservability']],
   ['../updater', ['isQuittingForUpdate']],
   ['../updater-lifecycle-diagnostics', ['recordUpdaterLifecycle']],
-  ['../macos-permissions/macos-tcc-prompt-notice', ['stopTccPromptNotice']],
+  ['../macos-tcc-prompt-notice', ['stopTccPromptNotice']],
   ['../terminal-history-gc', ['cancelHistoryGc']],
   ['./window-all-closed-quit-policy', ['shouldQuitWhenAllWindowsClosed']],
   ['./configure-process', ['isDevParentShutdownRequested']],
-  ['../persistence/loading-store/user-data-path', ['getCanonicalUserDataPath']]
+  ['../persistence', ['getCanonicalUserDataPath']]
 ]
 
 let exitListenersBefore = process.listeners('exit')

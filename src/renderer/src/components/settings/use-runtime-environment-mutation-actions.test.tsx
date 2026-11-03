@@ -93,3 +93,68 @@ it('still discards a brand-new server whose first connect fails', async () => {
 
   expect(remove).toHaveBeenCalledWith({ selector: 'env-new' })
 })
+
+it("lets main judge a saved server's own name, so its code can refresh it", async () => {
+  verifyAndAddFromPairingCode.mockResolvedValue({
+    ok: true,
+    environment: saved,
+    runtimeStatus: { runtimeId: 'runtime-a' },
+    updatedExisting: true
+  })
+  const view = renderActions(async () => true, 'Studio')
+
+  await act(async () => {
+    await view.result.current.addEnvironment(false)
+  })
+
+  expect(verifyAndAddFromPairingCode).toHaveBeenCalledWith(
+    expect.objectContaining({ name: 'Studio' })
+  )
+  expect(toastError).not.toHaveBeenCalled()
+})
+
+it('says a WSL host it kept was not removed yet, instead of "Removed"', async () => {
+  remove.mockResolvedValue({
+    removed: saved,
+    serverStop: { stopped: false, reason: '1 terminal kept running.', verdict: 'live', kept: true }
+  })
+  const view = renderActions(async () => true)
+  await act(async () => {
+    await view.result.current.removeEnvironment(saved)
+  })
+  expect(toastSuccess).not.toHaveBeenCalled()
+  expect(toastWarning).toHaveBeenCalledWith(
+    `${APP_DISPLAY_NAME} didn’t remove the host yet: 1 terminal kept running. Remove it again to retry, or connect it to keep it.`,
+    { duration: Infinity }
+  )
+})
+
+it('refuses account-only removal without calling the local pairing API', async () => {
+  const view = renderActions(async () => true)
+  let removed = true
+  await act(async () => {
+    removed = await view.result.current.removeEnvironment({
+      ...saved,
+      accessSources: ['account-claimed']
+    })
+  })
+  expect(removed).toBe(false)
+  expect(remove).not.toHaveBeenCalled()
+  expect(toastSuccess).not.toHaveBeenCalled()
+})
+it('removes only the local pairing of a mixed account server and says account access remains', async () => {
+  remove.mockResolvedValue({})
+  const view = renderActions(async () => true)
+  await act(async () => {
+    await view.result.current.removeEnvironment({
+      ...saved,
+      accessSources: ['local-pairing', 'account-claimed']
+    })
+  })
+  expect(remove).toHaveBeenCalledWith({ selector: saved.id })
+  expect(toastSuccess).toHaveBeenCalledWith(
+    'Removed local pairing for Studio. Account access remains available.'
+  )
+})
+
+import { APP_DISPLAY_NAME } from '@/product-brand'

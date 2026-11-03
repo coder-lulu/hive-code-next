@@ -10,7 +10,7 @@ import type { TerminalLeafId } from '../../../../shared/stable-pane-id'
 import type { DragReorderCallbacks, DragReorderState } from './pane-drag-reorder'
 import { attachPaneDrag } from './pane-drag-pointer'
 import type { ManagedPaneInternal, PaneManagerOptions } from './pane-manager-types'
-import { PANE_TERMINAL_VT_EXTENSIONS, buildDefaultTerminalOptions } from './pane-terminal-options'
+import { buildDefaultTerminalOptions } from './pane-terminal-options'
 import { shouldFocusTerminalFromPanePointerDown } from './pane-pointer-focus'
 import { ENABLE_WEBGL_RENDERER } from './pane-webgl-renderer'
 import { installGuardedLinkProviderRegistration } from './terminal-link-provider-guard'
@@ -42,15 +42,9 @@ export function createPaneDOM(
   container.appendChild(xtermContainer)
 
   const userOpts = options.terminalOptions?.(id) ?? {}
-  const defaultOpts = buildDefaultTerminalOptions()
   const terminalOpts: ITerminalOptions = {
-    ...defaultOpts,
-    ...userOpts,
-    vtExtensions: {
-      ...defaultOpts.vtExtensions,
-      ...userOpts.vtExtensions,
-      ...PANE_TERMINAL_VT_EXTENSIONS
-    }
+    ...buildDefaultTerminalOptions(),
+    ...userOpts
   }
 
   const terminal = new Terminal(terminalOpts)

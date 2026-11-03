@@ -49,16 +49,18 @@ describe('useNewWorktreeDrawerNavigation', () => {
     expect(nav.current.formSheetInteractive).toBe(false)
   })
 
-  it('keeps the form pinned under a picker instead of swapping it out', () => {
+  it('keeps a sheet on screen while swapping to a content-sized picker', () => {
     const nav = renderNavigation(true)
     act(() => nav.current.transitionDrawer('agent'))
+
+    expect(nav.current.drawerView).toBe<NewWorktreeDrawerView>('transition')
+    expect(nav.current.formSheetVisible).toBe(true)
+
     act(() => {
       vi.advanceTimersByTime(500)
     })
-
     expect(nav.current.drawerView).toBe<NewWorktreeDrawerView>('agent')
-    expect(nav.current.formSheetVisible).toBe(true)
-    expect(nav.current.formSheetInteractive).toBe(false)
+    expect(nav.current.formSheetVisible).toBe(false)
   })
 
   it('hands the form back interactive once the transition lands', () => {

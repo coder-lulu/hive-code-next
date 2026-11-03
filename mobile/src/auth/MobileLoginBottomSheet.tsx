@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { Check, Smartphone, X } from 'lucide-react-native'
 import {
   ActivityIndicator,
@@ -43,6 +44,8 @@ export function MobileLoginBottomSheet({
   onOpenPrivacy,
   onOpenTerms
 }: MobileLoginBottomSheetProps) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileLoginBottomSheetStyles)
   const insets = useSafeAreaInsets()
@@ -60,7 +63,10 @@ export function MobileLoginBottomSheet({
   return (
     <View style={styles.screen}>
       <Pressable
-        accessibilityLabel="关闭登录"
+        accessibilityLabel={t(
+          'auto.mobile.src.auth.MobileLoginBottomSheet.33b8c85315',
+          'Close sign-in'
+        )}
         accessibilityRole="button"
         onPress={onClose}
         style={styles.backdrop}
@@ -70,7 +76,10 @@ export function MobileLoginBottomSheet({
           <View style={styles.handle} />
         </View>
         <Pressable
-          accessibilityLabel="关闭登录"
+          accessibilityLabel={t(
+            'auto.mobile.src.auth.MobileLoginBottomSheet.33b8c85315',
+            'Close sign-in'
+          )}
           accessibilityRole="button"
           onPress={onClose}
           style={({ pressed }) => [styles.closeButton, pressed && styles.closePressed]}
@@ -90,10 +99,13 @@ export function MobileLoginBottomSheet({
             <OrcaLogo size={44} unframed />
             <View style={styles.brandCopy}>
               <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>
-                登录 HiveCode
+                {t('auto.mobile.src.auth.MobileLoginBottomSheet.38d2d2a589', 'Sign in to HiveCode')}
               </Text>
               <Text maxFontSizeMultiplier={1.3} style={styles.subtitle}>
-                同步云端任务、工作区与账号偏好
+                {t(
+                  'auto.mobile.src.auth.MobileLoginBottomSheet.5d7b53fb1f',
+                  'Sync cloud tasks, workspaces, and account preferences'
+                )}
               </Text>
             </View>
           </View>
@@ -103,7 +115,10 @@ export function MobileLoginBottomSheet({
               busy={busyActionKey === 'phone'}
               disabled={actionPending}
               icon={Smartphone}
-              label="手机号登录"
+              label={t(
+                'auto.mobile.src.auth.MobileLoginBottomSheet.c7d91fb5aa',
+                'Sign in with phone number'
+              )}
               onPress={() => requestAction({ kind: 'phone' })}
               styles={styles}
               theme={theme}
@@ -116,7 +131,10 @@ export function MobileLoginBottomSheet({
               <View style={styles.providerHeading}>
                 <View style={styles.providerRule} />
                 <Text maxFontSizeMultiplier={1.3} style={styles.providerTitle}>
-                  其他方式登录
+                  {t(
+                    'auto.mobile.src.auth.MobileLoginBottomSheet.950bb15370',
+                    'Other sign-in options'
+                  )}
                 </Text>
                 <View style={styles.providerRule} />
               </View>
@@ -157,7 +175,10 @@ export function MobileLoginBottomSheet({
 
           <View style={styles.agreementRow}>
             <Pressable
-              accessibilityLabel="同意服务协议和隐私政策"
+              accessibilityLabel={t(
+                'auto.mobile.src.auth.MobileLoginBottomSheet.7c9a5d389d',
+                'Accept the Terms of Service and Privacy Policy'
+              )}
               accessibilityRole="checkbox"
               accessibilityState={{ checked: agreed }}
               onPress={() => onAgreementChange(!agreed)}
@@ -170,13 +191,16 @@ export function MobileLoginBottomSheet({
               </View>
             </Pressable>
             <Text maxFontSizeMultiplier={1.3} style={styles.agreementText}>
-              已阅读并同意
+              {t(
+                'auto.mobile.src.auth.MobileLoginBottomSheet.16b2d57d04',
+                'I have read and accept'
+              )}
               <Text accessibilityRole="link" onPress={onOpenTerms} style={styles.agreementLink}>
-                《服务协议》
+                {t('auto.mobile.src.auth.MobileLoginBottomSheet.98fdef7160', 'Terms of Service')}
               </Text>
               和
               <Text accessibilityRole="link" onPress={onOpenPrivacy} style={styles.agreementLink}>
-                《隐私政策》
+                {t('auto.mobile.src.auth.MobileLoginBottomSheet.222dc896e6', 'Privacy Policy')}
               </Text>
             </Text>
           </View>

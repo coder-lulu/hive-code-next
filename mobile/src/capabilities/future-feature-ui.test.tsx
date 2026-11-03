@@ -1,3 +1,4 @@
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement, type ReactNode } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -84,20 +85,14 @@ describe('future feature Graphite shell', () => {
 
   it('uses safe keyboard layout, token spacing, readable preview state, and back fallback', () => {
     renderer = renderWithTheme(
-      createElement(
-        FutureFeatureScreen,
-        {
-          capabilityId: 'cloudWork',
-          description: '账号能力说明',
-          title: '产品账号'
-        },
-        createElement('Child')
-      )
+      <FutureFeatureScreen capabilityId="cloudWork" description="账号能力说明" title="产品账号">
+        {createElement('Child')}
+      </FutureFeatureScreen>
     )
 
-    expect(renderer.root.findByType('KeyboardAvoidingView').props.behavior).toBe('padding')
+    expect(findByHostType(renderer.root, 'KeyboardAvoidingView').props.behavior).toBe('padding')
     expect(
-      resolvedStyle(renderer.root.findByType('ScrollView'), 'contentContainerStyle')
+      resolvedStyle(findByHostType(renderer.root, 'ScrollView'), 'contentContainerStyle')
     ).toMatchObject({
       gap: 24,
       paddingBottom: 44,
@@ -107,9 +102,9 @@ describe('future feature Graphite shell', () => {
     expect(renderedText(renderer.root)).toContain('界面预览')
     expect(renderedText(renderer.root)).toContain('服务能力正在建设')
 
-    const back = renderer.root
-      .findAllByType('Pressable')
-      .find((node) => node.props.accessibilityLabel === '返回')
+    const back = findAllByHostType(renderer.root, 'Pressable').find(
+      (node) => node.props.accessibilityLabel === '返回'
+    )
     expect(back).toBeDefined()
     expect(resolvedStyle(back!)).toMatchObject({ height: 44, width: 44 })
     act(() => back!.props.onPress())
@@ -131,42 +126,38 @@ describe('future feature Graphite shell', () => {
           label: '登录',
           reason: '服务尚未接入'
         }),
-        createElement(FutureFeatureNotice, { danger: true, title: '无法继续' }, '请稍后重试')
+        <FutureFeatureNotice danger title="无法继续">
+          请稍后重试
+        </FutureFeatureNotice>
       )
     )
 
-    let input = renderer.root.findByType('TextInput')
+    let input = findByHostType(renderer.root, 'TextInput')
     expect(input.props.maxFontSizeMultiplier).toBe(1.3)
     expect(resolvedStyle(input)).toMatchObject({ borderColor: '#DDE1E6', minHeight: 48 })
     act(() => input.props.onFocus())
-    input = renderer.root.findByType('TextInput')
+    input = findByHostType(renderer.root, 'TextInput')
     expect(resolvedStyle(input).borderColor).toBe('#2F6BFF')
 
-    const action = renderer.root.findByType('Pressable')
+    const action = findByHostType(renderer.root, 'Pressable')
     expect(action.props.accessibilityState).toEqual({ busy: false, disabled: true })
     expect(resolvedStyle(action).minHeight).toBe(48)
-    const alert = renderer.root
-      .findAllByType('View')
-      .find((node) => node.props.accessibilityRole === 'alert')
+    const alert = findAllByHostType(renderer.root, 'View').find(
+      (node) => node.props.accessibilityRole === 'alert'
+    )
     expect(alert?.props.accessibilityLiveRegion).toBe('assertive')
   })
 
   it('uses the semantic dark palette immediately', () => {
     renderer = renderWithTheme(
-      createElement(
-        FutureFeatureScreen,
-        {
-          capabilityId: 'storage',
-          description: '存储能力说明',
-          title: '存储空间'
-        },
-        createElement('Child')
-      ),
+      <FutureFeatureScreen capabilityId="storage" description="存储能力说明" title="存储空间">
+        {createElement('Child')}
+      </FutureFeatureScreen>,
       'dark'
     )
 
-    const screen = renderer.root.findAllByType('View')[0]
+    const screen = findAllByHostType(renderer.root, 'View')[0]
     expect(resolvedStyle(screen).backgroundColor).toBe('#0D0F12')
-    expect(renderer.root.findByType('StatusBar').props.style).toBe('light')
+    expect(findByHostType(renderer.root, 'StatusBar').props.style).toBe('light')
   })
 })

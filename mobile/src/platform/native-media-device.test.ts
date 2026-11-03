@@ -15,7 +15,6 @@ const expo = vi.hoisted(() => ({
 vi.mock('expo-clipboard', () => ({ getImageAsync: expo.getImageAsync }))
 vi.mock('expo-document-picker', () => ({ getDocumentAsync: expo.getDocumentAsync }))
 vi.mock('expo-image-picker', () => ({
-  UIImagePickerPreferredAssetRepresentationMode: { Compatible: 'compatible' },
   launchImageLibraryAsync: expo.launchImageLibraryAsync,
   requestMediaLibraryPermissionsAsync: expo.requestMediaLibraryPermissionsAsync
 }))
@@ -93,9 +92,7 @@ describe('how the pickers are launched', () => {
       expect.objectContaining({
         mediaTypes: ['images'],
         base64: false,
-        allowsMultipleSelection: false,
-        // Agents can't read the HEIC iOS hands back by default.
-        preferredAssetRepresentationMode: 'compatible'
+        allowsMultipleSelection: false
       })
     )
     // Omit selectionLimit for single picks; zero means unlimited.

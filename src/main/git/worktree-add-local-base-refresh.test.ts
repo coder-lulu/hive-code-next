@@ -20,9 +20,6 @@ vi.mock('./runner', () => ({
   translateWslOutputPaths: translateWslOutputPathsMock
 }))
 
-// Keep the ordered runner queues; worktree-checkout-progress-real-git covers the checkout.workers read.
-vi.mock('./checkout-workers-git-args', () => ({ checkoutWorkersGitArgs: async () => [] }))
-
 import { addWorktree, WORKTREE_ADD_TIMEOUT_MS } from './worktree'
 import { registerWorktreeSuiteHooks } from './worktree-test-harness'
 

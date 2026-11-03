@@ -4,7 +4,7 @@ import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentChildWorkView } from '../../../../../src/shared/agent-status-child-work-view'
-import type { AgentSessionBackgroundTaskState } from '../../../../../src/shared/agent-session/agent-session-background-task-wire'
+import type { AgentSessionBackgroundTaskState } from '../../../../../src/shared/agent-session-wire'
 import { agentChildRowContextForSessionStream } from '../../../../../src/shared/agent-child-row-stream-context'
 import { structuredSessionBackgroundTasksView } from '../../../../../src/shared/structured-session-background-tasks-view'
 import { useMobileNativeChatComposerTray } from './use-mobile-native-chat-composer-tray'
@@ -20,8 +20,8 @@ vi.mock('react-native-reanimated', async () => {
   }
 })
 
-vi.mock('../theme/mobile-theme-provider', async () => {
-  const { lightTheme } = await import('../theme/mobile-theme')
+vi.mock('../../../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../../../theme/mobile-theme')
   return {
     useMobileTheme: () => lightTheme,
     useMobileThemeStyles: <T,>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)

@@ -1,10 +1,10 @@
 import * as runner from './structured-agent-session-restart-resume-runner'
 import { afterEach, expect, it, vi } from 'vitest'
-import type { AgentSessionStatusSummary } from '../../../shared/agent-session/agent-session-wire'
-import { AgentSessionRecoveryCapsule } from '../../runtime/agent-session/records/agent-session-recovery-capsule'
+import type { AgentSessionStatusSummary } from '../../../shared/agent-session-wire'
+import { AgentSessionRecoveryCapsule } from '../../runtime/agent-session-recovery-capsule'
 import {
   interruptedRestart,
-  continuationUnanswered,
+  continuationCannotFold,
   startAgent
 } from './structured-agent-session-restart-interruption-test-harness'
 import { HOST_TEST_SESSION as SESSION } from './structured-agent-session-host-test-data'
@@ -165,8 +165,7 @@ it('publishes skipped for an offer started elsewhere and sends no continuation',
 it.each(['continued', 'refused', 'unconfirmed'] as const)(
   'publishes %s before bookkeeping finishes, then clears progress on return',
   async (phase) => {
-    const state = await interruptedRestart()
-    const { host, acquire } = state
+    const { host, acquire } = await interruptedRestart()
     await host.restartResume.list()
     const summaries: AgentSessionStatusSummary[] = []
     const release = host.subscribeStatus({
@@ -181,7 +180,7 @@ it.each(['continued', 'refused', 'unconfirmed'] as const)(
       acquire.mockRejectedValueOnce(new Error('start refused'))
     }
     if (phase === 'unconfirmed') {
-      continuationUnanswered(state)
+      continuationCannotFold()
     }
     const bookkeeping = Promise.withResolvers<void>()
     const complete = AgentSessionRecoveryCapsule.prototype.completeResume

@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 
 import '@testing-library/jest-dom/vitest'
-import type { ITerminalOptions } from '@xterm/xterm'
 import { act, cleanup, render, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TerminalPreviewApi } from '../../../../preload/api/dashboard-api'
@@ -76,7 +75,6 @@ vi.mock('@xterm/xterm', () => ({
     element = document.createElement('div')
     unicode = { activeVersion: '6', versions: ['6', '11'], register: vi.fn() }
     loadAddon = vi.fn()
-    options: ITerminalOptions = {}
     attachCustomWheelEventHandler = vi.fn()
     scrollToTop = vi.fn()
     scrollToBottom = vi.fn()

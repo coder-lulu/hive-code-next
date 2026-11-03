@@ -16,7 +16,7 @@ vi.mock('electron', () => ({
   app: { getPath: vi.fn(() => '/tmp') }
 }))
 
-vi.mock('./agent-session/structured-agent-session-runtime', () => ({
+vi.mock('./structured-agent-session-runtime', () => ({
   ensureStructuredAgentSessionHost: vi.fn(
     async (deps: Record<string, unknown> & { logger: StructuredAgentSessionLogger }) => {
       installed.deps = deps
@@ -128,15 +128,24 @@ describe('mail dispatch through the current runtime', () => {
     expect(delivery).toHaveBeenCalledOnce()
   })
 
-  it('resolves a mailbox target through the runtime custody override', () => {
+  it('uses runtime coordinator and direct worker target overrides', () => {
     const target = new OrcaRuntimeService()
-    Object.defineProperty(target, 'structuredMailboxCustody', {
-      value: function (this: OrcaRuntimeService, handle: string) {
-        expect(this).toBe(target)
-        expect(arguments.length).toBe(1)
-        return handle === 'run:run-mailbox'
-          ? { sessionId: 'coordinator-session', dispatchId: null }
-          : 'elsewhere'
+    Object.defineProperties(target, {
+      resolveStructuredCoordinatorMailboxTarget: {
+        value: function (this: OrcaRuntimeService, runId: string) {
+          expect(this).toBe(target)
+          expect(arguments.length).toBe(1)
+          expect(runId).toBe('run-mailbox')
+          return { sessionId: 'coordinator-session', dispatchId: null }
+        }
+      },
+      resolveStructuredWorkerDirectMailboxTarget: {
+        value: function (this: OrcaRuntimeService, handle: string) {
+          expect(this).toBe(target)
+          expect(arguments.length).toBe(1)
+          expect(handle).toBe('term_mailbox')
+          return { sessionId: 'worker-session', dispatchId: null }
+        }
       }
     })
 
@@ -144,7 +153,10 @@ describe('mail dispatch through the current runtime', () => {
       sessionId: 'coordinator-session',
       dispatchId: null
     })
-    expect(target['resolveStructuredMailboxTarget']('term_mailbox')).toBeNull()
+    expect(target['resolveStructuredMailboxTarget']('term_mailbox')).toEqual({
+      sessionId: 'worker-session',
+      dispatchId: null
+    })
   })
 })
 

@@ -4,23 +4,20 @@ import { resolveAppImageCacheKey } from '../cli/appimage-extracted-root'
 import { CliInstaller } from '../cli/cli-installer'
 import { runKeyedSerializedOperation } from '../cli/keyed-promise-queue'
 import {
-  forgetWslCliRegistration,
   recordWslCliRegistrationInstalled,
   recordWslCliRegistrationRemoved
 } from '../cli/wsl-cli-registration-registry'
 import { WslCliInstaller } from '../cli/wsl-cli-installer'
 import {
-  deletedDistroWslCliStatus,
   notRunningWslCliStatus,
   unreachableWslCliStatus,
   WslCliUnreachableError
 } from '../cli/wsl-cli-status'
 import { runSerializedWslCliRegistrationOperation } from '../cli/wsl-cli-registration-operation'
-import { getCanonicalUserDataPath } from '../persistence/loading-store/user-data-path'
+import { getCanonicalUserDataPath } from '../persistence'
 import { hydrateShellPath, mergePathSegments } from '../startup/hydrate-shell-path'
 import { getDefaultWslDistro } from '../wsl'
 import { blockedWslDistroForExec, runAsWslExecUserAct } from '../wsl/wsl-background-exec-gate'
-import { isWslDistroNotFoundFailure } from '../wsl/wsl-distro-unsupported'
 import { resolveAppImageRuntimeIdentity } from '../appimage-runtime-identity'
 
 const APPIMAGE_REPAIR_RETRY_MS = 30_000
@@ -192,20 +189,7 @@ export function registerCliHandlers(): void {
     async (_event, args?: { distro?: string | null }): Promise<CliInstallStatus> => {
       const distro = resolveWslCliDistro(args)
       return runWslCliRegistrationOperation(distro, async () => {
-        let status: CliInstallStatus
-        try {
-          status = await new WslCliInstaller({ distro }).remove()
-        } catch (error) {
-          if (!distro || !isWslDistroNotFoundFailure(error)) {
-            throw error
-          }
-          // Nothing is left inside a deleted distro; only Orca's bookkeeping still names it.
-          await persistWslCliRegistration(
-            () => forgetWslCliRegistration(getCanonicalUserDataPath(), distro),
-            'remove'
-          )
-          return deletedDistroWslCliStatus(distro)
-        }
+        const status = await new WslCliInstaller({ distro }).remove()
         if (distro && status.state === 'not_installed') {
           await persistWslCliRegistration(
             () => recordWslCliRegistrationRemoved(getCanonicalUserDataPath(), distro),

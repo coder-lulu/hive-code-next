@@ -1,7 +1,7 @@
 import type { AppState } from '@/store/types'
 import {
   collectAgentPaneConversations,
-  resolvePaneLastAgentConversation
+  resolvePaneAgentConversation
 } from '@/lib/ai-vault-tab-title-requests'
 import type { ExecutionHostId } from '../../../../shared/execution-host'
 import {
@@ -26,15 +26,13 @@ export function resolveCliChatResumeSource(
   args: { tab: { id: string; worktreeId: string }; paneKey?: string }
 ): CliChatResumeSource | null {
   const conversation = args.paneKey
-    ? resolvePaneLastAgentConversation(
+    ? resolvePaneAgentConversation(
         state,
         { worktreeId: args.tab.worktreeId, paneKey: args.paneKey },
         adoptsCliConversations
       )
     : collectAgentPaneConversations(state, adoptsCliConversations, {
-        runningAgentsOnly: true,
-        includeLastReported: true,
-        tab: { worktreeId: args.tab.worktreeId, tabId: args.tab.id }
+        runningAgentsOnly: true
       }).find((candidate) => candidate.tabId === args.tab.id)
   const offer = conversation
     ? resolvePaneResumeInNewChatOffer(state, {

@@ -269,7 +269,7 @@ describe('OrchestrationDb Run state', () => {
       expect(d.getRun(parent.id)?.coordinator_handle).toBe('term_coord')
     })
 
-    it('binds creation to one pane and keeps that Run when the pane creates another', () => {
+    it('binds creation to one pane and fences that pane when it creates another Run', () => {
       const d = createDb()
       const first = d.createRun({
         objective: 'First objective',
@@ -287,8 +287,9 @@ describe('OrchestrationDb Run state', () => {
         coordinatorPaneKey: 'tab_b:11111111-1111-4111-8111-111111111111'
       })
       expect(d.getRun(first.id)).toMatchObject({
-        coordinator_handle: 'term_first',
-        consumer_generation: 1
+        coordinator_handle: null,
+        coordinator_pane_key: null,
+        consumer_generation: 2
       })
       expect(d.getCurrentRunForPane('tab_b:11111111-1111-4111-8111-111111111111')?.id).toBe(
         second.id

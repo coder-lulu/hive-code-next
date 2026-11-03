@@ -24,8 +24,7 @@ export const GITHUB_PULL_REQUEST_METHODS = [
         params.fallbackPRNumber,
         params.acceptMergedFallbackPR,
         params.currentHeadOid,
-        params.reason,
-        params.userRefresh
+        params.reason
       )
   }),
   defineMethod({
@@ -34,8 +33,7 @@ export const GITHUB_PULL_REQUEST_METHODS = [
     params: PullRequestChecks,
     handler: async (params, { runtime }) =>
       runtime.getRepoPRChecks(params.repo, params.prNumber, params.headSha, params.prRepo ?? null, {
-        noCache: params.noCache,
-        ...(params.userRefresh === true ? { userRefresh: true } : {})
+        noCache: params.noCache
       })
   }),
   defineMethod({
@@ -124,10 +122,7 @@ export const GITHUB_PULL_REQUEST_METHODS = [
         prRepo: params.prRepo ?? null,
         pullRequestId: params.pullRequestId,
         path: params.path,
-        viewed: params.viewed,
-        ...(params.expectedGhAccount !== undefined
-          ? { expectedGhAccount: params.expectedGhAccount }
-          : {})
+        viewed: params.viewed
       })
   })
 ]

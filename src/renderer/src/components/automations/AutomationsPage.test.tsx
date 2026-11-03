@@ -2,10 +2,6 @@
 
 /** Characterize observable page requests and child inputs. The mount/API harness lives in automations-page-test-harness; refresh/selection cases live in AutomationsPage.refresh-selection.spec.tsx. */
 
-import {
-  AutomationOwnerConflictError,
-  type AutomationOwnerConflictCode
-} from '../../../../shared/automation-owner-conflict'
 import { act } from 'react'
 import { describe, expect, it } from 'vitest'
 import {
@@ -389,8 +385,8 @@ describe('AutomationsPage mutations', () => {
 })
 
 describe('AutomationsPage owner conflicts', () => {
-  function conflict(code: AutomationOwnerConflictCode): Error {
-    return new AutomationOwnerConflictError(code)
+  function conflict(code: string): Error {
+    return new Error(`The host changed: ${code}`)
   }
 
   function notice(container: HTMLElement): HTMLElement | null {

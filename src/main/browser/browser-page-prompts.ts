@@ -28,7 +28,7 @@ type PendingPrompt = {
   details: () => unknown
   parseAnswer: (value: unknown) => unknown
   settles: ((value: unknown) => ReturnType<SettlePrompt<unknown>>)[]
-  timer: ReturnType<typeof setTimeout> | undefined
+  timer: ReturnType<typeof setTimeout>
   unwatch: (() => void)[]
 }
 
@@ -150,8 +150,6 @@ export function openBrowserPagePrompt<K extends BrowserPagePromptKind>(args: {
   target: BrowserPagePromptTarget | null
   details: () => BrowserPagePromptDetails<K>
   coalesceKey?: string
-  /** For the page's own dialogs: no timeout, and asked even when other prompts are open or quieted. */
-  waitsForAnswer?: boolean
   parseAnswer: (value: unknown) => BrowserPagePromptAnswer<K> | undefined
   settle: SettlePrompt<BrowserPagePromptAnswer<K>>
 }): BrowserPagePromptOpening {
@@ -163,28 +161,26 @@ export function openBrowserPagePrompt<K extends BrowserPagePromptKind>(args: {
   if (context?.renderer.isDestroyed()) {
     return 'no-window'
   }
-  if (!args.waitsForAnswer && isBrowserPagePromptQuiet(requester)) {
+  if (isBrowserPagePromptQuiet(requester)) {
     return 'refused'
   }
-  if (!args.waitsForAnswer) {
-    for (const pending of pendingPrompts.values()) {
-      const samePage =
-        pending.requester.id === requester.id ||
-        (context !== null && pending.browserPageId === context.browserPageId)
-      if (!samePage) {
-        continue
-      }
-      if (
-        args.coalesceKey !== undefined &&
-        pending.requester.id === requester.id &&
-        pending.kind === args.kind &&
-        pending.coalesceKey === args.coalesceKey
-      ) {
-        pending.settles.push(bindSettle(args.parseAnswer, args.settle))
-        return 'prompting'
-      }
-      return 'refused'
+  for (const pending of pendingPrompts.values()) {
+    const samePage =
+      pending.requester.id === requester.id ||
+      (context !== null && pending.browserPageId === context.browserPageId)
+    if (!samePage) {
+      continue
     }
+    if (
+      args.coalesceKey !== undefined &&
+      pending.requester.id === requester.id &&
+      pending.kind === args.kind &&
+      pending.coalesceKey === args.coalesceKey
+    ) {
+      pending.settles.push(bindSettle(args.parseAnswer, args.settle))
+      return 'prompting'
+    }
+    return 'refused'
   }
   const requestId = randomUUID()
   const pending: PendingPrompt = {
@@ -196,9 +192,7 @@ export function openBrowserPagePrompt<K extends BrowserPagePromptKind>(args: {
     details: args.details,
     parseAnswer: args.parseAnswer,
     settles: [bindSettle(args.parseAnswer, args.settle)],
-    timer: args.waitsForAnswer
-      ? undefined
-      : setTimeout(() => closePrompt(requestId, true), BROWSER_PAGE_PROMPT_TIMEOUT_MS),
+    timer: setTimeout(() => closePrompt(requestId, true), BROWSER_PAGE_PROMPT_TIMEOUT_MS),
     unwatch: [closeWhenGone(requestId, requester, { orNavigates: true })]
   }
   pendingPrompts.set(requestId, pending)
@@ -243,18 +237,6 @@ export async function respondToBrowserPagePrompt(
     quietBrowserPagePrompts(pending.requester)
   }
   return runSettles(pending, response.answer)
-}
-
-/** Closes a page's prompts of one kind that were answered some other way. */
-export function closeBrowserPagePrompts(
-  requester: Electron.WebContents,
-  kind: BrowserPagePromptKind
-): void {
-  for (const [requestId, pending] of pendingPrompts) {
-    if (pending.requester === requester && pending.kind === kind) {
-      closePrompt(requestId, false)
-    }
-  }
 }
 
 export function cancelBrowserPagePrompts(browserPageId: string): void {

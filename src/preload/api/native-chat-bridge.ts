@@ -5,23 +5,16 @@ import type {
   NativeChatSubscriptionFrame,
   PreloadApi
 } from '../api-types'
-import type { AgentType } from '../../shared/agent-status-types'
+import type { AgentType } from '../../shared/native-chat-types'
 
 export const nativeChatApi = {
   readSession: (
     agent: AgentType,
     sessionId: string,
     limit?: number,
-    transcriptPath?: string,
-    options?: { wakeWslDistro?: boolean }
+    transcriptPath?: string
   ): Promise<NativeChatReadSessionResult> =>
-    ipcRenderer.invoke('nativeChat:readSession', {
-      agent,
-      sessionId,
-      limit,
-      transcriptPath,
-      wakeWslDistro: options?.wakeWslDistro
-    }),
+    ipcRenderer.invoke('nativeChat:readSession', { agent, sessionId, limit, transcriptPath }),
   subscribe: (
     args: {
       subscriptionId: string
@@ -29,7 +22,6 @@ export const nativeChatApi = {
       sessionId: string
       transcriptPath?: string
       limit?: number
-      wakeWslDistro?: boolean
     },
     onFrame: (frame: NativeChatSubscriptionFrame) => void
   ): (() => void) => {

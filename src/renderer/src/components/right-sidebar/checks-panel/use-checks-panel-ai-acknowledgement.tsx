@@ -76,7 +76,7 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
         await fetchGitLabDetails({ commitAsCurrent: true })
         return
       }
-      await fetchComments({ force: true, userRefresh: true })
+      await fetchComments({ force: true })
     },
     [fetchComments, fetchGitLabDetails]
   )
@@ -148,7 +148,6 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
                 body,
                 {
                   repoId: githubTarget.repoId,
-                  repoOwnerExecutionHostId: githubTarget.ownerHostId,
                   prRepo: githubTarget.prRepo,
                   threadId: parentThreadId,
                   path: comment.path,
@@ -191,7 +190,6 @@ export function useChecksPanelAiAcknowledgement(model: ChecksPanelAiAcknowledgem
                 body,
                 {
                   repoId: githubTarget.repoId,
-                  repoOwnerExecutionHostId: githubTarget.ownerHostId,
                   prRepo: githubTarget.prRepo
                 }
               )

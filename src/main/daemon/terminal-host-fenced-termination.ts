@@ -13,7 +13,7 @@ export function beginTerminalHostFencedTermination(
   request: PtyFencedTerminationRequest,
   deps: {
     sessions: ReadonlyMap<string, Session>
-    pendingCreations: ReadonlyMap<string, unknown>
+    pendingCreations: ReadonlyMap<string, Promise<void>>
     owners: ClaimedAgentPtyOwnerRegistry
     kill: (id: string, options: { immediate: true }) => Promise<void>
   }

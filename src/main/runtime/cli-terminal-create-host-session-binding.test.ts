@@ -56,18 +56,7 @@ describe('host-initiated terminal creation under an attached window', () => {
 
     await runtime.createTerminal('id:repo-1::/tmp/wt-cli', {})
 
-    expect(spawn).toHaveBeenCalledWith(
-      expect.objectContaining({
-        persistHostSessionBinding: true,
-        resolvedWorkspace: {
-          id: 'repo-1::/tmp/wt-cli',
-          path: '/tmp/wt-cli',
-          connectionId: null,
-          repo: null,
-          folderWorkspace: null
-        }
-      })
-    )
+    expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ persistHostSessionBinding: true }))
   })
 
   it('spawns hidden so main answers startup queries before any pane mounts', async () => {
@@ -403,7 +392,7 @@ it.each(['unchanged', 'hook', 'config', 'incarnation', 'handle'] as const)(
       sendDesktopMultiplexSubscribe(harness.handlers)
       await vi.waitFor(() => expect(snapshotStarted).toBe(true))
       if (change === 'hook') {
-        runtime.clearSavedTerminalLaunchOnAgentHook({
+        runtime.recordCliWriterConversation({
           paneKey: 'saved-tab:11111111-1111-4111-8111-111111111111',
           connectionId: null,
           receivedAt: 1,

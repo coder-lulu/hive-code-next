@@ -74,7 +74,6 @@ function mountJira(fetchRepos: () => Promise<RepoSummary[]>) {
         setItems,
         setLoading: vi.fn(),
         setRefreshing: vi.fn(),
-        setTaskListSettled: vi.fn(),
         taskStateHydrated: true,
         tasksSupported: true
       })

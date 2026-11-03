@@ -1,4 +1,3 @@
-import type { TerminalIdentityReadContext } from '../query/terminal-identity-read-context'
 import {
   recordPtySurface,
   spawnSurfaceClaimSequence,
@@ -22,15 +21,9 @@ import { getLatestPtyTitle } from '../../runtime-worktree-status-projection'
 import type { PtyLivenessVerdict } from '../../../../shared/pty-liveness-verdict'
 
 export abstract class OrcaRuntimeWithAdoptTerminalOrphansFromInventory extends OrcaRuntimeWithSubscribeToTerminalResize {
-  protected abstract issueHandle(
-    leaf: RuntimeLeafRecord,
-    context?: TerminalIdentityReadContext
-  ): string
+  protected abstract issueHandle(leaf: RuntimeLeafRecord): string
 
-  protected abstract getPaneKeyForTerminalHandle(
-    handle: string,
-    context?: TerminalIdentityReadContext
-  ): string | null
+  protected abstract getPaneKeyForTerminalHandle(handle: string): string | null
 
   abstract assertGraphReady(): void
 
@@ -85,21 +78,9 @@ export abstract class OrcaRuntimeWithAdoptTerminalOrphansFromInventory extends O
         getLeaf: (tabId, leafId) => this.leaves.get(this.getLeafKey(tabId, leafId)),
         getDisplayTitle: (pty) => getLatestPtyTitle(this.getPtyDisplayRecord(pty)),
         replayPersistedSurface: (pty, tabId, paneKey) =>
-          recordPtySurface(
-            this.terminalIdentity,
-            pty,
-            tabId,
-            paneKey,
-            SURFACE_CLAIM_WITHOUT_STANDING
-          ),
+          recordPtySurface(pty, tabId, paneKey, SURFACE_CLAIM_WITHOUT_STANDING),
         recordAdoptedSurface: (pty, tabId, paneKey) => {
-          recordPtySurface(
-            this.terminalIdentity,
-            pty,
-            tabId,
-            paneKey,
-            spawnSurfaceClaimSequence(this.graphSequence)
-          )
+          recordPtySurface(pty, tabId, paneKey, spawnSurfaceClaimSequence(this.graphSequence))
           this.followExportedPaneKeys()
         },
         getMobileSnapshots: () => this.mobileSessionTabsByWorktree.values(),
@@ -210,20 +191,17 @@ export abstract class OrcaRuntimeWithAdoptTerminalOrphansFromInventory extends O
   }
 
   // Dispatch uses remint-stable pane keys; unresolved handles return null so best-effort dispatch can proceed.
-  getTerminalPaneKey(handle: string, context?: TerminalIdentityReadContext): string | null {
+  getTerminalPaneKey(handle: string): string | null {
     return (
-      resolveStructuredWorkerAuthority(
-        handle,
-        this.getOrchestrationDbIfAvailable?.() ?? null,
-        context?.structured
-      )?.identity.paneKey ??
-      this.getPaneKeyForTerminalHandle(handle, context) ??
-      this.getOrchestrationCompatibilitySshTerminal(handle, context)?.paneKey ??
+      resolveStructuredWorkerAuthority(handle, this.getOrchestrationDbIfAvailable?.() ?? null)
+        ?.identity.paneKey ??
+      this.getPaneKeyForTerminalHandle(handle) ??
+      this.getOrchestrationCompatibilitySshTerminal(handle)?.paneKey ??
       null
     )
   }
 
-  getLiveTerminalPaneKey(handle: string, context?: TerminalIdentityReadContext): string | null {
+  getLiveTerminalPaneKey(handle: string): string | null {
     const structured = resolveStructuredWorkerAuthority(
       handle,
       this.getOrchestrationDbIfAvailable?.() ?? null
@@ -232,19 +210,17 @@ export abstract class OrcaRuntimeWithAdoptTerminalOrphansFromInventory extends O
       // Runtime-owned structured workers accept direct mail even at rest; sending starts their agent.
       return structured.identity.paneKey
     }
-    const runtimePty = this.getLivePtyForHandle(handle, context)
+    const runtimePty = this.getLivePtyForHandle(handle)
     if (runtimePty) {
-      return runtimePty.pty.connected
-        ? (context ? context.paneOf(runtimePty.pty) : this.paneOfPty(runtimePty.pty)).paneKey
-        : null
+      return runtimePty.pty.connected ? this.paneOfPty(runtimePty.pty).paneKey : null
     }
     try {
-      const leaf = this.resolveLiveLeafForHandle(handle, context)
+      const leaf = this.resolveLiveLeafForHandle(handle)
       if (!leaf?.ptyId) {
-        return this.getOrchestrationCompatibilitySshTerminal(handle, context)?.paneKey ?? null
+        return this.getOrchestrationCompatibilitySshTerminal(handle)?.paneKey ?? null
       }
       const pty = this.ptysById.get(leaf.ptyId)
-      return pty?.connected === false ? null : this.getPaneKeyForTerminalHandle(handle, context)
+      return pty?.connected === false ? null : this.getPaneKeyForTerminalHandle(handle)
     } catch {
       return null
     }

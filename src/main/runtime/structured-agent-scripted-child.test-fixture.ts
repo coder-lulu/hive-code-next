@@ -1,6 +1,6 @@
 // Drive each registered real adapter/host/store/journal with a scripted child behind its transport seam; registrations without fixtures fail the matrix.
 
-import type { StructuredAgentSessionRuntimeDeps } from './structured-agent-session-runtime-contract'
+import type { StructuredAgentSessionRuntimeDeps } from './structured-agent-session-runtime'
 
 export type ScriptedAgentChild = {
   /** Override every launch/transport path to the scripted child; reaching any real binary is a fixture bug. */

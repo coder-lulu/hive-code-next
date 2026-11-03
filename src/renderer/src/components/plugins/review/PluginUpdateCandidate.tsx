@@ -5,7 +5,6 @@ import {
   pluginCapabilityReachable,
   reachablePluginCapabilities
 } from '../../../../../shared/plugins/capabilities/plugin-capability-reach'
-import { builtInActionTitle } from '../page/PluginCommandReplacementRow'
 import type { PluginContributionPoint } from '../../../../../shared/plugins/contributions/plugin-contribution-points'
 import { pluginUpdateGrowsAccess } from '../../../../../shared/plugins/approval/plugin-update-access-growth'
 import { translate } from '@/i18n/i18n'
@@ -81,13 +80,6 @@ const contributionGrowthLabel = (point: PluginContributionPoint): string => {
   )
 }
 
-const replacementLine = (command: string, action: string): string =>
-  translate(
-    'auto.components.settings.PluginUpdateAllDialog.replacesAction',
-    '{{value0}} runs instead of Orca’s {{value1}}',
-    { value0: command, value1: builtInActionTitle(action) }
-  )
-
 /** What main found the update adds over the installed version, as review lines. */
 export function updateChanges(preview: PluginMarketplaceHostInstallPreview): {
   capabilities: string[]
@@ -106,15 +98,9 @@ export function updateChanges(preview: PluginMarketplaceHostInstallPreview): {
   const executionLines =
     growth?.execution && execution.length === 0 ? [contributionGrowthLabel('panels')] : execution
   const contributions = (growth?.contributions ?? []).map(contributionGrowthLabel)
-  // Why named: "Commands" alone would hide that one takes over an Orca action.
-  const replacements = growth?.contributions.includes('commands')
-    ? preview.manifest.contributes.commands.flatMap((command) =>
-        command.replaces ? [replacementLine(command.title, command.replaces)] : []
-      )
-    : []
   return {
     capabilities: growth?.capabilities ?? [],
-    warnings: [...new Set([...executionLines, ...contributions, ...replacements])]
+    warnings: [...new Set([...executionLines, ...contributions])]
   }
 }
 
@@ -168,7 +154,7 @@ export function AllAccess({
           </ul>
           <PluginConsentProvenance
             official={preview.official}
-            publisher={preview.manifest.publisher ?? ''}
+            publisher={preview.manifest.publisher}
             source={{
               kind: preview.bundled ? 'bundled' : 'marketplace',
               reference: sourceLabel({

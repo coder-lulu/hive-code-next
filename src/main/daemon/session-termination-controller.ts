@@ -11,7 +11,7 @@ const SESSION_FORCE_KILL_MAX_ATTEMPTS = 2
 
 export type SessionTerminationControllerDeps = {
   sessionId: string
-  subprocess: Pick<SubprocessHandle, 'kill' | 'forceKill' | 'signal' | 'dispose'>
+  subprocess: SubprocessHandle
   isExited(): boolean
   releaseProducerPause(opts: { resume: boolean }): void
 }
@@ -24,10 +24,6 @@ export class SessionTerminationController {
   private readonly physicalExit = new PhysicalExitTracker()
 
   constructor(private readonly deps: SessionTerminationControllerDeps) {}
-
-  get physicalCompletion(): Promise<void> {
-    return this.physicalExit.exitedPromise
-  }
 
   get isTerminating(): boolean {
     return this._isTerminating
@@ -92,13 +88,7 @@ export class SessionTerminationController {
     }
     // Escalate now rather than spend the physical-exit budget waiting for graceful shutdown.
     await this.requestForceKillWithRetry()
-    try {
-      await this.waitForPhysicalExit(timeoutMs)
-    } catch (error) {
-      // A fulfilled request without exit cannot suppress the next explicit cleanup attempt.
-      this.forceKillRequest = null
-      throw error
-    }
+    await this.waitForPhysicalExit(timeoutMs)
   }
 
   signal(sig: string): void {

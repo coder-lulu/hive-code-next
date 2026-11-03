@@ -1,5 +1,4 @@
-import { describe, expect, it } from 'vitest'
-
+import { describe, expect, it, vi } from 'vitest'
 import { JiraCancellableRequests } from './cancellable-requests'
 
 describe('JiraCancellableRequests', () => {
@@ -45,5 +44,13 @@ describe('JiraCancellableRequests', () => {
     requests.cancel('req-2')
     expect(signal.aborted).toBe(true)
     resolveBox.current?.('done')
+  })
+
+  it('ignores blank request ids', async () => {
+    const requests = new JiraCancellableRequests()
+    const task = vi.fn(async () => 'ok')
+    await expect(requests.run('   ', task)).resolves.toBe('ok')
+    requests.cancel('   ')
+    expect(task).toHaveBeenCalledTimes(1)
   })
 })

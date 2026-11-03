@@ -14,8 +14,6 @@ export type MessageFormattingAuthority =
 export type MessageFormattingOptions = {
   authority?: MessageFormattingAuthority
   supportedActionHints?: readonly string[]
-  /** The CLI name the recipient runs; a chat's reply line must name the one it has. */
-  cliCommand?: OrchestrationCliCommand
 }
 
 function resolveAuthority(
@@ -93,9 +91,7 @@ export function formatMessageBanner(
       msg.to_handle.startsWith('run:') || msg.to_handle.startsWith('dispatch:')
         ? ''
         : ` --from ${msg.to_handle}`
-    lines.push(
-      `[Reply: ${options.cliCommand ?? 'orca'} orchestration reply --id ${msg.id}${explicitFrom} --body "..."]`
-    )
+    lines.push(`[Reply: orca orchestration reply --id ${msg.id}${explicitFrom} --body "..."]`)
   }
   lines.push(SEPARATOR)
 

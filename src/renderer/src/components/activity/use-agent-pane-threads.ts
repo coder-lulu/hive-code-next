@@ -12,7 +12,7 @@ import {
 import { buildActivityEvents, createActivityEventBuildCache } from './activity-event-builder'
 import { projectActivityTabs, type ActivityTabProjection } from './activity-tab-projection'
 import { buildAgentPaneThreads, createAgentPaneThreadReuseCache } from './activity-thread-builder'
-import { collectHiddenChildAgentPaneKeys } from './activity-thread-child-agent'
+import { collectChildAgentPaneKeys } from './activity-thread-child-agent'
 import {
   EMPTY_PAIRED_DEVICE_IDS_BY_ENVIRONMENT,
   getPairedDeviceIdsByEnvironment
@@ -233,8 +233,8 @@ export function useAgentPaneThreads(args: {
   )
 
   // Classify children over all threads so scoped-out parents do not orphan workers; skip when children are shown.
-  const hiddenChildAgentPaneKeys = useMemo(
-    () => (showChildAgents ? EMPTY_PANE_KEYS : collectHiddenChildAgentPaneKeys(allThreads)),
+  const childAgentPaneKeys = useMemo(
+    () => (showChildAgents ? EMPTY_PANE_KEYS : collectChildAgentPaneKeys(allThreads)),
     [allThreads, showChildAgents]
   )
 
@@ -254,10 +254,10 @@ export function useAgentPaneThreads(args: {
       ) {
         return false
       }
-      // Why: child agents (e.g. dispatched orchestration workers) are hidden by default to keep top-level agent views focused on root tasks; a live child always keeps its own row.
+      // Why: child agents (e.g. dispatched orchestration workers) are hidden by default to keep top-level agent views focused on root tasks.
       if (
         !showChildAgents &&
-        hiddenChildAgentPaneKeys.has(thread.paneKey) &&
+        childAgentPaneKeys.has(thread.paneKey) &&
         thread.paneKey !== effectiveSelectedPaneKey
       ) {
         return false
@@ -274,7 +274,7 @@ export function useAgentPaneThreads(args: {
     deferredQuery,
     effectiveSelectedPaneKey,
     showChildAgents,
-    hiddenChildAgentPaneKeys
+    childAgentPaneKeys
   ])
 
   const markAllReadThreads = useMemo(
@@ -282,10 +282,10 @@ export function useAgentPaneThreads(args: {
       allThreads.filter(
         (thread) =>
           showChildAgents ||
-          !hiddenChildAgentPaneKeys.has(thread.paneKey) ||
+          !childAgentPaneKeys.has(thread.paneKey) ||
           thread.paneKey === effectiveSelectedPaneKey
       ),
-    [allThreads, showChildAgents, hiddenChildAgentPaneKeys, effectiveSelectedPaneKey]
+    [allThreads, showChildAgents, childAgentPaneKeys, effectiveSelectedPaneKey]
   )
 
   const visibleThreadGroups = useMemo(

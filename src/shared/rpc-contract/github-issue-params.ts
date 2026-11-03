@@ -15,7 +15,6 @@ export const CreateIssue = RepoSelector.extend({
 })
 
 export const UpdateIssue = RepoSelector.extend({
-  ownerRepo: SlugRepo.optional(),
   number: z.number().int().positive(),
   updates: IssueUpdate
 })

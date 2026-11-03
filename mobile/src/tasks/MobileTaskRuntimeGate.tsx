@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { ListTodo, RefreshCw } from 'lucide-react-native'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { productNameText } from '@/product-brand'
@@ -10,6 +11,8 @@ export function MobileTaskRuntimeGate(props: {
   readonly onSelectRuntime: () => void
   readonly state: MobileTaskRuntimeState
 }) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileTaskScreenStyles)
 
@@ -26,7 +29,10 @@ export function MobileTaskRuntimeGate(props: {
       <View style={styles.centered}>
         <Text style={styles.emptyText}>{productNameText('请更新 Orca 桌面端')}</Text>
         <Text style={styles.centeredHint}>
-          当前移动端任务中心需要新版桌面运行时，更新后即可继续使用现有任务功能。
+          {t(
+            'auto.mobile.src.tasks.MobileTaskRuntimeGate.6d692ebfd4',
+            'The mobile task center requires a newer desktop runtime. Update it to keep using your existing tasks.'
+          )}
         </Text>
       </View>
     )
@@ -34,19 +40,31 @@ export function MobileTaskRuntimeGate(props: {
 
   const messages = {
     'auth-failed': {
-      title: 'Runtime 连接验证失败',
-      description: '任务状态不可验证。请先重试连接，若仍失败，请检查登录状态或重新配对这台电脑。'
+      title: t(
+        'auto.mobile.src.tasks.MobileTaskRuntimeGate.a989c9e249',
+        'Runtime connection verification failed'
+      ),
+      description: t(
+        'auto.mobile.src.tasks.MobileTaskRuntimeGate.1296853184',
+        'Task status cannot be verified. Retry the connection first. If it still fails, check your sign-in status or pair this computer again.'
+      )
     },
     offline: {
-      title: 'Runtime 当前离线',
+      title: t('auto.mobile.src.tasks.MobileTaskRuntimeGate.5d013de644', 'Runtime is offline'),
       description: productNameText('任务状态不可验证。请确认电脑上的 Orca 正在运行，再重试连接。')
     },
     disconnected: {
-      title: '尚未连接 Runtime',
-      description: '任务状态不可验证。请重试连接，连接成功后即可继续。'
+      title: t('auto.mobile.src.tasks.MobileTaskRuntimeGate.9b3b65d7f6', 'No Runtime connected'),
+      description: t(
+        'auto.mobile.src.tasks.MobileTaskRuntimeGate.895f54574f',
+        'Task status cannot be verified. Retry the connection to continue.'
+      )
     },
     unavailable: {
-      title: 'Runtime 连接暂不可用',
+      title: t(
+        'auto.mobile.src.tasks.MobileTaskRuntimeGate.281f270041',
+        'Runtime connection is temporarily unavailable'
+      ),
       description: productNameText('任务状态不可验证。请检查电脑上的 Orca 连接状态，稍后重试。')
     }
   }[props.state]
@@ -63,7 +81,10 @@ export function MobileTaskRuntimeGate(props: {
       </Text>
       {props.onRetry ? (
         <Pressable
-          accessibilityLabel="重试连接 Runtime"
+          accessibilityLabel={t(
+            'auto.mobile.src.tasks.MobileTaskRuntimeGate.dca0ddc6ab',
+            'Retry Runtime connection'
+          )}
           accessibilityRole="button"
           onPress={props.onRetry}
           style={({ pressed }) => [
@@ -73,7 +94,7 @@ export function MobileTaskRuntimeGate(props: {
         >
           <RefreshCw color={theme.color.text.inverse} size={20} strokeWidth={2} />
           <Text maxFontSizeMultiplier={1.3} style={styles.emptyPrimaryButtonText}>
-            重试连接
+            {t('auto.mobile.src.tasks.MobileTaskRuntimeGate.4a09ed3c32', 'Retry connection')}
           </Text>
         </Pressable>
       ) : null}
@@ -83,7 +104,10 @@ export function MobileTaskRuntimeGate(props: {
         style={styles.emptySecondaryButton}
       >
         <Text maxFontSizeMultiplier={1.3} style={styles.emptySecondaryButtonText}>
-          连接或切换电脑
+          {t(
+            'auto.mobile.src.tasks.MobileTaskRuntimeGate.0648ffa742',
+            'Connect or switch computer'
+          )}
         </Text>
       </Pressable>
     </View>

@@ -1,4 +1,3 @@
-import { EVERY_AGENT_CHAT } from '../../../../shared/native-chat/every-agent-chat.test-fixture'
 import '../unused-default-rpc-methods.test-fixture'
 // Before attach, classify no-effects refusal; at/after attach, failure cannot prove no session exists.
 
@@ -6,10 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-host'
 import { setStructuredAgentSessionHost } from '../../../native-chat/agent-session-wire/structured-agent-session-registry'
 import { recordingStructuredAgentSessionLogger } from '../../../native-chat/agent-session-wire/structured-agent-session-logger-test-support'
-import { computeAgentSessionPayloadFingerprint } from '../../../../shared/agent-session/lifecycle/agent-session-mutation-envelope'
-import { isDefinitiveAgentSessionCreateRefusal } from '../../../../shared/agent-session/failures/agent-session-definitive-refusal'
-import { agentSessionRefusalError } from '../../../../shared/agent-session/failures/agent-session-wire-refusals'
-import { STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY } from '../../../../shared/agent-session/agent-session-runtime-capabilities'
+import { computeAgentSessionPayloadFingerprint } from '../../../../shared/agent-session-mutation-envelope'
+import { isDefinitiveAgentSessionCreateRefusal } from '../../../../shared/agent-session-definitive-refusal'
+import { agentSessionRefusalError } from '../../../../shared/agent-session-wire-refusals'
+import { STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
 import type { OrcaRuntimeService } from '../../orca-runtime'
 import type { RpcResponse } from '../core'
 import { RpcDispatcher } from '../dispatcher'
@@ -82,7 +81,7 @@ async function create(
   const runtime = {
     getRuntimeId: () => 'runtime-1',
     // Fixtures pass capability admission so they exercise the pre-commit refusal boundary.
-    getClientSettings: () => ({ nativeChatProviders: EVERY_AGENT_CHAT }),
+    getClientSettings: () => ({ experimentalNativeChat: true }),
     registerSubscriptionCleanup: vi.fn(),
     cleanupSubscription: vi.fn(),
     cleanupSubscriptionsByPrefix: vi.fn(),
@@ -130,22 +129,37 @@ afterEach(() => {
 })
 
 describe('a create refused before it commits', () => {
-  it('answers an ownership refusal before commit as a definite failed attempt', async () => {
-    const code = 'agent_session_conflict'
-    const details = {
-      reason: 'conversationHeldElsewhere' as const,
-      owner: { sessionId: 'owner', workspaceId: 'workspace' }
+  it.each(['agent_session_conflict', 'agent_session_ownership_unknown'] as const)(
+    'answers a detailed %s refusal before commit as a definite failed attempt',
+    async (code) => {
+      const details = {
+        reason: 'conversationHeldElsewhere' as const,
+        owner: { sessionId: 'owner', workspaceId: 'workspace' }
+      }
+      const response = await create({
+        resolveStructuredAgentSessionCreateIntent: vi.fn(async () => {
+          throw agentSessionRefusalError(code, details)
+        })
+      })
+      expect(refusalOf(response)).toMatchObject({
+        code,
+        details,
+        createAttemptRefusedBeforeCommit: true
+      })
+      expect(attach).not.toHaveBeenCalled()
     }
+  )
+
+  it('keeps unclassified ownership uncertainty without definite failed-attempt proof', async () => {
     const response = await create({
       resolveStructuredAgentSessionCreateIntent: vi.fn(async () => {
-        throw agentSessionRefusalError(code, details)
+        throw new Error('agent_session_ownership_unknown')
       })
     })
-    expect(refusalOf(response)).toMatchObject({
-      code,
-      details,
-      createAttemptRefusedBeforeCommit: true
-    })
+    const refusal = refusalOf(response)
+    expect(refusal?.code).toBe('agent_session_ownership_unknown')
+    expect(refusal).not.toHaveProperty('createAttemptRefusedBeforeCommit')
+    expect(isDefinitiveAgentSessionCreateRefusal(refusal?.code)).toBe(false)
     expect(attach).not.toHaveBeenCalled()
   })
 
@@ -177,6 +191,16 @@ describe('a create refused before it commits', () => {
     const refusal = refusalOf(response)
     expect(isDefinitiveAgentSessionCreateRefusal(refusal?.code)).toBe(true)
     expect(refusal?.message).toContain('could not open the session store')
+  })
+
+  it('answers a missing host as a definitive envelope rather than a thrown code', async () => {
+    setStructuredAgentSessionHost(null)
+
+    const response = await create()
+
+    const refusal = refusalOf(response)
+    expect(refusal?.code).toBe('structured_agent_session_unsupported')
+    expect(isDefinitiveAgentSessionCreateRefusal(refusal?.code)).toBe(true)
   })
 
   it('still refuses a fingerprint conflict with its own code, not a pre-commit one', async () => {

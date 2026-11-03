@@ -64,7 +64,7 @@ export function useWorktreeNativeDragAutoscroll(args: {
             ? ctx.computeWorktreeStatusDrop({
                 pointerY: point.clientY,
                 status: target.status,
-                draggedKeys: dragSession.reorderDraggedKeys
+                draggedIds: dragSession.reorderDraggedIds
               })
             : null
           if (statusDrop) {

@@ -4,10 +4,7 @@ import {
   codexCollabRowAgentIds,
   isCodexCollabToolRowName
 } from '../../../../shared/codex-collab-agent-tools'
-import {
-  isSubagentGroupBlock,
-  type NativeChatMessage
-} from '../../../../shared/native-chat/native-chat-types'
+import { isSubagentGroupBlock, type NativeChatMessage } from '../../../../shared/native-chat-types'
 
 export type NativeChatSubagentDelegation =
   | { kind: 'roster'; agentIds: readonly string[] }

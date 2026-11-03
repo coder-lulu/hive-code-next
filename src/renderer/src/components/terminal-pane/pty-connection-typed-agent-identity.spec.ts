@@ -385,7 +385,8 @@ export function registerPtyConnectionTypedAgentIdentityTests(): void {
       expect(deps.updateTabTitle).toHaveBeenCalledWith('tab-1', 'Pi ready')
       expect(mockStoreState.agentStatusByPaneKey[paneKey]).toMatchObject({
         state: 'done',
-        agentType: 'pi'
+        agentType: 'pi',
+        terminalTitle: 'Pi ready'
       })
     })
 
@@ -627,7 +628,8 @@ export function registerPtyConnectionTypedAgentIdentityTests(): void {
 
       expect(mockStoreState.agentStatusByPaneKey[paneKey]).toMatchObject({
         state: 'done',
-        agentType: 'pi'
+        agentType: 'pi',
+        terminalTitle: 'Pi ready'
       })
     })
 

@@ -1,4 +1,4 @@
-import type { AgentSessionOptionsResult } from './agent-session/options/agent-session-options-result'
+import type { AgentSessionOptionsResult } from './agent-session-wire'
 
 export type AcpThinkingOptionsFixtureModule = {
   recordedOmpOptions: (

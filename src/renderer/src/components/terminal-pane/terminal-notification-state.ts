@@ -6,7 +6,6 @@ import {
   worktreeMatchesHost
 } from '@/store/slices/worktrees/listing/worktree-host-ownership'
 import { getResolvedExecutionHostIdForWorktree } from '@/lib/resolved-worktree-execution-host'
-import { getActiveWorkspaceExecutionHostId } from '@/lib/active-workspace-host'
 import {
   findIndexedFolderWorkspaceOwner,
   findIndexedProjectGroupOwner,
@@ -165,9 +164,7 @@ function findWorktreeRowOnItsOwnHost(
   if (rows.length <= 1) {
     return { worktree: rows[0], hostId: null }
   }
-  const hostId =
-    getActiveWorkspaceExecutionHostId(state, worktreeId) ??
-    getResolvedExecutionHostIdForWorktree(state, worktreeId)
+  const hostId = getResolvedExecutionHostIdForWorktree(state, worktreeId)
   if (!hostId) {
     return { worktree: undefined, hostId: null }
   }

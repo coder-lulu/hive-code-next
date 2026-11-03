@@ -432,7 +432,7 @@ describe('Linear issue queries', () => {
           workspaceId: 'workspace-2',
           workspaceName: 'Second Workspace',
           type: 'network',
-          message: 'Unable to load Linear issues. Try again.'
+          message: 'fetch failed'
         }
       ]
     })
@@ -450,7 +450,7 @@ describe('Linear issue queries', () => {
           workspaceId: 'workspace-1',
           workspaceName: 'Workspace',
           type: 'network',
-          message: 'Unable to load Linear issues. Try again.'
+          message: 'fetch failed'
         }
       ]
     })

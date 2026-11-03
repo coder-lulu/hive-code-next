@@ -6,6 +6,10 @@ import { OrchestrationError } from '../../../../orchestration/orchestration-erro
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import { defineMethod } from '../../../core'
 import {
+  applyFederatedFleetObservations,
+  readFederatedFleetSnapshots
+} from '../federation/federated-fleet-snapshot'
+import {
   decodeWorkerListCursor,
   encodeWorkerListCursor,
   type WorkerListCursor
@@ -16,7 +20,8 @@ import {
   pinWorkerListSnapshot,
   readWorkerListSnapshot
 } from './worker-list-snapshot-store'
-import { projectWorkerListFleet, type WorkerListPageParams } from './worker-list-projection'
+import { projectWorkerFleet, type WorkerListPageParams } from './worker-list-projection'
+import { chatAssigneeObserver } from './session-worker-observation'
 import { exposeWorkerTerminalResource } from './worker-terminal-resource-presentation'
 import {
   WORKER_TERMINAL_LIST_STATES,
@@ -189,11 +194,31 @@ async function projectWorkerListPageWithFilteredSnapshot(
   const db = runtime.getOrchestrationDb()
   const hasMore = rows.length > limit
   const pageRows = hasMore ? rows.slice(0, limit) : rows
-  const fleet = await projectWorkerListFleet(runtime, pageRows, {
+  const authorityNow = Date.now()
+  const attentionFacts = db.getWorkerAttentionFactsForDispatches(
+    pageRows.map((row) => row.dispatchId),
+    authorityNow
+  )
+  const statuses = runtime.getOrchestrationFleetAgentStatusSnapshot()
+  const fleet = projectWorkerFleet({
+    rows: pageRows,
+    attentionFacts,
+    statuses,
     limit,
+    now: authorityNow,
     completeProjection: args.completeProjection,
-    includeRemote: params.includeRemote
+    observeChat: await chatAssigneeObserver(runtime, db, pageRows)
   })
+  const federated = params.includeRemote
+    ? await readFederatedFleetSnapshots({
+        runtime,
+        db,
+        dispatchIds: pageRows.map((row) => row.dispatchId)
+      })
+    : null
+  if (federated) {
+    applyFederatedFleetObservations(fleet, federated, fleet.durable)
+  }
   // Derive totals and counts from the same pinned membership; live filter scans can count rows the cursor cannot reach.
   const pinnedCount = filteredSnapshot?.dispatchIds.length
   const inventory =
@@ -278,6 +303,6 @@ async function projectWorkerListPageWithFilteredSnapshot(
           ]
         }
       : {}),
-    ...(fleet.hostErrors.length ? { partialHostErrors: fleet.hostErrors } : {})
+    ...(federated?.errors.length ? { partialHostErrors: federated.errors } : {})
   }
 }

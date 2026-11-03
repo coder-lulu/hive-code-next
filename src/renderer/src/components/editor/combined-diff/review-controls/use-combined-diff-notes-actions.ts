@@ -1,15 +1,11 @@
-import type { AppState } from '@/store'
-import type { DiffCommentOwner } from '@/store/diff-comment-owner'
-import { useOwnedDiffComments } from '@/components/diff-comments/use-diff-comment-owner'
-import { withoutMarkdownReviewNotes } from '@/lib/markdown-review-notes-setting'
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { formatDiffComments } from '@/lib/diff-comments-format'
 import { translate } from '@/i18n/i18n'
 import type { DiffComment } from '../../../../../../shared/diff-comment-types'
+import type { DiffCommentsClearOptions } from '@/store/slices/diffComments'
 
 export type CombinedDiffNotesActions = {
-  clearNotesCount: number
   clearNotesDialogVisible: boolean
   diffCommentCount: number
   handleConfirmClearNotes: () => Promise<void>
@@ -22,15 +18,15 @@ export type CombinedDiffNotesActions = {
 }
 
 export function useCombinedDiffNotesActions({
-  owner,
   clearDiffComments,
   diffCommentsForWorktree,
-  markdownReviewNotesEnabled
+  markdownReviewNotesEnabled,
+  worktreeId
 }: {
-  owner: DiffCommentOwner | null
-  clearDiffComments: AppState['clearDiffComments']
+  clearDiffComments: (worktreeId: string, options?: DiffCommentsClearOptions) => Promise<boolean>
   diffCommentsForWorktree: DiffComment[]
   markdownReviewNotesEnabled: boolean
+  worktreeId: string
 }): CombinedDiffNotesActions {
   const diffCommentCount = diffCommentsForWorktree.length
   const diffCommentsPrompt = React.useMemo(
@@ -45,39 +41,12 @@ export function useCombinedDiffNotesActions({
     [diffCommentsForWorktree]
   )
 
-  // The confirmation acts on the copy shown when it opened, whatever is selected later.
-  const [clearTarget, setClearTarget] = useState<{ owner: DiffCommentOwner; count: number } | null>(
-    null
-  )
-  const clearNotesDialogOpen = clearTarget !== null
-  const setClearNotesDialogOpen: React.Dispatch<React.SetStateAction<boolean>> = useCallback(
-    (value) => {
-      const next = typeof value === 'function' ? value(clearNotesDialogOpen) : value
-      if (!next) {
-        setClearTarget(null)
-      } else if (!clearNotesDialogOpen && owner) {
-        setClearTarget({ owner, count: diffCommentCount })
-      }
-    },
-    [clearNotesDialogOpen, diffCommentCount, owner]
-  )
-  const ownedComments = useOwnedDiffComments(clearTarget?.owner ?? null)
-  // A copy gone since opening keeps its count, so confirming reports the failure.
-  const clearNotesCount = React.useMemo(
-    () =>
-      !clearTarget
-        ? 0
-        : !ownedComments
-          ? clearTarget.count
-          : (markdownReviewNotesEnabled ? ownedComments : withoutMarkdownReviewNotes(ownedComments))
-              .length,
-    [clearTarget, markdownReviewNotesEnabled, ownedComments]
-  )
+  const [clearNotesDialogOpen, setClearNotesDialogOpen] = useState(false)
   const [isClearingNotes, setIsClearingNotes] = useState(false)
-  const clearNotesDialogVisible = clearNotesDialogOpen && (clearNotesCount > 0 || isClearingNotes)
+  const clearNotesDialogVisible = clearNotesDialogOpen && (diffCommentCount > 0 || isClearingNotes)
   if (clearNotesDialogOpen && !clearNotesDialogVisible) {
     // External note clearing must close the dialog before an empty confirmation can paint.
-    setClearTarget(null)
+    setClearNotesDialogOpen(false)
   }
   const [notesCopied, setNotesCopied] = useState(false)
   const mountedRef = useRef(true)
@@ -131,12 +100,12 @@ export function useCombinedDiffNotesActions({
   }, [clearNotesCopiedResetTimer, diffCommentCount, diffCommentsPrompt])
 
   const handleConfirmClearNotes = useCallback(async (): Promise<void> => {
-    if (!clearTarget || clearNotesCount === 0 || isClearingNotes) {
+    if (diffCommentCount === 0 || isClearingNotes) {
       return
     }
     setIsClearingNotes(true)
     try {
-      const ok = await clearDiffComments(clearTarget.owner, {
+      const ok = await clearDiffComments(worktreeId, {
         keepMarkdownNotes: !markdownReviewNotesEnabled
       })
       if (!mountedRef.current) {
@@ -157,17 +126,9 @@ export function useCombinedDiffNotesActions({
         setIsClearingNotes(false)
       }
     }
-  }, [
-    clearDiffComments,
-    clearNotesCount,
-    clearTarget,
-    isClearingNotes,
-    markdownReviewNotesEnabled,
-    setClearNotesDialogOpen
-  ])
+  }, [clearDiffComments, diffCommentCount, isClearingNotes, markdownReviewNotesEnabled, worktreeId])
 
   return {
-    clearNotesCount,
     clearNotesDialogVisible,
     diffCommentCount,
     handleConfirmClearNotes,

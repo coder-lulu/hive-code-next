@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  existsSync,
   mkdirSync,
   mkdtempSync,
   readFileSync,
@@ -77,6 +78,11 @@ afterEach(() => {
 })
 
 describe('removeRealHomeCodexHookForOptOut', () => {
+  it('creates nothing when the user has no ~/.codex', async () => {
+    expect(await removeRealHomeCodexHookForOptOut([])).toBe('removed')
+    expect(existsSync(join(home, '.codex'))).toBe(false)
+  })
+
   it("keeps a malformed hooks.json's bytes, Orca's trust and its ledger", async () => {
     mkdirSync(join(home, '.codex'))
     const entry: CodexTrustEntry = { ...orcaStopAt(hooksJsonPath()), timeoutSec: 10 }
@@ -89,6 +95,12 @@ describe('removeRealHomeCodexHookForOptOut', () => {
     expect(readFileSync(hooksJsonPath(), 'utf-8')).toBe('{ not json')
     expect(readHookTrustEntries(configTomlPath()).has(computeTrustKey(entry))).toBe(true)
     expect(readCodexTrustGrantLedgerHome(join(home, '.codex'))).not.toBeNull()
+  })
+
+  it('keeps everything when hooks.json cannot be read', async () => {
+    mkdirSync(hooksJsonPath(), { recursive: true })
+
+    expect(await removeRealHomeCodexHookForOptOut([])).toBe('unavailable')
   })
 
   it('removes only hash-proven Orca trust from a mixed hook group', async () => {

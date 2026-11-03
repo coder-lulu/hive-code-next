@@ -68,9 +68,6 @@ describe('TabBar PowerShell launch wiring', () => {
       hostPlatform: 'win32'
     })
     vi.stubGlobal('window', {
-      // The setup prompt's image cache listens for window focus at load.
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
       api: {
         preflight: {
           detectRemoteWindowsTerminalCapabilities
@@ -142,9 +139,6 @@ describe('TabBar PowerShell launch wiring', () => {
       hostPlatform: 'linux'
     })
     vi.stubGlobal('window', {
-      // The setup prompt's image cache listens for window focus at load.
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
       api: {
         preflight: {
           detectRemoteWindowsTerminalCapabilities

@@ -47,7 +47,7 @@ describe('a Back press crossing from the shell to the page', () => {
     expect(pair.host.sendBack()).toBe(true)
     await pair.flush()
     expect(took).toHaveBeenCalledTimes(1)
-    expect(pair.readToShell().find((frame) => frame.type === 'ready')).toMatchObject({
+    expect(pair.readToShell().find((frame) => frame.type === 'ready')).toEqual({
       v: 1,
       type: 'ready'
     })

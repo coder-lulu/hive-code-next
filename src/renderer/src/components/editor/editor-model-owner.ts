@@ -25,7 +25,7 @@ export function resolveEditorModelOwner(
       ? file.runtimeEnvironmentId?.trim() || null
       : (route?.runtimeEnvironmentId ?? null)
   const hostId = captured
-    ? (file.operationProvenance?.generation.authority?.at ?? captured.executionHostId)
+    ? captured.executionHostId
     : file.externalSshTargetId
       ? toSshExecutionHostId(file.externalSshTargetId)
       : route &&

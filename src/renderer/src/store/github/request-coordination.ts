@@ -3,7 +3,6 @@ import type { PRComment } from '../../../../shared/github/comment-types'
 import type { IssueInfo, PRInfo } from '../../../../shared/github/pull-request-types'
 import type { GitHubWorkItem } from '../../../../shared/github/work-item-types'
 import type { GetProjectViewTableResult } from '../../../../shared/github/project-result-types'
-import type { LinkedReviewClearScope } from './linked-review-clear'
 import type { AppState } from '../types'
 import { matchesRepoCacheEviction, type RepoCacheEviction } from './cache-identity'
 
@@ -15,8 +14,6 @@ export type InflightPR = {
 }
 export type InflightChecks = {
   promise: Promise<PRCheckDetail[]>
-  /** The provider reply alone, so a failed successor can land it without waiting on this request. */
-  reply?: Promise<PRCheckDetail[]>
   requestId: number
   force: boolean
   noCache: boolean
@@ -25,8 +22,6 @@ export type InflightChecks = {
 }
 export type InflightComments = {
   promise: Promise<PRComment[]>
-  reply?: Promise<PRComment[]>
-  requestId: number
   postedComments: PRComment[]
 }
 export type InflightWorkItems = {
@@ -52,11 +47,7 @@ export const inflightProjectViewRequests = new Map<string, InflightProjectView>(
 export const prRequestGenerations = new Map<string, number>()
 export const prRefreshStartedHostedReviewEntries = new Map<
   string,
-  AppState['hostedReviewCache'][string]
->()
-export const prRefreshStartedLinkedReviewScopes = new Map<
-  string,
-  { sequence: number; scope: LinkedReviewClearScope; expiresAt: number }
+  AppState['hostedReviewCache'][string] | undefined
 >()
 
 let providerRequestSequence = 0
@@ -86,7 +77,6 @@ export function _getGitHubPRRefreshStartedEntryCountForTest(): number {
 
 export function _clearGitHubPRRefreshStartedEntriesForTest(): void {
   prRefreshStartedHostedReviewEntries.clear()
-  prRefreshStartedLinkedReviewScopes.clear()
 }
 
 const PROVIDER_REQUEST_CONCURRENCY = 8

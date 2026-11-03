@@ -8,7 +8,6 @@ import { resolveAiVaultSearchSettings } from '../../../../shared/ai-vault-search
 import type { CliInstallStatus } from '../../../../shared/cli-install-types'
 import type { FeatureInteractionState } from '../../../../shared/feature-interactions'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { ChatUiLaunchTipVariant } from '../../../../shared/native-chat/chat-ui-launch-tip-audience'
 import type { OnboardingState } from '../../../../shared/onboarding-state-types'
 import { shouldShowOnboarding } from '../onboarding/should-show-onboarding'
 
@@ -41,7 +40,7 @@ export function getPendingFeatureTips(args: {
   seenTipIds: readonly FeatureTipId[]
   cliInstalled: boolean
   featureInteractions: FeatureInteractionState
-  chatUiLaunchTipVariant: ChatUiLaunchTipVariant
+  inNativeChatUpgradeTipAudience: boolean
   settings: FeatureTipSettings | null | undefined
   webClient: boolean
 }): FeatureTip[] {
@@ -51,7 +50,7 @@ export function getPendingFeatureTips(args: {
       cliInstalled: args.cliInstalled,
       voiceDictationEnabled: args.settings?.voice?.enabled === true,
       sessionSearchTipCompleted: isSessionSearchFeatureTipCompleted(args.settings, args.webClient),
-      chatUiLaunchTipCompleted: args.webClient || args.chatUiLaunchTipVariant === 'none',
+      inNativeChatUpgradeTipAudience: args.inNativeChatUpgradeTipAudience,
       featureInteractions: args.featureInteractions
     })
   })
@@ -63,7 +62,7 @@ export function getFeatureTipsAppOpenDecision(args: {
   featureTipsSeenIds: readonly FeatureTipId[]
   featureInteractions: FeatureInteractionState
   /** Null until main answers. */
-  chatUiLaunchTipVariant: ChatUiLaunchTipVariant | null
+  inNativeChatUpgradeTipAudience: boolean | null
   onboarding: OnboardingState | null
   persistedUIReady: boolean
   promptedThisSession: boolean
@@ -83,7 +82,7 @@ export function getFeatureTipsAppOpenDecision(args: {
     args.onboarding === null ||
     args.activeModal !== 'none' ||
     args.cliInstalled === null ||
-    args.chatUiLaunchTipVariant === null ||
+    args.inNativeChatUpgradeTipAudience === null ||
     shouldShowOnboarding(args.onboarding)
   ) {
     return { kind: 'skip' }
@@ -93,7 +92,7 @@ export function getFeatureTipsAppOpenDecision(args: {
     seenTipIds: args.featureTipsSeenIds,
     cliInstalled: args.cliInstalled,
     featureInteractions: args.featureInteractions,
-    chatUiLaunchTipVariant: args.chatUiLaunchTipVariant,
+    inNativeChatUpgradeTipAudience: args.inNativeChatUpgradeTipAudience,
     settings: args.settings,
     webClient: args.webClient
   })[0]

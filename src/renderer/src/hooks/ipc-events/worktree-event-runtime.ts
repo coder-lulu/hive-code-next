@@ -1,12 +1,9 @@
-import { transitionLaunchDrafts } from '@/components/native-chat/native-chat-launch-draft-transition'
+import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import {
-  getRepoExecutionHostId,
   LOCAL_EXECUTION_HOST_ID,
   parseExecutionHostId,
   type ExecutionHostId
 } from '../../../../shared/execution-host'
-export const recentlyRenamedWorktreeIdExpiry = new Map<string, number>()
-import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import type { RuntimeClientEvent } from '../../../../shared/runtime-client-events'
 import type { AppState } from '../../store/types'
 import { hostWorktreeTarget } from '../../../../shared/worktree/host-qualified-identity'
@@ -42,6 +39,7 @@ const WORKTREE_RENAME_PURGE_GRACE_MS = 20_000
 function runtimeSortOrderFence(environmentId: string): string {
   return buildRuntimeClientEventEnvironmentKey([environmentId])
 }
+const recentlyRenamedWorktreeIdExpiry = new Map<string, number>()
 
 function getAuthoritativeDetectedWorktreeIds(state: AppState, repoId: string): Set<string> | null {
   const detected = selectDetectedWorktreesByRepo(state)[repoId]
@@ -132,24 +130,6 @@ export function createWorktreeEventRuntime(
       renamed != null && useAppStore.getState().activeWorktreeId === renamed.oldWorktreeId
     const selectionBeforeRename = captureWorkspaceSelection(useAppStore.getState())
     if (renamed) {
-      const owners = new Set(
-        useAppStore
-          .getState()
-          .repos.filter(
-            (repo) =>
-              repo.id === repoId &&
-              (!options?.forceLocalOwner || !getRepoExecutionHostId(repo).startsWith('runtime:'))
-          )
-          .map(getRepoExecutionHostId)
-      )
-      const owner = options?.executionHostId ?? (owners.size === 1 ? [...owners][0] : undefined)
-      if (owner) {
-        transitionLaunchDrafts((source) =>
-          source.executionHostId === owner && source.workspaceId === renamed.oldWorktreeId
-            ? { executionHostId: owner, workspaceId: renamed.newWorktreeId }
-            : undefined
-        )
-      }
       // Shield both ids from the deletion diff across the rename's event burst — the worktree list lags the on-disk move.
       const expiry = Date.now() + WORKTREE_RENAME_PURGE_GRACE_MS
       recentlyRenamedWorktreeIdExpiry.set(renamed.oldWorktreeId, expiry)

@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { ScanLine, UserRound, X } from 'lucide-react-native'
 import { Text, View } from 'react-native'
 import { ActionSheetModal } from '../components/ActionSheetModal'
@@ -15,15 +16,23 @@ export function MobileDeviceAddMenu(props: {
   onPair: () => void
   onAccount: () => void
 }) {
+  const t = useMobileTranslation()
+
   return (
     <ActionSheetModal
       visible={props.visible}
-      title="添加设备"
-      message="选择一种方式连接电脑。扫码页面也支持输入配对码。"
+      title={t('auto.mobile.src.devices.MobileDeviceMenus.c8aa6cacfd', 'Add device')}
+      message={t(
+        'auto.mobile.src.devices.MobileDeviceMenus.df0d3eca67',
+        'Choose how to connect to a computer. You can also enter a pairing code on the scan page.'
+      )}
       onClose={props.onClose}
       actions={[
         {
-          label: '扫码或配对码连接',
+          label: t(
+            'auto.mobile.src.devices.MobileDeviceMenus.3f41e93205',
+            'Connect with QR code or pairing code'
+          ),
           icon: ScanLine,
           closeBeforePress: true,
           onPress: props.onPair
@@ -45,19 +54,36 @@ export function MobileDeviceHelpSheet(props: {
   onClose: () => void
   theme: MobileTheme
 }) {
+  const t = useMobileTranslation()
+
   const styles = createMobileDevicesStyles(props.theme)
   return (
     <BottomDrawer visible={props.visible} onClose={props.onClose}>
       <View style={styles.deviceHeader}>
         <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.sheetTitle}>
-          连接帮助
+          {t('auto.mobile.src.devices.MobileDeviceMenus.02e72901c5', 'Connection help')}
         </Text>
-        <MobileIconButton accessibilityLabel="关闭连接帮助" icon={X} onPress={props.onClose} />
+        <MobileIconButton
+          accessibilityLabel={t(
+            'auto.mobile.src.devices.MobileDeviceMenus.efb8344e59',
+            'Close connection help'
+          )}
+          icon={X}
+          onPress={props.onClose}
+        />
       </View>
       {(['scan', 'account'] as const).map((method) => (
         <View key={method} style={styles.helpSection}>
           <Text maxFontSizeMultiplier={1.3} style={styles.deviceName}>
-            {method === 'scan' ? '扫码或配对码连接' : 'HiveCloud 账号连接'}
+            {method === 'scan'
+              ? t(
+                  'auto.mobile.src.devices.MobileDeviceMenus.3f41e93205',
+                  'Connect with QR code or pairing code'
+                )
+              : t(
+                  'auto.mobile.src.devices.MobileDeviceMenus.00e21629b6',
+                  'HiveCloud account connection'
+                )}
           </Text>
           {mobileHomeConnectionContent[method].steps.map((step) => (
             <View key={step.title}>
@@ -71,8 +97,10 @@ export function MobileDeviceHelpSheet(props: {
           ))}
           {method === 'scan' ? (
             <Text maxFontSizeMultiplier={1.3} style={styles.deviceMeta}>
-              配对码可在扫码页面输入。手机需要能访问电脑地址；可使用局域网、Tailscale
-              或自行配置可达网络。
+              {t(
+                'auto.mobile.src.devices.MobileDeviceMenus.6bcbbb7519',
+                'Enter pairing codes on the scan page. Your phone must be able to reach the computer’s address using a local network, Tailscale, or your own reachable network.'
+              )}
             </Text>
           ) : null}
         </View>

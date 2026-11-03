@@ -1,6 +1,8 @@
 import type { AgentKind } from '../../../shared/telemetry-events'
-import { getAgentResumeArgv } from '../../../shared/agent-resume-argv'
-import type { AgentProviderSessionMetadata } from '../../../shared/agent-session/lifecycle/agent-session-resume'
+import {
+  getAgentResumeArgv,
+  type AgentProviderSessionMetadata
+} from '../../../shared/agent-session-resume'
 import { parseLegacyNumericPaneKey, parsePaneKey } from '../../../shared/stable-pane-id'
 import {
   pickHostTurnEnd,

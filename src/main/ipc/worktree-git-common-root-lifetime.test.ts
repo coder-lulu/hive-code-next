@@ -520,8 +520,7 @@ it.each([
       identities: vi.mocked(notifyWorktreeHeadIdentitiesChanged).mock.calls.length
     })
     const blocked = Promise.withResolvers<void>()
-    const baselineRead = Promise.withResolvers<void>()
-    const reachedRead = vi.fn(baselineRead.resolve)
+    const reachedRead = vi.fn()
     native.mockRejectedValueOnce(
       new WatcherProcessFailure('test fuse', 'supervisor', 'supervisor_crash_fuse')
     )
@@ -542,24 +541,21 @@ it.each([
     await refreshWorktreeHeadIdentities(consumer, consumer.headIdentityRefresh, false)
     native.mockImplementation(async (...args) => {
       const installed = await installNative(...args)
+      await rm(fsControl.root, { recursive: true })
       fsControl.stat = async () => {
         fsControl.stat = null
-        // Reconciliation starts after fallback retirement, so removal cannot emit fallback batches.
-        await rm(fsControl.root, { recursive: true })
-        fsControl.read = async () => {
-          reachedRead()
-          await blocked.promise
-        }
         throw Object.assign(new Error('controlled root absence'), { code })
+      }
+      fsControl.read = async () => {
+        reachedRead()
+        await blocked.promise
       }
       return installed
     })
     const before = counts()
     const upgrading = fsControl.upgrade()
     try {
-      // Await real I/O without starting fallback ticks on the fake clock.
-      await Promise.race([baselineRead.promise, upgrading])
-      expect(reachedRead).toHaveBeenCalledOnce()
+      await vi.waitFor(() => expect(reachedRead).toHaveBeenCalledOnce())
       expect(events.slice(before.batches)).toEqual([[{ type: 'delete', path: fsControl.root }]])
       expect(subscriptions[0].unsubscribe).toHaveBeenCalledOnce()
       // Keep the real baseline blocked, but allow the real head reader its own listing.
@@ -653,14 +649,10 @@ it.each([
     } finally {
       fsControl.read = null
       blocked.resolve()
-      baselineRead.resolve()
-      try {
-        await upgrading
-      } finally {
-        consumer.disposed = true
-        clearTimeout(consumer.notifyTimer ?? undefined)
-        reader.mockRestore()
-      }
+      await upgrading
+      consumer.disposed = true
+      clearTimeout(consumer.notifyTimer ?? undefined)
+      reader.mockRestore()
     }
   }
 )

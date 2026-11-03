@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react'
-import { structuredAgentSessionShownSnapshot } from '../../../src/shared/agent-session/options/structured-agent-session-option-view'
-import type { StructuredAgentSessionOptionState } from '../../../src/shared/agent-session/options/structured-agent-session-options'
+import { structuredAgentSessionShownSnapshot } from '../../../src/shared/structured-agent-session-option-view'
+import type { StructuredAgentSessionOptionState } from '../../../src/shared/structured-agent-session-options'
 import type {
   SessionOptionDescriptor,
   SessionOptionsSurface,
@@ -9,6 +9,7 @@ import type {
 
 export function useMobileStructuredOptionSurface(args: {
   demandModelCatalog: () => void
+  lockSnapshot: (snapshot: SessionOptionDescriptor[]) => SessionOptionDescriptor[]
   optionSnapshot: SessionOptionDescriptor[]
   setStructuredOption: (id: string, value: SessionOptionValue) => Promise<boolean>
   /** The latest option state, which a settled pick's snapshot is read from. */
@@ -34,9 +35,9 @@ export function useMobileStructuredOptionSurface(args: {
   const setOption = useCallback(
     async (id: string, value: SessionOptionValue) => {
       await setStructuredOption(id, value)
-      return { snapshot: structuredAgentSessionShownSnapshot(readOptionState()) }
+      return { snapshot: args.lockSnapshot(structuredAgentSessionShownSnapshot(readOptionState())) }
     },
-    [readOptionState, setStructuredOption]
+    [args.lockSnapshot, readOptionState, setStructuredOption]
   )
 
   const optionSurface = useMemo<SessionOptionsSurface>(

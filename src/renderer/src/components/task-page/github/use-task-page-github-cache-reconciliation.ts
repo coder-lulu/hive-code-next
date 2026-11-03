@@ -22,8 +22,7 @@ export function useTaskPageGitHubCacheReconciliation(model: TaskPageGitHubDetail
     setTasksRefreshing,
     setTaskRefreshNonce,
     setPages,
-    selectedWorkItemsCacheEntries,
-    sourceDisplayWorkItemsCacheEntries
+    selectedWorkItemsCacheEntries
   } = model
   const patchTaskPageWorkItemRows = useCallback(
     (
@@ -59,11 +58,6 @@ export function useTaskPageGitHubCacheReconciliation(model: TaskPageGitHubDetail
   const perRepoSourceState = useMemo<TaskPageRepoSourceState[]>(
     () => buildTaskPageRepoSourceState(selectedRepos, selectedWorkItemsCacheEntries),
     [selectedRepos, selectedWorkItemsCacheEntries]
-  )
-  // Source displays (summary, repo link, Filters source row) only; notices, Retry and filters stay on current state.
-  const githubSourceDisplayState = useMemo<TaskPageRepoSourceState[]>(
-    () => buildTaskPageRepoSourceState(selectedRepos, sourceDisplayWorkItemsCacheEntries),
-    [selectedRepos, sourceDisplayWorkItemsCacheEntries]
   )
 
   // Unresolved sources otherwise look like genuine zero results; name them and offer Retry.
@@ -135,18 +129,27 @@ export function useTaskPageGitHubCacheReconciliation(model: TaskPageGitHubDetail
     setTasksRefreshing(true)
     setTaskRefreshNonce((current) => current + 1)
   }, [setTasksRefreshing, setTaskRefreshNonce])
-  return Object.assign(model, {
-    patchTaskPageWorkItemRows,
-    handleDialogReviewRequestsChange,
-    perRepoSourceState,
-    githubSourceDisplayState,
-    unresolvedSourceRepos,
-    fellBackToastedRef,
-    retryingSourceKeys,
-    setRetryingSourceKeys,
-    handleRetryIssuesFetch,
-    handleRefreshGithubTasks
-  })
+  const nextModel = model as typeof model & {
+    patchTaskPageWorkItemRows: typeof patchTaskPageWorkItemRows
+    handleDialogReviewRequestsChange: typeof handleDialogReviewRequestsChange
+    perRepoSourceState: typeof perRepoSourceState
+    unresolvedSourceRepos: typeof unresolvedSourceRepos
+    fellBackToastedRef: typeof fellBackToastedRef
+    retryingSourceKeys: typeof retryingSourceKeys
+    setRetryingSourceKeys: typeof setRetryingSourceKeys
+    handleRetryIssuesFetch: typeof handleRetryIssuesFetch
+    handleRefreshGithubTasks: typeof handleRefreshGithubTasks
+  }
+  nextModel.patchTaskPageWorkItemRows = patchTaskPageWorkItemRows
+  nextModel.handleDialogReviewRequestsChange = handleDialogReviewRequestsChange
+  nextModel.perRepoSourceState = perRepoSourceState
+  nextModel.unresolvedSourceRepos = unresolvedSourceRepos
+  nextModel.fellBackToastedRef = fellBackToastedRef
+  nextModel.retryingSourceKeys = retryingSourceKeys
+  nextModel.setRetryingSourceKeys = setRetryingSourceKeys
+  nextModel.handleRetryIssuesFetch = handleRetryIssuesFetch
+  nextModel.handleRefreshGithubTasks = handleRefreshGithubTasks
+  return nextModel
 }
 export type TaskPageGitHubCacheReconciliationModel = ReturnType<
   typeof useTaskPageGitHubCacheReconciliation

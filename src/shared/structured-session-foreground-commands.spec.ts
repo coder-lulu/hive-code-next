@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { AgentJournalRenderItem } from './agent-session/journal/agent-session-journal-types'
-import type { AgentSessionLatestTurn } from './agent-session/agent-session-wire'
-import type { AgentSessionBackgroundTaskState } from './agent-session/agent-session-background-task-wire'
+import type { AgentJournalRenderItem } from './agent-session-journal-types'
+import type { AgentSessionBackgroundTaskState, AgentSessionLatestTurn } from './agent-session-wire'
 import { structuredSessionForegroundCommands } from './structured-session-foreground-commands'
 
 const pwd = 'codex-command:primary:pwd'

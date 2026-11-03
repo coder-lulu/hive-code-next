@@ -80,21 +80,7 @@ function createModel(): AccountsPaneSectionModel {
     runCodexAccountAction: vi.fn(),
     recordOpenCodeSettingEdit: vi.fn(),
     miniMaxRateLimits: null,
-    miniMaxApiKeyDraft: '',
-    setMiniMaxApiKeyDraft: vi.fn(),
-    miniMaxApiKeyConfigured: false,
-    saveMiniMaxApiKey: vi.fn(),
-    clearMiniMaxApiKey: vi.fn(),
-    miniMaxCookieDraft: '',
-    miniMaxApiKeyProtection: null,
-    miniMaxCookieProtection: null,
-    setMiniMaxCookieDraft: vi.fn(),
-    miniMaxConfigured: false,
-    miniMaxCredentialBusy: false,
-    miniMaxCredentialLoadState: 'loaded',
-    refreshMiniMaxCredentialStatus: vi.fn(),
-    saveMiniMaxCookie: vi.fn(),
-    clearMiniMaxCookie: vi.fn()
+    usageHostSettings: { settings: {}, update: vi.fn(async () => {}) }
   }
 }
 
@@ -211,3 +197,6 @@ describe('AccountsPaneOverview', () => {
     expect(drawer).not.toHaveTextContent('Fe26.2**… token or auth=Fe26.2**… header')
   })
 })
+
+vi.mock('./MiniMaxAccountsSection', () => ({ MiniMaxAccountsSection: () => null }))
+vi.mock('./ZcodePlanAccountsSection', () => ({ ZcodePlanAccountsSection: () => null }))

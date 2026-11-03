@@ -10,6 +10,8 @@ import type { RuntimePtyWorktreeRecord } from '../../runtime-terminal-state-reco
 export abstract class OrcaRuntimeWithInvalidateAllHandlesForPty extends OrcaRuntimeWithResolveKnownWorkspaceFileTarget {
   protected abstract getOrCreatePtyWorktreeRecord(ptyId: string): RuntimePtyWorktreeRecord | null
 
+  protected abstract rejectWaitersForHandle(handle: string, code: string): void
+
   protected retirePredecessorPtyExitEvidence(pty: RuntimePtyWorktreeRecord): void {
     pty.lastExitCode = null
     pty.lastExitCause = null
@@ -24,14 +26,14 @@ export abstract class OrcaRuntimeWithInvalidateAllHandlesForPty extends OrcaRunt
     const preallocatedHandle = this.handleByPtyId.get(ptyId)
     const invalidated = new Set<string>()
     if (incarnationHandle && incarnationHandle !== preserveHandle) {
-      this.terminalIdentity.removeIncarnation(ptyId)
+      this.handleByPtyIncarnation.delete(ptyId)
       invalidated.add(incarnationHandle)
     } else if (incarnationHandle) {
       // Retain only the requested direct alias; drop incarnation-specific leaf identity.
-      this.terminalIdentity.removeIncarnation(ptyId)
+      this.handleByPtyIncarnation.delete(ptyId)
     }
     if (preallocatedHandle && preallocatedHandle !== preserveHandle) {
-      this.terminalIdentity.unbindPty(ptyId)
+      this.handleByPtyId.delete(ptyId)
       invalidated.add(preallocatedHandle)
     }
     for (const [handle, record] of this.handles) {
@@ -40,24 +42,19 @@ export abstract class OrcaRuntimeWithInvalidateAllHandlesForPty extends OrcaRunt
       }
     }
     for (const handle of invalidated) {
-      this.terminalIdentity.removeHandle(handle)
-      this.terminalIdentity.removeSynthetic(handle)
-    }
-    for (const waiter of this.terminalWaiters.forPty(ptyId)) {
-      // Waits end with the process they named; only the surviving alias carries its waits over.
-      if (waiter.handle !== preserveHandle) {
-        this.terminalWaiters.reject(waiter, 'terminal_handle_stale')
-      }
+      this.handles.delete(handle)
+      this.syntheticTerminalHandles.delete(handle)
+      this.rejectWaitersForHandle(handle, 'terminal_handle_stale')
     }
     for (const [leafKey, handle] of this.handleByLeafKey) {
       if (invalidated.has(handle) || (preserveHandle !== undefined && handle === preserveHandle)) {
-        this.terminalIdentity.unbindLeaf(leafKey)
+        this.handleByLeafKey.delete(leafKey)
       }
     }
     if (preserveHandle !== undefined) {
       // Only the direct alias survives incarnation changes; rebuild predecessor pane records before reuse.
-      this.terminalIdentity.removeHandle(preserveHandle)
-      this.terminalIdentity.removeSynthetic(preserveHandle)
+      this.handles.delete(preserveHandle)
+      this.syntheticTerminalHandles.delete(preserveHandle)
     }
     return invalidated
   }
@@ -179,17 +176,17 @@ export abstract class OrcaRuntimeWithInvalidateAllHandlesForPty extends OrcaRunt
         })
       }
     }
-    this.mainDaemonAttachments.markSpawnPublished(ptyId)
+    this.terminalViewSubscribers.markSpawnPublished(ptyId)
     const pty = this.getOrCreatePtyWorktreeRecord(ptyId)
     if (pty) {
       if (incarnationId) {
-        this.terminalIdentity.setPtyIncarnationId(pty, incarnationId)
+        pty.incarnationId = incarnationId
       }
-      this.terminalIdentity.setPtyConnected(pty, true)
+      pty.connected = true
       pty.disconnectedAt = null
     }
     for (const leaf of this.getLeavesForPty(ptyId)) {
-      this.terminalIdentity.updateLeafConnected(leaf, true)
+      leaf.connected = true
       leaf.writable = this.graphStatus === 'ready'
       this.adoptPreAllocatedHandle(leaf)
     }

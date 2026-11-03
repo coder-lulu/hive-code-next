@@ -1,8 +1,8 @@
 // Share host completion/prompt edges per target without snapshots, buffers or reconnect catch-up. Status feed retains state; this feed intentionally loses outage edges. Retention would create unread obligations with nothing to retire them and relight already-read work.
 
-import type { AgentSessionTurnCompletionEvent } from '../../../shared/agent-session/view/agent-session-turn-completion-wire'
-import type { AgentSessionAttentionEdge } from '../../../shared/agent-session/agent-session-attention'
-import { AGENT_SESSION_TURN_COMPLETION_RUNTIME_CAPABILITY } from '../../../shared/agent-session/agent-session-attention-capabilities'
+import type { AgentSessionTurnCompletionEvent } from '../../../shared/agent-session-wire'
+import type { AgentSessionAttentionEdge } from '../../../shared/agent-session-attention'
+import { AGENT_SESSION_TURN_COMPLETION_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import { runtimeEnvironmentSupportsCapability } from './runtime-rpc-client'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 import { subscribeStructuredAgentSessionTurnCompletions } from './structured-agent-session-client'
@@ -25,12 +25,9 @@ export function structuredAgentSessionTurnCompletionFeedKey(target: RuntimeClien
   return target.kind === 'local' ? 'local' : `environment:${target.environmentId}`
 }
 
-function createOwner(target: RuntimeClientTarget, key: string): OwnedTurnCompletionFeed {
-  const listeners = new Map<StructuredAgentSessionTurnCompletionListener, symbol>()
+function createOwner(target: RuntimeClientTarget): OwnedTurnCompletionFeed {
+  const listeners = new Set<StructuredAgentSessionTurnCompletionListener>()
   const activations = new Set<symbol>()
-  // Pending probes, opens and retries belong to this epoch until deferred stop runs.
-  let live = false
-  let pendingFlush = false
   let generation = 0
   let handle: { unsubscribe: () => void } | null = null
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null
@@ -38,7 +35,7 @@ function createOwner(target: RuntimeClientTarget, key: string): OwnedTurnComplet
 
   const deliver = (edge: AgentSessionAttentionEdge): void => {
     // A copy, so a listener that unsubscribes mid-fanout does not skip its neighbour.
-    for (const listener of Array.from(listeners.keys())) {
+    for (const listener of Array.from(listeners)) {
       try {
         listener(edge)
       } catch (error) {
@@ -46,7 +43,7 @@ function createOwner(target: RuntimeClientTarget, key: string): OwnedTurnComplet
       }
     }
   }
-  const active = (candidate: number): boolean => live && candidate === generation
+  const active = (candidate: number): boolean => activations.size > 0 && candidate === generation
   const clearReconnect = (): void => {
     if (reconnectTimer) {
       clearTimeout(reconnectTimer)
@@ -73,7 +70,7 @@ function createOwner(target: RuntimeClientTarget, key: string): OwnedTurnComplet
   }
   // Reconnect starts empty; host retains no missed-edge history to request.
   const loseConnection = (candidate: number): void => {
-    if (!active(candidate)) {
+    if (candidate !== generation) {
       return
     }
     generation += 1
@@ -93,7 +90,7 @@ function createOwner(target: RuntimeClientTarget, key: string): OwnedTurnComplet
         }
         reconnectAttempt = 0
         // An arm this build cannot name is dropped, not handed on half-read.
-        if (activations.size > 0 && (event.type === 'completion' || event.type === 'prompt')) {
+        if (event.type === 'completion' || event.type === 'prompt') {
           deliver(event)
         }
       },
@@ -147,86 +144,44 @@ function createOwner(target: RuntimeClientTarget, key: string): OwnedTurnComplet
       .catch(() => loseConnection(candidate))
   }
   const stop = (): void => {
-    live = false
     generation += 1
     clearReconnect()
     dropHandle()
     reconnectAttempt = 0
   }
 
-  const flush = (): void => {
-    if (pendingFlush) {
-      return
-    }
-    pendingFlush = true
-    queueMicrotask(() => {
-      pendingFlush = false
-      if (owners.get(key) !== owner) {
-        return
-      }
-      if (activations.size === 0) {
-        stop()
-      }
-      if (activations.size === 0 && listeners.size === 0) {
-        owners.delete(key)
-      }
-    })
-  }
-  const owner: OwnedTurnCompletionFeed = {
+  return {
     activate: () => {
       const token = Symbol('turn-completion-feed')
       activations.add(token)
-      if (!live) {
-        live = true
+      if (activations.size === 1) {
         open()
       }
       return () => {
-        if (activations.delete(token) && activations.size === 0) {
-          flush()
+        activations.delete(token)
+        if (activations.size === 0) {
+          stop()
         }
       }
     },
     subscribe: (listener) => {
-      const registration = listeners.get(listener) ?? Symbol('turn-completion-listener')
-      listeners.set(listener, registration)
-      return () => {
-        if (listeners.get(listener) !== registration) {
-          return
-        }
-        listeners.delete(listener)
-        flush()
-      }
+      listeners.add(listener)
+      return () => listeners.delete(listener)
     },
-    stop: () => {
-      stop()
-      listeners.clear()
-      activations.clear()
-      pendingFlush = false
-    }
+    stop
   }
-  return owner
 }
 
 export function getStructuredAgentSessionTurnCompletionFeed(
   target: RuntimeClientTarget
 ): StructuredAgentSessionTurnCompletionFeedOwner {
   const key = structuredAgentSessionTurnCompletionFeedKey(target)
-  const acquire = (): OwnedTurnCompletionFeed => {
-    let owner = owners.get(key)
-    if (!owner) {
-      owner = createOwner(target, key)
-      owners.set(key, owner)
-    }
-    return owner
+  let owner = owners.get(key)
+  if (!owner) {
+    owner = createOwner(target)
+    owners.set(key, owner)
   }
-  return {
-    activate: () => acquire().activate(),
-    subscribe: (listener) => acquire().subscribe(listener)
-  }
-}
-
-export function structuredAgentSessionTurnCompletionFeedCountForTests(): number {
-  return owners.size
+  return owner
 }
 
 export function resetStructuredAgentSessionTurnCompletionFeedsForTests(): void {

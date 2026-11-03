@@ -1,4 +1,4 @@
-import type { AgentBrowserBridge } from '../browser/agent-browser/agent-browser-bridge'
+import type { AgentBrowserBridge } from '../browser/agent-browser-bridge'
 import {
   navigationTargetsHost,
   resolveRuntimeNavigationTarget,
@@ -33,7 +33,7 @@ export type BrowserSessionTabSelectionOptions = {
   /** Required to force each caller to decide whether shared host selection moves. */
   focusesHost: boolean
   /** Paired origin and navigation audience travel together; absent for local creates. */
-  caller?: { clientNavigationId: string; navigation: RuntimeNavigationTarget; follows?: boolean }
+  caller?: { clientNavigationId: string; navigation: RuntimeNavigationTarget }
 }
 
 export type BrowserTabCreatePublication = {
@@ -42,8 +42,6 @@ export type BrowserTabCreatePublication = {
   worktreeId?: string
   focus: BrowserTabCreateFocusResolution
   clientNavigationId?: string
-  /** A link a page opened, not a create anyone asked for: its client has no pending focus, and no one picked it otherwise. */
-  opensPageLink?: boolean
   targetGroupId?: string
 }
 
@@ -180,15 +178,10 @@ export function publishCreatedBrowserSessionTab(
   publication: BrowserTabCreatePublication
 ): void {
   const rules = BROWSER_TAB_CREATE_PUBLICATION_RULES[publication.placementKind]
-  // A page link no client brought forward must not take over the agent's routing, yet must still appear.
-  const leavesAgentTab = publication.opensPageLink === true && !publication.focus.selects
-  if (
-    (rules.notifiesSessionTabsChanged || (rules.activatesBridgeTab && leavesAgentTab)) &&
-    publication.worktreeId !== undefined
-  ) {
+  if (rules.notifiesSessionTabsChanged && publication.worktreeId !== undefined) {
     host.notifyHeadlessBrowserSessionTabsChanged?.(publication.worktreeId)
   }
-  if (rules.activatesBridgeTab && !leavesAgentTab) {
+  if (rules.activatesBridgeTab) {
     const bridge = host.getAgentBrowserBridge()
     const webContentsId = bridge
       ?.getRegisteredTabs(publication.worktreeId)
@@ -208,8 +201,7 @@ export function publishCreatedBrowserSessionTab(
         ? {
             caller: {
               clientNavigationId: publication.clientNavigationId,
-              navigation: publication.focus.navigation,
-              ...(publication.opensPageLink ? { follows: true } : {})
+              navigation: publication.focus.navigation
             }
           }
         : {})

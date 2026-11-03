@@ -158,10 +158,8 @@ export function EditorConflictReviewSurface({
           <EditorFileLoadErrorView
             message={fileContent.loadError}
             code={fileContent.loadErrorCode}
-            worktreeId={contentFile.worktreeId}
             // Borrowed views reload through their owning workspace.
             onRetry={() => reloadContent(recordView ?? contentFile, USER_RETRY)}
-            onHostStarted={() => reloadContent(recordView ?? contentFile)}
           />
         </div>
       )
@@ -224,7 +222,6 @@ export function EditorConflictReviewSurface({
             key={`${viewStateScopeId}:${contentFile.id}:${viewStateKeySuffix}`}
             fileId={contentFile.id}
             filePath={contentFile.filePath}
-            noteSource={contentFile}
             viewStateKey={selectedViewStateKey}
             viewStateId={editorViewStateId}
             relativePath={contentFile.relativePath}

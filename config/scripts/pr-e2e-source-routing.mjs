@@ -371,6 +371,7 @@ export const PR_E2E_SOURCE_ROUTES = [
     specs: [
       'tests/e2e/ssh-orcad-paired-phone-projects.spec.ts',
       'tests/e2e/ssh-orcad-pairing-repair.spec.ts',
+      'tests/e2e/ssh-orcad-retained-upgrade-state.spec.ts',
       'tests/e2e/ssh-orcad-shared-home-machines.spec.ts',
       'tests/e2e/ssh-orcad-shared-login-migration.spec.ts',
       'tests/e2e/ssh-orcad-terminal-network-outage.spec.ts',

@@ -13,7 +13,7 @@ type AdjacentEditorOpenInput = {
   contentType: EditorTabContentType
 }
 
-/** Prefer an existing file view, then a neighboring editor or other neighbor, then the source. */
+/** Rank live-source destinations: neighboring file copy, any file copy, neighboring editor, any neighbor, source. Null for nonlive source leaves. */
 export function pickAdjacentEditorOpenGroupId(input: AdjacentEditorOpenInput): string | null {
   const groupsWithFile = new Set<string>()
   const tabsById = new Map<string, Tab>()

@@ -1,19 +1,16 @@
 import { createHash } from 'node:crypto'
-import { stat } from 'node:fs/promises'
 import type { PluginThemeContribution } from '../../../shared/plugins/contributions/plugin-content-pack-contributions'
 import {
   PLUGIN_ICON_SVG_MAX_BYTES,
   isPlausiblePluginIconSvg,
   parsePluginIconThemeArtifact,
-  pluginIconThemeIconRefs,
   type PluginIconThemeArtifact,
   type PluginIconThemeMetadata,
   type PluginIconThemeRegistration
 } from '../../../shared/plugins/artifacts/plugin-icon-theme-artifact'
 import {
   PLUGIN_ICON_THEME_MAX_BYTES,
-  readContainedPluginArtifactText,
-  resolveContainedPluginArtifact
+  readContainedPluginArtifactText
 } from '../plugin-artifact-validation'
 import { PluginArtifactPackRegistry } from './plugin-artifact-pack-registry'
 import type { PluginContentVerifier } from '../plugin-content-integrity'
@@ -44,23 +41,19 @@ export class PluginIconThemeRegistry {
           contribution.path,
           PLUGIN_ICON_THEME_MAX_BYTES
         )
-        const artifact = parsePluginIconThemeArtifact(text)
-        // Why the tree hash: SVGs load lazily, so it stands in for their bytes across updates.
-        // Dev folders have no tree hash, so in-place SVG edits are caught by file stats instead.
-        const svgStamp =
-          plugin.contentHash ?? (await statIconFiles(plugin.rootDir, iconPaths(artifact)))
         return {
           id: `plugin:${plugin.pluginKey}/${contribution.id}`,
           pluginKey: plugin.pluginKey,
           label: contribution.title,
+          // Why the tree hash: SVGs load lazily, so it stands in for their bytes across updates.
           revision: createHash('sha256')
-            .update(svgStamp)
+            .update(plugin.contentHash ?? '')
             .update('\0')
             .update(text)
             .digest('hex')
             .slice(0, 32),
           rootDir: plugin.rootDir,
-          artifact
+          artifact: parsePluginIconThemeArtifact(text)
         }
       }
     })
@@ -99,31 +92,15 @@ export class PluginIconThemeRegistry {
   }
 }
 
-function iconPaths(artifact: PluginIconThemeArtifact): string[] {
-  return [...new Set(pluginIconThemeIconRefs(artifact))]
-}
-
-async function statIconFiles(rootDir: string, paths: readonly string[]): Promise<string> {
-  const stamps = await Promise.all(
-    paths.map(async (path) => {
-      try {
-        const file = await stat(
-          await resolveContainedPluginArtifact(rootDir, path, PLUGIN_ICON_SVG_MAX_BYTES),
-          { bigint: true }
-        )
-        return `${path}:${file.size}:${file.mtimeNs}`
-      } catch {
-        // Load reports the real error; a missing file must still change the revision.
-        return `${path}:missing`
-      }
-    })
-  )
-  return stamps.join('\n')
-}
-
 async function materialize(descriptor: IconThemeDescriptor): Promise<PluginIconThemeRegistration> {
   const { artifact } = descriptor
-  const paths = iconPaths(artifact)
+  const paths = [
+    ...new Set([
+      ...Object.values(artifact.icons),
+      ...Object.values(artifact.fileNames),
+      ...Object.values(artifact.fileExtensions)
+    ])
+  ]
   const svgs: string[] = []
   let totalBytes = 0
   for (const path of paths) {
@@ -151,8 +128,6 @@ async function materialize(descriptor: IconThemeDescriptor): Promise<PluginIconT
     svgs,
     icons: indexOf(artifact.icons),
     fileNames: indexOf(artifact.fileNames),
-    fileExtensions: indexOf(artifact.fileExtensions),
-    folderNames: indexOf(artifact.folderNames),
-    folderNamesExpanded: indexOf(artifact.folderNamesExpanded)
+    fileExtensions: indexOf(artifact.fileExtensions)
   }
 }

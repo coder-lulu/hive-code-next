@@ -1,12 +1,10 @@
 import type { PluginThemeRegistration } from '../../../../../shared/plugins/artifacts/plugin-theme-artifact'
 
-/** A two-tone chip of a theme's background and accent. */
-export function ThemeColorSwatch({
-  background,
-  accent
+/** A two-tone chip of a plugin app theme's background and accent. */
+export function PluginThemeSwatch({
+  theme
 }: {
-  background: string
-  accent: string
+  theme: Pick<PluginThemeRegistration, 'tokens'>
 }): React.JSX.Element {
   return (
     <span
@@ -14,22 +12,11 @@ export function ThemeColorSwatch({
       className="flex size-3.5 overflow-hidden rounded-sm ring-1 ring-border"
     >
       {/* Why inline colour: the swatch is the theme's own palette. */}
-      <span className="flex-1" style={{ background }} />
-      <span className="flex-1" style={{ background: accent }} />
+      <span className="flex-1" style={{ background: theme.tokens['--background'] }} />
+      <span
+        className="flex-1"
+        style={{ background: theme.tokens['--primary'] ?? theme.tokens['--foreground'] }}
+      />
     </span>
-  )
-}
-
-/** The swatch of an installed plugin app theme. */
-export function PluginThemeSwatch({
-  theme
-}: {
-  theme: Pick<PluginThemeRegistration, 'tokens'>
-}): React.JSX.Element {
-  return (
-    <ThemeColorSwatch
-      background={theme.tokens['--background']}
-      accent={theme.tokens['--primary'] ?? theme.tokens['--foreground']}
-    />
   )
 }

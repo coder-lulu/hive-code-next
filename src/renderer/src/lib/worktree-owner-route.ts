@@ -1,5 +1,8 @@
-import { parseExecutionHostId } from '../../../shared/execution-host'
-import { resolveIndexedSshRepositoryHost } from './repository-owner-index'
+import {
+  getRepoExecutionHostId,
+  parseExecutionHostId,
+  toSshExecutionHostId
+} from '../../../shared/execution-host'
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import type {
   WorktreeOperationOwnerRecord,
@@ -42,12 +45,22 @@ function resolveRepoRouteForSshOwner(
   if (!repos || !owner.hostId) {
     return { kind: 'missing' }
   }
-  const evidence = resolveIndexedSshRepositoryHost(repos, owner.repoId, owner.hostId)
-  if (evidence.kind !== 'resolved') {
-    return evidence
+  const routes = new Map<string, WorktreeOperationRoute>()
+  for (const repo of repos) {
+    if (repo.id !== owner.repoId) {
+      continue
+    }
+    const connectionHostId = repo.connectionId ? toSshExecutionHostId(repo.connectionId) : null
+    if (getRepoExecutionHostId(repo) !== owner.hostId && connectionHostId !== owner.hostId) {
+      continue
+    }
+    addRoute(routes, routeForOwner({ hostId: getRepoExecutionHostId(repo) }))
   }
-  const route = routeForOwner({ hostId: evidence.hostId })
-  return route ? { kind: 'resolved', route } : { kind: 'missing' }
+  const route = routes.values().next().value
+  if (routes.size === 1 && route) {
+    return { kind: 'resolved', route }
+  }
+  return routes.size > 1 ? { kind: 'ambiguous' } : { kind: 'missing' }
 }
 
 export function resolveExactWorktreeRoute(

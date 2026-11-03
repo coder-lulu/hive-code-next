@@ -1,7 +1,6 @@
 import type { GitHubPRStack } from '../../../../shared/github/pull-request-types'
 import type { ghRepoExecOptions } from '../../gh-utils'
-import { githubHostExecOptions, type GitHubApiRepository } from '../../github-api-repository'
-import { githubReadExecutionScope } from '../../github-read-execution-scope'
+import type { GitHubApiRepository } from '../../github-api-repository'
 import { githubRepoIdentityKey } from '../../../../shared/github/repository-identity-key'
 import { getRestPRByNumber } from './pr-number-lookup'
 export const PR_STACK_SUMMARY_CACHE_TTL_MS = 60_000
@@ -43,8 +42,7 @@ export async function getCachedGitHubPRStackSummary(
   ghOptions: ReturnType<typeof ghRepoExecOptions>,
   executionScope: string
 ): Promise<GitHubPRStack | undefined> {
-  const execution = { ...ghOptions, ...githubHostExecOptions(ownerRepo) }
-  const key = `${executionScope}\0${githubReadExecutionScope(execution)}\0${githubRepoIdentityKey(ownerRepo)}#${number}`
+  const key = `${executionScope}\0${githubRepoIdentityKey(ownerRepo)}#${number}`
   const now = Date.now()
   prunePRStackSummaryCache(now)
   const cached = prStackSummaryCache.get(key)
@@ -58,7 +56,7 @@ export async function getCachedGitHubPRStackSummary(
   if (existing) {
     return existing
   }
-  const request = getRestPRByNumber(ownerRepo, number, execution).then((pr) => pr.stack)
+  const request = getRestPRByNumber(ownerRepo, number, ghOptions).then((pr) => pr.stack)
   prStackSummaryInFlight.set(key, request)
   try {
     const value = await request

@@ -31,7 +31,6 @@ type DragState = {
   currentY: number
   worktreeIds: string[]
   worktreeIdentities: string[]
-  worktreeKeys: string[]
   sourceCard: HTMLElement
   preview: HTMLElement | null
   previewOffsetX: number
@@ -129,7 +128,7 @@ export function useWorkspaceKanbanCardPointerDrag({
         pinWorktreesRef.current(state.worktreeIds)
       } else if (commitTarget.status) {
         dropWorktreesInStatusRef.current({
-          worktreeKeys: state.worktreeKeys,
+          worktreeIds: state.worktreeIds,
           status: commitTarget.status,
           dropIndex: commitTarget.dropIndex
         })
@@ -171,7 +170,7 @@ export function useWorkspaceKanbanCardPointerDrag({
       dragTargetChangeRef.current(dropTarget.status)
       if (
         dropTarget.status &&
-        shouldShowDropIndicatorRef.current(state.worktreeKeys, dropTarget.status)
+        shouldShowDropIndicatorRef.current(state.worktreeIds, dropTarget.status)
       ) {
         updateCardDropIndicator(board, dropTarget)
       } else {
@@ -291,13 +290,12 @@ export function useWorkspaceKanbanCardPointerDrag({
       }
 
       const selectedWorktrees = selectedWorktreesRef.current
-      const { worktreeIds, worktreeIdentities, worktreeKeys } =
-        resolveWorkspaceKanbanPointerDragSelection({
-          sourceWorktreeId: worktreeId,
-          sourceWorktreeIdentity: worktreeIdentity,
-          selectedWorktreeIds: selectedWorktreeIdsRef.current,
-          selectedWorktrees
-        })
+      const { worktreeIds, worktreeIdentities } = resolveWorkspaceKanbanPointerDragSelection({
+        sourceWorktreeId: worktreeId,
+        sourceWorktreeIdentity: worktreeIdentity,
+        selectedWorktreeIds: selectedWorktreeIdsRef.current,
+        selectedWorktrees
+      })
       dragRef.current = {
         pointerId: event.pointerId,
         startX: event.clientX,
@@ -306,7 +304,6 @@ export function useWorkspaceKanbanCardPointerDrag({
         currentY: event.clientY,
         worktreeIds,
         worktreeIdentities,
-        worktreeKeys,
         sourceCard: card,
         preview: null,
         previewOffsetX: 0,

@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { AgentType } from '../agent-status-types'
+import type { AgentType } from '../native-chat-types'
 
 // Expose the same transcript readers over RPC for paired mobile/web native chat.
 

@@ -5,7 +5,7 @@ import {
   type ProjectRuntimeResolutionStore
 } from './local-project-runtime-resolution'
 import type { ProjectExecutionRuntimeResolution } from '../shared/project-execution-runtime'
-import { wslHostsOptedIn } from './wsl/wsl-host-gate'
+import { wslHostsGateOpen } from './wsl/wsl-host-gate'
 
 export {
   resolveLocalProjectRuntimeForRepo,
@@ -88,14 +88,12 @@ export function getWorktreeCreatePrefetchGitOptions(
   return getLocalProjectWorktreeGitOptionsForRuntime(repo, projectRuntime)
 }
 
-/** Base-ref and remote-identity reads follow the runtime only once the user opted in to WSL hosts. */
+/** Base-ref and remote-identity reads follow the runtime only with WSL hosts on; before, host Git. */
 export function getProjectRuntimeReadGitOptions(
   store: ProjectRuntimeResolutionStore,
   repo: Repo
 ): LocalProjectWorktreeGitOptions {
-  return wslHostsOptedIn(store.getSettings?.())
-    ? getWorktreeCreatePrefetchGitOptions(store, repo)
-    : {}
+  return wslHostsGateOpen() ? getWorktreeCreatePrefetchGitOptions(store, repo) : {}
 }
 
 export function getLocalProjectWorktreeGitOptionsForRuntime(

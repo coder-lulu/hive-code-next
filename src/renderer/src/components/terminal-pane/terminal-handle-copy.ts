@@ -17,24 +17,20 @@ type CopyTerminalHandleDeps = {
   writeClipboardText: (text: string) => Promise<void>
 }
 
-export async function copyTerminalHandleForPane(args: CopyTerminalHandleDeps): Promise<string> {
-  const handle = await resolveTerminalHandleForPane(args)
-  await args.writeClipboardText(handle)
-  return handle
-}
-
-export async function resolveTerminalHandleForPane({
+export async function copyTerminalHandleForPane({
   tabId,
   leafId,
   ptyId,
-  callRuntime
-}: Omit<CopyTerminalHandleDeps, 'writeClipboardText'>): Promise<string> {
+  callRuntime,
+  writeClipboardText
+}: CopyTerminalHandleDeps): Promise<string> {
   // Use the paired owner’s bound handle; this desktop’s runtime cannot resolve the server’s pane.
   if (ptyId && isRemoteRuntimePtyId(ptyId)) {
     const ownerHandle = parseRemoteRuntimePtyId(ptyId)?.handle
     if (!ownerHandle) {
       throw new Error('Terminal ID unavailable')
     }
+    await writeClipboardText(ownerHandle)
     return ownerHandle
   }
   const paneKey = makePaneKey(tabId, leafId)
@@ -49,6 +45,7 @@ export async function resolveTerminalHandleForPane({
   if (!handle) {
     throw new Error('Terminal ID unavailable')
   }
+  await writeClipboardText(handle)
   return handle
 }
 

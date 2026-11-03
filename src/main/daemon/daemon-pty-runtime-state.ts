@@ -36,7 +36,7 @@ import type { ReadRunningWslDistros } from './daemon-wsl-bridge-exit'
 import { WslBridgeBootIdentity } from './daemon-wsl-bridge-boot-identity'
 
 export type PendingDaemonSpawnOperation = {
-  exitsBySessionId: Map<string, Omit<DaemonPtyRouterExitEvent, 'id'>[]>
+  exitsBySessionId: Map<string, { code: number; incarnationId?: string }[]>
   ignoredExitIncarnationIds: Set<string>
   ignoreNextExit: boolean
 }

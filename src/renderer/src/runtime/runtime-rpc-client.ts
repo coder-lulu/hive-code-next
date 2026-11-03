@@ -38,7 +38,6 @@ export async function callRuntimeRpc<TResult>(
     expectedEnvironmentPairingRevision?: number
     expectedEnvironmentRuntimeId?: string
     beforeSend?: () => void
-    paramsForStatus?: (status: RuntimeStatus | null) => unknown
   } = {}
 ): Promise<TResult> {
   if (options.signal?.aborted) {
@@ -51,27 +50,25 @@ export async function callRuntimeRpc<TResult>(
           options.expectedEnvironmentPairingRevision
         )
       : undefined
-  const compatibilityStatus =
+  if (
     target.kind === 'environment' &&
     method !== 'status.get' &&
     options.skipCompatibilityCheck !== true
-      ? await waitForPromiseWithSignal(
-          ensureRuntimeEnvironmentCompatible(target.environmentId, {
-            ...options,
-            expectedEnvironmentPairingRevision
-          }),
-          options.signal
-        )
-      : null
+  ) {
+    await waitForPromiseWithSignal(
+      ensureRuntimeEnvironmentCompatible(target.environmentId, {
+        ...options,
+        expectedEnvironmentPairingRevision
+      }),
+      options.signal
+    )
+  }
   if (options.signal?.aborted) {
     throw createRuntimeRpcAbortError()
   }
-  const selectedParams = options.paramsForStatus
-    ? options.paramsForStatus(compatibilityStatus)
-    : params
   const nextParams = options.suppressFeatureInteraction
-    ? withBrowserPaneUiRuntimeRpcSource(selectedParams)
-    : selectedParams
+    ? withBrowserPaneUiRuntimeRpcSource(params)
+    : params
   options.beforeSend?.()
   const response =
     target.kind === 'local'
@@ -83,9 +80,7 @@ export async function callRuntimeRpc<TResult>(
           timeoutMs: options.timeoutMs,
           signal: options.signal,
           expectedEnvironmentPairingRevision,
-          expectedEnvironmentRuntimeId:
-            options.expectedEnvironmentRuntimeId ??
-            (options.paramsForStatus ? compatibilityStatus?.runtimeId : undefined)
+          expectedEnvironmentRuntimeId: options.expectedEnvironmentRuntimeId
         })
   return unwrapRuntimeRpcResult<TResult>(response as RuntimeRpcResponse<TResult>)
 }
@@ -97,11 +92,10 @@ export async function ensureRuntimeEnvironmentCompatible(
     reuseRecentCompatibilityFailure?: boolean
     expectedEnvironmentPairingRevision?: number
   } = {}
-): Promise<RuntimeStatus | null> {
+): Promise<void> {
   const cached = getCachedRuntimeCompatibilityCheck(environmentId, options)
   if (cached) {
-    await cached.check
-    return cached.status
+    return cached.check
   }
   const entry = compatibilityEntry()
   const check = (async () => {
@@ -127,7 +121,6 @@ export async function ensureRuntimeEnvironmentCompatible(
     if (runtimeCompatibilityChecks.get(environmentId) === entry) {
       entry.provenCompatible = true
     }
-    return entry.status
   } catch (error) {
     if (runtimeCompatibilityChecks.get(environmentId) === entry) {
       // Startup repo/group/folder bursts should pay one offline-host timeout, not three.

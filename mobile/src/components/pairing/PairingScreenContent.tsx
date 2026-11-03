@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import type { LucideIcon } from 'lucide-react-native'
 import { LockKeyhole } from 'lucide-react-native'
 import type { ReactNode } from 'react'
@@ -35,12 +36,19 @@ export function PairingScreenContent(props: {
 }
 
 export function PairingSecurityNotice() {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   return (
     <View accessibilityRole="text" style={styles.securityNotice}>
       <LockKeyhole color={theme.color.status.success} size={16} strokeWidth={2} />
-      <Text style={styles.securityText}>配对凭据保存在本机，通信使用端到端加密</Text>
+      <Text style={styles.securityText}>
+        {t(
+          'auto.mobile.src.components.pairing.PairingScreenContent.aed70316d1',
+          'Pairing credentials stay on this device. Communication uses end-to-end encryption.'
+        )}
+      </Text>
     </View>
   )
 }
@@ -50,15 +58,27 @@ export function PairingConnectingState(props: {
   description?: string
   title?: string
 }) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   return (
     <View style={styles.connecting}>
       <ActivityIndicator color={theme.color.text.secondary} size="large" />
       <Text accessibilityRole="header" style={styles.connectingTitle}>
-        {props.title ?? '正在建立安全连接'}
+        {props.title ??
+          t(
+            'auto.mobile.src.components.pairing.PairingScreenContent.5db88204a4',
+            'Establishing a secure connection'
+          )}
       </Text>
-      <Text style={styles.description}>{props.description ?? '正在验证设备与配对凭据…'}</Text>
+      <Text style={styles.description}>
+        {props.description ??
+          t(
+            'auto.mobile.src.components.pairing.PairingScreenContent.7b2a53f91b',
+            'Verifying the device and pairing credentials…'
+          )}
+      </Text>
       {props.children}
     </View>
   )

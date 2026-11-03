@@ -46,4 +46,18 @@ describe('project host setup self-host stamp', () => {
     expect(() => parseParams(name, { ...base, hostId: 'nonsense' })).toThrow()
     expect(() => parseParams(name, { ...base, hostId: 'runtime:' })).toThrow()
   })
+
+  // Two clients paired with the same server now converge on one row instead of one each.
+  it('collapses two different clients onto the same host id', () => {
+    const fromClientA = parseParams('projectHostSetup.create', {
+      projectId: 'github:stablyai/orca',
+      hostId: 'runtime:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa'
+    })
+    const fromClientB = parseParams('projectHostSetup.create', {
+      projectId: 'github:stablyai/orca',
+      hostId: 'runtime:bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    })
+
+    expect(fromClientA.hostId).toBe(fromClientB.hostId)
+  })
 })

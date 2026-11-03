@@ -13,6 +13,9 @@ import {
   GITLAB_FILTER_OPTIONS,
   ISSUE_PRESETS,
   LINEAR_FILTER_OPTIONS,
+  LINEAR_GROUP_OPTIONS,
+  LINEAR_ORDER_OPTIONS,
+  LINEAR_VIEW_OPTIONS,
   type LinearListEntry,
   PR_PRESETS,
   type TaskItem,
@@ -45,6 +48,7 @@ export function useMobileTasksProviderViewProjection(model: PickerProjectionMode
     linearOrderBy,
     linearTeamPropertyTouched,
     linearTeams,
+    linearViewMode,
     linearWorkspaces,
     persistRepoSelection,
     selectedLinearTeamIds,
@@ -87,6 +91,15 @@ export function useMobileTasksProviderViewProjection(model: PickerProjectionMode
   const linearFilterLabel =
     LINEAR_FILTER_OPTIONS.find((filter) => filter.value === linearFilter)?.label ??
     t('tasks.providerViewProjection.all', 'All')
+  const linearViewLabel =
+    LINEAR_VIEW_OPTIONS.find((option) => option.value === linearViewMode)?.label ??
+    t('tasks.providerViewProjection.list', 'List')
+  const linearGroupLabel =
+    LINEAR_GROUP_OPTIONS.find((option) => option.value === linearGroupBy)?.label ??
+    t('tasks.providerViewProjection.noGrouping', 'No grouping')
+  const linearOrderLabel =
+    LINEAR_ORDER_OPTIONS.find((option) => option.value === linearOrderBy)?.label ??
+    t('tasks.providerViewProjection.priority', 'Priority')
   const linearWorkspaceLabel =
     selectedLinearWorkspaceId === 'all'
       ? t('tasks.providerViewProjection.allWorkspaces', 'All workspaces')
@@ -273,6 +286,9 @@ export function useMobileTasksProviderViewProjection(model: PickerProjectionMode
     jiraFilterLabel,
     jiraSiteChipLabel,
     linearFilterLabel,
+    linearViewLabel,
+    linearGroupLabel,
+    linearOrderLabel,
     linearWorkspaceLabel,
     linearWorkspaceOptions,
     linearTeamLabel,

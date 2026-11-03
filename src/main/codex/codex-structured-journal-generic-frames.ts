@@ -1,13 +1,14 @@
+import type { AgentJournalStatusItem } from '../../shared/agent-session-journal-types'
 import {
   unhandledProviderFrameJournalItem,
   type UnhandledProviderFrameJournalItem
 } from '../native-chat/agent-session-wire/unhandled-provider-frame'
 import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
-import {
-  type CodexJournalTranslationAdmission,
-  type CodexJournalTranslatorDeps,
-  CODEX_JOURNAL_ADMITTED
+import type {
+  CodexJournalTranslationAdmission,
+  CodexJournalTranslatorDeps
 } from './codex-structured-journal-contracts'
+import { CODEX_JOURNAL_ADMITTED } from './codex-structured-journal-contracts'
 import {
   MAX_CODEX_GENERIC_BOOKKEEPING_BYTES,
   MAX_CODEX_GENERIC_BOOKKEEPING_ENTRIES,
@@ -16,17 +17,14 @@ import {
   MAX_CODEX_WORDLESS_ROWS_PER_TURN
 } from './codex-structured-journal-limits'
 import { readCodexTurnId, readCodexErrorWillRetry } from './codex-structured-thread-facts'
-import {
-  type AgentJournalStatusItem,
-  AGENT_JOURNAL_THREAD_SCOPE
-} from '../../shared/agent-session/journal/agent-session-journal-types'
+import { AGENT_JOURNAL_THREAD_SCOPE } from '../../shared/agent-session-journal-types'
 import {
   CODEX_PLAN_UPDATED_FRAME_KIND,
   isWordlessProviderFrame
 } from '../../shared/native-chat/native-chat-provider-frame-summary'
 import type { CodexRowAttribution } from './codex-subagent-linkage'
 import { codexAuthenticationFailure } from './codex-authentication-failure'
-import { agentSessionFailureWords } from '../../shared/agent-session/failures/agent-session-failure-words'
+import { agentSessionFailureWords } from '../../shared/agent-session-failure-words'
 import { CodexUsageLimits } from './codex-usage-limits'
 
 const OVERFLOW_BUCKET = '__codex-generic-overflow__'

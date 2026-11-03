@@ -8,6 +8,7 @@ const state = vi.hoisted(() => ({
   afterConnect: null as (() => void | Promise<void>) | null,
   channels: [] as {
     isClosed: boolean
+    requests: unknown[][]
     callbacks: HiveAccountRelaySubscription | null
     close: (error?: Error) => void
   }[]
@@ -15,6 +16,7 @@ const state = vi.hoisted(() => ({
 vi.mock('./hive-account-relay-channel', () => ({
   HiveAccountRelayChannel: class {
     isClosed = false
+    requests: unknown[][] = []
     get isReady() {
       return !this.isClosed
     }
@@ -26,6 +28,7 @@ vi.mock('./hive-account-relay-channel', () => ({
       await state.afterConnect?.()
     }
     async request(...args: unknown[]) {
+      this.requests.push(args)
       state.request(...args)
       return { id: 'reply', ok: true, result: 'ok', _meta: { runtimeId: 'runtime' } }
     }
@@ -88,6 +91,62 @@ afterEach(() => {
 })
 
 describe('account relay pool ownership and bounds', () => {
+  it('rejects an old receipt after its stream closes while another stream survives', async () => {
+    const { pool, createMaterial } = setup()
+    const first = await pool.subscribe('first', {}, { onResponse: vi.fn() })
+    await pool.subscribe('second', {}, { onResponse: vi.fn() })
+    await pool.requestStatus()
+    const epoch = pool.connectionEpoch
+    first.close()
+    await Promise.resolve()
+    expect(pool.getState()).toBe('ready')
+    expect(pool.connectionEpoch).toBeGreaterThan(epoch)
+    state.request.mockClear()
+    await expect(
+      pool.request('files.write', {}, 1000, undefined, undefined, epoch)
+    ).rejects.toMatchObject({
+      code: 'remote_runtime_unavailable'
+    })
+    expect(state.request).not.toHaveBeenCalled()
+    expect(createMaterial).toHaveBeenCalledTimes(2)
+    await pool.requestStatus()
+    await pool.request('files.write', {}, 1000, undefined, undefined, pool.connectionEpoch)
+    expect(state.channels[1]!.requests.at(-1)?.[0]).toMatchObject({ method: 'files.write' })
+  })
+
+  it('rechecks receipt ownership after asynchronous acquisition before sending', async () => {
+    const { pool } = setup()
+    const stream = await pool.subscribe('watch', {}, { onResponse: vi.fn() })
+    await pool.requestStatus()
+    const epoch = pool.connectionEpoch
+    state.request.mockClear()
+    const write = pool.request('files.write', {}, 1000, undefined, undefined, epoch)
+    stream.close()
+    await expect(write).rejects.toMatchObject({ code: 'remote_runtime_unavailable' })
+    expect(state.request).not.toHaveBeenCalled()
+  })
+
+  it('invalidates an old receipt when a new Assignment replaces its channel', async () => {
+    const replacement = material()
+    replacement.outer.assignmentEpoch = 2
+    const { pool } = setup(vi.fn().mockResolvedValueOnce(material()).mockResolvedValue(replacement))
+    await pool.subscribe('first', {}, { onResponse: vi.fn() })
+    await pool.requestStatus()
+    const epoch = pool.connectionEpoch
+    await pool.subscribe('second', {}, { onResponse: vi.fn() })
+    await pool.requestStatus()
+    expect(pool.connectionEpoch).toBeGreaterThan(epoch)
+    state.request.mockClear()
+    await expect(
+      pool.request('files.write', {}, 1000, undefined, undefined, epoch)
+    ).rejects.toMatchObject({
+      code: 'remote_runtime_unavailable'
+    })
+    expect(state.request).not.toHaveBeenCalled()
+    await pool.request('files.write', {}, 1000, undefined, undefined, pool.connectionEpoch)
+    expect(state.channels[1]!.requests.at(-1)?.[0]).toMatchObject({ method: 'files.write' })
+  })
+
   it.each([
     [1000, 1000],
     [{ timeoutMs: 2000 }, 2000],

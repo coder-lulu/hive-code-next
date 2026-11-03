@@ -1,4 +1,3 @@
-import { EVERY_AGENT_CHAT } from '../../shared/native-chat/every-agent-chat.test-fixture'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const { handleMock, onMock, removeAllListenersMock, removeHandlerMock, fromWebContentsMock } =
@@ -215,7 +214,7 @@ describe('registerRuntimeHandlers', () => {
     }
     const runtime = {
       getRuntimeId: vi.fn().mockReturnValue('runtime-1'),
-      getClientSettings: vi.fn(() => ({ nativeChatProviders: EVERY_AGENT_CHAT })),
+      getClientSettings: vi.fn(() => ({ experimentalNativeChat: true })),
       restoreStructuredAgentSessionTabs: vi.fn(async () => undefined),
       listMobileSessionTabs: vi.fn(async () => ({
         worktree: 'workspace-1',

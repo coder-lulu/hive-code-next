@@ -1,5 +1,4 @@
 import { translate } from '../i18n/mobile-i18n'
-import { colors } from '../theme/mobile-theme'
 import type { GitFileStatus, GitStagingArea } from '../../../src/shared/git-status-types'
 import {
   buildSourceControlDisplaySections,
@@ -50,8 +49,8 @@ export type MobileSourceControlSection<TEntry extends MobileGitStatusEntry = Mob
 function sectionTitles(): Record<SourceControlDisplaySectionId, string> {
   return {
     conflicts: translate('sourceControl.gitStatus.conflicts', 'Conflicts'),
-    unstaged: translate('sourceControl.gitStatus.uncommitted', 'Uncommitted'),
-    staged: translate('sourceControl.gitStatus.staged', 'Staged')
+    unstaged: translate('sourceControl.gitStatus.changes', 'Changes'),
+    staged: translate('sourceControl.gitStatus.stagedChanges', 'Staged Changes')
   }
 }
 
@@ -135,21 +134,4 @@ export function isMobileGitTransientRefreshError(
 ) {
   const normalized = message?.trim().toLowerCase()
   return code === 'request_aborted' || normalized === 'aborting' || normalized === 'request_aborted'
-}
-
-export function statusColor(status: MobileGitFileStatus): string {
-  switch (status) {
-    case 'added':
-    case 'copied':
-      return colors.statusGreen
-    case 'deleted':
-      return colors.statusRed
-    case 'renamed':
-      return colors.accentBlue
-    case 'untracked':
-      return colors.statusAmber
-    case 'modified':
-    default:
-      return colors.textSecondary
-  }
 }

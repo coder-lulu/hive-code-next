@@ -6,7 +6,7 @@ import {
 import { isClaudeAuthSwitchInProgress } from '../../../claude-accounts/live-pty-gate'
 import { withClaudeProfileTerminalEnv } from '../../../claude-accounts/claude-profile-installed-router'
 import type { PtySpawnResult } from '../../../providers/pty-provider-contract'
-import { LocalPtyProvider } from '../../../providers/local-pty/local-pty-provider'
+import { LocalPtyProvider } from '../../../providers/local-pty-provider'
 import { isValidTerminalTabId } from '../../../../shared/terminal-tab-id'
 import { isTerminalLeafId } from '../../../../shared/stable-pane-id'
 import { getProvider } from '../provider/registry'
@@ -20,7 +20,7 @@ import {
   ptySessionIdForAgentCreateOperation
 } from '../../../daemon/pty-session-id'
 import { resolvePathEnvKey } from '../../../pty/windows-environment-path'
-import { isRuntimeWslBackgroundStart, type RuntimePtySpawnState } from './spawn-state'
+import type { RuntimePtySpawnState } from './spawn-state'
 import { localPtySpawnCwd } from '../host-env/spawn-cwd'
 import { resolvePtySpawnStartupTarget } from '../spawn-startup-target'
 import { resolvePtySpawnHostEnv } from '../spawn-host-env'
@@ -41,8 +41,7 @@ export async function prepareRuntimePtySpawn(
       args.sessionId,
       localPtySpawnCwd(args),
       // Main's background start must not stat a stopped distro's folder as a user act (E9).
-      args.wslUserAct !== true,
-      args.connectionId
+      args.wslUserAct !== true
     )
     if (admission) {
       await admission
@@ -80,21 +79,14 @@ export async function prepareRuntimePtySpawn(
     sessionId: ctx.sessionId,
     shellOverride: args.shellOverride,
     plannedPty: args.launchRuntime?.pty,
-    projectRuntimeSource: {
-      kind: 'store',
-      store: ctx.deps.store,
-      workspace: args.resolvedWorkspace,
-      connectionId: args.connectionId,
-      tabId: args.tabId
-    },
+    projectRuntimeSource: { kind: 'store', store: ctx.deps.store },
     preAdopted: ctx.preAdoptedStablePane !== null,
     getSettings: ctx.deps.getSettings,
-    resolveStartupCwd: (id, cwd, fallback) =>
-      ctx.deps.resolvePtySpawnStartupCwd(id, cwd, fallback, args.connectionId),
-    // The same verdict as spawn-options' `wslBackgroundStart`, held before the cwd probe and any provider.
-    ...(isRuntimeWslBackgroundStart(ctx)
-      ? { wslStartHold: { wslBackgroundStart: true, sessionId: ctx.sessionId } }
-      : {})
+    resolveStartupCwd: ctx.deps.resolvePtySpawnStartupCwd,
+    // Default-deny, as spawn-options' `wslBackgroundStart`: held before the cwd probe and any provider.
+    ...(args.wslUserAct === true
+      ? {}
+      : { wslStartHold: { wslBackgroundStart: true, sessionId: ctx.sessionId } })
   })
   ctx.cwd = target.cwd
   ctx.requestedCwd = target.requestedCwd

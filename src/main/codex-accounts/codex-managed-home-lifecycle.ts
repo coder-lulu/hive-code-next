@@ -43,18 +43,14 @@ export class CodexManagedHomeLifecycle {
     // Cleanup requires this ownership marker before deleting the home.
     writeFileSync(join(managedHomePath, '.orca-managed-home'), `${accountId}\n`, 'utf-8')
     return {
-      managedHomePath: await this.paths.assert(managedHomePath, accountId),
+      managedHomePath: this.paths.assert(managedHomePath, accountId),
       managedHomeRuntime: 'host',
       wslDistro: null,
       wslLinuxHomePath: null
     }
   }
 
-  async importAuthFromHome(
-    sourceHome: string,
-    managedHomePath: string,
-    accountId: string
-  ): Promise<void> {
+  importAuthFromHome(sourceHome: string, managedHomePath: string, accountId: string): void {
     const trimmed = sourceHome.trim()
     if (!trimmed) {
       throw new Error('A Codex home directory path is required.')
@@ -72,26 +68,22 @@ export class CodexManagedHomeLifecycle {
         `No Codex credentials found in ${resolvedSourceHome}. Run \`codex login\` into this directory first.`
       )
     }
-    const trustedHome = await this.paths.assert(managedHomePath, accountId)
+    const trustedHome = this.paths.assert(managedHomePath, accountId)
     writeFileAtomically(join(trustedHome, 'auth.json'), sourceAuthContents, { mode: 0o600 })
   }
 
   /** Preserve an unreadable home: rollback could destroy a successful login. */
-  async removeUnlessUnproven(
-    error: unknown,
-    managedHomePath: string,
-    accountId: string
-  ): Promise<void> {
+  removeUnlessUnproven(error: unknown, managedHomePath: string, accountId: string): void {
     if (error instanceof ManagedCodexHomeTemporarilyUnavailableError) {
       return
     }
-    await this.safeRemove(managedHomePath, accountId)
+    this.safeRemove(managedHomePath, accountId)
   }
 
-  async safeRemove(candidatePath: string, expectedAccountId: string): Promise<void> {
+  safeRemove(candidatePath: string, expectedAccountId: string): void {
     let managedHomePath: string
     try {
-      managedHomePath = await this.paths.assert(candidatePath, expectedAccountId)
+      managedHomePath = this.paths.assert(candidatePath, expectedAccountId)
     } catch (error) {
       console.warn('[codex-accounts] Refusing to remove untrusted managed home:', error)
       return
@@ -171,7 +163,7 @@ export class CodexManagedHomeLifecycle {
     const managedHomePath = toWindowsWslPath(linuxPath, distro)
     try {
       return {
-        managedHomePath: await this.paths.assert(managedHomePath, accountId),
+        managedHomePath: this.paths.assert(managedHomePath, accountId),
         managedHomeRuntime: 'wsl',
         wslDistro: distro,
         wslLinuxHomePath: linuxPath

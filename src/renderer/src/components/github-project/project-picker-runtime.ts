@@ -18,24 +18,16 @@ export function getProjectPickerBrowseHost(activeProject: { host?: string } | nu
   return githubProjectHost(activeProject?.host).toLowerCase()
 }
 
-/** `wake`: a click, which may start the stopped WSL distro gh lives in (E9); mount effects omit it. */
-type PickerCallOptions = { wake?: boolean }
-
-function wakeArg(options: PickerCallOptions): { wakeWslDistro?: true } {
-  return options.wake ? { wakeWslDistro: true } : {}
-}
-
 export async function listAccessibleProjectsForRuntime(
   target: RuntimeClientTarget,
-  host: string,
-  options: PickerCallOptions = {}
+  host: string
 ): Promise<ListAccessibleProjectsResult> {
   const args = { host }
   return target.kind === 'environment'
     ? callRuntimeRpc<ListAccessibleProjectsResult>(target, 'github.project.listAccessible', args, {
         timeoutMs: 60_000
       })
-    : window.api.gh.listAccessibleProjects({ ...args, ...wakeArg(options) })
+    : window.api.gh.listAccessibleProjects(args)
 }
 
 export async function listProjectViewsForRuntime(
@@ -45,21 +37,19 @@ export async function listProjectViewsForRuntime(
     ownerType: GitHubProjectOwnerType
     projectNumber: number
     host?: string
-  },
-  options: PickerCallOptions = {}
+  }
 ): Promise<ListProjectViewsResult> {
   return target.kind === 'environment'
     ? callRuntimeRpc<ListProjectViewsResult>(target, 'github.project.listViews', args, {
         timeoutMs: 30_000
       })
-    : window.api.gh.listProjectViews({ ...args, ...wakeArg(options) })
+    : window.api.gh.listProjectViews(args)
 }
 
 export async function resolveProjectRefForRuntime(
   target: RuntimeClientTarget,
   input: string,
-  host?: string,
-  options: PickerCallOptions = {}
+  host?: string
 ): Promise<ResolveProjectRefResult> {
   return target.kind === 'environment'
     ? callRuntimeRpc<ResolveProjectRefResult>(
@@ -68,5 +58,5 @@ export async function resolveProjectRefForRuntime(
         { input, ...(host ? { host } : {}) },
         { timeoutMs: 30_000 }
       )
-    : window.api.gh.resolveProjectRef({ input, ...(host ? { host } : {}), ...wakeArg(options) })
+    : window.api.gh.resolveProjectRef({ input, ...(host ? { host } : {}) })
 }

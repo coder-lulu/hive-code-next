@@ -6,16 +6,13 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   AGENT_JOURNAL_THREAD_SCOPE,
-  AGENT_SESSION_JOURNAL_SCHEMA_VERSION
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
-import type {
-  AgentJournalItemIdentity,
-  AgentSessionJournalIdentity
-} from '../../../shared/agent-session/journal/agent-session-journal-identity'
+  AGENT_SESSION_JOURNAL_SCHEMA_VERSION,
+  type AgentJournalItemIdentity,
+  type AgentSessionJournalIdentity
+} from '../../../shared/agent-session-journal-types'
 import {
   closeTestJournalHostDatabase,
   createTrackedJournalOpener,
-  deleteTestJournalRow,
   insertTestJournalRowJson,
   liveTestJournalRows,
   openTestJournalHostDatabase,
@@ -25,7 +22,7 @@ import { parseJournalRow, type JournalRow } from './journal-row-schema'
 import {
   agentSessionJournalProviderHandle,
   codexProviderHandle
-} from '../../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
+} from '../../../shared/agent-session-provider-handle-encoding'
 
 export function registerJournalUnknownRowKindTests(): void {
   const UNLOADABLE = {
@@ -42,7 +39,7 @@ export function registerJournalUnknownRowKindTests(): void {
   const SCOPE = { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
 
   let root: string
-  const journals = createTrackedJournalOpener({ legacyInputs: true })
+  const journals = createTrackedJournalOpener()
 
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'orca-journal-newer-kind-'))
@@ -61,14 +58,14 @@ export function registerJournalUnknownRowKindTests(): void {
     return journal.snapshot().items.map((entry) => entry.itemId)
   }
 
-  function rowEnvelope(epoch: string, seq: number) {
-    return { v: AGENT_SESSION_JOURNAL_SCHEMA_VERSION, epoch, seq, fence: 1, ts: 5_000 + seq }
-  }
-
   function newerRow(epoch: string, seq: number, extra: Record<string, unknown> = {}) {
     return {
-      ...rowEnvelope(epoch, seq),
+      v: AGENT_SESSION_JOURNAL_SCHEMA_VERSION,
       kind: 'future-mark',
+      epoch,
+      seq,
+      fence: 1,
+      ts: 5_000 + seq,
       payload: { said: 'by a newer build', seq },
       ...extra
     }
@@ -85,10 +82,13 @@ export function registerJournalUnknownRowKindTests(): void {
     await journals.closeAll()
     const { db } = openTestJournalHostDatabase(root)
     edit((seq, json) => {
-      deleteTestJournalRow(db, IDENTITY.sessionId, seq)
+      db.prepare('DELETE FROM journal_rows WHERE session_id = ? AND seq = ?').run(
+        IDENTITY.sessionId,
+        seq
+      )
       insertTestJournalRowJson(db, IDENTITY.sessionId, seq, json, 5_000 + seq)
     })
-    await closeTestJournalHostDatabase(root)
+    closeTestJournalHostDatabase(root)
   }
 
   async function restartAfter(edit: (put: (seq: number, json: string) => void) => void = () => {}) {
@@ -198,7 +198,7 @@ export function registerJournalUnknownRowKindTests(): void {
 
     it('reads a known kind that fails its own checks as malformed', () => {
       const parsed = parseJournalRow(
-        JSON.stringify({ ...rowEnvelope('epoch-1', 7), kind: 'item', itemId: 'x', revision: 1 })
+        JSON.stringify({ ...newerRow('epoch-1', 7), kind: 'item', itemId: 'x', revision: 1 })
       )
       expect(parsed).toEqual({ ok: false, unreadable: false })
     })
@@ -265,12 +265,7 @@ export function registerJournalUnknownRowKindTests(): void {
       ['a later', 9]
     ])('fails the load and is kept when it names %s one', async (_name, seq) => {
       const epoch = await journalWithOneItem()
-      const tombstone = {
-        ...rowEnvelope(epoch, seq),
-        kind: 'tombstone',
-        itemId: 'gone',
-        revision: 1
-      }
+      const tombstone = { ...newerRow(epoch, seq), kind: 'tombstone', itemId: 'gone', revision: 1 }
       await expect(restartAfter((put) => put(3, JSON.stringify(tombstone)))).rejects.toMatchObject(
         UNLOADABLE
       )

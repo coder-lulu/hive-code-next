@@ -59,19 +59,13 @@ function hostHistoryCard(
 
 // Only a proven catalog can establish deletion; cold/loading snapshots leave navigation to the session’s later check.
 export function isResumeTargetConfirmedMissing(
-  card: Readonly<{ worktree: Readonly<{ worktreeId: string }> }>,
-  provenWorktrees: readonly unknown[] | null
+  card: HomeResumeCard,
+  provenWorktrees: readonly { worktreeId: string }[] | null
 ): boolean {
   if (!provenWorktrees || isSyntheticWorkspaceRoute(card.worktree.worktreeId)) {
     return false
   }
-  return !provenWorktrees.some(
-    (worktree) =>
-      typeof worktree === 'object' &&
-      worktree !== null &&
-      'worktreeId' in worktree &&
-      worktree.worktreeId === card.worktree.worktreeId
-  )
+  return !provenWorktrees.some((worktree) => worktree.worktreeId === card.worktree.worktreeId)
 }
 
 export function selectHomeResumeCard(input: HomeResumeCardInput): HomeResumeCard | null {

@@ -221,10 +221,7 @@ export function findKeybindingConflictsForDefinitions(
         const definition = byId.get(id)
         return (
           !definition?.implicitDefaultYields ||
-          // Why: an override can carry the action's own default, which still shares that chord on purpose.
-          !getDefaultBindings(definition, platform).some((ownDefault) =>
-            bindingsOverlap(definition, binding, definition, ownDefault, platform)
-          ) ||
+          Object.hasOwn(overrides ?? {}, id) ||
           !Array.from(actionIds).every((otherId) => {
             const other = byId.get(otherId)
             return (

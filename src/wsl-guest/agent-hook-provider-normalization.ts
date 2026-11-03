@@ -1,8 +1,5 @@
 import { hasOtherAgentProcessOwner } from '../shared/agent-process-presence'
-import {
-  isOwnerProviderGuestHook,
-  readHookProcessVerdict
-} from '../shared/agent-hook-owner-presence'
+import { isOwnerProviderGuestHook } from '../shared/agent-hook-owner-presence'
 import { sameAgentStatusTerminalOwner } from '../shared/agent-status-terminal-owner'
 import { normalizeHookPayload } from '../shared/agent-hook-listener'
 import {
@@ -42,10 +39,7 @@ export class RelayProviderHookNormalization {
       lastToolByPaneKey: state.lastToolByPaneKey,
       lastStatusByPaneKey: state.lastStatusByPaneKey
     }
-    const event = normalizeHookPayload(view, source, body, env, {
-      ...options,
-      bindingStatusByPaneKey: canonical.lastStatusByPaneKey
-    })
+    const event = normalizeHookPayload(view, source, body, env, options)
     if (event) {
       const providerState = state
       cacheRelayLegacyAgentStatus(state, event, MAX_CACHED_PANES, (paneKey) =>
@@ -59,11 +53,7 @@ export class RelayProviderHookNormalization {
         hasOtherAgentProcessOwner(owner.agentPresence, {
           agent: source,
           process: event.agentPresence?.process
-        }) &&
-        readHookProcessVerdict(canonical, owner, {
-          paneKey: event.paneKey,
-          process: event.agentPresence?.process
-        }) !== 'root'
+        })
       ) {
         return event
       }

@@ -92,8 +92,7 @@ export const FILE_METHODS = [
         params.worktree,
         params.relativePath,
         params.staged === true,
-        params.navigation,
-        ...(params.oldPath ? ([params.oldPath] as const) : [])
+        params.navigation
       )
   }),
   defineMethod({

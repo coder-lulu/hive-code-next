@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest'
 import type { RpcClient } from '../transport/rpc-client'
-import { credentialDecryptionMessage } from '../../../src/shared/integration-credential-errors'
 import { fanOutSmartSearch } from './smart-source-fan-out'
 
 type Call = { method: string; params: Record<string, unknown> }
@@ -156,20 +155,4 @@ describe('fanOutSmartSearch', () => {
       branches: []
     })
   })
-})
-
-it.each([
-  ['Linear authentication expired for this workspace.', 'Unable to load Linear issues. Try again.'],
-  ['401 raw old-host diagnostic', 'Unable to load Linear issues. Try again.'],
-  [credentialDecryptionMessage('Linear'), credentialDecryptionMessage('Linear')]
-])('phone retains its existing safe error for %s', async (raw, visible) => {
-  const calls: Call[] = []
-  const result = await fanOutSmartSearch({
-    ...smartArgs,
-    mode: 'linear',
-    client: fakeClient({ 'linear.searchIssues': new Error(raw) }, calls)
-  })
-  expect(result.error).toBe(visible)
-  expect(result.linearIssues).toEqual([])
-  expect(calls.map((call) => call.method)).toEqual(['linear.searchIssues'])
 })

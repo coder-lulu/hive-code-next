@@ -83,16 +83,13 @@ export function setLegacyCompatibilityPrincipalStatus(
   id: string,
   status: 'settled' | 'revoked'
 ): LegacyCompatibilityPrincipalRow | undefined {
-  const changed = this.db
+  this.db
     .prepare(
       `UPDATE legacy_compatibility_principals
        SET status = ?
        WHERE id = ? AND status = 'committed'`
     )
     .run(status, id)
-  if (changed.changes) {
-    this.crewChanges.notify(new Set(['topology']))
-  }
   return this.getLegacyCompatibilityPrincipal(id)
 }
 

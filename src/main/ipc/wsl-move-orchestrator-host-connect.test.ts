@@ -59,7 +59,6 @@ function orchestratorOverHost(connector: ReturnType<typeof makeConnector>) {
     now: () => 1_000,
     appVersion: '1.0.0',
     autoMoveEnabled: () => true,
-    autoMovesBridgeProjects: () => true,
     prepareHost: (distro, stillWanted) =>
       prepareWslMoveHost(
         {

@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer, connect, type Server, type Socket } from 'node:net'
@@ -46,7 +47,7 @@ describe('paired runtime browser network tunnel', () => {
     const errors: Error[] = []
     const onPageCommand = vi.fn(() => Promise.resolve({ status: 'completed' as const }))
     const hostLease = new PairedRuntimeBrowserHostLease({
-      connection: pairing,
+      connection: pairedRuntimeConnectionFromOffer(pairing),
       authorityRuntimeId: runtime.getRuntimeId(),
       browserHostClientId: 'integration-browser-host',
       hostCapabilities: ['webview'],
@@ -138,7 +139,7 @@ describe('paired runtime browser network tunnel', () => {
     }
     const onPageCommand = vi.fn(() => Promise.resolve({ status: 'completed' as const }))
     const hostLease = new PairedRuntimeBrowserHostLease({
-      connection: pairing,
+      connection: pairedRuntimeConnectionFromOffer(pairing),
       authorityRuntimeId: runtime.getRuntimeId(),
       browserHostClientId: 'integration-browser-host',
       hostCapabilities: ['webview'],
@@ -223,7 +224,7 @@ describe('paired runtime browser network tunnel', () => {
 
     const errors: Error[] = []
     const hostLease = new PairedRuntimeBrowserHostLease({
-      connection: pairing,
+      connection: pairedRuntimeConnectionFromOffer(pairing),
       authorityRuntimeId: runtime.getRuntimeId(),
       browserHostClientId: 'integration-browser-host',
       hostCapabilities: ['webview'],
@@ -232,7 +233,7 @@ describe('paired runtime browser network tunnel', () => {
     const lease = await hostLease.start()
     resources.push(() => hostLease.close())
     const route = new PairedRuntimeBrowserNetworkRoute({
-      connection: pairing,
+      connection: pairedRuntimeConnectionFromOffer(pairing),
       lease,
       executionHostRevision: runtime.getStartedAt(),
       onError: (error) => errors.push(error)

@@ -5,7 +5,6 @@ import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { TaskPageJiraIssueDialog } from './IssueDialog'
 import { useTaskPageJiraIssueCreation } from './use-task-page-jira-issue-creation'
-import { useTaskCreationDraftRetention } from '@/components/use-task-creation-draft-retention'
 import type { TaskPageComposerActionsModel } from '../use-task-page-composer-actions'
 import type { JiraCreateField } from '../../../../../shared/jira/jira-types'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
@@ -44,11 +43,6 @@ function CreateDialog({ field = reporter }: { field?: JiraCreateField }) {
   const [values, setValues] = useState<Record<string, string>>({})
   const [open, setOpen] = useState(true)
   const [submitting, setSubmitting] = useState(false)
-  const discardNewJiraIssueDraft = useTaskCreationDraftRetention({
-    open,
-    draft: { title: 'Fix reporter selection', body: '' },
-    writeDraft: vi.fn()
-  })
   const model = {
     settings: null,
     providerRuntimeContextKey: 'local',
@@ -90,7 +84,7 @@ function CreateDialog({ field = reporter }: { field?: JiraCreateField }) {
     newJiraIssueTargetType: { id: 'bug', name: 'Bug' },
     newJiraIssueAssignee: null,
     setNewJiraIssueAssignee: vi.fn(),
-    discardNewJiraIssueDraft,
+    discardNewJiraIssueDraft: vi.fn(),
     setJiraRefreshNonce: vi.fn(),
     setJiraIssues: vi.fn(),
     setSelectedJiraIssue: vi.fn(),

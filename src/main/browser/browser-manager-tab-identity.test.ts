@@ -32,11 +32,7 @@ vi.mock('./popup-origin-bar-window', () => ({
 vi.mock('./browser-process-user-agent', () => ({
   getBrowserProcessUserAgentIdentity: () => ({
     mode: mocks.processUserAgentMode,
-    userAgent: mocks.processUserAgent,
-    electronUserAgent:
-      mocks.processUserAgentMode === 'native'
-        ? mocks.processUserAgent
-        : 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) orca/1.0.0 Chrome/134.0.0.0 Electron/30.0.0 Safari/537.36'
+    userAgent: mocks.processUserAgent
   })
 }))
 
@@ -158,7 +154,7 @@ async function presentWith(url: string, preset: Preset): Promise<Observed> {
   return observe(opened, url)
 }
 
-// UA overrides without metadata suppress client hints; only the Google sign-in identity omits them.
+// UA overrides without metadata suppress client hints; only the Firefox identity omits them.
 function expectClientHintsKept(observed: Observed): void {
   const override = observed.standingOverride
   if (override && override.userAgent !== googleAuthUserAgent()) {
@@ -192,12 +188,13 @@ describe('tab identity ownership', () => {
         const desktop = await presentWith(url, 'desktop')
         expect(desktop).toEqual(none)
         expectClientHintsKept(desktop)
-        const auth = url === AUTH_URL
-        expect(desktop.presented).toBe(auth ? googleAuthUserAgent() : processUserAgent)
-        expect(desktop.requestIdentity).toEqual({
-          kind: auth ? 'google-auth' : 'process',
-          userAgent: desktop.presented
-        })
+        const expected =
+          mode === 'clean' && url === AUTH_URL ? googleAuthUserAgent() : processUserAgent
+        expect(desktop.presented).toBe(expected)
+        expect(desktop.requestIdentity.userAgent).toBe(expected)
+        expect(desktop.requestIdentity.kind).toBe(
+          expected === processUserAgent ? 'process' : 'google-auth'
+        )
       }
     )
 
@@ -211,11 +208,16 @@ describe('tab identity ownership', () => {
       expect(observed.requestIdentity.userAgent).toBe(observed.presented)
     })
 
-    it('keeps the Google sign-in identity ahead of a mobile preset', async () => {
+    it('keeps the Google sign-in identity ahead of a mobile preset only in clean mode', async () => {
       const observed = await presentWith(AUTH_URL, 'mobile')
       expectClientHintsKept(observed)
-      expect(observed.presented).toBe(googleAuthUserAgent())
-      expect(observed.requestIdentity.kind).toBe('google-auth')
+      if (mode === 'clean') {
+        expect(observed.presented).toBe(googleAuthUserAgent())
+        expect(observed.requestIdentity.kind).toBe('google-auth')
+      } else {
+        expect(observed.presented).toContain('iPhone')
+        expect(observed.requestIdentity.kind).toBe('mobile')
+      }
     })
 
     it.each(['desktop', 'none'] as const)(
@@ -234,13 +236,15 @@ describe('tab identity ownership', () => {
     )
   })
 
-  it('keeps the Electron and app tokens off a clean-mode tab outside Google sign-in under any preset', async () => {
+  it('never puts the Electron or app tokens on a clean-mode tab under any preset', async () => {
     mocks.processUserAgentMode = 'clean'
     mocks.processUserAgent = GUEST_CLEAN_UA
-    for (const preset of ['none', 'desktop', 'mobile'] as const) {
-      const observed = await presentWith(ORDINARY_URL, preset)
-      expect(observed.presented).not.toMatch(APP_TOKENS)
-      expect(observed.requestIdentity.userAgent).not.toMatch(APP_TOKENS)
+    for (const url of [ORDINARY_URL, AUTH_URL]) {
+      for (const preset of ['none', 'desktop', 'mobile'] as const) {
+        const observed = await presentWith(url, preset)
+        expect(observed.presented).not.toMatch(APP_TOKENS)
+        expect(observed.requestIdentity.userAgent).not.toMatch(APP_TOKENS)
+      }
     }
   })
 
@@ -371,7 +375,7 @@ describe('tab identity ownership', () => {
       ([event]) => event === 'will-redirect'
     )?.[1]
     willRedirect({ preventDefault: vi.fn() }, ORDINARY_URL, false, true)
-    // Clearing now would expose the stale auth WebContents UA.
+    // Clearing now would expose the stale Firefox WebContents UA.
     expect((await observe(opened, ORDINARY_URL)).presented).toBe(GUEST_CLEAN_UA)
 
     navigate('https://example.org/')

@@ -46,7 +46,7 @@ vi.mock('../platform/haptics', () => ({
   triggerEdgeBump: () => {},
   triggerSelection: () => {}
 }))
-vi.mock('./native-chat/transcript/use-mobile-native-chat-readability', () => ({
+vi.mock('./use-mobile-native-chat-readability', () => ({
   useMobileNativeChatReadability: () => true
 }))
 vi.mock('./native-chat/use-mobile-native-chat-input-lease', () => ({
@@ -66,9 +66,9 @@ vi.mock('./use-mobile-session-view-mode', () => ({
     toggleTabChatView: () => {}
   })
 }))
-vi.mock('./native-chat/use-mobile-native-chat-controller', async () => {
+vi.mock('./use-mobile-native-chat-controller', async () => {
   const { useMobileNativeChatActiveResolution } =
-    await import('./native-chat/use-mobile-native-chat-active-resolution')
+    await import('./use-mobile-native-chat-active-resolution')
   return {
     useMobileNativeChatController: (
       args: Parameters<typeof useMobileNativeChatActiveResolution>[0]
@@ -96,7 +96,6 @@ type SessionScope = Pick<
   | 'hostId'
   | 'worktreeId'
   | 'client'
-  | 'pairedHostClient'
   | 'connState'
   | 'agentSessionHostSupport'
   | 'setInput'
@@ -159,7 +158,6 @@ function Probe({ client, tab, connState, dictationEnabled }: ProbeOptions): null
     hostId: 'h1',
     worktreeId: 'w1',
     client,
-    pairedHostClient: client,
     connState,
     agentSessionHostSupport: structuredAgentSessionHostSupport([]),
     setInput: (next) => {

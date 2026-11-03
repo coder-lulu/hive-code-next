@@ -3,14 +3,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const wslMocks = vi.hoisted(() => ({
   filterPathsToRunningWslDistrosAsync: vi.fn(),
   listRunningWslHomeDirsAsync: vi.fn(),
-  resolveWslGuestRealDirAsync: vi.fn(),
-  admitWslTranscriptPath: vi.fn<(path: string) => Promise<void>>()
+  resolveWslGuestRealDirAsync: vi.fn()
 }))
 
 // These cases cover root and path policy; the E9 gate has its own suite.
-vi.mock('./wsl-transcript-running-admission', () => ({
-  admitWslTranscriptPath: wslMocks.admitWslTranscriptPath
-}))
+vi.mock('./wsl-transcript-running-admission', () => ({ admitWslTranscriptPath: async () => {} }))
 vi.mock('../wsl/wsl-home-unless-stopped', async () => {
   const wsl = await import('../wsl')
   return {
@@ -50,7 +47,6 @@ beforeEach(() => {
     .mockImplementation(async (paths: readonly string[]) => [...paths])
   wslMocks.listRunningWslHomeDirsAsync.mockReset().mockResolvedValue([])
   wslMocks.resolveWslGuestRealDirAsync.mockReset().mockResolvedValue(null)
-  wslMocks.admitWslTranscriptPath.mockReset().mockResolvedValue(undefined)
 })
 
 describe('isGuestAbsoluteLinuxPath', () => {
@@ -121,17 +117,16 @@ describe('toHostReadableTranscriptPath', () => {
     await expect(
       toHostReadableTranscriptPath(ROLLOUT_UNC, { platform: 'win32', pathExists })
     ).resolves.toBe(ROLLOUT_UNC)
-    expect(wslMocks.admitWslTranscriptPath).toHaveBeenCalledWith(ROLLOUT_UNC)
+    expect(wslMocks.filterPathsToRunningWslDistrosAsync).toHaveBeenCalledWith([ROLLOUT_UNC])
     expect(pathExists).toHaveBeenCalledWith(ROLLOUT_UNC)
   })
 
-  it('reports an already-UNC transcript in a stopped distro as refused, never missing', async () => {
+  it('does not probe an already-UNC transcript after its distro stops', async () => {
     const pathExists = vi.fn().mockResolvedValue(true)
-    const refusal = new WslTranscriptFsError('unavailable', "WSL distro 'Ubuntu' is not running")
-    wslMocks.admitWslTranscriptPath.mockRejectedValue(refusal)
+    wslMocks.filterPathsToRunningWslDistrosAsync.mockResolvedValue([])
     await expect(
       toHostReadableTranscriptPath(ROLLOUT_UNC, { platform: 'win32', pathExists })
-    ).rejects.toBe(refusal)
+    ).resolves.toBeNull()
     expect(pathExists).not.toHaveBeenCalled()
   })
 

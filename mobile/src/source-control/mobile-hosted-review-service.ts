@@ -72,7 +72,6 @@ export async function resolveMobileHostedReviewPrefill(
   args: {
     branch: string | undefined
     title: string
-    base?: string
     hasUncommittedChanges?: boolean
     hasUpstream?: boolean
     ahead?: number
@@ -91,7 +90,6 @@ export async function resolveMobileHostedReviewPrefill(
   try {
     const eligibility = await fetchMobileHostedReviewEligibility(client, worktreeId, {
       branch: args.branch,
-      ...(args.base ? { base: args.base } : {}),
       hasUncommittedChanges: args.hasUncommittedChanges,
       hasUpstream: args.hasUpstream,
       ahead: args.ahead,

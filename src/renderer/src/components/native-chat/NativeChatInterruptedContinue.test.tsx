@@ -26,12 +26,15 @@ const mocks = vi.hoisted(() => {
 })
 
 vi.mock('@/lib/native-chat-telemetry', () => ({ emitNativeChatMessageSent: vi.fn() }))
+vi.mock('@/lib/worker-terminal-takeover-report', () => ({
+  reportStructuredSessionUserInput: vi.fn()
+}))
 
 vi.mock('@/i18n/i18n', () => ({ translate: (_key: string, fallback: string) => fallback }))
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   ensureRuntimeEnvironmentCompatible: async () => {}
 }))
-vi.mock('@/lib/agent-session/launch/structured-agent-session-launch-label', () => ({
+vi.mock('@/lib/structured-agent-session-launch-label', () => ({
   structuredAgentLabel: () => 'Codex'
 }))
 vi.mock('@/runtime/structured-agent-session-client', () => ({
@@ -63,14 +66,15 @@ import {
   updateNativeChatComposerDraft,
   structuredAgentSessionDraftScopeKey
 } from './native-chat-composer-draft-store'
+import { reportStructuredSessionUserInput } from '@/lib/worker-terminal-takeover-report'
 import { emitNativeChatMessageSent } from '@/lib/native-chat-telemetry'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { agentSessionFailureWords } from '../../../../shared/agent-session/failures/agent-session-failure-words'
-import { agentJournalItemKey } from '../../../../shared/agent-session/journal/agent-session-journal-item-key'
+import { agentSessionFailureWords } from '../../../../shared/agent-session-failure-words'
+import { agentJournalItemKey } from '../../../../shared/agent-session-journal-item-key'
 import type {
   AgentJournalRenderItem,
   AgentJournalSubmission
-} from '../../../../shared/agent-session/journal/agent-session-journal-types'
+} from '../../../../shared/agent-session-journal-types'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import {
   NativeChatInterruptedContinueButton,
@@ -376,14 +380,7 @@ it('keeps the draft through Continue admission, refusal, uncertainty and recorde
       fence: 1,
       submissions: [],
       queuedMessageIds: [],
-      queue: {
-        capability: 'unsupported',
-        followUpsQueue: false,
-        isWorking: false,
-        stopping: false,
-        session: {},
-        prompts: []
-      },
+      queue: { capability: 'unsupported', enabled: false },
       historyLoaded: false,
       sendOptions: () => options
     })
@@ -442,6 +439,7 @@ it('keeps the draft through Continue admission, refusal, uncertainty and recorde
     }
   ])
   expect(reveal).toHaveBeenCalledOnce()
+  expect(reportStructuredSessionUserInput).toHaveBeenCalledWith('session-1', 'studio-mac')
   expect(emitNativeChatMessageSent).toHaveBeenCalledWith({ agent: 'codex', runtime: 'remote' })
   await act(async () =>
     answer.resolve({

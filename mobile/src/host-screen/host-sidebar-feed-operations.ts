@@ -5,7 +5,7 @@ import { bindDeferredRpcOperation, defineRpcOperation } from '../transport/rpc-o
 import { rpcResultVariant } from '../transport/rpc-operation-result-reader'
 import { isMobileMethodUnavailableError } from '../transport/mobile-method-unavailable'
 import type { RpcResponse } from '../transport/types'
-import type { UnvalidatedRpcRequestPort } from '../transport/unvalidated-rpc-request-port'
+import type { RpcClient } from '../transport/rpc-client'
 
 // Only ORCA_SIDEBAR_INPUTS=main pages read this feed; method_not_found or an older allowlist’s forbidden means the page is newer than the host.
 
@@ -67,7 +67,7 @@ export function readHostMethodReply<Value>(
   }
 }
 
-export function hostSidebarFeedTransport(client: UnvalidatedRpcRequestPort): SidebarFeedTransport {
+export function hostSidebarFeedTransport(client: RpcClient): SidebarFeedTransport {
   return async (params) => {
     const read = readHostMethodReply(
       await sidebarInputsRead.request(client, params),

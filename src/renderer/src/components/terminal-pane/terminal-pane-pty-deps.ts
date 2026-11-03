@@ -89,9 +89,6 @@ export function createTerminalPanePtyDeps(args: {
       }
     },
     recordPaneMode2031Subscription: (paneId, mode) => {
-      if (deps.paneMode2031Ref.current.get(paneId)) {
-        return
-      }
       deps.paneMode2031Ref.current.set(paneId, true)
       deps.paneLastThemeModeRef.current.set(paneId, mode)
     },

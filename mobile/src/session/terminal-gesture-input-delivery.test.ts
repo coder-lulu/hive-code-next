@@ -13,6 +13,9 @@ vi.mock('../terminal/mobile-terminal-operations', () => ({
   },
   terminalBufferClear: {}
 }))
+vi.mock('../terminal/worker-terminal-takeover-report', () => ({
+  reportWorkerTerminalUserInput: vi.fn()
+}))
 
 const handle = 'term-gesture'
 const up = '\x1b[A'

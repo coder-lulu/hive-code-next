@@ -96,7 +96,7 @@ const styles = themedStyleSheet(() => ({
   container: {
     width: '100%',
     backgroundColor: colors.bgPanel,
-    borderRadius: radii.surface,
+    borderRadius: radii.card,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle,
     paddingVertical: spacing.sm,

@@ -47,7 +47,6 @@ function find(
     automationId: 'auto-1',
     agentId: 'claude',
     worktreeId: 'wt-1',
-    target: { hostId: 'local', repoId: 'repo-1', path: '/repo' },
     currentRunId: 'run-current',
     runs,
     agentStatusForPane: (paneKey) => statusesByPaneKey.get(paneKey),

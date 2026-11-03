@@ -149,8 +149,7 @@ export function installDesktopBrowserBridge(options: {
             rendererResolveRemoteCliWorkspace(getMainWindow, {
               environmentId: candidate.environmentId,
               ...(scope.workspaceId ? { workspaceId: scope.workspaceId } : {}),
-              // The renderer knows tabs, not the popups they open.
-              ...(scope.page ? { pageId: browserManager.getOwningTabIdForPage(scope.page) } : {})
+              ...(scope.page ? { pageId: scope.page } : {})
             }),
           markWorkspaceDriven: markRemoteCliDrivenWorkspace,
           isHostBrowsingRouted: () => isSshTargetBrowsingRouted(candidate.targetId),

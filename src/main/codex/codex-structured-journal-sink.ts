@@ -1,8 +1,8 @@
 import type {
   AgentJournalItemBody,
+  AgentJournalItemIdentity,
   AgentJournalRowAttribution
-} from '../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentJournalItemIdentity } from '../../shared/agent-session/journal/agent-session-journal-identity'
+} from '../../shared/agent-session-journal-types'
 import type {
   StructuredAgentSessionItemAppendOptions,
   StructuredAgentSessionEventSink,

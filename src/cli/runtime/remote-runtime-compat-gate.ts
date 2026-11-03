@@ -1,13 +1,10 @@
-import type { PairingOffer } from '../../shared/pairing'
+import type { PairedRuntimeConnection } from '../../shared/paired-runtime-connection'
 import { describeRuntimeCompatBlock, evaluateRuntimeCompat } from '../../shared/protocol-compat'
 import {
   MIN_COMPATIBLE_RUNTIME_SERVER_VERSION,
   RUNTIME_PROTOCOL_VERSION
 } from '../../shared/protocol-version'
-import type {
-  RuntimeRequestSelection,
-  RuntimeOrchestrationEnvelope
-} from '../../shared/runtime-rpc-envelope'
+import type { RuntimeOrchestrationEnvelope } from '../../shared/runtime-rpc-envelope'
 import type { RuntimeStatus } from '../../shared/runtime-types'
 import { markEnvironmentUsed } from './environments'
 import { RuntimeClientError, RuntimeRpcFailureError, type RuntimeRpcResponse } from './types'
@@ -31,14 +28,13 @@ export class RemoteRuntimeCompatGate {
 
   send<TResult>(args: {
     transport: WebSocketTransport
-    connection: PairingOffer
+    connection: PairedRuntimeConnection
     method: string
     params: unknown
     timeoutMs: number
     envelope?: RuntimeOrchestrationEnvelope
-    requestSelection?: RuntimeRequestSelection
   }): Promise<RuntimeRpcResponse<TResult>> {
-    if (!args.requestSelection && (this.checked || args.method === 'status.get')) {
+    if (this.checked || args.method === 'status.get') {
       return args.transport.sendWebSocketRequest<TResult>(
         args.connection,
         args.method,
@@ -63,8 +59,7 @@ export class RemoteRuntimeCompatGate {
           })
         }
       },
-      args.envelope,
-      args.requestSelection
+      args.envelope
     )
   }
 

@@ -9,13 +9,11 @@ import {
   type MobileAgentLaunchAvailability
 } from './mobile-agent-launch-availability'
 
-export type PrAiTriageKey = 'fix-checks' | 'resolve-conflicts' | 'resolve-comments'
+export type PrAiTriageKey = 'fix-checks' | 'resolve-conflicts'
 
 const TRIAGE_LAUNCH = {
   'fix-checks': { actionId: 'fixChecks', launchSource: 'task_page' },
-  'resolve-conflicts': { actionId: 'resolveConflicts', launchSource: 'conflict_resolution' },
-  // Desktop's Resolve comments with AI action and launch source.
-  'resolve-comments': { actionId: 'resolveComments', launchSource: 'task_page' }
+  'resolve-conflicts': { actionId: 'resolveConflicts', launchSource: 'conflict_resolution' }
 } as const
 
 export type PrAiTriageLaunchNotice = {

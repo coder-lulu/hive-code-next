@@ -1,8 +1,7 @@
-import type { RuntimeTerminalCreate } from '../../shared/runtime-terminal-create-contract'
 import { randomUUID } from 'node:crypto'
-import { createStructuredAgentSessionOperationId } from '../../shared/agent-session/lifecycle/structured-agent-session-mutation'
-import { structuredAgentSessionSendBody } from '../../shared/agent-session/requests/structured-agent-session-send-mutation'
-import type { StructuredAgentSessionFirstMessage } from '../../shared/agent-session/structured-agent-session-create'
+import { createStructuredAgentSessionOperationId } from '../../shared/structured-agent-session-mutation'
+import { structuredAgentSessionSendBody } from '../../shared/structured-agent-session-send-mutation'
+import type { StructuredAgentSessionFirstMessage } from '../../shared/structured-agent-session-create'
 import type {
   AgentLaunchIntent,
   AgentLaunchPromptDisposal,
@@ -67,20 +66,14 @@ export async function settleLaunchPromptDisposal(
   if (created.promptRodeLaunchCommand) {
     return HANDED_TO_TERMINAL
   }
-  return deliverTerminalLaunchPrompt(execution, created.outcome.handle, {
-    freshLaunch: true,
-    terminalCreation: created.terminalCreation
-  })
+  return deliverTerminalLaunchPrompt(execution, created.outcome.handle, { freshLaunch: true })
 }
 
 /** PTY writes prove handoff, not consumption; drafts remain undelivered because acceptance is unobservable. */
 export async function deliverTerminalLaunchPrompt(
   execution: AgentLaunchSurfaceExecution,
   handle: string,
-  {
-    freshLaunch,
-    terminalCreation
-  }: { freshLaunch: boolean; terminalCreation?: RuntimeTerminalCreate }
+  { freshLaunch }: { freshLaunch: boolean }
 ): Promise<AgentLaunchPromptDisposal> {
   const { intent, surfaces, signal } = execution
   if (!intent.prompt || intent.prompt.delivery !== 'submit' || signal?.aborted) {
@@ -90,7 +83,6 @@ export async function deliverTerminalLaunchPrompt(
     handle,
     agent: intent.agent,
     freshLaunch,
-    terminalCreation,
     prompt: intent.prompt,
     ...(signal ? { signal } : {})
   })

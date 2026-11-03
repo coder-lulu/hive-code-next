@@ -1,7 +1,9 @@
 import type { AgentType } from '../../../../shared/agent-status-types'
-import { createClaudeCatalogOptions } from '../../../../shared/agent-session/options/agent-session-option-catalog-claude-codex'
-import type { CatalogModel } from '../../../../shared/agent-session/options/agent-session-option-catalog-types'
-import { catalogModelsFromModelDiscovery } from '../../../../shared/native-chat/input/native-chat-discovered-catalog-models'
+import {
+  createClaudeCatalogOptions,
+  type CatalogModel
+} from '../../../../shared/agent-session-option-catalog'
+import { catalogModelsFromModelDiscovery } from '../../../../shared/native-chat-discovered-catalog-models'
 import {
   getCommitMessageModelDiscoveryHostKeyForLocalRuntime,
   getCommitMessageModelDiscoveryHostKeyForScope,
@@ -20,7 +22,7 @@ import { callStructuredAgentSession } from '@/runtime/structured-agent-session-c
 import type {
   AgentSessionModelCatalogResult,
   AgentSessionModelOption
-} from '../../../../shared/agent-session/agent-session-wire'
+} from '../../../../shared/agent-session-wire'
 import { useAppStore } from '@/store'
 import { findKnownWorktreeById } from '@/store/slices/worktrees/listing/detected-worktree-meta'
 

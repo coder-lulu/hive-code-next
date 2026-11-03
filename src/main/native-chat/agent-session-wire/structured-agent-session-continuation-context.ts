@@ -1,10 +1,10 @@
 import { projectSavedChatContextItems } from '../agent-session-saved-prompt-text'
-import type { AgentJournalCursor } from '../../../shared/agent-session/journal/agent-session-journal-identity'
-import type { AgentSessionContinuationContext } from '../../../shared/agent-session/agent-session-wire'
-import { agentSessionCurrentContextRows } from '../../../shared/agent-session/agent-session-context-clear'
-import { buildAgentSessionHandoffContext } from '../../../shared/agent-session-handoff-context'
+import type { AgentJournalCursor } from '../../../shared/agent-session-journal-types'
+import type { AgentSessionContinuationContext } from '../../../shared/agent-session-wire'
+import { agentSessionCurrentContextRows } from '../../../shared/agent-session-context-clear'
+import { trimAgentSessionContext } from '../../../shared/agent-session-context-budget'
 import { LOCAL_EXECUTION_HOST_ID } from '../../../shared/execution-host'
-import { projectStructuredAgentSessionMessages } from '../../../shared/agent-session/view/structured-agent-session-message-projection'
+import { projectStructuredAgentSessionMessages } from '../../../shared/structured-agent-session-message-projection'
 import { formatWorkerTranscriptMessage } from '../../../shared/worker-transcript-text'
 import { toLinuxPath } from '../../../shared/wsl-paths'
 import { writeAgentSessionContextSnapshot } from '../agent-session-context-snapshots'
@@ -43,14 +43,15 @@ export function continuationContextReader(
       return { status: 'superseded' }
     }
     const context = agentSessionCurrentContextRows(snapshot.items, snapshot.submissions)
-    const messages = projectStructuredAgentSessionMessages(
+    const text = projectStructuredAgentSessionMessages(
       context.items,
       [],
       context.submissions,
       projectSavedChatContextItems
     )
-    const capturedText = buildAgentSessionHandoffContext(messages)
-    const text = messages.map(formatWorkerTranscriptMessage).join('\n\n')
+      .map(formatWorkerTranscriptMessage)
+      .join('\n\n')
+    const capturedText = trimAgentSessionContext(text, 'saved chat messages')
     if (!text.trim()) {
       return { status: 'current', capturedText: '' }
     }

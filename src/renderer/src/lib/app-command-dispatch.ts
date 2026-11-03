@@ -1,10 +1,6 @@
 import { isKeybindingActionId, type KeybindingActionId } from '../../../shared/keybindings'
 
-export type AppCommandSource =
-  | 'plugin-keybinding'
-  | 'plugin-palette'
-  | 'plugin-host'
-  | 'plugin-replacement'
+export type AppCommandSource = 'plugin-keybinding' | 'plugin-palette'
 export type AppCommandDispatcher = (
   actionId: KeybindingActionId,
   source: AppCommandSource
@@ -21,7 +17,6 @@ export function registerAppCommandDispatcher(dispatcher: AppCommandDispatcher): 
   }
 }
 
-/** Runs Orca's own handler for the action; plugin commands that replace it never run here. */
 export function dispatchAppCommand(actionId: string, source: AppCommandSource): boolean {
   return isKeybindingActionId(actionId) && currentDispatcher !== null
     ? currentDispatcher(actionId, source)

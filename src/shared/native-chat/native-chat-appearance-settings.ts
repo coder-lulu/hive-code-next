@@ -1,4 +1,4 @@
-import type { NativeChatProviderChoices } from './native-chat-providers'
+import type { TuiAgent } from '../tui-agent'
 
 export type NativeChatAppearanceSettings = {
   /** Absent follows the IDE font. */
@@ -15,16 +15,12 @@ export type NativeChatAppearanceSettings = {
   matchTerminalInterface?: boolean
 }
 
-export type AgentDefaultSurface = 'chat' | 'terminal'
-
 export type NativeChatGlobalSettings = {
-  /** Unlisted agents follow this default; absent means terminal. */
-  agentDefaultSurface?: AgentDefaultSurface
   nativeChatAppearance?: NativeChatAppearanceSettings
   /** Off keeps chats unnamed without running a naming agent. Absent means on. */
   nativeChatAutoName?: boolean
-  /** Explicit per-agent overrides of the default surface. */
-  nativeChatProviders?: NativeChatProviderChoices
+  /** Explicit chat provider choices; unlisted agents retain the chat launch default. */
+  nativeChatProviders?: Partial<Record<TuiAgent, boolean>>
 }
 
 export const DEFAULT_NATIVE_CHAT_FONT_SIZE = 14

@@ -6,8 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'
-import { useImmediateMutation } from '@/hooks/useIssueMetadata'
-import { useRepoAssignees } from '@/hooks/useGitHubRepoMetadata'
+import { useImmediateMutation, useRepoAssignees } from '@/hooks/useIssueMetadata'
 import { useRepoAssigneesBySlug } from '@/hooks/useGitHubSlugMetadata'
 import { getGitHubRepoRoutingTarget } from '@/lib/github-source-runtime-context'
 import {
@@ -85,10 +84,10 @@ export function PRAssigneesPanel({
   const repoAssigneesByPath = useRepoAssignees(
     usesSlug ? null : repoPath,
     usesSlug ? null : item.repoId,
-    { target: ownerTarget, ownerRepo: prRepo }
+    { target: ownerTarget }
   )
-  const repoAssignees = usesSlug ? repoAssigneesBySlug : repoAssigneesByPath
-  const canEditAssignees = Boolean(projectOrigin || repoPath || ownerTarget.kind === 'environment')
+  const repoAssignees = slugOwner && slugRepo ? repoAssigneesBySlug : repoAssigneesByPath
+  const canEditAssignees = Boolean(projectOrigin || repoPath)
   const assigneesByLogin = useMemo(
     () => new Map(repoAssignees.data.map((user) => [user.login.toLowerCase(), user])),
     [repoAssignees.data]
@@ -114,7 +113,6 @@ export function PRAssigneesPanel({
             sourceContext,
             projectOrigin,
             issueRepo: prRepo,
-            type: item.type,
             number: item.number,
             updates: isAssigned ? { removeAssignees: [login] } : { addAssignees: [login] }
           }),
@@ -138,14 +136,11 @@ export function PRAssigneesPanel({
           useAppStore.getState().recordFeatureInteraction('github-tasks')
           onMutated()
         },
-        onError: (err) => {
-          toast.error(err)
-        }
+        onError: (err) => toast.error(err)
       })
     },
     [
       assigneesByLogin,
-      item.type,
       item.id,
       item.number,
       item.repoId,

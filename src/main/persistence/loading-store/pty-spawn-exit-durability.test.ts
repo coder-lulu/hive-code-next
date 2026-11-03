@@ -1,8 +1,6 @@
-import { formatTerminalStartFailure } from '../../../shared/terminal-start-failure'
-import { requireAcceptedSpawn } from '../../ipc/pty/spawn-outcome'
 import { SessionNotFoundError } from '../../daemon/daemon-errors'
 import { completePaneAdoption } from '../../ipc/pty/pane/complete-pane-adoption'
-import { LocalPtyProvider } from '../../providers/local-pty/local-pty-provider'
+import { LocalPtyProvider } from '../../providers/local-pty-provider'
 import { adoptStablePane } from '../../ipc/pty/pane/adopt-stable'
 import * as providerRegistry from '../../ipc/pty/provider/registry'
 import { bindProviderListeners } from '../../ipc/pty/provider/bind-listeners'
@@ -36,9 +34,7 @@ vi.mock('../../ssh/config/ssh-config-parser', () => ({
 it.each(
   [
     { controller: 'runtime', exitCode: 0 },
-    { controller: 'ipc', exitCode: -1 },
-    { controller: 'runtime', exitCode: 256 },
-    { controller: 'ipc', exitCode: 256 }
+    { controller: 'ipc', exitCode: -1 }
   ].flatMap((test) => [
     { ...test, stableOwner: false },
     { ...test, stableOwner: true }
@@ -70,7 +66,7 @@ it.each(
       runtime.onPtySpawned(binding.ptyId, binding.incarnationId)
       runtime.beginPtyRegistration(binding.ptyId, binding.incarnationId)
     }
-    let commit: () => Promise<Awaited<ReturnType<typeof commitRuntimePtySpawn>> | undefined>
+    let commit: () => Promise<unknown>
     if (owner) {
       const provider = new LocalPtyProvider()
       vi.spyOn(provider, 'spawn').mockResolvedValue({
@@ -111,8 +107,7 @@ it.each(
       commit = () => commitPtyIpcSpawn(ctx)
     }
     const gate = authority.pause()
-    const operation = commit()
-    const pending = expect(operation).resolves.toMatchObject({
+    const pending = expect(commit()).resolves.toMatchObject({
       kind: 'registration-exited',
       result: { id: binding.ptyId, incarnationId: binding.incarnationId }
     })
@@ -120,31 +115,10 @@ it.each(
     clearProviderPtyState(binding.ptyId)
     ptyOwnership.delete(binding.ptyId)
     await runtime.onPtyExit(binding.ptyId, exitCode, binding.incarnationId, {
-      providerExitObserved: true,
-      ...(exitCode > 0
-        ? {
-            cause: {
-              kind: 'exited' as const,
-              exitCode,
-              initialOutputDiagnostic: 'git-bash-console-capacity' as const
-            }
-          }
-        : {})
+      providerExitObserved: true
     })
     gate.finish.resolve()
     await pending
-    const outcome = await operation
-    if (!outcome) {
-      throw new Error('missing registration outcome')
-    }
-    let failure: unknown
-    try {
-      requireAcceptedSpawn(outcome)
-    } catch (error) {
-      failure = error
-    }
-    expect(failure).toMatchObject({ message: 'agent_session_exited_during_start' })
-    expect(formatTerminalStartFailure(failure) !== undefined).toBe(!stableOwner && exitCode > 0)
     expect(ptyOwnership.has(binding.ptyId)).toBe(false)
     expect(ptyIncarnationById.has(binding.ptyId)).toBe(false)
     expect(ptySizes.has(binding.ptyId)).toBe(false)
@@ -183,7 +157,6 @@ it.each(['replacement-pty', binding.ptyId])(
         runtime,
         store,
         undefined,
-        undefined,
         binding.ptyId,
         binding.worktreeId,
         null,
@@ -211,7 +184,6 @@ it('retains the binding when loss of contact supplies no process-exit proof', as
       runtime,
       store,
       undefined,
-      undefined,
       binding.ptyId,
       binding.worktreeId,
       null,
@@ -236,7 +208,6 @@ it('does not settle rejected registration until its exit cleanup reaches SQLite'
   const cleanup = registerPersistedPtySpawn(
     runtime,
     store,
-    undefined,
     undefined,
     binding.ptyId,
     binding.worktreeId,
@@ -275,7 +246,6 @@ it('keeps successful registration synchronous through the remaining spawn public
     registerPersistedPtySpawn(
       runtime,
       store,
-      undefined,
       undefined,
       binding.ptyId,
       binding.worktreeId,

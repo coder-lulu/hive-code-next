@@ -1,16 +1,14 @@
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import {
   getStructuredAgentSessionLaunchResumes,
-  subscribeStructuredAgentLaunchStatus,
+  relaunchFailedStructuredAgentSessionForMessage,
+  retryStructuredAgentSessionLaunch,
   useStructuredAgentSessionLaunchFailure,
   useStructuredAgentSessionLaunchLifecycle
-} from '@/lib/agent-session/launch/structured-agent-session-launch-registry'
-import {
-  relaunchFailedStructuredAgentSessionForMessage,
-  retryStructuredAgentSessionLaunch
-} from '@/lib/agent-session/launch/structured-agent-session-launch'
-import { getStructuredAgentSessionLaunchSelection } from '@/lib/agent-session/launch/structured-agent-session-launch-options'
-import { relaunchFailedStructuredAgentSessionWithMessage } from '@/lib/agent-session/launch/structured-agent-session-launch-message'
+} from '@/lib/structured-agent-session-launch'
+import { getStructuredAgentSessionLaunchSelection } from '@/lib/structured-agent-session-launch-options'
+import { subscribeStructuredAgentLaunchStatus } from '@/lib/agent-session/launch/structured-agent-session-launch-registry'
+import { relaunchFailedStructuredAgentSessionWithMessage } from '@/lib/structured-agent-session-launch-message'
 import { toRuntimeWorktreeSelector } from '@/runtime/runtime-worktree-selector'
 
 export type StructuredAgentSessionLaunchView = {

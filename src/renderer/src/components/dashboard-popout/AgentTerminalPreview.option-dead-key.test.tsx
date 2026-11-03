@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 
 import { cleanup, render, waitFor } from '@testing-library/react'
-import type { ITerminalOptions } from '@xterm/xterm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 type PreviewTerminal = {
@@ -33,7 +32,6 @@ vi.mock('@xterm/xterm', () => ({
     paste = vi.fn()
     input = vi.fn()
     loadAddon = vi.fn()
-    options: ITerminalOptions = {}
     attachCustomWheelEventHandler = vi.fn()
     scrollToTop = vi.fn()
     scrollToBottom = vi.fn()

@@ -4,7 +4,7 @@
   "family": "session.terminal-inventory",
   "namedDeltas": [],
   "values": {
-    "14a430a3a1d8": {
+    "25453c36879e": {
       "name": "terminal.list#1",
       "ordinal": 1,
       "args": [
@@ -15,7 +15,39 @@
         {
           "name": "params",
           "value": {
-            "includePreview": false,
+            "includeVisualLayouts": false,
+            "worktree": "id:workspace-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "rejected",
+        "startedAt": 0,
+        "settledAt": 0,
+        "error": {
+          "category": "Error",
+          "message": "transport failure",
+          "isRpcDeliveryUnknown": true
+        }
+      }
+    },
+    "27eeab567046": {
+      "name": "terminal.list#1",
+      "ordinal": 1,
+      "args": [
+        {
+          "name": "method",
+          "value": "terminal.list"
+        },
+        {
+          "name": "params",
+          "value": {
             "includeVisualLayouts": false,
             "worktree": "id:workspace-1"
           }
@@ -37,7 +69,7 @@
         }
       }
     },
-    "35d7b6bba435": {
+    "29bb18e90af9": {
       "name": "terminal.list#1",
       "ordinal": 1,
       "args": [
@@ -48,41 +80,6 @@
         {
           "name": "params",
           "value": {
-            "includePreview": false,
-            "includeVisualLayouts": false,
-            "worktree": "id:workspace-1"
-          }
-        },
-        {
-          "name": "options",
-          "value": {
-            "$rpc": "absent"
-          }
-        }
-      ],
-      "settlement": {
-        "status": "rejected",
-        "startedAt": 0,
-        "settledAt": 0,
-        "error": {
-          "category": "Error",
-          "message": "",
-          "isRpcDeliveryUnknown": true
-        }
-      }
-    },
-    "388035b7e5f3": {
-      "name": "terminal.list#1",
-      "ordinal": 1,
-      "args": [
-        {
-          "name": "method",
-          "value": "terminal.list"
-        },
-        {
-          "name": "params",
-          "value": {
-            "includePreview": false,
             "includeVisualLayouts": false,
             "worktree": "id:workspace-1"
           }
@@ -102,13 +99,17 @@
           "id": "frame-1",
           "ok": true,
           "result": {
-            "error": "inner refused",
-            "ok": false
+            "$rpc": "null"
           }
         }
       }
     },
-    "3a81bbc23680": {
+    "34f7b35ae07c": {
+      "name": "terminal.list#1",
+      "ordinal": 2,
+      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"terminal.list\",\"params\":{\"worktree\":\"id:workspace-1\",\"includeVisualLayouts\":false}}"
+    },
+    "5275a5541242": {
       "name": "terminal.list#1",
       "ordinal": 1,
       "args": [
@@ -119,7 +120,44 @@
         {
           "name": "params",
           "value": {
-            "includePreview": false,
+            "includeVisualLayouts": false,
+            "worktree": "id:workspace-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-1",
+          "ok": true,
+          "result": {
+            "error": {
+              "message": "inner refused"
+            },
+            "ok": false
+          }
+        }
+      }
+    },
+    "66484eee6d69": {
+      "name": "terminal.list#1",
+      "ordinal": 1,
+      "args": [
+        {
+          "name": "method",
+          "value": "terminal.list"
+        },
+        {
+          "name": "params",
+          "value": {
             "includeVisualLayouts": false,
             "worktree": "id:workspace-1"
           }
@@ -145,15 +183,54 @@
         }
       }
     },
-    "475f23d61c0e": {
-      "name": "terminal.list#1",
-      "ordinal": 2,
-      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"terminal.list\",\"params\":{\"worktree\":\"id:workspace-1\",\"includeVisualLayouts\":false,\"includePreview\":false}}"
-    },
     "66f849b2483e": {
       "name": "prune-live-input",
       "ordinal": 3,
       "value": ["terminal-1", "terminal-2"]
+    },
+    "6948ec0dbe98": {
+      "name": "terminal.list#1",
+      "ordinal": 1,
+      "args": [
+        {
+          "name": "method",
+          "value": "terminal.list"
+        },
+        {
+          "name": "params",
+          "value": {
+            "includeVisualLayouts": false,
+            "worktree": "id:workspace-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "id": "frame-1",
+          "ok": true,
+          "result": {
+            "terminals": [
+              {
+                "handle": "terminal-1",
+                "title": "one"
+              },
+              {
+                "handle": "terminal-2",
+                "title": "two"
+              }
+            ]
+          }
+        }
+      }
     },
     "6aa9d70c1c82": {
       "known": [],
@@ -193,13 +270,7 @@
         }
       ]
     },
-    "7ed3d39f0607": {
-      "status": "fulfilled",
-      "startedAt": 0,
-      "settledAt": 0,
-      "value": false
-    },
-    "7f0b8dfaa8ab": {
+    "766389d41deb": {
       "name": "terminal.list#1",
       "ordinal": 1,
       "args": [
@@ -210,89 +281,6 @@
         {
           "name": "params",
           "value": {
-            "includePreview": false,
-            "includeVisualLayouts": false,
-            "worktree": "id:workspace-1"
-          }
-        },
-        {
-          "name": "options",
-          "value": {
-            "$rpc": "absent"
-          }
-        }
-      ],
-      "settlement": {
-        "status": "fulfilled",
-        "startedAt": 0,
-        "settledAt": 0,
-        "value": {
-          "id": "frame-1",
-          "ok": true,
-          "result": {
-            "error": {
-              "message": "inner refused"
-            },
-            "ok": false
-          }
-        }
-      }
-    },
-    "831f677b9b45": {
-      "name": "terminal.list#1",
-      "ordinal": 1,
-      "args": [
-        {
-          "name": "method",
-          "value": "terminal.list"
-        },
-        {
-          "name": "params",
-          "value": {
-            "includePreview": false,
-            "includeVisualLayouts": false,
-            "worktree": "id:workspace-1"
-          }
-        },
-        {
-          "name": "options",
-          "value": {
-            "$rpc": "absent"
-          }
-        }
-      ],
-      "settlement": {
-        "status": "fulfilled",
-        "startedAt": 0,
-        "settledAt": 0,
-        "value": {
-          "error": {
-            "code": "method_not_found",
-            "message": "Unknown method"
-          },
-          "id": "frame-1",
-          "ok": false
-        }
-      }
-    },
-    "84e5ca07cb7a": {
-      "status": "fulfilled",
-      "startedAt": 0,
-      "settledAt": 0,
-      "value": true
-    },
-    "8603cded4ca5": {
-      "name": "terminal.list#1",
-      "ordinal": 1,
-      "args": [
-        {
-          "name": "method",
-          "value": "terminal.list"
-        },
-        {
-          "name": "params",
-          "value": {
-            "includePreview": false,
             "includeVisualLayouts": false,
             "worktree": "id:workspace-1"
           }
@@ -318,12 +306,19 @@
         }
       }
     },
-    "8d0d6d7c8b3b": {
-      "name": "default-live-input",
-      "ordinal": 4,
-      "value": ["terminal-1", "terminal-2"]
+    "7ed3d39f0607": {
+      "status": "fulfilled",
+      "startedAt": 0,
+      "settledAt": 0,
+      "value": false
     },
-    "b0ac4558f32f": {
+    "84e5ca07cb7a": {
+      "status": "fulfilled",
+      "startedAt": 0,
+      "settledAt": 0,
+      "value": true
+    },
+    "8745f8efeebd": {
       "name": "terminal.list#1",
       "ordinal": 1,
       "args": [
@@ -334,41 +329,6 @@
         {
           "name": "params",
           "value": {
-            "includePreview": false,
-            "includeVisualLayouts": false,
-            "worktree": "id:workspace-1"
-          }
-        },
-        {
-          "name": "options",
-          "value": {
-            "$rpc": "absent"
-          }
-        }
-      ],
-      "settlement": {
-        "status": "rejected",
-        "startedAt": 0,
-        "settledAt": 0,
-        "error": {
-          "category": "Error",
-          "message": "transport failure",
-          "isRpcDeliveryUnknown": true
-        }
-      }
-    },
-    "b1c05000c17a": {
-      "name": "terminal.list#1",
-      "ordinal": 1,
-      "args": [
-        {
-          "name": "method",
-          "value": "terminal.list"
-        },
-        {
-          "name": "params",
-          "value": {
-            "includePreview": false,
             "includeVisualLayouts": false,
             "worktree": "id:workspace-1"
           }
@@ -393,7 +353,12 @@
         }
       }
     },
-    "ea8f0bd05dca": {
+    "8d0d6d7c8b3b": {
+      "name": "default-live-input",
+      "ordinal": 4,
+      "value": ["terminal-1", "terminal-2"]
+    },
+    "9e94136c0512": {
       "name": "terminal.list#1",
       "ordinal": 1,
       "args": [
@@ -404,7 +369,42 @@
         {
           "name": "params",
           "value": {
-            "includePreview": false,
+            "includeVisualLayouts": false,
+            "worktree": "id:workspace-1"
+          }
+        },
+        {
+          "name": "options",
+          "value": {
+            "$rpc": "absent"
+          }
+        }
+      ],
+      "settlement": {
+        "status": "fulfilled",
+        "startedAt": 0,
+        "settledAt": 0,
+        "value": {
+          "error": {
+            "code": "method_not_found",
+            "message": "Unknown method"
+          },
+          "id": "frame-1",
+          "ok": false
+        }
+      }
+    },
+    "ba46aeaff0e3": {
+      "name": "terminal.list#1",
+      "ordinal": 1,
+      "args": [
+        {
+          "name": "method",
+          "value": "terminal.list"
+        },
+        {
+          "name": "params",
+          "value": {
             "includeVisualLayouts": false,
             "worktree": "id:workspace-1"
           }
@@ -424,12 +424,13 @@
           "id": "frame-1",
           "ok": true,
           "result": {
-            "$rpc": "null"
+            "error": "inner refused",
+            "ok": false
           }
         }
       }
     },
-    "ee68ebc5fb96": {
+    "dfa243637f21": {
       "name": "terminal.list#1",
       "ordinal": 1,
       "args": [
@@ -440,7 +441,6 @@
         {
           "name": "params",
           "value": {
-            "includePreview": false,
             "includeVisualLayouts": false,
             "worktree": "id:workspace-1"
           }
@@ -453,24 +453,13 @@
         }
       ],
       "settlement": {
-        "status": "fulfilled",
+        "status": "rejected",
         "startedAt": 0,
         "settledAt": 0,
-        "value": {
-          "id": "frame-1",
-          "ok": true,
-          "result": {
-            "terminals": [
-              {
-                "handle": "terminal-1",
-                "title": "one"
-              },
-              {
-                "handle": "terminal-2",
-                "title": "two"
-              }
-            ]
-          }
+        "error": {
+          "category": "Error",
+          "message": "",
+          "isRpcDeliveryUnknown": true
         }
       }
     }
@@ -481,8 +470,8 @@
       {
         "id": "session-terminal-list-merged.normal:listed",
         "observation": {
-          "sender": ["ee68ebc5fb96"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["6948ec0dbe98"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "84e5ca07cb7a"
           },
@@ -493,8 +482,8 @@
       {
         "id": "session-terminal-list-merged.result-absent:listed",
         "observation": {
-          "sender": ["14a430a3a1d8"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["27eeab567046"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },
@@ -505,8 +494,8 @@
       {
         "id": "session-terminal-list-merged.result-null:listed",
         "observation": {
-          "sender": ["ea8f0bd05dca"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["29bb18e90af9"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },
@@ -517,8 +506,8 @@
       {
         "id": "session-terminal-list-merged.inner-ok-missing:listed",
         "observation": {
-          "sender": ["b1c05000c17a"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["8745f8efeebd"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },
@@ -529,8 +518,8 @@
       {
         "id": "session-terminal-list-merged.inner-false-string-error:listed",
         "observation": {
-          "sender": ["388035b7e5f3"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["ba46aeaff0e3"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },
@@ -541,8 +530,8 @@
       {
         "id": "session-terminal-list-merged.inner-false-object-error:listed",
         "observation": {
-          "sender": ["7f0b8dfaa8ab"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["5275a5541242"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },
@@ -553,8 +542,8 @@
       {
         "id": "session-terminal-list-merged.outer-refused:listed",
         "observation": {
-          "sender": ["3a81bbc23680"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["66484eee6d69"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },
@@ -565,8 +554,8 @@
       {
         "id": "session-terminal-list-merged.outer-refused-no-message:listed",
         "observation": {
-          "sender": ["8603cded4ca5"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["766389d41deb"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },
@@ -577,8 +566,8 @@
       {
         "id": "session-terminal-list-merged.method-not-found:listed",
         "observation": {
-          "sender": ["831f677b9b45"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["9e94136c0512"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },
@@ -589,8 +578,8 @@
       {
         "id": "session-terminal-list-merged.transport-rejection:listed",
         "observation": {
-          "sender": ["b0ac4558f32f"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["25453c36879e"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },
@@ -601,8 +590,8 @@
       {
         "id": "session-terminal-list-merged.transport-rejection-no-message:listed",
         "observation": {
-          "sender": ["35d7b6bba435"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["dfa243637f21"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "7ed3d39f0607"
           },

@@ -8,20 +8,6 @@ import type {
 
 export type GitHubItemDialogProjectOrigin = GitHubWorkItemProjectOrigin
 
-export type GitHubWorkItemDetailsArgs = {
-  workItem: GitHubWorkItem | null
-  repoPath: string | null
-  effectiveRepoId: string | null
-  sourceContext?: TaskSourceContext | null
-  initialTab?: ItemDialogTab
-  projectOrigin?: GitHubItemDialogProjectOrigin
-  onRefreshAccepted?: (item: GitHubWorkItem) => void
-  onReviewRequestsChange?: (
-    itemKey: { id: string; repoId: string },
-    reviewRequests: GitHubAssignableUser[]
-  ) => void
-}
-
 export type GitHubItemDialogProps = {
   workItem: GitHubWorkItem | null
   repoPath: string | null
@@ -51,9 +37,7 @@ export type GitHubItemDialogEditSectionProps = {
   onLabelsChange: (labels: string[]) => void
   /** Invalidate the parent’s detail cache after mutation so reopening cannot show stale data during FRESH_MS. */
   onMutated: () => void
-  acceptedRefresh?: number
-  /** Undefined while the item's assignees are still unknown. */
-  assignees?: string[]
+  assignees: string[]
   onUse: (item: GitHubWorkItem) => void
   onOpenOrUse?: (item: GitHubWorkItem) => void
   attachedWorkspaceLabel?: string | null

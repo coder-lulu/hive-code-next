@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type {
   AgentSessionQueuedMessage,
   AgentSessionQueuePause
-} from '../../../../shared/agent-session/requests/agent-session-queued-message-wire'
+} from '../../../../shared/agent-session-wire'
 
 type ResumeParams = { envelope: { clientOperationId: string } }
 

@@ -104,7 +104,6 @@ describe('registerRuntimeEnvironmentHandlers', () => {
     updateSettings: ReturnType<typeof vi.fn>
     removeWorkspaceSessionHost: ReturnType<typeof vi.fn>
     setRemoteLayoutSnapshot: ReturnType<typeof vi.fn>
-    setHostRepoCatalogSnapshot: ReturnType<typeof vi.fn>
   }
 
   beforeEach(() => {
@@ -114,7 +113,6 @@ describe('registerRuntimeEnvironmentHandlers', () => {
       getSettings: () => ({ activeRuntimeEnvironmentId }),
       removeWorkspaceSessionHost: vi.fn(),
       setRemoteLayoutSnapshot: vi.fn(),
-      setHostRepoCatalogSnapshot: vi.fn(),
       updateSettings: vi.fn((updates: { activeRuntimeEnvironmentId: string | null }) => {
         activeRuntimeEnvironmentId = updates.activeRuntimeEnvironmentId
       })
@@ -224,7 +222,6 @@ describe('registerRuntimeEnvironmentHandlers', () => {
       `runtime:${encodeURIComponent(added.environment.id)}`
     )
     expect(store.setRemoteLayoutSnapshot).toHaveBeenCalledWith(added.environment.id, null, 'now')
-    expect(store.setHostRepoCatalogSnapshot).toHaveBeenCalledWith(added.environment.id, null)
     expect(JSON.stringify(removed)).not.toContain('device-token')
     expect(await list(null, undefined)).toEqual([])
   })
@@ -314,7 +311,7 @@ describe('registerRuntimeEnvironmentHandlers', () => {
 
     const result = await add(null, {
       name: 'desk',
-      pairingCode: pairingCode('ws://100.76.32.125:6768', runtimeRecordId)
+      pairingCode: pairingCode('ws://100.76.32.125:6768', { runtimeRecordId })
     })
 
     expect(result.environment).not.toHaveProperty('runtimeRecordId')
@@ -339,7 +336,9 @@ describe('registerRuntimeEnvironmentHandlers', () => {
     await expect(
       verifyAndAdd(null, {
         name: 'desk',
-        pairingCode: pairingCode('ws://100.76.32.125:6768', '123e4567-e89b-42d3-a456-426614174000')
+        pairingCode: pairingCode('ws://100.76.32.125:6768', {
+          runtimeRecordId: '123e4567-e89b-42d3-a456-426614174000'
+        })
       })
     ).resolves.toMatchObject({ ok: false, kind: 'host-identity-mismatch' })
     expect(environmentStore.listEnvironments(userDataPath)).toEqual([])

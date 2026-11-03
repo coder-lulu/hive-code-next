@@ -15,14 +15,8 @@ export class JournalStopMarks {
   constructor(private readonly deps: { state: () => JournalReducerState }) {}
 
   /** One nonthrowing listener, replaced on each call; settle edges do not trigger commits. */
-  observeSettleEdges(listener: () => void): () => void {
-    const registered = () => listener()
-    this.onSettleEdge = registered
-    return () => {
-      if (this.onSettleEdge === registered) {
-        this.onSettleEdge = null
-      }
-    }
+  observeSettleEdges(listener: () => void): void {
+    this.onSettleEdge = listener
   }
 
   latest(): JournalLatestStop | null {

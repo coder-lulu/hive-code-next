@@ -1,7 +1,7 @@
 import '../unused-default-rpc-methods.test-fixture'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { AGENT_LAUNCH_RUNTIME_CAPABILITY } from '../../../../shared/agent-launch-runtime-capability'
-import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../../../shared/agent-session/agent-session-create-capabilities'
+import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../../../shared/agent-session-create-capabilities'
 import {
   createRestTestRig,
   type RestTestRig
@@ -14,6 +14,8 @@ import { CodexAppServerRequestError } from '../../../codex/app-server/codex-app-
 import { executeAgentLaunch } from '../../../agent-launch/agent-launch-executor'
 import { agentLaunchSurfaceFactory } from './agent-launch-surfaces'
 import * as structuredCreate from './structured-agent-session-create'
+import { RuntimeClientSettingsController } from '../../runtime-client-settings'
+import { partialRuntimeStore } from '../../runtime-store-partial-fixture'
 import {
   methodNamed,
   rpcContext,
@@ -69,6 +71,11 @@ afterEach(async () => {
 function launchRuntime(folder = false) {
   const runtime = {
     ...runtimeStub(),
+    getClientSettings: vi.fn(() =>
+      new RuntimeClientSettingsController(
+        partialRuntimeStore({ getSettings: () => ({ nativeChatProviders: {} }) })
+      ).get()
+    ),
     resolveStructuredAgentSessionCreateIntent: vi.fn(async (params: { envelope: unknown }) => ({
       envelope: params.envelope,
       location: {
@@ -369,6 +376,7 @@ it.each(['before', 'after'] as const)(
     if (when === 'before') {
       await expect(running).rejects.toThrow('request_aborted')
       expect(rig.store.getRecord(SESSION)).toBeNull()
+      expect(runtime.publishStructuredAgentSessionTab).not.toHaveBeenCalled()
       expect(rig.adapter.acquire).not.toHaveBeenCalled()
       return
     }

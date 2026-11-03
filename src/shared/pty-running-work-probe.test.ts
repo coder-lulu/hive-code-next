@@ -46,8 +46,7 @@ it.each([
       verdict,
       ...(reason ? { reason } : {}),
       timedOut: false,
-      remote: true,
-      ...(verdict === 'unverifiable' ? {} : { foregroundProcess: 'zsh' })
+      remote: true
     })
     expect(inspect).toHaveBeenCalledWith('remote:owner:pty')
   }
@@ -92,13 +91,7 @@ it('retains input order and unobserved verdicts when only some hosts answer befo
   await vi.advanceTimersByTimeAsync(10)
   const probes = await probing
   expect(probes).toEqual([
-    {
-      ptyId: 'local-pty',
-      verdict: 'live',
-      timedOut: false,
-      remote: false,
-      foregroundProcess: 'zsh'
-    },
+    { ptyId: 'local-pty', verdict: 'live', timedOut: false, remote: false },
     {
       ptyId: 'remote:owner:pty',
       verdict: 'unverifiable',

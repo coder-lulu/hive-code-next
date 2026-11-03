@@ -37,12 +37,7 @@ export function installMultiplexFrameDelivery(state: TerminalMultiplexConnection
       typeof seq === 'number' ? seq : opcode === TerminalStreamOpcode.Output ? 0 : state.cursor++
     let sent: RpcBinarySendResult
     try {
-      sent = sendBinary(
-        encodeTerminalStreamFrame({ opcode, streamId, seq: resolvedSeq, payload }),
-        {
-          compressible: true
-        }
-      )
+      sent = sendBinary(encodeTerminalStreamFrame({ opcode, streamId, seq: resolvedSeq, payload }))
     } catch {
       state.closeMultiplex()
       return false

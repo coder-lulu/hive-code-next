@@ -1,11 +1,5 @@
 import { z } from 'zod'
 import { PLUGIN_MANIFEST_V2_SINCE, pluginFieldDoc } from '../manifest/plugin-schema-field-docs'
-import {
-  tolerantPluginThemeBackgroundRegistration,
-  pluginThemeBackgroundSchema,
-  tolerantPluginThemeBackground,
-  type PluginThemeBackgroundArtifact
-} from './plugin-theme-background'
 
 // Why: this is a public, additive-only theme API. Exposing every main.css
 // variable would make internal renderer refactors plugin-breaking changes.
@@ -46,36 +40,7 @@ export const PLUGIN_APP_THEME_TOKENS = [
   '--worktree-sidebar-accent',
   '--worktree-sidebar-accent-foreground',
   '--worktree-sidebar-border',
-  '--worktree-sidebar-ring',
-  '--worktree-sidebar-active',
-  '--worktree-sidebar-active-border',
-  '--host-badge',
-  '--host-badge-foreground',
-  '--tab-bar',
-  '--tab-active',
-  '--tab-active-foreground',
-  '--tab-active-indicator',
-  '--tab-inactive',
-  '--tab-inactive-foreground',
-  '--split-divider',
-  '--split-divider-hover',
-  '--chat-user-message',
-  '--text-link',
-  '--diff-added',
-  '--diff-added-background',
-  '--diff-added-emphasis',
-  '--diff-added-gutter',
-  '--diff-removed',
-  '--diff-removed-background',
-  '--diff-removed-emphasis',
-  '--diff-removed-gutter',
-  '--git-decoration-added',
-  '--git-decoration-modified',
-  '--git-decoration-deleted',
-  '--git-decoration-renamed',
-  '--git-decoration-untracked',
-  '--git-decoration-copied',
-  '--git-decoration-ignored'
+  '--worktree-sidebar-ring'
 ] as const
 
 const THEME_TOKEN_SET = new Set<string>(PLUGIN_APP_THEME_TOKENS)
@@ -85,11 +50,11 @@ export const PLUGIN_APP_THEME_REQUIRED_TOKENS = ['--background', '--foreground']
 
 // Why: an omitted token would otherwise keep the built-in value and clash with the theme's
 // palette (e.g. a neutral grey selected row on a purple theme). A rule names source tokens
-// (first present wins) or mixes the theme's foreground into its background (or `into`); the
-// renderer's contrast check still drops any derived pair that ends up unreadable.
-export type PluginThemeDerivationRule = readonly string[] | { mixForeground: number; into?: string }
+// (first present wins) or mixes the theme's foreground into its background; the renderer's
+// contrast check still drops any derived pair that ends up unreadable.
+type DerivationRule = readonly string[] | { mixForeground: number }
 
-const DERIVED_TOKENS: Record<string, PluginThemeDerivationRule> = {
+const DERIVED_TOKENS: Record<string, DerivationRule> = {
   '--editor-surface': ['--background'],
   '--card': ['--background'],
   '--card-foreground': ['--foreground'],
@@ -253,10 +218,6 @@ function pluginAppThemeArtifactSchema(strictness: PluginArtifactStrictness) {
     tokenColors: (strictness === 'strict'
       ? tokenColorsSchema
       : z.unknown().transform(tolerantTokenColors)
-    ).optional(),
-    background: (strictness === 'strict'
-      ? pluginThemeBackgroundSchema
-      : z.unknown().transform(tolerantPluginThemeBackground)
     ).optional()
   }
   return (strictness === 'strict' ? z.strictObject(fields) : z.object(fields)).refine(
@@ -283,7 +244,6 @@ const pluginThemeRegistrationSchema = z
       registrationTokenValueSchema
     ),
     tokenColors: tokenColorsSchema.optional(),
-    background: tolerantPluginThemeBackgroundRegistration,
     id: pluginContentIdSchema,
     /** Changes whenever the theme's content does, so a cached paint can be checked. */
     revision: z.string().max(128),
@@ -296,7 +256,7 @@ const pluginThemeRegistrationSchema = z
 export type PluginAppThemeArtifact = Pick<
   PluginThemeRegistration,
   'base' | 'tokens' | 'tokenColors'
-> & { background?: PluginThemeBackgroundArtifact }
+>
 export type PluginThemeRegistration = z.infer<typeof pluginThemeRegistrationSchema>
 
 /** Parses a theme and fills its omitted tokens. */
@@ -308,8 +268,7 @@ export function parsePluginAppThemeArtifact(
   return {
     base: theme.base,
     tokens: completePluginAppThemeTokens(theme.tokens),
-    ...(theme.tokenColors?.length ? { tokenColors: theme.tokenColors } : {}),
-    ...(theme.background ? { background: theme.background } : {})
+    ...(theme.tokenColors?.length ? { tokenColors: theme.tokenColors } : {})
   }
 }
 

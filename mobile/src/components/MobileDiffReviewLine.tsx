@@ -1,4 +1,3 @@
-import { memo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { MessageSquare } from 'lucide-react-native'
 import type { Translate } from '../i18n/mobile-i18n'
@@ -12,17 +11,12 @@ import { themedStyleSheet } from '../theme/themed-styles'
 import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { MobileSyntaxSegments } from './MobileSyntaxSegments'
 
-// Each pickable line row carries this id, so a drag finds the row under the finger in the page itself.
-export const DIFF_LINE_ID_PREFIX = 'orca-review-diff-line-'
-
 type Props = {
   line: MobileHighlightedDiffLine<MobileDiffLine>
   comments: readonly DiffComment[]
   staleCommentIds: ReadonlySet<string>
-  /** Part of the lines picked for a note. */
-  selected?: boolean
-  /** Absent where lines take no notes, e.g. a past commit's files. */
-  onAddNote?: (lineNumber: number) => void
+  active: boolean
+  onAddNote: (lineNumber: number) => void
   onEditNote: (comment: DiffComment) => void
 }
 
@@ -47,18 +41,18 @@ function canCommentOnLine(line: MobileDiffLine): boolean {
   return line.kind !== 'delete' && line.newLineNumber !== undefined
 }
 
-export const MobileDiffReviewLine = memo(function MobileDiffReviewLine({
+export function MobileDiffReviewLine({
   line,
   comments,
   staleCommentIds,
-  selected = false,
+  active,
   onAddNote,
   onEditNote
 }: Props) {
   const t = useMobileTranslation()
   useMobileColorScheme()
   const lineNumber = mobileDiffLineNumber(line)
-  const canComment = onAddNote !== undefined && canCommentOnLine(line)
+  const canComment = canCommentOnLine(line)
 
   return (
     <View
@@ -66,13 +60,10 @@ export const MobileDiffReviewLine = memo(function MobileDiffReviewLine({
         styles.row,
         line.kind === 'add' && styles.addedRow,
         line.kind === 'delete' && styles.deletedRow,
-        selected && styles.selectedRow
+        active && styles.activeRow
       ]}
       accessible
       accessibilityLabel={accessibilityLabelForLine(line, t)}
-      {...(canComment && line.newLineNumber !== undefined
-        ? { nativeID: `${DIFF_LINE_ID_PREFIX}${line.newLineNumber}` }
-        : {})}
     >
       <Text style={styles.prefix}>{mobileDiffLinePrefix(line.kind)}</Text>
       <Text style={styles.lineNumber}>{lineNumber ? String(lineNumber) : ''}</Text>
@@ -81,7 +72,7 @@ export const MobileDiffReviewLine = memo(function MobileDiffReviewLine({
         disabled={!canComment}
         onPress={() => {
           if (canComment && line.newLineNumber !== undefined) {
-            onAddNote?.(line.newLineNumber)
+            onAddNote(line.newLineNumber)
           }
         }}
         accessibilityRole={canComment ? 'button' : 'text'}
@@ -124,7 +115,7 @@ export const MobileDiffReviewLine = memo(function MobileDiffReviewLine({
       ) : null}
     </View>
   )
-})
+}
 
 // Use 18px lineHeight alone without padding/minHeight to match desktop diff density (STA-1239).
 const styles = themedStyleSheet(() => ({
@@ -140,9 +131,9 @@ const styles = themedStyleSheet(() => ({
   deletedRow: {
     backgroundColor: colors.diffDeletedBg
   },
-  // The same blue tint the composer gives a picked skill.
-  selectedRow: {
-    backgroundColor: colors.skillTokenSurface
+  activeRow: {
+    borderLeftWidth: 2,
+    borderLeftColor: colors.accentBlue
   },
   prefix: {
     width: 18,

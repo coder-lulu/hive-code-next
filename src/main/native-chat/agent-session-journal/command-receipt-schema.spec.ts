@@ -34,7 +34,7 @@ export function registerCommandReceiptSchemaTests(): void {
   })
 
   afterEach(async () => {
-    await closeTestJournalHostDatabases()
+    closeTestJournalHostDatabases()
     await rm(root, { recursive: true, force: true })
   })
 

@@ -16,12 +16,6 @@ const ACTIVATING_INPUT_TYPES: ReadonlySet<string> = new Set([
 
 export const BROWSER_GUEST_INPUT_GESTURE_WINDOW_MS = 1_000
 
-/** Whether activation observed at `observedAt` still lets the page act on it. */
-export function isRecentBrowserGuestInput(observedAt: number, now: number): boolean {
-  const elapsed = now - observedAt
-  return elapsed >= 0 && elapsed <= BROWSER_GUEST_INPUT_GESTURE_WINDOW_MS
-}
-
 export function isActivatingBrowserGuestInput(input: Electron.InputEvent | undefined): boolean {
   return typeof input?.type === 'string' && ACTIVATING_INPUT_TYPES.has(input.type)
 }
@@ -34,13 +28,12 @@ export type BrowserGuestInputGesture = {
 
 export function trackBrowserGuestInputGesture(
   guest: WebContents,
-  { now = Date.now, onActivatingInput }: { now?: () => number; onActivatingInput?: () => void } = {}
+  now: () => number = () => Date.now()
 ): BrowserGuestInputGesture {
   let lastGestureAt: number | null = null
   const onInputEvent = (_event: Electron.Event, input: Electron.InputEvent): void => {
     if (isActivatingBrowserGuestInput(input)) {
       lastGestureAt = now()
-      onActivatingInput?.()
     }
   }
   let attached = false
@@ -54,7 +47,13 @@ export function trackBrowserGuestInputGesture(
     consume: () => {
       const observedAt = lastGestureAt
       lastGestureAt = null
-      return attached && observedAt !== null && isRecentBrowserGuestInput(observedAt, now())
+      const elapsed = observedAt === null ? -1 : now() - observedAt
+      return (
+        attached &&
+        observedAt !== null &&
+        elapsed >= 0 &&
+        elapsed <= BROWSER_GUEST_INPUT_GESTURE_WINDOW_MS
+      )
     },
     dispose: () => {
       lastGestureAt = null

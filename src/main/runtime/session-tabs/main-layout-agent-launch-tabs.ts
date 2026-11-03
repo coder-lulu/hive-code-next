@@ -9,7 +9,6 @@ import type { AgentLaunchPaneAddress } from '../../../shared/agent-launch-pane-v
 import { parseExecutionHostId } from '../../../shared/execution-host'
 import { ORCA_LAYOUT_OWNER_IS_MAIN } from '../../../shared/layout-owner-switch'
 import type { RuntimePtyWorktreeRecord } from '../runtime-terminal-state-records'
-import type { TerminalIdentityReadContext } from '../terminal/query/terminal-identity-read-context'
 
 /** Where the tab landed against where the launch asked for it, as the window reports it. */
 function placementFallback(
@@ -24,10 +23,7 @@ function placementFallback(
 }
 
 export abstract class OrcaRuntimeWithMainLayoutAgentLaunchTabs extends OrcaRuntimeWithCloseStructuredAgentSessionTab {
-  protected abstract getPtyRecordForPaneKey(
-    paneKey: string,
-    context?: TerminalIdentityReadContext
-  ): RuntimePtyWorktreeRecord | null
+  protected abstract getPtyRecordForPaneKey(paneKey: string): RuntimePtyWorktreeRecord | null
 
   /** Whether a running process holds this pane now: such a pane is attached to, never launched into. */
   hasLiveTerminalForPaneKey(paneKey: string): boolean {

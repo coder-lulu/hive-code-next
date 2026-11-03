@@ -62,8 +62,7 @@ export function useMobileSessionTerminalList(scope: MobileSessionTerminalStreamD
             const response = sessionTerminalListRead.interpret(
               await sessionTerminalListRead.request(client, {
                 worktree: `id:${worktreeId}`,
-                includeVisualLayouts: false,
-                includePreview: false
+                includeVisualLayouts: false
               })
             )
             if (!isCurrent() || !response.accepted) {

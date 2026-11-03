@@ -1,4 +1,4 @@
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import { CodexRuntimeHomeAuthSync } from './runtime-home-service-auth-sync'
 
 export type {

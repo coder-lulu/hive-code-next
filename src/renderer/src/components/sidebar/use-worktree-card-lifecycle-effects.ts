@@ -1,4 +1,3 @@
-import { consumeLinearIssueRead } from '@/store/slices/linear/linear-issue-publication'
 import { useEffect } from 'react'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 
@@ -161,24 +160,19 @@ export function useWorktreeCardLifecycleEffects({
     if (!worktree.linkedLinearIssue || !showLinearIssue) {
       return
     }
-    const controller = new AbortController()
     const linearIssueId = worktree.linkedLinearIssue
     const refreshLinearIssueIfVisible = (): void => {
       if (!isWindowVisible()) {
         return
       }
-      void consumeLinearIssueRead(
-        fetchLinearIssue(linearIssueId, linearWorkspaceId, { sourceContext: linearSourceContext }),
-        () => !controller.signal.aborted,
-        undefined,
-        controller.signal
-      ).catch(() => {})
+      void fetchLinearIssue(linearIssueId, linearWorkspaceId, {
+        sourceContext: linearSourceContext
+      })
     }
     refreshLinearIssueIfVisible()
     window.addEventListener('focus', refreshLinearIssueIfVisible)
     document.addEventListener('visibilitychange', refreshLinearIssueIfVisible)
     return () => {
-      controller.abort()
       window.removeEventListener('focus', refreshLinearIssueIfVisible)
       document.removeEventListener('visibilitychange', refreshLinearIssueIfVisible)
     }
@@ -194,16 +188,9 @@ export function useWorktreeCardLifecycleEffects({
     if (!newCardStyle || !hoverDetailsOpen || showLinearIssue || !worktree.linkedLinearIssue) {
       return
     }
-    const controller = new AbortController()
-    void consumeLinearIssueRead(
-      fetchLinearIssue(worktree.linkedLinearIssue, linearWorkspaceId, {
-        sourceContext: linearSourceContext
-      }),
-      () => !controller.signal.aborted,
-      undefined,
-      controller.signal
-    ).catch(() => {})
-    return () => controller.abort()
+    void fetchLinearIssue(worktree.linkedLinearIssue, linearWorkspaceId, {
+      sourceContext: linearSourceContext
+    })
   }, [
     newCardStyle,
     hoverDetailsOpen,

@@ -8,8 +8,8 @@ describe('classifyMobileArtifact', () => {
     }
   })
 
-  it('keeps svg off the raster image path', () => {
-    expect(classifyMobileArtifact('logo.SVG')).toBe('vector')
+  it('treats svg as other (RN Image cannot decode svg data URIs; render as source)', () => {
+    expect(classifyMobileArtifact('logo.svg')).toBe('other')
   })
 
   it('classifies html extensions', () => {

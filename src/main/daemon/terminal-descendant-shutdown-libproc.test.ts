@@ -28,8 +28,8 @@ beforeEach(() => {
   // A stalled libuv pool: native reads never finish.
   setLibprocAddonForTests({
     readProcessTable: () => new Promise<never>(() => {}),
-    readProcessCwd: async () => null,
-    readProcessPath: async () => null
+    processCwd: () => null,
+    processPath: () => null
   })
   // A 200ms ps, killed at its timeout like execFile.
   execFile.mockImplementation((_file, _args, { timeout }, callback) => {

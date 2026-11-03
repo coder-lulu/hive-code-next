@@ -2,8 +2,7 @@ import type { AppState } from '../types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import type { GitHubPRRefreshCandidate } from '../../../../shared/github/pull-request-refresh-types'
 import { getHostedReviewCacheKey } from '../slices/hosted-review-cache-identity'
-import { findIndexedRepoOwnerForHost } from '@/lib/worktree-runtime-owner-index'
-import { getRepoExecutionHostId } from '../../../../shared/execution-host'
+import { getGitHubRepoLookupIndex } from '../slices/github-repo-lookup-index'
 
 export function shouldCoordinateVisibleGitHubReview(
   state: AppState,
@@ -23,11 +22,7 @@ export function shouldCoordinateVisibleGitHubReview(
     true
   )
   const hosted = state.hostedReviewCache[key]
-  const remote = findIndexedRepoOwnerForHost(
-    state.repos,
-    candidate.repoId,
-    getRepoExecutionHostId(candidate)
-  )?.gitRemoteIdentity
+  const remote = getGitHubRepoLookupIndex(state.repos).findById(candidate.repoId)?.gitRemoteIdentity
   return (
     state.prCache[candidate.cacheKey]?.data != null ||
     hosted?.data?.provider === 'github' ||

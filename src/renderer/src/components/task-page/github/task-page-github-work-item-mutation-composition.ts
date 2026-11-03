@@ -95,9 +95,7 @@ export function getRegistryMergedTaskPageGitHubWorkItem(
   item: GitHubWorkItem,
   sourceScope: string | null
 ): GitHubWorkItem {
-  const ops = listPendingTaskPageGitHubOpsForItem(item.repoId, item.id, sourceScope).filter(
-    (op) => !op.settleAccepted
-  )
+  const ops = listPendingTaskPageGitHubOpsForItem(item.repoId, item.id, sourceScope)
   let merged: GitHubWorkItem = { ...item }
 
   // Hold confirmed whole-field values after pending clears until matching search adoption or newer intent.

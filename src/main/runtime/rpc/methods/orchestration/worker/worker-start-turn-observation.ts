@@ -11,8 +11,6 @@ export type WorkerTurnStartObservation = {
   prompt?: RuntimeTerminalPromptDelivery
   /** Why an `unobserved` start is unknown, when the default PTY wording does not fit. */
   reason?: string
-  /** Held as a card in a chat's queue; it runs when the chat's current turn ends. */
-  queued?: boolean
 }
 
 function classifyPromptDelivery(prompt: RuntimeTerminalPromptDelivery): WorkerTurnStartVerdict {

@@ -10,13 +10,6 @@ import {
 } from './wsl-availability'
 import { wslExeProcessSpec, wslExeStdout } from './wsl-exe-process'
 import {
-  isWslListOutputLost,
-  listedOrRegisteredWslDistros,
-  readRegisteredWslDistrosLater,
-  resetWslListOutputLost,
-  runningWhenListedNone
-} from './wsl-registered-distro-fallback'
-import {
   _resetRunningWslDistroCacheForTests,
   resolveRunningWslDistros,
   type RunningWslDistroReadOptions
@@ -144,11 +137,7 @@ export function listWslDistros(): string[] {
     const output = wslExeStdout(
       runProcessSync(wslExeProcessSpec(['--list', '--quiet'], WSL_PROBE_TIMEOUT_MS))
     )
-    const listed = parseWslDistros(output)
-    if (listed.length === 0) {
-      readRegisteredWslDistrosLater((found) => cacheWslDistroList(found, probeSequence))
-    }
-    return cacheWslDistroList(listed, probeSequence)
+    return cacheWslDistroList(parseWslDistros(output), probeSequence)
   } catch {
     armWslDistroListRetry()
     return wslDistroCache ?? []
@@ -180,9 +169,7 @@ export async function listWslDistrosAsync(): Promise<string[]> {
   // Catch before sharing the promise so all concurrent callers receive the same fallback.
   const probeSequence = ++wslDistroProbeSequence
   const probe = runWslExe(['--list', '--quiet'])
-    .then(async (output) =>
-      cacheWslDistroList(await listedOrRegisteredWslDistros(parseWslDistros(output)), probeSequence)
-    )
+    .then((output) => cacheWslDistroList(parseWslDistros(output), probeSequence))
     .catch(() => {
       armWslDistroListRetry()
       return wslDistroCache ?? []
@@ -205,24 +192,12 @@ export async function listRunningWslDistrosAsync(
   }
   return resolveRunningWslDistros(
     () =>
-      // A host known to lose redirected list output goes straight to the console.
-      isWslListOutputLost()
-        ? runningFromList('')
-        : runWslExe(['--list', '--running', '--quiet'], {
-            ...process.env,
-            WSL_UTF8: '1'
-          }).then(runningFromList),
+      runWslExe(['--list', '--running', '--quiet'], {
+        ...process.env,
+        WSL_UTF8: '1'
+      }).then((output) => filterUserWslDistros(parseWslDistros(output))),
     options
   )
-}
-
-// Empty means "none running" unless this host loses list output; then only a console can tell.
-async function runningFromList(output: string): Promise<string[]> {
-  const listed = parseWslDistros(output)
-  if (listed.length > 0) {
-    return filterUserWslDistros(listed)
-  }
-  return runningWhenListedNone(await listWslDistrosAsync(), WSL_PROBE_TIMEOUT_MS)
 }
 
 export function hasCachedWslDistros(): boolean {
@@ -327,7 +302,6 @@ function resetWslDistroListState(): void {
   wslDistroListEmptyStreak = 0
   wslDistroProbeSequence = 0
   wslDistroCacheSequence = 0
-  resetWslListOutputLost()
 }
 
 export function _resetWslCachesForTests(): void {

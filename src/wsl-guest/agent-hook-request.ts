@@ -1,5 +1,4 @@
 import { checkHookOwnerPresence } from '../shared/agent-hook-owner-presence'
-import type { HookRootEvidenceReader } from '../shared/hook-process-root-evidence'
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import { HOOK_REQUEST_SLOWLORIS_MS } from '../shared/agent-hook-listener/listener-limits'
 import { mergeAgentHookRequestHeaders } from '../shared/agent-hook-listener/hook-envelope'
@@ -14,10 +13,6 @@ import type { AgentHookResultRetryScheduler } from './agent-hook-result-retry-sc
 import { hookBodyEnv, hookBodyVersion } from './agent-hook-envelope-build'
 import { bindOpenCodeTuiSession } from '../shared/agent-hook-listener/opencode-session-registry'
 import type { RelayProviderHookNormalization } from './agent-hook-provider-normalization'
-import {
-  relayHookRootAcquisition,
-  type RelayHookAdmissionOptions
-} from './agent-hook-event-admission'
 import { CLAUDE_AGENT_VIEW_PATH } from '../shared/claude-agent-view'
 
 export async function handleRelayHookRequest(
@@ -30,7 +25,6 @@ export async function handleRelayHookRequest(
     env: string
     state: HookListenerState
     checkAgentPresence: (paneKey: string) => Promise<void>
-    readHookRootEvidence?: HookRootEvidenceReader
     providerNormalization: RelayProviderHookNormalization
     isPaneSurfaceRetired: (paneKey: string) => boolean
     getAgentLaunchToken: (paneKey: string) => string | undefined
@@ -38,8 +32,7 @@ export async function handleRelayHookRequest(
       event: AgentHookEventPayload,
       source: AgentHookSource,
       env?: string,
-      version?: string,
-      admission?: RelayHookAdmissionOptions
+      version?: string
     ) => AgentHookEventPayload | undefined
     ingestTmuxHook?: (source: AgentHookSource, body: unknown) => Promise<boolean>
     retryScheduler: AgentHookResultRetryScheduler
@@ -94,12 +87,7 @@ export async function handleRelayHookRequest(
       source,
       hookBody,
       options.env,
-      options.checkAgentPresence,
-      relayHookRootAcquisition(options.readHookRootEvidence, options.state, (event) =>
-        options.applyEvent(event, source, hookBodyEnv(hookBody), hookBodyVersion(hookBody), {
-          checkPresence: false
-        })
-      )
+      options.checkAgentPresence
     )
     if (!options.isCurrent()) {
       res.writeHead(204)
@@ -125,9 +113,7 @@ export async function handleRelayHookRequest(
       // TODO: once normalizeHookPayload returns validated env/version, drop bodyEnv/bodyVersion and source them from the listener result.
       const env = hookBodyEnv(hookBody)
       const version = hookBodyVersion(hookBody)
-      const stored = options.applyEvent(event, source, env, version, {
-        onAccepted: (row) => options.retryScheduler.observeClaudeHook(row)
-      })
+      const stored = options.applyEvent(event, source, env, version)
       if (stored) {
         if (admittedOpenCodeTuiOwner) {
           bindOpenCodeTuiSession(options.state, source, hookBody, event.providerSession?.id)

@@ -3,8 +3,9 @@ import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../../../shared/protoco
 import { OrcaRuntimeService } from '../../../../orca-runtime'
 import { OrchestrationDb } from '../../../../orchestration/db'
 import { ORCHESTRATION_METHODS } from '../../orchestration'
-import { isStreamingMethod, eraseRpcMethods } from '../../../core'
+import { eraseRpcMethods } from '../../../core'
 import { orchestrationTimestampToMs } from '../worker/worker-output'
+import { prepareFederatedAttachmentAuthority } from './federation-attachment-authority'
 
 // Host proof must report agent exit whether its PTY survives the kill or disappears on reboot (#24353).
 
@@ -71,7 +72,7 @@ describe('federation host agent-death liveness', () => {
     const method = eraseRpcMethods(ORCHESTRATION_METHODS).find(
       (candidate) => candidate.name === name
     )
-    if (!method || isStreamingMethod(method)) {
+    if (!method) {
       throw new Error(`Method not found: ${name}`)
     }
     const params =
@@ -106,6 +107,14 @@ describe('federation host agent-death liveness', () => {
     expect(presence).toHaveBeenCalledWith(HANDLE, orchestrationTimestampToMs(attachedAt))
   })
 
+  it('keeps the PTY verdict when no hook identified the agent or it cannot be checked', async () => {
+    vi.spyOn(runtime, 'checkTerminalAgentPresence')
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce('unverifiable')
+    await expect(snapshotObservation()).resolves.toEqual({ status: 'live', exactWorker: true })
+    await expect(snapshotObservation()).resolves.toEqual({ status: 'live', exactWorker: true })
+  })
+
   it('reports exited after a reboot when the host process table lacks the PTY', async () => {
     vi.mocked(runtime.showTerminal).mockRejectedValue(new Error('terminal_handle_stale'))
     const inspect = vi
@@ -131,6 +140,46 @@ describe('federation host agent-death liveness', () => {
       exactWorker: false
     })
     expect(inspect).not.toHaveBeenCalled()
+  })
+
+  it('forgets the pane agent exit the hook store held before this worker attached', () => {
+    const forget = vi.spyOn(runtime, 'forgetTerminalAgentExit').mockImplementation(() => {})
+    vi.spyOn(runtime, 'getOrchestrationDispatchAuthority').mockReturnValue(null)
+    vi.mocked(runtime.getTerminalPaneKey).mockReturnValue(
+      'tab_reused:cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    )
+    db.createRemoteDispatchAttachment({
+      runId: 'run-home',
+      dispatchId: 'ctx_reused_pane',
+      taskId: 'task_reused',
+      homePeerFingerprint: HOME_FINGERPRINT,
+      protocolVersion: ORCHESTRATION_CONTRACT_VERSION,
+      runtimeEpoch: runtime.getRuntimeId(),
+      mutationReceipt: {
+        callerFingerprint: HOME_FINGERPRINT,
+        requestId: 'rpc_attach_reused',
+        method: 'orchestration.federationStart',
+        payloadHash: 'hash-reused'
+      }
+    })
+    prepareFederatedAttachmentAuthority({
+      runtime,
+      db,
+      dispatchId: 'ctx_reused_pane',
+      terminalHandle: 'term_reused',
+      worktreeId: 'repo::remote-worktree',
+      setup: {
+        requested: 'not_applicable',
+        effective: 'not_applicable',
+        source: 'test',
+        hookFound: false,
+        startupPolicy: 'start-immediately',
+        state: 'not_applicable'
+      },
+      effects: [],
+      reusesTerminal: true
+    })
+    expect(forget).toHaveBeenCalledWith('term_reused')
   })
 
   it('stays unverifiable after a reboot when the process table cannot be read', async () => {

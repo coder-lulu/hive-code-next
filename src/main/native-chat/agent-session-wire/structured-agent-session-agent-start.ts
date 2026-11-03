@@ -3,20 +3,20 @@
 
 import type {
   SubmissionRejectionFact,
+  AgentSessionArgumentProblem,
   ProviderDiagnostic
-} from '../../../shared/agent-session/failures/agent-session-failure'
-import type { AgentSessionArgumentProblem } from '../../../shared/agent-session/agent-session-argument-problem'
+} from '../../../shared/agent-session-failure'
 import { argumentProblemOf } from '../structured-agent-arguments-error'
 import {
   agentSessionRefusalFromReference,
   isAgentSessionRefusalError,
-  readAgentSessionRefusalReference,
-  type AgentSessionWireRefusal
-} from '../../../shared/agent-session/failures/agent-session-wire-refusals'
+  readAgentSessionRefusalReference
+} from '../../../shared/agent-session-wire-refusals'
 import type {
   AgentSessionAttachResult,
-  AgentSessionMutationResult
-} from '../../../shared/agent-session/agent-session-wire'
+  AgentSessionMutationResult,
+  AgentSessionWireRefusal
+} from '../../../shared/agent-session-wire'
 import type { StructuredAgentSessionAttachContext } from './structured-agent-session-attach-context'
 import { attachStructuredAgentSessionForStart } from './structured-agent-session-attach-orchestration'
 import type { StructuredAgentSessionAttachLock } from './structured-agent-session-attach-lock'

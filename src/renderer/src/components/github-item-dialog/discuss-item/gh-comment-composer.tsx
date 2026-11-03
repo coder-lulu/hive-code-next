@@ -65,15 +65,13 @@ export function GHCommentComposer({
         type: itemType,
         prRepo
       })
-      if (result.ok) {
-        onCommentAdded(result.comment)
-      }
       if (!mountedRef.current) {
         return
       }
       if (result.ok) {
         setBody('')
         // Why: use GitHub's returned comment so the optimistic row shows the real login/avatar immediately.
+        onCommentAdded(result.comment)
       } else {
         toast.error(
           codeHostErrorText(result) ??

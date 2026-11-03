@@ -1,6 +1,6 @@
 import { enableMainProcessGpuFeatures } from './configure-process'
 import { app, type BrowserWindow } from 'electron'
-import { relaunchApp } from './quit/app-relaunch'
+import { relaunchApp } from '../app-relaunch'
 import { destroySystemTray } from '../tray/system-tray'
 import { applyGpuFallbackCommandLineSwitches } from './gpu-fallback-switches'
 import {

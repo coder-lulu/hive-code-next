@@ -14,8 +14,8 @@ vi.mock('sonner', () => ({ toast: { error: mocks.toastError, message: vi.fn() } 
 vi.mock('@/store', () => ({
   useAppStore: (selector: (state: Record<string, unknown>) => unknown) => selector({})
 }))
-vi.mock('@/store/diff-comment-owner', () => {
-  const comments = [
+vi.mock('@/store/worktree-diff-comments-selector', () => ({
+  selectWorktreeDiffCommentsOrEmpty: () => [
     {
       id: 'c1',
       worktreeId: 'wt-1',
@@ -26,12 +26,7 @@ vi.mock('@/store/diff-comment-owner', () => {
       side: 'modified'
     } satisfies DiffComment
   ]
-  return {
-    createOwnedDiffCommentsSelector: () => () => undefined,
-    sourceParts: () => [],
-    createDiffCommentViewSelector: () => () => ({ owner: null, comments })
-  }
-})
+}))
 
 import { useSourceControlDiffCommentNotes } from './use-diff-comment-notes'
 

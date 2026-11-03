@@ -13,11 +13,9 @@ import { codeHostErrorText } from '@/lib/code-host-error-copy'
 export function useGitLabReviewActions(
   item: GitLabWorkItem | null,
   repoSelector: GitLabDialogRepoSelector | null,
-  state: GitLabItemDialogState,
-  handleRefresh: () => void
+  state: GitLabItemDialogState
 ) {
   const {
-    claimDetailsOwner,
     details,
     inlineCommentBody,
     inlineCommentFilePath,
@@ -39,14 +37,13 @@ export function useGitLabReviewActions(
       return
     }
     setReviewerOptionsLoading(true)
-    const ownsResult = claimDetailsOwner()
     try {
       const users = await gitLabApiFor(repoSelector).listAssignableUsers(repoSelector)
-      if (ownsResult()) {
+      if (mountedRef.current) {
         setReviewerOptions(dedupeGitLabUsers(users))
       }
     } catch {
-      if (ownsResult()) {
+      if (mountedRef.current) {
         setReviewerOptions([])
       }
     } finally {
@@ -55,7 +52,6 @@ export function useGitLabReviewActions(
       }
     }
   }, [
-    claimDetailsOwner,
     mountedRef,
     repoSelector,
     reviewerOptions,
@@ -82,7 +78,6 @@ export function useGitLabReviewActions(
         return
       }
       setReviewerUpdating(true)
-      const ownsResult = claimDetailsOwner()
       try {
         const result = await gitLabApiFor(repoSelector).updateMRReviewers({
           ...repoSelector,
@@ -90,7 +85,7 @@ export function useGitLabReviewActions(
           reviewerIds,
           projectRef: details.item.projectRef ?? item.projectRef ?? null
         })
-        if (!ownsResult()) {
+        if (!mountedRef.current) {
           return
         }
         if (result.ok) {
@@ -110,18 +105,13 @@ export function useGitLabReviewActions(
           showGitLabMutationError(error)
         }
       } finally {
-        // Only while this item is still shown: a switched-to item keeps its own read and busy state.
-        if (ownsResult()) {
+        if (mountedRef.current) {
           setReviewerUpdating(false)
-          // Why: a failed response doesn't prove the host kept the old reviewers; reread on every attempted write.
-          handleRefresh()
         }
       }
     },
     [
-      claimDetailsOwner,
       details,
-      handleRefresh,
       item,
       mountedRef,
       repoSelector,

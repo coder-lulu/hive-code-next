@@ -10,7 +10,7 @@ import { sendFrameSessionInput } from './guest-frame-input-sessions'
 import { planCdpKeyEvent, planInsertText, type GuestEditCommand } from './guest-key-event-plan'
 import { sendGuestCdpCommand } from './guest-cdp-command'
 import { acquireElectronDebugger } from './electron-debugger-lease'
-import { normalizeCdpPointerButton } from './agent-browser/agent-browser-bridge-mouse'
+import { normalizeCdpPointerButton } from './agent-browser-bridge-mouse'
 import { cdpPointerStateFor, releaseCdpPointerButton } from './cdp-pointer-input'
 import {
   assertRemoteCliPageAccess,
@@ -101,88 +101,48 @@ export async function dispatchPageKeyEvent(
   send: GuestCdpSender,
   guardFocus: AgentInputFocusGuard = NO_FOCUS_GUARD
 ): Promise<unknown> {
-  return await dispatchPageKeyEvents(webContents, [params], send, guardFocus)
-}
-
-const isTabDown = (params: Record<string, unknown>): boolean =>
-  params.key === 'Tab' && (params.type === 'keyDown' || params.type === 'rawKeyDown')
-
-/** Deliver a run of key events along one focus route; callers split runs where focus may move. */
-export async function dispatchPageKeyEvents(
-  webContents: WebContents,
-  events: readonly Record<string, unknown>[],
-  send: GuestCdpSender,
-  guardFocus: AgentInputFocusGuard = NO_FOCUS_GUARD
-): Promise<unknown> {
-  let result: unknown = {}
   if (!isEmbeddedGuest(webContents)) {
-    for (const params of events) {
-      result = await send('Input.dispatchKeyEvent', params)
-    }
-    return result
+    return await send('Input.dispatchKeyEvent', params)
   }
-  let start = 0
-  let route = await resolveFocusedFrameRoute(webContents, send)
-  // A frame's key handler can move focus to another frame, so each key finds its route again.
-  while (route.kind === 'session') {
-    const keyUp = events.findIndex((params, index) => index >= start && params.type === 'keyUp')
-    const end = keyUp === -1 ? events.length : keyUp + 1
-    const key = events.slice(start, end)
+  const route = await resolveFocusedFrameRoute(webContents, send)
+  if (route.kind === 'session') {
     // Tab from the last frame field can escape into Orca's window.
-    const release = key.some(isTabDown) ? await guardFocus() : () => {}
+    const isTabDown =
+      params.key === 'Tab' && (params.type === 'keyDown' || params.type === 'rawKeyDown')
+    const release = isTabDown ? await guardFocus() : () => {}
     try {
-      for (const params of key) {
-        result = await sendToFrameSession(
-          webContents,
-          send,
-          route.sessionId,
-          'Input.dispatchKeyEvent',
-          params
-        )
-      }
+      return await sendToFrameSession(
+        webContents,
+        send,
+        route.sessionId,
+        'Input.dispatchKeyEvent',
+        params
+      )
     } finally {
       release()
     }
-    if (end >= events.length) {
-      return result
-    }
-    start = end
-    route = await resolveFocusedFrameRoute(webContents, send)
   }
-  const remaining = events.slice(start)
-  const plans = remaining.map((params) => planCdpKeyEvent(params))
-  if (route.kind === 'widget' && plans.every((plan) => plan !== null)) {
+  const plan = planCdpKeyEvent(params)
+  if (plan && route.kind === 'widget') {
     // Tab from the last page field can escape into Orca's window.
-    const release = remaining.some(isTabDown) ? await guardFocus() : () => {}
+    const release = plan.events.some((event) => event.type === 'keyDown' && event.keyCode === 'Tab')
+      ? await guardFocus()
+      : () => {}
     try {
-      await withAgentInputInjection(webContents, async () => {
-        // One page round trip settles the whole run; edit commands must see the keys before them.
-        let unsettled = false
-        for (const [index, plan] of plans.entries()) {
-          // Widget events bypass CDP send, so track held keys here.
-          await trackRemoteCliInput(
-            webContents.id,
-            'Input.dispatchKeyEvent',
-            remaining[index],
-            async () => {
-              for (const event of plan.events) {
-                webContents.sendInputEvent(event)
-              }
-              unsettled ||= plan.events.length > 0
-              if (plan.commands.length > 0) {
-                await waitForPageToHandleInput(send)
-                unsettled = false
-                for (const command of plan.commands) {
-                  runEditCommand(webContents, command)
-                }
-              }
-            }
-          )
-        }
-        if (unsettled) {
-          await waitForPageToHandleInput(send)
-        }
-      })
+      await withAgentInputInjection(webContents, () =>
+        // Widget events bypass CDP send, so track held keys here.
+        trackRemoteCliInput(webContents.id, 'Input.dispatchKeyEvent', params, async () => {
+          for (const event of plan.events) {
+            webContents.sendInputEvent(event)
+          }
+          if (plan.commands.length > 0 || plan.events.length > 0) {
+            await waitForPageToHandleInput(send)
+          }
+          for (const command of plan.commands) {
+            runEditCommand(webContents, command)
+          }
+        })
+      )
     } finally {
       release()
     }
@@ -190,12 +150,7 @@ export async function dispatchPageKeyEvents(
   }
   const release = await focusGuestForCdpInput(webContents, send, guardFocus)
   try {
-    for (const params of remaining) {
-      result = await withAgentInputInjection(webContents, () =>
-        send('Input.dispatchKeyEvent', params)
-      )
-    }
-    return result
+    return await withAgentInputInjection(webContents, () => send('Input.dispatchKeyEvent', params))
   } finally {
     release()
   }

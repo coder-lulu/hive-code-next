@@ -3,6 +3,7 @@ import {
   normalizeTerminalPasteLineEndings,
   wrapTerminalBracketedPasteText
 } from '../../../src/shared/terminal-bracketed-paste-text'
+import { reportWorkerTerminalUserInput } from '../terminal/worker-terminal-takeover-report'
 import { useCallback, type RefObject } from 'react'
 import { translate } from '../i18n/mobile-i18n'
 import { terminalInputSend } from '../terminal/mobile-terminal-operations'
@@ -149,7 +150,7 @@ export function useMobileTerminalPaste({
         showToast(translate('session.useTerminalPaste.pasteFailed', 'Paste failed'), 1500)
         return
       }
-      await sendTerminalUserInput(currentClient, {
+      const response = await sendTerminalUserInput(currentClient, {
         terminal: targetHandle,
         text: payload,
         enter: false,
@@ -157,6 +158,9 @@ export function useMobileTerminalPaste({
           ? { client: { id: deviceTokenRef.current, type: 'mobile' as const } }
           : {})
       })
+      if (terminalInputSend.interpret(response) === true) {
+        reportWorkerTerminalUserInput(currentClient, targetHandle)
+      }
       onSuccess()
       refreshCanPaste()
     } catch (e) {

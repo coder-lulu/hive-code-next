@@ -49,6 +49,8 @@ function args(
     decision: decision(),
     rebaseBaseRef: 'origin/main',
     busyAction: null,
+    openingPath: null,
+    openingBranchPath: null,
     prAvailable: true,
     handlers: noopHandlers(),
     ...overrides

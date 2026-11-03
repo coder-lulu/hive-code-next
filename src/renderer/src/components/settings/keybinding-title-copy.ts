@@ -16,6 +16,7 @@ type StaticKeybindingActionId = Exclude<
 
 // Literal keys keep extraction and coverage gates aware of every shortcut title.
 const STATIC_TITLE_COPY = {
+  'home.newTask': () => translate('keybindings.title.homeNewTask', 'New task'),
   'worktree.quickOpen': () => translate('keybindings.title.worktreeQuickOpen', 'Go to File'),
   'app.settings': () => translate('keybindings.title.appSettings', 'Open Settings'),
   'app.forceReload': () => translate('keybindings.title.appForceReload', 'Force Reload'),

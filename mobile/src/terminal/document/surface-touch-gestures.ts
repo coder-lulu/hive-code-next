@@ -102,7 +102,6 @@ export function attachSurfaceEventHandlers(
       if (targetSurface !== scope.surface || dispatcherShouldBlockSurface(scope)) {
         return
       }
-      notify(scope, { type: 'terminal-interaction' })
       if (scope.touchGesture.momentumId) {
         cancelDocumentFrame(scope, scope.touchGesture.momentumId)
         scope.touchGesture.momentumId = null

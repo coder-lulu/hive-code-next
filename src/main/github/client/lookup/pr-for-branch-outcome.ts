@@ -1,4 +1,3 @@
-import { withGitHubRepoExecution } from '../../github-repository-identity'
 import { getRepoExecutionHostId } from '../../../../shared/execution-host'
 import {
   hostedReviewRepoScope,
@@ -22,63 +21,51 @@ export async function getPRForBranchOutcome(
   fallbackPRNumber?: number | null,
   options: GitHubPRBranchLookupOptions = {}
 ): Promise<PRRefreshOutcome> {
-  return withGitHubRepoExecution(
-    repoPath,
-    connectionId,
-    hostedReviewLocalGitOptionArgs(options)[0] ?? {},
-    async (): Promise<PRRefreshOutcome> => {
-      const branchName = branch.replace(/^refs\/heads\//, '')
-      // Detached HEAD cannot discover by branch, but explicit PR numbers remain safe.
-      if (
-        !branchName &&
-        typeof linkedPRNumber !== 'number' &&
-        typeof fallbackPRNumber !== 'number'
-      ) {
-        return { kind: 'no-pr', fetchedAt: Date.now() }
-      }
-      const localGitArgs = hostedReviewLocalGitOptionArgs(options)
-      const localGitOptions = localGitArgs[0] ?? {}
-      const context = githubRepoContext(repoPath, connectionId, localGitOptions)
-      const ghOptions = ghRepoExecOptions(context)
-      const executionScope = githubPRStackExecutionScope(connectionId, localGitOptions)
+  const branchName = branch.replace(/^refs\/heads\//, '')
+  // Detached HEAD cannot discover by branch, but explicit PR numbers remain safe.
+  if (!branchName && typeof linkedPRNumber !== 'number' && typeof fallbackPRNumber !== 'number') {
+    return { kind: 'no-pr', fetchedAt: Date.now() }
+  }
+  const localGitArgs = hostedReviewLocalGitOptionArgs(options)
+  const localGitOptions = localGitArgs[0] ?? {}
+  const context = githubRepoContext(repoPath, connectionId, localGitOptions)
+  const ghOptions = ghRepoExecOptions(context)
+  const executionScope = githubPRStackExecutionScope(connectionId, localGitOptions)
 
-      const key = JSON.stringify([
-        executionScope,
-        repoPath,
-        scopeGeneration(hostedReviewRepoScope(repoPath, getRepoExecutionHostId({ connectionId }))),
-        branchName,
-        linkedPRNumber ?? null,
-        fallbackPRNumber ?? null,
-        options.acceptMergedFallbackPR ?? false,
-        options.currentHeadOid ?? null,
-        githubReadExecutionScope(ghOptions)
-      ])
-      return runCoalescedProbe(
-        reads,
-        key,
-        async () => {
-          await acquire()
-          try {
-            return await resolvePRForBranchOutcome({
-              repoPath,
-              branchName,
-              linkedPRNumber,
-              connectionId,
-              fallbackPRNumber,
-              options,
-              localGitOptions,
-              ghOptions,
-              executionScope
-            })
-          } catch (err) {
-            return prRefreshUpstreamError(err)
-          } finally {
-            release()
-          }
-        },
-        2 * 60_000,
-        options
-      )
-    }
+  const key = JSON.stringify([
+    executionScope,
+    repoPath,
+    scopeGeneration(hostedReviewRepoScope(repoPath, getRepoExecutionHostId({ connectionId }))),
+    branchName,
+    linkedPRNumber ?? null,
+    fallbackPRNumber ?? null,
+    options.acceptMergedFallbackPR ?? false,
+    options.currentHeadOid ?? null,
+    githubReadExecutionScope(ghOptions)
+  ])
+  return runCoalescedProbe(
+    reads,
+    key,
+    async () => {
+      await acquire()
+      try {
+        return await resolvePRForBranchOutcome({
+          repoPath,
+          branchName,
+          linkedPRNumber,
+          connectionId,
+          fallbackPRNumber,
+          options,
+          localGitOptions,
+          ghOptions,
+          executionScope
+        })
+      } catch (err) {
+        return prRefreshUpstreamError(err)
+      } finally {
+        release()
+      }
+    },
+    2 * 60_000
   )
 }

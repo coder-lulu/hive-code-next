@@ -7,8 +7,10 @@ import {
   getRuntimeRepoBaseRefDefault,
   searchRuntimeRepoBaseRefDetails
 } from '@/runtime/runtime-repo-client'
-import { stripBaseRef } from './create-pull-request-base-ref-normalization'
-import { normalizeCreateReviewBaseSearchResults } from '../../../../shared/hosted-review-refs'
+import {
+  normalizeCreateReviewBaseSearchResults,
+  stripBaseRef
+} from './create-pull-request-base-ref-normalization'
 
 type CreatePullRequestBaseRefDiscoveryOptions = {
   open: boolean

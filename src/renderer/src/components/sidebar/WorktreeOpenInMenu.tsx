@@ -140,7 +140,6 @@ export async function openWorktreePath(args: {
   ownerUnresolved?: boolean
   workspace?: WorkspaceOwnerRef | null
   command?: string
-  subject?: 'workspace' | 'path'
 }): Promise<void> {
   const owner = getLocalPathOpenOwnerForRoute({
     connectionId: args.connectionId,
@@ -186,7 +185,7 @@ export async function openWorktreePath(args: {
           ownerHostId: owner
         })
   if (!result.ok) {
-    showOpenFailureToast(result, Boolean(editorConnectionId?.trim()), args.subject)
+    showOpenFailureToast(result, Boolean(editorConnectionId?.trim()))
   }
 }
 

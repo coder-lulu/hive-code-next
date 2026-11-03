@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { hostOs } from '../platform/host-os'
 import type { ReactNode } from 'react'
 import { KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
@@ -53,6 +54,8 @@ export function FutureFeatureScreen({
   description,
   children
 }: FutureFeatureScreenProps) {
+  const t = useMobileTranslation()
+
   const router = useRouter()
   const insets = useSafeAreaInsets()
   const theme = useFutureFeatureTheme()
@@ -73,7 +76,7 @@ export function FutureFeatureScreen({
       <MobileScreenHeader
         leading={
           <MobileIconButton
-            accessibilityLabel="返回"
+            accessibilityLabel={t('common.back', 'Back')}
             icon={ChevronLeft}
             iconSize={24}
             onPress={goBack}
@@ -110,10 +113,15 @@ export function FutureFeatureScreen({
           >
             {description}
           </Text>
-          <MobileGroupedList accessibilityLabel="功能状态">
+          <MobileGroupedList
+            accessibilityLabel={t(
+              'auto.mobile.src.capabilities.FutureFeatureUI.557adf77a9',
+              'Feature status'
+            )}
+          >
             <FutureFeatureRow
               detail={capability.unavailableReason ?? undefined}
-              label="功能状态"
+              label={t('auto.mobile.src.capabilities.FutureFeatureUI.557adf77a9', 'Feature status')}
               value={capabilityLabel(capability)}
             />
           </MobileGroupedList>

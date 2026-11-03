@@ -1,5 +1,4 @@
 import type { MarkdownDocument } from '../../../../shared/filesystem-entry-types'
-import type { EditorFileOperationProvenance } from '@/lib/editor-file-operation-owner'
 
 export type MarkdownPreviewProps = {
   content: string
@@ -35,7 +34,6 @@ export type MarkdownPreviewSourceOpenFile = {
   worktreeId: string
   runtimeEnvironmentId?: string | null
   externalSshTargetId?: string
-  operationProvenance?: EditorFileOperationProvenance
   mode: string
   markdownPreviewSourceFileId?: string
 }

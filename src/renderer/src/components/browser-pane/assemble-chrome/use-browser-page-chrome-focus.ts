@@ -309,9 +309,7 @@ export function useBrowserPageChromeFocus({
   ])
 
   // Why an effect event: a split focused mid-retry must not re-run the effect and cancel it.
-  const isSplitFocused = useEffectEvent(
-    () => chromeShortcutScope === 'focused' || chromeShortcutScope === 'owned-target-focused'
-  )
+  const isSplitFocused = useEffectEvent(() => chromeShortcutScope === 'focused')
   const dragPassthroughActive = useWebviewDragPassthroughActive(isActive)
   const focusedForActivationRef = useRef(false)
   // Why: switching to a page hands it the keyboard, as for terminals (#20533); declared after the
@@ -326,7 +324,7 @@ export function useBrowserPageChromeFocus({
       return
     }
     focusedForActivationRef.current = true
-    // Why the focused split only: never pull the keyboard across splits.
+    // Why 'focused' only: never pull the keyboard across splits; floating ones all report 'owned-target'.
     const cancelGuestFocus = startGuestFocusRetry({
       firstAttempt: 'now',
       stillWanted: () => !inputLocked && isSplitFocused() && !keepAddressBarFocusRef.current

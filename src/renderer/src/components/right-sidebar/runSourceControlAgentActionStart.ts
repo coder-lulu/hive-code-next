@@ -1,4 +1,3 @@
-import type { DirectWorkItemLaunchResult } from '@/lib/direct-work-item-setup'
 import {
   sourceControlActionRecipeEntry,
   type SelectedSourceControlActionRecipe
@@ -48,11 +47,7 @@ export type RunSourceControlAgentActionStartArgs = {
   launchSource: LaunchSource
   recoveryContext?: RuntimeGitContext | null
   signal?: AbortSignal
-  onCreateAccepted?: () => void
   onStart?: (args: {
-    signal?: AbortSignal
-    onCreateAccepted?: () => void
-    onFailureNotified?: () => void
     agentLaunchPreferences?: AgentLaunchPreferences
     agent: TuiAgent
     commandInput: string
@@ -62,7 +57,7 @@ export type RunSourceControlAgentActionStartArgs = {
     sessionOptions?: Readonly<Record<string, string>>
     launchChoice?: AgentLaunchChoice
     sessionOptionsYieldToAgentArgs?: true
-  }) => DirectWorkItemLaunchResult | Promise<DirectWorkItemLaunchResult>
+  }) => boolean | Promise<boolean>
   onSaveAgentDefault?: (
     target: SourceControlAiWriteTarget,
     actionId: SourceControlLaunchActionId,
@@ -94,7 +89,6 @@ export async function runSourceControlAgentActionStart({
   launchSource,
   recoveryContext,
   signal,
-  onCreateAccepted,
   onStart,
   onSaveAgentDefault,
   onLaunchAccepted,
@@ -184,12 +178,7 @@ export async function runSourceControlAgentActionStart({
     onLaunchAccepted?.()
   }
   if (onStart) {
-    const result = await onStart({
-      signal,
-      onCreateAccepted,
-      onFailureNotified: () => {
-        launchFailureNotified = true
-      },
+    launched = await onStart({
       agentLaunchPreferences,
       agent: selectedAgent,
       commandInput: trimmedCommandInput,
@@ -197,10 +186,6 @@ export async function runSourceControlAgentActionStart({
       ...launchOptions,
       ...(launchChoice ? { launchChoice } : {})
     })
-    if (result === 'cancelled') {
-      return false
-    }
-    launched = result
     if (launched) {
       notifyLaunchAccepted()
     }

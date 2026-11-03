@@ -1,18 +1,13 @@
+import { runProcess } from '@orca/process-host'
 import type { LibprocProcessRow } from './libproc-addon'
-import { DEADLINE_PASSED, beforeDeadline, monotonicNow } from './deadline-settle-notifier'
-import { NODEV, P_WEXIT, SIDL, SZOMB } from './libproc-ps-format'
-import { runArgvRecoveryPs } from './libproc-ps-fallback'
+import { monotonicNow } from './deadline-settle-notifier'
+import { NODEV } from './libproc-ps-format'
 
+const SZOMB_STATUS = 5
 const MAX_ANCESTOR_DEPTH = 64
 
-/** KERN_PROCARGS2 refuses only another euid's argv; our own fails just mid-exec or exiting, where setuid ps fails too. */
-function isOwnProcess(row: LibprocProcessRow): boolean {
-  const ownUid = process.geteuid?.()
-  return row.uid !== undefined && ownUid !== undefined ? row.uid === ownUid : !row.commandIncomplete
-}
-
-/** A pane descendant: the foreign chain above it starts on the terminal of one of the user's own processes, e.g.
- * `sudo` under the pane shell, and the root shell and agent `sudo -i` puts on its own pty (use_pty).
+/** A pane descendant: the unreadable chain above it starts on the terminal of one of the user's own (argv-readable)
+ * processes, e.g. `sudo` under the pane shell, and the root shell and agent `sudo -i` puts on its own pty (use_pty).
  * Root daemons descend only from launchd, and a pane's root `login` opens its own pty under the terminal host, so
  * neither costs a ps. */
 function descendsFromUsersTerminal(
@@ -25,7 +20,7 @@ function descendsFromUsersTerminal(
     if (!parent) {
       return false
     }
-    if (isOwnProcess(parent)) {
+    if (!parent.commandIncomplete) {
       return parent.tdev !== NODEV && parent.tdev === top.tdev
     }
     top = parent
@@ -33,183 +28,90 @@ function descendsFromUsersTerminal(
   return false
 }
 
-/** Which rows the caller asked ps for: `-p` pids, one `-t` terminal, or the whole table. */
-export type CommandSelection = 'pids' | 'tty' | 'all'
+type AuthoritativeCommand = { command: string; cachedAtMs: number }
 
-function needsRecovery(
-  row: LibprocProcessRow,
-  selection: CommandSelection,
-  byPid: ReadonlyMap<number, LibprocProcessRow>
-): boolean {
-  return (
-    row.commandIncomplete === true &&
-    row.status !== SZOMB &&
-    row.status !== SIDL &&
-    (row.flags & P_WEXIT) === 0 &&
-    !isOwnProcess(row) &&
-    (selection === 'pids' ||
-      // After `exec su` no process of ours is left on the terminal; its foreground group is what callers judge.
-      (selection === 'tty' && row.pgid === row.tpgid) ||
-      descendsFromUsersTerminal(row, byPid))
-  )
-}
+// exec can keep pid, start time, comm and executable (node → node with another script) and no cheap field shows it,
+// so a recovered argv is trusted for 30s: a sudo pane costs one targeted ps per process per TTL, other users none.
+const authoritativeCommands = new Map<string, AuthoritativeCommand>()
+const AUTHORITATIVE_COMMAND_LIMIT = 512
+const AUTHORITATIVE_COMMAND_TTL_MS = 30_000
 
-/** A positive answer ages from when its ps started; a failure from when it ended, however long ps took. */
-type Recovered = Answer & { settledAtMs: number }
-
-// exec can keep pid, start time and comm (node → node with another script) and no cheap field shows it, so recovered
-// argv is reused for at most 1.5s (plus the 500ms snapshot cache, under the 2s evidence freshness gate), and every row
-// carries when ps read it so evidence reports its oldest input's age.
-const recovered = new Map<string, Recovered>()
-/** A ps run's answer for one process: its argv (undefined when ps omitted it) and when that ps started. */
-type Answer = { command: string | undefined; readAtMs: number }
-// null when ps timed out or the budget withheld it: that proves nothing.
-const recovering = new Map<string, { startedAtMs: number; answer: Promise<Answer | null> }>()
-const RECOVERED_LIMIT = 512
-const RECOVERED_TTL_MS = 1_500
-// A row ps answered without (exited, or unreadable to it too) waits this long before costing another ps.
-const UNRECOVERED_TTL_MS = 5_000
-
-/** exec keeps pid and start time; comm usually changes, and microseconds split same-second pid reuse. */
+/** exec keeps pid and start time but changes comm and the executable path; microseconds split same-second pid reuse. */
 function commandKey(ctype: string, row: LibprocProcessRow): string {
-  return [ctype, row.pid, row.startSec, row.startUsec ?? '', row.comm].join('\0')
+  return [ctype, row.pid, row.startSec, row.startUsec ?? '', row.comm, row.command ?? ''].join('\0')
 }
 
-function remember(key: string, entry: Recovered): void {
-  // A recovery begun past an older one's window can finish first; the older answer must not replace it.
-  if ((recovered.get(key)?.readAtMs ?? Number.NEGATIVE_INFINITY) > entry.readAtMs) {
-    return
-  }
-  recovered.delete(key)
-  for (const oldest of recovered.keys()) {
-    if (recovered.size < RECOVERED_LIMIT) {
+function rememberCommand(key: string, command: string, now: number): void {
+  authoritativeCommands.delete(key)
+  for (const oldest of authoritativeCommands.keys()) {
+    if (authoritativeCommands.size < AUTHORITATIVE_COMMAND_LIMIT) {
       break
     }
-    recovered.delete(oldest)
+    authoritativeCommands.delete(oldest)
   }
-  recovered.set(key, entry)
+  authoritativeCommands.set(key, { command, cachedAtMs: now })
 }
 
-async function readCommands(
-  pids: readonly number[],
-  env: NodeJS.ProcessEnv,
-  deadline: number,
-  background: boolean
-): Promise<{ commands: ReadonlyMap<number, string>; readAtMs: number } | null> {
-  const requestedAtMs = monotonicNow()
-  try {
-    const result = await runArgvRecoveryPs(
-      ['-ww', '-o', 'pid=,command=', '-p', pids.join(',')],
-      { env, maxOutputBytes: 1024 * 1024 },
-      deadline,
-      background
-    )
-    if (result.timedOut || result.outputTruncated || (result.code !== 0 && result.code !== 1)) {
-      return null
-    }
-    const commands = new Map<number, string>()
-    for (const line of result.stdout.split('\n')) {
-      const match = /^\s*(\d+) (.*)$/.exec(line)
-      if (match) {
-        commands.set(Number(match[1]), match[2])
-      }
-    }
-    // Reuse ages from when ps started, not from a wait for its fork token.
-    return { commands, readAtMs: result.spawnedAtMs ?? requestedAtMs }
-  } catch {
-    return null
-  }
-}
-
-/** Fill argv only setuid ps can read, for the rows this caller selected or that descend from a user's terminal.
- * Concurrent callers share one ps per process; `background` polls yield the recovery budget to interactive reads. */
+/** Fill argv only setuid ps can read, for the rows this caller selected or that descend from a user's terminal. */
 export async function completeCommands(
   rows: LibprocProcessRow[],
-  selection: CommandSelection,
+  selectedByPid: boolean,
   ctype: string,
   env: NodeJS.ProcessEnv,
-  deadline: number,
-  background: boolean,
-  notBeforeMs = Number.NEGATIVE_INFINITY
+  deadline: number
 ): Promise<void> {
   const byPid = new Map(rows.map((row) => [row.pid, row]))
   const now = monotonicNow()
-  const pending: { row: LibprocProcessRow; answer: Promise<Answer | null> }[] = []
   const missing: { row: LibprocProcessRow; key: string }[] = []
   for (const row of rows) {
-    if (!needsRecovery(row, selection, byPid)) {
+    if (
+      !row.commandIncomplete ||
+      row.status === SZOMB_STATUS ||
+      !(selectedByPid || descendsFromUsersTerminal(row, byPid))
+    ) {
       continue
     }
     const key = commandKey(ctype, row)
-    const known = recovered.get(key)
-    // A failure only withholds argv (the row reads unverifiable), never serves stale argv.
-    if (known && known.command === undefined && now - known.settledAtMs < UNRECOVERED_TTL_MS) {
-      continue
-    }
-    if (
-      known?.command !== undefined &&
-      known.readAtMs >= notBeforeMs &&
-      now - known.readAtMs < RECOVERED_TTL_MS
-    ) {
-      row.command = known.command
-      row.commandReadAtMs = known.readAtMs
-      continue
-    }
-    // A run begun too long ago reads argv older than this caller may reuse.
-    const inFlight = recovering.get(key)
-    if (
-      inFlight &&
-      inFlight.startedAtMs >= notBeforeMs &&
-      now - inFlight.startedAtMs < RECOVERED_TTL_MS
-    ) {
-      pending.push({ row, answer: inFlight.answer })
+    const cached = authoritativeCommands.get(key)
+    if (cached && now - cached.cachedAtMs < AUTHORITATIVE_COMMAND_TTL_MS) {
+      row.command = cached.command
     } else {
       missing.push({ row, key })
     }
   }
-  if (deadline <= monotonicNow()) {
+  const timeoutMs = Math.floor(deadline - monotonicNow())
+  if (missing.length === 0 || timeoutMs <= 0) {
     return
   }
-  if (missing.length > 0) {
-    const startedAtMs = monotonicNow()
-    const read = readCommands(
-      missing.map(({ row }) => row.pid),
+  let stdout: string
+  try {
+    const result = await runProcess({
+      program: '/bin/ps',
+      args: ['-ww', '-o', 'pid=,command=', '-p', missing.map(({ row }) => row.pid).join(',')],
       env,
-      deadline,
-      background
-    )
-    for (const { row, key } of missing) {
-      const recovery = {
-        startedAtMs,
-        answer: read.then((result) =>
-          result ? { command: result.commands.get(row.pid), readAtMs: result.readAtMs } : null
-        )
-      }
-      recovering.set(key, recovery)
-      void recovery.answer.then((answer) => {
-        // Only an answer is remembered: a ps that timed out, or a run the budget withheld, proved nothing.
-        if (answer) {
-          remember(key, { ...answer, settledAtMs: monotonicNow() })
-        }
-        if (recovering.get(key) === recovery) {
-          recovering.delete(key)
-        }
-      })
-      pending.push({ row, answer: recovery.answer })
+      timeoutMs,
+      maxOutputBytes: 1024 * 1024
+    })
+    // Unreadable rows keep the executable path and retry next read.
+    if (result.timedOut || result.outputTruncated || (result.code !== 0 && result.code !== 1)) {
+      return
     }
-  }
-  if (pending.length === 0) {
+    stdout = result.stdout
+  } catch {
     return
   }
-  const answers = await beforeDeadline(Promise.all(pending.map(({ answer }) => answer)), deadline)
-  if (answers === DEADLINE_PASSED) {
-    return
-  }
-  pending.forEach(({ row }, index) => {
-    const answer = answers[index]
-    if (answer?.command !== undefined) {
-      row.command = answer.command
-      row.commandReadAtMs = answer.readAtMs
+  const commands = new Map<number, string>()
+  for (const line of stdout.split('\n')) {
+    const match = /^\s*(\d+) (.*)$/.exec(line)
+    if (match) {
+      commands.set(Number(match[1]), match[2])
     }
-  })
+  }
+  for (const { row, key } of missing) {
+    const command = commands.get(row.pid)
+    if (command !== undefined) {
+      row.command = command
+      rememberCommand(key, command, now)
+    }
+  }
 }

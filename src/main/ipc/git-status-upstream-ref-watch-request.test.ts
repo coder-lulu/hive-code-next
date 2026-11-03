@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 
 const mocks = vi.hoisted(() => ({
   gitExec: vi.fn(),

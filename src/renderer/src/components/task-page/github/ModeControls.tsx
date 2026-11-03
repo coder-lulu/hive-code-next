@@ -71,7 +71,7 @@ export function TaskPageGitHubModeControls({
           })}
         </div>
       ) : null}
-      {/* Repository-backed Project rows follow this selection in both GitHub modes. */}
+      {/* Why: Project rows are repo-scoped, so the selection must stay visible in both GitHub modes. */}
       <div className="min-w-0 max-w-[220px] shrink-0">
         <TaskProjectSourceCombobox
           groups={taskPickerGroups}

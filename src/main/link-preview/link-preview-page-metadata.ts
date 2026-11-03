@@ -3,7 +3,7 @@ import {
   findIconHref,
   htmlTagAttributes,
   normalizeHtmlText
-} from '../network/page-metadata/html-head-tags'
+} from '../html-head-tags'
 
 const MAX_TITLE_CHARS = 200
 const MAX_DESCRIPTION_CHARS = 400

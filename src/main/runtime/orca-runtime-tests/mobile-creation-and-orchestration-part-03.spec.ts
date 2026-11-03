@@ -10,7 +10,6 @@ import {
   store,
   syncSinglePty
 } from '../orca-runtime-test-fixtures.spec'
-import { MessageWake } from '../runtime-message-waiters'
 
 describe('OrcaRuntimeService', () => {
   it('leaves rows a live filtered waiter reserved out of the pushed batch', async () => {
@@ -55,7 +54,7 @@ describe('OrcaRuntimeService', () => {
       })
       runtime.notifyMessageArrived(terminal.handle, 'worker_done')
 
-      await expect(waitPromise).resolves.toBeInstanceOf(MessageWake)
+      await expect(waitPromise).resolves.toBe('notified')
       await vi.advanceTimersByTimeAsync(600)
       const payloads = write.mock.calls
         .map(([, data]) => data)
@@ -388,7 +387,7 @@ describe('OrcaRuntimeService', () => {
       const waitPromise = runtime.waitForMessage(mailbox, { timeoutMs: 5_000 })
       runtime.notifyMessageArrived(terminal.handle, 'status')
 
-      await expect(waitPromise).resolves.toBeInstanceOf(MessageWake)
+      await expect(waitPromise).resolves.toBe('notified')
       expect(write).not.toHaveBeenCalled()
       expect(message.delivered_at).toBeNull()
       db.close()
@@ -538,7 +537,7 @@ describe('OrcaRuntimeService', () => {
 
     const waitPromise = runtime.waitForMessage('term_abc', { timeoutMs: 5000 })
     runtime.notifyMessageArrived('term_abc')
-    await expect(waitPromise).resolves.toBeInstanceOf(MessageWake)
+    await expect(waitPromise).resolves.toBe('notified')
   })
 
   it('does not resolve type-filtered message waiters for unrelated message types', async () => {
@@ -623,8 +622,7 @@ describe('OrcaRuntimeService', () => {
     }
   })
 
-  // #24354: a wait follows its terminal, which a renderer reload does not end.
-  it('keeps a terminal wait across a renderer reload until the terminal exits', async () => {
+  it('fails terminal waits closed when the handle goes stale during reload', async () => {
     const runtime = new OrcaRuntimeService(store)
 
     runtime.attachWindow(1)
@@ -652,8 +650,7 @@ describe('OrcaRuntimeService', () => {
     const [terminal] = (await runtime.listTerminals()).terminals
     const waitPromise = runtime.waitForTerminal(terminal.handle, { timeoutMs: 1000 })
     runtime.markRendererReloading(1)
-    await runtime.onPtyExit('pty-1', 0)
 
-    await expect(waitPromise).resolves.toMatchObject({ condition: 'exit', exitCode: 0 })
+    await expect(waitPromise).rejects.toThrow('terminal_handle_stale')
   })
 })

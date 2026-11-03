@@ -17,14 +17,14 @@ type HostScopedPtyProcesses = { processes: PtyProcessInfo[]; hostIds: ExecutionH
 export type PtyInventoryListing = HostScopedPtyProcesses & { stale: boolean }
 
 export abstract class OrcaRuntimeWithPtyControllerInventoryListing extends OrcaRuntimeWithRefreshPtyWorktreeRecordsFromController {
-  /** The newest aggregate listing, which a superseded targeted read can join. */
+  /** The newest aggregate listing, which a superseded targeted read joins instead of re-listing. */
   private latestAggregatePtyInventoryListing: {
     generation: number
     processes: Promise<HostScopedPtyProcesses>
     opts: { deadlineMs: number; includeForegroundProcessEvidence?: boolean }
   } | null = null
 
-  /** Pending polls cannot invalidate an answer; newer accepted answers and lifecycle changes can. */
+  /** Lists the controller's PTYs; `stale` means a newer listing or lifecycle change overtook it. */
   protected async listPtyControllerInventory(
     targeted: boolean,
     deadline: number | undefined,
@@ -37,6 +37,12 @@ export abstract class OrcaRuntimeWithPtyControllerInventoryListing extends OrcaR
     }
     let generation = ++this.ptyControllerInventorySequence
     const providerKey = getConnectionExecutionHostId(connectionId)
+    if (connectionId === undefined) {
+      this.ptyControllerAggregateInventoryGeneration = generation
+    } else {
+      this.ptyControllerInventoryGenerationByProvider.set(providerKey, generation)
+      pruneOldestMapEntry(this.ptyControllerInventoryGenerationByProvider, 512)
+    }
     // Why one deadline: joining newer listings must not extend a deadline-free read without end.
     const overallDeadline = deadline ?? Date.now() + PTY_CONTROLLER_LIST_TIMEOUT_MS
     const listBudget = () =>
@@ -59,14 +65,14 @@ export abstract class OrcaRuntimeWithPtyControllerInventoryListing extends OrcaR
     }
     const isCurrent = () =>
       connectionId === undefined
-        ? this.ptyControllerAggregateInventoryGeneration <= generation &&
+        ? this.ptyControllerAggregateInventoryGeneration === generation &&
           ![...this.ptyControllerInventoryGenerationByProvider.values()].some(
             (provider) => provider > generation
           )
-        : (this.ptyControllerInventoryGenerationByProvider.get(providerKey) ?? 0) <= generation &&
+        : this.ptyControllerInventoryGenerationByProvider.get(providerKey) === generation &&
           this.ptyControllerAggregateInventoryGeneration <= generation
     let result = await withTimeoutResult(processes, listBudgetMs)
-    // A newer census can satisfy a superseded read without another provider request.
+    // Why join: a census begun after ours is fresh enough, and re-listing would supersede it in turn.
     while (result.ok && targeted && connectionId === undefined && !isCurrent()) {
       const newer = this.latestAggregatePtyInventoryListing
       // Never another read's question: same evidence asked, and as long to wait for slow hosts.
@@ -82,18 +88,6 @@ export abstract class OrcaRuntimeWithPtyControllerInventoryListing extends OrcaR
       generation = newer.generation
       result = await withTimeoutResult(newer.processes, listBudget())
     }
-    if (!result.ok) {
-      return null
-    }
-    const stale = !isCurrent()
-    if (!stale) {
-      if (connectionId === undefined) {
-        this.ptyControllerAggregateInventoryGeneration = generation
-      } else {
-        this.ptyControllerInventoryGenerationByProvider.set(providerKey, generation)
-        pruneOldestMapEntry(this.ptyControllerInventoryGenerationByProvider, 512)
-      }
-    }
-    return { ...result.value, stale }
+    return result.ok ? { ...result.value, stale: !isCurrent() } : null
   }
 }

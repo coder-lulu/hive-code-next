@@ -1,7 +1,7 @@
 import type {
   AgentSessionQueuedMessageEditHoldParams,
   AgentSessionQueuedMessageEditHoldResult
-} from './agent-session/requests/agent-session-queued-message-wire'
+} from './agent-session-wire'
 
 /** A quarter of the host's two-minute lease. */
 export const QUEUED_EDIT_LEASE_RENEW_MS = 30_000

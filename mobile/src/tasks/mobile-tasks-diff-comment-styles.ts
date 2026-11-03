@@ -6,7 +6,6 @@ import {
   spacing,
   typography
 } from './mobile-tasks-dependencies'
-import { LIST_ROW_PADDING } from '../components/list/ListGroup'
 
 export const mobileTasksDiffCommentStyles = themedStyleSheet(() => ({
   filePreview: {
@@ -16,7 +15,7 @@ export const mobileTasksDiffCommentStyles = themedStyleSheet(() => ({
   fileDiff: {
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    borderRadius: radii.surface,
+    borderRadius: radii.row,
     overflow: 'hidden'
   },
   diffLineBlock: {
@@ -87,7 +86,7 @@ export const mobileTasksDiffCommentStyles = themedStyleSheet(() => ({
     gap: spacing.sm,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
-    borderRadius: radii.control,
+    borderRadius: radii.card,
     backgroundColor: colors.bgPanel,
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.sm
@@ -123,7 +122,7 @@ export const mobileTasksDiffCommentStyles = themedStyleSheet(() => ({
     borderWidth: 1,
     borderColor: colors.borderSubtle,
     backgroundColor: colors.bgRaised,
-    borderRadius: radii.pill,
+    borderRadius: 999,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2
   },
@@ -155,8 +154,8 @@ export const mobileTasksDiffCommentStyles = themedStyleSheet(() => ({
     marginHorizontal: spacing.md
   },
   setupPromptBox: {
-    backgroundColor: colors.sheetGroup,
-    borderRadius: radii.surface,
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.borderSubtle,
     padding: spacing.md,
@@ -172,17 +171,19 @@ export const mobileTasksDiffCommentStyles = themedStyleSheet(() => ({
   linearStatesBlock: {
     paddingTop: spacing.sm
   },
-  // A line of copy standing in for a row inside a ListGroup.
-  groupNote: {
-    color: colors.textSecondary,
-    fontSize: 13,
-    paddingHorizontal: LIST_ROW_PADDING,
-    paddingVertical: spacing.md
+  linearStatesTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    paddingHorizontal: spacing.md + 2,
+    paddingBottom: spacing.xs
   },
   emptyInlineText: {
     color: colors.textSecondary,
     fontSize: 13,
-    paddingHorizontal: LIST_ROW_PADDING,
+    paddingHorizontal: spacing.md + 2,
     paddingBottom: spacing.md
   }
 }))

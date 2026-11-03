@@ -1,5 +1,4 @@
 import type {
-  ClaudeAccountSelectionChange,
   ClaudeRateLimitAccountsState,
   CodexRateLimitAccountsState
 } from '../../shared/managed-account-types'
@@ -63,7 +62,6 @@ export type ClaudeAccountsApi = {
     runtime?: 'host' | 'wsl'
     wslDistro?: string | null
   }) => Promise<ClaudeRateLimitAccountsState>
-  onSelectedElsewhere?: (callback: (change: ClaudeAccountSelectionChange) => void) => () => void
 }
 
 export type GrokAccountsApi = {

@@ -264,7 +264,7 @@ describe('handleOscLink', () => {
     vi.mocked(getWorkspaceFilePreviewPlan).mockReturnValueOnce({
       status: 'unsupported',
       message: 'nope',
-      reason: 'no-channel'
+      reason: 'outside-worktree'
     })
 
     openDetectedFilePath('/home/me/repo/report.html', null, null, {

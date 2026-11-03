@@ -4,7 +4,7 @@ import {
 } from '../../runtime/structured-agent-launch-composition'
 import { CODEX_STRUCTURED_AGENT } from '../../codex/codex-structured-agent-definition'
 import { afterEach, expect, it, vi } from 'vitest'
-import { openTestAgentSessionRecordStore } from '../../runtime/agent-session/records/agent-session-record-store-test-harness'
+import { openTestAgentSessionRecordStore } from '../../runtime/agent-session-record-store-test-harness'
 import { openTestJournalHostDatabase } from '../agent-session-journal/journal-host-database-test-support'
 import { StructuredAgentSessionHost } from './structured-agent-session-host'
 import { admitAndRunAgentSessionMutation } from './structured-agent-session-mutation-admission'
@@ -200,40 +200,54 @@ function damageFloor(root: string): void {
     .run(SESSION)
 }
 
-it('refuses launch and probe results when saved authority changes during preparation', async () => {
-  rig = await createQueuedMessageTestRig()
-  const identity = {
-    sessionId: SESSION,
-    workspaceId: 'workspace-1',
-    hostId: 'local',
-    agent: 'codex',
-    providerHandle: null
+it.each(['agent part', 'launch directory'])(
+  'refuses launch and probe results when saved authority changes during %s preparation',
+  async (phase) => {
+    rig = await createQueuedMessageTestRig()
+    const identity = {
+      sessionId: SESSION,
+      workspaceId: 'workspace-1',
+      hostId: 'local',
+      agent: 'codex',
+      providerHandle: null
+    }
+    let current = rig.store
+    const damageAuthority = async () => {
+      damageFloor(rig!.root)
+      current = await openTestAgentSessionRecordStore(rig!.root)
+    }
+    const sources = {
+      store: {
+        getRecord: (id: string) => current.getRecord(id),
+        selectWritableRecord: (id: string) => current.selectWritableRecord(id),
+        requireWritableRecord: (id: string) => current.requireWritableRecord(id),
+        pinLaunchDirectory: rig.store.pinLaunchDirectory
+      },
+      resolveWorkspacePath: async () => {
+        if (phase === 'launch directory') {
+          await damageAuthority()
+        }
+        return rig!.root
+      },
+      resolveBaseEnvironment: async () => ({}),
+      resolveAgentEnvironment: async () => ({})
+    }
+    const part = async () => {
+      if (phase === 'agent part') {
+        await damageAuthority()
+      }
+      return { launch: { command: '/fixture/codex' }, env: {}, inheritedEnvToDelete: [] }
+    }
+    await expect(
+      composeStructuredLaunch(
+        CODEX_STRUCTURED_AGENT,
+        sources,
+        part
+      )({ identity, spawnToken: 'fixture-token' })
+    ).rejects.toMatchObject({ refusal: { details: { reason: 'recordUnreadable' } } })
+    current = rig.store
+    await expect(
+      composeStructuredLaunchRead(CODEX_STRUCTURED_AGENT, sources, part)(identity)
+    ).rejects.toMatchObject({ refusal: { details: { reason: 'recordUnreadable' } } })
   }
-  let current = rig.store
-  const sources = {
-    store: {
-      selectWritableRecord: (id: string) => current.selectWritableRecord(id),
-      requireWritableRecord: (id: string) => current.requireWritableRecord(id),
-      pinLaunchDirectory: rig.store.pinLaunchDirectory
-    },
-    resolveWorkspacePath: async () => rig!.root,
-    resolveBaseEnvironment: async () => ({}),
-    resolveAgentEnvironment: async () => ({})
-  }
-  const part = async () => {
-    damageFloor(rig!.root)
-    current = await openTestAgentSessionRecordStore(rig!.root)
-    return { launch: { command: '/fixture/codex' }, env: {}, inheritedEnvToDelete: [] }
-  }
-  await expect(
-    composeStructuredLaunch(
-      CODEX_STRUCTURED_AGENT,
-      sources,
-      part
-    )({ identity, spawnToken: 'fixture-token' })
-  ).rejects.toMatchObject({ refusal: { details: { reason: 'recordUnreadable' } } })
-  current = rig.store
-  await expect(
-    composeStructuredLaunchRead(CODEX_STRUCTURED_AGENT, sources, part)(identity)
-  ).rejects.toMatchObject({ refusal: { details: { reason: 'recordUnreadable' } } })
-})
+)

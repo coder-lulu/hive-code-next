@@ -115,7 +115,6 @@ export type MountedTerminalSurfaceCapture = {
 }
 /** Complete per-worktree inputs constrain builders at compile time rather than relying on review. */
 export type MobileSessionWorktreeInputs = {
-  hostTabIds: ReadonlyMap<string, string>
   worktreeId: string
   worktreeInstanceId: string | undefined
   terminalTabs: AppState['tabsByWorktree'][string]

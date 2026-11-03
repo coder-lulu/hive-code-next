@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { WatcherProcessFailure } from '../watcher-process/parcel-watcher-process-failure'
-import type * as WslBackgroundDistroGate from '../../../wsl-background-distro-gate'
 
 const { createLocalWatcherMock, createWslWatcherMock, statMock, blockedWslDistroForPathMock } =
   vi.hoisted(() => ({
@@ -15,11 +14,8 @@ const { noteWslDistroMayHaveStoppedMock } = vi.hoisted(() => ({
   noteWslDistroMayHaveStoppedMock: vi.fn()
 }))
 vi.mock('../../../wsl/wsl-unc-access-gate', () => ({
+  noteWslDistroMayHaveStopped: noteWslDistroMayHaveStoppedMock,
   blockedWslDistroForPath: blockedWslDistroForPathMock
-}))
-vi.mock('../../../wsl-background-distro-gate', async (importOriginal) => ({
-  ...(await importOriginal<typeof WslBackgroundDistroGate>()),
-  noteWslDistroMayHaveStopped: noteWslDistroMayHaveStoppedMock
 }))
 
 vi.mock('node:fs/promises', () => ({ stat: statMock }))

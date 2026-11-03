@@ -1,6 +1,6 @@
-import { agentSessionConversationView } from '../../shared/agent-session/lifecycle/agent-session-conversation-view'
+import { agentSessionConversationView } from '../../shared/agent-session-conversation-view'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentSessionRecord } from '../../shared/agent-session/lifecycle/agent-session-record'
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import type { IPtyProvider } from '../providers/pty-provider-contract'
 import { ABANDONED_SWEEP_GRACE_MS } from './forced-sweep-settlement'
 
@@ -63,6 +63,8 @@ function installHost(options: {
   visible?: string[]
   /** Detached chats are ordinary idle-sweep results; they remain workspace members without a live child. */
   detached?: Set<string>
+  /** Death evidence lands during tab-restore transaction, between the close observation and the sweep re-read. */
+  exitsDuringTabRestore?: Set<string>
 }): { closed: string[]; visible: Set<string> } {
   const held = new Set(
     options.records
@@ -80,7 +82,6 @@ function installHost(options: {
   }
   hostRef.current = {
     deps: {
-      logger: { warn: vi.fn() },
       store: {
         listRecords: () => options.records,
         listConversations: () => options.records.map(agentSessionConversationView),
@@ -92,13 +93,15 @@ function installHost(options: {
         getSessionTabId: (sessionId: string) => (visible.has(sessionId) ? `tab-${sessionId}` : null)
       }
     },
-    getSessionTabId: (sessionId: string) => (visible.has(sessionId) ? `tab-${sessionId}` : null),
     hasSession: (sessionId: string) => held.has(sessionId),
     getPersistedVisibleSessionTabIndex: () => ({ present: true, sessionIds: [...visible] }),
     setSessionTabVisibility: async (sessionId: string, isVisible: boolean) => {
       if (!isVisible) {
         visible.delete(sessionId)
         return
+      }
+      if (options.exitsDuringTabRestore?.has(sessionId)) {
+        recordExit(sessionId)
       }
       visible.add(sessionId)
     },
@@ -113,7 +116,9 @@ function installHost(options: {
       if (options.unverifiable?.has(sessionId)) {
         return
       }
-      recordExit(sessionId)
+      if (!options.exitsDuringTabRestore?.has(sessionId)) {
+        recordExit(sessionId)
+      }
       if (options.settledThenThrows?.has(sessionId)) {
         throw new Error('the event sink could not be flushed')
       }
@@ -145,26 +150,8 @@ function destructiveDeps(extra: { allowUnverifiedStop?: boolean; timeoutMs?: num
 /** Keys are pinned to the real runtime; each stub narrows its own args to what the case drives. */
 type TeardownRuntimeStubs = Partial<Record<keyof TeardownRuntime, unknown>>
 
-function presentationRuntime() {
-  const retired = new Set<string>()
-  const raw = (sessionId: string) =>
-    retired.has(sessionId) ? null : { worktreeId: WORKTREE, tabId: `raw-${sessionId}` }
-  return {
-    captureStructuredAgentSessionPresentation: (sessionId: string) => ({
-      raw: raw(sessionId),
-      saved: []
-    }),
-    currentLocalStructuredSessionPresentation: raw,
-    removeCapturedStructuredSessionSavedTabs: () => {},
-    retireStructuredAgentSessionTabFromSnapshot: (sessionId: string) => {
-      retired.add(sessionId)
-      return true
-    }
-  }
-}
-
 function runtimeDouble(hooks: TeardownRuntimeStubs): TeardownRuntime {
-  return Object.assign(Object.create(null), presentationRuntime(), hooks)
+  return Object.assign(Object.create(null), hooks)
 }
 
 function livePtyProvider(): IPtyProvider {
@@ -265,6 +252,19 @@ describe('worktree teardown and structured agent sessions', () => {
     warn.mockRestore()
   })
 
+  it('drops the chat tab for a session the sweep proves exited after the close gave up', async () => {
+    // Exit evidence may arrive during tab rollback; the sweep re-read must undo the restored tab when it proves exit.
+    const host = installHost({
+      records: [record('s1', WORKTREE)],
+      visible: ['s1'],
+      exitsDuringTabRestore: new Set(['s1'])
+    })
+    await expect(killAllProcessesForWorktree(WORKTREE, destructiveDeps())).resolves.toMatchObject({
+      structuredStopped: 1
+    })
+    expect([...host.visible]).toEqual([])
+  })
+
   it('names the force escape hatch in the refusal, like the unstopped-PTY gate', async () => {
     installHost({ records: [record('s1', WORKTREE)], stuck: new Set(['s1']) })
     await expect(killAllProcessesForWorktree(WORKTREE, destructiveDeps())).rejects.toThrow(/force/i)
@@ -338,17 +338,13 @@ describe('worktree teardown and structured agent sessions', () => {
   it('takes the proof when a failed close is re-observed as exited', async () => {
     // Later exit evidence can prove a child gone after close threw or restored its tab.
     const retired: string[] = []
-    const runtime: TeardownRuntime = {
-      ...presentationRuntime(),
-      getPtyLivenessVerdict: () => null,
+    const runtime = {
       stopTerminalsForWorktree: async () => ({ stopped: 0 }),
       retireStructuredAgentSessionTabFromSnapshot: (sessionId: string) => {
-        if (!retired.includes(sessionId)) {
-          retired.push(sessionId)
-        }
+        retired.push(sessionId)
         return true
       }
-    }
+    } as never
     installHost({ records: [record('s1', WORKTREE)], settledThenThrows: new Set(['s1']) })
     await expect(
       killAllProcessesForWorktree(WORKTREE, { ...destructiveDeps(), runtime })
@@ -454,13 +450,11 @@ describe('worktree teardown and structured agent sessions', () => {
     // close that already ran, so the count has to survive that return or the removal log claims
     // `structured=0` for chats it just ended.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const runtime: TeardownRuntime = {
-      ...presentationRuntime(),
-      getPtyLivenessVerdict: () => null,
+    const runtime = {
       stopTerminalsForWorktree: async () => {
         throw new Error('the terminal sweep died')
       }
-    }
+    } as never
     const host = installHost({ records: [record('s1', WORKTREE)] })
     const result = await killAllProcessesForWorktree(WORKTREE, {
       ...destructiveDeps({ allowUnverifiedStop: true }),
@@ -615,14 +609,12 @@ describe('worktree teardown and structured agent sessions', () => {
     // PTY sweeps run concurrently to share the deadline: structured refusal can follow already-stopped PTYs.
     // Serializing again would starve terminal stops and let force-delete remove files with open PTY handles.
     let terminalSweeps = 0
-    const runtime: TeardownRuntime = {
-      ...presentationRuntime(),
-      getPtyLivenessVerdict: () => null,
+    const runtime = {
       stopTerminalsForWorktree: async () => {
         terminalSweeps += 1
         return { stopped: 2 }
       }
-    }
+    } as never
     installHost({ records: [record('s1', WORKTREE)], stuck: new Set(['s1']) })
     await expect(
       killAllProcessesForWorktree(WORKTREE, { ...destructiveDeps(), runtime })
@@ -638,14 +630,12 @@ describe('worktree teardown and structured agent sessions', () => {
     })
     installHost({ records: [record('s1', WORKTREE)], closeGate })
     let terminalSweepStarted = false
-    const runtime: TeardownRuntime = {
-      ...presentationRuntime(),
-      getPtyLivenessVerdict: () => null,
+    const runtime = {
       stopTerminalsForWorktree: async () => {
         terminalSweepStarted = true
         return { stopped: 0 }
       }
-    }
+    } as never
     const removal = killAllProcessesForWorktree(WORKTREE, { ...destructiveDeps(), runtime })
     await vi.waitFor(() => {
       expect(terminalSweepStarted).toBe(true)
@@ -671,17 +661,13 @@ describe('worktree teardown and structured agent sessions', () => {
   it('retires it from the live tab snapshot as well as the durable index', async () => {
     // Durable index hiding alone leaves the live snapshot tab able to reattach this session.
     const retired: string[] = []
-    const runtime: TeardownRuntime = {
-      ...presentationRuntime(),
-      getPtyLivenessVerdict: () => null,
+    const runtime = {
       stopTerminalsForWorktree: async () => ({ stopped: 0 }),
       retireStructuredAgentSessionTabFromSnapshot: (sessionId: string) => {
-        if (!retired.includes(sessionId)) {
-          retired.push(sessionId)
-        }
+        retired.push(sessionId)
         return true
       }
-    }
+    } as never
     installHost({
       records: [record('s1', WORKTREE)],
       detached: new Set(['s1']),

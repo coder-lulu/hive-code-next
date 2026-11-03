@@ -20,9 +20,7 @@ const cheapProcessTableReader = createProcessTableSnapshotReader<CheapProcessTab
     const options = {
       env: psLocaleEnvironment(),
       timeoutMs: PS_TIMEOUT_MS,
-      maxOutputBytes: PS_MAX_BUFFER_BYTES,
-      // Steady-state polls: their fallbacks wait behind interactive reads.
-      background: true
+      maxOutputBytes: PS_MAX_BUFFER_BYTES
     }
     const result =
       (await runPsInProcess(CHEAP_PS_ARGS, options)) ??

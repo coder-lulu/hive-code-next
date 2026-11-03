@@ -1,4 +1,3 @@
-import { launchDraftSource } from '@/components/native-chat/native-chat-launch-draft-source'
 import { assertWorkspaceAttachmentWriteCapability } from '../../runtime/runtime-workspace-attachment-capabilities'
 import { getWorkspaceAttachments } from '../../../../shared/workspace-attachments'
 import type { StateCreator } from 'zustand'
@@ -33,7 +32,10 @@ import {
   reconcileFailedFolderWorkspaceUpdate
 } from './folder-workspace-catalog'
 import { getFolderWorkspaceHostId } from '../../../../shared/folder-workspace-execution-host'
-import * as chatDrafts from '../slices/worktrees/teardown/removed-worktree-chat-drafts'
+import {
+  captureWorkspaceChatDraftKeys,
+  deleteWorkspaceChatDrafts
+} from '../slices/worktrees/teardown/removed-worktree-chat-drafts'
 
 export type FolderWorkspaceUpdateField = keyof FolderWorkspaceUpdates
 
@@ -262,7 +264,7 @@ export function createFolderWorkspaceMutationActions(
       }
       const workspaceKey = folderWorkspaceKey(folderWorkspaceId)
       // Why before the host call: its announcement can start a refresh that drops these tabs.
-      const chatDraftKeys = chatDrafts.captureWorkspaceChatDraftKeys(state, [
+      const chatDraftKeys = captureWorkspaceChatDraftKeys(state, [
         { workspaceId: workspaceKey, executionHostId: ownerHostId }
       ])
       try {
@@ -288,19 +290,13 @@ export function createFolderWorkspaceMutationActions(
           ),
           folderWorkspacePathStatuses: {}
         }))
-        const origin = target.kind === 'local' ? 'local' : `runtime:${target.environmentId}`
-        chatDrafts.deleteWorkspaceChatDraftOwners(
-          chatDraftKeys,
-          (owner, scope) =>
-            owner.workspaceId === workspaceKey && launchDraftSource(scope)?.origin === origin
-        )
         if (!get().folderWorkspaces.some((workspace) => workspace.id === folderWorkspaceId)) {
           // Folder/worktree browser registry keys coincide; retire Chromium guests before renderer cleanup.
           await Promise.resolve(get().shutdownWorktreeBrowsers(workspaceKey))
           // Why here too: a server-hosted folder's local pages use this desktop's profile, which the server can't reach.
           void get().deleteManagedBrowserSessionProfile({ kind: 'worktree', id: workspaceKey })
           get().purgeWorktreeTerminalState([workspaceKey])
-          chatDrafts.deleteWorkspaceChatDrafts(chatDraftKeys)
+          deleteWorkspaceChatDrafts(chatDraftKeys)
         }
         return true
       } catch (err) {

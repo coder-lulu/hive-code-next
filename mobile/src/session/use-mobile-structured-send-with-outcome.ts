@@ -1,32 +1,25 @@
-import { selectAgentSessionCurrentRequests } from '../../../src/shared/agent-session/requests/agent-session-current-requests'
+import { selectAgentSessionCurrentRequests } from '../../../src/shared/agent-session-current-requests'
 
 import { useCallback } from 'react'
-import { runningStructuredAgentSessionTurnId } from '../../../src/shared/agent-session/view/structured-agent-session-live-turn'
-import { mobileStructuredAgentSessionWorking } from './mobile-structured-agent-session-working'
+import { runningStructuredAgentSessionTurnId } from '../../../src/shared/structured-agent-session-live-turn'
 import { structuredSessionBackgroundTasksView } from '../../../src/shared/structured-session-background-tasks-view'
-import { agentSessionVisibleFailureFacts } from '../../../src/shared/agent-session/failures/agent-session-visible-failures'
+import { agentSessionVisibleFailureFacts } from '../../../src/shared/agent-session-visible-failures'
 import { tuiAgentDisplayName } from '../../../src/shared/tui-agent-display-names'
-import { pendingPromptsAllUnanswerableHere } from '../../../src/shared/agent-session/agent-session-approval-subject'
+import { pendingPromptsAllUnanswerableHere } from '../../../src/shared/agent-session-approval-subject'
 import {
   SkillRefLimitError,
   structuredAgentSessionSendBody,
   type StructuredAgentSessionAttachment,
   type StructuredAgentSessionSendControl
-} from '../../../src/shared/agent-session/requests/structured-agent-session-send-mutation'
-import type { AgentJournalSkillRef } from '../../../src/shared/agent-session/journal/agent-session-journal-types'
+} from '../../../src/shared/structured-agent-session-send-mutation'
+import type { AgentJournalSkillRef } from '../../../src/shared/agent-session-journal-types'
 import { MAX_SKILL_REFS } from '../../../src/shared/rpc-contract/structured-agent-session-message-params'
-import type { StructuredAgentSessionComposerOptions } from '../../../src/shared/agent-session/view/structured-agent-session-composer'
-import type { AgentSessionSlashCommand } from '../../../src/shared/agent-session/agent-session-wire'
-import type { StructuredAgentSessionState } from '../../../src/shared/agent-session/structured-agent-session-reducer'
-import {
-  structuredAgentSessionFollowUpsQueue,
-  structuredAgentSessionQueueEnabled
-} from '../../../src/shared/agent-session/view/structured-agent-session-queued-cards'
+import type { StructuredAgentSessionComposerOptions } from '../../../src/shared/structured-agent-session-composer'
+import type { AgentSessionSlashCommand } from '../../../src/shared/agent-session-wire'
+import type { StructuredAgentSessionState } from '../../../src/shared/structured-agent-session-reducer'
+import { structuredAgentSessionQueueEnabled } from '../../../src/shared/structured-agent-session-queued-cards'
 import type { RpcClient } from '../transport/rpc-client'
-import type {
-  MobileNativeChatSendIntent,
-  MobileNativeChatSendOutcome
-} from './native-chat/mobile-native-chat-send'
+import type { MobileNativeChatSendOutcome } from './native-chat/mobile-native-chat-send'
 import { dispatchMobileStructuredCommand } from './mobile-structured-composer-command'
 import type { MobileNativeChatSendErrorReporter } from './native-chat/use-mobile-native-chat-send-error'
 import { sendMobileStructuredAgentSessionMessage } from './mobile-structured-agent-session-send'
@@ -40,20 +33,15 @@ import {
   actionableStructuredQuestion
 } from './mobile-structured-actionable-prompt'
 
-/** The desktop's rule: the alternate flips the setting first, then the queue's own rules decide. */
 export function mobileStructuredSendQueues(
   queueCapable: boolean,
   queueFollowUps: boolean,
-  state: Pick<StructuredAgentSessionState, 'items' | 'currentRequests' | 'queuedMessages'>,
-  send: { alternate?: boolean; isWorking: boolean; stopping: boolean } = {
-    isWorking: false,
-    stopping: false
-  }
+  state: Pick<StructuredAgentSessionState, 'items' | 'currentRequests' | 'queuedMessages'>
 ): boolean {
   return (
     queueCapable &&
     structuredAgentSessionQueueEnabled(
-      structuredAgentSessionFollowUpsQueue(queueFollowUps, send),
+      queueFollowUps,
       state,
       selectAgentSessionCurrentRequests(state)
     )
@@ -98,8 +86,7 @@ export function useMobileStructuredSendWithOutcome(args: {
   images?: string[],
   deadline?: number,
   attachments?: readonly StructuredMobileSendAttachment[],
-  skills?: readonly AgentJournalSkillRef[],
-  intent?: MobileNativeChatSendIntent
+  skills?: readonly AgentJournalSkillRef[]
 ) => Promise<MobileNativeChatSendOutcome> {
   const {
     accept,
@@ -129,8 +116,7 @@ export function useMobileStructuredSendWithOutcome(args: {
       images?: string[],
       deadline?: number,
       attachments?: readonly StructuredMobileSendAttachment[],
-      pickedSkills?: readonly AgentJournalSkillRef[],
-      intent?: MobileNativeChatSendIntent
+      pickedSkills?: readonly AgentJournalSkillRef[]
     ): Promise<MobileNativeChatSendOutcome> => {
       const currentFence = stateRef.current.fence
       if (!client || !sessionId || !enabled || currentFence === null) {
@@ -162,7 +148,7 @@ export function useMobileStructuredSendWithOutcome(args: {
           const turnId = runningStructuredAgentSessionTurnId(state)
           const tasks = structuredSessionBackgroundTasksView(state.backgroundTasks, turnId)
           return {
-            working: mobileStructuredAgentSessionWorking(state) || queueSendsNext,
+            working: turnId !== null || queueSendsNext,
             prompt: Boolean(
               actionableStructuredApproval(state) || actionableStructuredQuestion(state)
             ),
@@ -221,12 +207,7 @@ export function useMobileStructuredSendWithOutcome(args: {
         text: wireText,
         attachments: imageAttachments,
         skills,
-        // Resolved from the chat as it is now: a hold-menu choice made mid-turn may land after it.
-        ...(mobileStructuredSendQueues(queueCapable, queueFollowUps, stateRef.current, {
-          alternate: intent?.alternate,
-          isWorking: mobileStructuredAgentSessionWorking(stateRef.current) || queueSendsNext,
-          stopping
-        })
+        ...(mobileStructuredSendQueues(queueCapable, queueFollowUps, stateRef.current)
           ? { delivery: 'queue-if-active' as const }
           : {}),
         ...captured,

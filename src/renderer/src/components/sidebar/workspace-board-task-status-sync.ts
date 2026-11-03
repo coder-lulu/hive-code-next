@@ -1,5 +1,3 @@
-import { getLinearSourceScope } from '@/store/slices/linear/linear-slice-scope'
-import { confirmLinearIssueWrite } from '@/store/slices/linear/linear-issue-publication'
 import { linearGetIssue, linearUpdateIssue } from '@/runtime/runtime-linear-issue-mutations'
 import { linearTeamStates } from '@/runtime/runtime-linear-project-client'
 import type { LinearMutationResult, RuntimeLinearSettings } from '@/runtime/runtime-linear-client'
@@ -34,48 +32,47 @@ type WorkspaceBoardTaskStatusSyncDependencies = {
   updateIssue: typeof linearUpdateIssue
 }
 
-/** Cards are keyed by host identity: same-id copies on two hosts each sync their own linked issue. */
 export type SyncWorkspaceBoardTaskStatusesArgs = {
-  worktreeKeys: readonly string[]
+  worktreeIds: readonly string[]
   targetStatus: WorkspaceStatusDefinition
-  worktreesByKey: ReadonlyMap<
+  worktreesById: ReadonlyMap<
     string,
     Pick<Worktree, 'linkedLinearIssue' | 'linkedLinearIssueWorkspaceId'>
   >
   settings?: RuntimeLinearSettings
   /** `null` refuses the worktree: its owner is ambiguous, so no host's Linear settings apply. */
-  getSettingsForWorktree?: (worktreeKey: string) => RuntimeLinearSettings | null
-  getLatestWorkspaceStatus: (worktreeKey: string) => WorkspaceStatus | null | undefined
+  getSettingsForWorktree?: (worktreeId: string) => RuntimeLinearSettings | null
+  getLatestWorkspaceStatus: (worktreeId: string) => WorkspaceStatus | null | undefined
   deps?: Partial<WorkspaceBoardTaskStatusSyncDependencies>
 }
 
 export type WorkspaceBoardTaskStatusSyncRequest = {
-  worktreeKeys: string[]
+  worktreeIds: string[]
   targetStatus: WorkspaceStatusDefinition
 }
 
 export function getWorkspaceBoardTaskStatusSyncRequest(args: {
   enabled: boolean
-  worktreeKeys: readonly string[]
+  worktreeIds: readonly string[]
   status: WorkspaceStatus
-  worktreesByKey: ReadonlyMap<string, Pick<Worktree, 'workspaceStatus'>>
+  worktreesById: ReadonlyMap<string, Pick<Worktree, 'workspaceStatus'>>
   workspaceStatuses: readonly WorkspaceStatusDefinition[]
 }): WorkspaceBoardTaskStatusSyncRequest | null {
-  if (!args.enabled || args.worktreeKeys.length === 0) {
+  if (!args.enabled || args.worktreeIds.length === 0) {
     return null
   }
   const targetStatus = args.workspaceStatuses.find((item) => item.id === args.status)
   if (!targetStatus) {
     return null
   }
-  const changedWorktreeKeys = [...new Set(args.worktreeKeys)].filter((key) => {
-    const worktree = args.worktreesByKey.get(key)
+  const changedWorktreeIds = [...new Set(args.worktreeIds)].filter((worktreeId) => {
+    const worktree = args.worktreesById.get(worktreeId)
     return worktree ? getWorkspaceStatus(worktree, args.workspaceStatuses) !== args.status : false
   })
-  if (changedWorktreeKeys.length === 0) {
+  if (changedWorktreeIds.length === 0) {
     return null
   }
-  return { worktreeKeys: changedWorktreeKeys, targetStatus }
+  return { worktreeIds: changedWorktreeIds, targetStatus }
 }
 
 const defaultDeps: WorkspaceBoardTaskStatusSyncDependencies = {
@@ -152,23 +149,23 @@ function mergeResult(
 }
 
 async function enqueueWorktreeSync(
-  worktreeKey: string,
+  worktreeId: string,
   task: () => Promise<WorkspaceBoardTaskStatusSyncResult>
 ): Promise<WorkspaceBoardTaskStatusSyncResult> {
-  const previous = worktreeSyncQueues.get(worktreeKey) ?? Promise.resolve()
+  const previous = worktreeSyncQueues.get(worktreeId) ?? Promise.resolve()
   const next = previous.catch(() => undefined).then(task)
   const cleanup = next.finally(() => {
-    if (worktreeSyncQueues.get(worktreeKey) === cleanup) {
-      worktreeSyncQueues.delete(worktreeKey)
+    if (worktreeSyncQueues.get(worktreeId) === cleanup) {
+      worktreeSyncQueues.delete(worktreeId)
     }
   })
-  worktreeSyncQueues.set(worktreeKey, cleanup)
+  worktreeSyncQueues.set(worktreeId, cleanup)
   return next
 }
 
 async function syncLinearWorktreeStatus(
   args: SyncWorkspaceBoardTaskStatusesArgs,
-  worktreeKey: string,
+  worktreeId: string,
   deps: WorkspaceBoardTaskStatusSyncDependencies
 ): Promise<WorkspaceBoardTaskStatusSyncResult> {
   const result: WorkspaceBoardTaskStatusSyncResult = {
@@ -177,19 +174,18 @@ async function syncLinearWorktreeStatus(
     failed: 0,
     messages: []
   }
-  const worktree = args.worktreesByKey.get(worktreeKey)
+  const worktree = args.worktreesById.get(worktreeId)
   if (!worktree?.linkedLinearIssue) {
     return skipped(result)
   }
 
   // Legacy callers without source settings route to this computer.
   const settings = args.getSettingsForWorktree
-    ? args.getSettingsForWorktree(worktreeKey)
+    ? args.getSettingsForWorktree(worktreeId)
     : (args.settings ?? { kind: 'local' })
   if (!settings) {
     return skipped(result, { kind: 'owner-ambiguous', issueIdentifier: worktree.linkedLinearIssue })
   }
-  const scope = getLinearSourceScope(settings)
   const linkedWorkspaceId = worktree.linkedLinearIssueWorkspaceId ?? undefined
 
   try {
@@ -223,7 +219,7 @@ async function syncLinearWorktreeStatus(
     }
 
     // Board moves are local-first; a slow provider read must not let an older move overwrite a newer one.
-    if (args.getLatestWorkspaceStatus(worktreeKey) !== args.targetStatus.id) {
+    if (args.getLatestWorkspaceStatus(worktreeId) !== args.targetStatus.id) {
       return skipped(result)
     }
 
@@ -240,7 +236,6 @@ async function syncLinearWorktreeStatus(
         detail: updateResult.error
       })
     }
-    confirmLinearIssueWrite({ scope, id: issue.id })
     result.updated += 1
     return result
   } catch (error) {
@@ -263,11 +258,11 @@ export async function syncWorkspaceBoardTaskStatuses(
     messages: []
   }
 
-  const uniqueKeys = new Set(args.worktreeKeys)
+  const uniqueIds = new Set(args.worktreeIds)
   await Promise.all(
-    [...uniqueKeys].map(async (worktreeKey) => {
-      const item = await enqueueWorktreeSync(worktreeKey, () =>
-        syncLinearWorktreeStatus(args, worktreeKey, deps)
+    [...uniqueIds].map(async (worktreeId) => {
+      const item = await enqueueWorktreeSync(worktreeId, () =>
+        syncLinearWorktreeStatus(args, worktreeId, deps)
       )
       mergeResult(aggregate, item)
     })

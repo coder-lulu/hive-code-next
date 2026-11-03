@@ -15,7 +15,6 @@ function handle(): NativeChatComposerHandle {
   return {
     focus: vi.fn(() => true),
     insertTypedText: vi.fn(() => true),
-    insertAgentReferences: () => false,
     acceptsText: vi.fn(() => true),
     appendText: vi.fn(),
     handlePasteEvent: vi.fn(),

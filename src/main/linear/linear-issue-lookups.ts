@@ -1,7 +1,3 @@
-import {
-  LINEAR_AUTHENTICATION_ERROR,
-  isIntegrationCredentialDecryptionError
-} from '../../shared/integration-credential-errors'
 import type { LinearIssue } from '../../shared/linear/issue-types'
 import type { LinearWorkspaceSelection } from '../../shared/linear/workspace-types'
 import { acquire, release } from './linear-request-concurrency'
@@ -85,7 +81,7 @@ async function readIssueWithSignal(
       if (isAuthError(error)) {
         clearToken(entry.workspace.id)
         if (shouldThrowAuthError(workspaceId)) {
-          throw new Error(LINEAR_AUTHENTICATION_ERROR)
+          throw error
         }
       } else {
         console.warn('[linear] getIssue failed:', error)
@@ -193,7 +189,7 @@ export async function searchIssues(
     return []
   }
 
-  const results = await Promise.allSettled(
+  const results = await Promise.all(
     entries.map(async (entry) => {
       await acquire()
       try {
@@ -206,31 +202,21 @@ export async function searchIssues(
       } catch (error) {
         if (isAuthError(error)) {
           clearToken(entry.workspace.id)
+          if (shouldThrowAuthError(workspaceId)) {
+            throw error
+          }
         } else {
           console.warn('[linear] searchIssues failed:', error)
         }
-        throw error
+        return []
       } finally {
         release()
       }
     })
   )
-  const successful = results.flatMap((result) =>
-    result.status === 'fulfilled' ? result.value : []
-  )
-  const failure = results.find((result) => result.status === 'rejected')
-  if (failure?.status === 'rejected' && results.every((result) => result.status === 'rejected')) {
-    if (isIntegrationCredentialDecryptionError(failure.reason)) {
-      throw failure.reason
-    }
-    if (results.some((result) => result.status === 'rejected' && isAuthError(result.reason))) {
-      throw new Error(LINEAR_AUTHENTICATION_ERROR)
-    }
-    throw new Error('Unable to load Linear issues. Try again.')
-  }
   // Single-workspace results must retain Linear relevance ranking instead of updatedAt order.
   if (entries.length === 1) {
-    return successful.slice(0, limit)
+    return results.flat().slice(0, limit)
   }
-  return sortAndLimitIssues(successful, limit)
+  return sortAndLimitIssues(results.flat(), limit)
 }

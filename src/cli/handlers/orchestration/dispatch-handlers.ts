@@ -1,12 +1,12 @@
 import type { CommandHandler } from '../../dispatch'
-import { printOrchestrationReceipt } from './agent-view'
+import { printResult } from '../../format'
 import { getOptionalStringFlag, getRequiredStringFlag } from '../../flags'
 import { RuntimeClientError } from '../../runtime-client'
 import { orchestrationMigrationData } from '../../../shared/orchestration-rpc-contract'
 import { callOrchestrationMutation } from './mutation-request'
 import { isDevCliInvocation } from './runtime-compatibility'
 import { resolveCoordinatorTerminalHandle } from './terminal-identity'
-import { injectedSessionAddress } from '../../../shared/agent-session/lifecycle/agent-session-caller-env'
+import { injectedSessionAddress } from '../../../shared/agent-session-caller-env'
 
 export const ORCHESTRATION_DISPATCH_HANDLER: Record<string, CommandHandler> = {
   'orchestration dispatch': async ({ flags, client, cwd, json }) => {
@@ -29,7 +29,7 @@ export const ORCHESTRATION_DISPATCH_HANDLER: Record<string, CommandHandler> = {
       returnPreamble,
       devMode: isDevCliInvocation()
     })
-    printOrchestrationReceipt(result, { flags, json }, (value) => {
+    printResult(result, json, (value) => {
       if (value.dryRun) {
         return value.preamble ?? ''
       }
@@ -57,7 +57,7 @@ export const ORCHESTRATION_DISPATCH_INSPECTION_HANDLERS: Record<string, CommandH
       from,
       devMode: isDevCliInvocation()
     })
-    printOrchestrationReceipt(result, { flags, json }, (value) => {
+    printResult(result, json, (value) => {
       if (value.preamble && showPreamble) {
         return value.preamble
       }

@@ -65,6 +65,7 @@ export function TaskPageLinearIssueList({
       {selectedLinearProject && linearProjectTab === 'issues' ? (
         <>
           <LinearCollectionNotice
+            errors={linearProjectIssuesResult.errors}
             hasMore={showLinearEmptyFilteredLoadMore}
             count={linearProjectIssuesResult.items.length}
             kind="projectIssues"
@@ -86,6 +87,7 @@ export function TaskPageLinearIssueList({
       ) : selectedLinearCustomView?.model === 'issue' ? (
         <>
           <LinearCollectionNotice
+            errors={linearCustomViewIssuesResult.errors}
             hasMore={showLinearEmptyFilteredLoadMore}
             count={linearCustomViewIssuesResult.items.length}
             kind="viewIssues"

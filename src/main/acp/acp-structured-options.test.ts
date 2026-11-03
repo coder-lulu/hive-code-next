@@ -11,11 +11,11 @@ import { recordedOmpOptions } from './acp-thinking-options.test-fixture'
 import { SessionConfigSelectOptionSchema } from './generated/acp-protocol.generated'
 import { AgentModelCatalogStore } from '../native-chat/agent-model-catalog/agent-model-catalog-store'
 import { agentModelCatalogListingKey } from '../native-chat/agent-model-catalog/agent-model-catalog-entry'
-import { OMP_SESSION_OPTION_CATALOG } from '../../shared/agent-session/options/agent-session-option-catalog-omp'
+import { OMP_SESSION_OPTION_CATALOG } from '../../shared/agent-session-option-catalog-omp'
 import {
   applyStructuredAgentSessionModelCatalog,
   createStructuredAgentSessionOptionState
-} from '../../shared/agent-session/options/structured-agent-session-options'
+} from '../../shared/structured-agent-session-options'
 
 const mobileProducer = { AcpStructuredOptions } satisfies AcpCommandOptionsFixtureModule
 
@@ -333,7 +333,7 @@ describe('ACP session options', () => {
               reasoningEfforts: [{ value: 'medium', default: true }]
             }
           },
-          // Display declarations do not change the legacy marker policy.
+          // Session-selected effort metadata must not become a model default.
           {
             modelId: 'model-b',
             name: 'Model B',
@@ -352,14 +352,12 @@ describe('ACP session options', () => {
         label: 'Model A',
         isDefault: false,
         efforts: [{ value: 'medium', label: 'Medium' }],
-        defaultEffort: 'medium',
-        declaredDefaultEffort: 'medium'
+        defaultEffort: 'medium'
       },
       {
         id: 'model-b',
         label: 'Model B',
         isDefault: false,
-        declaredDefaultEffort: 'high',
         efforts: [
           { value: 'low', label: 'Low' },
           { value: 'high', label: 'High' }

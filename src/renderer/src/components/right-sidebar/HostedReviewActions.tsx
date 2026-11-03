@@ -337,16 +337,12 @@ export default function HostedReviewActions({
     )
   }
   if (review.state === 'merged') {
-    // Why: a merge can report failure yet land; the reread then shows merged and the write's error must stay visible.
     return (
-      <div className="flex flex-col items-start gap-1.5">
-        <MergedReviewActions
-          isMainWorktree={worktree.isMainWorktree}
-          isDeletingWorktree={isDeletingWorktree}
-          onDeleteWorktree={handleDeleteWorktree}
-        />
-        <HostedReviewActionError message={actionError} />
-      </div>
+      <MergedReviewActions
+        isMainWorktree={worktree.isMainWorktree}
+        isDeletingWorktree={isDeletingWorktree}
+        onDeleteWorktree={handleDeleteWorktree}
+      />
     )
   }
 

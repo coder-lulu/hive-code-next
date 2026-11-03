@@ -14,7 +14,6 @@ import { findVisibleBrowserLinkTarget } from './visible-browser-link-target'
 import type { TabSplitTarget } from '@/store/slices/tabs/tabs-slice-contract'
 import { isLiveLinkOpenGroup, liveLinkOpenGroupIds, type LinkOpenIntent } from './link-open-intent'
 import { runtimeEnvironmentIdOrLocalUnlessTwin } from './worktree-runtime-owner'
-import { resolveLinkOpenSidePlacement } from './adjacent-link-open-group'
 
 export type BrowserLinkDestination = {
   worktreeId: string
@@ -288,12 +287,14 @@ export function selectBrowserLinkDestination(
         : focusedGroupId && liveGroups.has(focusedGroupId)
           ? focusedGroupId
           : [...liveGroups][0]
-    const placement = resolveLinkOpenSidePlacement({
-      layout: state.layoutByWorktree[worktreeId],
-      groups,
-      sourceGroupId
-    })
-    return { status: 'ready', ...placement, match: null }
+    if (sourceGroupId && groups.find((group) => group.id === sourceGroupId)?.activeTabId) {
+      return {
+        status: 'ready',
+        split: { sourceGroupId, splitDirection: 'right', activate: false },
+        match: null
+      }
+    }
+    groupId = sourceGroupId
   }
   const group = groups.find((item) => item.id === groupId)
   const ids = group ? [group.activeTabId, ...group.tabOrder] : []

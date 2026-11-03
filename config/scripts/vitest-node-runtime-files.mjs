@@ -276,7 +276,7 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/main/sqlite/**/*.test.ts',
   'src/main/orca-profiles/**/*.test.ts',
   'src/main/managed-data-accounts/**/*.test.ts',
-  'src/main/startup/quit/quit-path-durable-write-blocking.test.ts',
+  'src/main/quit-path-durable-write-blocking.test.ts',
   'src/main/automations/automation-worker-durability.test.ts',
   'src/**/*.node-pty.test.ts',
   'src/**/node-pty-*.test.ts',
@@ -294,6 +294,8 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/**/*expiry*.test.ts',
   'src/renderer/src/lib/flatten-retained-slice.test.ts',
   'src/shared/own-retained-string.test.ts',
+  // Times V8 string flattening, which is what Electron main runs.
+  'src/main/runtime/terminal-tail-redraw-wall-time.test.ts',
   'src/main/agent-hooks/server-transport-interference.test.ts',
   'src/main/plugins/workers/plugin-worker-supervision.integration.test.ts',
   // Reconciliation loads the real native Parcel watcher; Bun can abort on Linux ARM.
@@ -343,6 +345,7 @@ export const NODE_RUNTIME_INCLUDE = [
   'src/renderer/src/components/terminal-pane/terminal-pane-host-state-memo.test.ts',
   'src/renderer/src/components/automations/use-automation-runs-dashboard-payload.test.tsx',
   'src/renderer/src/components/right-sidebar/parent-pr-checks-projection-selector.test.ts',
+  'src/renderer/src/store/github/cache-persistence.test.ts',
   'src/main/native-chat/agent-session-journal/**/*.test.ts',
   'src/main/native-chat/agent-session-wire/structured-agent-session-terminal-writer-acquire.test.ts',
   'src/main/native-chat/agent-session-wire/structured-agent-session-status-feed.test.ts',

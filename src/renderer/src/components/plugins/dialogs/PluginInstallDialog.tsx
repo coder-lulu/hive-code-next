@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { PluginHostInstallSource } from '../../../../../preload/api-types'
 import { translate } from '@/i18n/i18n'
@@ -14,14 +14,8 @@ import {
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs'
-import type { PluginGitSourceResolution } from '../../../../../shared/plugins/installation/plugin-git-resolution'
 import { parsePluginInstallSource } from '../presentation/plugin-install-source'
 import { pluginInstallErrorMessage } from '../presentation/plugin-error-presentation'
-import {
-  pluginGitInputErrorMessage,
-  pluginGitResolutionErrorMessage,
-  pluginGitResolutionSummary
-} from '../presentation/plugin-git-install-presentation'
 
 type PluginInstallDialogProps = {
   open: boolean
@@ -29,115 +23,65 @@ type PluginInstallDialogProps = {
   onInstall: (source: PluginHostInstallSource) => Promise<void>
   /** The tab it opens on; remount (key) to apply a new one. */
   initialKind?: 'local-path' | 'git'
-  resolveGitSource?: (args: { url: string; ref: string }) => Promise<PluginGitSourceResolution>
 }
 
-type ResolvedGitSource = Extract<PluginGitSourceResolution, { ok: true }>
-
-function resolveGitSourceInMain(args: {
-  url: string
-  ref: string
-}): Promise<PluginGitSourceResolution> {
-  return window.api.plugins.resolveGitSource(args)
+function installValidationMessage(reason: string): string {
+  switch (reason) {
+    case 'missing-local-path':
+      return translate(
+        'auto.components.settings.PluginInstallDialog.localRequired',
+        'Enter the plugin folder path.'
+      )
+    case 'missing-git-url':
+      return translate(
+        'auto.components.settings.PluginInstallDialog.gitUrlRequired',
+        'Enter a repository URL.'
+      )
+    case 'invalid-git-url':
+      return translate(
+        'auto.components.settings.PluginInstallDialog.gitUrlInvalid',
+        'Use an HTTPS or SSH Git URL.'
+      )
+    default:
+      return translate(
+        'auto.components.settings.PluginInstallDialog.gitRefRequired',
+        'Add a #tag or #commit, like #v0.1.0.'
+      )
+  }
 }
 
 export function PluginInstallDialog({
   open,
   onOpenChange,
   onInstall,
-  initialKind = 'local-path',
-  resolveGitSource = resolveGitSourceInMain
+  initialKind = 'local-path'
 }: PluginInstallDialogProps): React.JSX.Element {
   const [kind, setKind] = useState<'local-path' | 'git'>(initialKind)
   const [localPath, setLocalPath] = useState('')
   const [gitUrl, setGitUrl] = useState('')
-  // Why a separate step: the user sees the exact version and commit before anything downloads.
-  const [resolvedGit, setResolvedGit] = useState<ResolvedGitSource | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [busy, setBusy] = useState<'resolving' | 'installing' | null>(null)
-  const awaitingGitResolution = kind === 'git' && !resolvedGit
-  // Why: an edit while a check is in flight must not show the old URL's version.
-  const gitInputVersion = useRef(0)
-
-  const install = async (source: PluginHostInstallSource): Promise<void> => {
-    setBusy('installing')
-    try {
-      await onInstall(source)
-    } catch (cause) {
-      console.warn('[plugins] installation failed:', cause)
-      setError(pluginInstallErrorMessage(cause))
-      // Why: a retry checks the repository again instead of reusing a possibly moved commit.
-      setResolvedGit(null)
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  const resolveGit = async (source: { url: string; ref: string }): Promise<void> => {
-    setBusy('resolving')
-    const version = gitInputVersion.current
-    try {
-      const resolution = await resolveGitSource(source)
-      if (version !== gitInputVersion.current) {
-        return
-      }
-      if (resolution.ok) {
-        setResolvedGit(resolution)
-      } else {
-        setError(pluginGitResolutionErrorMessage(resolution))
-      }
-    } catch (cause) {
-      if (version !== gitInputVersion.current) {
-        return
-      }
-      console.warn('[plugins] Git source resolution failed:', cause)
-      setError(pluginGitResolutionErrorMessage({ ok: false, reason: 'unreachable', error: '' }))
-    } finally {
-      setBusy(null)
-    }
-  }
+  const [installing, setInstalling] = useState(false)
 
   const submit = async (): Promise<void> => {
-    if (kind === 'git' && resolvedGit) {
-      setError(null)
-      await install({
-        kind: 'git',
-        url: resolvedGit.url,
-        ref: resolvedGit.ref,
-        expectedCommit: resolvedGit.commit
-      })
-      return
-    }
     const parsed = parsePluginInstallSource(kind, kind === 'git' ? gitUrl : localPath)
     if (!parsed.ok) {
-      setError(
-        parsed.reason === 'missing-local-path'
-          ? translate(
-              'auto.components.settings.PluginInstallDialog.localRequired',
-              'Enter the plugin folder path.'
-            )
-          : pluginGitInputErrorMessage(parsed.reason)
-      )
+      setError(installValidationMessage(parsed.reason))
       return
     }
     setError(null)
-    const { source } = parsed
-    await (source.kind === 'git'
-      ? resolveGit({ url: source.url, ref: source.ref })
-      : install(source))
-  }
-
-  // Why only installing blocks closing: a version check can wait on a slow remote for minutes.
-  const dismiss = (): void => {
-    if (busy === 'installing') {
-      return
+    setInstalling(true)
+    try {
+      await onInstall(parsed.source)
+    } catch (cause) {
+      console.warn('[plugins] installation failed:', cause)
+      setError(pluginInstallErrorMessage(cause))
+    } finally {
+      setInstalling(false)
     }
-    gitInputVersion.current += 1
-    onOpenChange(false)
   }
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => (nextOpen ? onOpenChange(true) : dismiss())}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !installing && onOpenChange(nextOpen)}>
       <DialogContent surface="security" scrollable className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>
@@ -216,33 +160,21 @@ export function PluginInstallDialog({
                 id="plugin-git-url"
                 className="font-mono text-xs"
                 value={gitUrl}
-                onChange={(event) => {
-                  setGitUrl(event.target.value)
-                  gitInputVersion.current += 1
-                  setResolvedGit(null)
-                  setError(null)
-                }}
+                onChange={(event) => setGitUrl(event.target.value)}
                 placeholder={translate(
                   'auto.components.settings.PluginInstallDialog.gitPlaceholder',
-                  'https://github.com/acme/orca-notes'
+                  'https://git.example/acme/orca-notes#v0.1.0'
                 )}
                 spellCheck={false}
                 aria-invalid={kind === 'git' && Boolean(error)}
                 aria-describedby={error ? 'plugin-install-error' : undefined}
               />
-              {resolvedGit ? (
-                <div className="space-y-1 rounded-md border border-border bg-muted/30 px-2.5 py-2 text-xs">
-                  <p className="text-foreground">{pluginGitResolutionSummary(resolvedGit)}</p>
-                  <p className="break-all font-mono text-muted-foreground">{resolvedGit.url}</p>
-                </div>
-              ) : (
-                <p className="text-xs leading-5 text-muted-foreground">
-                  {translate(
-                    'auto.components.settings.PluginInstallDialog.gitHelp',
-                    'Paste a repository, release, or tag link. Without #tag or #commit, Orca uses the latest version tag.'
-                  )}
-                </p>
-              )}
+              <p className="text-xs leading-5 text-muted-foreground">
+                {translate(
+                  'auto.components.settings.PluginInstallDialog.gitHelp',
+                  'End with #tag or #commit to pin a version'
+                )}
+              </p>
             </TabsContent>
           </Tabs>
           {error ? (
@@ -255,33 +187,23 @@ export function PluginInstallDialog({
               type="button"
               variant="ghost"
               size="sm"
-              disabled={busy === 'installing'}
-              onClick={dismiss}
+              disabled={installing}
+              onClick={() => onOpenChange(false)}
             >
               {translate('auto.components.settings.PluginInstallDialog.cancel', 'Cancel')}
             </Button>
-            <Button type="submit" size="sm" className="w-31" disabled={busy !== null}>
-              {busy ? <Loader2 className="animate-spin" /> : null}
-              {submitLabel(busy, awaitingGitResolution)}
+            <Button type="submit" size="sm" className="w-31" disabled={installing}>
+              {installing ? <Loader2 className="animate-spin" /> : null}
+              {installing
+                ? translate(
+                    'auto.components.settings.PluginInstallDialog.installing',
+                    'Installing…'
+                  )
+                : translate('auto.components.settings.PluginInstallDialog.install', 'Install')}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
   )
-}
-
-function submitLabel(
-  busy: 'resolving' | 'installing' | null,
-  awaitingGitResolution: boolean
-): string {
-  if (busy === 'resolving') {
-    return translate('auto.components.settings.PluginInstallDialog.checking', 'Checking…')
-  }
-  if (busy === 'installing') {
-    return translate('auto.components.settings.PluginInstallDialog.installing', 'Installing…')
-  }
-  return awaitingGitResolution
-    ? translate('auto.components.settings.PluginInstallDialog.continue', 'Continue')
-    : translate('auto.components.settings.PluginInstallDialog.install', 'Install')
 }

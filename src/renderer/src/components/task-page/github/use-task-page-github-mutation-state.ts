@@ -11,8 +11,8 @@ import type { TaskPageGitHubPatchWorkItem } from '@/components/task-page/github/
 import { useAppStore } from '@/store/index'
 import { useTaskPageGitHubWorkItemMutation } from '@/hooks/useTaskPageGitHubWorkItemMutation'
 import { rebuildSoftHiddenKeysFromPendingAndSticky } from '@/components/task-page/github/task-page-github-work-item-mutation-composition'
-import { getTaskPageRepoSourceContext } from '../../../lib/task-repo-source-context'
-import { useTaskPageSourceDisplay } from '../use-task-page-source-display'
+import { buildGitHubRepoUrl } from '../../../../../shared/github/links'
+import { getTaskPageRepoSourceContext } from '../task-page-source-context'
 export function useTaskPageGitHubMutationState(model: TaskPageLinearCreationStateModel) {
   const {
     selectedRepos,
@@ -24,7 +24,8 @@ export function useTaskPageGitHubMutationState(model: TaskPageLinearCreationStat
     githubViewerLogin,
     setGitHubViewerLogin,
     pages,
-    patchTaskPageWorkItemRows
+    patchTaskPageWorkItemRows,
+    perRepoSourceState
   } = model
   const activeGithubTaskKind = getGitHubTaskKind(activeTaskPreset, appliedTaskSearch)
   const appliedTaskQuery = useMemo(() => parseTaskQuery(appliedTaskSearch), [appliedTaskSearch])
@@ -128,6 +129,25 @@ export function useTaskPageGitHubMutationState(model: TaskPageLinearCreationStat
     scheduleQuietRevalidate,
     taskSource
   ])
+  const selectedGitHubRepoExternalLink = useMemo(() => {
+    if (selectedRepos.length !== 1) {
+      return null
+    }
+    const [repo] = selectedRepos
+    const sourceState = perRepoSourceState.find((state) => state.repoId === repo.id)
+    const sources = sourceState?.sources
+    const slug =
+      activeGithubTaskKind === 'issues'
+        ? (sources?.issues ?? sources?.prs)
+        : (sources?.prs ?? sources?.issues)
+    const url = buildGitHubRepoUrl(slug)
+    return url
+      ? {
+          url,
+          label: slug ? `${slug.owner}/${slug.repo}` : repo.displayName
+        }
+      : null
+  }, [activeGithubTaskKind, perRepoSourceState, selectedRepos])
   const nextModel = model as typeof model & {
     activeGithubTaskKind: typeof activeGithubTaskKind
     appliedTaskQuery: typeof appliedTaskQuery
@@ -136,6 +156,7 @@ export function useTaskPageGitHubMutationState(model: TaskPageLinearCreationStat
     patchCoordinatedGitHubWorkItem: typeof patchCoordinatedGitHubWorkItem
     githubWorkItemMutation: typeof githubWorkItemMutation
     observedQuietScopeRef: typeof observedQuietScopeRef
+    selectedGitHubRepoExternalLink: typeof selectedGitHubRepoExternalLink
   }
   nextModel.activeGithubTaskKind = activeGithubTaskKind
   nextModel.appliedTaskQuery = appliedTaskQuery
@@ -144,6 +165,7 @@ export function useTaskPageGitHubMutationState(model: TaskPageLinearCreationStat
   nextModel.patchCoordinatedGitHubWorkItem = patchCoordinatedGitHubWorkItem
   nextModel.githubWorkItemMutation = githubWorkItemMutation
   nextModel.observedQuietScopeRef = observedQuietScopeRef
-  return useTaskPageSourceDisplay(nextModel)
+  nextModel.selectedGitHubRepoExternalLink = selectedGitHubRepoExternalLink
+  return nextModel
 }
 export type TaskPageGitHubMutationStateModel = ReturnType<typeof useTaskPageGitHubMutationState>

@@ -5,9 +5,8 @@ import { resolveCliCommand } from '../../shared/node-cli-command-resolution'
 
 const WINDOWS_DRIVE_MOUNT_TYPES = new Set(['drvfs', '9p', 'virtiofs'])
 
-import { ORCAD_WSL_HOST_ENV } from '../../shared/orcad-server-launch-env'
-
-export { ORCAD_WSL_HOST_ENV }
+/** WSL-host launch marker; SSH guests and WSLg retain their original PATH. */
+export const ORCAD_WSL_HOST_ENV = 'ORCA_WSL_ORCAD_HOST'
 
 let cachedGuestMounts: readonly string[] | null = null
 

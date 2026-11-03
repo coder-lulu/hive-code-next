@@ -48,7 +48,7 @@ export function useWorktreeDocumentDrop(args: {
           ? ctx.computeWorktreeStatusDrop({
               pointerY: event.clientY,
               status: target.status,
-              draggedKeys: session.reorderDraggedKeys
+              draggedIds: session.reorderDraggedIds
             })
           : null
         if (target.status && statusDrop) {
@@ -72,7 +72,7 @@ export function useWorktreeDocumentDrop(args: {
       ctx.onReorderWorktrees({
         groups: ctx.worktreeDragGroups,
         sourceGroupKey: session.sourceGroupKey,
-        draggedKeys: session.reorderDraggedKeys,
+        draggedIds: session.reorderDraggedIds,
         dropIndex: getFullDropIndexForWorktreeDragUnit({
           groups: ctx.worktreeDragUnitGroups,
           sourceGroupKey: session.sourceGroupKey,

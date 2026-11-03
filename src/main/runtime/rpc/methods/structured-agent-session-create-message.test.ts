@@ -1,8 +1,8 @@
 import '../unused-default-rpc-methods.test-fixture'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY } from '../../../../shared/agent-session/agent-session-runtime-capabilities'
-import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../../../shared/agent-session/agent-session-create-capabilities'
-import { structuredAgentSessionCreateParams } from '../../../../shared/agent-session/structured-agent-session-create'
+import { STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY } from '../../../../shared/protocol-version'
+import { AGENT_SESSION_CREATE_MESSAGE_RUNTIME_CAPABILITY } from '../../../../shared/agent-session-create-capabilities'
+import { structuredAgentSessionCreateParams } from '../../../../shared/structured-agent-session-create'
 import {
   createRestTestRig,
   restTestSend,
@@ -208,9 +208,7 @@ it('replaces unrelated host model defaults before the first acquisition', async 
     ok: true
   })
   await vi.waitFor(() => expect(rig.adapter.acquire).toHaveBeenCalledOnce())
-  expect(rig.adapter.acquire).toHaveBeenCalledWith(
-    expect.objectContaining({ options: { model: 'held-model' } })
-  )
+  expect(rig.store.requireWritableRecord(SESSION).options).toEqual({ model: 'held-model' })
 })
 
 it('keeps the seeded permission mode beside explicit picks on an acquired create', async () => {
@@ -234,8 +232,16 @@ it('keeps the seeded permission mode beside explicit picks on an acquired create
       resolveStructuredAgentSessionCreateIntent
     })
   ).toMatchObject({ ok: true, result: { ok: true } })
+  expect(rig.store.requireWritableRecord(SESSION)).toMatchObject({
+    options: { model: 'held-model' },
+    permissionMode: 'full-access'
+  })
+  expect(rig.store.requireWritableRecord(SESSION).options).not.toHaveProperty('effort')
   expect(rig.adapter.acquire).toHaveBeenCalledWith(
-    expect.objectContaining({ options: { model: 'held-model' }, permissionMode: 'full-access' })
+    expect.objectContaining({
+      identity: expect.objectContaining({ sessionId: SESSION, agent: 'codex', hostId: 'local' }),
+      permissionMode: 'full-access'
+    })
   )
 })
 
@@ -252,7 +258,7 @@ it('keeps the remembered model under a permission mode picked alone on an acquir
     provider: 'codex',
     agent: 'codex',
     accountHome: { variable: 'CODEX_HOME', path: '/host/.codex' },
-    options: { model: 'saved', effort: 'low', permissionMode: 'full-access' },
+    options: { model: 'saved', effort: 'low', fastMode: 'false', permissionMode: 'full-access' },
     runtimeKind: 'native'
   })
   expect(
@@ -260,8 +266,17 @@ it('keeps the remembered model under a permission mode picked alone on an acquir
       resolveStructuredAgentSessionCreateIntent
     })
   ).toMatchObject({ ok: true, result: { ok: true } })
+  expect(rig.store.requireWritableRecord(SESSION).options).toEqual({
+    model: 'saved',
+    effort: 'low',
+    fastMode: 'false'
+  })
+  expect(rig.store.requireWritableRecord(SESSION).permissionMode).toBe('ask')
   expect(rig.adapter.acquire).toHaveBeenCalledWith(
-    expect.objectContaining({ options: { model: 'saved', effort: 'low' }, permissionMode: 'ask' })
+    expect.objectContaining({
+      identity: expect.objectContaining({ sessionId: SESSION, agent: 'codex', hostId: 'local' }),
+      permissionMode: 'ask'
+    })
   )
 })
 

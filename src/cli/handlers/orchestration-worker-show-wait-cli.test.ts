@@ -11,7 +11,6 @@ vi.mock('../selectors', () => ({ getTerminalHandle: vi.fn() }))
 import { ORCHESTRATION_HANDLERS } from './orchestration'
 import { printResult } from '../format'
 import { okFixture } from '../test-fixtures'
-import { orchestrationTestContext } from './orchestration-handler-test-context'
 
 async function showWorker(observation: unknown): Promise<string> {
   const result = {
@@ -20,16 +19,12 @@ async function showWorker(observation: unknown): Promise<string> {
     ...(observation === undefined ? {} : { observation })
   }
   callMock.mockResolvedValue(okFixture('req_show', result))
-  await ORCHESTRATION_HANDLERS['orchestration worker-show'](
-    orchestrationTestContext(
-      callMock,
-      new Map<string, string | boolean>([
-        ['full', true],
-        ['dispatch', 'ctx_1']
-      ]),
-      false
-    )
-  )
+  await ORCHESTRATION_HANDLERS['orchestration worker-show']({
+    flags: new Map<string, string | boolean>([['dispatch', 'ctx_1']]),
+    client: { call: callMock },
+    cwd: '/tmp/repo',
+    json: false
+  } as never)
   expect(callMock).toHaveBeenCalledExactlyOnceWith('orchestration.workerShow', {
     dispatch: 'ctx_1'
   })

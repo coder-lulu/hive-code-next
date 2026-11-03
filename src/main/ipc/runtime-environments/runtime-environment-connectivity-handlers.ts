@@ -178,12 +178,9 @@ export function registerRuntimeEnvironmentConnectivityHandlers({
   )
 }
 
-export function registerRuntimeEnvironmentPassiveHandlers(
-  getUserDataPath: () => string,
-  recordAnswer?: RecordRuntimeEnvironmentAnswer
-): void {
+export function registerRuntimeEnvironmentPassiveHandlers(getUserDataPath: () => string): void {
   registerPassiveStatusHandler(getUserDataPath)
-  registerPassiveCallHandler(getUserDataPath, recordAnswer)
+  registerPassiveCallHandler(getUserDataPath)
 }
 
 function closeLegacySelectorTransport(selector: string, environmentId: string): void {
@@ -218,16 +215,7 @@ function registerPassiveStatusHandler(getUserDataPath: () => string): void {
   )
 }
 
-type RecordRuntimeEnvironmentAnswer = (
-  environment: ReturnType<typeof resolveEnvironment>,
-  method: string,
-  response: RuntimeRpcResponse<unknown>
-) => void
-
-function registerPassiveCallHandler(
-  getUserDataPath: () => string,
-  recordAnswer?: RecordRuntimeEnvironmentAnswer
-): void {
+function registerPassiveCallHandler(getUserDataPath: () => string): void {
   ipcMain.handle(
     'runtimeEnvironments:call',
     async (
@@ -291,7 +279,6 @@ function registerPassiveCallHandler(
         throw error
       }
       observeWslOrcadHostResponse(environment.id, args.method, response)
-      recordAnswer?.(environment, args.method, response)
       return isRuntimeEnvironmentManuallyDisconnected(environment.id)
         ? manuallyDisconnectedResponse(environment)
         : response

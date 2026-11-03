@@ -1,8 +1,7 @@
-import type { TerminalExitCause } from './terminal-exit-cause'
 /** Only owning-host evidence proves exit. Lost relay/contact or incomplete provider inventory is unverifiable,
  * never proof of death or a successful stop. */
 export type PtyLivenessVerdict =
-  | { status: 'exited'; incarnationId?: string; cause?: TerminalExitCause }
+  | { status: 'exited' }
   | { status: 'live'; ptyIds: string[] }
   | { status: 'unverifiable'; reason: string }
 

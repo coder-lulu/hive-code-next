@@ -1,4 +1,3 @@
-import { waitForTabRegistration } from '../ipc/browser-tab-registration-wait'
 import * as mocks from './orca-runtime-test-mocks.spec'
 import type { MockInstance } from 'vitest'
 import * as worktreeChangeInvalidators from '../ipc/worktree-change-invalidators'
@@ -81,7 +80,6 @@ function resetRuntimeTestMocks(): void {
   setRuntimeDesktopSurface({
     showNotification: () => true,
     findWindowById: (id) => electronMocks.BrowserWindow.fromId(id) as never,
-    waitForBrowserTabRegistration: waitForTabRegistration,
     onIpc: (channel, listener) => electronMocks.ipcMain.on(channel, listener as never),
     removeIpcListener: (channel, listener) =>
       electronMocks.ipcMain.removeListener(channel, listener as never)

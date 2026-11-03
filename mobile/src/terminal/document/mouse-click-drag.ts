@@ -134,9 +134,7 @@ export function attachSurfaceMouseClickDragHandler(
       if (dispatcherShouldBlockSurface(scope) || !scope.term) {
         return
       }
-      notify(scope, { type: 'terminal-interaction' })
-      // Why: a pointerup lost outside the WebView must not leave the previous
-      // gesture latched (tracking press with no release) when the next one lands.
+      // Clear stale gestures when outside-WebView pointerup was lost.
       if (scope.mouseGesture) {
         abandonMouseGesture(scope)
       }

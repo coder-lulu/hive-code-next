@@ -1,8 +1,3 @@
-import {
-  AGENT_LAUNCH_CHOICE_KEYS,
-  normalizeAgentLaunchChoices,
-  normalizeAgentModelOptionChoices
-} from './agent-launch-choices'
 import { agentPermissionHostPlatform, permissionEnvNameMatches } from './agent-permission-env'
 import type { GlobalSettings } from './global-settings-types'
 import {
@@ -91,11 +86,7 @@ export function liftAgentPermissionEnv(
 type AgentPermissionProfile = Required<
   Pick<
     GlobalSettings,
-    | 'agentDefaultArgs'
-    | 'agentDefaultEnv'
-    | 'agentLaunchChoices'
-    | 'agentPermissionDefault'
-    | 'agentPermissionOverrides'
+    'agentDefaultArgs' | 'agentDefaultEnv' | 'agentPermissionDefault' | 'agentPermissionOverrides'
   >
 >
 
@@ -106,14 +97,10 @@ export function migrateAgentPermissionChoice(
 ): AgentPermissionProfile {
   const args = { ...settings.agentDefaultArgs }
   const env = { ...settings.agentDefaultEnv }
-  const typed = hasTypedAgentPermission(settings)
-  const agentLaunchChoices = normalizeAgentLaunchChoices(settings.agentLaunchChoices)
-  if (typed && settings.agentLaunchChoices !== undefined) {
+  if (hasTypedAgentPermission(settings)) {
     return {
-      ...settings,
       agentDefaultArgs: args,
       agentDefaultEnv: env,
-      agentLaunchChoices,
       agentPermissionDefault: settings.agentPermissionDefault ?? 'own',
       agentPermissionOverrides: normalizeAgentPermissionOverrides(settings.agentPermissionOverrides)
     }
@@ -121,34 +108,14 @@ export function migrateAgentPermissionChoice(
   const choices = new Map<TuiAgent, AgentPermissionChoice>()
   const counts = new Map<AgentPermissionChoice, number>()
   for (const agent of PERMISSION_CHOICE_AGENTS) {
-    const result = reconcileAgentChoiceArgs({
-      agent,
-      userArgs: args[agent] ?? '',
-      choices: {
-        ...agentLaunchChoices[agent],
-        ...(typed ? { permissionMode: resolveAgentPermission(agent, settings).choice } : {})
-      },
-      mode: 'load',
-      keys:
-        settings.agentLaunchChoices === undefined
-          ? AGENT_LAUNCH_CHOICE_KEYS
-          : new Set(['permissionMode'])
-    })
-    const model = normalizeAgentModelOptionChoices(result.choices)
-    if (model) {
-      agentLaunchChoices[agent] = model
-    }
-    if (args[agent] !== undefined || result.userArgs) {
-      args[agent] = result.userArgs
-    }
-    const fromEnv =
-      typed || result.choices.permissionMode
-        ? null
-        : liftAgentPermissionEnv(agent, env[agent], platform)
-    if (fromEnv?.choice && env[agent]) {
+    const fromArgs = liftAgentPermissionArgs(agent, args[agent])
+    const fromEnv = fromArgs.choice ? null : liftAgentPermissionEnv(agent, env[agent], platform)
+    if (fromArgs.choice) {
+      args[agent] = fromArgs.args
+    } else if (fromEnv?.choice && env[agent]) {
       env[agent] = fromEnv.env
     }
-    const choice = result.choices.permissionMode ?? fromEnv?.choice ?? 'own'
+    const choice = fromArgs.choice ?? fromEnv?.choice ?? 'own'
     choices.set(agent, choice)
     counts.set(choice, (counts.get(choice) ?? 0) + 1)
   }
@@ -168,12 +135,7 @@ export function migrateAgentPermissionChoice(
   return {
     agentDefaultArgs: args,
     agentDefaultEnv: env,
-    agentLaunchChoices,
-    agentPermissionDefault: typed
-      ? (settings.agentPermissionDefault ?? 'own')
-      : agentPermissionDefault,
-    agentPermissionOverrides: typed
-      ? normalizeAgentPermissionOverrides(settings.agentPermissionOverrides)
-      : agentPermissionOverrides
+    agentPermissionDefault,
+    agentPermissionOverrides
   }
 }

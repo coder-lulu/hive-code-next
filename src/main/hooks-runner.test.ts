@@ -7,14 +7,12 @@ import type { Repo } from '../shared/repo-types'
 
 import { describe, expect, it, vi } from 'vitest'
 
-const { execFileSyncMock, statSyncMock } = vi.hoisted(() => ({
-  execFileSyncMock: vi.fn(),
-  statSyncMock: vi.fn()
+const { execFileSyncMock } = vi.hoisted(() => ({
+  execFileSyncMock: vi.fn()
 }))
 
 vi.mock('fs', () => ({
   readFileSync: vi.fn(),
-  statSync: statSyncMock,
   existsSync: vi.fn(),
   mkdirSync: vi.fn(),
   writeFileSync: vi.fn(),
@@ -27,16 +25,6 @@ vi.mock('child_process', () => ({
   execFile: vi.fn(),
   spawn: vi.fn()
 }))
-
-// Answers a WSL worktree's `.git` link the way the distro's Git wrote it.
-function linkWslWorktree(fs: typeof NodeFs, gitdir: string): void {
-  statSyncMock.mockImplementation((path: string) => ({
-    isDirectory: () => !path.endsWith('.git')
-  }))
-  vi.mocked(fs.readFileSync).mockImplementation((path) =>
-    String(path).endsWith('.git') ? `gitdir: ${gitdir}\n` : ''
-  )
-}
 
 describe('createSetupRunnerScript', () => {
   const makeRepo = () =>
@@ -60,7 +48,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = await createSetupRunnerScript(
+      const result = createSetupRunnerScript(
         makeRepo(),
         'C:\\repo\\feature\\',
         'pnpm install\npnpm build'
@@ -105,7 +93,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = await createSetupRunnerScript(
+      const result = createSetupRunnerScript(
         { ...makeRepo(), path: 'C:\\Users\\jinwo\\git\\orca' },
         'C:\\repo\\feature',
         '#!/usr/bin/env bash\npnpm install',
@@ -150,7 +138,7 @@ describe('createSetupRunnerScript', () => {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
       const { TERMINAL_GIT_CREDENTIAL_GUARD_POLICY_ENV } =
         await import('../shared/terminal-git-credential-guard')
-      const result = await createSetupRunnerScript(
+      const result = createSetupRunnerScript(
         makeRepo(),
         'C:\\repo\\feature',
         'pnpm install',
@@ -172,7 +160,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = await createSetupRunnerScript(
+      const result = createSetupRunnerScript(
         { ...makeRepo(), path: 'C:\\Users\\jinwo\\git\\orca' },
         'C:\\repo\\feature',
         'pnpm install'
@@ -255,7 +243,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = await createSetupRunnerScript(makeRepo(), '/test/repo-feature', 'pnpm install')
+      const result = createSetupRunnerScript(makeRepo(), '/test/repo-feature', 'pnpm install')
 
       expect(result.envVars).toEqual(
         expect.objectContaining({
@@ -275,8 +263,7 @@ describe('createSetupRunnerScript', () => {
     const fs = await import('node:fs')
     const originalPlatform = process.platform
 
-    execFileSyncMock.mockClear()
-    linkWslWorktree(fs, '/home/jin/.git/worktrees/feature')
+    execFileSyncMock.mockReturnValue('/home/jin/.git/worktrees/feature/orca/setup-runner.sh')
     Object.defineProperty(process, 'platform', {
       configurable: true,
       value: 'win32'
@@ -284,7 +271,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = await createSetupRunnerScript(
+      const result = createSetupRunnerScript(
         {
           ...makeRepo(),
           path: 'C:\\Users\\jinwo\\git\\orca'
@@ -313,11 +300,7 @@ describe('createSetupRunnerScript', () => {
         '\\\\wsl.localhost\\Ubuntu\\home\\jin\\.git\\worktrees\\feature\\orca\\setup-runner.sh',
         0o755
       )
-      // The link answers it: Git in a distro would be a synchronous wsl.exe on the main thread.
-      expect(execFileSyncMock).not.toHaveBeenCalled()
     } finally {
-      vi.mocked(fs.readFileSync).mockReset()
-      statSyncMock.mockReset()
       Object.defineProperty(process, 'platform', {
         configurable: true,
         value: originalPlatform
@@ -329,8 +312,7 @@ describe('createSetupRunnerScript', () => {
     const fs = await import('node:fs')
     const originalPlatform = process.platform
 
-    execFileSyncMock.mockClear()
-    linkWslWorktree(fs, '/home/jin/repo/.git/worktrees/feature')
+    execFileSyncMock.mockReturnValue('/home/jin/repo/.git/worktrees/feature/orca/setup-runner.sh')
     Object.defineProperty(process, 'platform', {
       configurable: true,
       value: 'win32'
@@ -338,7 +320,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = await createSetupRunnerScript(
+      const result = createSetupRunnerScript(
         makeRepo(),
         '\\\\wsl.localhost\\Ubuntu\\home\\jin\\repo\\feature',
         'pnpm install'
@@ -364,11 +346,7 @@ describe('createSetupRunnerScript', () => {
         '\\\\wsl.localhost\\Ubuntu\\home\\jin\\repo\\.git\\worktrees\\feature\\orca\\setup-runner.sh',
         0o755
       )
-      // The link answers it: Git in a distro would be a synchronous wsl.exe on the main thread.
-      expect(execFileSyncMock).not.toHaveBeenCalled()
     } finally {
-      vi.mocked(fs.readFileSync).mockReset()
-      statSyncMock.mockReset()
       Object.defineProperty(process, 'platform', {
         configurable: true,
         value: originalPlatform

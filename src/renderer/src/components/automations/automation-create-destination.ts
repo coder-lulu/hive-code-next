@@ -6,8 +6,7 @@ import type {
 } from '../../../../shared/automation-owner-ref'
 import type { AutomationDestination } from '../../../../shared/automation-owner-precondition'
 import { hostStableKey, isSameAutomationOwner } from '../../../../shared/automation-owner-key'
-import { getRepoSshConnectionId, parseExecutionHostId } from '../../../../shared/execution-host'
-import type { Repo } from '../../../../shared/repo-types'
+import { parseExecutionHostId } from '../../../../shared/execution-host'
 import type {
   AutomationCatalogHydrationEvidence,
   AutomationHostCatalogEntry
@@ -148,33 +147,22 @@ export function automationCreateProjectMismatch(
   projectId: string
 ): boolean {
   const table = tables.get(automationAuthorityCatalogKey(destination.authority))
-  const selector = destination.destination.selector
-  const connectionId = table
-    ? repoConnectionIdIn(table, selector.kind === 'ssh' ? selector.targetId : null)(projectId)
-    : undefined
+  const connectionId = table ? repoConnectionIdIn(table)(projectId) : undefined
   if (connectionId === undefined) {
     return true
   }
+  const selector = destination.destination.selector
   return selector.kind === 'ssh' ? connectionId !== selector.targetId : connectionId !== null
 }
 
-/**
- * The projects a destination can hold, filtered by the rule submit already
- * enforces, so the form cannot offer a pairing its own check will refuse.
- */
-export function automationCreateEligibleProjects<
-  TProject extends Pick<Repo, 'id' | 'connectionId' | 'executionHostId'>
->(
+/** Offer only project/destination pairs the submit check accepts. */
+export function automationCreateEligibleProjects<TProject extends { id: string }>(
   tables: AutomationAuthorityRepoTables,
   destination: AutomationCreateDestination,
   projects: readonly TProject[]
 ): TProject[] {
-  const selector = destination.destination.selector
-  const connectionId = selector.kind === 'ssh' ? selector.targetId : null
   return projects.filter(
-    (project) =>
-      getRepoSshConnectionId(project) === connectionId &&
-      !automationCreateProjectMismatch(tables, destination, project.id)
+    (project) => !automationCreateProjectMismatch(tables, destination, project.id)
   )
 }
 

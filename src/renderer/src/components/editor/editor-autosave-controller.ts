@@ -110,8 +110,7 @@ export function attachEditorAutosaveController(store: AppStoreApi): () => void {
       }
       detail.resolve()
     } catch (error) {
-      // Why pass Errors whole: a plugin's denial must reach the toast with its reason.
-      detail.reject(error instanceof Error ? error : String(error))
+      detail.reject(String((error as Error)?.message ?? error))
     }
   }
 

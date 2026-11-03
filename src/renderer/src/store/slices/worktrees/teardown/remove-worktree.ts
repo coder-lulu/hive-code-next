@@ -1,6 +1,7 @@
-import { getRepoIdFromWorktreeId, type WorktreeSlice } from '../../worktree-helpers'
+import type { WorktreeSlice } from '../../worktree-helpers'
 import type { WorktreeSliceGet, WorktreeSliceSet } from '../listing/worktree-slice-types'
 import type { RemoveWorktreeResult } from '../../../../../../shared/worktree/create-types'
+import { getRepoIdFromWorktreeId } from '../../worktree-helpers'
 import { parseExecutionHostId } from '../../../../../../shared/execution-host'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { runtimeTargetForOwnerEnvironment } from '../../../../runtime/runtime-client-target'
@@ -38,10 +39,7 @@ import { recordRemovedWorktreeSnapshotPrune } from './removed-worktree-snapshot-
 import { clearSessionCommitDraftForWorktree } from '@/lib/source-control-commit-draft-session'
 import { dispatchWorktreeRemoval } from './dispatch-worktree-removal'
 import { tearDownRemovedWorktreeRendererState } from './removed-worktree-renderer-teardown'
-import {
-  captureWorktreeStateBeforeRemoval,
-  retireWorktreeDraftOwners
-} from './worktree-state-before-removal'
+import { captureWorktreeStateBeforeRemoval } from './worktree-state-before-removal'
 import { resolveWorktreeRemovalPreference } from './worktree-removal-preference'
 import { completePreservedBranchCleanup } from './complete-preserved-branch-cleanup'
 
@@ -104,7 +102,7 @@ export function createRemoveWorktree(
         worktreeId,
         requiredExecutionHostId
       )
-      let beforeRemoval = captureWorktreeStateBeforeRemoval(get(), worktreeId, hostId)
+      const beforeRemoval = captureWorktreeStateBeforeRemoval(get(), worktreeId, hostId)
       if (!policy.forgetLocalOnly) {
         removalGenerationGuard?.assertCurrent()
       }
@@ -165,8 +163,6 @@ export function createRemoveWorktree(
           throw error
         }
       }
-
-      beforeRemoval = retireWorktreeDraftOwners(beforeRemoval)
 
       if (!snapshotPruneHandledByLocalMain) {
         await recordRemovedWorktreeSnapshotPrune({

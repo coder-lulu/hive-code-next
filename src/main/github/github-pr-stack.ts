@@ -8,7 +8,6 @@ import type {
 } from '../../shared/github/pull-request-types'
 import { githubRepoIdentityKey } from '../../shared/github/repository-identity-key'
 import { ghExecFileAsync } from '../git/runner'
-import { githubReadExecutionScope } from './github-read-execution-scope'
 import {
   githubHostExecOptions,
   type GitHubApiRepository,
@@ -68,10 +67,9 @@ export function _resetGitHubPRStackCacheForTests(): void {
 function stackCacheKey(
   repository: GitHubApiRepository,
   stackNumber: number,
-  executionScope: string,
-  execution: GitHubRepoExecOptions
+  executionScope: string
 ): string {
-  return `${executionScope}\0${githubReadExecutionScope(execution)}\0${githubRepoIdentityKey(repository)}:${stackNumber}`
+  return `${executionScope}\0${githubRepoIdentityKey(repository)}:${stackNumber}`
 }
 
 function pruneStackCache(now = Date.now()): void {
@@ -230,7 +228,7 @@ async function fetchStackDetails(
       '-F',
       `pr=${prNumber}`
     ],
-    ghOptions
+    { ...ghOptions, ...githubHostExecOptions(repository) }
   )
   return parseStackDetails(
     JSON.parse(stdout) as GraphQLStackResponse,
@@ -248,8 +246,7 @@ export async function hydrateGitHubPRStack(
   prUpdatedAt?: string,
   executionScope = 'local:host'
 ): Promise<GitHubPRStack> {
-  const execution = { ...ghOptions, ...githubHostExecOptions(repository) }
-  const key = stackCacheKey(repository, summary.number, executionScope, execution)
+  const key = stackCacheKey(repository, summary.number, executionScope)
   const now = Date.now()
   pruneStackCache(now)
   const cached = stackDetailsCache.get(key)
@@ -267,7 +264,7 @@ export async function hydrateGitHubPRStack(
     const value = await existing
     return value ? { ...value, position: summary.position, baseSha: summary.baseSha } : summary
   }
-  const request = fetchStackDetails(repository, prNumber, summary, execution).catch(() => null)
+  const request = fetchStackDetails(repository, prNumber, summary, ghOptions).catch(() => null)
   stackDetailsInFlight.set(key, request)
   try {
     const value = await request

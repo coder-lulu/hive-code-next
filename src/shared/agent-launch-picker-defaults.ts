@@ -8,12 +8,10 @@ import type { AgentPickerEntry } from './agent-launch-picker'
 export type AgentPickerDefaultSettings = Partial<
   Pick<
     GlobalSettings,
-    | 'agentLaunchChoices'
     | 'agentDefaultArgs'
     | 'agentPermissionDefault'
     | 'agentPermissionOverrides'
     | 'nativeChatSessionOptions'
-    | 'nativeChatPermissionMode'
   >
 >
 

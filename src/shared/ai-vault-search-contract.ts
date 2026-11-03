@@ -1,6 +1,5 @@
 import { resolveSessionSearchLimit, SESSION_SEARCH_LIMIT_MAX } from './ai-vault-search-limit'
 import { z } from 'zod'
-import { AiVaultSessionAccountHomeSchema } from './ai-vault-session-account-home'
 import {
   AI_VAULT_AGENTS,
   AI_VAULT_SCOPE_PATHS_MAX_COUNT,
@@ -60,8 +59,6 @@ const executionHostIdSchema = z.string().min(1)
 
 export const AiVaultSearchHitSchema = z
   .object({
-    accountHome: AiVaultSessionAccountHomeSchema,
-    accountWslDistro: z.string().nullable().optional().catch(undefined),
     agent: z.enum(AI_VAULT_AGENTS),
     executionHostId: executionHostIdSchema.optional(),
     sessionId: z.string(),

@@ -15,8 +15,6 @@ import type { RpcOperationSender } from '../transport/rpc-operation-sender'
 type RunInput = {
   branch: string
   title: string
-  /** What the user chose in the Create PR sheet; without it the host's prefill decides. */
-  fields?: { title: string; body: string; base: string; draft: boolean }
   status: MobileGitStatusResult | null
   commitMessage?: string
   readCommitMessage?: () => string
@@ -54,10 +52,7 @@ export async function runMobileHostedReviewCreateIntent(
   worktreeId: string,
   input: RunInput
 ): Promise<MobileHostedReviewCreateIntentRunOutcome> {
-  const prepared = await prepareMobileHostedReviewCreateIntent(client, worktreeId, {
-    ...input,
-    ...(input.fields ? { base: input.fields.base } : {})
-  })
+  const prepared = await prepareMobileHostedReviewCreateIntent(client, worktreeId, input)
   if (!prepared.ok) {
     return prepared
   }
@@ -75,11 +70,11 @@ export async function runMobileHostedReviewCreateIntent(
   input.onProgress?.('creating_review')
   const created = await createMobilePr(client, worktreeId, {
     provider: prepared.prefill.provider,
-    base: input.fields?.base || prepared.prefill.base,
+    base: prepared.prefill.base,
     head: input.branch,
-    title: input.fields?.title.trim() || prepared.prefill.title,
-    body: input.fields?.body ?? prepared.prefill.body,
-    draft: input.fields?.draft ?? false,
+    title: prepared.prefill.title,
+    body: prepared.prefill.body,
+    draft: false,
     pushBeforeCreate: shouldPushBeforeMobilePrCreate(prepared.prefill)
   })
   if (!created.ok) {

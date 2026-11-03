@@ -28,7 +28,6 @@ export function AutomationsPageListPanel({
     repoMap,
     worktreeMap,
     sshConnectionStates,
-    sshStateByEnvironment,
     runtimeStatusByEnvironmentId
   } = store
   const {
@@ -92,7 +91,6 @@ export function AutomationsPageListPanel({
       worktreeForRow={store.worktreeForRow}
       projectHostSetups={projectHostSetups}
       sshConnectionStates={sshConnectionStates}
-      sshStateByEnvironment={sshStateByEnvironment}
       runtimeStatusByEnvironmentId={runtimeStatusByEnvironmentId}
       hostTargetFor={destination.automationHostTargetFor}
       automationSourceHostAvailabilityByRowKey={

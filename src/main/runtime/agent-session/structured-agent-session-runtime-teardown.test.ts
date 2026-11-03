@@ -6,7 +6,6 @@ import { tearDownRuntime, type InstalledRuntime } from './structured-agent-sessi
 it('stops delivery before it drains the recovery of exits already observed', async () => {
   const order: string[] = []
   const drained = Promise.withResolvers<void>()
-  const closing = Promise.withResolvers<void>()
   const installed: InstalledRuntime = {
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: teardown calls only `stopDelivery` and `flushAllStreamedEvents` on the host.
     host: {
@@ -21,27 +20,16 @@ it('stops delivery before it drains the recovery of exits already observed', asy
     } as never,
     adapter: { closeAll: async () => undefined },
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: teardown calls only `close` on the database.
-    journalDatabase: {
-      close: async () => {
-        order.push('close-database')
-        await closing.promise
-      }
-    } as never,
+    journalDatabase: { close: () => order.push('close-database') } as never,
     waitForRecovery: async () => {
       order.push('wait-for-recovery')
     }
   }
 
-  let finished = false
-  const stopping = tearDownRuntime(installed, 'quit').then(() => {
-    finished = true
-  })
+  const stopping = tearDownRuntime(installed, 'quit')
   await vi.waitFor(() => expect(order).toContain('drain-status'))
   expect(order).not.toContain('close-database')
   drained.resolve()
-  await vi.waitFor(() => expect(order).toContain('close-database'))
-  expect(finished).toBe(false)
-  closing.resolve()
   await stopping
 
   expect(order).toEqual([

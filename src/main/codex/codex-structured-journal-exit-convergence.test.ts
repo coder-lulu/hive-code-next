@@ -2,14 +2,14 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
-import { AGENT_JOURNAL_THREAD_SCOPE } from '../../shared/agent-session/journal/agent-session-journal-types'
-import { codexProviderHandle } from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
-import { readAgentJournalTurn } from '../../shared/agent-session/lifecycle/agent-session-turn-record'
-import type { AgentSessionRecord } from '../../shared/agent-session/lifecycle/agent-session-record'
+import { AGENT_JOURNAL_THREAD_SCOPE } from '../../shared/agent-session-journal-types'
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
+import { readAgentJournalTurn } from '../../shared/agent-session-turn-record'
+import type { AgentSessionRecord } from '../../shared/agent-session-record'
 import {
   agentSessionLeaseFixture,
   agentSessionRecordFixture
-} from '../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
+} from '../../shared/agent-session-record.test-fixture'
 import {
   closeTestJournalHostDatabase,
   createTrackedJournalOpener
@@ -179,8 +179,12 @@ it('settles a refused Codex exit through the host in one commit, then permits a 
     options: new Map(),
     reportedOptions: {}
   }
-  // A closed sink refuses the provider's exit rows, so the host must settle the turn.
-  deferred.close()
+  const gate = Promise.withResolvers<void>()
+  const blocked = journal.readInOrder(() => gate.promise)
+  // Saturate the queue to force host settlement after the provider's exit rows are refused.
+  for (let index = 0; index < 1_024; index++) {
+    deferred.sink.publish({ lifecycle: true, coalescingKey: `limit-${index}` })
+  }
   const exited = handleCodexSessionExit({
     sessions: new Map([[SESSION, codexSession]]),
     sessionId: SESSION,
@@ -193,12 +197,14 @@ it('settles a refused Codex exit through the host in one commit, then permits a 
       }
     }
   })
+  gate.resolve()
+  await blocked
   expect(exited).toBe(true)
-  expect(admission).toHaveReturnedWith({ accepted: false, reason: 'closed' })
+  expect(admission).toHaveReturnedWith({ accepted: false, reason: 'backpressure' })
   expect(recording.entries).toContainEqual({
     level: 'warn',
     message: "Codex's final rows were refused; the host settles the turn instead",
-    fields: { scope: 'codex-exit-rows', sessionId: SESSION, reason: 'closed' }
+    fields: { scope: 'codex-exit-rows', sessionId: SESSION, reason: 'backpressure' }
   })
   expect(codexSession.ended).toBe(true)
   expect(events).toHaveLength(1)
@@ -260,7 +266,7 @@ it('settles a refused Codex exit through the host in one commit, then permits a 
   const settled = journal.snapshot()
   const submissions = journal.submissions()
   await journal.close()
-  await closeTestJournalHostDatabase(root)
+  closeTestJournalHostDatabase(root)
   const reopened = await journals.open(options)
   expect(reopened.snapshot()).toEqual(settled)
   expect(reopened.submissions()).toEqual(submissions)

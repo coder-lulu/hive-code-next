@@ -140,6 +140,7 @@ export class BrowserNetworkTunnelSession {
       return
     }
     stream.connected = true
+    stream.releasePendingOpen()
     clearTimeout(stream.connectTimeout)
     this.frameSender.send(BrowserNetworkTunnelOpcode.Opened, stream.id)
     this.frameSender.send(

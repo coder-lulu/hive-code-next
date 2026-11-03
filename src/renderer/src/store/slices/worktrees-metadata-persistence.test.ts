@@ -397,7 +397,6 @@ describe('worktree remote runtime mutations', () => {
     expect(store.getState().prCache[legacyPathPRCacheKey]).toBeUndefined()
     expect(fetchHostedReviewForBranch).toHaveBeenCalledWith('/repo1', 'pr-branch', {
       repoId: 'repo1',
-      repoOwnerExecutionHostId: 'local',
       linkedGitHubPR: null,
       linkedGitLabMR: null,
       linkedBitbucketPR: null,

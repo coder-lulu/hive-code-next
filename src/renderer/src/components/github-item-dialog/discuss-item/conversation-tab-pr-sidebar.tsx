@@ -67,7 +67,6 @@ export function ConversationTabPRSidebar({
         sourceContext={sourceContext}
         projectOrigin={projectOrigin}
         onReviewersRequested={onReviewersRequested}
-        onMutated={onMutated}
       />
       <aside className="overflow-hidden rounded-lg border border-border/50 bg-card/50 shadow-xs">
         <ChecksTab

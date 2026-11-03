@@ -1,3 +1,5 @@
+import { renderOfflineFeedRows } from './render-offline-feed-rows'
+import { useOfflineRuntimeEnvironmentIds } from './use-offline-runtime-environment-ids'
 import { useCallback, useMemo, useState, useSyncExternalStore } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store'
@@ -21,7 +23,6 @@ import type { SidebarFeedDomains } from '../../../../../../shared/sidebar-list/s
 import { EMPTY_SIDEBAR_FEED_DOMAINS } from '../../../../../../shared/sidebar-feed-client/sidebar-feed-snapshot'
 import {
   planSidebarFeedRows,
-  renderSidebarFeedRows,
   type SidebarFeedView
 } from '../../../../../../shared/sidebar-list/sidebar-feed-rows'
 import {
@@ -91,6 +92,7 @@ function windowFolderRecordOf(
 /** Use the phone’s builder over main’s domains, adding desktop state and pending writes; cards read window records. */
 export function useMainSidebarListModel(args: SidebarListModelArgs): SidebarListModel {
   const { filterState, sortBy, groupBy, repos, defaultHostId, settings } = args
+  const offlineRuntimeEnvironmentIds = useOfflineRuntimeEnvironmentIds()
   useSidebarListSession()
   const feed = useDesktopSidebarFeed()
   const pending = useSyncExternalStore(subscribeSidebarPendingLayer, readSidebarPendingLayer)
@@ -241,8 +243,15 @@ export function useMainSidebarListModel(args: SidebarListModelArgs): SidebarList
   })
   const [hostDragActive, setHostDragActive] = useState(false)
   const rendered = useMemo(
-    () => renderSidebarFeedRows(planned, view, effectiveCollapsedGroups, hostDragActive),
-    [planned, view, effectiveCollapsedGroups, hostDragActive]
+    () =>
+      renderOfflineFeedRows(
+        planned,
+        view,
+        effectiveCollapsedGroups,
+        hostDragActive,
+        offlineRuntimeEnvironmentIds
+      ),
+    [planned, view, effectiveCollapsedGroups, hostDragActive, offlineRuntimeEnvironmentIds]
   )
   const sectionRows = useMemo(
     () =>
@@ -286,6 +295,7 @@ export function useMainSidebarListModel(args: SidebarListModelArgs): SidebarList
     },
     externalWorktreeCards,
     rowModel: {
+      offlineRuntimeEnvironmentIds,
       occurrencePlan: planned.plan.occurrencePlan,
       hostOptions: planned.orderedHostOptions,
       effectiveCollapsedGroups,

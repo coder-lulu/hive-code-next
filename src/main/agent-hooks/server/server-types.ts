@@ -15,8 +15,6 @@ import type { CodexRemoteRosterAuthority } from '../../../shared/agent-hook-list
 export type IncomingAgentHookEvent = AgentHookEventPayload & {
   authorityRestartId?: string
   codexRosterAuthority?: CodexRemoteRosterAuthority
-  /** The relay echoed this link's current binding for the pane on the owner it proved. */
-  rooted?: true
 }
 
 export type EnrichedAgentHookEventPayload = AgentHookEventPayload & {
@@ -44,7 +42,6 @@ export type EnrichedAgentHookEventPayload = AgentHookEventPayload & {
 export type PersistedAgentHookEventPayload = Omit<
   EnrichedAgentHookEventPayload,
   | 'authorityRestartId'
-  | 'statusAdmissionSession'
   | 'launchToken'
   | 'hostTurnRevision'
   | 'promptInteractionKey'

@@ -1,9 +1,11 @@
-import type { AgentJournalTurnLifecycle } from '../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentJournalTurnOutcome } from '../../shared/agent-turn-outcome'
+import type {
+  AgentJournalTurnLifecycle,
+  AgentJournalTurnOutcome
+} from '../../shared/agent-session-journal-types'
 import {
   agentJournalItemKey,
   agentJournalSubmissionKey
-} from '../../shared/agent-session/journal/agent-session-journal-item-key'
+} from '../../shared/agent-session-journal-item-key'
 import type { StructuredAgentSessionEventSink } from '../native-chat/agent-session-wire/structured-agent-session-event-sink'
 import {
   CODEX_JOURNAL_ADMITTED,
@@ -13,14 +15,9 @@ import type { CodexJournalItems } from './codex-structured-journal-items'
 import { settleCodexJournalTurn } from './codex-structured-journal-settlement'
 import {
   CodexJournalRecentTurns,
-  earlierRequestOrigin,
-  type CodexJournalActiveTurns,
-  type CodexJournalRequestOrigin
+  type CodexJournalActiveTurns
 } from './codex-structured-journal-translation-turn-state'
-import type {
-  CodexDispatchEchoes,
-  CodexDispatchRequestOrigin
-} from './codex-structured-dispatch-echo'
+import type { CodexDispatchRequestOrigin } from './codex-structured-dispatch-echo'
 import {
   codexTurnLifecycleState,
   codexTurnOutcome,
@@ -69,7 +66,6 @@ export class CodexJournalTurnBoundaries {
       resetActivity: (threadId: string) => void
       attributionFor: CodexRowAttribution
       commands: CodexJournalCommandTurn
-      turnOpener?: CodexDispatchEchoes['turnOpener']
       now?: () => number
     }
   ) {}
@@ -82,9 +78,6 @@ export class CodexJournalTurnBoundaries {
     const startedAt = this.receiptTime(event)
     const command =
       event.threadId === this.deps.primaryThreadId() ? this.deps.commands.claim(turnId) : null
-    const opener = command
-      ? null
-      : this.replyOpener(event.threadId, turnId, event.dispatchSequenceAtReceipt)
     // Command-owned turns reuse the command's row and scope.
     const admission = command
       ? recordCodexCommandTurnClaim(this.deps.sink, agentJournalItemKey(command.identity), turnId)
@@ -95,8 +88,7 @@ export class CodexJournalTurnBoundaries {
           threadId: event.threadId,
           turnId,
           state: 'running',
-          startedAt,
-          ...(opener ? { userItemId: opener.userItemId, requestedAt: opener.requestedAt } : {})
+          startedAt
         })
     if (admission.accepted) {
       this.deps.activeTurns.remember(
@@ -105,9 +97,6 @@ export class CodexJournalTurnBoundaries {
         startedAt,
         event.dispatchSequenceAtReceipt
       )
-      if (opener) {
-        this.deps.activeTurns.rememberRequestOrigin(event.threadId, turnId, opener)
-      }
       this.deps.resetActivity(event.threadId)
     }
     return admission
@@ -193,7 +182,7 @@ export class CodexJournalTurnBoundaries {
             durationMs: readCodexTurnDurationMs(event.params)
           })
         : null
-    const requestOrigin = this.requestOrigin(event.threadId, turnId)
+    const requestOrigin = this.deps.activeTurns.requestOrigin(event.threadId, turnId)
     const latestDispatchSequence = this.deps.activeTurns.latestDispatchSequence(
       event.threadId,
       turnId
@@ -233,7 +222,7 @@ export class CodexJournalTurnBoundaries {
   /** Keep terminal state and outcome together when revising the remembered turn. */
   settled(threadId: string, turnId: string, terminal: TurnTerminal): AgentJournalTurnLifecycle {
     const startedAt = this.deps.activeTurns.startedAt(threadId, turnId)
-    const requestOrigin = this.requestOrigin(threadId, turnId)
+    const requestOrigin = this.deps.activeTurns.requestOrigin(threadId, turnId)
     return {
       turnId,
       state: terminal.state,
@@ -254,29 +243,6 @@ export class CodexJournalTurnBoundaries {
     this.deps.activeTurns.clear()
     this.recentTurns.clear()
     this.deps.commands.clear()
-  }
-
-  /** The earlier of the echoed and the replied opener; a reply read after turn/started counts too. */
-  private requestOrigin(threadId: string, turnId: string): CodexJournalRequestOrigin | undefined {
-    const echoed = this.deps.activeTurns.requestOrigin(threadId, turnId)
-    const latestDispatchSequence = this.deps.activeTurns.latestDispatchSequence(threadId, turnId)
-    const replied =
-      latestDispatchSequence === undefined
-        ? null
-        : this.replyOpener(threadId, turnId, latestDispatchSequence)
-    return replied && earlierRequestOrigin(replied, echoed) ? replied : echoed
-  }
-
-  /** Codex never echoes a prompt its hook refused, so the turn/start reply names the opener. */
-  private replyOpener(
-    threadId: string,
-    turnId: string,
-    latestDispatchSequence = Number.MAX_SAFE_INTEGER
-  ): CodexJournalRequestOrigin | null {
-    const opener = this.deps.turnOpener?.(threadId, turnId)
-    return opener && opener.requestOrigin.sequence <= latestDispatchSequence
-      ? { ...opener.requestOrigin, userItemId: agentJournalSubmissionKey(opener.clientMessageId) }
-      : null
   }
 
   private receiptTime(event: TurnBoundaryEvent): number {

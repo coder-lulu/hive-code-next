@@ -4,12 +4,12 @@ import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { resolveCliCommand } from '../../shared/node-cli-command-resolution'
 import type { GlobalSettings } from '../../shared/global-settings-types'
-import type { StructuredAgentSessionRuntimeDeps } from './structured-agent-session-runtime-contract'
+import type { StructuredAgentSessionRuntimeDeps } from './structured-agent-session-runtime'
 
 const installed = vi.hoisted(() =>
   vi.fn<(deps: StructuredAgentSessionRuntimeDeps) => Promise<void>>(async () => {})
 )
-vi.mock('./agent-session/structured-agent-session-runtime', () => ({
+vi.mock('./structured-agent-session-runtime', () => ({
   ensureStructuredAgentSessionHost: installed
 }))
 vi.mock('electron', () => ({
@@ -43,10 +43,9 @@ describe('execution host structured launch settings wiring', () => {
     settings.agentDefaultArgs = { claude: '--dangerously-skip-permissions', codex: '' }
     expect(deps?.resolveAgentFullAccess?.('claude')).toBe(true)
     expect(deps?.resolveAgentFullAccess?.('codex')).toBe(false)
-    // OMP lacks bypass arguments; legacy chats inherit the new-chat permission setting.
-    settings.nativeChatPermissionMode = 'full-access'
+    settings.agentPermissionOverrides = { omp: 'full-access' }
     expect(deps?.resolveAgentFullAccess?.('omp')).toBe(true)
-    settings.nativeChatPermissionMode = 'ask'
+    settings.agentPermissionOverrides = { omp: 'ask' }
     expect(deps?.resolveAgentFullAccess?.('omp')).toBe(false)
     const notRunnable = expect.objectContaining({ reason: 'agentCommandNotRunnable' })
     settings.agentCmdOverrides = { claude: 'wrapper $SECRET' }

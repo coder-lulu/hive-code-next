@@ -82,5 +82,5 @@ export type ChecksPanelEmptyContentModel = Pick<
   > &
   Pick<ChecksPanelCreateReviewState, 'handleCreatePullRequest'> &
   Pick<ChecksPanelBranchActionsState, 'handlePublishBranch' | 'handleSyncBranch'> &
-  Pick<ChecksPanelRefreshState, 'handleRefresh' | 'manualRefreshError'> &
+  Pick<ChecksPanelRefreshState, 'handleRefresh'> &
   Pick<ChecksPanelCheckAndReviewActionsState, 'handleLinkSuppressedPullRequest'>

@@ -1,4 +1,3 @@
-import type { RuntimeTerminalCreate } from '../../shared/runtime-terminal-create-contract'
 import { vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 import type { TuiAgent } from '../../shared/tui-agent'
@@ -16,7 +15,6 @@ export type TranscriptPaneOptions = {
   paneTitle: string
   foregroundProcess: string | null
   data: string
-  isReattach?: true
   launchAgent?: TuiAgent
   connectionId?: string
   remoteWindowsHost?: boolean
@@ -57,7 +55,7 @@ function transcriptLayoutStore(): RuntimeStore {
 export async function createTranscriptPane(
   options: TranscriptPaneOptions,
   runtimeDeps?: ConstructorParameters<typeof OrcaRuntimeService>[2]
-): Promise<{ runtime: OrcaRuntimeService; handle: string; terminal: RuntimeTerminalCreate }> {
+): Promise<{ runtime: OrcaRuntimeService; handle: string }> {
   const runtime = new OrcaRuntimeService(
     ORCA_LAYOUT_OWNER_IS_MAIN ? transcriptLayoutStore() : null,
     undefined,
@@ -83,8 +81,7 @@ export async function createTranscriptPane(
       runtime,
       vi.fn(async (_args: { worktreeId?: string; tabId?: string; leafId?: string }) => ({
         id: TRANSCRIPT_PANE_PTY_ID,
-        incarnationId: 'inc-1',
-        ...(options.isReattach ? { isReattach: true as const } : {})
+        incarnationId: 'inc-1'
       }))
     ),
     write: () => true,
@@ -188,11 +185,11 @@ export async function createTranscriptPane(
   if (options.data.length > 0) {
     runtime.onPtyData(TRANSCRIPT_PANE_PTY_ID, options.data, Date.now())
   }
-  return { runtime, handle: terminal.handle, terminal }
+  return { runtime, handle: terminal.handle }
 }
 
 export async function waitForTranscriptIdle(
-  pane: Pick<Awaited<ReturnType<typeof createTranscriptPane>>, 'runtime' | 'handle'>,
+  pane: Awaited<ReturnType<typeof createTranscriptPane>>,
   timeoutMs: number
 ) {
   vi.useFakeTimers({

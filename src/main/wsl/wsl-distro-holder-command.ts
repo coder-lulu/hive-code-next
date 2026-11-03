@@ -72,8 +72,7 @@ export function buildWslDistroHolderScript(
   ].join('\n')
 }
 
-/** `wsl.exe` argv for a holder. WSL keeps a distro up while a Windows-side client or anything started
- * through one still runs (orcad, its terminals); the holder covers the gaps when nothing does. */
+/** `wsl.exe` argv for a holder: only a Windows-side WSL client keeps a distro from idling out. */
 export function buildWslDistroHolderArgs(distro: string): string[] {
   return buildWslExecArgs(distro, [
     '/bin/sh',

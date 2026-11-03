@@ -42,8 +42,7 @@ describe('loadMobileDiffReviewDiff', () => {
         client: clientWith(failure('diff_too_large', 'Diff too large')),
         worktreeId: 'wt-1',
         item: DELETED_ITEM,
-        branchCompare: null,
-        commit: null
+        branchCompare: null
       })
     ).resolves.toEqual({ kind: 'too-large', itemKey: DELETED_ITEM.key })
   })
@@ -54,8 +53,7 @@ describe('loadMobileDiffReviewDiff', () => {
         client: clientWith(failure('internal_error', 'Unable to read deleted file')),
         worktreeId: 'wt-1',
         item: DELETED_ITEM,
-        branchCompare: null,
-        commit: null
+        branchCompare: null
       })
     ).resolves.toEqual({ kind: 'deleted', itemKey: DELETED_ITEM.key })
   })
@@ -74,7 +72,6 @@ describe('loadMobileDiffReviewDiff', () => {
         worktreeId: 'wt-1',
         item: { ...DELETED_ITEM, status: 'modified' },
         branchCompare: null,
-        commit: null,
         signal: controller.signal
       })
     ).resolves.toEqual({ kind: 'idle' })

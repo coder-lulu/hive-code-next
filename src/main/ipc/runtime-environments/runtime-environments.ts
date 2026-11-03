@@ -10,7 +10,6 @@ import { getRuntimeEnvironmentRegistryRoot } from './runtime-environment-registr
 import { listEnvironments } from '../../../shared/runtime-environment-store'
 import type { Store } from '../../persistence'
 import { recordRemoteLayoutFrame } from '../../remote-layout-snapshot/remote-layout-snapshot-recorder'
-import { recordHostRepoCatalogAnswer } from '../../host-repo-catalog-snapshot/host-repo-catalog-snapshot-recorder'
 import {
   isRuntimeEnvironmentManuallyDisconnected,
   registerRuntimeEnvironmentConnectivityHandlers,
@@ -154,9 +153,7 @@ export function registerRuntimeEnvironmentHandlers(store: Store): void {
     getUserDataPath,
     invalidateTransport: invalidateRuntimeEnvironmentTransport
   })
-  registerRuntimeEnvironmentPassiveHandlers(getUserDataPath, (environment, method, response) =>
-    recordHostRepoCatalogAnswer(store, environment, method, response)
-  )
+  registerRuntimeEnvironmentPassiveHandlers(getUserDataPath)
   setManagedOrcadPairingRepairedListener(invalidateRuntimeEnvironmentTransport)
   setRefusedPairingHandlers({
     recover: (environmentId) => recoverRefusedManagedPairing(getUserDataPath(), environmentId),

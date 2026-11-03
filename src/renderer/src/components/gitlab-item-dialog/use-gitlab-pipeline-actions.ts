@@ -15,7 +15,6 @@ export function useGitLabPipelineActions(
   handleRefresh: () => void
 ) {
   const {
-    claimDetailsOwner,
     details,
     expandedJobId,
     jobTraceById,
@@ -84,14 +83,13 @@ export function useGitLabPipelineActions(
         return
       }
       setRetryingJobId(job.id)
-      const ownsResult = claimDetailsOwner()
       try {
         const result = await gitLabApiFor(repoSelector).retryJob({
           ...repoSelector,
           jobId: job.id,
           projectRef: details?.item.projectRef ?? item.projectRef ?? null
         })
-        if (!ownsResult()) {
+        if (!mountedRef.current) {
           return
         }
         if (result.ok) {
@@ -127,7 +125,6 @@ export function useGitLabPipelineActions(
       }
     },
     [
-      claimDetailsOwner,
       details?.item.projectRef,
       handleRefresh,
       item,

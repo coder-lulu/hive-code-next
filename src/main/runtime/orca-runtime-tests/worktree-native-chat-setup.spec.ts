@@ -63,7 +63,7 @@ async function createFromRendererPayload(options: {
     }
   ])
   vi.mocked(getEffectiveHooks).mockReturnValue({ scripts: { setup: 'pnpm install' } })
-  vi.mocked(createSetupRunnerScript).mockResolvedValue({
+  vi.mocked(createSetupRunnerScript).mockReturnValue({
     runnerScriptPath: RUNNER,
     envVars: SETUP_ENV
   })

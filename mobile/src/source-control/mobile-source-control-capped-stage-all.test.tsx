@@ -68,6 +68,7 @@ async function runStageAll(
       hostId: 'host-a',
       worktreeId: 'wt-1',
       status,
+      branchLabel: 'main',
       commitMessage: '',
       stagedEntries: [],
       generatingMessage: false,
@@ -87,6 +88,8 @@ async function runStageAll(
       setShowActionSheet: vi.fn(),
       setLocalBranches: vi.fn(),
       setShowBranchPicker: vi.fn(),
+      setCreatedPrUrl: vi.fn(),
+      setCreatedPrWarning: vi.fn(),
       recordCommitFailure: vi.fn()
     }).stageAll
     return null

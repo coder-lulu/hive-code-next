@@ -14,7 +14,6 @@ import {
 } from './agent-status-pane-key-tab-binding'
 import { retireAgentPaneAuthorityAliasesByOwnerTab } from '../agent-pane-authority'
 import { agentTurnEndedOnPurpose } from '../../../../../shared/agent-main-agent-verdict'
-import { removePaneKeys } from './agent-status-pane-keyed-records'
 
 function removeAcknowledgement(
   acknowledgements: Record<string, number>,
@@ -54,9 +53,6 @@ export function createAgentStatusDropActions(
         const nextManualUnread = opts?.paneRemoved
           ? removeAcknowledgement(s.manuallyUnreadTurnsByPaneKey, paneKey)
           : s.manuallyUnreadTurnsByPaneKey
-        const nextConversations = opts?.paneRemoved
-          ? removePaneKeys(s.agentConversationsByPaneKey, new Set([paneKey]))
-          : s.agentConversationsByPaneKey
         const hasLaunchConfig = paneKey in s.agentLaunchConfigByPaneKey
         const nextLaunchConfigs = hasLaunchConfig
           ? { ...s.agentLaunchConfigByPaneKey }
@@ -66,9 +62,6 @@ export function createAgentStatusDropActions(
         }
         if (!hasLive && !hasRetained && !migrationUnsupported.changed) {
           const cleanupPatch = {
-            ...(nextConversations !== s.agentConversationsByPaneKey
-              ? { agentConversationsByPaneKey: nextConversations }
-              : {}),
             ...(hasLaunchConfig ? { agentLaunchConfigByPaneKey: nextLaunchConfigs } : {}),
             ...(nextAck !== s.acknowledgedAgentsByPaneKey
               ? { acknowledgedAgentsByPaneKey: nextAck }
@@ -96,7 +89,6 @@ export function createAgentStatusDropActions(
         const needsSuppressor = hasLive && !(paneKey in s.retentionSuppressedPaneKeys)
         return {
           agentStatusByPaneKey: nextLive,
-          agentConversationsByPaneKey: nextConversations,
           agentLaunchConfigByPaneKey: nextLaunchConfigs,
           retainedAgentsByPaneKey: nextRetained,
           migrationUnsupportedByPtyId: migrationUnsupported.next,

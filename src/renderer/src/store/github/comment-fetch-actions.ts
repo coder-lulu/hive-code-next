@@ -5,14 +5,8 @@ import type { PRComment } from '../../../../shared/github/comment-types'
 import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
 import { prCommentsCacheSuffix, sourceScopedRepoCacheKey } from './cache-identity'
 import { isFresh, withBoundedCacheEntry } from './cache-policy'
-import {
-  inflightCommentsRequests,
-  nextProviderRequestId,
-  ownsInflightRequest
-} from './request-coordination'
+import { inflightCommentsRequests } from './request-coordination'
 import { mergePRCommentIntoList } from './pr-comment-cache'
-import { findRepoForGitHubOwner } from './repository-routing'
-import { hostedReviewOwnerIpcArgs } from '../slices/hosted-review-cache-state'
 import {
   getGitHubRepoSourceSettings,
   getGitHubSourceTarget,
@@ -24,11 +18,8 @@ export const createCommentFetchActions = (
   get: Parameters<StateCreator<AppState>>[1]
 ): Pick<GitHubSlice, 'fetchPRComments'> => ({
   fetchPRComments: async (repoPath, prNumber, options): Promise<PRComment[]> => {
-    const repo = findRepoForGitHubOwner(
-      get(),
-      options?.repoId,
-      repoPath,
-      options?.repoOwnerExecutionHostId
+    const repo = get().repos?.find((candidate) =>
+      options?.repoId ? candidate.id === options.repoId : candidate.path === repoPath
     )
     const repoId = options?.repoId ?? repo?.id
     const requestSettings = getGitHubRepoSourceSettings(get(), repo, options?.sourceContext)
@@ -43,22 +34,16 @@ export const createCommentFetchActions = (
       repo !== undefined
     )
     const cached = get().commentsCache[cacheKey]
-    const force = Boolean(options?.force) || options?.userRefresh === true
-    if (!force && isFresh(cached)) {
+    if (!options?.force && isFresh(cached)) {
       return cached.data ?? []
     }
 
     const inflightRequest = inflightCommentsRequests.get(cacheKey)
-    // An explicit refresh replaces a read begun before it instead of joining it.
-    if (inflightRequest && !options?.userRefresh) {
+    if (inflightRequest) {
       return inflightRequest.promise
     }
 
-    const requestId = nextProviderRequestId()
-    const requestStartedAt = Date.now()
-    // Carry the replaced read's local posts: its reply will no longer publish them.
-    const postedComments: PRComment[] = [...(inflightRequest?.postedComments ?? [])]
-    let reply: Promise<PRComment[]> | undefined
+    const postedComments: PRComment[] = []
     const request = (async () => {
       try {
         const requestContext = getGitHubWorkItemRequestContext(
@@ -68,43 +53,27 @@ export const createCommentFetchActions = (
           repoPath,
           options?.sourceContext
         )
-        reply =
+        let comments: PRComment[] =
           requestContext.target.kind === 'environment'
-            ? callRuntimeRpc<PRComment[]>(
+            ? await callRuntimeRpc<PRComment[]>(
                 { kind: 'environment', environmentId: requestContext.target.environmentId },
                 'github.prComments',
                 {
                   repo: requestContext.target.runtimeRepoId,
                   prNumber,
                   prRepo: options?.prRepo ?? null,
-                  noCache: force
+                  noCache: options?.force
                 },
                 { timeoutMs: 30_000 }
               )
-            : window.api.gh.prComments({
+            : await window.api.gh.prComments({
                 repoPath,
                 repoId,
                 prNumber,
                 prRepo: options?.prRepo ?? null,
-                noCache: force,
-                ...hostedReviewOwnerIpcArgs(options),
+                noCache: options?.force,
                 sourceContext: options?.sourceContext
               })
-        // If this read fails, the read it replaced still lands its answer, which is newer than the cache.
-        let comments = await reply.catch(async (err: unknown) => {
-          if (!inflightRequest?.reply) {
-            throw err
-          }
-          return inflightRequest.reply.catch(() => {
-            throw err
-          })
-        })
-        if (!ownsInflightRequest(inflightCommentsRequests, cacheKey, requestId)) {
-          // Its callers show the owner's answer, so a late superseded reply cannot repaint older comments.
-          await inflightCommentsRequests.get(cacheKey)?.promise
-          const latest = get().commentsCache[cacheKey]
-          return latest?.data && latest.fetchedAt >= requestStartedAt ? latest.data : comments
-        }
         if (postedComments.length > 0) {
           const currentById = new Map(
             (get().commentsCache[cacheKey]?.data ?? []).map((comment) => [comment.id, comment])
@@ -124,13 +93,11 @@ export const createCommentFetchActions = (
         console.error('Failed to fetch PR comments:', err)
         return get().commentsCache[cacheKey]?.data ?? []
       } finally {
-        if (ownsInflightRequest(inflightCommentsRequests, cacheKey, requestId)) {
-          inflightCommentsRequests.delete(cacheKey)
-        }
+        inflightCommentsRequests.delete(cacheKey)
       }
     })()
 
-    inflightCommentsRequests.set(cacheKey, { promise: request, reply, requestId, postedComments })
+    inflightCommentsRequests.set(cacheKey, { promise: request, postedComments })
     return request
   }
 })

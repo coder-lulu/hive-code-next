@@ -72,21 +72,11 @@ export const reviewFileDiffRead = bindDeferredRpcOperation(
   })
 )
 
-// Review requires a closed text/binary/too-large result.
+// Review requires a closed text/binary/too-large result; the Changes preview uses the verbatim payload.
 export const reviewBranchFileDiffRead = bindDeferredRpcOperation(
   defineRpcOperation({
     name: 'git.review-branch-file-diff',
     method: 'git.branchDiff',
-    acceptance: 'require-result-or-throw-message',
-    barrier: 'after-caller-barrier',
-    read: reviewDiffReader
-  })
-)
-
-export const reviewCommitFileDiffRead = bindDeferredRpcOperation(
-  defineRpcOperation({
-    name: 'git.review-commit-file-diff',
-    method: 'git.commitDiff',
     acceptance: 'require-result-or-throw-message',
     barrier: 'after-caller-barrier',
     read: reviewDiffReader

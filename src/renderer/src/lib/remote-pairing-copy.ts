@@ -16,7 +16,7 @@ export function translateHostAccessLinkError(kind: HostAccessLinkErrorKind): str
     case 'mobile-only':
       return translate(
         'auto.lib.remotePairingCopy.mobileOnly',
-        'This link grants mobile-only access. Generate a link for another Orca client.'
+        'This link grants mobile-only access. Generate a link for another HiveCode client.'
       )
     case 'invalid-destination':
       return translate(
@@ -59,7 +59,7 @@ export function translateRemotePairingFailureDescription(
     case 'host-identity-mismatch':
       return translate(
         'auto.components.settings.RuntimeHostAccessForm.identityMismatchHelp',
-        'Orca reached {{endpoint}}, but that host does not match this link. Generate a new link on the other host.',
+        'HiveCode reached {{endpoint}}, but that host does not match this link. Generate a new link on the other host.',
         { endpoint: endpoint ?? APP_DISPLAY_NAME }
       )
     case 'access-link-invalid':
@@ -70,7 +70,7 @@ export function translateRemotePairingFailureDescription(
     case 'protocol-incompatible':
       return translate(
         'auto.components.settings.RuntimeHostAccessForm.incompatibleHelp',
-        'Update Orca on this device and the other host, then try again.'
+        'Update HiveCode on this device and the other host, then try again.'
       )
     case 'connection-interrupted':
       return translate(
@@ -80,7 +80,7 @@ export function translateRemotePairingFailureDescription(
     case 'environment-save-failed':
       return translate(
         'auto.components.settings.RuntimeHostAccessForm.saveFailedHelp',
-        'The host was verified, but Orca could not save it. Check the name and local settings storage, then try again.'
+        'The host was verified, but HiveCode could not save it. Check the name and local settings storage, then try again.'
       )
     case 'different-server':
       return translate(
@@ -90,7 +90,7 @@ export function translateRemotePairingFailureDescription(
     case 'host-unreachable':
       return translate(
         'auto.components.settings.RuntimeHostAccessForm.unavailableHelp',
-        'Make sure Orca is running on the other host and that the network or SSH tunnel can reach {{endpoint}}.',
+        'Make sure HiveCode is running on the other host and that the network or SSH tunnel can reach {{endpoint}}.',
         { endpoint: endpoint ?? APP_DISPLAY_NAME }
       )
   }

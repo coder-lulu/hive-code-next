@@ -323,8 +323,8 @@ class SessionRuntime extends OrcaRuntimeService {
     return this.restoreStructuredAgentSessionTabs()
   }
 
-  closeTab(tab: RuntimeMobileSessionAgentTab): Promise<boolean> {
-    return this.closeStructuredAgentSessionTab(tab, 'user-close', null)
+  closeTab(tab: RuntimeMobileSessionAgentTab): Promise<void> {
+    return this.closeStructuredAgentSessionTab(tab, 'user-close')
   }
 }
 
@@ -359,12 +359,7 @@ describe('session runtime reentry', () => {
     await runtime.publishStructuredAgentSessionTab(input)
 
     expect(list).toHaveBeenCalledExactlyOnceWith('client')
-    expect(project).toHaveBeenCalledExactlyOnceWith({
-      ...input,
-      tabId: 'structured-agent-session-session',
-      eligible: expect.any(Function)
-    })
-    expect(project.mock.calls[0]?.[0].eligible?.()).toBe(true)
+    expect(project).toHaveBeenCalledExactlyOnceWith(input)
   })
 
   it('re-enters the protected graph reload override', () => {
@@ -448,6 +443,35 @@ describe('session runtime reentry', () => {
       })
     ).rejects.toThrow('tab_not_found')
     expect(replacement).toHaveBeenCalledExactlyOnceWith(snapshot, 'tab')
+  })
+
+  it('captures the runtime callee before a tab getter replaces it', async () => {
+    const runtime = new SessionRuntime()
+    const first = vi.fn(function (this: OrcaRuntimeService, sessionId: string) {
+      expect(this).toBe(runtime)
+      expect(sessionId).toBe('session')
+      return false
+    })
+    const replacement = vi.fn(() => false)
+    runtime.retireStructuredAgentSessionTabFromSnapshot = first
+    const tab: RuntimeMobileSessionAgentTab = {
+      type: 'agent-session',
+      id: 'agent-session:session',
+      title: '',
+      agent: 'claude',
+      isActive: false,
+      get sessionId() {
+        runtime.retireStructuredAgentSessionTabFromSnapshot = replacement
+        return 'session'
+      }
+    }
+
+    await runtime.closeTab(tab)
+
+    expect(first).toHaveBeenCalledOnce()
+    expect(replacement).not.toHaveBeenCalled()
+    await runtime.closeTab(tab)
+    expect(replacement).toHaveBeenCalledExactlyOnceWith('session')
   })
 })
 

@@ -103,7 +103,7 @@ export function PluginUpdateReview({
       {notice !== 'none' ? (
         <PluginNotOfficialWarning
           notice={notice}
-          publisher={preview.manifest.publisher ?? null}
+          publisher={preview.manifest.publisher}
           moment="update"
         />
       ) : null}

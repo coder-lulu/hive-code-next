@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto'
 import path from 'node:path'
-import { BrowserError } from './browser-error'
 import { browserDownloadDestinationReservations } from './browser-download-destination'
 import { routeBrowserClientDownload } from './browser-client-download-routing'
 import {
@@ -18,7 +17,6 @@ export type BrowserDownloadClaim = {
 }
 
 type PendingDownloadClaim = {
-  clickedGuestWebContentsId: number
   savePath: string
   start: (started: boolean) => void
   finish: (event: BrowserDownloadFinishedEvent) => void
@@ -54,45 +52,25 @@ export abstract class BrowserManagerDownloadCreation extends BrowserManagerQueri
     this.requestedSavePaths.set(item, savePath)
   }
 
-  /** Agent `download`: saves the next download this tab (or its popups) starts to `savePath`. */
+  /** Agent `download`: saves the next download this page (or its popups) starts to `savePath`. */
   claimNextDownload(guestWebContentsId: number, savePath: string): BrowserDownloadClaim {
-    // Claims live on the tab's root guest, where will-download and the popup policy look them up.
-    const rootGuestWebContentsId =
-      this.resolvePopupOwnerContext(guestWebContentsId)?.rootGuestWebContentsId ??
-      guestWebContentsId
-    // The tab and its popups share one claim; a second would take the first one's download.
-    if (this.downloadClaimsByGuestId.has(rootGuestWebContentsId)) {
-      throw new BrowserError(
-        'browser_download_busy',
-        'Another download is already waiting on this tab or its popups.'
-      )
-    }
     const started = Promise.withResolvers<boolean>()
     const finished = Promise.withResolvers<BrowserDownloadFinishedEvent>()
     const claim: PendingDownloadClaim = {
-      clickedGuestWebContentsId: guestWebContentsId,
       savePath,
       start: started.resolve,
       finish: finished.resolve
     }
-    this.downloadClaimsByGuestId.set(rootGuestWebContentsId, claim)
+    this.downloadClaimsByGuestId.set(guestWebContentsId, claim)
     return {
       started: started.promise,
       finished: finished.promise,
       release: () => {
-        if (this.downloadClaimsByGuestId.get(rootGuestWebContentsId) === claim) {
-          this.downloadClaimsByGuestId.delete(rootGuestWebContentsId)
+        if (this.downloadClaimsByGuestId.get(guestWebContentsId) === claim) {
+          this.downloadClaimsByGuestId.delete(guestWebContentsId)
         }
       }
     }
-  }
-
-  protected isAwaitingDownloadFrom(
-    guestWebContentsId: number,
-    rootGuestWebContentsId: number
-  ): boolean {
-    const claim = this.downloadClaimsByGuestId.get(rootGuestWebContentsId)
-    return claim?.clickedGuestWebContentsId === guestWebContentsId
   }
 
   handleGuestWillDownload(args: { guestWebContentsId: number; item: Electron.DownloadItem }): void {

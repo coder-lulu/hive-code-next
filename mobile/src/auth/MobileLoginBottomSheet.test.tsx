@@ -1,3 +1,4 @@
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -72,14 +73,13 @@ function renderSheet(
 }
 
 function buttonByLabel(renderer: ReactTestRenderer, label: string): ReactTestInstance {
-  return renderer.root
-    .findAllByType('Pressable')
-    .find((node) => node.props.accessibilityLabel === label)!
+  return findAllByHostType(renderer.root, 'Pressable').find(
+    (node) => node.props.accessibilityLabel === label
+  )!
 }
 
 function visibleText(renderer: ReactTestRenderer): string {
-  return renderer.root
-    .findAllByType('Text')
+  return findAllByHostType(renderer.root, 'Text')
     .flatMap((node) => node.children)
     .filter((child): child is string => typeof child === 'string')
     .join('')
@@ -99,7 +99,7 @@ describe('MobileLoginBottomSheet', () => {
     expect(visibleText(renderer)).not.toContain('首次验证将自动注册新账号')
     expect(visibleText(renderer)).not.toContain('账号信息将加密传输')
     expect(visibleText(renderer)).not.toContain('其他方式登录')
-    expect(renderer.root.findAllByType('MobileLoginProviderIcon')).toHaveLength(0)
+    expect(findAllByHostType(renderer.root, 'MobileLoginProviderIcon')).toHaveLength(0)
   })
 
   it('renders only enabled providers in backend order with accessible names', () => {
@@ -129,9 +129,9 @@ describe('MobileLoginBottomSheet', () => {
       }
     })
 
-    const providerButtons = renderer.root
-      .findAllByType('Pressable')
-      .filter((node) => String(node.props.accessibilityLabel).startsWith('使用'))
+    const providerButtons = findAllByHostType(renderer.root, 'Pressable').filter((node) =>
+      String(node.props.accessibilityLabel).startsWith('使用')
+    )
     expect(providerButtons.map((node) => node.props.accessibilityLabel)).toEqual([
       '使用 QQ 登录',
       '使用微信登录'
@@ -152,9 +152,9 @@ describe('MobileLoginBottomSheet', () => {
     expect(onAgreementRequired).toHaveBeenCalledOnce()
     expect(onAction).not.toHaveBeenCalled()
 
-    const links = renderer.root
-      .findAllByType('Text')
-      .filter((node) => node.props.accessibilityRole === 'link')
+    const links = findAllByHostType(renderer.root, 'Text').filter(
+      (node) => node.props.accessibilityRole === 'link'
+    )
     act(() => links[0].props.onPress())
     act(() => links[1].props.onPress())
     expect(onOpenTerms).toHaveBeenCalledOnce()
@@ -200,6 +200,6 @@ describe('MobileLoginBottomSheet', () => {
       busy: true,
       disabled: true
     })
-    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1)
+    expect(findAllByHostType(renderer.root, 'ActivityIndicator')).toHaveLength(1)
   })
 })

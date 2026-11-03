@@ -16,7 +16,7 @@ import {
   setPRRefreshOutcomeObserver,
   setPRRefreshRegistrationCheck
 } from '../github/pr-refresh-coordinator'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import type { StatsCollector } from '../stats/collector'
 import {
   applyRegisteredRepoToPRRefreshCandidate,
@@ -69,7 +69,6 @@ export function registerGitHubPRRefreshHandlers(store: Store, stats: StatsCollec
         currentHeadOid?: string | null
         /** A manual refresh: a user act that may start a stopped WSL distro. */
         wakeWslDistro?: boolean
-        userRefresh?: boolean
       }
     ) => {
       const repo = assertRegisteredGitHubRepo(args, store)
@@ -83,14 +82,9 @@ export function registerGitHubPRRefreshHandlers(store: Store, stats: StatsCollec
           : null
       const lookupOptions: GitHubPRBranchLookupOptions | undefined = hostedReviewOptions
         ? { ...hostedReviewOptions }
-        : args.acceptMergedFallbackPR === true ||
-            currentHeadOid !== null ||
-            args.userRefresh === true
+        : args.acceptMergedFallbackPR === true || currentHeadOid !== null
           ? {}
           : undefined
-      if (lookupOptions && args.userRefresh === true) {
-        lookupOptions.userRefresh = true
-      }
       if (lookupOptions && args.acceptMergedFallbackPR === true) {
         lookupOptions.acceptMergedFallbackPR = true
       }
@@ -131,17 +125,12 @@ export function registerGitHubPRRefreshHandlers(store: Store, stats: StatsCollec
     'gh:refreshPRNow',
     async (
       _event,
-      args: {
-        candidate: GitHubPRRefreshCandidate
-        reason?: GitHubPRRefreshReason
-        userRefresh?: boolean
-      }
+      args: { candidate: GitHubPRRefreshCandidate; reason?: GitHubPRRefreshReason }
     ) => {
       const repo = assertRegisteredPRRefreshCandidateRepo(args.candidate, store)
       const outcome = await refreshPRNow(
         applyRegisteredRepoToPRRefreshCandidate(store, repo, args.candidate),
-        args.reason,
-        ...(args.userRefresh === true ? ([{ userRefresh: true }] as const) : [])
+        args.reason
       )
       recordPRIfNeeded(repo, outcome)
       return outcome

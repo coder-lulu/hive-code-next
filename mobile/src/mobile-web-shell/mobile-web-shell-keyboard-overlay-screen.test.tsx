@@ -32,23 +32,17 @@ import {
   renderScreen as mountScreen
 } from './mobile-web-shell-screen-test-harness'
 import { readBridgeHostMessage } from './bridge/bridge-envelope'
+import { MobileWebShellScreen } from './MobileWebShellScreen'
 import type { MobileWebShellSessionState } from './mobile-web-shell-session-contract'
 import type { ReactTestRenderer } from 'react-test-renderer'
-import type * as ScreenModule from './MobileWebShellScreen'
-
-let MobileWebShellScreen: typeof ScreenModule.MobileWebShellScreen
 
 const renderScreen = (state: MobileWebShellSessionState): Promise<ReactTestRenderer> =>
   mountScreen(MobileWebShellScreen, dependencies, state)
 
 afterEach(harness.unmountRenderedScreens)
 
-beforeEach(async () => {
-  // Each OS case starts a fresh app-lifetime keyboard observer.
-  vi.resetModules()
+beforeEach(() => {
   harness.resetScreenDependencies(dependencies)
-  dependencies.keyboardListeners.clear()
-  MobileWebShellScreen = (await import('./MobileWebShellScreen')).MobileWebShellScreen
 })
 
 const WINDOW = { top: 44, right: 0, bottom: 8, left: 0 }

@@ -8,7 +8,6 @@ import type { OrchestrationDb } from '../../../../orchestration/db'
 import type { OrcaRuntimeService } from '../../../../orca-runtime'
 import { ORCHESTRATION_CONTRACT_VERSION } from '../../../../../../shared/protocol-version'
 import { createRootDispatch } from '../../../../orchestration/db/root-dispatch-test-fixture'
-import { MessageWake } from '../../../../runtime-message-waiters'
 
 function lifecycleGroupRecipientError(
   type: 'worker_done' | 'heartbeat' | 'escalation' | 'decision_gate'
@@ -102,7 +101,7 @@ describe('orchestration RPC methods', () => {
       })) as { message: { to_handle: string } }
 
       expect(result.message.to_handle).toBe(`run:${activeRunId}`)
-      await expect(waiting).resolves.toBeInstanceOf(MessageWake)
+      await expect(waiting).resolves.toBe('notified')
     })
 
     it('routes exact Dispatch mail independently of terminal handles', async () => {
@@ -222,10 +221,7 @@ describe('orchestration RPC methods', () => {
 
       expect(db.getTask(task.id)?.status).toBe('completed')
       expect(db.getDispatchContextById(dispatch.id)?.status).toBe('completed')
-      expect(result).toMatchObject({
-        lifecycle: { action: 'completed' },
-        next: 'Recorded. End your turn.'
-      })
+      expect(result).toMatchObject({ lifecycle: { action: 'completed' } })
     })
 
     it('fences a replacement process for a capability-less manual Dispatch', async () => {
@@ -443,11 +439,12 @@ describe('orchestration RPC methods', () => {
       expect(db.getMessageById(result.message.id)).toMatchObject({ read: 1 })
     })
 
-    it('records a heartbeat without delivering it as coordinator mail', async () => {
+    it('still wakes waiters for a heartbeat on an active dispatch', async () => {
       setup()
       const task = db.createTask({ spec: 'work' })
       const dispatch = createRootDispatch(db, task.id, 'term_worker')
-      const waiting = runtime.waitForMessage(`run:${activeRunId}`, { timeoutMs: 50 })
+      vi.spyOn(runtime, 'deliverPendingMessagesForHandle').mockImplementation(() => {})
+      const notify = vi.spyOn(runtime, 'notifyMessageArrived').mockImplementation(() => {})
 
       await call('orchestration.send', {
         from: 'term_worker',
@@ -457,9 +454,7 @@ describe('orchestration RPC methods', () => {
         payload: JSON.stringify({ dispatchId: dispatch.id })
       })
 
-      await expect(waiting).resolves.toBe('timed_out')
-      expect(db.getUnreadMessages(`run:${activeRunId}`)).toEqual([])
-      expect(db.getDispatchContextById(dispatch.id)?.last_heartbeat_at).toBeTruthy()
+      expect(notify).toHaveBeenCalledWith(`run:${activeRunId}`, 'heartbeat')
     })
 
     it('allows an omitted recipient so an active Dispatch can default to its Run', () => {

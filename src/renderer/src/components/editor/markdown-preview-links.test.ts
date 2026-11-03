@@ -141,7 +141,7 @@ describe('isMarkdownPreviewSystemBrowserModifier', () => {
 })
 
 describe('resolveMarkdownPreviewHttpOpenOptions', () => {
-  // Pass modifier intent to openHttpLink, which applies settings; see http-link-routing.ts.
+  // Pass modifier intent to openHttpLink, which applies settings; see http-link-routing.test.ts.
   it('marks the modifier held on Cmd+Shift-click on macOS', () => {
     expect(
       resolveMarkdownPreviewHttpOpenOptions(

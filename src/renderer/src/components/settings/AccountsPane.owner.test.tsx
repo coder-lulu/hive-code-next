@@ -119,7 +119,7 @@ describe('AccountsPane owner transitions', () => {
 
     act(() => {
       handlers[0]?.onSnapshot({ ...codexSnapshot('healthy'), failedProviders: ['claude'] })
-      handlers[0]?.onError(new Error('Claude keychain unavailable'), 'claude')
+      handlers[0]?.onError(new Error('Claude keychain unavailable'))
     })
 
     expect(screen.getByTestId('codex-state').textContent).toBe('loaded')
@@ -157,3 +157,6 @@ describe('AccountsPane owner transitions', () => {
     expect(screen.getByTestId('system-email').textContent).toBe('')
   })
 })
+
+vi.mock('./MiniMaxAccountsSection', () => ({ MiniMaxAccountsSection: () => null }))
+vi.mock('./ZcodePlanAccountsSection', () => ({ ZcodePlanAccountsSection: () => null }))

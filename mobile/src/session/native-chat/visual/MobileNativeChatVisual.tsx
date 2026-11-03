@@ -3,7 +3,7 @@ import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'rea
 import { Maximize2, X } from 'lucide-react-native'
 import type { NativeChatVisualDirective } from '../../../../../src/shared/native-chat/native-chat-visual-directive'
 import { useWindowSafeAreaInsets } from '../../../layout/side-safe-area'
-import { colors, radii, spacing, typography, pressedStyle } from '../../../theme/mobile-theme'
+import { colors, radii, spacing, typography } from '../../../theme/mobile-theme'
 import { themedStyleSheet } from '../../../theme/themed-styles'
 import { useMobileColorScheme } from '../../../theme/use-mobile-color-scheme'
 import type { MobileNativeChatVisualSource } from './mobile-native-chat-visual-read'
@@ -67,7 +67,7 @@ export const MobileNativeChatVisual = memo(function MobileNativeChatVisual({
         accessibilityRole="button"
         accessibilityLabel={t('chat.nativeChatVisual.unavailable', 'Visualization unavailable')}
         accessibilityHint={t('chat.nativeChatVisual.retryHint', 'Tries to load it again')}
-        style={({ pressed }) => [styles.unavailable, pressed && pressedStyle]}
+        style={styles.unavailable}
       >
         <Text style={styles.unavailableText}>
           {t('chat.nativeChatVisual.unavailable', 'Visualization unavailable')}
@@ -94,7 +94,7 @@ export const MobileNativeChatVisual = memo(function MobileNativeChatVisual({
           }
         )}
         hitSlop={8}
-        style={({ pressed }) => [styles.openButton, pressed && pressedStyle]}
+        style={styles.openButton}
       >
         <Maximize2 size={14} color={colors.textSecondary} strokeWidth={2.2} />
       </Pressable>
@@ -146,7 +146,7 @@ function MobileNativeChatVisualFullscreen({
             accessibilityRole="button"
             accessibilityLabel={t('common.close', 'Close')}
             hitSlop={8}
-            style={({ pressed }) => [styles.closeButton, pressed && pressedStyle]}
+            style={styles.closeButton}
           >
             <X size={18} color={colors.textSecondary} strokeWidth={2.2} />
           </Pressable>
@@ -166,7 +166,7 @@ const styles = themedStyleSheet(() => ({
   frame: {
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle,
-    borderRadius: radii.surface,
+    borderRadius: radii.row,
     marginBottom: spacing.sm,
     overflow: 'hidden'
   },
@@ -183,7 +183,7 @@ const styles = themedStyleSheet(() => ({
     right: spacing.xs,
     width: 28,
     height: 28,
-    borderRadius: radii.control,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: colors.bgPanel,

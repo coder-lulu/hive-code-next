@@ -5,9 +5,7 @@ describe('BrowserNetworkTunnelOutboundMemoryBudgetRegistry', () => {
   it('shares one host ceiling across application, encrypted queue, and native buffers', () => {
     const registry = new BrowserNetworkTunnelOutboundMemoryBudgetRegistry({
       hostMaxBytes: 10,
-      processMaxBytes: 100,
-      controlFrameReserveBytes: 0,
-      controlFrameReserveClaims: 0
+      processMaxBytes: 100
     })
     const first = registry.acquire('host-a')!
     const second = registry.acquire('host-a')!
@@ -30,9 +28,7 @@ describe('BrowserNetworkTunnelOutboundMemoryBudgetRegistry', () => {
   it('shares one process ceiling across distinct browser hosts and restores exact admission', () => {
     const registry = new BrowserNetworkTunnelOutboundMemoryBudgetRegistry({
       hostMaxBytes: 100,
-      processMaxBytes: 10,
-      controlFrameReserveBytes: 0,
-      controlFrameReserveClaims: 0
+      processMaxBytes: 10
     })
     const first = registry.acquire('host-a')!
     const second = registry.acquire('host-b')!
@@ -54,9 +50,7 @@ describe('BrowserNetworkTunnelOutboundMemoryBudgetRegistry', () => {
       hostMaxClaims: 2,
       processMaxClaims: 3,
       hostMaxSocketSources: 1,
-      processMaxSocketSources: 2,
-      controlFrameReserveBytes: 0,
-      controlFrameReserveClaims: 0
+      processMaxSocketSources: 2
     })
     const first = registry.acquire('host-a')!
     const second = registry.acquire('host-b')!
@@ -100,5 +94,21 @@ describe('BrowserNetworkTunnelOutboundMemoryBudgetRegistry', () => {
       socketSources: 0
     })
     expect(registry.acquire('host-b')).not.toBeNull()
+  })
+
+  it('treats unavailable native-buffer evidence as full until the source releases', () => {
+    const registry = new BrowserNetworkTunnelOutboundMemoryBudgetRegistry({
+      hostMaxBytes: 10,
+      processMaxBytes: 10
+    })
+    const lease = registry.acquire('host-a')!
+    const socket = lease.registerBufferedAmount(() => {
+      throw new Error('socket unavailable')
+    })!
+
+    expect(socket.canSend(1)).toBe(false)
+    expect(lease.claimApplicationBytes(1)).toBeNull()
+    socket.release()
+    expect(lease.claimApplicationBytes(1)).not.toBeNull()
   })
 })

@@ -138,7 +138,6 @@ export function canReuseMobileSessionSnapshot(
   next: MobileSessionWorktreeInputs
 ): boolean {
   return (
-    narrowedEntriesEqual(previous.hostTabIds, next.hostTabIds) &&
     previous.worktreeId === next.worktreeId &&
     previous.worktreeInstanceId === next.worktreeInstanceId &&
     previous.terminalTabs === next.terminalTabs &&

@@ -1,13 +1,12 @@
-import { structuredAgentSessionOwnerStatus } from './structured-agent-session-owner-status'
-import type { AgentSessionCurrentRequestsRead } from '../../../shared/agent-session/requests/agent-session-current-requests-wire'
+import type { AgentSessionCurrentRequestsRead } from '../../../shared/agent-session-current-requests-wire'
 import { readCurrentRequestsPiece } from './agent-session-current-requests'
 import type {
+  AgentSessionBackgroundTaskState,
   AgentSessionHistoryRequest,
   AgentSessionHistoryResult
-} from '../../../shared/agent-session/agent-session-wire'
-import type { AgentSessionBackgroundTaskState } from '../../../shared/agent-session/agent-session-background-task-wire'
+} from '../../../shared/agent-session-wire'
 import type { AgentChildWorkView } from '../../../shared/agent-status-child-work-view'
-import { structuredChildWorkLegacyTasks } from '../../../shared/agent-session/structured-agent-session-child-work-legacy'
+import { structuredChildWorkLegacyTasks } from '../../../shared/structured-agent-session-child-work-legacy'
 import { structuredRunningChildWork } from '../../../shared/agent-child-work-listing'
 import { readStructuredAgentSessionHistoryResult } from './structured-agent-session-history-result'
 import { hostStructuredAgentSessionCurrentWork } from './structured-agent-session-host-current-work'
@@ -36,12 +35,6 @@ export class StructuredAgentSessionBackgroundTaskChannel {
     private readonly readChildWork: (sessionId: string) => AgentChildWorkView[] | undefined,
     private readonly childWorkIncomplete: (sessionId: string) => boolean = () => false
   ) {}
-
-  handoffStatus = (sessionId: string) => structuredAgentSessionOwnerStatus(this.deps, sessionId)
-
-  /** Full reduction: absence from a bounded page cannot prove a revised/tombstoned item is absent. */
-  journalSnapshot = async (sessionId: string) =>
-    (await this.conversation(sessionId)).journal.snapshot()
 
   async history(
     request: AgentSessionHistoryRequest,

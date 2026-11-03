@@ -57,7 +57,7 @@ export async function prepareRuntimeLocalWorktreeSetup(args: {
   if (shouldRunSetup && hooks?.scripts.setup) {
     if (args.shouldUseSetupRunner) {
       try {
-        setup = await createSetupRunnerScript(
+        setup = createSetupRunnerScript(
           repo,
           worktreePath,
           hooks.scripts.setup,

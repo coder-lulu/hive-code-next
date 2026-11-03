@@ -101,7 +101,7 @@ test.describe('E9: background work on a stopped WSL host', () => {
         const settings = await window.api.settings.set({ experimentalWslHosts: true })
         window.__store?.setState({ settings })
         await window.__store?.getState().updateSettings({
-          nativeChatProviders: { claude: true, codex: true },
+          experimentalNativeChat: true,
           defaultTuiAgent: 'claude',
           agentCmdOverrides: { claude }
         })
@@ -165,7 +165,7 @@ test.describe('E9: background work on a stopped WSL host', () => {
             ),
           { timeout: 30_000 }
         )
-        .toContain('Ubuntu is stopped')
+        .toContain('Ubuntu was stopped')
       const connectsWhileStopped = fakeWslConnects(connectLogFile).length
       // Setup connected at least once: a connect log that was never written fails here.
       expect(connectsWhileStopped).toBeGreaterThan(0)

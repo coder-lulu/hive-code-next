@@ -1,105 +1,141 @@
 import type { ConnectionPresentationModel } from './use-mobile-tasks-connection-presentation'
 import { translate } from '../i18n/mobile-i18n'
-import { ScrollView, SlidersHorizontal } from './mobile-tasks-dependencies'
+import {
+  ScrollView,
+  Pressable,
+  TaskProviderLogo,
+  colors,
+  Text,
+  View,
+  GitBranch
+} from './mobile-tasks-dependencies'
 import { styles } from './mobile-tasks-legacy-styles'
-import { FilterChip } from '../components/nav-bar/FilterChip'
+import { getRepoBadgeColor } from './mobile-tasks-legacy-foundation'
 import { renderMobileTasksGitHubViewControls } from './mobile-tasks-github-view-controls'
 import { renderMobileTasksLinearViewControls } from './mobile-tasks-linear-view-controls'
 import { renderMobileTasksJiraViewControls } from './mobile-tasks-jira-view-controls'
-import { mobileTasksFilterCount } from './mobile-tasks-filter-sheet'
 
-/** The scope dropdowns, then the one Filter chip that opens Filter & display. */
 export function renderMobileTasksProviderControls(model: ConnectionPresentationModel) {
   const {
-    effectiveRepoIds,
     githubMode,
     gitlabFilterLabel,
     gitlabView,
-    hostedRepos,
-    jiraConnection,
-    linearConnected,
     provider,
+    providerLabel,
     repoPickerLabel,
-    setShowFilterSheet,
+    repoPickerSelectedRepo,
     setShowGitLabFilterPicker,
     setShowGitLabViewPicker,
+    setShowProviderPicker,
     setShowRepoPicker,
+    setShowSortPicker,
+    sortLabel,
     taskUiReady
   } = model
-  if (
-    (provider === 'linear' && !linearConnected) ||
-    (provider === 'jira' && !jiraConnection.connected)
-  ) {
-    return null
-  }
-  const filterCount = mobileTasksFilterCount(model)
-  const gitlabViewLabel =
-    gitlabView === 'project'
-      ? translate('tasks.providerControls.projectMergeRequests', 'Project MRs')
-      : translate('tasks.providerControls.myTodos', 'My Todos')
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      keyboardShouldPersistTaps="handled"
+      style={styles.toolbarScroll}
       contentContainerStyle={styles.toolbar}
     >
+      <Pressable
+        style={styles.segmentButton}
+        disabled={!taskUiReady}
+        onPress={() => {
+          if (!taskUiReady) {
+            return
+          }
+          setShowProviderPicker(true)
+        }}
+      >
+        <TaskProviderLogo provider={provider} size={14} color={colors.textPrimary} />
+        <Text style={styles.segmentButtonText}>{providerLabel}</Text>
+      </Pressable>
+
       {provider === 'gitlab' || (provider === 'github' && githubMode !== 'project') ? (
-        <FilterChip
-          label={repoPickerLabel}
-          menu
-          active={effectiveRepoIds.size > 0 && effectiveRepoIds.size < hostedRepos.length}
+        <Pressable
+          style={styles.segmentButton}
           disabled={!taskUiReady}
-          accessibilityLabel={translate(
-            'tasks.providerControls.reposLabel',
-            'Repositories: {{repos}}',
-            {
-              repos: repoPickerLabel
+          onPress={() => {
+            if (!taskUiReady) {
+              return
             }
-          )}
-          onPress={() => setShowRepoPicker(true)}
-        />
+            setShowRepoPicker(true)
+          }}
+        >
+          {repoPickerSelectedRepo ? (
+            <View
+              style={[
+                styles.segmentRepoDot,
+                {
+                  backgroundColor: getRepoBadgeColor(repoPickerSelectedRepo)
+                }
+              ]}
+            />
+          ) : null}
+          <Text style={styles.segmentSecondaryText}>{repoPickerLabel}</Text>
+        </Pressable>
       ) : null}
 
       {renderMobileTasksGitHubViewControls(model)}
 
-      {provider === 'gitlab' ? (
+      {provider === 'gitlab' && (
         <>
-          <FilterChip
-            label={gitlabViewLabel}
-            menu
+          <Pressable
+            style={styles.segmentButton}
             disabled={!taskUiReady}
-            onPress={() => setShowGitLabViewPicker(true)}
-          />
-          {gitlabView === 'project' ? (
-            <FilterChip
-              label={gitlabFilterLabel}
-              menu
+            onPress={() => {
+              if (!taskUiReady) {
+                return
+              }
+              setShowGitLabViewPicker(true)
+            }}
+          >
+            <Text style={styles.segmentSecondaryText}>
+              {gitlabView === 'project'
+                ? translate('tasks.providerControls.projectMergeRequests', 'Project MRs')
+                : translate('tasks.providerControls.myTodos', 'My Todos')}
+            </Text>
+          </Pressable>
+          {gitlabView === 'project' && (
+            <Pressable
+              style={styles.segmentButton}
               disabled={!taskUiReady}
-              onPress={() => setShowGitLabFilterPicker(true)}
-            />
-          ) : null}
+              onPress={() => {
+                if (!taskUiReady) {
+                  return
+                }
+                setShowGitLabFilterPicker(true)
+              }}
+            >
+              <Text style={styles.segmentSecondaryText}>{gitlabFilterLabel}</Text>
+            </Pressable>
+          )}
         </>
-      ) : null}
+      )}
 
       {renderMobileTasksLinearViewControls(model)}
 
       {renderMobileTasksJiraViewControls(model)}
 
-      <FilterChip
-        label={
-          filterCount > 0
-            ? translate('tasks.providerControls.filterCount', 'Filter · {{count}}', {
-                count: filterCount
-              })
-            : translate('tasks.providerControls.filter', 'Filter')
-        }
-        icon={SlidersHorizontal}
-        active={filterCount > 0}
-        disabled={!taskUiReady}
-        accessibilityLabel={translate('tasks.providerControls.filterLabel', 'Filter and display')}
-        onPress={() => setShowFilterSheet(true)}
-      />
+      {provider !== 'linear' && !(provider === 'github' && githubMode === 'project') ? (
+        <Pressable
+          style={styles.segmentButton}
+          disabled={!taskUiReady}
+          onPress={() => {
+            if (!taskUiReady) {
+              return
+            }
+            setShowSortPicker(true)
+          }}
+        >
+          <GitBranch size={14} color={colors.textSecondary} />
+          <Text style={styles.segmentSecondaryText}>
+            {translate('tasks.providerControls.sort', 'Sort: {{sortLabel}}', { sortLabel })}
+          </Text>
+        </Pressable>
+      ) : null}
     </ScrollView>
   )
 }

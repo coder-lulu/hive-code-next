@@ -1,3 +1,4 @@
+import { reportWorkerTerminalUserInput } from './worker-terminal-takeover-report'
 import { getTerminalLiveAccessoryRawSendTarget } from './terminal-live-accessory-raw-send-target'
 import { buildTerminalSendParams, TERMINAL_INPUT_SEND_OPTIONS } from './terminal-send-request'
 import { terminalInputSend } from './mobile-terminal-operations'
@@ -40,7 +41,11 @@ export async function sendTerminalLiveAccessoryRawBytes(
     )
     .then(
       (reply) => {
-        return terminalInputSend.interpret(reply) === true
+        const accepted = terminalInputSend.interpret(reply) === true
+        if (accepted) {
+          reportWorkerTerminalUserInput(args.client!, rawSendTarget)
+        }
+        return accepted
       },
       () => false
     )

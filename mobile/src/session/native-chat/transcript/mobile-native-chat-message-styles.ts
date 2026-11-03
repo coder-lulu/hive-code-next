@@ -28,7 +28,7 @@ export const styles = themedStyleSheet(() => ({
     backgroundColor: colors.chatUserSurface,
     borderWidth: 1,
     borderColor: colors.chatUserBorder,
-    borderRadius: radii.surface,
+    borderRadius: radii.card,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm
   },
@@ -70,15 +70,10 @@ export const styles = themedStyleSheet(() => ({
     color: colors.textMuted,
     fontSize: typography.metaSize
   },
-  // Same gap as the tool rows' icon and sentence, so the time starts on their text.
   meta: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6
-  },
-  // The copy button's 24 pt box centres a 14 pt glyph; pulling the 5 pt back lines the glyph up with the tool icons.
-  metaCopy: {
-    marginHorizontal: -5
+    gap: spacing.xs
   },
   unsentNotice: {
     maxWidth: '88%',
@@ -102,7 +97,7 @@ export const styles = themedStyleSheet(() => ({
   imageThumb: {
     width: 200,
     height: 150,
-    borderRadius: radii.surface,
+    borderRadius: radii.card,
     backgroundColor: colors.bgRaised,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.borderSubtle

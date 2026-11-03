@@ -1,7 +1,7 @@
 import {
   AGENT_JOURNAL_THREAD_SCOPE,
   type AgentJournalItemBody
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
+} from '../../../shared/agent-session-journal-types'
 import type { AgentSessionJournal } from '../../native-chat/agent-session-journal/journal-store'
 import type { JournalLifecycleMutationInput } from '../../native-chat/agent-session-journal/journal-row-builders'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -9,7 +9,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, vi } from 'vitest'
 import type { StructuredAgentSessionAdapter } from '../../native-chat/agent-session-wire/structured-agent-session-adapter'
-import { codexProviderHandle } from '../../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 import { formatOrcaSessionAddress } from '../../../shared/orca-session-address'
 import { testOrcaSessionId } from '../../../shared/orca-session-address-test-fixture'
 import { createTrackedJournalOpener } from '../../native-chat/agent-session-journal/journal-host-database-test-support'
@@ -68,6 +68,7 @@ export async function rig(
       formatOrcaSessionAddress(SESSION)
     )
   let dispatch = assign()
+  let enabled = true
   const notify = vi.fn<(handle: string, messageType: string) => void>()
   const deliver = vi.fn<(sessionId: string, journal: AgentSessionJournal) => void>()
   const sessions = new StructuredAgentSessionConversations({
@@ -82,11 +83,7 @@ export async function rig(
     capturePendingOutput,
     wordsContext: () => ({ agentName: 'Codex', retryControl: true }),
     onFailure: (failure) => {
-      void escalateChatWorkerError(failure, {
-        getDb: () => db,
-        notify,
-        isWaitingForMail: () => false
-      })
+      void escalateChatWorkerError(failure, { db: () => db, enabled: () => enabled, notify })
     }
   })
   const session: StructuredAgentSessionHostSession = {
@@ -105,6 +102,9 @@ export async function rig(
     notify,
     deliver,
     mail: () => db.getUnreadRunMailbox(run.id, 100, ['escalation']),
+    enabled: (value: boolean) => {
+      enabled = value
+    },
     dispatch: () => dispatch,
     unassign: () => db.completeDispatch(dispatch.id),
     reassign: () => {

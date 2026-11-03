@@ -231,9 +231,12 @@ function verifyNativeArgumentGuardrails() {
   }
   if (
     !linux.includes('def require_non_empty_string(value, name):') ||
-    !linux.includes('text = require_non_empty_string(operation.get("text"), "text")')
+    !linux.includes('text = require_non_empty_string(operation.get("text"), "text")') ||
+    !linux.includes('press_key(require_non_empty_string(operation.get("key"), "key"))')
   ) {
-    failures.push('Linux text actions must reject missing payloads instead of sending empty input')
+    failures.push(
+      'Linux text/key actions must reject missing payloads instead of sending empty input'
+    )
   }
   if (!linux.includes('"targetById": False')) {
     failures.push('Linux provider must not advertise stable window-id targeting')

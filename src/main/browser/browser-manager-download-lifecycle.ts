@@ -15,11 +15,6 @@ export abstract class BrowserManagerDownloadLifecycle extends BrowserManagerDown
     }
     download.browserTabId = browserTabId
     download.rendererWebContentsId = this.rendererWebContentsIdByTabId.get(browserTabId) ?? null
-    this.pageEvents.emit(browserTabId, {
-      kind: 'download',
-      filename: download.filename,
-      origin: download.origin
-    })
   }
 
   protected flushPendingDownloadRequests(browserTabId: string, guestWebContentsId: number): void {

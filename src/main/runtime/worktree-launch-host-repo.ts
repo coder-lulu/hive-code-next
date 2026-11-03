@@ -23,10 +23,9 @@ export type WorktreeHostRouting<T extends LaunchHostRepo> =
 /** Adapt the shared renderer/main ownership rule: unknown ids remain unowned for legacy local-folder launches; conflicting/malformed owners fail closed. */
 export function resolveWorktreeHostRouting<T extends LaunchHostRepo & ExecutionHostOwnerRow>(
   repos: readonly T[],
-  worktree: { repoId: string; hostId?: string | null },
-  lookup = createRepoRowExecutionHostLookup(repos)
+  worktree: { repoId: string; hostId?: string | null }
 ): WorktreeHostRouting<T> {
-  const resolution = resolveWorktreeExecutionHost(lookup, worktree)
+  const resolution = resolveWorktreeExecutionHost(createRepoRowExecutionHostLookup(repos), worktree)
   if (resolution.kind === 'unresolved') {
     // Only a wholly unknown id permits local fallback; a malformed declared host must fail closed.
     return resolution.reason === 'unknown' ? { kind: 'unowned' } : { kind: 'ambiguous' }

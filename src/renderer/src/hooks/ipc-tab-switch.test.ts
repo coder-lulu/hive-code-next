@@ -138,6 +138,16 @@ describe('handleSwitchTerminalTab', () => {
     expect(store.setActiveTabType).not.toHaveBeenCalled()
   })
 
+  it('returns false when only one terminal tab exists', () => {
+    const store = makeStore('terminal')
+    getStateMock.mockReturnValue(store)
+    getActiveTabNavOrderMock.mockReturnValue([{ type: 'terminal', id: 'term-1' }])
+
+    expect(handleSwitchTerminalTab(1)).toBe(false)
+    expect(store.setActiveTab).not.toHaveBeenCalled()
+    expect(store.setActiveTabType).not.toHaveBeenCalled()
+  })
+
   it('jumps to the first terminal when an editor tab is active', () => {
     const store = makeStore('editor')
     store.activeFileId = 'editor-2'
@@ -410,6 +420,16 @@ describe('handleSwitchTabAcrossAllTypes', () => {
     expect(store.setActiveTab).toHaveBeenCalledWith('term-1')
     expect(store.setActiveTabType).toHaveBeenCalledWith('terminal', 'wt-1')
   })
+
+  it('returns false when only one tab exists total', () => {
+    const store = makeStore('terminal')
+    getStateMock.mockReturnValue(store)
+    getActiveTabNavOrderMock.mockReturnValue([{ type: 'terminal', id: 'term-1' }])
+
+    expect(handleSwitchTabAcrossAllTypes(1)).toBe(false)
+    expect(store.setActiveTab).not.toHaveBeenCalled()
+    expect(store.setActiveTabType).not.toHaveBeenCalled()
+  })
 })
 
 describe('handleSwitchRecentTab', () => {
@@ -441,5 +461,27 @@ describe('handleSwitchRecentTab', () => {
     expect(store.setActiveBrowserTab).toHaveBeenCalledWith('browser-b')
     expect(store.activateTab).toHaveBeenCalledWith('tab-b')
     expect(store.setActiveTabType).toHaveBeenCalledWith('browser', 'wt-1')
+  })
+
+  it('returns false when the MRU stack has no previous visible tab', () => {
+    const store = makeStore('terminal')
+    store.groupsByWorktree = {
+      'wt-1': [
+        {
+          id: 'group-1',
+          activeTabId: 'tab-term-1',
+          tabOrder: ['tab-term-1'],
+          recentTabIds: ['tab-term-1']
+        }
+      ]
+    }
+    getStateMock.mockReturnValue(store)
+    getActiveTabNavOrderMock.mockReturnValue([
+      { type: 'terminal', id: 'term-1', tabId: 'tab-term-1' }
+    ])
+
+    expect(handleSwitchRecentTab()).toBe(false)
+    expect(store.setActiveTab).not.toHaveBeenCalled()
+    expect(store.setActiveTabType).not.toHaveBeenCalled()
   })
 })

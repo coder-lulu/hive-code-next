@@ -15,9 +15,7 @@ const { appMock, getCanonicalUserDataPathMock } = vi.hoisted(() => ({
 }))
 
 vi.mock('electron', () => ({ app: appMock }))
-vi.mock('./persistence/loading-store/user-data-path', () => ({
-  getCanonicalUserDataPath: getCanonicalUserDataPathMock
-}))
+vi.mock('./persistence', () => ({ getCanonicalUserDataPath: getCanonicalUserDataPathMock }))
 
 describe('serve update handoff', () => {
   let root: string

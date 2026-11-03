@@ -48,7 +48,7 @@ export function createLinearProjectDetailActions(
         inflight &&
         inflight.contextKey === contextKey &&
         inflight.mutationGeneration === getLinearMutationGeneration() &&
-        !options?.force
+        (!options?.force || inflight.force)
       ) {
         return inflight.promise
       }
@@ -122,6 +122,7 @@ export function createLinearProjectDetailActions(
 
       entry = {
         promise,
+        force: Boolean(options?.force),
         contextKey,
         mutationGeneration: requestMutationGeneration
       }

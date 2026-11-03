@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
-import { getAgentSessionOptionLaunchCatalog } from '../../../../shared/agent-session/options/agent-session-option-catalog'
+import { useState } from 'react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CornerDownLeft } from 'lucide-react'
+import { getAgentSessionOptionLaunchCatalog } from '../../../../shared/agent-session-option-catalog'
+import { Button } from '@/components/ui/button'
 import {
   Command,
   CommandInput,
@@ -15,7 +16,6 @@ import { NativeChatSessionOptionRows } from '../native-chat/NativeChatSessionOpt
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible'
 import type { SessionOptionDescriptor } from '../../../../shared/native-chat/input/native-chat-session-options'
 import { AgentPermissionMenu } from '../settings/AgentPermissionChoiceControls'
-import { AgentLaunchSetupFooter, type AgentLaunchSetupFooterHandle } from './AgentLaunchSetupFooter'
 import {
   agentPickerPanelArguments,
   agentPickerSpeedValue,
@@ -25,6 +25,7 @@ import {
 import { agentPickerSpeedIsOpaque } from '../../../../shared/agent-launch-picker-speed'
 import { editAgentPickerPermission } from '../../../../shared/agent-launch-picker-permission'
 import {
+  agentPickerButtonOrder,
   agentPickerArgumentsKnown,
   agentPickerDraft,
   agentPickerEffectiveChoices,
@@ -40,24 +41,17 @@ import {
 export function AgentLaunchSetupPanel({
   entry,
   initial,
-  value,
   disabled,
   onDraftChange,
   onUse
 }: {
   entry: AgentPickerEntry
   initial?: AgentPickerDraft
-  value?: AgentPickerDraft
   disabled?: boolean
   onDraftChange?: (draft: AgentPickerDraft) => void
-  // Returning false (or a promise of it) refuses the launch; a caller with no answer, as before, accepts.
-  onUse:
-    | ((draft: AgentPickerDraft) => void)
-    | ((draft: AgentPickerDraft) => boolean | Promise<boolean>)
+  onUse: (draft: AgentPickerDraft) => void
 }) {
-  const footer = useRef<AgentLaunchSetupFooterHandle>(null)
-  const [localDraft, updateDraft] = useState(() => initial ?? agentPickerDraft(entry))
-  const draft = value ?? localDraft
+  const [draft, updateDraft] = useState(() => initial ?? agentPickerDraft(entry))
   const setDraft = (next: AgentPickerDraft) => {
     updateDraft(next)
     onDraftChange?.(next)
@@ -167,7 +161,7 @@ export function AgentLaunchSetupPanel({
       onAction={() => {}}
     />
   )
-  const use = (surface: AgentPickerSurface) => footer.current?.launch(surface)
+  const use = (surface: AgentPickerSurface) => onUse({ ...draft, surface })
   const legacyCount = models.filter((model) => model.isLegacy && !model.hidden).length
   return (
     <div
@@ -215,7 +209,7 @@ export function AgentLaunchSetupPanel({
             agent: entry.label
           })}
         />
-        <CommandList className="max-h-56" data-focus-behavior="page">
+        <CommandList className="max-h-56">
           <CommandEmpty>
             {translate('agentPicker.noModels', 'No models match your search.')}
           </CommandEmpty>
@@ -366,12 +360,25 @@ export function AgentLaunchSetupPanel({
           </div>
         ) : null}
       </div>
-      <AgentLaunchSetupFooter
-        ref={footer}
-        entry={entry}
-        disabled={disabled}
-        onLaunch={(surface, prompt) => onUse({ ...draft, surface, ...(prompt ? { prompt } : {}) })}
-      />
+      <div className="flex items-center justify-end gap-2 border-t border-border px-2.5 py-2">
+        {agentPickerButtonOrder(entry).map((surface) => (
+          <Button
+            key={surface}
+            type="button"
+            size="xs"
+            disabled={disabled}
+            variant={surface === entry.defaultSurface ? 'default' : 'outline'}
+            onClick={() => use(surface)}
+          >
+            {surface === 'chat'
+              ? translate('agentPicker.launchChat', 'Launch chat')
+              : translate('agentPicker.launchTerminal', 'Launch terminal')}
+            {surface === entry.defaultSurface ? (
+              <CornerDownLeft className="size-3 opacity-60" />
+            ) : null}
+          </Button>
+        ))}
+      </div>
     </div>
   )
 }

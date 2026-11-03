@@ -10,7 +10,7 @@ import {
   notePRRefreshValidationDenial,
   type PRRefreshValidationDenialReason
 } from '../github/pr-refresh-validation-backoff'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import {
   getLocalProjectGhExecOptions,
   type LocalProjectGhExecOptions
@@ -20,7 +20,6 @@ import { guardWslUncPathAccess, WslDistroStoppedError } from '../wsl/wsl-unc-acc
 export type GitHubRepoScopedArgs = {
   repoPath: string
   repoId?: string | null
-  repoOwnerExecutionHostId?: string
   sourceContext?: TaskSourceContext | null
 }
 
@@ -31,7 +30,6 @@ type RegisteredRepoValidationResult =
 type RegisteredRepoQuery = {
   repoPath: string
   repoId?: string | null
-  repoOwnerExecutionHostId?: string
   /** Picks between twins (one id on two hosts); a lone row's own fields still win (they may be stale). */
   hostHint?: Parameters<typeof getRepoExecutionHostId>[0] | null
   sourceContext?: TaskSourceContext | null
@@ -68,14 +66,9 @@ function validateRegisteredRepo(
           message: 'Access denied: unknown repository path'
         }
   }
-  const ownerHostId =
-    query.repoOwnerExecutionHostId ??
-    (sourceContext?.provider === 'github' ? sourceContext.hostId : null)
-  if (ownerHostId) {
+  if (sourceContext?.provider === 'github') {
     const repo = pathRows.find(
-      (candidate) =>
-        getRepoExecutionHostId(candidate) === ownerHostId &&
-        (sourceContext?.provider !== 'github' || sourceContext.hostId === ownerHostId)
+      (candidate) => getRepoExecutionHostId(candidate) === sourceContext.hostId
     )
     return repo
       ? { kind: 'ok', repo }
@@ -96,12 +89,7 @@ function validateRegisteredRepo(
 function registeredRepoQuery(args: string | GitHubRepoScopedArgs): RegisteredRepoQuery {
   return typeof args === 'string'
     ? { repoPath: args }
-    : {
-        repoPath: args.repoPath,
-        repoId: args.repoId,
-        repoOwnerExecutionHostId: args.repoOwnerExecutionHostId,
-        sourceContext: args.sourceContext
-      }
+    : { repoPath: args.repoPath, repoId: args.repoId, sourceContext: args.sourceContext }
 }
 
 function prRefreshCandidateQuery(candidate: GitHubPRRefreshCandidate): RegisteredRepoQuery {

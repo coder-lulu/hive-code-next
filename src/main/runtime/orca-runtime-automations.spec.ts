@@ -100,7 +100,7 @@ export function registerOrcaRuntimeAutomationsTests(): void {
           workspaceId: null,
           setupDecision: 'skip'
         }),
-        { destination: undefined, resolvedRepo: repo }
+        undefined
       )
       expect(automation.id).toBe('auto-1')
     })
@@ -190,11 +190,7 @@ export function registerOrcaRuntimeAutomationsTests(): void {
       const updated = await runtime.updateAutomation('auto-1', { enabled: false })
       const removed = await runtime.deleteAutomation('auto-1')
 
-      expect(store.updateAutomation).toHaveBeenCalledWith(
-        'auto-1',
-        { enabled: false },
-        { resolvedRepo: undefined }
-      )
+      expect(store.updateAutomation).toHaveBeenCalledWith('auto-1', { enabled: false }, undefined)
       expect(updated).toMatchObject({
         prompt: existingAutomation.prompt,
         baseBranch: existingAutomation.baseBranch,
@@ -211,11 +207,7 @@ export function registerOrcaRuntimeAutomationsTests(): void {
 
       await runtime.updateAutomation('auto-1', { baseBranch: null })
 
-      expect(store.updateAutomation).toHaveBeenCalledWith(
-        'auto-1',
-        { baseBranch: null },
-        { resolvedRepo: undefined }
-      )
+      expect(store.updateAutomation).toHaveBeenCalledWith('auto-1', { baseBranch: null }, undefined)
     })
 
     it('passes setup decision updates through the shared store', async () => {
@@ -227,7 +219,7 @@ export function registerOrcaRuntimeAutomationsTests(): void {
       expect(store.updateAutomation).toHaveBeenCalledWith(
         'auto-1',
         { setupDecision: 'run' },
-        { resolvedRepo: undefined }
+        undefined
       )
     })
 
@@ -246,7 +238,7 @@ export function registerOrcaRuntimeAutomationsTests(): void {
       expect(store.updateAutomation).toHaveBeenCalledWith(
         'auto-1',
         { reuseSession: true },
-        { resolvedRepo: undefined }
+        undefined
       )
     })
 
@@ -274,7 +266,7 @@ export function registerOrcaRuntimeAutomationsTests(): void {
           workspaceId: null,
           reuseSession: false
         }),
-        { resolvedRepo: repo }
+        undefined
       )
     })
 

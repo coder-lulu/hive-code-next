@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
-import { confirmPluginInstallTrust } from '@/store/plugin-install-trust-request'
 import { Button } from '../../ui/button'
 import {
   Dialog,
@@ -12,7 +11,6 @@ import {
 } from '../../ui/dialog'
 import { Input } from '../../ui/input'
 import { Label } from '../../ui/label'
-import { localFolderTrustPrompt } from '../presentation/plugin-install-trust'
 
 type PluginDevelopmentDialogProps = {
   open: boolean
@@ -53,9 +51,6 @@ export function PluginDevelopmentDialog({
       return
     }
     setError(null)
-    if (!(await confirmPluginInstallTrust(localFolderTrustPrompt('dev-folder', path)))) {
-      return
-    }
     try {
       await onChange([...paths, path])
       setPathInput('')

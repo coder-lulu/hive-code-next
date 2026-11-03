@@ -30,8 +30,7 @@ vi.mock('node:fs', async (original) => {
   }
 })
 import type Database from '../../sqlite/sync-database'
-import type { JournalHostDatabase } from '../agent-session-journal/journal-host-database'
-import type { AgentJournalMessageItem } from '../../../shared/agent-session/journal/agent-session-journal-types'
+import type { AgentJournalMessageItem } from '../../../shared/agent-session-journal-types'
 import {
   closeTestJournalHostDatabases,
   openTestJournalHostDatabase
@@ -61,7 +60,6 @@ const CARRIED = '3e1f0a9b-8c7d-4e6f-a5b4-c3d2e1f0a903'
 
 let stateDirectory: string
 let store: AgentSessionAttachmentStore
-let journal: JournalHostDatabase
 let db: Database.Database
 let recorded: Set<string> | null
 
@@ -70,8 +68,7 @@ beforeEach(async () => {
   store = new AgentSessionAttachmentStore(agentSessionAttachmentStoreRoot(stateDirectory), {
     hasSession: () => true
   })
-  journal = openTestJournalHostDatabase(stateDirectory)
-  db = journal.db
+  db = openTestJournalHostDatabase(stateDirectory).db
   recorded = new Set(['session-1', 'session-2'])
 })
 
@@ -79,18 +76,12 @@ afterEach(async () => {
   fault.path = ''
   fault.sync = false
   store.clearInFlightForTests()
-  await closeTestJournalHostDatabases()
+  closeTestJournalHostDatabases()
   await rm(stateDirectory, { recursive: true, force: true })
 })
 
 function facts(overrides: Partial<AgentSessionAttachmentSweepFacts> = {}) {
-  return {
-    database: () => db,
-    write: <T>(run: (db: Database.Database) => T) =>
-      overrides.database?.() === null ? undefined : journal.writeAutocommit(run),
-    recordedSessionIds: () => recorded,
-    ...overrides
-  }
+  return { database: () => db, recordedSessionIds: () => recorded, ...overrides }
 }
 
 async function seedUpload(
@@ -149,7 +140,7 @@ describe('sweepAgentSessionAttachments', () => {
     expect(await remaining()).toEqual([UNSENT])
   })
 
-  it('removes an upload nobody claimed after 7 days, and keeps a claimed one and a fresh one', async () => {
+  it('removes an upload nobody claimed after 30 days, and keeps a claimed one and a fresh one', async () => {
     claim('session-1', await seedUpload(SENT, OLD))
     await seedUpload(UNSENT, OLD)
     await seedUpload(CARRIED, HOUR)

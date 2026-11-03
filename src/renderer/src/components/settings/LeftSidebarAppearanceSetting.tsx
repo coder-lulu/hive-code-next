@@ -32,13 +32,13 @@ export function LeftSidebarAppearanceSetting({
           'Left Sidebar Appearance'
         )}
         description={translate(
-          'auto.components.settings.AppearancePane.leftSidebarAppearance.tintDescription',
-          'Keep the left sidebar default or tint it. To follow the terminal, pick Match Terminal as the Light or Dark theme.'
+          'auto.components.settings.AppearancePane.leftSidebarAppearance.rowDescription',
+          'Make the left sidebar match your terminal, stay default, or use a tint.'
         )}
         control={
           <SettingsSegmentedControl<LeftSidebarAppearanceMode>
             size="sm"
-            value={settings.leftSidebarAppearanceMode === 'tinted' ? 'tinted' : 'default'}
+            value={settings.leftSidebarAppearanceMode ?? 'default'}
             onChange={(leftSidebarAppearanceMode) => updateSettings({ leftSidebarAppearanceMode })}
             ariaLabel={translate(
               'auto.components.settings.AppearancePane.leftSidebarAppearance.title',
@@ -53,6 +53,13 @@ export function LeftSidebarAppearanceSetting({
                 )
               },
               {
+                value: 'match-terminal',
+                label: translate(
+                  'auto.components.settings.AppearancePane.leftSidebarAppearance.matchTerminal',
+                  'Match Terminal'
+                )
+              },
+              {
                 value: 'tinted',
                 label: translate(
                   'auto.components.settings.AppearancePane.leftSidebarAppearance.tinted',
@@ -63,7 +70,7 @@ export function LeftSidebarAppearanceSetting({
           />
         }
       />
-      {settings.leftSidebarAppearanceMode === 'tinted' ? (
+      {(settings.leftSidebarAppearanceMode ?? 'default') === 'tinted' ? (
         <div className="space-y-2">
           <ColorField
             label={translate(

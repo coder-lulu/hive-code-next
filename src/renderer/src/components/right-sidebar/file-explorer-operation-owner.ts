@@ -60,7 +60,7 @@ export function getFileExplorerOperationOwnerFromState(
       ? operationOwnerFromAuthority(match.owner)
       : { kind: 'unresolved' }
   }
-  if (match.kind === 'resolved') {
+  if (match.kind === 'resolved' && match.owner.endpoint.kind === 'environment') {
     return operationOwnerFromAuthority(match.owner)
   }
   return thisAppFolderOwner(state, worktreeId)

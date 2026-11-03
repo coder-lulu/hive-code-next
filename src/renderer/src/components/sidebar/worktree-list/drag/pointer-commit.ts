@@ -104,7 +104,7 @@ export function commitWorktreePointerDrop(args: PointerDropCommitArgs): void {
         ? ctx.computeWorktreeStatusDrop({
             pointerY: event.clientY,
             status: preferredStatusTarget.status,
-            draggedKeys: drag.reorderDraggedKeys
+            draggedIds: drag.reorderDraggedIds
           })
         : null
       commitStatusOrPinDrop(args, preferredStatusTarget, statusDrop?.dropIndex ?? null)
@@ -116,7 +116,7 @@ export function commitWorktreePointerDrop(args: PointerDropCommitArgs): void {
       ctx.onReorderWorktrees({
         groups: ctx.worktreeDragGroups,
         sourceGroupKey: drag.sourceGroupKey,
-        draggedKeys: drag.reorderDraggedKeys,
+        draggedIds: drag.reorderDraggedIds,
         dropIndex: getFullDropIndexForWorktreeDragUnit({
           groups: ctx.worktreeDragUnitGroups,
           sourceGroupKey: drag.sourceGroupKey,
@@ -132,7 +132,7 @@ export function commitWorktreePointerDrop(args: PointerDropCommitArgs): void {
         ? ctx.computeWorktreeStatusDrop({
             pointerY: event.clientY,
             status: preferredStatusTarget.status,
-            draggedKeys: drag.reorderDraggedKeys
+            draggedIds: drag.reorderDraggedIds
           })
         : null
       const { target, preview: statusDrop } = resolveWorktreeSidebarStatusDropCommitTarget({

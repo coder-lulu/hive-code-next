@@ -1,4 +1,4 @@
-import { createElement } from 'react'
+import { createElement, useState } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createFakeRpcClient } from '../mobile-web-shell/bridge-host-test-fakes'
@@ -45,6 +45,9 @@ function readyDiff(firstLine: string): ReviewDiffState {
         highlighted: false
       }
     ],
+    hunks: [
+      { index: 0, startIndex: 0, endIndex: 0, addedLines: 1, deletedLines: 0, firstLineNumber: 1 }
+    ],
     truncated: false
   }
 }
@@ -52,21 +55,20 @@ function readyDiff(firstLine: string): ReviewDiffState {
 describe('useMobileDiffReviewDiffLoading', () => {
   let renderer: ReactTestRenderer | null = null
   let diffState: ReviewDiffState = { kind: 'idle' }
+  let activeHunkIndex: number | null = null
+  let selectHunk: ((index: number | null) => void) | null = null
 
-  function Probe({
-    connState,
-    snapshotVersion = 0
-  }: {
-    connState: ConnectionState
-    snapshotVersion?: number
-  }): null {
+  function Probe({ connState }: { connState: ConnectionState }): null {
+    const [selectedHunk, setActiveHunkIndex] = useState<number | null>(null)
+    activeHunkIndex = selectedHunk
+    selectHunk = setActiveHunkIndex
     diffState = useMobileDiffReviewDiffLoading({
       client,
       connState,
       worktreeId: 'wt-1',
       currentItem,
       screenState: readyScreen,
-      snapshotVersion
+      setActiveHunkIndex
     })
     return null
   }
@@ -101,11 +103,14 @@ describe('useMobileDiffReviewDiffLoading', () => {
 
     await render('connected')
     expect(diffState).toMatchObject({ kind: 'ready' })
+    act(() => selectHunk?.(0))
+    expect(activeHunkIndex).toBe(0)
 
     await update('reconnecting')
     await update('connected')
     expect(diffState).toMatchObject({ kind: 'ready', lines: [{ text: 'before the drop' }] })
     expect(loadDiff).toHaveBeenCalledTimes(2)
+    expect(activeHunkIndex).toBe(0)
   })
 
   it('keeps the loaded diff through a disconnect and its reconnect refetch', async () => {
@@ -119,6 +124,8 @@ describe('useMobileDiffReviewDiffLoading', () => {
 
     await render('connected')
     expect(diffState).toMatchObject({ kind: 'ready' })
+    act(() => selectHunk?.(0))
+    expect(activeHunkIndex).toBe(0)
 
     await update('reconnecting')
     expect(diffState).toMatchObject({ kind: 'ready', lines: [{ text: 'before the drop' }] })
@@ -132,6 +139,7 @@ describe('useMobileDiffReviewDiffLoading', () => {
     })
     expect(diffState).toMatchObject({ kind: 'ready', lines: [{ text: 'after the drop' }] })
     expect(loadDiff).toHaveBeenCalledTimes(2)
+    expect(activeHunkIndex).toBe(0)
   })
 
   it('waits for the desktop when the drop lands before any diff is loaded', async () => {
@@ -142,20 +150,5 @@ describe('useMobileDiffReviewDiffLoading', () => {
 
     await update('disconnected')
     expect(diffState).toMatchObject({ kind: 'error', message: 'Waiting for desktop...' })
-  })
-
-  it('reloads the open diff when the review reloads, as Retry does', async () => {
-    loadDiff
-      .mockRejectedValueOnce(new Error('diff fetch failed'))
-      .mockResolvedValueOnce(readyDiff('after retry'))
-
-    await render('connected')
-    expect(diffState).toMatchObject({ kind: 'error' })
-
-    await act(async () => {
-      renderer?.update(createElement(Probe, { connState: 'connected', snapshotVersion: 1 }))
-      await Promise.resolve()
-    })
-    expect(diffState).toMatchObject({ kind: 'ready', lines: [{ text: 'after retry' }] })
   })
 })

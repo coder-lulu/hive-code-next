@@ -8,12 +8,12 @@ describe('agent startup delayed-delivery tab resolution', () => {
     const mirroredTabId = toWebTerminalSurfaceTabId(hostTabId)
     const state = {
       tabsByWorktree: {
-        'worktree-1': [{ id: mirroredTabId }]
+        'repo-1::worktree-1': [{ id: mirroredTabId }]
       },
       activeTabIdByWorktree: {}
     } as never
 
-    expect(resolveAgentStartupTabId(state, 'worktree-1', hostTabId)).toBe(mirroredTabId)
+    expect(resolveAgentStartupTabId(state, 'repo-1::worktree-1', hostTabId)).toBe(mirroredTabId)
   })
 
   it('maps a remote host tab before its paired web surface is materialized', () => {
@@ -21,11 +21,13 @@ describe('agent startup delayed-delivery tab resolution', () => {
     const state = {
       tabsByWorktree: {},
       activeTabIdByWorktree: {},
-      activeWorktreeId: 'worktree-1',
-      activeWorkspaceExecutionHostId: 'runtime:runtime-1'
+      activeWorktreeId: 'repo-1::worktree-1',
+      activeWorkspaceExecutionHostId: 'runtime:runtime-1',
+      repos: [{ id: 'repo-1', executionHostId: 'runtime:runtime-1' }],
+      worktreesByRepo: { 'repo-1': [{ id: 'repo-1::worktree-1', repoId: 'repo-1', path: '/repo' }] }
     } as never
 
-    expect(resolveAgentStartupTabId(state, 'worktree-1', hostTabId)).toBe(
+    expect(resolveAgentStartupTabId(state, 'repo-1::worktree-1', hostTabId)).toBe(
       toWebTerminalSurfaceTabId(hostTabId)
     )
   })

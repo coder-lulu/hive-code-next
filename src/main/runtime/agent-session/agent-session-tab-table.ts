@@ -1,12 +1,12 @@
 import { AgentSessionRecordPublication } from '../agent-session-record-publication'
-import { isAgentSessionSurfaceTabId } from '../../../shared/agent-session/view/agent-session-surface-tab-id'
+import { isAgentSessionSurfaceTabId } from '../../../shared/agent-session-surface-tab-id'
 import type { AgentSessionReserveRequest } from './ownership/agent-session-reservation-admission'
-import { agentSessionRefusalError } from '../../../shared/agent-session/failures/agent-session-wire-refusals'
-import { structuredAgentSessionTabId } from '../../../shared/agent-session/view/structured-agent-session-projection'
+import { agentSessionRefusalError } from '../../../shared/agent-session-wire-refusals'
+import { structuredAgentSessionTabId } from '../../../shared/structured-agent-session-projection'
 import {
   hasAgentSessionConversation,
   type AgentSessionStoreState
-} from './records/agent-session-store-state'
+} from '../agent-session-store-state'
 
 /** Tab membership defines visibility; tab and session ids form a one-to-one mapping. */
 export class AgentSessionTabTable {
@@ -220,23 +220,17 @@ export abstract class AgentSessionRecordTabs extends AgentSessionRecordPublicati
     sessionId: string,
     visible: boolean,
     tabId?: string,
-    check?: () => void,
-    capture?: (tabId: string | null) => void
+    check?: () => void
   ): Promise<void> {
     return this.transact((draft) => {
       check?.()
-      const retired =
-        effectiveAgentSessionTabs(draft, this.transactions.legacySessionTabIds).tabIdFor(
-          sessionId
-        ) ?? null
-      setAgentSessionTabVisibility(
+      return setAgentSessionTabVisibility(
         draft,
         sessionId,
         visible,
         tabId,
         this.transactions.legacySessionTabIds
       )
-      capture?.(visible ? (draft.sessionTabs?.tabIdFor(sessionId) ?? null) : retired)
     })
   }
 

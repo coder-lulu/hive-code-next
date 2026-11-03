@@ -5,7 +5,6 @@ import ts from 'typescript-api'
 import { describe, expect, it } from 'vitest'
 import { censusSourceFiles } from '../test-support/census-source-files'
 import {
-  HIVE_FROZEN_LEGACY_RPC_CALLERS,
   UNVALIDATED_RPC_REQUEST_PORT_OWNERS,
   UNVALIDATED_RPC_REQUEST_PORT_PENDING,
   type UnvalidatedRpcRequestPortEntry
@@ -135,7 +134,6 @@ export function rawRequestPortReferences(path: string, source: string): number {
 }
 
 const inventory: readonly UnvalidatedRpcRequestPortEntry[] = [
-  ...HIVE_FROZEN_LEGACY_RPC_CALLERS,
   ...UNVALIDATED_RPC_REQUEST_PORT_OWNERS,
   ...UNVALIDATED_RPC_REQUEST_PORT_PENDING
 ]
@@ -222,15 +220,13 @@ describe('unvalidated RPC request port boundary', () => {
     expect(seen.filter((file, index) => seen.indexOf(file) !== index)).toEqual([])
   })
 
-  it('restricts the fork baseline to its measured frozen task route and no additional reach', () => {
-    expect(HIVE_FROZEN_LEGACY_RPC_CALLERS).toEqual([
-      {
-        file: 'app/h/[hostId]/tasks.tsx',
-        references: 96,
-        frozenProductHead: 'a697f3baec9b1e62ecbba7005ff31693c4afd4f2'
-      }
-    ])
-    expect(observed.get(HIVE_FROZEN_LEGACY_RPC_CALLERS[0].file)).toBeLessThanOrEqual(96)
+  it('keeps the migrated fork task route off the raw request port', () => {
+    expect(
+      rawRequestPortReferences(
+        join(mobileRoot, 'app/h/[hostId]/tasks.tsx'),
+        readFileSync(join(mobileRoot, 'app/h/[hostId]/tasks.tsx'), 'utf8')
+      )
+    ).toBe(0)
   })
 
   it('has no unlisted file reaching the raw request port', () => {

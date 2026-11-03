@@ -1,16 +1,10 @@
 import type {
   AgentSessionFailureCopyId,
   AgentSessionFailureCopyValues
-} from '../../../src/shared/agent-session/failures/agent-session-failure-copy'
+} from '../../../src/shared/agent-session-failure-copy'
 import { translate } from '../i18n/mobile-i18n'
 
 export const START_FAILURE_COPY = {
-  savedConversationMissing: (values) =>
-    translate(
-      'session.failure.savedConversationMissing',
-      "{{agent}} couldn't find this chat's saved conversation.",
-      values
-    ),
   theAgent: (values) => translate('session.failure.theAgent', 'The agent', values),
   providerStartFailed: (values) =>
     translate(
@@ -214,13 +208,13 @@ export const START_FAILURE_COPY = {
   agentCommandNotRunnable: (values) =>
     translate(
       'session.failure.agentCommandNotRunnable',
-      "{{agent}}'s Command in Settings → Agents must be a program path or name Orca can find, with no arguments or variables. Change it or reset it.",
+      "{{agent}}'s Command in Settings → Agents must be a program path or name HiveCode can find, with no arguments or variables. Change it or reset it.",
       values
     ),
   runtimeNotInstalled: (values) =>
     translate(
       'session.failure.runtimeNotInstalled',
-      "{{agent}} isn't installed on the computer running this chat. Install it from the chat in a current version of Orca.",
+      "{{agent}} isn't installed on the computer running this chat. Install it from the chat in a current version of HiveCode.",
       values
     ),
   fullAccessAsRoot: (values) =>
@@ -232,7 +226,7 @@ export const START_FAILURE_COPY = {
   launchPreparationFailed: (values) =>
     translate(
       'session.failure.launchPreparationFailed',
-      "Orca couldn't prepare {{agent}} to start on the computer running this chat.",
+      "HiveCode couldn't prepare {{agent}} to start on the computer running this chat.",
       values
     ),
   conversationOpenElsewhere: (values) =>

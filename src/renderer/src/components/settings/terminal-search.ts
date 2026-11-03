@@ -1,7 +1,7 @@
 import type { SettingsSearchEntry } from './settings-search'
 import {
   getTerminalAdvancedSearchEntries,
-  getTerminalConfigImportSearchEntries,
+  getTerminalGhosttyImportSearchEntries,
   getTerminalMacOptionSearchEntries,
   getTerminalMacYenSearchEntries
 } from './terminal-advanced-platform-search'
@@ -56,7 +56,7 @@ export {
   getTerminalAdvancedSearchEntries,
   getTerminalMacOptionSearchEntries,
   getTerminalMacYenSearchEntries,
-  getTerminalConfigImportSearchEntries
+  getTerminalGhosttyImportSearchEntries
 } from './terminal-advanced-platform-search'
 export {
   getManageSessionsSearchEntries,
@@ -83,7 +83,7 @@ const getTerminalAppearanceSearchEntriesWithoutImports = createLocalizedCatalog(
 const getTerminalAppearanceSearchEntriesWithImports = createLocalizedCatalog(
   (): SettingsSearchEntry[] => [
     ...getTerminalAppearanceSearchEntriesWithoutImports(),
-    ...getTerminalConfigImportSearchEntries(),
+    ...getTerminalGhosttyImportSearchEntries(),
     ...getTerminalWarpImportSearchEntries(),
     ...getTerminalYamlImportSearchEntries()
   ]

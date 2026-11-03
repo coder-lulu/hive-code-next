@@ -28,7 +28,9 @@ export function decideAgentLaunchIntentMode(execution: {
         : {}),
       ...(execution.callerRendersStructured === false ? { callerRendersStructured: false } : {})
     },
-    settings: execution.terminalOnly ? undefined : readAgentLaunchModeSettings(runtime, intent),
+    settings: execution.terminalOnly
+      ? undefined
+      : readAgentLaunchModeSettings(runtime, intent.nativeChatDefault),
     ...(execution.terminalOnly ? { terminalOnly: true } : {}),
     ...(intent.surface ? { surface: intent.surface } : {}),
     vocabulary: execution.vocabulary ?? DEFAULT_LAUNCH_VOCABULARY

@@ -1,11 +1,10 @@
 // @vitest-environment happy-dom
 
-import { EVERY_AGENT_CHAT } from '../../../../shared/native-chat/every-agent-chat.test-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY
-} from '../../../../shared/agent-session/agent-session-runtime-capabilities'
+} from '../../../../shared/protocol-version'
 import type * as LocalRuntimeCapabilitiesModule from '@/runtime/local-runtime-capabilities'
 import { makeProjectGroup, makeFolderWorkspace } from './folder-workspace-composer-submit-fixtures'
 
@@ -66,7 +65,7 @@ function create(
 describe('submitFolderWorkspaceCreate surface pick', () => {
   it('starts the CLI in a terminal for a terminal pick even when chats are the default', async () => {
     useAppStore.setState({
-      settings: { ...getDefaultSettings('/home/test'), nativeChatProviders: EVERY_AGENT_CHAT }
+      settings: { ...getDefaultSettings('/home/test') }
     })
     mocks.activateAndRevealFolderWorkspace.mockReturnValue({ primaryTabId: 'tab-1' })
 
@@ -77,7 +76,7 @@ describe('submitFolderWorkspaceCreate surface pick', () => {
       vi.fn(() => materialization.promise)
     )
     useAppStore.setState({
-      settings: { ...getDefaultSettings('/home/test'), nativeChatProviders: {} }
+      settings: { ...getDefaultSettings('/home/test') }
     })
     materialization.resolve(makeFolderWorkspace())
     await creating
@@ -89,7 +88,7 @@ describe('submitFolderWorkspaceCreate surface pick', () => {
     })
 
     useAppStore.setState({
-      settings: { ...getDefaultSettings('/home/test'), nativeChatProviders: EVERY_AGENT_CHAT }
+      settings: { ...getDefaultSettings('/home/test') }
     })
     await create('terminal')
     expect(mocks.terminal).toHaveBeenCalledOnce()

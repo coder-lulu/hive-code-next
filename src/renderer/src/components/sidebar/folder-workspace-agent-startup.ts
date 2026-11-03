@@ -1,7 +1,3 @@
-import {
-  resolveAgentStartupPlanInputs,
-  type AgentStartupSettings
-} from '../../../../shared/agent-startup-plan-inputs'
 import type { LinkedWorkItemSummary } from '@/lib/new-workspace'
 import {
   resolveRepoExecutionHostPlatform,
@@ -16,6 +12,7 @@ import {
 } from '@/lib/tui-agent-startup'
 import type { ProjectGroup } from '../../../../shared/project-group-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
+import type { AgentLaunchPermissionMode } from '../../../../shared/tui-agent-permissions'
 import type { AgentStartupShell } from '../../../../shared/tui-agent-startup-shell'
 
 /** OS of the host that owns a folder group; its agents are quoted for that host's shell. */
@@ -47,32 +44,28 @@ export function resolveFolderWorkspaceLaunchDraft(
 
 export function buildFolderWorkspaceLinkedStartupPlan(args: {
   agent: TuiAgent
-  settings?: AgentStartupSettings
   linkedWorkItem: LinkedWorkItemSummary
   note: string
   agentCmdOverrides: Record<string, string> | undefined
   agentArgs?: string | null
   agentEnv?: Record<string, string>
+  agentPermissionMode?: AgentLaunchPermissionMode
   platform: NodeJS.Platform
   shell?: AgentStartupShell
   isRemote: boolean
 }): AgentStartupPlan | null {
-  const inputs = resolveAgentStartupPlanInputs({
-    agent: args.agent,
-    settings: args.settings ?? { agentCmdOverrides: args.agentCmdOverrides },
-    agentArgs: args.settings ? args.agentArgs : (args.agentArgs ?? null),
-    platform: args.platform,
-    shell: args.shell,
-    isRemote: args.isRemote
-  })
-  if (args.agentEnv) {
-    inputs.agentEnv = args.agentEnv
-  }
   const linkedDraftPrompt = resolveFolderWorkspaceLaunchDraft(args.linkedWorkItem, args.note)
   const draftLaunchPlan = linkedDraftPrompt
     ? buildAgentDraftLaunchPlan({
-        ...inputs,
-        draft: linkedDraftPrompt
+        agent: args.agent,
+        draft: linkedDraftPrompt,
+        cmdOverrides: args.agentCmdOverrides ?? {},
+        agentArgs: args.agentArgs,
+        agentEnv: args.agentEnv,
+        agentPermissionMode: args.agentPermissionMode,
+        platform: args.platform,
+        shell: args.shell,
+        isRemote: args.isRemote
       })
     : null
   if (draftLaunchPlan) {
@@ -82,7 +75,9 @@ export function buildFolderWorkspaceLinkedStartupPlan(args: {
       expectedProcess: draftLaunchPlan.expectedProcess,
       followupPrompt: null,
       launchConfig: draftLaunchPlan.launchConfig,
-      ...(draftLaunchPlan.sessionOptions ? { sessionOptions: draftLaunchPlan.sessionOptions } : {}),
+      ...(args.agentPermissionMode && args.agentPermissionMode !== 'default'
+        ? { agentPermissionMode: args.agentPermissionMode }
+        : {}),
       ...(draftLaunchPlan.startupCommandDelivery
         ? { startupCommandDelivery: draftLaunchPlan.startupCommandDelivery }
         : {}),
@@ -91,8 +86,16 @@ export function buildFolderWorkspaceLinkedStartupPlan(args: {
   }
 
   const startupPlan = buildAgentStartupPlan({
-    ...inputs,
+    agent: args.agent,
+    // Why: linked context must stay reviewable; launch empty, then paste the draft after readiness.
     prompt: '',
+    cmdOverrides: args.agentCmdOverrides ?? {},
+    agentArgs: args.agentArgs,
+    agentEnv: args.agentEnv,
+    agentPermissionMode: args.agentPermissionMode,
+    platform: args.platform,
+    shell: args.shell,
+    isRemote: args.isRemote,
     allowEmptyPromptLaunch: true
   })
   if (startupPlan && linkedDraftPrompt) {

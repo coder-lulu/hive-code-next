@@ -1,4 +1,3 @@
-import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
 import { forgeOwnerHostIdForWorkspace } from '@/runtime/forge-credential-target'
 import React, { useCallback } from 'react'
 import { toast } from 'sonner'
@@ -33,7 +32,6 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
     fetchPRChecks,
     fetchPRComments,
     fetchPRForBranch,
-    gitLabPipelineCheck,
     gitLabProjectRefRef,
     isCurrentAsyncResult,
     isFixingChecksWithAI,
@@ -64,9 +62,7 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
     ) {
       return
     }
-    // A failed parent pipeline joins the prompt by name and link; it has no job log to load.
-    const fixChecks = gitLabPipelineCheck ? [gitLabPipelineCheck, ...checks] : checks
-    const broken = getBrokenChecks(fixChecks)
+    const broken = getBrokenChecks(checks)
     if (broken.length === 0) {
       toast.message(
         translate(
@@ -80,7 +76,7 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
     setIsFixingChecksWithAI(true)
     try {
       const checkRunDetailsByCheckKey = await collectFixChecksPromptDetails(
-        fixChecks,
+        checks,
         async (check) => {
           const isGitLabJob = Boolean(check.gitlabJobId)
           if (
@@ -108,7 +104,7 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
                     url: check.url,
                     prRepo: pr?.prRepo ?? null
                   },
-                  { repoId: repo.id, repoOwnerExecutionHostId: getRepoExecutionHostId(repo) }
+                  { repoId: repo.id }
                 )
           } catch {
             console.warn('[ChecksPanel] failed to load check details for AI fix prompt')
@@ -124,7 +120,7 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
         reviewNumber: activeReview.number,
         reviewTitle: activeReview.title,
         reviewUrl: activeReview.url,
-        checks: fixChecks,
+        checks,
         checkRunDetailsByCheckKey
       })
       const started = await startFixChecksAgent({
@@ -150,7 +146,6 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
     activeWorktreeId,
     checks,
     fetchPRCheckDetails,
-    gitLabPipelineCheck,
     isCurrentAsyncResult,
     isFixingChecksWithAI,
     pr?.prRepo,
@@ -182,10 +177,8 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
         const refreshedPR = await fetchPRForBranch(repo.path, branch, {
           force: true,
           repoId: repo.id,
-          repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
           worktreeId: activeWorktreeId ?? undefined,
-          linkedPRNumber,
-          userRefresh: true
+          linkedPRNumber
         })
         if (!isCurrentRequestContext()) {
           return
@@ -193,15 +186,13 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
         await refreshHostedReviewCard(fetchHostedReviewForBranch, {
           repoPath: repo.path,
           repoId: repo.id,
-          repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
           branch,
           linkedGitHubPR: linkedPRNumber,
-          userRefresh: true,
           linkedGitLabMR,
           linkedBitbucketPR,
           linkedAzureDevOpsPR,
           linkedGiteaPR
-        }).catch(() => null)
+        })
         if (!isCurrentRequestContext()) {
           return
         }
@@ -230,9 +221,7 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
             {
               force: true,
               repoId: repo.id,
-              repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
-              wakeWslDistro: true,
-              userRefresh: true
+              wakeWslDistro: true
             }
           )
             .then(
@@ -257,9 +246,7 @@ export function useChecksPanelCheckAndReviewActions(model: ChecksPanelCheckAndRe
           fetchPRComments(repo.path, refreshedPR.number, {
             force: true,
             repoId: repo.id,
-            repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
-            prRepo: refreshedPR.prRepo,
-            userRefresh: true
+            prRepo: refreshedPR.prRepo
           })
             .then(
               (result) => {

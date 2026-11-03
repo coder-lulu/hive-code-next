@@ -1,5 +1,5 @@
 import React from 'react'
-import { GitPullRequest, Link2, ListTodo } from 'lucide-react'
+import { Link2 } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import type { WorkspaceAttachment, Worktree } from '../../../../shared/worktree/types'
 import {
@@ -9,23 +9,11 @@ import {
 import { getWorkspaceAttachmentSourceLabel } from './workspace-attachment-source-label'
 import { WorktreeCardDetailSection } from './WorktreeCardDetailSection'
 import { DetailHeader } from './WorktreeCardMetadataControls'
-import {
-  getIssueTaskState,
-  getLinearTaskState,
-  type WorktreeTaskState
-} from './worktree-task-state'
+import { IssueStateBadge, LinearStateBadge } from './WorktreeCardMetadataStatusBadges'
 import { WorkspaceAttachmentOrigins } from './WorkspaceAttachmentOrigins'
 import { WorktreeCardReferenceRow } from './WorktreeCardReferenceRow'
-import { WorktreeCardTaskActions } from './WorktreeCardTaskDetailSection'
-import type { WorktreeCardTaskActionHandlers } from './worktree-card-task-actions'
-import type {
-  WorkspaceReferenceDetails,
-  WorkspaceReferenceDetailsMap
-} from './workspace-reference-details'
-import {
-  getWorkspaceLinkedItemRows,
-  type WorkspaceLinkedItemRow
-} from './workspace-hover-attachments'
+import type { WorkspaceReferenceDetailsMap } from './workspace-reference-details'
+import { getWorkspaceLinkedItemRows } from './workspace-hover-attachments'
 import type {
   WorktreeCardIssueDisplay,
   WorktreeCardLinearIssueDisplay,
@@ -33,22 +21,6 @@ import type {
 } from './worktree-card-meta-types'
 import type { WorktreeCardPrDisplay } from './worktree-card-pr-display'
 import { openAppHttpLink } from '@/lib/app-http-link-open'
-
-function getLinkedTaskState(
-  detail: WorkspaceReferenceDetails | undefined,
-  liveTask: WorkspaceLinkedItemRow['liveTask']
-): WorktreeTaskState | null {
-  if (detail?.stateName) {
-    return getLinearTaskState(detail.stateName, detail.stateType)
-  }
-  if (detail?.issueState) {
-    return getIssueTaskState(detail.issueState)
-  }
-  if (liveTask && 'identifier' in liveTask) {
-    return getLinearTaskState(liveTask.stateName, liveTask.stateType)
-  }
-  return getIssueTaskState(liveTask?.state)
-}
 
 export function WorktreeCardLinkedItemsSection({
   workspace,
@@ -60,8 +32,7 @@ export function WorktreeCardLinkedItemsSection({
   showItems,
   onManage,
   onOpen,
-  renderReviewActions,
-  taskMenu
+  renderReviewActions
 }: {
   workspace?: Worktree
   referenceDetails?: WorkspaceReferenceDetailsMap
@@ -72,7 +43,6 @@ export function WorktreeCardLinkedItemsSection({
   showItems: boolean
   onManage?: (event: React.MouseEvent) => void
   onOpen?: (url: string, event: React.MouseEvent) => void
-  taskMenu?: { actions: WorktreeCardTaskActionHandlers; onOpenChange: (open: boolean) => void }
   renderReviewActions?: (
     item: WorkspaceAttachment,
     review: WorktreeCardPrDisplay | null
@@ -89,12 +59,10 @@ export function WorktreeCardLinkedItemsSection({
   const groups = [
     {
       label: translate('workspace.links.reviews', 'Reviews'),
-      icon: <GitPullRequest className="size-3" />,
       rows: rows.filter((row) => row.item.type !== 'issue')
     },
     {
       label: translate('workspace.links.tasks', 'Issues & tasks'),
-      icon: <ListTodo className="size-3" />,
       rows: rows.filter((row) => row.item.type === 'issue')
     }
   ].filter((group) => group.rows.length)
@@ -121,12 +89,12 @@ export function WorktreeCardLinkedItemsSection({
         ? groups.map((group) => (
             <div key={group.label} className="space-y-1.5">
               <DetailHeader
-                icon={group.icon}
+                icon={<Link2 className="size-3" />}
                 label={`${group.label} · ${group.rows.length}`}
                 onAddReference={onManage}
               />
               <div className="divide-y divide-border">
-                {group.rows.map(({ item, key, url, detail, live, liveTask }) => {
+                {group.rows.map(({ item, key, url, detail, live }) => {
                   const label = workspaceAttachmentLabel(item)
                   const source = getWorkspaceAttachmentSourceLabel(item)
                   return (
@@ -143,10 +111,6 @@ export function WorktreeCardLinkedItemsSection({
                         provider={workspaceAttachmentProviderLabel(item)}
                         source={source}
                         stale={detail?.stale}
-                        taskState={
-                          item.type === 'issue' ? getLinkedTaskState(detail, liveTask) : null
-                        }
-                        labels={liveTask?.labels}
                         url={url}
                         onOpen={(url, event) => open({ ...item, url }, event)}
                         onManage={onManage ? (event) => open(item, event) : undefined}
@@ -156,24 +120,29 @@ export function WorktreeCardLinkedItemsSection({
                           ) : undefined
                         }
                         actions={
-                          item.type === 'issue'
-                            ? taskMenu && (
-                                <WorktreeCardTaskActions
-                                  item={item}
-                                  url={url}
-                                  isCardTask={Boolean(liveTask)}
-                                  actions={taskMenu.actions}
-                                  onOpenChange={taskMenu.onOpenChange}
-                                />
-                              )
-                            : renderReviewActions?.(item, live)
+                          item.type !== 'issue' ? renderReviewActions?.(item, live) : undefined
                         }
                       />
-                      {live && 'baseRefName' in live && live.baseRefName ? (
-                        <div className="pl-5 text-2xs text-muted-foreground">
-                          {translate('workspace.links.reviewTarget', 'Target: {{branch}}', {
-                            branch: live.baseRefName
-                          })}
+                      {(live && 'baseRefName' in live && live.baseRefName) ||
+                      detail?.stateName ||
+                      detail?.issueState ? (
+                        <div className="flex flex-wrap items-center gap-1 pl-5">
+                          {live && 'baseRefName' in live && live.baseRefName ? (
+                            <span className="text-2xs text-muted-foreground">
+                              {translate('workspace.links.reviewTarget', 'Target: {{branch}}', {
+                                branch: live.baseRefName
+                              })}
+                            </span>
+                          ) : null}
+                          {detail?.stateName ? (
+                            <LinearStateBadge
+                              stateName={detail.stateName}
+                              stateType={detail.stateType}
+                            />
+                          ) : null}
+                          {detail?.issueState ? (
+                            <IssueStateBadge state={detail.issueState} />
+                          ) : null}
                         </div>
                       ) : null}
                     </div>

@@ -40,7 +40,7 @@ async function getBehindCommitsArePatchEquivalent(
         'log',
         '--no-show-signature',
         '--no-color',
-        '--format=%m',
+        '--oneline',
         '--cherry-mark',
         '--right-only',
         `HEAD...${upstreamName}`,

@@ -39,7 +39,6 @@ import {
   type EditorSaveResult,
   type EditorSaveTrigger
 } from './editor-save-disk-precondition'
-import { editorSavePluginHook } from './editor-save-plugin-hook'
 import { withEditorFileWriteLock } from './editor-file-write-lock'
 import {
   editorSaveWriterView,
@@ -141,9 +140,7 @@ export function createEditorSaveQueue(store: AppStoreApi): EditorSaveQueue {
     if (!isDirty && request.requestedDirty && trigger !== 'overwrite') {
       return nothingToWrite
     }
-    const buffered = store.getState().editorDrafts[fileId] ?? request.fallbackContent
-    const hooked = editorSavePluginHook(store, liveFile, trigger, buffered)
-    const contentToSave = hooked ? await hooked : buffered
+    const contentToSave = store.getState().editorDrafts[fileId] ?? request.fallbackContent
     if (
       trigger === 'autosave' &&
       hasPendingEditorBufferChange(store.getState(), fileId) &&

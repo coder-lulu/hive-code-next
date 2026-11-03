@@ -6,30 +6,23 @@ import { profileStateAccessPidNamespace } from './profile-state-access-owner'
 import { basename, dirname, join } from 'node:path'
 
 const ORPHAN_AGE_MS = 60 * 60_000
-// eCryptfs caps names at 143 bytes: 8 base64url characters keep 48 bits of the scope within it.
-const OWNER_TOKEN_LENGTH = 8
-// Older versions wrote the full 64-character hex scope.
 const BACKUP_TEMP_PATTERN =
-  /^([1-9]\d*)-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.db\.owner-([\w-]{8}|[a-f0-9]{64})\.([1-9]\d*)\.\d+\.[0-9a-f]+\.tmp(?:-(?:wal|shm|journal))?$/
+  /^([1-9]\d*)-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.db\.owner-([a-f0-9]{64})\.([1-9]\d*)\.\d+\.[0-9a-f]+\.tmp(?:-(?:wal|shm|journal))?$/
 
 export function profileStateBackupTemporaryPath(targetPath: string): string {
   const scope = currentProcessScope()
-  return durableWriteTempPath(scope ? `${targetPath}.owner-${scope.token}` : targetPath)
+  return durableWriteTempPath(scope ? `${targetPath}.owner-${scope}` : targetPath)
 }
 
-function currentProcessScope(): { token: string; legacyToken: string } | undefined {
+function currentProcessScope(): string | undefined {
   const boot = profileStateAccessBootIdentity()
   const namespace = profileStateAccessPidNamespace()
   if (!boot || (process.platform === 'linux' && namespace === null)) {
     return undefined
   }
-  const digest = createHash('sha256')
+  return createHash('sha256')
     .update(JSON.stringify([process.platform, boot, namespace]))
-    .digest()
-  return {
-    token: digest.toString('base64url').slice(0, OWNER_TOKEN_LENGTH),
-    legacyToken: digest.toString('hex')
-  }
+    .digest('hex')
 }
 
 /** Require process-exit proof before deleting temporary databases or journals. */
@@ -48,12 +41,7 @@ export async function removeAbandonedProfileStateBackupFiles(
       continue
     }
     const match = BACKUP_TEMP_PATTERN.exec(name.slice(prefix.length))
-    const owner = match?.[2]
-    if (
-      !match ||
-      (owner !== scope.token && owner !== scope.legacyToken) ||
-      !ownerExited(Number(match[3]))
-    ) {
+    if (!match || match[2] !== scope || !ownerExited(Number(match[3]))) {
       continue
     }
     const path = join(directory, name)

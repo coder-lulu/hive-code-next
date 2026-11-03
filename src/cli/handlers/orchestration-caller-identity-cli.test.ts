@@ -93,8 +93,7 @@ describe('orchestration dispatch coordinator handle', () => {
         ['task', 'task_1'],
         ['from', 'terminal_coordinator'],
         ['dry-run', true],
-        ['return-preamble', true],
-        ['full', true]
+        ['return-preamble', true]
       ]),
       false
     )
@@ -117,13 +116,7 @@ describe('orchestration dispatch coordinator handle', () => {
   it('does not resolve coordinator identity for a non-preamble dispatch lookup', async () => {
     callMock.mockResolvedValue({ result: { dispatch: null } })
 
-    await invokeDispatchShow(
-      new Map<string, string | boolean>([
-        ['task', 'task_1'],
-        ['full', true]
-      ]),
-      false
-    )
+    await invokeDispatchShow(new Map([['task', 'task_1']]), false)
 
     expect(callMock).toHaveBeenCalledWith('orchestration.dispatchShow', {
       task: 'task_1',

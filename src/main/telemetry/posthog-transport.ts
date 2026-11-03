@@ -77,9 +77,13 @@ function loadPostHogSdk(): typeof PostHogSdk {
   return require('posthog-node')
 }
 
-export function createPostHogClient(writeKey: string, consent: ConsentState): PostHogSdk.PostHog {
+export function createPostHogClient(
+  writeKey: string,
+  consent: ConsentState,
+  host: string
+): PostHogSdk.PostHog {
   const client = new (loadPostHogSdk().PostHog)(writeKey, {
-    host: 'https://us.i.posthog.com',
+    host,
     flushAt: POSTHOG_FLUSH_AT,
     flushInterval: POSTHOG_FLUSH_INTERVAL_MS,
     // Disable SDK GeoIP/IP enrichment to keep the wire inside the declared allow-list.

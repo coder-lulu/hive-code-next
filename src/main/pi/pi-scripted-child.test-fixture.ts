@@ -1,9 +1,6 @@
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import {
-  providerDiagnostic,
-  withProviderDiagnostic
-} from '../../shared/agent-session/failures/agent-session-failure'
+import { providerDiagnostic, withProviderDiagnostic } from '../../shared/agent-session-failure'
 import type { JsonlRpcAgentConnectionOptions } from '../jsonl-rpc/agent-connection'
 import { JsonlRpcResponseError, type JsonlRpcRecord } from '../jsonl-rpc/peer'
 import type { ProviderProcessLaunch } from '../provider-process/provider-process-launch'
@@ -26,7 +23,6 @@ class ScriptedPiConnection implements PiRpcConnection {
   closed = false
   rootVerdict: PiRpcConnection['rootVerdict'] = 'live'
   processless = false
-  spawnAbsence: PiRpcConnection['spawnAbsence'] = null
   lastCloseResult: PiRpcConnection['lastCloseResult'] = null
   readonly pid: number
   readonly file: string

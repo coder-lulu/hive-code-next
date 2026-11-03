@@ -387,11 +387,6 @@
       "ordinal": 6,
       "value": "transport failure"
     },
-    "9ddfd0ed517d": {
-      "name": "taskListSettled",
-      "ordinal": 8,
-      "value": true
-    },
     "b1272a516ca7": {
       "name": "gitlab.todos#1",
       "ordinal": 3,
@@ -428,11 +423,6 @@
           }
         }
       }
-    },
-    "ba411b67de4b": {
-      "name": "taskListSettled",
-      "ordinal": 9,
-      "value": true
     },
     "bdb019c11efb": {
       "name": "error",
@@ -577,8 +567,7 @@
             "609f32a21704",
             "2ee5e836afb7",
             "6d7869e6f6ea",
-            "88d78bf42794",
-            "9ddfd0ed517d"
+            "88d78bf42794"
           ]
         }
       },
@@ -597,8 +586,7 @@
             "609f32a21704",
             "1f4eeb3dcff1",
             "6d7869e6f6ea",
-            "88d78bf42794",
-            "9ddfd0ed517d"
+            "88d78bf42794"
           ]
         }
       },
@@ -617,8 +605,7 @@
             "609f32a21704",
             "1f4eeb3dcff1",
             "6d7869e6f6ea",
-            "88d78bf42794",
-            "9ddfd0ed517d"
+            "88d78bf42794"
           ]
         }
       },
@@ -638,8 +625,7 @@
             "1f4eeb3dcff1",
             "bdb019c11efb",
             "5ac1816a09df",
-            "411aee2eccd9",
-            "ba411b67de4b"
+            "411aee2eccd9"
           ]
         }
       },
@@ -659,8 +645,7 @@
             "1f4eeb3dcff1",
             "bdb019c11efb",
             "5ac1816a09df",
-            "411aee2eccd9",
-            "ba411b67de4b"
+            "411aee2eccd9"
           ]
         }
       },
@@ -680,8 +665,7 @@
             "1f4eeb3dcff1",
             "bdb019c11efb",
             "5ac1816a09df",
-            "411aee2eccd9",
-            "ba411b67de4b"
+            "411aee2eccd9"
           ]
         }
       },
@@ -701,8 +685,7 @@
             "1f4eeb3dcff1",
             "f457139d901b",
             "5ac1816a09df",
-            "411aee2eccd9",
-            "ba411b67de4b"
+            "411aee2eccd9"
           ]
         }
       },
@@ -722,8 +705,7 @@
             "1f4eeb3dcff1",
             "f1dcb0c02c92",
             "5ac1816a09df",
-            "411aee2eccd9",
-            "ba411b67de4b"
+            "411aee2eccd9"
           ]
         }
       },
@@ -743,8 +725,7 @@
             "1f4eeb3dcff1",
             "5a3a7999f165",
             "5ac1816a09df",
-            "411aee2eccd9",
-            "ba411b67de4b"
+            "411aee2eccd9"
           ]
         }
       },
@@ -764,8 +745,7 @@
             "1f4eeb3dcff1",
             "8f4406e0198e",
             "5ac1816a09df",
-            "411aee2eccd9",
-            "ba411b67de4b"
+            "411aee2eccd9"
           ]
         }
       },
@@ -785,8 +765,7 @@
             "1f4eeb3dcff1",
             "f1dcb0c02c92",
             "5ac1816a09df",
-            "411aee2eccd9",
-            "ba411b67de4b"
+            "411aee2eccd9"
           ]
         }
       }

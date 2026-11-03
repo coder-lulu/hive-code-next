@@ -4,12 +4,10 @@ import { translate } from '@/i18n/i18n'
 
 type CodeBlockCopyButtonProps = React.HTMLAttributes<HTMLPreElement> & {
   children?: React.ReactNode
-  wrapInPre?: boolean
 }
 
 export default function CodeBlockCopyButton({
   children,
-  wrapInPre = true,
   ...props
 }: CodeBlockCopyButtonProps): React.JSX.Element {
   const [copied, setCopied] = useState(false)
@@ -65,10 +63,8 @@ export default function CodeBlockCopyButton({
   }, [children, clearCopiedResetTimer])
 
   return (
-    <div
-      className={wrapInPre ? 'code-block-wrapper' : 'code-block-wrapper code-block-wrapper-diagram'}
-    >
-      {wrapInPre ? <pre {...props}>{children}</pre> : children}
+    <div className="code-block-wrapper">
+      <pre {...props}>{children}</pre>
       <button
         ref={setCopyButtonRef}
         type="button"

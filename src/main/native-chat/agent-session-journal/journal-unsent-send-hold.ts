@@ -5,12 +5,12 @@ import type {
   AgentJournalItemBody,
   AgentJournalMessageItem,
   AgentJournalSubmission
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
-import { agentJournalSubmissionKey } from '../../../shared/agent-session/journal/agent-session-journal-item-key'
-import { isQueuedAgentJournalSubmission } from '../../../shared/agent-session/requests/agent-session-queued-submission'
+} from '../../../shared/agent-session-journal-types'
+import { agentJournalSubmissionKey } from '../../../shared/agent-session-journal-item-key'
+import { isQueuedAgentJournalSubmission } from '../../../shared/agent-session-queued-submission'
 import { USER_MESSAGE_SOURCE } from '../../../shared/agent-session/agent-session-message-source'
-import { agentSessionFailureFact } from '../../../shared/agent-session/failures/agent-session-failure'
-import { agentSessionFailureWords } from '../../../shared/agent-session/failures/agent-session-failure-words'
+import { agentSessionFailureFact } from '../../../shared/agent-session-failure'
+import { agentSessionFailureWords } from '../../../shared/agent-session-failure-words'
 import type { AgentSessionJournal } from './journal-store'
 import type { JournalQueueCardChange } from './journal-queue-events'
 import type { JournalQueuePlan } from './journal-queued-messages'
@@ -76,7 +76,7 @@ export async function holdUnsentSends(
         ? isUnansweredHandedOverSubmission(entry) && (input.unrun === true || input.unrun(entry))
         : isQueuedAgentJournalSubmission(entry) &&
           (hold.cause === 'hostRestarted'
-            ? journal.inputOrder.recoveryPending(entry.clientMessageId)
+            ? journal.wroteBeforeOpen(entry.acceptedSequence)
             : (hold.which?.(entry) ?? true))
     )
     .sort((a, b) => (a.acceptedSequence ?? 0) - (b.acceptedSequence ?? 0))
@@ -91,16 +91,18 @@ export async function holdUnsentSends(
       journal.itemBody(agentJournalSubmissionKey(submission.clientMessageId))
     )
   }))
-  const positions = headOfQueuePositions(journal, kept, Boolean(input.unrun))
+  const positions = headOfQueuePositions(journal, kept)
   const rejection = agentSessionFailureWords(agentSessionFailureFact(hold.cause), {
     surface: 'rejection'
   })
   const failures: unknown[] = []
-  let ranksCommitted = false
-  for (const { submission, body } of kept) {
+  for (const [index, { submission, body }] of kept.entries()) {
     const { clientMessageId } = submission
-    const moves = ranksCommitted ? [] : positions.moves
-    const position = positions.placed.get(clientMessageId)
+    const moves = [
+      ...(index === 0 ? positions.earlier : []),
+      ...positions.placed.filter((entry) => entry.messageId === submission.queuedMessageId)
+    ]
+    const position = positions.placed.find((entry) => entry.messageId === clientMessageId)?.position
     const card = body && position !== undefined ? { body, position } : null
     const keep: (() => JournalQueuePlan) | undefined =
       card || moves.length > 0
@@ -117,7 +119,7 @@ export async function holdUnsentSends(
                   ]
             )
             if (card && !queuedMessages.get(clientMessageId)) {
-              const queuedAt = { epoch, sequence: submission.submittedSequence! }
+              const queuedAt = { epoch, sequence: submission.acceptedSequence ?? 0 }
               const change = {
                 op: 'queued' as const,
                 body: card.body,
@@ -143,9 +145,6 @@ export async function holdUnsentSends(
         card ? { ...reject, keptAsQueuedMessageId: clientMessageId } : reject,
         keep
       )
-      if (keep) {
-        ranksCommitted = true
-      }
     } catch (error) {
       if (!keep) {
         failures.push(error)
@@ -167,105 +166,45 @@ export async function holdUnsentSends(
   return unsent.at(-1)?.acceptedSequence ?? 0
 }
 
-/** Merge logical places once, then materialize finite ranks with the first successful keep. */
+/** Order earlier kept cards first, then admissions; queuedAt cannot compare across epochs or handoff origins. */
 function headOfQueuePositions(
   journal: AgentSessionJournal,
-  batch: readonly { submission: AgentJournalSubmission; body: AgentJournalMessageItem | null }[],
-  unrun: boolean
-): { placed: Map<string, number>; moves: QueuedMessagePositionMove[] } {
+  batch: readonly { submission: AgentJournalSubmission; body: AgentJournalMessageItem | null }[]
+): { placed: QueuedMessagePositionMove[]; earlier: QueuedMessagePositionMove[] } {
   const cards = journal.queuedMessages.list()
   const keptIds = new Set(
     journal.submissions().flatMap((entry) => entry.keptAsQueuedMessageId ?? [])
   )
   const { epoch } = journal.cursor()
-  const state = journal.queuedMessages.displayState()
-  const forcedBatch = batch.some(({ submission }) =>
-    journal.inputOrder.forced(submission.clientMessageId)
-  )
-  const earlier: string[] = []
-  const rest: (typeof cards)[number][] = []
-  const cardsById = new Map(cards.map((card) => [card.messageId, card]))
-  const explicitHeads = new Map(
-    batch.flatMap(({ submission }) => {
-      const id = submission.origin === 'client' ? submission.queuedMessageId : undefined
-      return id && cardsById.get(id)?.consumedAs === submission.clientMessageId
-        ? [[submission.clientMessageId, id] as const]
-        : []
-    })
-  )
-  const explicit = new Set(explicitHeads.values())
-  for (const card of cards) {
-    if (explicit.has(card.messageId)) {
-      continue
-    }
-    if (
-      card.state === 'waiting' &&
-      ((unrun && keptIds.has(card.messageId)) ||
-        (!forcedBatch && card.queuedAt && card.queuedAt.epoch !== epoch))
-    ) {
-      earlier.push(card.messageId)
-    } else {
-      rest.push(card)
-    }
-  }
-  const at = new Map<number, string[]>()
-  const head: string[] = []
-  const firstCut = batch
-    .flatMap(
-      ({ submission }) => journal.inputOrder.place(submission.clientMessageId)?.context.cut ?? []
+  // Earlier settlements survive either through explicit links or cards from earlier epochs.
+  const earlier = cards
+    .filter(
+      (card) =>
+        card.state === 'waiting' &&
+        (keptIds.has(card.messageId) || (card.queuedAt !== null && card.queuedAt.epoch !== epoch))
     )
-    .reduce((a, b) => Math.min(a, b), Infinity)
-  let previousBoundary = 0
-  for (let i = 0; i < rest.length; i++) {
-    if (
-      rest[i].state === 'waiting' &&
-      keptIds.has(rest[i].messageId) &&
-      (journal.inputOrder.lineage.cards.get(rest[i].messageId)?.introduced ?? -Infinity) < firstCut
-    ) {
-      previousBoundary = i + 1
-    }
-  }
+    .map((card) => card.messageId)
+  const placed: QueuedMessagePositionMove[] = []
   for (const { submission, body } of batch) {
-    const id = body ? submission.clientMessageId : explicitHeads.get(submission.clientMessageId)
-    if (!id || keptIds.has(id)) {
-      continue
-    }
-    if (!body && previousBoundary > 0) {
-      head.push(id)
-      continue
-    }
-    const after = journal.inputOrder.forced(submission.clientMessageId)
-      ? journal.inputOrder.predecessors(state, submission.clientMessageId).position
-      : -Infinity
-    let low = 0,
-      high = rest.length
-    while (low < high) {
-      const mid = (low + high) >>> 1
-      if (rest[mid].position <= after) {
-        low = mid + 1
-      } else {
-        high = mid
-      }
-    }
-    const boundary = Math.max(previousBoundary, low)
-    previousBoundary = boundary
-    const bucket = at.get(boundary) ?? []
-    bucket.push(id)
-    at.set(boundary, bucket)
-  }
-  const order = [...earlier, ...head]
-  for (let i = 0; i <= rest.length; i++) {
-    order.push(...(at.get(i) ?? []))
-    if (i < rest.length) {
-      order.push(rest[i].messageId)
+    const { clientMessageId } = submission
+    if (body && !earlier.includes(clientMessageId)) {
+      placed.push({ messageId: clientMessageId, position: 0 })
+    } else if (
+      // Explicit Send handoffs return to the head; automatic queue handoffs stay put.
+      submission.origin === 'client' &&
+      submission.queuedMessageId !== undefined &&
+      cards.some((card) => card.consumedAs === clientMessageId)
+    ) {
+      placed.push({ messageId: submission.queuedMessageId, position: 0 })
     }
   }
-  const placed = new Map(order.map((id, index) => [id, index]))
+  const inHead = (card: (typeof cards)[number]): boolean =>
+    earlier.includes(card.messageId) || placed.some((move) => move.messageId === card.messageId)
+  const others = cards.filter((card) => !inHead(card)).map((card) => card.position)
+  const anchor = others.length > 0 ? Math.min(...others) : 1
+  const first = anchor - earlier.length - placed.length
   return {
-    placed,
-    moves: cards.flatMap((card) => {
-      const position = placed.get(card.messageId)!
-      return position === card.position ? [] : [{ messageId: card.messageId, position }]
-    })
+    earlier: earlier.map((messageId, index) => ({ messageId, position: first + index })),
+    placed: placed.map((move, index) => ({ ...move, position: first + earlier.length + index }))
   }
 }

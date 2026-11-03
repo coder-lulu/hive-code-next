@@ -2,16 +2,12 @@ import type { ProviderViewProjectionModel } from './use-mobile-tasks-provider-vi
 import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { classifyConnection } from './mobile-tasks-dependencies'
 import { PROVIDER_EMPTY_LABELS } from './mobile-task-view-options'
-import { getTaskPresetQuery } from './mobile-tasks-legacy-foundation'
 
 export function useMobileTasksConnectionPresentation(model: ProviderViewProjectionModel) {
-  const t = useMobileTranslation()
+  useMobileTranslation()
   const {
-    appliedGithubProjectSearch,
     connState,
     githubMode,
-    githubPreset,
-    githubProjectSearch,
     lastConnectedAt,
     provider,
     query,
@@ -24,29 +20,14 @@ export function useMobileTasksConnectionPresentation(model: ProviderViewProjecti
     lastConnectedAt,
     ...relayRecovery
   })
-  const isGithubProjectSearch = provider === 'github' && githubMode === 'project'
-  // GitHub's preset text is a filter, not a search, so only a changed query counts as one.
-  const hasSearch = isGithubProjectSearch
-    ? githubProjectSearch.length > 0 || (appliedGithubProjectSearch?.length ?? 0) > 0
-    : provider === 'github'
-      ? query.trim() !== getTaskPresetQuery(githubPreset).trim()
-      : query.trim().length > 0
   const emptyLabel =
     connState !== 'connected'
-      ? t('tasks.connectionPresentation.connectToHost', 'Connect to a host to load tasks')
-      : hasSearch
-        ? t('tasks.connectionPresentation.noMatchingTasks', 'No matching tasks')
+      ? 'Connect to a host to load tasks'
+      : query
+        ? 'No matching tasks'
         : PROVIDER_EMPTY_LABELS[provider]
-  // Until the first read settles, an empty list is unread, not empty: keep the spinner up.
-  const loading =
-    model.loading || (connState === 'connected' && !model.taskListSettled && !model.error)
-  return Object.assign(model, {
-    headerVerdict,
-    emptyLabel,
-    hasSearch,
-    isGithubProjectSearch,
-    loading
-  })
+  const isGithubProjectSearch = provider === 'github' && githubMode === 'project'
+  return Object.assign(model, { headerVerdict, emptyLabel, isGithubProjectSearch })
 }
 
 export type ConnectionPresentationModel = ReturnType<typeof useMobileTasksConnectionPresentation>

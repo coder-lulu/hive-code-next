@@ -22,10 +22,9 @@ import {
   SquareTerminal,
   Wrench
 } from 'lucide-react-native'
-import { useState } from 'react'
 import { Image, StyleSheet, Text, View } from 'react-native'
 import type { MobileRenderableRepoIcon } from '../host-screen/host-screen-reply-schema'
-import { colors, radii } from '../theme/mobile-theme'
+import { colors } from '../theme/mobile-theme'
 import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 
 // Match desktop repo-icon picker’s lucide glyphs so mobile project headers retain chosen icons.
@@ -62,16 +61,12 @@ type Props = {
 // Render desktop-style custom image/emoji/lucide with Folder fallback, never bare project dot.
 export function MobileRepoIcon({ repoIcon, size = 14, color = colors.textSecondary }: Props) {
   useMobileColorScheme()
-  // Keyed by src so a changed icon gets a fresh try; the page shell refuses every https load.
-  const [failedSrc, setFailedSrc] = useState<string | null>(null)
-  if (repoIcon?.type === 'image' && repoIcon.src !== failedSrc) {
-    const { src } = repoIcon
+  if (repoIcon?.type === 'image') {
     return (
       <Image
-        source={{ uri: src }}
-        style={{ width: size, height: size, borderRadius: radii.mark }}
+        source={{ uri: repoIcon.src }}
+        style={{ width: size, height: size, borderRadius: 3 }}
         accessibilityLabel={repoIcon.label}
-        onError={() => setFailedSrc(src)}
       />
     )
   }

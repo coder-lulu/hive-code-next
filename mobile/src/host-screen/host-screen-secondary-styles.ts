@@ -1,6 +1,5 @@
 import { StyleSheet } from 'react-native'
-import { colors, radii, spacing, typography } from '../theme/mobile-theme'
-import { WORKTREE_ROW_LAYOUT } from '../components/worktree-list-row-layout'
+import { colors, spacing, typography } from '../theme/mobile-theme'
 import { themedStyleSheet } from '../theme/themed-styles'
 
 export const hostScreenSecondaryStyles = themedStyleSheet(() => ({
@@ -11,19 +10,12 @@ export const hostScreenSecondaryStyles = themedStyleSheet(() => ({
   list: {
     paddingBottom: spacing.lg
   },
-  // The chevron sits in the rows' status-dot column, so the icon and title start at the row text.
   sectionHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingLeft: WORKTREE_ROW_LAYOUT.indicatorInset,
-    paddingRight: spacing.lg,
-    paddingTop: spacing.lg,
-    paddingBottom: 6
-  },
-  sectionChevron: {
-    width: WORKTREE_ROW_LAYOUT.indicatorWidth,
-    alignItems: 'center',
-    marginRight: spacing.sm
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs
   },
   sectionIcon: {
     marginRight: spacing.xs
@@ -32,57 +24,136 @@ export const hostScreenSecondaryStyles = themedStyleSheet(() => ({
     marginRight: spacing.xs
   },
   sectionTitle: {
-    fontSize: 13,
-    fontWeight: '500',
-    color: colors.textSecondary,
-    flexShrink: 1
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5
   },
   sectionCount: {
-    fontSize: 13,
+    fontSize: 11,
     color: colors.textMuted,
-    marginLeft: 6
+    marginLeft: spacing.xs
   },
   sectionPendingSpinner: {
     marginLeft: spacing.sm
   },
   separator: {
-    height: StyleSheet.hairlineWidth,
+    height: 1,
     backgroundColor: colors.borderSubtle,
-    marginLeft: WORKTREE_ROW_LAYOUT.textInset
+    marginLeft: spacing.lg + 24,
+    marginRight: spacing.lg
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.md
+  },
+  filterModalHeading: {
+    flexShrink: 1
+  },
+  filterModalTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary
   },
   filterModalSubtitle: {
-    fontSize: typography.metaSize,
-    color: colors.textMuted
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2
   },
   optionPending: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
     gap: spacing.xs,
-    marginBottom: spacing.sm
+    marginTop: spacing.xs
   },
-  optionSectionGap: {
-    height: spacing.xs
+  clearFiltersText: {
+    fontSize: 13,
+    color: colors.textSecondary
   },
-  optionGroup: {
+  filterSectionLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: spacing.xs,
+    paddingHorizontal: spacing.xs
+  },
+  filterGroup: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
+    overflow: 'hidden',
     marginBottom: spacing.md
+  },
+  filterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md + 2,
+    gap: spacing.sm
+  },
+  filterRowText: {
+    flex: 1,
+    fontSize: typography.bodySize,
+    color: colors.textPrimary
+  },
+  filterSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.borderSubtle,
+    marginHorizontal: spacing.md
+  },
+  optionRowLabel: {
+    flex: 1
+  },
+  optionRowDetail: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2
+  },
+  optionRowIndented: {
+    paddingLeft: spacing.md + 2 + spacing.lg
+  },
+  optionRowDisabled: {
+    opacity: 0.5
   },
   optionSearch: {
-    marginBottom: spacing.sm
+    padding: spacing.sm
   },
+  optionRowValue: {
+    flexShrink: 1,
+    maxWidth: '45%',
+    fontSize: 13,
+    color: colors.textMuted
+  },
+  // On the drawer's base color, so the track takes the panel color the option cards use.
   optionSegmented: {
+    backgroundColor: colors.bgPanel,
     marginBottom: spacing.md
   },
-  // Over the sheet header's empty leading side, centred in its 52pt row.
-  optionPageBack: {
-    position: 'absolute',
-    top: 8,
-    left: spacing.xs
+  optionBack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    alignSelf: 'flex-start',
+    paddingVertical: spacing.xs,
+    marginBottom: spacing.xs
+  },
+  optionBackText: {
+    fontSize: 14,
+    color: colors.textSecondary
+  },
+  optionPageTitle: {
+    paddingHorizontal: spacing.xs,
+    marginBottom: spacing.md
   },
   filterRepoDot: {
     width: 8,
     height: 8,
-    borderRadius: radii.pill
+    borderRadius: 4
   },
   confirmContent: {
     paddingBottom: spacing.lg
@@ -105,11 +176,11 @@ export const hostScreenSecondaryStyles = themedStyleSheet(() => ({
   confirmBtn: {
     flex: 1,
     paddingVertical: spacing.sm + 2,
-    borderRadius: radii.control,
+    borderRadius: 10,
     alignItems: 'center'
   },
   confirmBtnCancel: {
-    backgroundColor: colors.sheetGroup
+    backgroundColor: colors.bgPanel
   },
   confirmBtnDestructive: {
     backgroundColor: colors.statusRed

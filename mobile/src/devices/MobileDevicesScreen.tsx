@@ -1,3 +1,5 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { translate } from '../i18n/mobile-i18n'
 import { useMemo, useState } from 'react'
 import { ChevronRight, CircleHelp, Plus } from 'lucide-react-native'
 import { Pressable, SectionList, Text, View, useWindowDimensions } from 'react-native'
@@ -15,9 +17,24 @@ import {
 import { createMobileDevicesStyles } from './mobile-devices-styles'
 
 const FILTERS = [
-  { id: 'all', label: '全部' },
-  { id: 'connected', label: '已连接' },
-  { id: 'disconnected', label: '未连接' }
+  {
+    id: 'all',
+    get label() {
+      return translate('agentHistory.panel.all', 'All')
+    }
+  },
+  {
+    id: 'connected',
+    get label() {
+      return translate('diagnostics.useTroubleshootDiagnostics.connected', 'Connected')
+    }
+  },
+  {
+    id: 'disconnected',
+    get label() {
+      return translate('auto.mobile.src.devices.MobileDevicesScreen.11c69e4028', 'Disconnected')
+    }
+  }
 ] as const
 
 export function MobileDevicesScreen(props: {
@@ -35,6 +52,8 @@ export function MobileDevicesScreen(props: {
   onDetails: (host: HostCatalogEntry) => void
   onRetry: (host: HostCatalogEntry) => void
 }) {
+  const t = useMobileTranslation()
+
   const styles = useMemo(() => createMobileDevicesStyles(props.theme), [props.theme])
   const { width, fontScale } = useWindowDimensions()
   const compact =
@@ -46,17 +65,31 @@ export function MobileDevicesScreen(props: {
   const current = filtered.filter((device) => device.current)
   const others = filtered.filter((device) => !device.current)
   const sections = [
-    ...(current.length ? [{ title: '当前使用', data: current }] : []),
-    ...(others.length ? [{ title: '其他设备', data: others }] : [])
+    ...(current.length
+      ? [
+          {
+            title: t('auto.mobile.src.devices.MobileDevicesScreen.db861564ea', 'Current device'),
+            data: current
+          }
+        ]
+      : []),
+    ...(others.length
+      ? [
+          {
+            title: t('auto.mobile.src.devices.MobileDevicesScreen.2c80480376', 'Other devices'),
+            data: others
+          }
+        ]
+      : [])
   ]
   return (
     <View style={[styles.container, { maxWidth: props.contentMaxWidth }]}>
       <View style={[styles.heading, compact && styles.headingCompact]}>
         <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>
-          设备管理
+          {t('auto.mobile.src.devices.MobileDevicesScreen.de00883408', 'Device management')}
         </Text>
         <PairingActionButton
-          label="添加设备"
+          label={t('auto.mobile.src.devices.MobileDevicesScreen.8bf6def55a', 'Add device')}
           labelStyle={styles.addLabel}
           icon={Plus}
           variant="ghost"
@@ -65,7 +98,10 @@ export function MobileDevicesScreen(props: {
         />
       </View>
       <Text maxFontSizeMultiplier={1.3} style={styles.subtitle}>
-        扫码、配对码或 HiveCloud 账号连接电脑
+        {t(
+          'auto.mobile.src.devices.MobileDevicesScreen.054e11f206',
+          'Connect to a computer with a QR code, pairing code, or HiveCloud account'
+        )}
       </Text>
       <View accessibilityRole="tablist" style={[styles.filters, styles.filterBar]}>
         {FILTERS.map((item) => {
@@ -74,7 +110,11 @@ export function MobileDevicesScreen(props: {
             <Pressable
               key={item.id}
               accessibilityRole="tab"
-              accessibilityLabel={`${item.label}，${count} 台设备`}
+              accessibilityLabel={t(
+                'auto.mobile.src.devices.MobileDevicesScreen.ad2b127a73',
+                '{{value0}}, devices: {{value1}}',
+                { value0: item.label, value1: count }
+              )}
               accessibilityState={{ selected: filter === item.id }}
               onPress={() => setFilter(item.id)}
               style={({ pressed }) => [
@@ -134,19 +174,36 @@ export function MobileDevicesScreen(props: {
           <View style={styles.empty}>
             <Text maxFontSizeMultiplier={1.3} style={styles.emptyTitle}>
               {props.loading
-                ? '正在读取设备'
+                ? t('auto.mobile.src.devices.MobileDevicesScreen.5e450e7748', 'Reading devices')
                 : props.error && !props.devices.length
-                  ? '设备读取失败'
+                  ? t(
+                      'auto.mobile.src.devices.MobileDevicesScreen.9660654f17',
+                      'Could not read devices'
+                    )
                   : props.devices.length
-                    ? '没有匹配的设备'
-                    : '暂无设备'}
+                    ? t(
+                        'auto.mobile.src.devices.MobileDevicesScreen.665c1dc012',
+                        'No matching devices'
+                      )
+                    : t('auto.mobile.src.devices.MobileDevicesScreen.bcf81b3336', 'No devices yet')}
             </Text>
             <Text maxFontSizeMultiplier={1.3} style={styles.emptyBody}>
-              {props.devices.length ? '切换筛选查看其他设备' : '添加电脑后，在这里管理连接'}
+              {props.devices.length
+                ? t(
+                    'auto.mobile.src.devices.MobileDevicesScreen.f363578cda',
+                    'Change the filter to see other devices'
+                  )
+                : t(
+                    'auto.mobile.src.devices.MobileDevicesScreen.d8a7a0ef39',
+                    'Add a computer to manage its connection here'
+                  )}
             </Text>
             {props.error ? (
               <PairingActionButton
-                label="重试读取设备"
+                label={t(
+                  'auto.mobile.src.devices.MobileDevicesScreen.e72ed52915',
+                  'Retry reading devices'
+                )}
                 variant="ghost"
                 onPress={props.onRefresh}
                 style={styles.textAction}
@@ -156,7 +213,7 @@ export function MobileDevicesScreen(props: {
         }
         ListFooterComponent={
           <PairingActionButton
-            label="连接帮助"
+            label={t('auto.mobile.src.devices.MobileDevicesScreen.c25a51d18c', 'Connection help')}
             labelStyle={styles.helpLabel}
             icon={CircleHelp}
             trailingIcon={ChevronRight}

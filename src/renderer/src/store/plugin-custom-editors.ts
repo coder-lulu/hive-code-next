@@ -4,7 +4,6 @@ import type { PluginHostCustomEditor, PluginHostListEntry } from '../../../prelo
 import { matchPluginFile } from '../../../shared/plugins/contributions/plugin-file-match'
 import { customEditorMayOpenByDefault } from '../../../shared/plugins/contributions/plugin-custom-editor-core-file-types'
 import { isLivePlugin, keyedPluginContribution, usePluginListDerived } from './plugin-panels'
-import { usePluginFramesIsolated } from './plugin-frame-isolation'
 
 /** A custom editor from an enabled plugin. `key` is unique across plugins; `iconUrl` is its own
  *  tab icon, else the plugin's. */
@@ -13,9 +12,6 @@ export type ActivePluginCustomEditor = PluginHostCustomEditor & {
   pluginKey: string
   pluginName: string
   iconUrl?: string
-  /** It would open this file by default but needs an isolated frame this window lacks, so the
-   *  file opens in Source with a notice instead. */
-  frameUnavailable?: boolean
 }
 
 /** The per-file view a user picked in the toggle: an editor key, or `source`. */
@@ -37,8 +33,7 @@ export function collectActivePluginCustomEditors(
  *  type by default, so there its editors are only offered. Ties go by plugin key, not list order. */
 export function customEditorsForFile(
   filePath: string,
-  editors: readonly ActivePluginCustomEditor[],
-  isolatedFrames = true
+  editors: readonly ActivePluginCustomEditor[]
 ): ActivePluginCustomEditor[] {
   const matching = editors.flatMap((editor) => {
     const match = matchPluginFile(filePath, editor)
@@ -47,9 +42,6 @@ export function customEditorsForFile(
     }
     const takesDefault =
       editor.priority === 'default' && customEditorMayOpenByDefault(filePath, match)
-    if (takesDefault && editor.frame === 'isolated' && !isolatedFrames) {
-      return [{ ...editor, priority: 'option' as const, frameUnavailable: true }]
-    }
     return [{ ...editor, priority: takesDefault ? ('default' as const) : ('option' as const) }]
   })
   const byPlugin = (a: ActivePluginCustomEditor, b: ActivePluginCustomEditor): number =>
@@ -98,10 +90,9 @@ export function useFileCustomEditors(
   customEditorChoice: CustomEditorViewChoice | undefined
 } {
   const all = usePluginCustomEditors()
-  const isolatedFrames = usePluginFramesIsolated()
   const customEditors = useMemo(
-    () => (filePath ? customEditorsForFile(filePath, all, isolatedFrames) : []),
-    [filePath, all, isolatedFrames]
+    () => (filePath ? customEditorsForFile(filePath, all) : []),
+    [filePath, all]
   )
   const customEditorChoice = useCustomEditorViewStore((state) =>
     fileId ? state.choices[fileId] : undefined

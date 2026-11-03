@@ -1,6 +1,5 @@
 // @vitest-environment happy-dom
 
-import { EVERY_AGENT_CHAT } from '../../../../shared/native-chat/every-agent-chat.test-fixture'
 import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactElement } from 'react'
@@ -56,7 +55,7 @@ function renderPicker(
         selection: resolveAgentMenuSelection({
           agent: value,
           surface,
-          settings: { nativeChatProviders: EVERY_AGENT_CHAT },
+          settings: { nativeChatProviders: {} },
           inventoryReady: model.state === 'settled',
           answer:
             model.state === 'settled' &&
@@ -183,7 +182,7 @@ it('keeps a recorded host chat without its CLI on CHAT after ArrowRight and Ente
   // QA controls/phase-matrix/probe.json: external.raw.inventory + streams.health[0].result.
   const detectedOnHost: TuiAgent[] = ['codex', 'opencode', 'pi', 'omp']
   const rows = buildNewTabAgentMenuRows({
-    settings: { nativeChatProviders: EVERY_AGENT_CHAT, defaultTuiAgent: 'antigravity' },
+    settings: { defaultTuiAgent: 'antigravity' },
     detectedOnHost,
     chatAgents: ['antigravity'],
     hostChatAnswer: () => 'yes',

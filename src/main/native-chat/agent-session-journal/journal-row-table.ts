@@ -35,19 +35,8 @@ export function insertJournalRow(
   row: JournalRow,
   savedAt = row.ts
 ): number {
-  const { rowJson } = journalRowReadBack(sessionId, row)
-  // The table timestamp records the save; the JSON timestamp can remain pinned to item start.
-  db.prepare(INSERT_ROW).run(sessionId, row.epoch, row.seq, savedAt, rowJson)
-  return Buffer.byteLength(rowJson, 'utf8')
-}
-
-/** Rejects a row the reader would not read back before it can break the next load, and returns the
- * row the reader sees: without the annotations it drops as unusable. */
-export function journalRowReadBack(
-  sessionId: string,
-  row: JournalRow
-): { rowJson: string; stored: JournalRow } {
   const rowJson = serializeJournalRow(row)
+  // Reject unreadable rows before they can break the next load; the caller rolls back.
   const readBack = parseJournalRow(rowJson)
   if (!readBack.ok || readBack.row.seq !== row.seq) {
     throw new AgentSessionJournalError(
@@ -55,7 +44,9 @@ export function journalRowReadBack(
       `the ${row.kind} row for ${sessionId} would not read back, so it was not written`
     )
   }
-  return { rowJson, stored: readBack.row }
+  // The table timestamp records the save; the JSON timestamp can remain pinned to item start.
+  db.prepare(INSERT_ROW).run(sessionId, row.epoch, row.seq, savedAt, rowJson)
+  return Buffer.byteLength(rowJson, 'utf8')
 }
 
 // Page fetches release read snapshots before reduction so WAL checkpoints are not blocked.
@@ -64,10 +55,9 @@ const EPOCH_ROW_PAGE_SIZE = 128
 export function* iterateJournalEpochRows(
   db: Database.Database,
   sessionId: string,
-  epoch: string,
-  afterSequence = Number.MIN_SAFE_INTEGER
+  epoch: string
 ): Generator<JournalStoredRow> {
-  let afterSeq = afterSequence
+  let afterSeq = Number.MIN_SAFE_INTEGER
   for (;;) {
     const page = readJournalRowsAfter(db, sessionId, epoch, afterSeq, EPOCH_ROW_PAGE_SIZE)
     yield* page

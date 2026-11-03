@@ -1,5 +1,12 @@
-import type { WorkerRequestTransport, WorkerThreadFactory } from './worker-thread-transport'
-export type { WorkerRequestTransport, WorkerThreadFactory } from './worker-thread-transport'
+import type { Worker } from 'node:worker_threads'
+
+export type WorkerRequestTransport = Pick<Worker, 'unref' | 'postMessage' | 'terminate'> & {
+  on(...args: Parameters<Worker['on']>): unknown
+  off(...args: Parameters<Worker['off']>): unknown
+  removeAllListeners(): unknown
+}
+
+export type WorkerThreadFactory = () => WorkerRequestTransport
 
 /** Clients own request state and must fail queued calls when spawning fails. */
 export class LazyWorkerThreadHost<TResponse> {

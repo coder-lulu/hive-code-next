@@ -1,4 +1,4 @@
-import { isAgentSessionClaimedSpawnResult } from '../../shared/agent-session/agent-session-host-authority'
+import { isAgentSessionClaimedSpawnResult } from '../../shared/agent-session-host-authority'
 import { parseTerminalKittyKeyboardFlags } from '../../shared/terminal-kitty-keyboard-flags'
 import { daemonSpawnResultIdentity } from './daemon-spawn-result-identity'
 import { retireUnexpectedAttachOnlySpawn } from './daemon-attach-only-retirement'
@@ -32,13 +32,13 @@ export abstract class DaemonPtySpawnResult extends DaemonPtySpawnRequest {
     }
     let result = initialResult
     const finalizeSpawnResult = (spawnResult: PtySpawnResult): PtySpawnResult =>
-      this.resultForExitBeforeSpawnReply(sessionId, result, operation) ?? {
-        ...spawnResult,
-        ...(!result.isNew ? { isReattach: true } : {}),
-        ...(result.isNew && !historyRecovery.identityChanged
-          ? { startupCwdSource: effectiveCwd === opts.cwd ? 'request' : 'recovered-history' }
-          : {})
-      }
+      this.resultForExitBeforeSpawnReply(sessionId, result, operation) ??
+      (result.isNew && !historyRecovery.identityChanged
+        ? {
+            ...spawnResult,
+            startupCwdSource: effectiveCwd === opts.cwd ? 'request' : 'recovered-history'
+          }
+        : spawnResult)
     let historySeedSegments = restoreInfo ? getRecoveredHistorySeedSegments(restoreInfo) : null
     const adoptSpawnResultSession = async (spawnResult: CreateOrAttachResult): Promise<void> => {
       const requestedSessionId = sessionId
@@ -129,7 +129,8 @@ export abstract class DaemonPtySpawnResult extends DaemonPtySpawnRequest {
         ...daemonSpawnResultIdentity(result),
         pid,
         coldRestore: cachedRestore,
-        ...(providerWslDistro !== undefined ? { wslDistro: providerWslDistro } : {})
+        ...(providerWslDistro !== undefined ? { wslDistro: providerWslDistro } : {}),
+        ...(!result.isNew ? { isReattach: true } : {})
       })
     }
 
@@ -222,7 +223,8 @@ export abstract class DaemonPtySpawnResult extends DaemonPtySpawnRequest {
           pid,
           coldRestore,
           ...(providerWslDistro !== undefined ? { wslDistro: providerWslDistro } : {}),
-          ...(providerSequence ? { providerSequence } : {})
+          ...(providerSequence ? { providerSequence } : {}),
+          ...(!result.isNew ? { isReattach: true } : {})
         })
       }
       return finalizeSpawnResult({
@@ -275,7 +277,8 @@ export abstract class DaemonPtySpawnResult extends DaemonPtySpawnRequest {
         ...daemonSpawnResultIdentity(result),
         pid,
         ...(providerWslDistro !== undefined ? { wslDistro: providerWslDistro } : {}),
-        ...(providerSequence ? { providerSequence } : {})
+        ...(providerSequence ? { providerSequence } : {}),
+        ...(!result.isNew ? { isReattach: true } : {})
       })
     }
 
@@ -314,6 +317,7 @@ export abstract class DaemonPtySpawnResult extends DaemonPtySpawnRequest {
       ...(reattachSnapshot.terminalOwner
         ? { snapshotTerminalOwner: reattachSnapshot.terminalOwner }
         : {}),
+      isReattach: true,
       isAlternateScreen: isAltScreen,
       // Snapshot ANSI lacks title frames; carry the title separately across relaunch.
       ...(reattachSnapshot.lastTitle ? { lastTitle: reattachSnapshot.lastTitle } : {}),

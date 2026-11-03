@@ -65,7 +65,6 @@ async function createActivated(options: {
   const liveWindow = { isDestroyed: () => false, webContents: { isDestroyed: () => false } }
   setRuntimeDesktopSurface({
     showNotification: () => false,
-    waitForBrowserTabRegistration: async () => {},
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the create path reads only the window's liveness.
     findWindowById: () => liveWindow as never,
     onIpc: () => {},
@@ -80,7 +79,7 @@ async function createActivated(options: {
   ensurePathWithinWorkspaceMock.mockReturnValue(WORKTREE_PATH)
   vi.mocked(getEffectiveHooks).mockReturnValue({ scripts: { setup: 'pnpm worktree:setup' } })
   vi.mocked(shouldRunSetupForCreate).mockReturnValue(true)
-  vi.mocked(createSetupRunnerScript).mockResolvedValue({
+  vi.mocked(createSetupRunnerScript).mockReturnValue({
     runnerScriptPath: RUNNER,
     envVars: { ORCA_ROOT_PATH: '/tmp/repo', ORCA_WORKTREE_PATH: WORKTREE_PATH }
   })

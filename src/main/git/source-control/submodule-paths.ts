@@ -3,7 +3,6 @@ import type { GitRuntimeOptions } from '../git-runtime-options'
 import { gitOptionsForWorktree } from '../git-runtime-options'
 import { gitExecFileAsync, gitOptionalLocksDisabledEnv } from '../runner'
 import { gitRuntimeOptionsKey } from './git-runtime-options-cache-key'
-import { iterateNulDelimitedFields } from '../../../shared/nul-delimited-fields'
 
 const SUBMODULE_PATHS_CACHE_TTL_MS = 5_000
 export const MAX_SUBMODULE_PATHS_CACHE_ENTRIES = 512
@@ -98,22 +97,21 @@ export async function listSubmodulePaths(
   let paths: string[] = []
   try {
     const { stdout } = await gitExecFileAsync(
-      ['config', '-z', '--file', '.gitmodules', '--get-regexp', '^submodule\\..*\\.path$'],
-      {
-        ...gitOptionsForWorktree(worktreePath, options),
-        env: gitOptionalLocksDisabledEnv()
-      }
+      ['config', '--file', '.gitmodules', '--get-regexp', '^submodule\\..*\\.path$'],
+      { ...gitOptionsForWorktree(worktreePath, options), env: gitOptionalLocksDisabledEnv() }
     )
-    for (const record of iterateNulDelimitedFields(stdout)) {
-      const separator = record.indexOf('\n')
-      if (separator === -1) {
-        continue
-      }
-      const submodulePath = record.slice(separator + 1).replace(/\/+$/, '')
-      if (submodulePath) {
-        paths.push(submodulePath)
-      }
-    }
+    paths = stdout
+      .split(/\r?\n/)
+      .map((line) => {
+        const spaceIndex = line.indexOf(' ')
+        return spaceIndex === -1
+          ? ''
+          : line
+              .slice(spaceIndex + 1)
+              .trim()
+              .replace(/\/+$/, '')
+      })
+      .filter((value) => value.length > 0)
   } catch {
     paths = []
   }

@@ -73,14 +73,6 @@ describe('resolveLocalGitUsername', () => {
     currentBranch = ''
 
     gitExecFileAsyncMock.mockImplementation(async (args: string[]) => {
-      if (args[0] === 'config' && args[1] === '--list') {
-        return {
-          stdout: Object.entries(gitConfig)
-            .map(([key, value]) => `${key}\n${value}\0`)
-            .join(''),
-          stderr: ''
-        }
-      }
       if (args[0] === 'config' && args[1] === '--get') {
         const value = gitConfig[args[2]]
         if (value !== undefined) {
@@ -152,8 +144,10 @@ describe('resolveLocalGitUsername', () => {
       authoritative: true
     })
     expect(gitExecFileAsyncMock.mock.calls.map(([args]) => args)).toEqual([
-      ['config', '--list', '-z'],
-      ['remote']
+      ['config', '--get', 'github.user'],
+      ['config', '--get', 'user.username'],
+      ['remote'],
+      ['config', '--get', 'user.name']
     ])
     expect(ghExecFileAsyncMock).not.toHaveBeenCalled()
   })

@@ -1,5 +1,7 @@
-import type { AgentJournalItemIdentity } from '../../shared/agent-session/journal/agent-session-journal-identity'
-import type { AgentJournalRowAttribution } from '../../shared/agent-session/journal/agent-session-journal-types'
+import type {
+  AgentJournalItemIdentity,
+  AgentJournalRowAttribution
+} from '../../shared/agent-session-journal-types'
 import { requiresTerminalSettlement } from '../native-chat/agent-session-journal/journal-terminal-settlement'
 import {
   codexItemIdentity,

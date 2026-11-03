@@ -13,8 +13,6 @@ import {
 } from '../../../../shared/github/check-details-deadline'
 import { syncPRChecksStatus } from '../slices/github-checks'
 import { isWslDistroNotRunningRefusal } from '../../../../shared/wsl-distro-not-running-refusal'
-import { findRepoForGitHubOwner } from './repository-routing'
-import { hostedReviewOwnerIpcArgs } from '../slices/hosted-review-cache-state'
 import {
   getPRChecksCacheTtl,
   prChecksCacheSuffix,
@@ -44,11 +42,8 @@ export const createCheckActions = (
     prRepo,
     options
   ): Promise<PRCheckDetail[]> => {
-    const repo = findRepoForGitHubOwner(
-      get(),
-      options?.repoId,
-      repoPath,
-      options?.repoOwnerExecutionHostId
+    const repo = get().repos?.find((candidate) =>
+      options?.repoId ? candidate.id === options.repoId : candidate.path === repoPath
     )
     const repoId = options?.repoId ?? repo?.id
     const requestSettings = getGitHubRepoSourceSettings(get(), repo, options?.sourceContext)
@@ -76,12 +71,9 @@ export const createCheckActions = (
       : cacheKey
     const inflightKey = cacheKey
     const cached = get().checksCache[cacheKey] ?? get().checksCache[legacyCacheKey]
-    const userRefresh = options?.userRefresh === true
-    const force = Boolean(options?.force) || userRefresh
-    const noCache = force || Boolean(options?.noCache)
     if (
-      !force &&
-      !noCache &&
+      !options?.force &&
+      !options?.noCache &&
       isFresh(cached, getPRChecksCacheTtl(cached)) &&
       (!headSha || cached.headSha === headSha)
     ) {
@@ -120,15 +112,14 @@ export const createCheckActions = (
     }
 
     let waitedForUpgrade = false
-    // An explicit refresh is neither answered by nor kept waiting on a read begun before it.
-    while (!userRefresh) {
+    for (;;) {
       const inflightRequest = inflightChecksRequests.get(inflightKey)
       if (!inflightRequest) {
         break
       }
       const weakerThanRequested =
-        (force && !inflightRequest.force) ||
-        (noCache && !inflightRequest.noCache) ||
+        (options?.force && !inflightRequest.force) ||
+        (options?.noCache && !inflightRequest.noCache) ||
         (options?.wakeWslDistro && !inflightRequest.wakeWslDistro)
       if (!weakerThanRequested) {
         return inflightRequest.promise.catch(recoverChecks)
@@ -142,9 +133,6 @@ export const createCheckActions = (
     }
 
     const requestId = nextProviderRequestId()
-    const requestStartedAt = Date.now()
-    const replaced = inflightChecksRequests.get(inflightKey)
-    let reply: Promise<PRCheckDetail[]> | undefined
     const request = (async () => {
       const requestContext = getGitHubWorkItemRequestContext(
         get(),
@@ -153,9 +141,9 @@ export const createCheckActions = (
         repoPath,
         options?.sourceContext
       )
-      reply =
+      const checks =
         requestContext.target.kind === 'environment'
-          ? callRuntimeRpc<PRCheckDetail[]>(
+          ? await callRuntimeRpc<PRCheckDetail[]>(
               { kind: 'environment', environmentId: requestContext.target.environmentId },
               'github.prChecks',
               {
@@ -163,37 +151,23 @@ export const createCheckActions = (
                 prNumber,
                 headSha,
                 prRepo: prRepo ?? null,
-                noCache,
-                ...(userRefresh ? { userRefresh: true } : {})
+                noCache: Boolean(options?.force || options?.noCache)
               },
               { timeoutMs: 30_000 }
             )
-          : window.api.gh.prChecks({
+          : await window.api.gh.prChecks({
               repoPath,
               repoId,
               prNumber,
               headSha,
               prRepo: prRepo ?? null,
-              noCache,
-              ...hostedReviewOwnerIpcArgs(options),
+              noCache: Boolean(options?.force || options?.noCache),
               sourceContext: options?.sourceContext,
-              ...(userRefresh ? { userRefresh: true } : {})
+              ...(options?.wakeWslDistro ? { wakeWslDistro: true } : {})
             })
-      // If this read fails, the read it replaced still lands its answer, which is newer than the cache.
-      const checks = await reply.catch(async (err: unknown) => {
-        if (!replaced?.reply) {
-          throw err
-        }
-        return replaced.reply.catch(() => {
-          throw err
-        })
-      })
-      // Bounded waits and explicit refreshes overlap older reads; only the current key owner may write caches/derived PR state, preserving newer run evidence.
+      // Bounded waits can overlap stronger requests; only the current key owner may write caches/derived PR state, preserving newer run evidence.
       if (!ownsInflightRequest(inflightChecksRequests, inflightKey, requestId)) {
-        // Its callers show the owner's answer, so a late superseded reply cannot repaint older checks.
-        await inflightChecksRequests.get(inflightKey)?.promise.catch(() => {})
-        const latest = get().checksCache[cacheKey]
-        return latest?.data && latest.fetchedAt >= requestStartedAt ? latest.data : checks
+        return checks
       }
       set((s) => {
         const nextState: Partial<AppState> = {
@@ -232,10 +206,9 @@ export const createCheckActions = (
 
     inflightChecksRequests.set(inflightKey, {
       promise: request,
-      reply,
       requestId,
-      force,
-      noCache,
+      force: Boolean(options?.force),
+      noCache: Boolean(options?.force || options?.noCache),
       wakeWslDistro: Boolean(options?.wakeWslDistro)
     })
     return request.catch(recoverChecks)
@@ -243,11 +216,8 @@ export const createCheckActions = (
 
   fetchPRCheckDetails: async (repoPath, args, options): Promise<PRCheckRunDetails | null> => {
     try {
-      const repo = findRepoForGitHubOwner(
-        get(),
-        options?.repoId,
-        repoPath,
-        options?.repoOwnerExecutionHostId
+      const repo = get().repos?.find((candidate) =>
+        options?.repoId ? candidate.id === options.repoId : candidate.path === repoPath
       )
       const repoId = options?.repoId ?? repo?.id
       const requestContext = getGitHubWorkItemRequestContext(
@@ -284,7 +254,6 @@ export const createCheckActions = (
                 checkName: args.checkName,
                 url: args.url,
                 prRepo: args.prRepo ?? null,
-                ...hostedReviewOwnerIpcArgs(options),
                 sourceContext: options?.sourceContext
               })
             )

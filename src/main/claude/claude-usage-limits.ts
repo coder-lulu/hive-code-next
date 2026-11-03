@@ -1,19 +1,15 @@
-import {
-  agentSessionFailureFact,
-  providerDiagnostic,
-  type ProviderDiagnostic
-} from '../../shared/agent-session/failures/agent-session-failure'
+import { agentSessionFailureFact, providerDiagnostic } from '../../shared/agent-session-failure'
 import {
   agentSessionFailureWords,
   type AgentSessionFailureRowWords
-} from '../../shared/agent-session/failures/agent-session-failure-words'
+} from '../../shared/agent-session-failure-words'
 import {
   usageLimitResetsAt,
   type AgentSessionUsageLimit,
   type AgentSessionUsageLimitWindow
-} from '../../shared/agent-session/failures/agent-session-usage-limit'
+} from '../../shared/agent-session-usage-limit'
 import type { ClaudeOpenTurn } from './claude-open-turn'
-import { claudeRecord, claudeText } from './structured/journal/claude-structured-item-translation'
+import { claudeRecord, claudeText } from './claude-structured-item-translation'
 
 const CLAUDE_LIMIT_WINDOWS: Record<string, AgentSessionUsageLimitWindow> = {
   five_hour: 'session',
@@ -53,10 +49,9 @@ export class ClaudeUsageLimits {
 
   constructor(private readonly now: () => number = Date.now) {}
 
-  /** An open command's own set records which limits rejected it while it ran. */
-  observe(message: Record<string, unknown>, attempt?: Set<string>): void {
+  observe(message: Record<string, unknown>): void {
     if (message.type === 'rate_limit_event') {
-      this.record(claudeRecord(message.rate_limit_info), attempt)
+      this.record(claudeRecord(message.rate_limit_info))
     }
   }
 
@@ -65,13 +60,7 @@ export class ClaudeUsageLimits {
       return null
     }
     const typed = claudeText(message.api_error)
-    // A login failure is an explicit cause, even though it carries no api_error.
-    const cause =
-      typed === 'usage_limit_reached'
-        ? 'quota'
-        : typed || message.error === 'authentication_failed'
-          ? 'other'
-          : 'untyped'
+    const cause = typed === 'usage_limit_reached' ? 'quota' : typed ? 'other' : 'untyped'
     if (cause === 'quota') {
       this.record(claudeRecord(claudeRecord(message.api_error_params)?.rate_limit_info))
     }
@@ -80,7 +69,7 @@ export class ClaudeUsageLimits {
     const decision = !typed && root ? (turn?.usageLimitEvidence?.cause ?? cause) : cause
     const row =
       decision !== 'other' && refused ? this.row(messageText(message), decision === 'quota') : null
-    if (root && turn?.isOpen && (cause !== 'untyped' || (refused && decision === 'untyped'))) {
+    if (root && turn?.isOpen && (typed || (refused && decision === 'untyped'))) {
       turn.usageLimitEvidence = { cause: row ? 'quota' : cause }
     }
     return row
@@ -89,10 +78,9 @@ export class ClaudeUsageLimits {
   result(
     message: Record<string, unknown>,
     failed: boolean,
-    evidence: ClaudeUsageLimitEvidence | null,
-    compactionFailure?: { detail?: ProviderDiagnostic; rejections: ReadonlySet<string> }
+    evidence: ClaudeUsageLimitEvidence | null
   ): ClaudeUsageLimitRow | null {
-    if ((!failed && !compactionFailure) || evidence?.cause === 'other') {
+    if (!failed || evidence?.cause === 'other') {
       return null
     }
     const status = message.api_error_status
@@ -101,22 +89,14 @@ export class ClaudeUsageLimits {
       evidence?.cause === 'quota' ||
       (evidence?.cause === 'untyped' &&
         (status == null || status === 429) &&
-        (reason === null || LIMIT_TERMINAL_REASONS.includes(reason))) ||
-      // Only a rejection received during this command can explain its failure; older ones are context.
-      (compactionFailure !== undefined &&
-        this.rejecting(compactionFailure.rejections) &&
-        (status == null || status === 429) &&
-        (reason === null || LIMIT_TERMINAL_REASONS.includes(reason) || reason === 'blocking_limit'))
+        (reason === null || LIMIT_TERMINAL_REASONS.includes(reason)))
     if (!limited) {
       return null
     }
-    return this.row(
-      compactionFailure?.detail?.text ?? claudeText(message.result) ?? '',
-      evidence?.cause === 'quota'
-    )
+    return this.row(claudeText(message.result) ?? '', evidence?.cause === 'quota')
   }
 
-  private record(info: Record<string, unknown> | null, attempt?: Set<string>): void {
+  private record(info: Record<string, unknown> | null): void {
     if (!info) {
       return
     }
@@ -131,31 +111,19 @@ export class ClaudeUsageLimits {
       const resetsAt =
         typeof seconds === 'number' ? usageLimitResetsAt(seconds * 1000, this.now()) : undefined
       this.rejected.set(type, resetsAt ?? null)
-      attempt?.add(type)
     } else if (info.status === 'allowed' || info.status === 'allowed_warning' || overage) {
       this.rejected.delete(type)
-      attempt?.delete(type)
     }
   }
 
-  /** A limit this attempt saw rejecting must still be rejecting; an older one cannot stand in. */
-  private rejecting(attempt: ReadonlySet<string>): boolean {
-    this.expire()
-    return [...attempt].some((type) => this.rejected.has(type))
-  }
-
-  private expire(): void {
+  /** All rejecting limits must reset before requests can resume. */
+  private limit(): AgentSessionUsageLimit | null {
     const now = this.now()
     for (const [type, resetsAt] of this.rejected) {
       if (resetsAt !== null && resetsAt <= now) {
         this.rejected.delete(type)
       }
     }
-  }
-
-  /** All rejecting limits must reset before requests can resume. */
-  private limit(): AgentSessionUsageLimit | null {
-    this.expire()
     if (this.rejected.size === 0) {
       return null
     }

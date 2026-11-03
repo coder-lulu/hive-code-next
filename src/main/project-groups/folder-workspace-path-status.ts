@@ -1,5 +1,3 @@
-import { resolveQualifiedFolderWorkspaceResult } from '../../shared/folder-workspace-execution-host'
-import { parseExecutionHostId, type ExecutionHostId } from '../../shared/execution-host'
 import { stat as statLocalPath } from 'node:fs/promises'
 import { isPathInsideOrEqual } from '../../shared/cross-platform-path'
 import type {
@@ -129,20 +127,6 @@ async function statFolderPath(
   }
 }
 
-export function getResolvedFolderWorkspacePathStatus(
-  workspace: Pick<FolderWorkspace, 'folderPath'>,
-  hostId: ExecutionHostId
-): Promise<FolderWorkspacePathStatus> {
-  const host = parseExecutionHostId(hostId)
-  if (host?.kind === 'runtime') {
-    return Promise.resolve({ path: workspace.folderPath, exists: false, reason: 'unavailable' })
-  }
-  return statFolderPath(
-    workspace.folderPath,
-    host?.kind === 'ssh' ? { kind: 'ssh', connectionId: host.targetId } : { kind: 'local' }
-  )
-}
-
 export async function getFolderWorkspacePathStatusForPath(args: {
   folderPath: string
   projectGroupId?: string | null
@@ -201,33 +185,6 @@ export async function getFolderWorkspacePathStatus(
   store: FolderWorkspacePathStatusStore,
   request: FolderWorkspacePathStatusRequest
 ): Promise<FolderWorkspacePathStatus> {
-  if (request.scope === 'folder-workspace') {
-    const result = resolveQualifiedFolderWorkspaceResult(
-      {
-        folderWorkspaces: store.getFolderWorkspaces?.() ?? [],
-        projectGroups: store.getProjectGroups?.() ?? [],
-        repos: store.getRepos()
-      },
-      request.folderWorkspaceId
-    )
-    if (result.kind === 'missing') {
-      throw new Error('folder_workspace_path_scope_not_found')
-    }
-    if (result.kind === 'ambiguous') {
-      const paths = new Set(
-        store
-          .getFolderWorkspaces?.()
-          .filter((row) => row.id === request.folderWorkspaceId)
-          .map((row) => row.folderPath)
-      )
-      return {
-        path: paths.size === 1 ? [...paths][0] : request.folderWorkspaceId,
-        exists: false,
-        reason: 'ambiguous-connection'
-      }
-    }
-    return getResolvedFolderWorkspacePathStatus(result.value.workspace, result.value.hostId)
-  }
   const scope = resolveFolderWorkspaceStatusPath({ store, request })
   return getFolderWorkspacePathStatusForPath({
     folderPath: scope.folderPath,

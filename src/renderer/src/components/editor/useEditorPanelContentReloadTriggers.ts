@@ -51,7 +51,6 @@ export function useEditorPanelContentReloadTriggers({
       activeFileGitStatusEntries.map((entry) => ({
         area: entry.area,
         status: entry.status,
-        oldPath: entry.oldPath,
         conflictStatus: entry.conflictStatus
       }))
     )

@@ -8,14 +8,9 @@ import type { Worktree } from '../../../../../../shared/worktree/types'
 import type { ExecutionHostId } from '../../../../../../shared/execution-host'
 import type { HostSectionRow } from '../../../../../../shared/sidebar-list/host-section-rows'
 import { DEFAULT_WORKSPACE_STATUSES } from '../../../../../../shared/workspace-status-defaults'
-import {
-  makeFolderWorkspace,
-  makeWorktree
-} from '../../../worktree-jump/worktree-jump-palette-test-fixtures'
+import { makeFolderWorkspace, makeWorktree } from '../../../worktree-jump-palette-test-fixtures'
 import { folderWorkspaceKey } from '../../../../../../shared/workspace-scope'
 import { buildWorktreeManualOrderCatalog } from '../../worktree-manual-order-catalog'
-import { getWorktreeHostIdentity } from '../../../../../../shared/worktree/host-qualified-identity'
-import { folderWorkspaceToWorktree } from '../../../../../../shared/folder-workspace-worktree'
 import { useWorktreeStatusMutations } from './use-status-mutations'
 import { useWorktreeDropCommitContext } from './use-drop-commit-context'
 import { useWorktreeDragSession } from './use-session'
@@ -74,7 +69,6 @@ function writtenHosts(
 }
 
 const copyOf = (row: Worktree) => [{ id: row.id, hostId: row.hostId }]
-const keyOf = getWorktreeHostIdentity
 
 describe('a sidebar drop on one card of a twin', () => {
   beforeEach(() => {
@@ -103,45 +97,35 @@ describe('a sidebar drop on one card of a twin', () => {
     expect(writtenHosts(TWIN_ID, 'workspaceStatus')).toEqual([dragged.hostId])
   })
 
-  // The sidebar ranks each card: same-id copies on two machines reorder independently.
-  it("writes a dragged twin's new rank to that copy only", async () => {
-    const { local, ssh, dragged } = seedTwins()
-    const other = useAppStore.getState().worktreesByRepo[REPO_ID]!.find((w) => w.id === OTHER_ID)!
-    const ranked = { [keyOf(local)]: 300, [keyOf(other)]: 200, [keyOf(ssh)]: 100 }
-    useAppStore.setState({
-      worktreesByRepo: {
-        [REPO_ID]: useAppStore
-          .getState()
-          .worktreesByRepo[REPO_ID]!.map((row) => ({ ...row, manualOrder: ranked[keyOf(row)] }))
-      }
-    })
+  // Manual order is ranked per id: the catalog drops a rank the copies disagree on.
+  it("writes a dragged twin's new rank to every copy so the id keeps one rank", async () => {
+    const { dragged } = seedTwins()
     const mutations = renderMutations()
 
     await act(async () => {
       mutations.current.reorderWorktrees({
-        groups: [{ key: 'all', worktreeIds: [keyOf(local), keyOf(other), keyOf(ssh)] }],
+        groups: [{ key: 'all', worktreeIds: [OTHER_ID, TWIN_ID] }],
         sourceGroupKey: 'all',
-        draggedKeys: [keyOf(dragged)],
-        dropIndex: dragged === ssh ? 1 : 3,
+        draggedIds: [TWIN_ID],
+        dropIndex: 0,
         draggedCopies: copyOf(dragged)
       })
     })
 
-    expect(writtenHosts(TWIN_ID, 'manualOrder')).toEqual([dragged.hostId])
-    expect(writtenHosts(OTHER_ID)).toEqual([])
+    expect(writtenHosts(TWIN_ID, 'manualOrder')).toEqual(['local', SSH])
   })
 
-  it('ranks every copy of a twin when a drop first materializes the order', async () => {
-    const { local, ssh } = seedTwins()
+  it('re-ranks every copy of a twin sibling, not whichever one the id-keyed map kept', async () => {
+    seedTwins()
     const mutations = renderMutations()
     const other = useAppStore.getState().worktreesByRepo[REPO_ID]!.find((w) => w.id === OTHER_ID)!
 
     await act(async () => {
-      // Drag the unique row above both twin cards; neither twin is dragged, but every card gets a rank.
+      // Drag the unique row between the twin's cards; the twin is only re-ranked, not dragged.
       mutations.current.reorderWorktrees({
-        groups: [{ key: 'all', worktreeIds: [keyOf(local), keyOf(ssh), keyOf(other)] }],
+        groups: [{ key: 'all', worktreeIds: [TWIN_ID, OTHER_ID] }],
         sourceGroupKey: 'all',
-        draggedKeys: [keyOf(other)],
+        draggedIds: [OTHER_ID],
         dropIndex: 0,
         draggedCopies: copyOf(other)
       })
@@ -175,9 +159,9 @@ describe('a sidebar drop on one card of a twin', () => {
 
     await act(async () => {
       result.current.reorderWorktrees({
-        groups: [{ key: 'all', worktreeIds: [keyOf(a), keyOf(b)] }],
+        groups: [{ key: 'all', worktreeIds: [a.id, b.id] }],
         sourceGroupKey: 'all',
-        draggedKeys: [keyOf(b)],
+        draggedIds: [b.id],
         dropIndex: 0,
         draggedCopies: copyOf(b)
       })
@@ -207,9 +191,9 @@ describe('a sidebar drop on one card of a twin', () => {
 
     await act(async () => {
       mutations.current.reorderWorktrees({
-        groups: [{ key: 'all', worktreeIds: [keyOf(b), keyOf(a)] }],
+        groups: [{ key: 'all', worktreeIds: [b.id, a.id] }],
         sourceGroupKey: 'all',
-        draggedKeys: [keyOf(b)],
+        draggedIds: [b.id],
         dropIndex: 2,
         draggedCopies: copyOf(b)
       })
@@ -222,8 +206,8 @@ describe('a sidebar drop on one card of a twin', () => {
       return write ? { ...row, ...write.updates } : row
     })
     expect(
-      buildWorktreeManualOrderCatalog({ worktrees: applied, folderWorkspaces: [] }).orderedKeys
-    ).toEqual([keyOf(a), keyOf(b), keyOf(aOnSsh)])
+      buildWorktreeManualOrderCatalog({ worktrees: applied, folderWorkspaces: [] }).orderedIds
+    ).toEqual([a.id, b.id])
   })
 
   it('ranks a selected folder workspace dragged together with a git card', async () => {
@@ -237,14 +221,13 @@ describe('a sidebar drop on one card of a twin', () => {
       updateWorktreesMeta
     })
     const folderId = folderWorkspaceKey(folder.id)
-    const folderKey = keyOf(folderWorkspaceToWorktree(folder))
     const mutations = renderMutations()
 
     await act(async () => {
       mutations.current.reorderWorktrees({
-        groups: [{ key: 'all', worktreeIds: [keyOf(a), keyOf(b), folderKey] }],
+        groups: [{ key: 'all', worktreeIds: [a.id, b.id, folderId] }],
         sourceGroupKey: 'all',
-        draggedKeys: [keyOf(b), folderKey],
+        draggedIds: [b.id, folderId],
         dropIndex: 0,
         draggedCopies: [...copyOf(b), { id: folderId, hostId: 'local' }]
       })
@@ -395,7 +378,7 @@ describe('a sidebar drop on one card of a twin', () => {
     ctx.onReorderWorktrees({
       groups: [],
       sourceGroupKey: 'all',
-      draggedKeys: [keyOf({ id: TWIN_ID, hostId: SSH })],
+      draggedIds: [TWIN_ID],
       dropIndex: 0
     })
 

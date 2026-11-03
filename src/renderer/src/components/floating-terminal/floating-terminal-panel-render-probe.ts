@@ -200,7 +200,6 @@ export function bindFocusedFloatingPanelKeydown(element: unknown): {
   Object.setPrototypeOf(panelElement, HTMLElement.prototype)
   attachRef(panel.props.ref, panelElement)
   vi.stubGlobal('document', {
-    ...document,
     activeElement: panelElement,
     addEventListener: vi.fn(),
     removeEventListener: vi.fn()

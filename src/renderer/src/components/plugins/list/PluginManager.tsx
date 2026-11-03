@@ -13,11 +13,9 @@ import type { InstalledRowHandlers } from './PluginManagerRows'
 import { PluginMarketplaceSourceDialog } from '../dialogs/PluginMarketplaceSourceDialog'
 import { PluginCatalogLinkDialog } from '../dialogs/PluginCatalogLinkDialog'
 import { usePluginInstallLink } from '../state/use-plugin-install-link'
-import { usePluginBrowseRequest } from '../state/use-plugin-browse-request'
 import { usePluginCatalog } from '../state/use-plugin-catalog'
 import { usePluginHoverPrefetch } from '../state/use-plugin-hover-prefetch'
 import { usePluginInstallAction } from '../state/use-plugin-install-action'
-import { usePluginUpdateDialog } from '../state/use-plugin-update-dialog'
 import {
   CatalogCard,
   CatalogNotice,
@@ -104,10 +102,15 @@ export function PluginManager({
   const [search, setSearch] = useState('')
   const [chosenTab, setTab] = useState<PluginCatalogFilter>('all')
   const [listFilter, setListFilter] = useState<PluginListFilter>(NO_PLUGIN_LIST_FILTER)
+  // Why a count: each open mounts a fresh dialog, so its previews and results start clean.
+  const [updateAllOpens, setUpdateAllOpens] = useState(0)
+  const [updateEntries, setUpdateEntries] = useState<readonly PluginListEntry[] | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<ReadonlySet<string>>(() => new Set())
   const { openKey, open, back } = page
-  usePluginBrowseRequest({ page, setTab, setSearch, setListFilter })
-  const catalog = usePluginCatalog({ onRefreshInstalled, onOpenRequested: open })
+  const catalog = usePluginCatalog({
+    onRefreshInstalled,
+    onOpenRequested: open
+  })
   // Why: an install counts as from a link only while the page that link opened is showing.
   const [linkedKey, setLinkedKey] = useState<string | null>(null)
   const installLink = usePluginInstallLink({
@@ -170,18 +173,15 @@ export function PluginManager({
   // Why: dev folders, local installs and bundled plugins have no catalog card to carry their switch.
   const uncataloged = catalog.loading ? [] : installed.filter((entry) => !listedInCatalog(entry))
   const catalogInstalled = filter === 'available' ? [] : entries.installed
-  const updateDialog = usePluginUpdateDialog({
-    ready: !pluginsLoading && !catalog.loading,
-    updates,
-    page,
-    showUpdates: () => setTab('updates'),
-    reloadCatalogs: catalog.loadMarketplaceData
-  })
+  const openUpdates = (entries: readonly PluginListEntry[]): void => {
+    setUpdateAllOpens((count) => count + 1)
+    setUpdateEntries(entries)
+  }
   const rowHandlers: InstalledRowHandlers = {
     ...handlers,
     onOpen: openEntry,
     onViewLogs: openEntry,
-    onCheckUpdate: (entry) => updateDialog.open([entry])
+    onCheckUpdate: (entry) => openUpdates([entry])
   }
   const cardHandlers: CatalogCardHandlers = {
     install,
@@ -278,11 +278,11 @@ export function PluginManager({
   const dialogs = (
     <>
       <PluginUpdateAllDialog
-        key={updateDialog.opens}
-        open={updateDialog.entries !== null}
-        entries={updateDialog.entries ?? []}
+        key={updateAllOpens}
+        open={updateEntries !== null}
+        entries={updateEntries ?? []}
         orcaVersion={orcaVersion}
-        onClose={updateDialog.close}
+        onClose={() => setUpdateEntries(null)}
         onUpdated={onInstalled}
       />
       <PluginMarketplaceSourceDialog
@@ -347,7 +347,7 @@ export function PluginManager({
         toolbar={
           <PluginListToolbar
             updateCount={filter === 'updates' ? updates.length : 0}
-            onUpdateAll={() => updateDialog.open(updates)}
+            onUpdateAll={() => openUpdates(updates)}
             filter={listFilter}
             sources={catalog.sources}
             onFilterChange={setListFilter}

@@ -1,4 +1,3 @@
-import { getRepoExecutionHostId } from '../../../../../shared/execution-host'
 import { useEffect } from 'react'
 
 import type { ChecksPanelControllerState } from './use-checks-panel-controller-state'
@@ -57,7 +56,6 @@ export function useChecksPanelConflictRefresh(model: ChecksPanelConflictRefreshI
     void fetchPRForBranch(repo.path, branch, {
       force: true,
       repoId: repo.id,
-      repoOwnerExecutionHostId: getRepoExecutionHostId(repo),
       worktreeId: activeWorktreeId ?? undefined,
       linkedPRNumber: linkedPR,
       fallbackPRNumber: fallbackGitHubPRNumber ?? pr.number,

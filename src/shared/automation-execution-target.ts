@@ -1,6 +1,4 @@
 import type { Automation, AutomationExecutionTargetType } from './automations-types'
-import type { Repo } from './repo-types'
-import { getRepoSshConnectionId } from './execution-host'
 import type { AutomationWorkspaceSshPin } from './automation-workspace-pin'
 
 /** Fail closed when project resolution misses: create refuses; update retains the target unless explicitly moved. Capture SSH registration generations even through local folder-workspace pins so same-ID re-registration cannot impersonate the chosen host. */
@@ -11,7 +9,7 @@ export type AutomationExecutionTargetSelection = {
   executionTargetGeneration?: number
 }
 
-export type AutomationExecutionTargetRepo = Pick<Repo, 'connectionId' | 'executionHostId'>
+export type AutomationExecutionTargetRepo = { connectionId?: string | null }
 
 export type AutomationStoredExecutionTarget = Pick<
   Automation,
@@ -36,7 +34,7 @@ function selectionForRepo(
   sshTargetGeneration: number | undefined,
   workspaceSshPin: AutomationWorkspaceSshPin | undefined
 ): AutomationExecutionTargetSelection {
-  const connectionId = getRepoSshConnectionId(repo)
+  const connectionId = repo.connectionId?.trim()
   if (!connectionId) {
     // A pinned workspace is the record's real host, so the local target captures its generation.
     return withGeneration(

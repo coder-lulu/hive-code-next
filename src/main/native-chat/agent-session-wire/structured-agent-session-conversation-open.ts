@@ -7,15 +7,14 @@ import type { JournalHostDatabase } from '../agent-session-journal/journal-host-
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import { openAgentSessionJournal } from '../agent-session-journal/journal-store-factory'
 import { holdUnsentSends } from '../agent-session-journal/journal-unsent-send-hold'
-import { computeAgentSessionPayloadFingerprint } from '../../../shared/agent-session/lifecycle/agent-session-mutation-envelope'
-import type { AgentSessionConversationView } from '../../../shared/agent-session/lifecycle/agent-session-conversation-view'
-import type { UsageLimitContinueIdentity } from '../../../shared/agent-session/lifecycle/agent-session-usage-limit-continue'
+import { computeAgentSessionPayloadFingerprint } from '../../../shared/agent-session-mutation-envelope'
+import type { AgentSessionConversationView } from '../../../shared/agent-session-conversation-view'
 import {
   attachFingerprintFields,
   journalIdentityFor,
   type AgentSessionAttachParams
 } from './structured-agent-session-attach'
-import type { AgentSessionRecordStore } from '../../runtime/agent-session/records/agent-session-record-store'
+import type { AgentSessionRecordStore } from '../../runtime/agent-session-record-store'
 import { settleStaleStructuredAgentSessionState } from './structured-agent-session-dead-generation-settlement'
 import { structuredAgentSessionFailureWordsContext } from './structured-agent-session-send-preparation'
 import { markStructuredQueueReopen } from './structured-agent-session-queued-pause'
@@ -29,10 +28,7 @@ export type OpenedStructuredAgentSessionConversation = {
 }
 
 export type StructuredAgentSessionConversationOpenDeps = {
-  store: Pick<
-    AgentSessionRecordStore,
-    'getConversation' | 'replacedRuntime' | 'usageLimitContinueCancelReceipt'
-  >
+  store: Pick<AgentSessionRecordStore, 'getConversation' | 'replacedRuntime'>
   journalDatabase: JournalHostDatabase
   logger: StructuredAgentSessionHostDeps['logger']
 }
@@ -94,18 +90,7 @@ export async function openStructuredAgentSessionConversationJournal(
     expectedRuntimeFence: fence
   })
   const identity = journalIdentityFor(record, params)
-  const { store } = deps
-  const journal = await openAgentSessionJournal({
-    identity,
-    database: deps.journalDatabase,
-    // Without a record store (acquisition-only opens) there is no continuation to withdraw.
-    ...(store
-      ? {
-          withdrawStoppedCut: (cut: UsageLimitContinueIdentity) =>
-            store.usageLimitContinueCancelReceipt(sessionId, cut)
-        }
-      : {})
-  })
+  const journal = await openAgentSessionJournal({ identity, database: deps.journalDatabase })
   try {
     // A handed-over row found here stays doubt: it reads as sent, and nothing narrows it later.
     await journal.markPendingSubmissionsUnknown(fence)

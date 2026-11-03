@@ -1,11 +1,8 @@
-import { AGENT_LAUNCH_PANE_REFUSED_CODE } from '../../../../shared/agent-launch-pane-verdict'
-import { requireAcceptedSpawn } from '../spawn-outcome'
 import { runPtySpawn, normalizePtySpawnSessionId } from '../spawn-operation'
 import { checkPtyIpcLaunchPane, resolveEarlyPaneKey } from './spawn-begin'
 import { stopReplacedPaneOwner } from '../pane/pane-owner-replacement'
 import { keepAbsentBindingForSwap } from './spawn-absent-binding-swap'
 import { planPaneAgentLaunch } from './spawn-agent-launch'
-import { applyAgentLaunchPluginHook } from '../spawn-agent-launch-plugin-hook'
 import { endPaneAgentLaunch } from './spawn-agent-launch-end'
 import { preparePtyIpcSpawnPreflight } from './spawn-preflight'
 import { assemblePtyIpcSpawnEnv } from './spawn-env'
@@ -47,9 +44,6 @@ export async function runPtyIpcSpawn(deps: PtySpawnIpcDeps, request: PtySpawnIpc
       if (ctx.args.agentLaunch !== undefined) {
         await planPaneAgentLaunch(ctx)
       }
-      if (!ctx.earlyStablePaneOwner) {
-        ctx.args = await applyAgentLaunchPluginHook(ctx.args, deps.runtime)
-      }
       await preparePtyIpcSpawnPreflight(ctx)
       await assemblePtyIpcSpawnEnv(ctx)
       await preparePtyIpcQoderCommand(ctx)
@@ -85,9 +79,7 @@ export async function runPtyIpcSpawn(deps: PtySpawnIpcDeps, request: PtySpawnIpc
     onOutcome: (settled) =>
       endPaneAgentLaunch(
         ctx,
-        settled.kind === 'registration-exited'
-          ? { exitedDuringStart: true, terminalStartFailure: settled.terminalStartFailure }
-          : { started: true }
+        settled.kind === 'registration-exited' ? { exitedDuringStart: true } : { started: true }
       ),
     onError: (error) => endPaneAgentLaunch(ctx, { error }),
     releasePreparation: () => {
@@ -116,7 +108,5 @@ export async function runPtyIpcSpawn(deps: PtySpawnIpcDeps, request: PtySpawnIpc
         }
       : {})
   })
-  return args.agentLaunch === undefined
-    ? outcome.result
-    : requireAcceptedSpawn(outcome, AGENT_LAUNCH_PANE_REFUSED_CODE)
+  return outcome.result
 }

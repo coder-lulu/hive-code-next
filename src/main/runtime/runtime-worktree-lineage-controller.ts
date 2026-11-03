@@ -19,8 +19,6 @@ import { getRepoOwnedWorktreeMeta } from '../worktree-metadata-ownership'
 import { isWslMoveWorktreeBlocked } from '../persistence/moving-wsl-projects/wsl-move-background-backoff'
 import {
   RuntimeLineageError,
-  LINEAGE_PARENT_AMBIGUOUS,
-  formatAmbiguousCwdParentMessage,
   enforceCreateLineageHostBoundary,
   resolveRuntimeWorktreeCreateLineage,
   type ResolvedWorkspaceParent,
@@ -86,15 +84,7 @@ export class RuntimeWorktreeLineageController {
         }
       }
     })
-    const retained = enforceCreateLineageHostBoundary(resolution, childHostId)
-    if (
-      retained.kind === 'lineage' &&
-      retained.capture.source === 'cwd-context' &&
-      input?.cwdParentAmbiguous === true
-    ) {
-      throw new RuntimeLineageError(LINEAGE_PARENT_AMBIGUOUS, formatAmbiguousCwdParentMessage())
-    }
-    return retained
+    return enforceCreateLineageHostBoundary(resolution, childHostId)
   }
 
   async resolveParent(selector: string): Promise<ResolvedWorkspaceParent> {

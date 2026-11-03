@@ -9,10 +9,8 @@ import type { Repo } from '../../../shared/repo-types'
 import { ipcOrRuntimeTargetForHostId } from '@/runtime/runtime-client-target'
 import type { RuntimeClientTarget } from '../../../shared/runtime-client-target'
 
-type RepoOwnerRow = Pick<Repo, 'id' | 'connectionId' | 'executionHostId'>
-
-export type RepoRuntimeOwnerState<T extends RepoOwnerRow = RepoOwnerRow> = {
-  repos?: readonly T[]
+export type RepoRuntimeOwnerState = {
+  repos?: readonly Pick<Repo, 'id' | 'connectionId' | 'executionHostId'>[]
   settings?: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null
 }
 
@@ -26,11 +24,11 @@ function findRepoOwner(
 }
 
 /** Resolve twins through caller host, else Active Server focus; this nonrefusable route must not fall to local IPC and this machine’s credentials. */
-function findTwinRepoOwner<T extends RepoOwnerRow>(
-  state: RepoRuntimeOwnerState<T>,
+function findTwinRepoOwner(
+  state: RepoRuntimeOwnerState,
   repoId: string,
   hostId: ExecutionHostId | null | undefined
-): T | null {
+): Pick<Repo, 'id' | 'connectionId' | 'executionHostId'> | null {
   const matchingRepos = state.repos?.filter((entry) => entry.id === repoId) ?? []
   if (matchingRepos.length < 2) {
     return matchingRepos[0] ?? null
@@ -82,19 +80,16 @@ export function getExplicitRuntimeOwnerEnvironmentId(
   repoId: string | null | undefined,
   hostId?: ExecutionHostId | null
 ): string | null {
-  return resolveRepoRuntimeOwner(state, repoId, hostId).environmentId
-}
-
-export function resolveRepoRuntimeOwner<T extends RepoOwnerRow>(
-  state: RepoRuntimeOwnerState<T>,
-  repoId: string | null | undefined,
-  hostId?: ExecutionHostId | null
-) {
-  const repo = repoId ? findTwinRepoOwner(state, repoId, hostId) : null
+  if (!repoId) {
+    return null
+  }
+  const repo = findTwinRepoOwner(state, repoId, hostId)
   const hasExplicitOwner = Boolean(repo?.executionHostId?.trim() || repo?.connectionId?.trim())
-  const parsed =
-    repo && hasExplicitOwner ? parseExecutionHostId(getRepoExecutionHostId(repo)) : null
-  return { repo, environmentId: parsed?.kind === 'runtime' ? parsed.environmentId : null }
+  if (!repo || !hasExplicitOwner) {
+    return null
+  }
+  const parsed = parseExecutionHostId(getRepoExecutionHostId(repo))
+  return parsed?.kind === 'runtime' ? parsed.environmentId : null
 }
 
 // Inherit repo runtime only for a unique ID; cross-host duplicates fail closed to the source’s own host (#7623).

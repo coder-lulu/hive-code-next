@@ -1,14 +1,10 @@
-import {
-  configuredDeclarationModels,
-  mergedAgentModelCatalogModels
-} from './agent-model-catalog-models'
 import { independentAgentModelCatalog } from './agent-model-catalog-discovery'
-import type { AgentSessionUnavailable } from '../../../shared/agent-session/agent-session-availability'
+import type { AgentSessionUnavailable } from '../../../shared/agent-session-availability'
 import type {
   AgentSessionFastModeSupport,
   AgentSessionModelCatalogResult,
   AgentSessionModelOption
-} from '../../../shared/agent-session/agent-session-wire'
+} from '../../../shared/agent-session-wire'
 
 /** Discovery owns configured defaults/freshness; live listings supply membership and effort menus. */
 export type AgentModelCatalogSource = 'discovery' | 'live'
@@ -131,6 +127,56 @@ export function agentModelCatalogResultFromEntry(
   }
 }
 
+/** Newer listings own membership/menus; configured facts then discovery/live determine defaults. */
+function mergedModels(
+  discovered: AgentModelCatalogListing | null,
+  live: AgentModelCatalogListing | null,
+  configured: AgentModelCatalogConfiguredDefault | null
+): AgentSessionModelOption[] {
+  const liveIsNewer = live !== null && (discovered === null || live.at >= discovered.at)
+  const newer = liveIsNewer ? live : discovered
+  const older = liveIsNewer ? discovered : live
+  return (newer?.models ?? []).map((model) => {
+    const listed = discovered?.models.find((entry) => entry.id === model.id)
+    const reported = live?.models.find((entry) => entry.id === model.id)
+    const olderModel = older?.models.find((entry) => entry.id === model.id)
+    const olderEfforts = olderModel?.efforts ?? []
+    const runsConfigured =
+      configured?.modelId === model.id || configured?.sameModelIds?.includes(model.id) === true
+    const configuredEffort = runsConfigured ? configured?.effort : undefined
+    const offersConfigured = (menu: AgentSessionModelOption['efforts']): boolean =>
+      menu.some((choice) => choice.value === configuredEffort)
+    // Coarser probe menus must not discard a chat-confirmed effort unless a newer chat menu does.
+    const keepsChatMenu =
+      older === live && !offersConfigured(model.efforts) && offersConfigured(olderEfforts)
+    const { efforts, effortsKnown } =
+      olderModel && model.effortsKnown !== olderModel.effortsKnown
+        ? model.effortsKnown === false
+          ? olderModel
+          : model
+        : model.efforts.length > 0 && !keepsChatMenu
+          ? model
+          : (olderModel ?? model)
+    const defaultEffort = [configuredEffort, listed?.defaultEffort, reported?.defaultEffort].find(
+      (effort) => effort !== undefined && efforts.some((choice) => choice.value === effort)
+    )
+    const { defaultEffort: _own, effortsKnown: _known, ...rest } = model
+    return {
+      ...rest,
+      // Efforts stay unknown only when neither listing knows this model's menu.
+      ...(effortsKnown === false ? { effortsKnown } : {}),
+      // Without discovery/configuration, live flags are the only available default evidence.
+      isDefault: configured
+        ? model.id === configured.modelId
+        : discovered
+          ? listed?.isDefault === true
+          : model.isDefault,
+      efforts,
+      ...(defaultEffort ? { defaultEffort } : {})
+    }
+  })
+}
+
 export function agentModelCatalogEntry(
   agent: string,
   fingerprint: string,
@@ -150,7 +196,7 @@ export function agentModelCatalogEntry(
     discovered,
     live,
     configured,
-    models: mergedAgentModelCatalogModels(discovered, live, configured).map((model) =>
+    models: mergedModels(discovered, live, configured).map((model) =>
       independentAgentModelCatalog(agent) && discovered?.complete !== true
         ? { ...model, isDefault: false }
         : model
@@ -192,12 +238,7 @@ export function agentModelCatalogEntryWithSuccess(
       identity.agent,
       identity.fingerprint,
       {
-        models: configuredDeclarationModels(
-          success.models.map((row) => ({ ...row })),
-          configuredModel
-            ? { modelId: configuredRow?.id ?? configuredModel, effort: success.configured?.effort }
-            : undefined
-        ),
+        models: success.models.map((row) => ({ ...row })),
         origin: success.origin,
         at,
         complete: success.complete === true,
@@ -217,27 +258,14 @@ export function agentModelCatalogEntryWithSuccess(
   if (models.length === 0) {
     return null
   }
-  const { agent, fingerprint } = identity
   const listing: AgentModelCatalogListing = {
-    models: configuredDeclarationModels(
-      models.map((model) => ({ ...model })),
-      agent === 'pi' && source === 'discovery' && success.configured?.model
-        ? { modelId: success.configured.model, effort: success.configured.effort }
-        : undefined
-    ),
+    models: models.map((model) => ({ ...model })),
     ...(success.fastModeSupport ? { fastModeSupport: success.fastModeSupport } : {}),
     origin: success.origin,
     at
   }
-  let configured = previous?.configured ?? null
-  if (agent === 'pi' && source === 'discovery') {
-    const { model, effort } = success.configured ?? {}
-    if (model) {
-      const facts = configuredDefaultFacts({ modelId: model, effort }, configured)
-      configured = facts && { ...facts, at }
-    }
-    return agentModelCatalogEntry(agent, fingerprint, listing, null, configured)
-  }
+  const { agent, fingerprint } = identity
+  const configured = previous?.configured ?? null
   return source === 'discovery'
     ? agentModelCatalogEntry(agent, fingerprint, listing, previous?.live ?? null, configured)
     : agentModelCatalogEntry(agent, fingerprint, previous?.discovered ?? null, listing, configured)
@@ -267,39 +295,21 @@ function configuredDefaultFacts(
 export function entryWithConfiguredDefault(
   entry: AgentModelCatalogEntry,
   choice: AgentModelCatalogConfiguredChoice | null,
-  at: number,
-  source: AgentModelCatalogListing | null = entry.live
+  at: number
 ): AgentModelCatalogEntry | null {
   if (independentAgentModelCatalog(entry.agent)) {
     return null
   }
   const next = configuredDefaultFacts(choice, entry.configured)
-  const { agent, fingerprint, discovered, live } = entry
-  const models =
-    live && live === source ? configuredDeclarationModels(live.models, choice) : live?.models
-  const samePolicy =
-    JSON.stringify(next) === JSON.stringify(configuredDefaultFacts(entry.configured))
-  if (samePolicy && models === live?.models) {
+  if (JSON.stringify(next) === JSON.stringify(configuredDefaultFacts(entry.configured))) {
     return null
   }
   return agentModelCatalogEntry(
-    agent,
-    fingerprint,
-    discovered,
-    live && models && models !== live.models ? { ...live, models } : live,
-    samePolicy ? entry.configured : next && { ...next, at }
-  )
-}
-
-/** Display observations share listing lifetime but are never durable facts. */
-export function serializedAgentModelCatalogListing(
-  listing: AgentModelCatalogListing | null
-): AgentModelCatalogListing | null {
-  return (
-    listing && {
-      ...listing,
-      models: listing.models.map(({ declaredDefaultEffort: _declaration, ...model }) => model)
-    }
+    entry.agent,
+    entry.fingerprint,
+    entry.discovered,
+    entry.live,
+    next && { ...next, at }
   )
 }
 
@@ -308,7 +318,7 @@ export function agentModelCatalogListingKey(entry: AgentModelCatalogEntry): stri
   const facts = (listing: AgentModelCatalogListing | null): unknown =>
     listing && [
       listing.origin,
-      serializedAgentModelCatalogListing(listing)?.models,
+      listing.models,
       listing.fastModeSupport ?? null,
       listing.complete ?? null
     ]

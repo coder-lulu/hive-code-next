@@ -1,6 +1,6 @@
 import type { EditorGet, EditorSet } from '../types/editor-set-get'
 import type { EditorSlice } from '../types/editor-slice'
-import { gitOperationExecutionHostId, resolveGitOperationTarget } from './git-operation-target'
+import { resolveGitOperationTarget } from './git-operation-target'
 import { toast } from 'sonner'
 import {
   fetchRuntimeGit,
@@ -23,7 +23,7 @@ export function createGitRemoteSync(
     syncBranch: async (worktreeId, worktreePath, connectionId, pushTarget, options) => {
       const runtimeTarget = resolveGitOperationTarget(get(), worktreeId, options)
       // Why: like pushBranch — fire-and-forget the post-op upstream refresh so the primary button label rotates immediately.
-      const endRemoteOperation = get().beginRemoteOperation('sync', worktreeId)
+      get().beginRemoteOperation('sync')
       // Why: the inner push stage toasts as Sync and marks the error so the outer catch skips toasting, avoiding a double-toast.
       let pushStageToastShown = false
       let pushed = false
@@ -73,7 +73,7 @@ export function createGitRemoteSync(
         }
         throw error
       } finally {
-        endRemoteOperation()
+        get().endRemoteOperation()
       }
       void get().fetchUpstreamStatus(worktreeId, worktreePath, connectionId, pushTarget, {
         runtimeTarget
@@ -81,10 +81,7 @@ export function createGitRemoteSync(
       if (pushed) {
         const refreshGitHubForWorktree = get().refreshGitHubForWorktree
         if (typeof refreshGitHubForWorktree === 'function') {
-          refreshGitHubForWorktree(
-            worktreeId,
-            gitOperationExecutionHostId(runtimeTarget, connectionId)
-          )
+          refreshGitHubForWorktree(worktreeId)
         }
       }
     },
@@ -97,7 +94,7 @@ export function createGitRemoteSync(
       options
     ) => {
       const runtimeTarget = resolveGitOperationTarget(get(), worktreeId, options)
-      const endRemoteOperation = get().beginRemoteOperation('rebase', worktreeId)
+      get().beginRemoteOperation('rebase')
       try {
         await rebaseRuntimeGitFromBase(
           { target: runtimeTarget, worktreeId, worktreePath, connectionId },
@@ -107,23 +104,20 @@ export function createGitRemoteSync(
         toast.error(resolveRemoteOperationErrorMessage(error, { isRebase: true }))
         throw error
       } finally {
-        endRemoteOperation()
+        get().endRemoteOperation()
       }
       void get().fetchUpstreamStatus(worktreeId, worktreePath, connectionId, pushTarget, {
         runtimeTarget
       })
       const refreshGitHubForWorktree = get().refreshGitHubForWorktree
       if (typeof refreshGitHubForWorktree === 'function') {
-        refreshGitHubForWorktree(
-          worktreeId,
-          gitOperationExecutionHostId(runtimeTarget, connectionId)
-        )
+        refreshGitHubForWorktree(worktreeId)
       }
     },
     fetchBranch: async (worktreeId, worktreePath, connectionId, pushTarget, options) => {
       const runtimeTarget = resolveGitOperationTarget(get(), worktreeId, options)
       // Why: like pushBranch — fire-and-forget the upstream refresh after the busy flag clears so new ahead/behind counts surface.
-      const endRemoteOperation = get().beginRemoteOperation('fetch', worktreeId)
+      get().beginRemoteOperation('fetch')
       try {
         await fetchRuntimeGit(
           { target: runtimeTarget, worktreeId, worktreePath, connectionId },
@@ -133,7 +127,7 @@ export function createGitRemoteSync(
         toast.error(resolveRemoteOperationErrorMessage(error, { isFetch: true }))
         throw error
       } finally {
-        endRemoteOperation()
+        get().endRemoteOperation()
       }
       void get().fetchUpstreamStatus(worktreeId, worktreePath, connectionId, pushTarget, {
         runtimeTarget

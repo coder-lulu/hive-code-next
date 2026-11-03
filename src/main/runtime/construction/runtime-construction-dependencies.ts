@@ -36,7 +36,7 @@ export type RuntimeConstructionDependencies = {
   getAgentStatusSnapshotForPane?: (paneKey: string) => AgentStatusIpcPayload[]
   structuredAgentStatusSink?: StructuredAgentSessionStatusSink
   readObservedAgentStatusPaneIdentity?: (paneKey: string) => ObservedAgentStatusPaneIdentity
-  getAgentProviderSessionSnapshot?: (tabId?: string) => AgentStatusIpcPayload[]
+  getAgentProviderSessionSnapshot?: () => AgentStatusIpcPayload[]
   getAgentProviderSessionRowsForPane?: (paneKey: string) => AgentStatusIpcPayload[]
   subscribeAgentProviderSessionChanges?: (
     listener: (sessions: readonly { paneKey: string; sessionId: string }[]) => void

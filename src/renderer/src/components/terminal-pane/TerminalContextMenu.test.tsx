@@ -208,7 +208,7 @@ describe('TerminalContextMenu', () => {
 
   it('uses nominal primary toggle labels, including default and unbound', () => {
     for (const [bindings, label] of [
-      [undefined, 'Ctrl+⇧+F11'],
+      [undefined, 'Ctrl+⇧+J'],
       [['Mod+Alt+Y', 'Mod+Alt+K'], 'Ctrl+Alt+Y'],
       [[], null]
     ] as const) {
@@ -217,7 +217,7 @@ describe('TerminalContextMenu', () => {
         canToggleNativeChat: true,
         keybindings: bindings === undefined ? {} : { 'terminal.toggleNativeChat': [...bindings] }
       })
-      expect(shortcuts.list.filter((value) => /(J|Y|F11)$/.test(value))).toEqual(
+      expect(shortcuts.list.filter((value) => value.endsWith('J') || value.endsWith('Y'))).toEqual(
         label ? [label] : []
       )
     }
@@ -301,13 +301,12 @@ describe('TerminalContextMenu', () => {
           label: 'Local Mac',
           repoCommands: [{ id: 'repo', label: 'Repo command', command: 'repo', appendEnter: true }],
           globalCommands: [
-            { id: 'global', label: 'Global command', command: 'global', appendEnter: false }
+            { id: 'global', label: 'Global command', command: 'global', appendEnter: true }
           ]
         }
       ]
     })
 
-    expect(rendered).toContain('Insert')
     expect(rendered).toContain('Orca')
     expect(rendered).toContain('Global')
     expect(rendered).not.toContain('Local Mac')

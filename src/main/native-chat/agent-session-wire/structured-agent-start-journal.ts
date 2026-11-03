@@ -1,29 +1,13 @@
-import type {
-  AgentJournalAgentHandoffItem,
-  AgentJournalAgentStartItem
-} from '../../../shared/agent-session/journal/agent-journal-creation-facts'
-import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session/journal/agent-session-journal-types'
-import { agentJournalItemKey } from '../../../shared/agent-session/journal/agent-session-journal-item-key'
+import type { AgentJournalAgentStartItem } from '../../../shared/agent-session-journal-types'
+import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
+import { agentJournalItemKey } from '../../../shared/agent-session-journal-item-key'
 import { readJournalSessionEpoch } from '../agent-session-journal/journal-row-table'
 import type {
   StructuredAgentSessionHostDeps,
   StructuredAgentSessionHostSession
 } from './structured-agent-session-host-types'
 
-export type AgentStartDestination = {
-  sessionId: string
-  epoch: string
-  contextId: string | null
-}
-
-/** One creation fact per worker Dispatch or agent launch, so a retry or replay never draws it twice. */
-function agentStartClientMessageId(
-  body: AgentJournalAgentStartItem | AgentJournalAgentHandoffItem
-): string {
-  return body.kind === 'agent-start'
-    ? `agent-start:${body.dispatchId}`
-    : `agent-handoff:${body.launchId}`
-}
+type AgentStartDestination = { sessionId: string; epoch: string; contextId: string | null }
 
 export function structuredAgentStartJournal(
   deps: () => StructuredAgentSessionHostDeps,
@@ -40,7 +24,7 @@ export function structuredAgentStartJournal(
 
   const appendAgentStart = async (
     destination: AgentStartDestination,
-    body: AgentJournalAgentStartItem | AgentJournalAgentHandoffItem,
+    body: AgentJournalAgentStartItem,
     observedAt: number
   ): Promise<void> => {
     const { sessionId } = destination
@@ -54,7 +38,7 @@ export function structuredAgentStartJournal(
     const { journal } = await conversation(sessionId)
     const identity = {
       provider: 'orca' as const,
-      clientMessageId: agentStartClientMessageId(body)
+      clientMessageId: `agent-start:${body.dispatchId}`
     }
     await journal.appendResolvedItem(
       () => {

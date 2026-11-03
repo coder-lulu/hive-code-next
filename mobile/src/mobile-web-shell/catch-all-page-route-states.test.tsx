@@ -98,7 +98,7 @@ vi.mock('expo-router', () => ({
     canGoBack: () => false
   }),
   usePathname: () => '/h/host-1',
-  useNavigation: () => ({ setOptions: vi.fn(), getParent: () => undefined }),
+  useNavigation: () => ({ setOptions: vi.fn() }),
   useNavigationContainerRef: () => ({ getRootState: () => undefined }),
   useFocusEffect: () => {}
 }))

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { z } from 'zod'
 import { ORCHESTRATION_METHODS } from './orchestration'
-import { isStreamingMethod, eraseRpcMethods, type RpcContext, type RpcMethod } from '../core'
+import { eraseRpcMethods, type RpcContext } from '../core'
 import { OrchestrationDb } from '../../orchestration/db'
 import { OrcaRuntimeService } from '../../orca-runtime'
 import { completeWorkerTerminalRelease } from './orchestration/worker/worker-release-completion'
@@ -131,9 +131,9 @@ describe('orchestration worker release incarnation fallback', () => {
     vi.restoreAllMocks()
   })
 
-  function findMethod(name: string): RpcMethod {
+  function findMethod(name: string) {
     const method = eraseRpcMethods(ORCHESTRATION_METHODS).find((m) => m.name === name)
-    if (!method || isStreamingMethod(method)) {
+    if (!method) {
       throw new Error(`Method not found: ${name}`)
     }
     return method

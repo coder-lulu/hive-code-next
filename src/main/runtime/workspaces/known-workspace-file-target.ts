@@ -1,5 +1,3 @@
-import { getRepoHostIdentityForParts } from '../../../shared/repo-host-identity'
-import { createRepoRowExecutionHostLookup } from '../../../shared/worktree-execution-host-resolution'
 import type { RuntimeWorkspaceCatalog } from './workspace-catalog'
 import type { OrcaRuntimeWithListManagedWorktrees } from './managed-workspace-operations'
 import type { OrcaRuntimeWithTransitionGraphReloadToTerminalState } from '../session-graph/session-graph-authority'
@@ -20,8 +18,6 @@ import type { PtyIncarnationId } from '../../../shared/pty-incarnation'
 import { forgetPtySurface } from '../pty-recorded-surface-topology'
 
 export abstract class OrcaRuntimeWithResolveKnownWorkspaceFileTarget extends OrcaRuntimeWithPersistHeadlessTerminalTitle {
-  protected abstract deliverPendingMessagesForPty(ptyId: string): void
-
   protected abstract listResolvedWorktrees(
     ...args: Parameters<RuntimeWorkspaceCatalog['listResolvedWorktrees']>
   ): ReturnType<RuntimeWorkspaceCatalog['listResolvedWorktrees']>
@@ -72,25 +68,21 @@ export abstract class OrcaRuntimeWithResolveKnownWorkspaceFileTarget extends Orc
       { worktree: ResolvedWorktree; executionHostId: ExecutionHostId }
     >()
     const repos = this.store?.getRepos() ?? []
-    const repoOwners = createRepoRowExecutionHostLookup(repos)
     const resolvedWorktrees = await this.listResolvedWorktrees()
     const visibilitySourceMatchersByRepoId =
       this.buildRuntimeVisibilitySourceMatchersByRepoId(resolvedWorktrees)
     for (const worktree of resolvedWorktrees) {
-      const routing = resolveWorktreeHostRouting(repos, worktree, repoOwners)
-      if (routing.kind === 'ambiguous') {
-        continue
-      }
       if (
         !this.isRuntimeWorktreeVisible(
           worktree,
-          routing.kind === 'resolved'
-            ? visibilitySourceMatchersByRepoId.get(
-                getRepoHostIdentityForParts(worktree.repoId, routing.hostId)
-              )
-            : undefined
+          visibilitySourceMatchersByRepoId.get(worktree.repoId)
         )
       ) {
+        continue
+      }
+      // Host-blind repo ids can misroute SSH paths; drop candidates with no unambiguous filesystem owner.
+      const routing = resolveWorktreeHostRouting(repos, worktree)
+      if (routing.kind === 'ambiguous') {
         continue
       }
       const target = {
@@ -158,7 +150,7 @@ export abstract class OrcaRuntimeWithResolveKnownWorkspaceFileTarget extends Orc
       return existing
     }
     const handle = this.createPreAllocatedTerminalHandle()
-    this.setPtyHandle(ptyId, handle)
+    this.handleByPtyId.set(ptyId, handle)
     return handle
   }
 
@@ -200,27 +192,14 @@ export abstract class OrcaRuntimeWithResolveKnownWorkspaceFileTarget extends Orc
     }
     const retained = this.handleByPtyIncarnation.get(ptyId)
     if (retained?.handle === handle) {
-      this.terminalIdentity.removeIncarnation(ptyId)
+      this.handleByPtyIncarnation.delete(ptyId)
     } else {
       this.invalidatePtyIncarnationHandle(ptyId)
     }
-    this.setPtyHandle(ptyId, handle)
+    this.handleByPtyId.set(ptyId, handle)
     for (const leaf of this.getLeavesForPty(ptyId)) {
       this.adoptPreAllocatedHandle(leaf)
     }
-  }
-
-  protected setPtyHandle(ptyId: string, handle: string): void {
-    if (this.handleByPtyId.get(ptyId) !== handle) {
-      this.terminalIdentity.bindPty(ptyId, handle)
-      this.wakeMailForNewPtyHandle(ptyId)
-    }
-  }
-
-  /** Mail waits for a PTY's handle, so every new one is that PTY's delivery edge. */
-  protected wakeMailForNewPtyHandle(ptyId: string): void {
-    // Deferred so issuance inside a read (a terminal list) never types mid-read.
-    queueMicrotask(() => this.deliverPendingMessagesForPty(ptyId))
   }
 
   protected adoptControllerTerminalHandle(
@@ -240,7 +219,7 @@ export abstract class OrcaRuntimeWithResolveKnownWorkspaceFileTarget extends Orc
     if (changedIncarnation) {
       const priorHandle = this.handleByPtyId.get(ptyId)
       this.invalidateAllHandlesForPty(ptyId)
-      forgetPtySurface(this.terminalIdentity, pty!)
+      forgetPtySurface(pty!)
       // Reusing an exported handle would make stale client metadata name the replacement process.
       if (priorHandle === trimmed) {
         return

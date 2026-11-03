@@ -4,7 +4,7 @@ import type { OpenFile } from '@/store/slices/editor'
 import { editorTabFileAccess } from '@/lib/local-file-access'
 import type { RuntimeFileOperationArgs } from '@/runtime/runtime-file-client-types'
 import { writeRuntimeFileBytes } from '@/runtime/runtime-file-bytes-write'
-import type { CustomEditorBinaryDocument } from './plugin-custom-editor-host-types'
+import type { CustomEditorBinaryDocument } from './plugin-custom-editor-host'
 import type { EditorSaveResult, EditorSaveTrigger } from './editor-save-disk-precondition'
 import {
   clearSelfWrite,
@@ -171,8 +171,7 @@ export async function saveEditorBytesDraft(
   context: RuntimeFileOperationArgs,
   trigger: EditorSaveTrigger,
   /** A Don't Save since the request; checked at the last moment before the write. */
-  discarded: () => boolean,
-  assertWriterCurrent?: () => void
+  discarded: () => boolean
 ): Promise<EditorSaveResult> {
   const box = bytesDocumentBoxes.get(file.id)
   const document = box?.current
@@ -199,7 +198,6 @@ export async function saveEditorBytesDraft(
         ? {}
         : { expectedSha256: document.savedSha256, allowMissing: trigger !== 'autosave' },
       () => {
-        assertWriterCurrent?.()
         if (discarded()) {
           throw new EditorSaveDiscardedError()
         }

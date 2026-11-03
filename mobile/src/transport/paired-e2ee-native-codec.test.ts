@@ -1,7 +1,6 @@
 import { gunzipSync } from 'node:zlib'
-import sodium from 'react-native-libsodium'
 import nacl from 'tweetnacl'
-import { beforeAll, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import {
   encodeMobileE2EEV2Transcript,
   validateMobileE2EEV2Handshake,
@@ -13,23 +12,33 @@ import { PairedE2EEV2ClientSession } from '../../../src/shared/paired-e2ee-v2-cl
 import { derivePairedE2EEV2KeySchedule } from '../../../src/shared/paired-e2ee-v2-key-schedule'
 import type { PairedE2EENativeBindings } from './paired-e2ee-native-codec'
 
-// Use the package’s wasm libsodium under Node; Kotlin/Swift tests pin the separate codec stand-in.
+// Exercise the current JSI binding seam with real crypto and Node codecs.
+// This is adapter/protocol coverage; platform native implementations require their own device tests.
 const secretboxOpenCalls = vi.fn()
 let bindings: PairedE2EENativeBindings | null = null
 
-function libsodiumBindings(): PairedE2EENativeBindings {
+function codecBindings(): PairedE2EENativeBindings {
   return {
     sodium: {
-      fromBase64: (value, variant) => sodium.from_base64(value, variant).slice().buffer,
+      fromBase64: (value, variant) => {
+        expect(variant).toBe(1)
+        const decoded = Buffer.from(value, 'base64')
+        if (decoded.toString('base64') !== value) {
+          throw new Error('Noncanonical base64')
+        }
+        return Uint8Array.from(decoded).buffer
+      },
       secretboxOpen: (box, nonce, key) => {
         secretboxOpenCalls(box.byteLength)
-        return sodium
-          .crypto_secretbox_open_easy(
-            new Uint8Array(box),
-            new Uint8Array(nonce),
-            new Uint8Array(key)
-          )
-          .slice().buffer
+        const opened = nacl.secretbox.open(
+          new Uint8Array(box),
+          new Uint8Array(nonce),
+          new Uint8Array(key)
+        )
+        if (!opened) {
+          throw new Error('Secretbox authentication failed')
+        }
+        return opened.slice().buffer
       }
     },
     codec: {
@@ -49,7 +58,7 @@ function libsodiumBindings(): PairedE2EENativeBindings {
 }
 
 async function load(withNative: boolean) {
-  bindings = withNative ? libsodiumBindings() : null
+  bindings = withNative ? codecBindings() : null
   vi.resetModules()
   const codec = await import('./paired-e2ee-native-codec')
   if (withNative) {
@@ -162,10 +171,6 @@ function inboundWire(schedule: ReturnType<typeof derivePairedE2EEV2KeySchedule>)
 }
 
 describe('the native paired E2EE codec', () => {
-  beforeAll(async () => {
-    await sodium.ready
-  })
-
   it('opens and refuses exactly the frames the JS paths do, never advancing on a refusal', async () => {
     const wire = inboundWire(pairedSession((await load(true)).primitives).schedule)
     expect(wire.filter((entry) => entry.plaintext === null).length).toBeGreaterThan(50)
@@ -195,22 +200,18 @@ describe('the native paired E2EE codec', () => {
     const { native: before } = await load(false)
     expect(before).toBeNull()
     const codec = await import('./paired-e2ee-native-codec')
-    bindings = libsodiumBindings()
+    bindings = codecBindings()
     codec.providePairedE2EENativeBindings(() => bindings)
     expect(codec.pairedE2EENativeCodec()).not.toBeNull()
   })
 
-  it('agrees with tweetnacl on boxes either library sealed', async () => {
+  it('preserves authenticated boxes through the ArrayBuffer binding boundary', async () => {
     const { native } = await load(true)
     for (let index = 0; index < 300; index++) {
       const key = randomBytes(32)
       const nonce = randomBytes(24)
       const message = randomBytes(random(600))
-      const boxes = [
-        sodium.crypto_secretbox_easy(message, nonce, key),
-        nacl.secretbox(message, nonce, key)
-      ]
-      expect(boxes[0]).toEqual(boxes[1])
+      const boxes = [nacl.secretbox(message, nonce, key)]
       for (const box of boxes) {
         expect(native!.openSecretbox(box, nonce, key)).toEqual(message)
         const tampered = box.slice()
@@ -219,6 +220,15 @@ describe('the native paired E2EE codec', () => {
         expect(nacl.secretbox.open(tampered, nonce, key)).toBeNull()
       }
     }
+  })
+
+  it('opens a fixed known-answer box through the provided binding', async () => {
+    const { native } = await load(true)
+    const box = Uint8Array.from(Buffer.from('sqQBX9c2fQaZ4F6j8gHDpjGU', 'base64'))
+    const key = Uint8Array.from({ length: 32 }, (_, index) => index)
+    const nonce = Uint8Array.from({ length: 24 }, (_, index) => index)
+    expect(native!.openSecretbox(box, nonce, key)).toEqual(new TextEncoder().encode('ok'))
+    expect(native!.openSecretbox(box, nonce, new Uint8Array(32))).toBeNull()
   })
 
   // UTF-8 fallback must preserve an already-opened frame whose counter advanced.

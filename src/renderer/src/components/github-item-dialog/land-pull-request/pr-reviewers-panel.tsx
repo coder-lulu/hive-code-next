@@ -4,7 +4,7 @@ import { LoaderCircle, Pencil } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useAppStore } from '@/store'
-import { useRepoAssignees } from '@/hooks/useGitHubRepoMetadata'
+import { useRepoAssignees } from '@/hooks/useIssueMetadata'
 import { useRepoAssigneesBySlug } from '@/hooks/useGitHubSlugMetadata'
 import { getGitHubPRReviewerRows } from '../../../../../shared/github/pr-reviewer-display'
 import {
@@ -29,8 +29,7 @@ export function PRReviewersPanel({
   repoPath,
   sourceContext,
   projectOrigin,
-  onReviewersRequested,
-  onMutated
+  onReviewersRequested
 }: {
   item: GitHubWorkItem
   loading: boolean
@@ -38,7 +37,6 @@ export function PRReviewersPanel({
   sourceContext?: TaskSourceContext | null
   projectOrigin?: GitHubItemDialogProjectOrigin
   onReviewersRequested: (reviewRequests: GitHubAssignableUser[]) => void
-  onMutated: () => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [reviewerInput, setReviewerInput] = useState('')
@@ -141,7 +139,7 @@ export function PRReviewersPanel({
   const reviewerMetadataByPath = useRepoAssignees(
     open && !reviewRepo ? repoPath : null,
     open && !reviewRepo ? item.repoId : null,
-    { target: ownerTarget, ownerRepo: reviewRepo }
+    { target: ownerTarget }
   )
   const reviewerMetadata = reviewRepo ? reviewerMetadataBySlug : reviewerMetadataByPath
   const displayItem = { ...item, reviewRequests: localReviewRequests }
@@ -248,8 +246,7 @@ export function PRReviewersPanel({
     setLocalReviewRequests,
     setReviewerInput,
     patchWorkItem,
-    onReviewersRequested,
-    onMutated
+    onReviewersRequested
   }
 
   const handleRequestReview = async (requestedLogins?: string[]): Promise<void> => {

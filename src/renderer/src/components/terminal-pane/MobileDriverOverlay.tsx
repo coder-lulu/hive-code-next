@@ -215,7 +215,6 @@ function LoudOverlay({
     <div
       ref={setRootRef}
       role="dialog"
-      data-overlay-focus-scope="parent"
       aria-live="assertive"
       aria-labelledby={titleId}
       aria-describedby={bodyId}
@@ -230,7 +229,7 @@ function LoudOverlay({
           {tone === 'driving' ? (
             <span
               aria-hidden="true"
-              className="absolute -right-0.5 -top-0.5 size-1.5 animate-pulse rounded-full bg-foreground ring-2 ring-card motion-reduce:animate-none"
+              className="absolute -right-0.5 -top-0.5 size-1.5 animate-pulse rounded-full bg-foreground ring-2 ring-card"
             />
           ) : null}
         </div>

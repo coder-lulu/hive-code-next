@@ -62,13 +62,11 @@ const LEGACY_ENTRY: AutomationHostCatalogEntry = {
 function control(
   projects: Repo[],
   entries: AutomationHostCatalogEntry[] = [ENTRY],
-  moveWarning?: string,
-  recordedProject?: AutomationCreateDestinationControl['recordedProject']
+  moveWarning?: string
 ): AutomationCreateDestinationControl {
   return {
     entries,
     moveWarning,
-    recordedProject,
     resolution: {
       status: 'ready',
       authority: OWNER.authority,
@@ -83,15 +81,12 @@ function control(
 function render(
   projects: Repo[],
   entries?: AutomationHostCatalogEntry[],
-  moveWarning?: string,
-  recordedProject?: AutomationCreateDestinationControl['recordedProject']
+  moveWarning?: string
 ): void {
   act(() => {
     root.render(
       <TooltipProvider>
-        <AutomationDestinationField
-          control={control(projects, entries, moveWarning, recordedProject)}
-        />
+        <AutomationDestinationField control={control(projects, entries, moveWarning)} />
       </TooltipProvider>
     )
   })
@@ -106,17 +101,6 @@ describe('AutomationDestinationField', () => {
     render([])
 
     expect(emptyNote()?.textContent).toContain('openclaw')
-  })
-
-  it('does not contradict a recorded project choice and keeps the move warning', () => {
-    render([], undefined, 'Saving creates this automation on GPU box.', {
-      id: 'saved',
-      label: '/saved/project'
-    })
-    expect(emptyNote()).toBeNull()
-    expect(container.querySelector('[data-testid="automation-host-move"]')?.textContent).toContain(
-      'GPU box'
-    )
   })
 
   it('states the storing authority once the host has a project to offer', () => {

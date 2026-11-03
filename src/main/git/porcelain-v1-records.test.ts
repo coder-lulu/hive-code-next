@@ -26,6 +26,10 @@ afterEach(() => {
 })
 
 describe('parsePorcelainV1Records', () => {
+  it('returns [] for a clean status', () => {
+    expect(parsePorcelainV1Records('')).toEqual([])
+  })
+
   it('keeps paths containing spaces and quotes intact', () => {
     // Windows filenames cannot contain quotes, but porcelain records from a
     // remote/other-platform repository still can. Exercise the parser contract
@@ -71,6 +75,18 @@ describe('parsePorcelainV1Records', () => {
     expect(records).toEqual([
       { xy: 'R ', path: 'renamed.txt' },
       { xy: '??', path: 'node_modules/' }
+    ])
+  })
+
+  it('parses staged and unstaged codes distinctly', () => {
+    const repo = createRepo()
+    writeFileSync(join(repo, 'tracked.txt'), 'v1\n')
+    git(['add', '-A'], repo)
+    git(['commit', '-qm', 'init'], repo)
+    writeFileSync(join(repo, 'tracked.txt'), 'v2\n')
+
+    expect(parsePorcelainV1Records(git(['status', '--porcelain', '-z'], repo))).toEqual([
+      { xy: ' M', path: 'tracked.txt' }
     ])
   })
 })

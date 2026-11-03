@@ -1,50 +1,39 @@
-import '../unused-default-rpc-methods.test-fixture'
-import { describe, expect, it, vi } from 'vitest'
-import type { OrcaRuntimeService } from '../../orca-runtime'
-import { RpcDispatcher } from '../dispatcher'
+import { expect, it, vi } from 'vitest'
+import { buildRegistry, isStreamingMethod, type RpcContext } from '../core'
 import { MOBILE_RELAY_HOSTS_METHODS } from './mobile-relay-hosts'
-import type { z } from 'zod'
-import type {
-  MobileRelayHostWorktreesParamsSchema,
-  MobileRelayServerWorktreeRow
+import {
+  MOBILE_RELAY_HOSTS_LIST_METHOD,
+  MOBILE_RELAY_HOST_WORKTREES_METHOD
 } from '../../../../shared/mobile-relay-hosts-contract'
 
-const row = (worktreeId: string, displayName = worktreeId): MobileRelayServerWorktreeRow => ({
-  hostId: 'runtime:env-1',
-  worktreeId,
-  displayName
-})
-
-function relay(...served: (MobileRelayServerWorktreeRow[] | null)[]) {
-  const worktrees = vi.fn(async () => ({ worktrees: served.shift() ?? null }))
-  // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the dispatcher reads only the runtime id; these methods read none.
-  const runtime = { getRuntimeId: () => 'desktop' } as unknown as OrcaRuntimeService
-  const dispatcher = new RpcDispatcher({ runtime, methods: MOBILE_RELAY_HOSTS_METHODS })
-  return async (
-    params: Omit<z.input<typeof MobileRelayHostWorktreesParamsSchema>, 'hostId'>
-  ): Promise<Record<string, unknown>> => {
-    let result: Record<string, unknown> = {}
-    await dispatcher.dispatchStreaming(
-      {
-        id: 'r',
-        authToken: 'token',
-        method: 'mobileRelay.hosts.worktrees',
-        params: { hostId: 'runtime:env-1', ...params }
-      },
-      (reply) => {
-        result = JSON.parse(reply).result
-      },
-      { mobileRelayHosts: { list: () => ({ hosts: [] }), worktrees } }
-    )
-    return result
+const registry = buildRegistry(MOBILE_RELAY_HOSTS_METHODS)
+function invoke(name: string, context: Partial<RpcContext>, params: unknown = null) {
+  const method = registry.get(name)!
+  if (isStreamingMethod(method)) {
+    throw new Error('Expected unary catalog method')
   }
+  return method.handler(params, context as RpcContext)
 }
-
-describe('mobileRelay.hosts.worktrees snapshots', () => {
-  it('answers callers that send no snapshot fields exactly as before', async () => {
-    const read = relay([row('a')], null)
-
-    expect(await read({})).toEqual({ worktrees: [row('a')] })
-    expect(await read({})).toEqual({ worktrees: null })
-  })
+it('refuses absent catalog and unauthenticated contexts instead of a fabricated empty list', () => {
+  expect(() => invoke(MOBILE_RELAY_HOSTS_LIST_METHOD, {})).toThrow('unavailable')
+  expect(() =>
+    invoke(MOBILE_RELAY_HOSTS_LIST_METHOD, { authenticatedAccountRuntimeSessionId: 'session' })
+  ).toThrow('unavailable')
+  expect(() =>
+    invoke(MOBILE_RELAY_HOSTS_LIST_METHOD, {
+      mobileRelayHosts: { list: vi.fn(), worktrees: vi.fn() }
+    })
+  ).toThrow('unavailable')
+})
+it('uses the installed catalog only under the authenticated account transport', async () => {
+  const listing = { hosts: [] }
+  const list = vi.fn(() => listing)
+  const worktrees = vi.fn(async () => ({ worktrees: null }))
+  const ctx = {
+    authenticatedAccountRuntimeSessionId: 'session',
+    mobileRelayHosts: { list, worktrees }
+  }
+  expect(invoke(MOBILE_RELAY_HOSTS_LIST_METHOD, ctx)).toBe(listing)
+  await invoke(MOBILE_RELAY_HOST_WORKTREES_METHOD, ctx, { hostId: 'runtime:known' })
+  expect(worktrees).toHaveBeenCalledWith('runtime:known')
 })

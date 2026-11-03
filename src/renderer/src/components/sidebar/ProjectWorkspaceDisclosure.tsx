@@ -1,10 +1,36 @@
+import { useMemo, type ReactNode } from 'react'
+import type { DashboardAgentRow } from '@/components/dashboard/useDashboardData'
+import type { Worktree } from '../../../../shared/worktree/types'
+import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
+import { useWorktreeAgentExpansionState } from './worktree-card-agents-expansion-state'
 import { ChevronRight, Folder, GitBranch } from 'lucide-react'
 import { AgentIcon } from '@/lib/agent-catalog'
 import { agentTypeToIconAgent } from '@/lib/agent-status'
 import { AgentStateDot, agentStateLabel } from '@/components/AgentStateDot'
 import { translate } from '@/i18n/i18n'
-import { useProjectWorkspaceDisclosure } from './project-tree-context'
+import {
+  ProjectWorkspaceDisclosureContext,
+  useProjectWorkspaceDisclosure
+} from './project-tree-context'
 import { summarizeAgents, buildSummaryAgentGroups } from './worktree-card-agent-summary'
+
+export function ProjectWorkspaceCardDisclosure({
+  worktree,
+  agents,
+  children
+}: {
+  worktree: Pick<Worktree, 'id' | 'hostId'>
+  agents: DashboardAgentRow[]
+  children: ReactNode
+}) {
+  const expansion = useWorktreeAgentExpansionState(getWorktreeHostIdentity(worktree))
+  const value = useMemo(() => ({ agents, expansion }), [agents, expansion])
+  return (
+    <ProjectWorkspaceDisclosureContext.Provider value={value}>
+      {children}
+    </ProjectWorkspaceDisclosureContext.Provider>
+  )
+}
 
 export function ProjectWorkspaceDisclosure({ isFolder }: { isFolder: boolean }) {
   const disclosure = useProjectWorkspaceDisclosure()

@@ -2,8 +2,8 @@ import {
   closeClaudeSession,
   claudeCloseReport,
   claudeAcquisitionCleanupError
-} from './claude-structured-session-close'
-import { AgentSessionAcquisitionExitUnprovenError } from '../../native-chat/agent-session-wire/structured-agent-session-acquisition-errors'
+} from '../claude-structured-session-close'
+import { AgentSessionAcquisitionExitUnprovenError } from '../../native-chat/agent-session-wire/structured-agent-session-adapter'
 import type {
   ClaudeAcquisitionRegistry,
   ClaudeSession,

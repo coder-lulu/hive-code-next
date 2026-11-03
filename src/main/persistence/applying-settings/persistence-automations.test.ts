@@ -209,10 +209,6 @@ describe('Store', () => {
     expect(existing.setupDecision).toBeUndefined()
 
     const skipped = store.updateAutomation(newPerRun.id, { setupDecision: 'skip' })
-    const reloaded = await createStore()
-    expect(reloaded.listAutomations().find((row) => row.id === newPerRun.id)?.setupDecision).toBe(
-      'skip'
-    )
     const switchedToExisting = store.updateAutomation(newPerRun.id, {
       workspaceMode: 'existing',
       workspaceId: 'wt1'

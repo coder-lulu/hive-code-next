@@ -6,8 +6,7 @@ import {
   type AcpCompactionFrame
 } from './acp-compaction-turn'
 import type { AcpDialect, AcpTurnEnding } from './acp-dialects/acp-dialect'
-import type { AcpTurnFailures } from './acp-turn-failures'
-import { hookOutcomeRowBody } from '../../shared/agent-session/journal/agent-session-hook-outcome'
+import { hookOutcomeRowBody } from '../../shared/agent-session-hook-outcome'
 import type { SessionUpdate } from './generated/acp-protocol.generated'
 
 export type AcpPromptTurn = {
@@ -73,11 +72,7 @@ export class AcpPromptTurns {
     return prompt !== undefined && absorbAcpCompactionFrame(prompt, extension, update)
   }
 
-  endCompaction(
-    turn: string,
-    ending: AcpTurnEnding,
-    failures: Pick<AcpTurnFailures, 'write'>
-  ): ProviderTimelineEvent[] | undefined {
+  endCompaction(turn: string, ending: AcpTurnEnding): ProviderTimelineEvent[] | undefined {
     const prompt = this.compacting(turn)
     if (!prompt?.compaction) {
       return undefined
@@ -85,7 +80,6 @@ export class AcpPromptTurns {
     return acpCompactionEnd({
       ...prompt,
       ...ending,
-      failures,
       compaction: prompt.compaction,
       thread: this.sessionId,
       dialect: this.dialect,

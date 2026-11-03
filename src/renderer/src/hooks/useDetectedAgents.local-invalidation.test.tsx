@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { EVERY_AGENT_CHAT } from '../../../shared/native-chat/every-agent-chat.test-fixture'
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
@@ -17,7 +16,7 @@ import {
 } from '@/runtime/host-structured-agents'
 import { setLocalRuntimeCapabilitiesForTests } from '@/runtime/local-runtime-capabilities'
 import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultSettings } from '../../../shared/constants'
-import { STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY } from '../../../shared/agent-session/structured-agent-session-surface-capabilities'
+import { STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
 import type { Project } from '../../../shared/project-types'
 import { useDetectedAgents, type AgentDetectionTarget } from './useDetectedAgents'
 
@@ -150,7 +149,7 @@ it('recovers mounted native consumers after availability changes alongside WSL l
   }
   const settings = {
     ...getDefaultSettings('/home/test'),
-    nativeChatProviders: EVERY_AGENT_CHAT,
+    experimentalNativeChat: true,
     localWindowsRuntimeDefault: { kind: 'windows-host' } as const
   }
   useAppStore.setState({

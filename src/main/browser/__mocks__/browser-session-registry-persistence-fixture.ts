@@ -152,6 +152,9 @@ export function installModuleMocks(
       userAgent: CLEAN_USER_AGENT
     })
   }))
+  vi.doMock('../../persistence', () => ({
+    getCanonicalUserDataPath: () => USER_DATA
+  }))
   vi.doMock('../../persistence/loading-store/user-data-path', () => ({
     getCanonicalUserDataPath: () => USER_DATA
   }))

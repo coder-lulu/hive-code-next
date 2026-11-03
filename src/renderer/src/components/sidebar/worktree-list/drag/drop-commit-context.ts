@@ -29,8 +29,7 @@ export type ShouldShowWorkspaceBoardDropIndicator = (
 export type WorktreeReorderArgs = {
   groups: readonly WorktreeDragGroup[]
   sourceGroupKey: string
-  /** Host identities, as the sidebar's drag groups key their members. */
-  draggedKeys: readonly string[]
+  draggedIds: readonly string[]
   dropIndex: number
   draggedCopies?: DraggedWorktreeCopies
 }

@@ -1,12 +1,4 @@
-import {
-  useLayoutEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  useCallback,
-  type KeyboardEvent,
-  type ReactElement
-} from 'react'
+import { useLayoutEffect, useRef, useState, type KeyboardEvent, type ReactElement } from 'react'
 import { flushSync } from 'react-dom'
 import { ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -14,18 +6,10 @@ import { Separator } from '@/components/ui/separator'
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { translate } from '@/i18n/i18n'
 import { AgentLaunchSetupPanel } from './AgentLaunchSetupPanel'
-import {
-  agentPickerDraft,
-  type AgentPickerDraft,
-  type AgentPickerEntry
-} from '../../../../shared/agent-launch-picker'
+import type { AgentPickerDraft, AgentPickerEntry } from '../../../../shared/agent-launch-picker'
 
-import { agentLaunchPromptScopeKey } from './AgentLaunchPromptComposer'
-import { readLaunchSetupOptions } from '../native-chat/native-chat-launch-draft-source'
-import {
-  subscribeToNativeChatComposerDraft,
-  writeLaunchSetupOptions
-} from '../native-chat/native-chat-composer-draft-store'
+// The menu and its popovers unmount on dismissal; authored setups live for this app session.
+const sessionDrafts = new Map<string, AgentPickerDraft>()
 
 function setupKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
   if (event.key === 'Enter' || event.key === ' ') {
@@ -62,25 +46,11 @@ export function AgentLaunchSetupButton({
   open?: boolean
   replacedByAnotherSetup?: boolean
   onOpenChange?: (open: boolean) => void
-  onUse: (draft: AgentPickerDraft) => boolean | void | Promise<boolean>
+  onUse: (draft: AgentPickerDraft) => void
 }) {
-  const draftKey = agentLaunchPromptScopeKey(entry)
+  const draftKey = JSON.stringify([entry.ownerKey, entry.agent, initial])
   const [localOpen, setOpen] = useState(false)
   const open = controlledOpen ?? localOpen
-  // Only the open panel reads options, so a closed row holds no subscription.
-  const subscribe = useCallback(
-    (listener: () => void) =>
-      open ? subscribeToNativeChatComposerDraft(draftKey, listener) : () => {},
-    [draftKey, open]
-  )
-  // Each search preset keeps its own options slot, keyed by what the search parsed (never by
-  // defaults, which can change between renders); the plain row is the empty slot.
-  const slot = initial ? JSON.stringify(initial.choices) : ''
-  const retained = useSyncExternalStore(subscribe, () => readLaunchSetupOptions(draftKey, slot))
-  const authored = retained ?? initial ?? agentPickerDraft(entry)
-  const draft =
-    authored.arguments === undefined ? authored : { ...authored, argumentsOwner: entry.ownerKey }
-
   const closeFocus = useRef({ open, restore: true })
   useLayoutEffect(() => {
     if (closeFocus.current.open && !open) {
@@ -174,17 +144,10 @@ export function AgentLaunchSetupButton({
         aria-label={translate('agentPicker.configure', 'Configure {{agent}}', {
           agent: entry.label
         })}
-        // Why: base popovers sit below menus (z-60), so this menu-launched panel would render under the menu's shadow; sharing the menu layer stacks it by open order, like a submenu.
-        className="z-[70] flex w-104 min-w-64 max-w-(--radix-popover-content-available-width) max-h-(--radix-popover-content-available-height) flex-col"
+        className="flex w-104 min-w-64 max-w-(--radix-popover-content-available-width) max-h-(--radix-popover-content-available-height) flex-col"
         onClick={(event) => event.stopPropagation()}
         // Hovering another menu row moves focus there; only a click outside or Escape closes the panel.
         onFocusOutside={(event) => event.preventDefault()}
-        // The prompt's open / or @ menu takes Escape first.
-        onEscapeKeyDown={(event) => {
-          if (content.current?.querySelector('[contenteditable][aria-expanded="true"]')) {
-            event.preventDefault()
-          }
-        }}
         onCloseAutoFocus={(event) => {
           if (!closeFocus.current.restore) {
             event.preventDefault()
@@ -193,17 +156,14 @@ export function AgentLaunchSetupButton({
       >
         <div className="min-h-0 overflow-y-auto scrollbar-sleek">
           <AgentLaunchSetupPanel
-            key={`${draftKey}${slot}`}
+            key={draftKey}
             entry={entry}
-            value={draft}
+            initial={sessionDrafts.get(draftKey) ?? initial}
             disabled={disabled}
-            onDraftChange={(draft) => writeLaunchSetupOptions(draftKey, draft, slot)}
+            onDraftChange={(draft) => sessionDrafts.set(draftKey, draft)}
             onUse={(draft) => {
-              const accepted = onUse(draft)
-              if (accepted !== false) {
-                changeOpen(false)
-              }
-              return accepted
+              onUse(draft)
+              changeOpen(false)
             }}
           />
         </div>

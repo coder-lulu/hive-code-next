@@ -1,38 +1,49 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-native', () => ({
-  StyleSheet: {
-    hairlineWidth: 1,
-    create: <T>(styles: T) => styles
-  }
+  Platform: { select: (choices: Record<string, unknown>) => choices.default },
+  StyleSheet: { hairlineWidth: 1, create: <T>(styles: T) => styles }
 }))
 
-import { darkTheme, lightTheme } from '../theme/mobile-theme'
-import { createAgentHistoryStyles } from './agent-history-styles'
+import { styles } from './agent-history-styles'
+import {
+  applyMobileColorScheme,
+  paletteForScheme,
+  radii,
+  spacing,
+  typography
+} from '../theme/mobile-theme'
 
-describe('Agent history Graphite presentation', () => {
-  it.each([lightTheme, darkTheme])('uses the $scheme semantic theme', (theme) => {
-    const styles = createAgentHistoryStyles(theme)
+afterEach(() => applyMobileColorScheme('dark'))
 
-    expect(styles.container.backgroundColor).toBe(theme.color.bg.canvas)
-    expect(styles.card).toMatchObject({
-      backgroundColor: theme.color.bg.surface,
-      borderColor: theme.color.border.subtle,
-      borderRadius: theme.radii.card
+describe('Agent history live presentation', () => {
+  it.each(['light', 'dark', 'light'] as const)(
+    'uses the %s palette without rebuilding the import',
+    (scheme) => {
+      applyMobileColorScheme(scheme)
+      const palette = paletteForScheme(scheme)
+      expect(styles.container.backgroundColor).toBe(palette.bgBase)
+      expect(styles.card).toMatchObject({
+        backgroundColor: palette.bgPanel,
+        borderRadius: radii.card,
+        padding: spacing.md
+      })
+      expect(styles.scopeTabActive.backgroundColor).toBe(palette.bgRaised)
+      expect(styles.scopeTabTextActive.color).toBe(palette.textPrimary)
+      expect(styles.currentBadge.backgroundColor).toBe(palette.bgRaised)
+    }
+  )
+
+  it('keeps compact history controls padded and resume affordances sized', () => {
+    expect(styles.backButton.padding).toBe(spacing.xs)
+    expect(styles.refreshButton.padding).toBe(spacing.xs)
+    expect(styles.scopeTab.paddingVertical).toBe(spacing.sm)
+    expect(styles.resumeButton).toMatchObject({
+      minHeight: 28,
+      minWidth: 28,
+      paddingVertical: spacing.xs
     })
-    expect(styles.scopeTabActive.backgroundColor).toBe(theme.color.bg.selected)
-    expect(styles.scopeTabTextActive.color).toBe(theme.color.text.inverse)
-    expect(styles.currentBadge.backgroundColor).toBe(theme.color.brand.subtle)
-  })
-
-  it('keeps primary controls at the shared minimum touch target', () => {
-    const styles = createAgentHistoryStyles(lightTheme)
-
-    expect(styles.backButton.width).toBe(lightTheme.size.minimumTouchTarget)
-    expect(styles.refreshButton.width).toBe(lightTheme.size.minimumTouchTarget)
-    expect(styles.scopeTab.minHeight).toBe(lightTheme.size.minimumTouchTarget)
-    expect(styles.searchInput.minHeight).toBe(lightTheme.size.minimumTouchTarget)
-    expect(styles.resumeButton.minHeight).toBe(lightTheme.size.minimumTouchTarget)
-    expect(styles.retryButton.minHeight).toBe(lightTheme.size.minimumTouchTarget)
+    expect(styles.retryButton.paddingVertical).toBe(spacing.sm)
+    expect(styles.cardTitle.fontSize).toBe(typography.bodySize)
   })
 })

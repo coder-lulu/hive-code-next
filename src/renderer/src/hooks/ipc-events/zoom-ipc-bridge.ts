@@ -1,17 +1,13 @@
 import { writeNativeChatFontSize } from '@/components/native-chat/native-chat-font-size-write'
 import { applyUIZoom } from '@/lib/ui-zoom'
 import { computeEditorFontSize, nextEditorFontZoomLevel } from '@/lib/editor-font-zoom'
-import { resolveEditorBaseFontSize } from '@/lib/editor-typography'
 import { zoomLevelToPercent } from '@/components/settings/SettingsConstants'
 import { dispatchZoomLevelChanged } from '@/lib/zoom-events'
 import { stepUIZoomLevel } from '../../../../shared/ui-zoom-level'
 import { useAppStore } from '../../store'
 import { focusedBrowserPageId, resolveZoomTarget } from '../resolve-zoom-target'
 import { dispatchBrowserPageZoom } from '@/components/browser-pane/host-guest/browser-page-zoom'
-import {
-  requestFrontDialogViewerZoom,
-  requestViewerZoom
-} from '@/components/editor/viewer-zoom-request'
+import { requestViewerZoom } from '@/components/editor/viewer-zoom-request'
 
 export function registerZoomIpcBridge(unsubs: (() => void)[]): void {
   unsubs.push(
@@ -49,15 +45,11 @@ export function registerZoomIpcBridge(unsubs: (() => void)[]): void {
         setEditorFontZoomLevel(next)
         void window.api.ui.set({ editorFontZoomLevel: next })
 
-        // Why: mirror the editor's base font + clamping so the overlay percent matches the rendered size.
-        const baseFontSize = resolveEditorBaseFontSize(settings)
+        // Why: mirror the editor's base font (terminalFontSize) + clamping so the overlay percent matches the rendered size.
+        const baseFontSize = settings?.terminalFontSize ?? 13
         const actual = computeEditorFontSize(baseFontSize, next)
         const percent = Math.round((actual / baseFontSize) * 100)
         dispatchZoomLevelChanged('editor', percent)
-        return
-      }
-      // Why: viewer dialogs are portaled outside every pane, so only the editor branch above reached them.
-      if (requestFrontDialogViewerZoom(direction)) {
         return
       }
 

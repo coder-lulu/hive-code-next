@@ -1,17 +1,10 @@
 import { useMemo, type ReactNode } from 'react'
-import { ActivityIndicator, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { ChevronLeft } from 'lucide-react-native'
 import { colors } from '../theme/mobile-theme'
 import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import { useBackClaim } from '../navigation/use-back-claim'
-import {
-  BottomDrawer,
-  OptionPager,
-  useOptionPager,
-  type OptionPagerControls
-} from '../components/bottom-drawer/BottomDrawer'
-import { NavBarButton } from '../components/nav-bar/NavBarButton'
-import { SheetHeader } from '../components/nav-bar/SheetHeader'
+import { BottomDrawer } from '../components/BottomDrawer'
 import {
   LOCAL_EXECUTION_HOST_ID,
   parseExecutionHostId,
@@ -29,8 +22,8 @@ import { resolveWorktreeHostId } from '../worktree/worktree-host-context-labels'
 import { withServerHosts } from '../worktree/server-workspaces'
 import { hostScreenStyles as styles } from './host-screen-styles'
 import type { HostScreenController } from './use-host-screen-controller'
-import { ListGroup, SectionHeader } from '../components/list/ListGroup'
-import { DrillRow } from './workspace-option-rows'
+import { DrillRow, OptionRowList } from './workspace-option-rows'
+import { OptionPager, useOptionPager, type OptionPagerControls } from './workspace-options-pager'
 import {
   WORKSPACE_OPTION_CONTROLS,
   type WorkspaceOptionHost,
@@ -131,11 +124,7 @@ export function WorkspaceOptionsSheet({ controller }: { controller: HostScreenCo
       onAfterClose={pager.forget}
       scrollResetKey={pager.page}
     >
-      <WorkspaceOptionsContent
-        controller={controller}
-        pager={pager}
-        onDone={() => state.setShowWorkspaceOptions(false)}
-      />
+      <WorkspaceOptionsContent controller={controller} pager={pager} />
     </BottomDrawer>
   )
 }
@@ -162,12 +151,10 @@ function WorkspaceOptionsPending({ settings }: Pick<HostScreenController, 'setti
 // Its own component so the host list is built only while the sheet is open.
 function WorkspaceOptionsContent({
   controller,
-  pager,
-  onDone
+  pager
 }: {
   controller: HostScreenController
   pager: OptionPagerControls<WorkspaceViewOptionKey>
-  onDone: () => void
 }) {
   const t = useMobileTranslation()
   useMobileColorScheme()
@@ -203,46 +190,53 @@ function WorkspaceOptionsContent({
         }
       : null
   )
-  const title = t('hostScreen.workspaceOptionsSheet.workspaceOptions', 'Workspace options')
-  const done = { label: t('hostScreen.workspaceOptionsSheet.done', 'Done'), onPress: onDone }
   const page =
     pageOption && pageControl?.kind === 'page' ? (
       <>
-        <View>
-          <SheetHeader title={pageOption.label} trailing={done} />
-          <View style={styles.optionPageBack}>
-            <NavBarButton
-              icon={ChevronLeft}
-              accessibilityLabel={t(
-                'hostScreen.workspaceOptionsSheet.backToOptions',
-                'Back to Workspace options'
-              )}
-              onPress={pager.close}
-            />
-          </View>
-        </View>
+        <Pressable
+          style={styles.optionBack}
+          onPress={pager.close}
+          accessibilityRole="button"
+          accessibilityLabel={t(
+            'hostScreen.workspaceOptionsSheet.backToOptions',
+            'Back to Workspace options'
+          )}
+        >
+          <ChevronLeft size={16} color={colors.textSecondary} />
+          <Text style={styles.optionBackText}>
+            {t('hostScreen.workspaceOptionsSheet.workspaceOptions', 'Workspace options')}
+          </Text>
+        </Pressable>
+        <Text style={[styles.filterModalTitle, styles.optionPageTitle]}>{pageOption.label}</Text>
         <pageControl.Page controller={controller} hosts={hosts} label={pageOption.label} />
       </>
     ) : null
 
   const main = (
     <>
-      <SheetHeader
-        title={title}
-        subtitle={t(
-          'hostScreen.workspaceOptionsSheet.syncedAcrossDevices',
-          'Synced across your devices'
+      <View style={styles.filterModalHeader}>
+        <View style={styles.filterModalHeading}>
+          <Text style={styles.filterModalTitle}>
+            {t('hostScreen.workspaceOptionsSheet.workspaceOptions', 'Workspace options')}
+          </Text>
+          <Text style={styles.filterModalSubtitle}>
+            {t(
+              'hostScreen.workspaceOptionsSheet.syncedAcrossDevices',
+              'Synced across your devices'
+            )}
+          </Text>
+          <WorkspaceOptionsPending settings={settings} />
+        </View>
+        {controller.activeFilterCount > 0 && (
+          <Pressable onPress={settings.clearFilters}>
+            <Text style={styles.clearFiltersText}>
+              {t('hostScreen.workspaceOptionsSheet.clearFilters', 'Clear filters')}
+            </Text>
+          </Pressable>
         )}
-        leading={{
-          label: t('hostScreen.workspaceOptionsSheet.reset', 'Reset'),
-          onPress: settings.clearFilters,
-          disabled: controller.activeFilterCount === 0
-        }}
-        trailing={done}
-      />
-      <WorkspaceOptionsPending settings={settings} />
+      </View>
 
-      {sections.map(({ section, options }, index) => {
+      {sections.map(({ section, options }) => {
         const sectionLabel = sectionLabels[section]
         const bareRows: ReactNode[] = []
         const framedRows: ReactNode[] = []
@@ -265,14 +259,12 @@ function WorkspaceOptionsContent({
         }
         return (
           <View key={section} testID={`workspace-option-section-${section}`}>
-            {sectionLabel ? (
-              <SectionHeader title={sectionLabel} first={index === 0} />
-            ) : (
-              <View style={styles.optionSectionGap} />
-            )}
+            {sectionLabel && <Text style={styles.filterSectionLabel}>{sectionLabel}</Text>}
             {bareRows}
             {framedRows.length > 0 && (
-              <ListGroup style={styles.optionGroup}>{framedRows}</ListGroup>
+              <View style={styles.filterGroup}>
+                <OptionRowList>{framedRows}</OptionRowList>
+              </View>
             )}
           </View>
         )

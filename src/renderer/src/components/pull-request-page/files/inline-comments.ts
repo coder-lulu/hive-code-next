@@ -1,7 +1,6 @@
 import type { DecoratedDiffComment } from '@/components/diff-comments/decorated-diff-comment'
 import { formatRelativeTime } from '@/components/github/work-item-state-presentation'
 import type { PRComment } from '../../../../../shared/github/comment-types'
-import { getPRInlineCommentPlacement } from '../../../../../shared/github/pr-inline-comment-placement'
 
 export function buildInlineReviewComments(
   comments: PRComment[],
@@ -9,8 +8,8 @@ export function buildInlineReviewComments(
   prNumber: number
 ): DecoratedDiffComment[] {
   return comments.flatMap((comment): DecoratedDiffComment[] => {
-    const placement = getPRInlineCommentPlacement(comment)
-    if (!placement) {
+    // Why: outdated threads keep originalLine for the sidebar, but rendering it inline can attach the comment to unrelated current code.
+    if (comment.isOutdated || !comment.path || typeof comment.line !== 'number') {
       return []
     }
     const createdAtMs = new Date(comment.createdAt).getTime()
@@ -18,10 +17,10 @@ export function buildInlineReviewComments(
       {
         id: `github-pr-comment:${comment.id}`,
         worktreeId: `github-pr:${repoId}:${prNumber}`,
-        filePath: placement.path,
+        filePath: comment.path,
         source: 'diff',
-        startLine: placement.startLine,
-        lineNumber: placement.line,
+        startLine: comment.startLine,
+        lineNumber: comment.line,
         body: comment.body,
         createdAt: Number.isFinite(createdAtMs) ? createdAtMs : Date.now(),
         side: 'modified',

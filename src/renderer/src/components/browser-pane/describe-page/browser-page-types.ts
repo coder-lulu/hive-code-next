@@ -24,12 +24,7 @@ export type BrowserPageUrlSetter = (
   options?: { preserveLoadError?: boolean }
 ) => void
 
-/** 'owned-target' panes answer only chords from their own overlay; '-focused' marks the one in the focused split. */
-export type BrowserChromeShortcutScope =
-  | 'focused'
-  | 'inactive'
-  | 'owned-target'
-  | 'owned-target-focused'
+export type BrowserChromeShortcutScope = 'focused' | 'inactive' | 'owned-target'
 
 export type { GrabIntent } from '../../../../../shared/browser-grab-types'
 

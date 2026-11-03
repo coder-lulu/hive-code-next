@@ -1,6 +1,6 @@
-import type { OrcaRuntimeWithResolveExitWaiters as ResolveExitWaitersMethods } from '../terminal/wait/terminal-wait-settlements'
 import type { OrcaRuntimeWithHasTerminalsForWorktree as HasTerminalsForWorktreeMethods } from './session-graph-reload-lifecycle'
 import type { OrcaRuntimeWithBindPtyIncarnationHandle as BindPtyIncarnationHandleMethods } from '../terminal/identity/terminal-handle-bindings'
+import type { OrcaRuntimeWithResolveExitWaiters as ResolveExitWaitersMethods } from '../terminal/wait/terminal-wait-settlements'
 import type { OrcaRuntimeWithCollectMobileVisibleGraphChangedWorktrees as CollectMobileVisibleGraphChangedWorktreesMethods } from '../session-tabs/session-tabs-inventory'
 import type { OrcaRuntimeWithGetPtyRecordForPaneKey as GetPtyRecordForPaneKeyMethods } from '../orchestration/terminal-pane-mail-routing'
 import type { OrcaRuntimeWithResolveWaiter as ResolveWaiterMethods } from '../orca-runtime-resolve-waiter'
@@ -68,6 +68,10 @@ export abstract class OrcaRuntimeWithAttachWindow extends OrcaRuntimeWithNotifyS
     ...args: Parameters<BindPtyIncarnationHandleMethods['adoptPreAllocatedHandle']>
   ): ReturnType<BindPtyIncarnationHandleMethods['adoptPreAllocatedHandle']>
 
+  protected abstract checkDeliverySettledAndArmRecheck(
+    ...args: Parameters<ResolveExitWaitersMethods['checkDeliverySettledAndArmRecheck']>
+  ): ReturnType<ResolveExitWaitersMethods['checkDeliverySettledAndArmRecheck']>
+
   protected abstract collectMobileVisibleGraphChangedWorktrees(
     ...args: Parameters<
       CollectMobileVisibleGraphChangedWorktreesMethods['collectMobileVisibleGraphChangedWorktrees']
@@ -76,13 +80,20 @@ export abstract class OrcaRuntimeWithAttachWindow extends OrcaRuntimeWithNotifyS
     CollectMobileVisibleGraphChangedWorktreesMethods['collectMobileVisibleGraphChangedWorktrees']
   >
 
-  protected abstract deliverPendingMessagesForPty(
-    ...args: Parameters<ResolveExitWaitersMethods['deliverPendingMessagesForPty']>
-  ): ReturnType<ResolveExitWaitersMethods['deliverPendingMessagesForPty']>
+  protected abstract deliverPendingMessagesForLeaf(
+    ...args: Parameters<GetPtyRecordForPaneKeyMethods['deliverPendingMessagesForLeaf']>
+  ): ReturnType<GetPtyRecordForPaneKeyMethods['deliverPendingMessagesForLeaf']>
 
   protected abstract getLeafKey(
     ...args: Parameters<ResolveWaiterMethods['getLeafKey']>
   ): ReturnType<ResolveWaiterMethods['getLeafKey']>
+
+  abstract isPtyStopRequested(
+    ...args: Parameters<MarkPtyLivenessUnverifiableMethods['isPtyStopRequested']>
+  ): ReturnType<MarkPtyLivenessUnverifiableMethods['isPtyStopRequested']>
+  protected abstract retainUnmountedPublishedPtyHandle(
+    ...args: Parameters<BindPtyIncarnationHandleMethods['retainUnmountedPublishedPtyHandle']>
+  ): ReturnType<BindPtyIncarnationHandleMethods['retainUnmountedPublishedPtyHandle']>
 
   abstract getPtyLivenessVerdict(
     ...args: Parameters<MarkPtyLivenessUnverifiableMethods['getPtyLivenessVerdict']>

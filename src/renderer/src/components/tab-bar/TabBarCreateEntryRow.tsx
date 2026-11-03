@@ -57,7 +57,7 @@ export function EntryActionRow({
   id: string
   labelOverride?: string
   loading?: boolean
-  onUseAgent?: (draft: AgentPickerDraft) => boolean | void | Promise<boolean>
+  onUseAgent?: (draft: AgentPickerDraft) => void
   onClick: () => void
   option: ActiveOption
   selected: boolean

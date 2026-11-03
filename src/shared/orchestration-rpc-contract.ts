@@ -40,8 +40,7 @@ const ORCHESTRATION_MUTATION_METHODS = new Set([
   'orchestration.federationAck',
   'orchestration.federationImport',
   'orchestration.federationStop',
-  'orchestration.federationRelease',
-  'orchestration.federationRetain'
+  'orchestration.federationRelease'
 ])
 
 const RETIRED_ORCHESTRATION_METHODS = new Set(['orchestration.run', 'orchestration.runStop'])

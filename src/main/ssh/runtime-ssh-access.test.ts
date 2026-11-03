@@ -1,3 +1,4 @@
+import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -125,10 +126,10 @@ describe('independent runtime SSH access coordinator', () => {
       events.push('verify')
       return {
         verifiedRuntimeId: 'runtime',
-        verifiedConnection: {
+        verifiedConnection: pairedRuntimeConnectionFromOffer({
           ...pairing,
           endpoint: 'ws://127.0.0.1:41000'
-        },
+        }),
         runtimeStatus: {}
       }
     })
@@ -312,7 +313,7 @@ describe('independent runtime SSH access coordinator', () => {
         }
         return {
           verifiedRuntimeId: 'runtime',
-          verifiedConnection: pairing
+          verifiedConnection: pairedRuntimeConnectionFromOffer(pairing)
         }
       })
       await expect(linkRuntimeSshAccess(userDataPath, request())).rejects.toThrow('changed')

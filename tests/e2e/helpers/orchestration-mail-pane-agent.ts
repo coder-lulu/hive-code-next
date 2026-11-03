@@ -94,10 +94,8 @@ export type MailPaneAgent = {
   titleEmitCount: () => number
 }
 
-export type MailPaneAgentOptions = {
+type MailPaneAgentOptions = {
   titleOnStdin?: { needle: string; title: string }
-  /** Agent CLI the script is named after (default codex); null models an unrecognized program. */
-  executable?: 'codex' | 'cursor-agent' | null
 }
 
 // Clean up at worker exit: reused spec workers can still be polling another file’s agent ledger.
@@ -112,9 +110,7 @@ process.once('exit', () => {
 export function createMailPaneAgent(options: MailPaneAgentOptions = {}): MailPaneAgent {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-mail-agent-'))
   agentDirs.push(dir)
-  // Named like an npm shim (`node …/bin/codex`) so launch and foreground identity recognize the agent.
-  const { executable = 'codex' } = options
-  const scriptPath = path.join(dir, executable ?? 'program.cjs')
+  const scriptPath = path.join(dir, 'agent.cjs')
   const ledgerPath = path.join(dir, 'ledger.jsonl')
   const controlPath = path.join(dir, 'title')
   writeFileSync(scriptPath, AGENT_SOURCE)

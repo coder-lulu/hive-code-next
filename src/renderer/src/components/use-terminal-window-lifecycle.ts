@@ -3,27 +3,13 @@ import { useAppStore } from '../store'
 import { isIntentionalAppRestartInProgress } from '@/lib/updater-beforeunload'
 import { preventUnloadAndScheduleShutdownCheckpointReset } from '@/lib/shutdown-checkpoint-guard'
 import { setWindowCloseRequestHandler } from './window-close-request-coordinator'
-import { runAfterEditorFramesFlush } from './editor/editor-pending-flush'
 import {
   collectBrowserWebviewIds,
   destroyWebviewsRemovedFromStore
 } from '../store/slices/browser-webview-cleanup'
 import type { TerminalActivationController } from './use-terminal-activation-actions'
 
-export function useTerminalWindowLifecycle(
-  controller: Pick<
-    TerminalActivationController,
-    | 'activeBrowserTabId'
-    | 'activeTabType'
-    | 'activeWorktreeBrowserTabIdsKey'
-    | 'proceedToNativeWindowClose'
-    | 'queueEditorCloseRequests'
-    | 'renderedActiveWorktreeId'
-    | 'setActiveBrowserTab'
-    | 'setActiveTabType'
-    | 'windowCloseAfterDirtyRef'
-  >
-): void {
+export function useTerminalWindowLifecycle(controller: TerminalActivationController): void {
   const {
     activeBrowserTabId,
     activeTabType,
@@ -58,30 +44,15 @@ export function useTerminalWindowLifecycle(
       if (windowCloseAfterDirtyRef.current) {
         return
       }
-      const state = useAppStore.getState()
-      // Claimed before the flush so repeat requests are ignored; a cancel clears it and voids this one.
-      const pendingClose = { isQuitting }
-      windowCloseAfterDirtyRef.current = pendingClose
-      // Why: a custom editor frame may still hold debounced edits the dirty check must see.
-      runAfterEditorFramesFlush(
-        state,
-        state.openFiles.map((file) => file.id),
-        () => {
-          if (windowCloseAfterDirtyRef.current !== pendingClose) {
-            return
-          }
-          const dirtyFiles = useAppStore.getState().openFiles.filter((file) => file.isDirty)
-          if (dirtyFiles.length > 0) {
-            queueEditorCloseRequests(
-              dirtyFiles.map((file) => file.id),
-              pendingClose
-            )
-            return
-          }
-          windowCloseAfterDirtyRef.current = null
-          proceedToNativeWindowClose(isQuitting)
-        }
-      )
+      const dirtyFiles = useAppStore.getState().openFiles.filter((file) => file.isDirty)
+      if (dirtyFiles.length > 0) {
+        queueEditorCloseRequests(
+          dirtyFiles.map((file) => file.id),
+          { isQuitting }
+        )
+        return
+      }
+      proceedToNativeWindowClose(isQuitting)
     })
     return () => setWindowCloseRequestHandler(null)
   }, [proceedToNativeWindowClose, queueEditorCloseRequests, windowCloseAfterDirtyRef])

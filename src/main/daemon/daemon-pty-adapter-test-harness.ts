@@ -8,7 +8,6 @@ import { DaemonServer } from './daemon-server'
 import { getDaemonSocketPath } from './daemon-spawner'
 import type { SubprocessHandle } from './session-subprocess-handle'
 import type { DaemonFileLog } from './daemon-file-log'
-import type { TerminalExitCause } from '../../shared/terminal-exit-cause'
 
 export type SpawnSubprocess = ConstructorParameters<typeof DaemonServer>[0]['spawnSubprocess']
 
@@ -32,10 +31,10 @@ export function createMockSubprocess(dataOnSubscribe?: string): SubprocessHandle
   resume: ReturnType<typeof vi.fn<() => void>>
   confirmShellForeground: ReturnType<typeof vi.fn<() => Promise<boolean>>>
   _simulateData: (data: string) => void
-  _simulateExit: (code: number, cause?: TerminalExitCause) => void
+  _simulateExit: (code: number) => void
 } {
   let onDataCb: ((data: string) => void) | null = null
-  let onExitCb: ((code: number, cause?: TerminalExitCause) => void) | null = null
+  let onExitCb: ((code: number) => void) | null = null
   return {
     // getCwd falls back to OS lookup; keep the fake PID outside the real process range.
     pid: 999_999_999,
@@ -64,8 +63,8 @@ export function createMockSubprocess(dataOnSubscribe?: string): SubprocessHandle
     _simulateData(data: string) {
       onDataCb?.(data)
     },
-    _simulateExit(code: number, cause?: TerminalExitCause) {
-      onExitCb?.(code, cause)
+    _simulateExit(code: number) {
+      onExitCb?.(code)
     }
   }
 }

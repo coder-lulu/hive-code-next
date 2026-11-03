@@ -13,7 +13,7 @@ export type ManagedRuntimeInstallView = {
   error: string | null
   action: ManagedRuntimeInstallAction | null
   menuAction: ManagedRuntimeInstallAction | null
-  /** Settings draws this action as a button instead of inline text. */
+  /** The action is the first step to using the agent, so Settings draws it as a button. */
   prominent: boolean
   /** Settings may offer to delete the copy Orca installed: one is there and nothing runs. */
   removable: boolean
@@ -121,10 +121,7 @@ function settledView(state: ManagedRuntimeInstallState, agent: string): ManagedR
       : state.available
         ? reinstall
         : null
-    const status = translate('components.managed-runtime.installed', 'Installed')
-    return state.installedCurrent
-      ? view(status, null, null, label)
-      : { ...view(status, label), prominent: true }
+    return view(translate('components.managed-runtime.installed', 'Installed'), null, null, label)
   }
   if (!state.available) {
     return view(

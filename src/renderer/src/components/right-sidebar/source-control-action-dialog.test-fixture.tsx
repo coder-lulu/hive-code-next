@@ -1,4 +1,3 @@
-import { EVERY_AGENT_CHAT } from '../../../../shared/native-chat/every-agent-chat.test-fixture'
 import { terminalSessionOptionInputs } from '../../../../shared/tui-agent-launch-command'
 import { buildAgentStartupPlan } from '../../../../shared/tui-agent-startup'
 import { resolveSourceControlActionRecipe } from '../../../../shared/source-control-ai-operation-policy'
@@ -8,6 +7,7 @@ import {
   type SourceControlAgentActionDialogProps
 } from './SourceControlAgentActionDialog'
 import type { RunSourceControlAgentActionStartArgs } from './runSourceControlAgentActionStart'
+import type { SourceControlActionRecipe } from '../../../../shared/source-control-ai-actions'
 import type { Repo } from '../../../../shared/repo-types'
 import { normalizeRepoSourceControlAiOverrides } from '../../../../shared/source-control-ai'
 import { saveSourceControlAiActionRecipeForTarget } from './source-control/ai/recipe-persistence'
@@ -19,11 +19,8 @@ import { AGENT_LAUNCH_SURFACE_RUNTIME_CAPABILITY as SURFACE } from '../../../../
 import {
   STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY as CLIENT,
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY as CHAT
-} from '../../../../shared/agent-session/agent-session-runtime-capabilities'
-import {
-  type SourceControlActionRecipe,
-  normalizeSourceControlActionRecipe
-} from '../../../../shared/source-control-ai-actions'
+} from '../../../../shared/protocol-version'
+import { normalizeSourceControlActionRecipe } from '../../../../shared/source-control-ai-actions'
 import { useSourceControlAgentActionDialog } from './useSourceControlAgentActionDialog'
 import {
   render,
@@ -68,7 +65,7 @@ export function mountSourceDialog(
   const settings = {
     ...getDefaultSettings('/tmp/fc1-action'),
     defaultTuiAgent: 'claude' as const,
-    nativeChatProviders: EVERY_AGENT_CHAT,
+    experimentalNativeChat: true,
     agentPermissionDefault: 'own' as const
   }
   settings.sourceControlAi!.actions = { resolveConflicts: global }
@@ -153,7 +150,7 @@ export function renderDialog(
   )!.launchPreferences!
   settings.sourceControlAi!.actions = { resolveConflicts: { agentId: null, launchPreferences } }
   useAppStore.setState({
-    settings: { ...settings, nativeChatProviders: chat ? EVERY_AGENT_CHAT : {} },
+    settings: { ...settings, nativeChatProviders: { claude: chat, codex: chat } },
     detectedAgentIds: ['claude', 'codex'],
     localDetectedAgentIdsByContext: { host: ['claude', 'codex'] }
   })

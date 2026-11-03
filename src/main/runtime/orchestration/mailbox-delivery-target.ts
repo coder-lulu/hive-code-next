@@ -1,11 +1,9 @@
 import type { OrchestrationDb } from './db'
-import type { OrchestrationMailboxTerminal } from './mailbox-owner'
+import type { OrchestrationMailboxLeaf } from './mailbox-owner'
 
 type OrchestrationMailboxDeliveryTargetDependencies = {
   getDb: () => OrchestrationDb | null
-  /** The terminal now in the pane, keyed by its PTY, so a replaced or unlisted PTY is still reached. */
-  getMailboxTerminalForPaneKey: (paneKey: string) => OrchestrationMailboxTerminal | null
-  getTerminalForHandle: (handle: string) => OrchestrationMailboxTerminal | null
+  getTerminalHandleForPaneKey: (paneKey: string) => string | null
   hasTerminalHandle: (handle: string) => boolean
   /** A structured worker or a chat has no PTY handle; its own lane delivers, so this must not claim it. */
   isStructuredSessionOwner: (handle: string) => boolean
@@ -15,13 +13,13 @@ type OrchestrationMailboxDeliveryTargetDependencies = {
 }
 
 export class OrchestrationMailboxDeliveryTarget {
-  private readonly probeDeferredMailboxes = new Map<string, Set<string>>()
+  private readonly probeDeferredPtyIds = new Set<string>()
 
   constructor(private readonly deps: OrchestrationMailboxDeliveryTargetDependencies) {}
 
-  resolveTerminal(handle: string): OrchestrationMailboxTerminal | null {
+  resolveTerminalHandle(handle: string): string | null {
     if (this.deps.hasTerminalHandle(handle)) {
-      return this.deps.getTerminalForHandle(handle)
+      return handle
     }
     if (this.deps.isStructuredSessionOwner(handle)) {
       return null
@@ -32,18 +30,12 @@ export class OrchestrationMailboxDeliveryTarget {
     const dispatch = dispatchId ? db?.getDispatchContextById?.(dispatchId) : undefined
     const remote =
       dispatchId && !dispatch ? db?.getRemoteDispatchAttachment?.(dispatchId) : undefined
-    const run = runId ? db?.getRun(runId) : undefined
-    // Runs bind their coordinator by pane; the stored handle is stale once that pane's PTY is replaced.
-    const paneKey = run
-      ? run.coordinator_pane_key
-      : (dispatch?.assignee_pane_key ?? remote?.pane_key)
-    const paneTerminal = paneKey ? this.deps.getMailboxTerminalForPaneKey(paneKey) : null
-    if (paneTerminal) {
-      return paneTerminal
-    }
-    const ownerHandle = run
-      ? run.coordinator_handle
-      : (dispatch?.assignee_handle ?? remote?.terminal_handle)
+    const paneKey = dispatch?.assignee_pane_key ?? remote?.pane_key
+    const ownerHandle = runId
+      ? db?.getRun(runId)?.coordinator_handle
+      : ((paneKey ? this.deps.getTerminalHandleForPaneKey(paneKey) : null) ??
+        dispatch?.assignee_handle ??
+        remote?.terminal_handle)
     if (!ownerHandle) {
       return null
     }
@@ -58,41 +50,37 @@ export class OrchestrationMailboxDeliveryTarget {
       })
       return null
     }
-    return this.deps.getTerminalForHandle(ownerHandle)
+    return ownerHandle
   }
 
   deferForAbsenceProbe(
-    ptyId: string,
+    leaf: OrchestrationMailboxLeaf,
     mailboxHandle: string,
     skipAbsenceProbe: boolean | undefined,
-    redeliver: (mailboxHandle: string) => void
+    redeliver: (leaf: OrchestrationMailboxLeaf, ptyId: string, mailboxHandle: string) => void
   ): boolean {
+    const ptyId = leaf.ptyId
     if (
+      !ptyId ||
       skipAbsenceProbe ||
       !this.deps.canProbePtyLiveness() ||
       this.deps.controllerKnowsPtyIsLive(ptyId)
     ) {
       return false
     }
-    // A coordinator of several Runs can defer one mailbox per Run on the same probe.
-    const deferred = this.probeDeferredMailboxes.get(ptyId)
-    if (deferred) {
-      deferred.add(mailboxHandle)
+    if (this.probeDeferredPtyIds.has(ptyId)) {
       return true
     }
-    const mailboxes = new Set([mailboxHandle])
-    this.probeDeferredMailboxes.set(ptyId, mailboxes)
+    this.probeDeferredPtyIds.add(ptyId)
     void this.deps
       .isLeafPtyProvenAbsent(ptyId)
       .then((absent) => {
-        this.probeDeferredMailboxes.delete(ptyId)
-        if (!absent) {
-          for (const deferredMailbox of mailboxes) {
-            setTimeout(() => redeliver(deferredMailbox), 0)
-          }
+        this.probeDeferredPtyIds.delete(ptyId)
+        if (!absent && leaf.ptyId === ptyId) {
+          setTimeout(() => redeliver(leaf, ptyId, mailboxHandle), 0)
         }
       })
-      .catch(() => this.probeDeferredMailboxes.delete(ptyId))
+      .catch(() => this.probeDeferredPtyIds.delete(ptyId))
     return true
   }
 }

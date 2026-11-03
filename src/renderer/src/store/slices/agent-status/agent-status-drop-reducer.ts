@@ -17,7 +17,6 @@ export type AgentStatusTabPrefixDropState = Pick<
   | 'acknowledgedAgentsByPaneKey'
   | 'activityClearedAtByPaneKey'
   | 'agentLaunchConfigByPaneKey'
-  | 'agentConversationsByPaneKey'
   | 'agentStatusByPaneKey'
   | 'agentStatusEpoch'
   | 'migrationUnsupportedByPtyId'
@@ -76,15 +75,6 @@ export function buildAgentStatusTabPrefixDropPatch(
     const nextClosedTabs = opts?.paneKeys
       ? s.recentlyClosedAgentStatusTabIds
       : boundRecentlyClosedAgentStatusTabIds(s.recentlyClosedAgentStatusTabIds, tabIdPrefix)
-    const nextConversations = opts?.preserveActivityClearedState
-      ? s.agentConversationsByPaneKey
-      : opts?.paneKeys
-        ? removePaneKeys(s.agentConversationsByPaneKey, opts.paneKeys)
-        : removePaneKeysByTabPrefix(
-            s.agentConversationsByPaneKey,
-            tabIdPrefix,
-            new Set([...completedOrphanKeys, ...retiredAliasPaneKeys])
-          )
     const nextRetiredPaneKeys = boundRecentlyRetiredAgentStatusPaneKeys(
       s.recentlyRetiredAgentStatusPaneKeys,
       closedAgentStatusRetirementKeys(
@@ -127,13 +117,11 @@ export function buildAgentStatusTabPrefixDropPatch(
           ...(nextManualUnread !== s.manuallyUnreadTurnsByPaneKey
             ? { manuallyUnreadTurnsByPaneKey: nextManualUnread }
             : {}),
-          agentConversationsByPaneKey: nextConversations,
           recentlyClosedAgentStatusTabIds: nextClosedTabs,
           recentlyRetiredAgentStatusPaneKeys: nextRetiredPaneKeys
         }
       }
       return {
-        agentConversationsByPaneKey: nextConversations,
         recentlyClosedAgentStatusTabIds: nextClosedTabs,
         recentlyRetiredAgentStatusPaneKeys: nextRetiredPaneKeys,
         ...(nextClearedAt !== s.activityClearedAtByPaneKey
@@ -179,7 +167,6 @@ export function buildAgentStatusTabPrefixDropPatch(
 
     return {
       agentStatusByPaneKey: nextLive,
-      agentConversationsByPaneKey: nextConversations,
       agentLaunchConfigByPaneKey: nextLaunchConfigs,
       retainedAgentsByPaneKey: nextRetained,
       migrationUnsupportedByPtyId: migrationUnsupported.next,

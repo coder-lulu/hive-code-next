@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { act, useRef, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import { Terminal } from '@xterm/xterm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HostSectionRow } from '../../../../../../shared/sidebar-list/host-section-rows'
@@ -10,7 +11,6 @@ import { getShortcutPlatform } from '@/lib/shortcut-platform'
 
 const state = {
   keybindings: undefined,
-  revealWorktreeInSidebar: vi.fn(),
   activeView: 'terminal',
   activeTabType: 'terminal',
   activeWorktreeId: 'a',
@@ -60,7 +60,11 @@ let modal = 'none'
 function Probe() {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [activeId, setActiveId] = useState(state.activeWorktreeId)
-
+  const virtualizer = useVirtualizer<HTMLDivElement, HTMLDivElement>({
+    count: rows.length,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 30
+  })
   activate.mockImplementation((id: string) => {
     state.activeWorktreeId = id
     state.activeTabId = `tab-${id}`
@@ -69,9 +73,11 @@ function Probe() {
   })
   const { handleContainerKeyDown } = useWorktreeListKeyboardNavigation({
     rows,
+    renderRows: rows,
     activeWorktreeId: activeId,
     activeWorkspaceExecutionHostId: 'ssh:fixture',
     pinnedDisplayPolicy: 'single-location',
+    virtualizer,
     scrollRef,
     activeModal: modal,
     markDirectScrollInput: () => {}

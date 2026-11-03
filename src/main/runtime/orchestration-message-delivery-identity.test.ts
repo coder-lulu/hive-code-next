@@ -112,8 +112,9 @@ function createRuntime(
 
 async function driveToLiveIdle(runtime: OrcaRuntimeService): Promise<void> {
   await runtime.listTerminals()
-  runtime.onPtyData(PTY_ID, '\x1b]0;Codex done\x07', 1)
-  // Await the model's write chain so the chunk is parsed.
+  runtime.onPtyData(PTY_ID, '\x1b]0;Codex working\x07', 1)
+  runtime.onPtyData(PTY_ID, '\x1b]0;Codex done\x07', 2)
+  // Await the model's write chain so both chunks are parsed.
   await runtime.serializeMainTerminalBuffer(PTY_ID)
 }
 
@@ -151,9 +152,7 @@ async function runBuiltCli(
   userDataPath: string,
   args: string[]
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
-  // These tests read the full receipt, not the concise agent view.
-  const fullArgs = args[0] === 'orchestration' ? [...args, '--full'] : args
-  const child = spawn(process.execPath, [CLI_PATH, ...fullArgs], {
+  const child = spawn(process.execPath, [CLI_PATH, ...args], {
     env: {
       ...process.env,
       ORCA_USER_DATA_PATH: userDataPath,
@@ -219,32 +218,37 @@ describe('STA-4325 message and delivery identity', () => {
     })
 
     await driveToLiveIdle(runtime)
+    const [first, concurrent] = await Promise.all([check(runtime), check(runtime)])
     const expectedIds = [status.id, dispatch.id, done.id]
+
+    expect(pointerPayloads(write)).toEqual([expect.stringContaining('3 orchestration messages')])
+    expect(first).toMatchObject({ runId: run.id, count: 3, replayed: false })
+    expect(concurrent).toMatchObject({ runId: run.id, count: 3, replayed: true })
+    expect(first.deliveryId).toBeTruthy()
+    expect(concurrent.deliveryId).toBe(first.deliveryId)
+    expect(first.messages.map((message) => message.id)).toEqual(expectedIds)
+    expect(concurrent.messages.map((message) => message.id)).toEqual(expectedIds)
+
     const peeked = await check(runtime, { peek: true, unread: false })
     const filtered = await check(runtime, { peek: true, unread: false, types: 'worker_done' })
+    const all = await check(runtime, { all: true })
     expect(peeked.messages.map((message) => message.id)).toEqual(
       expect.arrayContaining(expectedIds)
     )
     expect(peeked.count).toBe(3)
     expect(filtered.messages.map((message) => message.id)).toEqual([done.id])
+    expect(all.messages.map((message) => message.id)).toEqual(expect.arrayContaining(expectedIds))
+    expect(all.count).toBe(3)
+
+    const deliveryRowsBeforeAck = sqliteFor(db)
+      .prepare('SELECT id, status, message_ids FROM deliveries ORDER BY rowid')
+      .all() as { id: string; status: string; message_ids: string }[]
+    expect(deliveryRowsBeforeAck).toEqual([
+      { id: first.deliveryId, status: 'outstanding', message_ids: JSON.stringify(expectedIds) }
+    ])
     for (const id of expectedIds) {
       expect(db.getMessageById(id)).toMatchObject({ to_handle: `run:${run.id}`, read: 0 })
     }
-
-    const [first, concurrent] = await Promise.all([check(runtime), check(runtime)])
-    expect(pointerPayloads(write)).toEqual([expect.stringContaining('3 orchestration messages')])
-    expect(first).toMatchObject({ runId: run.id, count: 3, replayed: false })
-    expect(concurrent).toMatchObject({ runId: run.id, count: 0, deliveryId: null })
-    expect(first.deliveryId).toBeTruthy()
-    expect(first.messages.map((message) => message.id)).toEqual(expectedIds)
-    const all = await check(runtime, { all: true })
-    expect(all.messages.map((message) => message.id)).toEqual(expect.arrayContaining(expectedIds))
-    expect(all.count).toBe(3)
-    expect(
-      sqliteFor(db).prepare('SELECT id, status, message_ids FROM deliveries ORDER BY rowid').all()
-    ).toEqual([
-      { id: first.deliveryId, status: 'acknowledged', message_ids: JSON.stringify(expectedIds) }
-    ])
 
     const acknowledged = await check(runtime, { ack: first.deliveryId })
     expect(acknowledged).toMatchObject({
@@ -267,7 +271,7 @@ describe('STA-4325 message and delivery identity', () => {
     db.close()
   })
 
-  it('keeps a handled Delivery handled across restart and wakes a filtered waiter once', async () => {
+  it('replays one outstanding Delivery across restart and wakes a filtered waiter once', async () => {
     vi.useFakeTimers()
     const fixture = createDatabase('orca-sta-4325-restart-')
     const firstRuntime = createRuntime(fixture.db)
@@ -293,11 +297,16 @@ describe('STA-4325 message and delivery identity', () => {
     const restarted = createRuntime(reopened, REMINTED_TERMINAL_HANDLE)
     await driveToLiveIdle(restarted.runtime)
     const afterRestart = await check(restarted.runtime, { terminal: REMINTED_TERMINAL_HANDLE })
-    expect(afterRestart).toMatchObject({ deliveryId: null, count: 0 })
+    expect(afterRestart).toMatchObject({ deliveryId: beforeRestart.deliveryId, replayed: true })
+    expect(afterRestart.messages.map((message) => message.id)).toEqual([status.id])
     expect(sqliteFor(reopened).prepare('SELECT id FROM deliveries').all()).toEqual([
       { id: beforeRestart.deliveryId }
     ])
 
+    await check(restarted.runtime, {
+      terminal: REMINTED_TERMINAL_HANDLE,
+      ack: afterRestart.deliveryId
+    })
     const waiting = check(restarted.runtime, {
       terminal: REMINTED_TERMINAL_HANDLE,
       wait: true,
@@ -365,13 +374,8 @@ describe('STA-4325 message and delivery identity', () => {
     expect(plan.map((row) => row.detail).join(' ')).toMatch(
       /SEARCH messages USING INDEX (idx_messages_delivery_contract|idx_messages_unread_current_inbox)/
     )
-    const replacement = fixture.db.createRun({
+    fixture.db.createRun({
       objective: 'Replacement coordinator',
-      coordinatorHandle: TERMINAL_HANDLE,
-      coordinatorPaneKey: PANE_KEY
-    })
-    fixture.db.bindRun({
-      runId: replacement.id,
       coordinatorHandle: TERMINAL_HANDLE,
       coordinatorPaneKey: PANE_KEY
     })
@@ -481,26 +485,26 @@ describe('STA-4325 message and delivery identity', () => {
           0
         )
         const firstPayload = JSON.parse(first.stdout) as { result: CheckResult }
-        expect(firstPayload.result).toMatchObject({
-          runId: run.id,
-          count: 2,
-          replayed: false,
-          deliveryAcknowledged: true
-        })
+        expect(firstPayload.result).toMatchObject({ runId: run.id, count: 2, replayed: false })
         expect(firstPayload.result.messages.map((message) => message.id)).toEqual([
           status.id,
           done.id
         ])
 
-        const next = await runBuiltCli(userDataPath, ['orchestration', 'check', '--json'])
-        expect(next.exitCode, next.stderr).toBe(0)
-        expect(JSON.parse(next.stdout)).toMatchObject({ result: { count: 0, deliveryId: null } })
+        const replay = await runBuiltCli(userDataPath, ['orchestration', 'check', '--json'])
+        expect(replay.exitCode, replay.stderr).toBe(0)
+        const replayPayload = JSON.parse(replay.stdout) as { result: CheckResult }
+        expect(replayPayload.result).toMatchObject({
+          count: 2,
+          deliveryId: firstPayload.result.deliveryId,
+          replayed: true
+        })
         expect(sqliteFor(db).prepare('SELECT id, status FROM deliveries').all()).toEqual([
-          { id: firstPayload.result.deliveryId, status: 'acknowledged' }
+          { id: firstPayload.result.deliveryId, status: 'outstanding' }
         ])
         expect(db.getMessageById(status.id)).toMatchObject({
           to_handle: `run:${run.id}`,
-          read: 1
+          read: 0
         })
 
         const acknowledged = await runBuiltCli(userDataPath, [

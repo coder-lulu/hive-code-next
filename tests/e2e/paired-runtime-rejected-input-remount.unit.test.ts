@@ -291,7 +291,6 @@ describe('host-rejected paired-runtime input reaches a pane remount', () => {
     mockStoreState = {
       activeWorktreeId: 'wt-1',
       activeWorkspaceExecutionHostId: `runtime:${ENVIRONMENT_ID}`,
-      unifiedTabsByWorktree: {},
       tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: REMOTE_PTY_ID }] },
       ptyIdsByTabId: { 'tab-1': [REMOTE_PTY_ID] },
       terminalLayoutsByTabId: {

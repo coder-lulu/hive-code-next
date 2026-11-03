@@ -6,7 +6,6 @@ import { MESSAGE_TYPES } from '../../../orchestration/types'
 import { OrchestrationError } from '../../../orchestration/orchestration-error'
 import { LEGACY_CONTRACT_VERSION } from '../../../orchestration/db'
 import { isDispatchMutationMessageType, parseMessageTaskId } from './schemas'
-import { federatedMessageNamesOnlyHome } from '../../../orchestration/dispatch-report-mailbox'
 
 export function parseMessageTypes(rawTypes: string | undefined): MessageType[] | undefined {
   const types = rawTypes
@@ -186,7 +185,9 @@ export function rejectFederatedExplicitTarget(
   params: { to?: string; run?: string },
   homeRunId: string
 ): void {
-  if (!federatedMessageNamesOnlyHome(params, homeRunId)) {
+  const namesOnlyHome =
+    (!params.to || params.to === `run:${homeRunId}`) && (!params.run || params.run === homeRunId)
+  if (!namesOnlyHome) {
     throw new OrchestrationError(
       'invalid_argument',
       'Federated Dispatch messages route to their Run home; omit --to and --run.'

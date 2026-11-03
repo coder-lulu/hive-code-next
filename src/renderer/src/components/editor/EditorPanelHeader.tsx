@@ -7,8 +7,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import EditorViewToggle, {
   CSV_VIEW_MODE_METADATA,
   CUSTOM_EDITOR_SOURCE_METADATA,
-  NOTEBOOK_VIEW_MODE_METADATA,
-  SVG_VIEW_MODE_METADATA
+  NOTEBOOK_VIEW_MODE_METADATA
 } from './EditorViewToggle'
 import type { CustomEditorToggleValue, EditorToggleValue } from './EditorViewToggle'
 import type { EditorHeaderOpenFileState } from './editor-header'
@@ -34,7 +33,6 @@ type EditorPanelHeaderProps = {
   isMarkdown: boolean
   isCsv: boolean
   isNotebook: boolean
-  isSvg?: boolean
   /** Titles of the file's plugin editors, by toggle value; empty when none apply. */
   customEditorTitles?: Readonly<Record<CustomEditorToggleValue, string>>
   hasEditorToggle: boolean
@@ -71,7 +69,6 @@ export function EditorPanelHeader({
   isMarkdown,
   isCsv,
   isNotebook,
-  isSvg = false,
   customEditorTitles = NO_CUSTOM_EDITOR_TITLES,
   hasEditorToggle,
   availableEditorToggleModes,
@@ -98,10 +95,7 @@ export function EditorPanelHeader({
   onExportMarkdownToPdf,
   createArtifactRequest
 }: EditorPanelHeaderProps): React.JSX.Element {
-  const { owner: commentOwner, comments: diffComments } = useVisibleWorktreeDiffComments(
-    activeFile.worktreeId,
-    activeFile
-  )
+  const { comments: diffComments } = useVisibleWorktreeDiffComments(activeFile.worktreeId)
   const activeGroupId = useAppStore((s) => s.activeGroupIdByWorktree[activeFile.worktreeId])
   const diffWordWrap = useAppStore((s) => s.settings?.diffWordWrap === true)
   const diffShowWhitespace = useAppStore((s) => s.settings?.diffShowWhitespace === true)
@@ -187,7 +181,6 @@ export function EditorPanelHeader({
       )}
       {isSingleDiff && fileDiffComments.length > 0 && (
         <DiffNotesSendMenu
-          owner={commentOwner}
           worktreeId={activeFile.worktreeId}
           groupId={activeGroupId ?? activeFile.worktreeId}
           comments={diffComments}
@@ -287,11 +280,9 @@ export function EditorPanelHeader({
               ? CSV_VIEW_MODE_METADATA
               : isNotebook
                 ? NOTEBOOK_VIEW_MODE_METADATA
-                : isSvg
-                  ? SVG_VIEW_MODE_METADATA
-                  : Object.keys(customEditorTitles).length > 0
-                    ? CUSTOM_EDITOR_SOURCE_METADATA
-                    : undefined
+                : Object.keys(customEditorTitles).length > 0
+                  ? CUSTOM_EDITOR_SOURCE_METADATA
+                  : undefined
           }
           customEditorTitles={customEditorTitles}
         />

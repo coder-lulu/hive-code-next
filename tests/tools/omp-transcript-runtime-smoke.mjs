@@ -6,8 +6,10 @@ import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { getPiAgentStatusExtensionSource } from '../../src/main/pi/agent-status-extension-source.ts'
-import { extractAgentProviderSession } from '../../src/shared/agent-session/lifecycle/agent-session-resume'
-import { getAgentResumeArgv } from '../../src/shared/agent-resume-argv'
+import {
+  extractAgentProviderSession,
+  getAgentResumeArgv
+} from '../../src/shared/agent-session-resume.ts'
 import { readNativeChatTranscript } from '../../src/main/native-chat/transcript-reader.ts'
 
 const reference = process.argv[2]

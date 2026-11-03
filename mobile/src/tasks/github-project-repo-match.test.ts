@@ -75,17 +75,11 @@ describe('GitHub project repo matching', () => {
     ).toBeNull()
   })
 
-  it('keeps draft and restricted items while filtering repository-backed rows', () => {
+  it('filters project rows to rows backed by open repositories', () => {
     const rows = [
-      { id: 'row-1', itemType: 'ISSUE', content: { repository: 'stablyai/orca' } },
-      { id: 'row-2', itemType: 'ISSUE', content: { repository: 'other/missing' } },
-      { id: 'row-3', itemType: 'REDACTED', content: { repository: null } },
-      { id: 'row-4', itemType: 'ISSUE', content: { repository: null } },
-      ...Array.from({ length: 67 }, (_, index) => ({
-        id: `draft-${index}`,
-        itemType: 'DRAFT_ISSUE',
-        content: { repository: null }
-      }))
+      { id: 'row-1', content: { repository: 'stablyai/orca' } },
+      { id: 'row-2', content: { repository: 'other/missing' } },
+      { id: 'row-3', content: { repository: null } }
     ]
 
     expect(
@@ -95,7 +89,7 @@ describe('GitHub project repo matching', () => {
           repository: { owner: 'stablyai', repo: 'orca' }
         }
       }).map((row) => row.id)
-    ).toEqual(['row-1', 'row-3', ...Array.from({ length: 67 }, (_, index) => `draft-${index}`)])
+    ).toEqual(['row-1'])
   })
 
   it('matches same-named repositories only on the active Project host', () => {

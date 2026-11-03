@@ -1,19 +1,21 @@
 import {
   refuse,
+  type AgentSessionRefusalReason,
   type AgentSessionWireRefusal
-} from '../../../shared/agent-session/failures/agent-session-wire-refusals'
-import type { AgentSessionRefusalReason } from '../../../shared/agent-session/failures/agent-session-refusal-details'
+} from '../../../shared/agent-session-wire-refusals'
 import type {
   AgentJournalCursor,
-  AgentJournalItemIdentity
-} from '../../../shared/agent-session/journal/agent-session-journal-identity'
-import type { AgentJournalThreadGoal } from '../../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentSessionMutationEnvelope } from '../../../shared/agent-session/agent-session-wire'
-import type { AgentSessionOptionsResult } from '../../../shared/agent-session/options/agent-session-options-result'
+  AgentJournalItemIdentity,
+  AgentJournalThreadGoal
+} from '../../../shared/agent-session-journal-types'
+import type {
+  AgentSessionMutationEnvelope,
+  AgentSessionOptionsResult
+} from '../../../shared/agent-session-wire'
 import type {
   AgentSessionThreadGoalChange,
   AgentSessionThreadGoalResult
-} from '../../../shared/agent-session/agent-session-thread-goal-wire'
+} from '../../../shared/agent-session-thread-goal-wire'
 import type { StructuredAgentSessionAdapter } from './structured-agent-session-adapter'
 import type { StructuredAgentRegistry } from './structured-agent-registry'
 import type { MutationPlan } from './structured-agent-session-mutation-plans'

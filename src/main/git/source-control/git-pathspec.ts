@@ -45,15 +45,10 @@ function finishedCommandLineLength(
 ): number {
   // Include config that Windows-checkout routing may add after chunking.
   const budgetArgs = options.wslDistro ? [...WINDOWS_CHECKOUT_GIT_CONFIG_ARGS, ...args] : [...args]
-  // Measure the longer fenced form that buffered login-shell reads spawn.
-  const resolved = resolveGitCommandWithoutProbe(
-    budgetArgs,
-    {
-      cwd: worktreePath,
-      ...(options.wslDistro ? { wslDistro: options.wslDistro } : {})
-    },
-    true
-  )
+  const resolved = resolveGitCommandWithoutProbe(budgetArgs, {
+    cwd: worktreePath,
+    ...(options.wslDistro ? { wslDistro: options.wslDistro } : {})
+  })
   return commandLineLength([resolved.binary, ...resolved.args])
 }
 

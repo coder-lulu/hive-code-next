@@ -30,8 +30,5 @@ export function openUncommittedEntry(
     )
     return
   }
-  state.openDiff(worktreeId, filePath, entry.path, language, entry.area === 'staged', {
-    ...options,
-    ...(entry.area === 'staged' && entry.status === 'renamed' ? { oldPath: entry.oldPath } : {})
-  })
+  state.openDiff(worktreeId, filePath, entry.path, language, entry.area === 'staged', options)
 }

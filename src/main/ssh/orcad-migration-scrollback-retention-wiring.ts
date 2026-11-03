@@ -1,4 +1,4 @@
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import {
   listOrcadMigrationSourceCutovers,
   setOrcadMigrationJournalChangeListener

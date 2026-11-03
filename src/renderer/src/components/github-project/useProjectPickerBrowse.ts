@@ -54,10 +54,7 @@ export function useProjectPickerBrowse(
     setBrowseProjects([])
     setPartialFailures([])
     try {
-      const result = await listAccessibleProjectsForRuntime(settings, browseHost, {
-        // Browsing follows the user opening the picker.
-        wake: true
-      })
+      const result = await listAccessibleProjectsForRuntime(settings, browseHost)
       if (result.ok) {
         rememberProjectPickerBrowseCacheEntry(cacheKey, {
           projects: result.projects,

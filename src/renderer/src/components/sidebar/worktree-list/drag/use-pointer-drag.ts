@@ -22,11 +22,7 @@ import { useWorktreePointerDragAutoscroll } from './use-pointer-autoscroll'
 import { useWorktreePointerDragWindowEvents } from './use-pointer-window-events'
 import { flushWorktreePointerDragFrame } from './pointer-flush'
 import { EMPTY_WORKTREE_DRAG_PREVIEW_OFFSETS, type WorktreePointerDrag } from './row-state'
-import {
-  draggedWorktreeCopiesOf,
-  uniqueDraggedIds,
-  uniqueDraggedKeys
-} from './dragged-worktree-copies'
+import { draggedWorktreeCopiesOf, uniqueDraggedIds } from './dragged-worktree-copies'
 
 export function useWorktreePointerDrag(args: {
   ctx: WorktreeDropCommitContext
@@ -125,20 +121,19 @@ export function useWorktreePointerDrag(args: {
       suppressWorktreeClickUntilRef.current = window.performance.now() + 500
       setSidebarPointerDragDocumentStyles(true)
       session.worktreeDragSessionRef.current = {
-        draggingWorktreeId: drag.worktreeKey,
+        draggingWorktreeId: drag.worktreeId,
         sourceGroupKey: drag.sourceGroupKey,
         draggedIds: drag.draggedIds,
         draggedCopies: drag.draggedCopies,
         reorderDraggedIds: drag.reorderDraggedIds,
-        reorderDraggedKeys: drag.reorderDraggedKeys,
-        reorderUnitDraggedKeys: drag.reorderUnitDraggedKeys,
+        reorderUnitDraggedIds: drag.reorderUnitDraggedIds,
         rects: drag.rects,
         // Hit-test the floating card’s visual offset rather than the raw pointer.
         grab: getWorktreeSidebarDragGrab({ offsetY, height }),
         anchor: null
       }
       setWorktreeDragState({
-        draggingWorktreeId: drag.worktreeKey,
+        draggingWorktreeId: drag.worktreeId,
         sourceGroupKey: drag.sourceGroupKey,
         lineageDropTargetId: null,
         dropIndex: null,
@@ -192,10 +187,9 @@ export function useWorktreePointerDrag(args: {
       const draggedIds = draggedCopies.map((copy) => copy.id)
       const reorderDraggedCopies = session.getReorderDraggedCopies(draggedCopies)
       const reorderDraggedIds = uniqueDraggedIds(reorderDraggedCopies)
-      const reorderDraggedKeys = uniqueDraggedKeys(reorderDraggedCopies)
-      const reorderUnitDraggedKeys = session.getReorderUnitDraggedKeys(
+      const reorderUnitDraggedIds = session.getReorderUnitDraggedIds(
         sourceGroupKey,
-        reorderDraggedKeys
+        reorderDraggedIds
       )
       worktreePointerDragRef.current = {
         pointerId: event.pointerId,
@@ -205,12 +199,10 @@ export function useWorktreePointerDrag(args: {
         currentX: event.clientX,
         currentY: event.clientY,
         worktreeId,
-        worktreeKey: getWorktreeHostIdentity(worktree),
         draggedIds,
         draggedCopies: reorderDraggedCopies,
         reorderDraggedIds,
-        reorderDraggedKeys,
-        reorderUnitDraggedKeys,
+        reorderUnitDraggedIds,
         sourceGroupKey,
         rects,
         active: false,

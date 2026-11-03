@@ -114,7 +114,7 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
           })
           const state = useAppStore.getState()
           if (projectGroupId !== undefined) {
-            const moved = await state.moveProjectToGroup(repo.id, projectGroupId)
+            const moved = await state.moveProjectToGroup(repo, projectGroupId)
             if (!moved) {
               console.warn('Failed to associate added folder with its originating space', {
                 repoId: repo.id,
@@ -131,7 +131,7 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
           )
           if (folderWorktree) {
             // SSH adds can bypass addNonGitFolder after onboarding dismissal; resolve the default agent here too.
-            const launch = await resolveDismissedOnboardingFolderAgentLaunch({
+            const launch = resolveDismissedOnboardingFolderAgentLaunch({
               worktreeId: folderWorktree.id,
               store: useAppStore.getState(),
               onboarding: onboardingBeforeAdd,

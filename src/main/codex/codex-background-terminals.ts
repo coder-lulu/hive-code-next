@@ -3,7 +3,7 @@ import { isCodexAppServerRequestError } from './app-server/codex-app-server-requ
 import {
   CodexAppServerTimeoutError,
   isCodexAppServerUnsupportedError
-} from './app-server/codex-app-server-session'
+} from './codex-app-server-session'
 import type { CodexTerminalStopSupport } from './codex-background-task-tracker'
 import { readRecord } from './codex-item-field-readers'
 import type {

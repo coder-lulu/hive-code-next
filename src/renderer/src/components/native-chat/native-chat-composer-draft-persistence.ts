@@ -2,18 +2,15 @@
 
 import { basename } from '@/lib/path'
 import { isNativeChatKeptPastePath } from './native-chat-image-paste'
-import { isNativeChatPastedImagePath } from '../../../../shared/native-chat/native-chat-image-label'
-import { isAgentSessionAttachmentStorePath } from '../../../../shared/agent-session/agent-session-attachments'
+import { isNativeChatPastedImagePath } from '../../../../shared/native-chat-image-label'
+import { isAgentSessionAttachmentStorePath } from '../../../../shared/agent-session-attachments'
 import {
   dirtyScopes,
-  deferredRemovals,
-  isNativeChatSetupDraft,
   hasLocalChange,
   load,
   nextSavedAt,
   notifyScope,
   records,
-  installNativeChatDraftRecord,
   refusedScopes,
   unconfirmed,
   reconcileRestoredImageChecks,
@@ -42,19 +39,6 @@ const inFlight = new Set<Promise<boolean>>()
 // Per scope, the writes not yet settled: each resolves true once committed, false when refused.
 const scopeWrites = new Map<string, Set<Promise<boolean>>>()
 let channel: BroadcastChannel | null = null
-
-function completeDeferredRemovals(destinationScope: string, savedAt: number): void {
-  let released = false
-  for (const [sourceScope, pending] of deferredRemovals) {
-    if (pending.destinationScope === destinationScope && savedAt >= pending.savedAt) {
-      deferredRemovals.delete(sourceScope)
-      released = true
-    }
-  }
-  if (released) {
-    flushNativeChatComposerDrafts()
-  }
-}
 
 /** An image the draft names but can no longer send, so the user can attach it again. */
 export function unavailableNativeChatComposerDraftImage(
@@ -96,7 +80,6 @@ function confirm(scopeKey: string, change: UnconfirmedDraftChange): void {
   }
   pruneNativeChatComposerDraftJournal(scopeKey, change.at)
   channel?.postMessage({ scopeKey })
-  completeDeferredRemovals(scopeKey, change.at)
 }
 
 function refuse(scopeKey: string, change: UnconfirmedDraftChange, error: unknown): void {
@@ -113,8 +96,7 @@ function refuse(scopeKey: string, change: UnconfirmedDraftChange, error: unknown
 }
 
 function persist(scopeKey: string): void {
-  // A refused deliberate setup removal retries only null, even beside new live input.
-  const record = isNativeChatSetupDraft(scopeKey) ? undefined : records.get(scopeKey)
+  const record = records.get(scopeKey)
   const draft = record ? savedForm(record) : null
   const change: UnconfirmedDraftChange = { draft, at: draft?.savedAt ?? nextSavedAt() }
   unconfirmed.set(scopeKey, change)
@@ -152,9 +134,6 @@ export function flushNativeChatComposerDrafts(): void {
     flushTimer = null
   }
   for (const scopeKey of dirtyScopes) {
-    if (deferredRemovals.has(scopeKey)) {
-      continue
-    }
     dirtyScopes.delete(scopeKey)
     persist(scopeKey)
   }
@@ -208,7 +187,6 @@ function appendBeforeLoad(scopeKey: string, append: DraftAppend): void {
         entry.committed = true
         pruneNativeChatComposerDraftJournal(scopeKey, appendedAt)
         channel?.postMessage({ scopeKey })
-        completeDeferredRemovals(scopeKey, appendedAt)
         return true
       },
       (error: unknown) => {
@@ -233,9 +211,6 @@ export function persistNativeChatComposerDraft(
   append?: DraftAppend
 ): void {
   installFlushOnHide()
-  if (records.has(scopeKey)) {
-    deferredRemovals.delete(scopeKey)
-  }
   if (!load.hydrated && append && !load.editedBeforeLoad.has(scopeKey)) {
     appendBeforeLoad(scopeKey, append)
     return
@@ -275,15 +250,12 @@ function adoptForeignChange(message: unknown): void {
       if (hasLocalChange(scopeKey)) {
         return
       }
-      if (isNativeChatSetupDraft(scopeKey) && value != null) {
-        return
-      }
       const draft = parseStoredNativeChatComposerDraft(value)
       if (draft) {
         reconcileRestoredImageChecks(scopeKey, draft.images, records.get(scopeKey)?.images ?? [])
-        installNativeChatDraftRecord(scopeKey, draft)
+        records.set(scopeKey, draft)
       } else {
-        installNativeChatDraftRecord(scopeKey)
+        records.delete(scopeKey)
         reconcileRestoredImageChecks(scopeKey, [])
       }
       notifyScope(scopeKey)

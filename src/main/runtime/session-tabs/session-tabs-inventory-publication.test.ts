@@ -5,10 +5,7 @@ import { OrcaRuntimeService } from '../orca-runtime'
 class InventoryPublicationRuntime extends OrcaRuntimeService {
   setGraph(status: RuntimeGraphStatus, epoch: number): void {
     this.graphStatus = status
-    if (this.rendererGraphEpoch !== epoch) {
-      this.terminalIdentity.advanceRendererEpoch()
-    }
-    expect(this.rendererGraphEpoch).toBe(epoch)
+    this.rendererGraphEpoch = epoch
   }
 
   get epoch(): number | null {
@@ -79,6 +76,28 @@ describe('session tab inventory publication ownership', () => {
     publication.markSessionTabsInventoryPublished()
     await pending
     expect(publication.getAuthoritativeSessionTabsInventoryEpoch()).toBe(2)
+  })
+
+  it('keeps an unpublished waiter until the reset graph publishes', async () => {
+    const { publication } = inventoryPublication()
+    const pending = publication.waitForSessionTabsInventoryPublication()
+    publication.reset()
+    expect(publication.pendingWaiterCount).toBe(1)
+
+    publication.markSessionTabsInventoryPublished()
+    await pending
+  })
+
+  it('removes an already-aborted waiter before a later publication', async () => {
+    const { publication } = inventoryPublication()
+    const controller = new AbortController()
+    controller.abort()
+
+    await expect(
+      publication.waitForSessionTabsInventoryPublication(controller.signal)
+    ).rejects.toThrow('client_disconnected')
+    expect(publication.pendingWaiterCount).toBe(0)
+    publication.markSessionTabsInventoryPublished()
   })
 
   it('removes a newly-aborted waiter without cancelling another caller', async () => {

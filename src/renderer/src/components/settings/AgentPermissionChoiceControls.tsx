@@ -162,7 +162,6 @@ export function AgentPermissionMenu({
   label,
   permission,
   inheritLabel,
-  onOpenChange,
   disabled,
   size = 'xs',
   layout = 'inline',
@@ -173,7 +172,6 @@ export function AgentPermissionMenu({
   label: string
   permission: AgentPermissionChoiceRow
   inheritLabel?: string
-  onOpenChange?: (open: boolean) => void
   disabled?: boolean
   size?: 'xs' | 'sm'
   /** Row: muted label left and the menu right, like the chat composer's option rows. */
@@ -208,7 +206,7 @@ export function AgentPermissionMenu({
           {translate('settings.agents.rowPermissions', 'Permissions')}
         </span>
       )}
-      <DropdownMenu onOpenChange={onOpenChange}>
+      <DropdownMenu>
         <DropdownMenuTrigger asChild disabled={disabled}>
           <Button
             type="button"

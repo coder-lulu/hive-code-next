@@ -69,12 +69,13 @@ describe('moveProjectToGroup host routing', () => {
       projectGroups: [projectGroup]
     })
 
-    await expect(
-      store.getState().moveProjectToGroup(localRepo.id, projectGroup.id, 4, 'local')
-    ).resolves.toBe(true)
+    await expect(store.getState().moveProjectToGroup(localRepo, projectGroup.id, 4)).resolves.toBe(
+      true
+    )
 
     expect(projectGroupsMoveProject).toHaveBeenCalledWith({
       projectId: localRepo.id,
+      hostId: 'local',
       groupId: projectGroup.id,
       order: 4
     })
@@ -110,17 +111,17 @@ describe('moveProjectToGroup host routing', () => {
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-active' } as never,
       repos: [localTwin, runtimeTwin],
-      projectGroups: [projectGroup]
+      projectGroups: [{ ...projectGroup, executionHostId: 'runtime:env-dragged' }]
     })
 
     await expect(
-      store.getState().moveProjectToGroup('shared-repo', projectGroup.id, 7, 'runtime:env-dragged')
+      store.getState().moveProjectToGroup(runtimeTwin, projectGroup.id, 7)
     ).resolves.toBe(true)
 
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-dragged',
       method: 'projectGroup.moveProject',
-      params: { repo: 'shared-repo', groupId: projectGroup.id, order: 7 },
+      params: { repo: 'shared-repo', groupId: projectGroup.id, order: 7, connectionId: null },
       timeoutMs: 15_000
     })
     expect(projectGroupsMoveProject).not.toHaveBeenCalled()

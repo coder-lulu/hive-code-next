@@ -144,22 +144,6 @@
         }
       }
     },
-    "3f48bd7d1369": {
-      "crash": {
-        "$rpc": "null"
-      },
-      "elements": {
-        "ActivityIndicator": 1,
-        "ChevronLeft": 1,
-        "Pressable": 2,
-        "RefreshCw": 1,
-        "SafeAreaView": 1,
-        "Text": 3,
-        "View": 7
-      },
-      "labels": ["Back", "Refresh agent sessions"],
-      "text": ["Agent Session History", "orca-history", "Loading agent sessions…"]
-    },
     "40fa6811eb00": {
       "name": "streams-registered-at-teardown",
       "ordinal": 10,
@@ -269,34 +253,22 @@
         "startedAt": 0
       }
     },
-    "9ace0f68da61": {
+    "9a4b6a2428eb": {
       "crash": {
         "$rpc": "null"
       },
       "elements": {
         "ChevronLeft": 1,
-        "Defs": 1,
-        "LinearGradient": 1,
         "Pressable": 5,
-        "Rect": 1,
         "RefreshCw": 1,
         "SafeAreaView": 1,
         "Search": 1,
         "SectionList": 1,
-        "Stop": 2,
-        "Svg": 1,
         "Text": 5,
         "TextInput": 1,
-        "View": 13
+        "View": 6
       },
-      "labels": [
-        "Back",
-        "Refresh agent sessions",
-        "Workspace",
-        "Project",
-        "All",
-        "Search sessions, repo:, path:"
-      ],
+      "labels": ["Back", "Refresh agent sessions", "Search sessions, repo:, path:"],
       "text": ["Agent Session History", "orca-history", "Workspace", "Project", "All"]
     },
     "a26eb8ffaa7c": {
@@ -338,6 +310,22 @@
         }
       }
     },
+    "d22bb2f62cea": {
+      "crash": {
+        "$rpc": "null"
+      },
+      "elements": {
+        "ActivityIndicator": 1,
+        "ChevronLeft": 1,
+        "Pressable": 2,
+        "RefreshCw": 1,
+        "SafeAreaView": 1,
+        "Text": 2,
+        "View": 4
+      },
+      "labels": ["Back", "Refresh agent sessions"],
+      "text": ["Agent Session History", "orca-history"]
+    },
     "e28c488ce6b2": {
       "name": "agentSession.subscribeStatus#1",
       "ordinal": 1,
@@ -363,7 +351,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "3f48bd7d1369",
+          "state": "d22bb2f62cea",
           "effects": []
         }
       },
@@ -381,7 +369,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "3f48bd7d1369",
+          "state": "d22bb2f62cea",
           "effects": []
         }
       },
@@ -399,7 +387,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "9ace0f68da61",
+          "state": "9a4b6a2428eb",
           "effects": []
         }
       },
@@ -417,7 +405,7 @@
           "settlements": {
             "mount": "eb79a9b3682a"
           },
-          "state": "9ace0f68da61",
+          "state": "9a4b6a2428eb",
           "effects": ["40fa6811eb00"]
         }
       }

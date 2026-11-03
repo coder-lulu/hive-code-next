@@ -12,7 +12,6 @@ import {
   normalizeHostPart,
   parseExecutionHostId,
   toSshExecutionHostId,
-  toRuntimeExecutionHostId,
   type ExecutionHostId
 } from './execution-host'
 
@@ -24,14 +23,8 @@ export type FolderWorkspaceHostState = {
 
 /** The fields host resolution reads, so a catalog read over the wire resolves the same way. */
 export type FolderHostRepo = {
-  path?: string
+  path: string
   projectGroupId?: string | null
-  connectionId?: string | null
-  executionHostId?: string | null
-}
-
-export type FolderHostWorkspace = Pick<FolderWorkspace, 'id' | 'projectGroupId'> & {
-  folderPath?: string
   connectionId?: string | null
   executionHostId?: string | null
 }
@@ -65,7 +58,7 @@ function getRepoScopeConnectionId(repo: FolderHostRepo): string | null {
 }
 
 function getFolderScopeCandidateRepos<R extends FolderHostRepo>(args: {
-  folderPath?: string
+  folderPath: string
   projectGroupId: string
   connectionId: string | null
   projectGroups: FolderHostCatalog<R>['projectGroups']
@@ -79,7 +72,7 @@ function getFolderScopeCandidateRepos<R extends FolderHostRepo>(args: {
     const projectGroupId = repo.projectGroupId
     if (typeof projectGroupId === 'string' && groupIds.has(projectGroupId)) {
       groupRepos.push(repo)
-    } else if (args.folderPath && repo.path && isPathInsideOrEqual(args.folderPath, repo.path)) {
+    } else if (isPathInsideOrEqual(args.folderPath, repo.path)) {
       pathRepos.push(repo)
     }
   }
@@ -104,22 +97,15 @@ export function findFolderWorkspaceCandidateRepos<R extends FolderHostRepo>(
   state: FolderHostCatalog<R>,
   folderWorkspaceId: string
 ): R[] {
-  const rows = state.folderWorkspaces.filter((entry) => entry.id === folderWorkspaceId)
-  return rows.length === 1 ? candidateReposForFolder(state, rows[0]) : []
-}
-
-function candidateReposForFolder<R extends FolderHostRepo>(
-  state: FolderHostCatalog<R>,
-  workspace: FolderHostWorkspace
-): R[] {
-  const groups = state.projectGroups.filter((entry) => entry.id === workspace.projectGroupId)
-  const connections = new Set(groups.map(getRepoScopeConnectionId))
+  const workspace = state.folderWorkspaces.find((entry) => entry.id === folderWorkspaceId)
+  if (!workspace) {
+    return []
+  }
+  const group = state.projectGroups.find((entry) => entry.id === workspace.projectGroupId)
   return getFolderScopeCandidateRepos({
     folderPath: workspace.folderPath,
     projectGroupId: workspace.projectGroupId,
-    connectionId:
-      normalizeHostPart(workspace.connectionId) ??
-      (connections.size === 1 ? [...connections][0] : null),
+    connectionId: normalizeHostPart(workspace.connectionId ?? group?.connectionId),
     projectGroups: state.projectGroups,
     repos: state.repos
   })
@@ -129,52 +115,37 @@ export function resolveFolderWorkspaceHost<R extends FolderHostRepo>(
   state: FolderHostCatalog<R>,
   folderWorkspaceId: string
 ): FolderWorkspaceHost {
-  const rows = state.folderWorkspaces.filter((entry) => entry.id === folderWorkspaceId)
-  return rows.length === 0
-    ? { kind: 'missing' }
-    : rows.length !== 1
-      ? { kind: 'ambiguous' }
-      : resolveFolderWorkspaceRowHost(state, rows[0])
-}
-
-export function resolveFolderWorkspaceRowHost<R extends FolderHostRepo>(
-  state: FolderHostCatalog<R>,
-  workspace: FolderHostWorkspace
-): FolderWorkspaceHost {
-  const groups = state.projectGroups.filter((entry) => entry.id === workspace.projectGroupId)
-  const groupHosts = new Set(groups.map(getRepoExecutionHostId))
-  const explicitHost =
-    parseExecutionHostId(workspace.executionHostId) ??
-    (!normalizeHostPart(workspace.connectionId) &&
-    groupHosts.size === 1 &&
-    groups.some(
-      (group) =>
-        parseExecutionHostId(group.executionHostId) || normalizeHostPart(group.connectionId)
+  const workspace = state.folderWorkspaces.find((entry) => entry.id === folderWorkspaceId)
+  if (!workspace) {
+    return { kind: 'missing' }
+  }
+  const readScopeConnectionId = (): string | null =>
+    normalizeHostPart(
+      workspace.connectionId ??
+        state.projectGroups.find((entry) => entry.id === workspace.projectGroupId)?.connectionId
     )
-      ? parseExecutionHostId([...groupHosts][0])
-      : null)
-  const scopeConnections = new Set(groups.map(getRepoScopeConnectionId))
-  const scopeConnectionId =
-    normalizeHostPart(workspace.connectionId) ??
-    (scopeConnections.size === 1 ? [...scopeConnections][0] : null)
+  const explicitHost = parseExecutionHostId(workspace.executionHostId)
   switch (explicitHost?.kind) {
     case 'ssh':
       return { kind: 'ssh', targetId: explicitHost.targetId }
-    case 'runtime':
+    case 'runtime': {
+      // Only an unambiguous folder id identifies which host’s nested target is selected.
+      const isOnlyOwner = state.folderWorkspaces.every(
+        (entry) => entry.id !== folderWorkspaceId || entry === workspace
+      )
       return {
         kind: 'runtime',
         environmentId: explicitHost.environmentId,
-        sshTargetId: scopeConnectionId
+        sshTargetId: isOnlyOwner ? readScopeConnectionId() : null
       }
+    }
     case 'local':
       return { kind: 'local' }
     case undefined:
       break
   }
-  if (!normalizeHostPart(workspace.connectionId) && groupHosts.size > 1) {
-    return { kind: 'ambiguous' }
-  }
-  const candidateRepos = candidateReposForFolder(state, workspace)
+  const scopeConnectionId = readScopeConnectionId()
+  const candidateRepos = findFolderWorkspaceCandidateRepos(state, folderWorkspaceId)
   let hasLocalRepo = false
   const connectionIds = new Set<string>()
   for (const repo of candidateRepos) {
@@ -202,121 +173,28 @@ export function resolveFolderWorkspaceRowHost<R extends FolderHostRepo>(
   return { kind: 'ssh', targetId: [...connectionIds][0] }
 }
 
-export { getFolderWorkspaceHostId } from './folder-workspace-host-id'
-
-export type QualifiedFolderHostState<W extends FolderHostWorkspace = FolderHostWorkspace> = {
-  folderWorkspaces?: readonly W[]
-  projectGroups?: readonly (Pick<ProjectGroup, 'id' | 'connectionId' | 'executionHostId'> &
-    Partial<Pick<ProjectGroup, 'parentGroupId'>>)[]
-  repos?: readonly FolderHostRepo[]
-}
-
-export type QualifiedFolderWorkspaceResult<W extends FolderHostWorkspace> =
-  | {
-      kind: 'selected'
-      value: { workspace: W; hostId: ExecutionHostId; connectionId: string | null }
+export function getFolderWorkspaceHostId(
+  workspace: FolderWorkspace,
+  projectGroups: readonly ProjectGroup[]
+): ExecutionHostId {
+  const explicitHostId = parseExecutionHostId(workspace.executionHostId)?.id
+  if (explicitHostId) {
+    return explicitHostId
+  }
+  if (workspace.connectionId) {
+    return toSshExecutionHostId(workspace.connectionId)
+  }
+  let matchingHostId: ExecutionHostId | undefined
+  for (const group of projectGroups) {
+    if (group.id !== workspace.projectGroupId) {
+      continue
     }
-  | { kind: 'ambiguous' }
-  | { kind: 'missing' }
-
-export function resolveQualifiedFolderWorkspaceResult<W extends FolderHostWorkspace>(
-  state: QualifiedFolderHostState<W>,
-  folderWorkspaceId: string,
-  requiredHostId?: ExecutionHostId
-): QualifiedFolderWorkspaceResult<W> {
-  const rows =
-    state.folderWorkspaces?.filter((workspace) => workspace.id === folderWorkspaceId) ?? []
-  let underivable = false
-  const matches = rows.flatMap((workspace) => {
-    const groups = state.projectGroups?.filter((group) => group.id === workspace.projectGroupId)
-    const explicit =
-      parseExecutionHostId(workspace.executionHostId) ||
-      normalizeHostPart(workspace.connectionId) ||
-      groups?.some(
-        (group) =>
-          parseExecutionHostId(group.executionHostId) || normalizeHostPart(group.connectionId)
-      )
-    const incomplete = !explicit && (!state.projectGroups || !state.repos || !workspace.folderPath)
-    const host = incomplete
-      ? { kind: 'ambiguous' as const }
-      : resolveFolderWorkspaceRowHost(
-          {
-            folderWorkspaces: [],
-            projectGroups: (state.projectGroups ?? []).map((group) => ({
-              ...group,
-              parentGroupId: group.parentGroupId ?? null
-            })),
-            repos: state.repos ?? []
-          },
-          workspace
-        )
-    const hostId: ExecutionHostId | null =
-      host.kind === 'local'
-        ? LOCAL_EXECUTION_HOST_ID
-        : host.kind === 'ssh'
-          ? toSshExecutionHostId(host.targetId)
-          : host.kind === 'runtime'
-            ? toRuntimeExecutionHostId(host.environmentId)
-            : null
-    underivable ||= hostId === null
-    return hostId && (!requiredHostId || hostId === requiredHostId)
-      ? [
-          {
-            workspace,
-            hostId,
-            connectionId:
-              host.kind === 'ssh'
-                ? host.targetId
-                : host.kind === 'runtime'
-                  ? host.sshTargetId
-                  : null
-          }
-        ]
-      : []
-  })
-  return matches.length === 1
-    ? { kind: 'selected' as const, value: matches[0] }
-    : {
-        kind:
-          rows.length && (underivable || matches.length > 1)
-            ? ('ambiguous' as const)
-            : ('missing' as const)
-      }
-}
-
-export function resolveQualifiedFolderWorkspace(
-  state: FolderWorkspaceHostState,
-  folderWorkspaceId: string,
-  requiredHostId: ExecutionHostId | undefined,
-  failure: (kind: 'missing' | 'ambiguous') => Error
-) {
-  const result = resolveQualifiedFolderWorkspaceResult(state, folderWorkspaceId, requiredHostId)
-  if (result.kind !== 'selected') {
-    throw failure(result.kind)
+    const hostId = getRepoExecutionHostId(group)
+    if (matchingHostId === undefined) {
+      matchingHostId = hostId
+    } else if (matchingHostId !== hostId) {
+      return LOCAL_EXECUTION_HOST_ID
+    }
   }
-  return result.value
-}
-
-/** A folder's local project association, scoped to its acquired physical row when supplied. */
-export function findLocalFolderWorkspaceRuntimeRepo(
-  state: FolderWorkspaceHostState,
-  folderWorkspaceId: string,
-  selectedFolder?: FolderWorkspace
-): Repo | undefined {
-  const scoped = {
-    ...state,
-    folderWorkspaces: selectedFolder ? [selectedFolder] : state.folderWorkspaces
-  }
-  const result = resolveQualifiedFolderWorkspaceResult(scoped, folderWorkspaceId)
-  if (result.kind !== 'selected' || result.value.hostId !== LOCAL_EXECUTION_HOST_ID) {
-    return undefined
-  }
-  const candidates = findFolderWorkspaceCandidateRepos(
-    {
-      ...scoped,
-      repos: state.repos.filter((repo) => getRepoExecutionHostId(repo) === LOCAL_EXECUTION_HOST_ID)
-    },
-    folderWorkspaceId
-  )
-  return candidates.length === 1 ? candidates[0] : undefined
+  return matchingHostId ?? LOCAL_EXECUTION_HOST_ID
 }

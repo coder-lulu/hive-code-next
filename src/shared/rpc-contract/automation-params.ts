@@ -184,15 +184,6 @@ export const AutomationRuns = z.object({
 // Why strict: null or a non-string must fail rather than fall back to "omitted", which preserves.
 const ExtraAgentArgs = z.string({ message: 'Extra agent arguments must be text.' }).optional()
 
-export const AutomationLaunchSetupPatch = z
-  .strictObject({
-    surface: z.enum(['chat', 'terminal']).optional(),
-    arguments: z.strictObject({ kind: z.literal('legacy-extras'), value: z.string() }).optional()
-  })
-  .refine((patch) => patch.surface !== undefined || patch.arguments !== undefined, {
-    message: 'Choose an automation launch change.'
-  })
-
 export const AutomationCreate = z.object({
   creationKey: OptionalString,
   name: requiredString('Missing automation name'),
@@ -200,7 +191,6 @@ export const AutomationCreate = z.object({
   precheck: AutomationPrecheck,
   agentId: TuiAgent,
   extraAgentArgs: ExtraAgentArgs,
-  launchSetupPatch: AutomationLaunchSetupPatch.optional(),
   runContext: WorkspaceRunContext,
   sourceContext: TaskSourceContext,
   repo: OptionalString,
@@ -223,7 +213,6 @@ export const AutomationUpdateFields = z.object({
   precheck: AutomationPrecheck,
   agentId: TuiAgent.optional(),
   extraAgentArgs: ExtraAgentArgs,
-  launchSetupPatch: AutomationLaunchSetupPatch.optional(),
   runContext: WorkspaceRunContext,
   sourceContext: TaskSourceContext,
   repo: OptionalString,
@@ -244,7 +233,5 @@ export const AutomationUpdate = z.object({
   id: requiredString('Missing automation id'),
   updates: AutomationUpdateFields,
   expectedOwner: ExpectedOwner,
-  destination: Destination,
-  // An edit relying on the current new-per-run mode is refused if the stored mode changed first.
-  expectedWorkspaceMode: z.literal('new_per_run').optional()
+  destination: Destination
 })

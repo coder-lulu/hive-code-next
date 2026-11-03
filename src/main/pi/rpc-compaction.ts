@@ -1,8 +1,5 @@
-import {
-  agentSessionFailureFact,
-  providerDiagnostic
-} from '../../shared/agent-session/failures/agent-session-failure'
-import { agentSessionFailureWords } from '../../shared/agent-session/failures/agent-session-failure-words'
+import { agentSessionFailureFact, providerDiagnostic } from '../../shared/agent-session-failure'
+import { agentSessionFailureWords } from '../../shared/agent-session-failure-words'
 import type {
   AgentSessionCommandAdmission,
   StructuredAgentSessionCommandRun

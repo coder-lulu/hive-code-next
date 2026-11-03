@@ -6,7 +6,7 @@ import type { Repo } from '../../shared/repo-types'
 import type { Automation } from '../../shared/automations-types'
 import { APP_DISPLAY_NAME } from '../../shared/brand'
 import { removeTreeSync } from '../../shared/windows-transient-lock-removal'
-import type { Store } from '../persistence/loading-store/store'
+import type { Store } from '../persistence'
 import {
   closeTestStores,
   createStore,

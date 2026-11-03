@@ -1,16 +1,18 @@
-import type { AskPrompt } from '../../../../../src/shared/native-chat/input/native-chat-ask-types'
+import { MobileThemeProvider } from '../../../theme/mobile-theme-provider'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { Pressable, TextInput } from 'react-native'
 import { describe, expect, it, vi } from 'vitest'
-import { useMobileNativeChatAskDismiss } from './use-mobile-native-chat-ask-dismiss'
-import { nativeChatAskDismissKey } from '../../../../../src/shared/native-chat/input/native-chat-ask-dismiss-key'
 import { MobileNativeChatPromptCard } from './MobileNativeChatPromptCard'
 
-vi.mock('react-native', async () => ({
-  ...(await import('../../../test-support/react-native-motion-stub')).reactNativeMotionStub(),
+vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
+  AccessibilityInfo: {
+    isReduceMotionEnabled: async () => false,
+    addEventListener: () => ({ remove: () => {} })
+  },
+  useColorScheme: () => 'light',
   StyleSheet: { create: (styles: unknown) => styles, hairlineWidth: 1 },
   Text: 'Text',
   TextInput: 'TextInput',
@@ -28,7 +30,7 @@ vi.mock('lucide-react-native', () => ({
 vi.mock('../../../components/MobileMarkdown', () => ({ MobileMarkdown: 'Markdown' }))
 
 const textInput = (root: ReactTestInstance) =>
-  root.find((node) => node.props.placeholder === 'Type your answer')
+  root.find((node) => node.props.placeholder === '输入你的回答')
 const ask = { questions: [{ question: 'Pick?', options: [{ label: 'East' }], multiSelect: false }] }
 
 describe('MobileNativeChatPromptCard collapse', () => {
@@ -76,67 +78,24 @@ describe('MobileNativeChatPromptCard collapse', () => {
         collapsedPrompt: collapsed ? { title: 'Pick?', expand: () => {} } : null
       })
     await act(async () => {
-      tree = create(render(false))
+      tree = create(createElement(MobileThemeProvider, { preference: 'light' }, render(false)))
     })
-    const other = tree!.root.findAll((node) => node.props.label === 'Other…')[0]!
+    const other = tree!.root.findAll((node) => node.props.label === '其他…')[0]!
     act(() => other.props.onPress())
     act(() => textInput(tree!.root).props.onChangeText('turbo'))
 
-    await act(async () => tree!.update(render(true)))
+    await act(async () =>
+      tree!.update(createElement(MobileThemeProvider, { preference: 'light' }, render(true)))
+    )
     expect(tree!.root.findByProps({ testID: 'native-chat-prompt-strip' })).toBeTruthy()
     const hidden = tree!.root.findAll((node) => node.props.style?.display === 'none')
     expect(hidden).toHaveLength(1)
     expect(textInput(hidden[0]!).props.value).toBe('turbo')
 
-    await act(async () => tree!.update(render(false)))
+    await act(async () =>
+      tree!.update(createElement(MobileThemeProvider, { preference: 'light' }, render(false)))
+    )
     expect(textInput(tree!.root).props.value).toBe('turbo')
-    act(() => tree!.unmount())
-  })
-  it('resets stale pending choices/text on definition revision', async () => {
-    let tree: ReactTestRenderer | null = null
-    const render = (question: string) => {
-      const prompt: AskPrompt = {
-        ...ask,
-        replyAsMessage: true,
-        occurrenceIds: ['same-call'],
-        questions: [{ ...ask.questions[0]!, question }]
-      }
-      return createElement(MobileNativeChatPromptCard, {
-        ask: prompt,
-        askKey: nativeChatAskDismissKey(prompt)
-      })
-    }
-    await act(async () => {
-      tree = create(render('Q1?'))
-    })
-    act(() => tree!.root.findAll((node) => node.props.label === 'Other…')[0]!.props.onPress())
-    act(() => textInput(tree!.root).props.onChangeText('old answer'))
-    await act(async () => tree!.update(render('Edited Q1?')))
-    expect(tree!.root.findAllByType(TextInput)).toHaveLength(0)
-    expect(tree!.root.findAll((node) => node.props.selected === true)).toHaveLength(0)
-    act(() => tree!.unmount())
-  })
-
-  it('resets typed answers on a host/view owner change with the same portable prompt', async () => {
-    const prompt: AskPrompt = { ...ask, replyAsMessage: true, occurrenceIds: ['same-portable-id'] }
-    function Harness({ host }: { host: string }) {
-      const dismissal = useMobileNativeChatAskDismiss({
-        ask: prompt,
-        startedAt: null,
-        scopeKey: host,
-        sessionKey: 'view',
-        observing: true
-      })
-      return createElement(MobileNativeChatPromptCard, { ask: prompt, askKey: dismissal.askKey })
-    }
-    let tree: ReactTestRenderer | null = null
-    await act(async () => {
-      tree = create(createElement(Harness, { host: 'host-A' }))
-    })
-    act(() => tree!.root.findAll((node) => node.props.label === 'Other…')[0]!.props.onPress())
-    act(() => textInput(tree!.root).props.onChangeText('old host answer'))
-    await act(async () => tree!.update(createElement(Harness, { host: 'host-B' })))
-    expect(tree!.root.findAllByType(TextInput)).toHaveLength(0)
     act(() => tree!.unmount())
   })
 })

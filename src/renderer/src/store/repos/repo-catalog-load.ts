@@ -29,7 +29,7 @@ export async function loadRepoCatalog(
   }
   updateStatus('loading')
   try {
-    const catalog = await fetchRepoCatalogForTarget(target)
+    const catalog = await fetchRepoCatalogForTarget(target, get().repos)
     if (
       target.kind === 'environment' &&
       (getRuntimeEnvironmentConnectionGeneration(target.environmentId) !== connectionGeneration ||

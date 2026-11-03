@@ -108,12 +108,8 @@ export function ConfirmationDialogProvider({
       if (confirmed && dontAskAgain) {
         request.options.dontAskAgain?.onConfirmed()
       }
-      const fields = request.options.fields
-      if (confirmed && fields) {
-        const defaults = Object.fromEntries(
-          fields.inputs.map((field) => [field.id, field.defaultValue ?? ''])
-        )
-        fields.onConfirmed({ ...defaults, ...fieldValues })
+      if (confirmed) {
+        request.options.fields?.onConfirmed(fieldValues)
       }
       // Why: queued prompts must not inherit this request's preference or typed values.
       setDontAskAgain(false)
@@ -186,7 +182,7 @@ export function ConfirmationDialogProvider({
                     id={`confirmation-dialog-field-${field.id}`}
                     type={field.type ?? 'text'}
                     autoComplete={field.autoComplete}
-                    value={fieldValues[field.id] ?? field.defaultValue ?? ''}
+                    value={fieldValues[field.id] ?? ''}
                     onChange={(event) => {
                       const { value } = event.target
                       setFieldValues((current) => ({ ...current, [field.id]: value }))
@@ -194,9 +190,7 @@ export function ConfirmationDialogProvider({
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         event.preventDefault()
-                        if (!(guarded && event.repeat)) {
-                          settleActiveRequest(true)
-                        }
+                        settleActiveRequest(true)
                       }
                     }}
                   />

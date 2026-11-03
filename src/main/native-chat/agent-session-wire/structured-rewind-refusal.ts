@@ -2,11 +2,8 @@ import {
   AGENT_SESSION_REWIND_REASONS,
   type AgentSessionRewindParams,
   type AgentSessionRewindReason
-} from '../../../shared/agent-session/lifecycle/agent-session-rewind'
-import {
-  refuse,
-  type AgentSessionWireRefusal
-} from '../../../shared/agent-session/failures/agent-session-wire-refusals'
+} from '../../../shared/agent-session-rewind'
+import { refuse, type AgentSessionWireRefusal } from '../../../shared/agent-session-wire'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 
 export function rewindRefusal(reason: AgentSessionRewindReason): {

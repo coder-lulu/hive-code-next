@@ -26,10 +26,7 @@ export function RepositorySourceControlAiSection({
 }: RepositorySourceControlAiSectionProps): React.JSX.Element {
   const settings = useAppStore((state) => state.settings)
   const ownership = getSettingOwnershipSummary('repositorySourceControlAi')
-  const source = normalizeSourceControlAiSettings(
-    settings?.sourceControlAi,
-    settings?.commitMessageAi
-  )
+  const source = normalizeSourceControlAiSettings(settings?.sourceControlAi)
   const persistedRepoAi = useMemo(
     () => normalizeRepoAiDraft(repo.sourceControlAi),
     [repo.sourceControlAi]

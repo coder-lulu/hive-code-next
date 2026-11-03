@@ -97,14 +97,6 @@ process.stdin.on('data', (chunk) => {
     } catch {
       frame = null
     }
-    fs.appendFileSync(
-      `${launchLog}.requests.jsonl`,
-      `${JSON.stringify({
-        pid: process.pid,
-        type: frame?.type ?? null,
-        subtype: frame?.request?.subtype ?? null
-      })}\n`
-    )
     if (frame?.type === 'user') {
       startTurn(frame)
       continue

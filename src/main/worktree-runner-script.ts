@@ -8,7 +8,6 @@ import { resolveWindowsGitBashShellPath } from './git-bash'
 import { gitExecFileSync } from './git/runner'
 import { isLocalGitRuntimeRouterInstalled } from './git/command-runner/local-git-runtime-route'
 import { readWorktreeGitPath } from './git/worktree-git-path'
-import { resolveWslWorktreeGitPath } from './git/wsl-worktree-git-path'
 import { knownWslAutomountRoots } from './wsl/wsl-automount-root'
 import { isWslPath, toWindowsWslPath, toLinuxPath } from './wsl'
 import { getHookRuntimeTarget, getHookWslContext } from './hook-runtime-target'
@@ -31,14 +30,14 @@ function getGitPath(cwd: string, relativePath: string): string {
   }).trim()
 }
 
-export async function createSetupRunnerScript(
+export function createSetupRunnerScript(
   repo: Repo,
   worktreePath: string,
   script: string,
   projectRuntime?: ProjectExecutionRuntimeResolution | HookRuntimeTarget,
   setupShell?: SetupRunnerShell,
   projectStartupPolicy?: SetupAgentStartupPolicy
-): Promise<WorktreeSetupLaunch> {
+): WorktreeSetupLaunch {
   return createWorktreeRunnerScript({
     repo,
     worktreePath,
@@ -53,7 +52,7 @@ export async function createSetupRunnerScript(
   })
 }
 
-async function createWorktreeRunnerScript(args: {
+function createWorktreeRunnerScript(args: {
   repo: Repo
   worktreePath: string
   script: string
@@ -61,7 +60,7 @@ async function createWorktreeRunnerScript(args: {
   runtimeTarget?: HookRuntimeTarget
   waitForAgentStartup?: boolean
   setupShell?: SetupRunnerShell
-}): Promise<WorktreeSetupLaunch> {
+}): WorktreeSetupLaunch {
   const {
     repo,
     worktreePath,
@@ -89,13 +88,10 @@ async function createWorktreeRunnerScript(args: {
   // Linked worktrees have .git files; resolve the per-worktree gitdir through Git.
   const runnerExtension = runnerShell.family === 'cmd' ? 'cmd' : 'sh'
   const gitRelPath = `orca/${runnerBaseName}.${runnerExtension}`
-  // Read the link with the D1c Git router (if WSL Git made the worktree, host Git can't). A worktree
-  // inside a distro never runs synchronous Git: that would be a synchronous wsl.exe on the main thread.
-  const fromLink = isWslPath(worktreePath)
-    ? await resolveWslWorktreeGitPath(worktreePath, gitRelPath)
-    : isLocalGitRuntimeRouterInstalled()
-      ? readWorktreeGitPath(worktreePath, gitRelPath, knownWslAutomountRoots())
-      : null
+  // With the D1c Git router, read the link: if WSL Git made the worktree, host Git can't.
+  const fromLink = isLocalGitRuntimeRouterInstalled()
+    ? readWorktreeGitPath(worktreePath, gitRelPath, knownWslAutomountRoots())
+    : null
   let runnerScriptPath = fromLink ?? getGitPath(worktreePath, gitRelPath)
 
   // Convert WSL Git's Linux path to a path Windows filesystem calls can reach.

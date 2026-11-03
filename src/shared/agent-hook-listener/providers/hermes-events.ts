@@ -20,14 +20,6 @@ const HERMES_EVENT_STATES: Record<string, 'working' | 'waiting' | 'done'> = {
   post_approval_response: 'working'
 }
 
-export function isHermesRootSessionEvent(eventName: unknown): boolean {
-  return (
-    eventName === 'on_session_start' ||
-    eventName === 'on_session_reset' ||
-    eventName === 'pre_llm_call'
-  )
-}
-
 // Why: Hermes' post-turn memory/skill review fires tool hooks with no turn of its own.
 function admitsHermesEvent(
   state: HookListenerState,
@@ -60,7 +52,7 @@ function admitsHermesEvent(
   return !(isToolEvent && turn?.ended)
 }
 
-/** Status admission compares warm children with their parent; this never supplies restore identity. */
+/** The hook payload with a `delegate_task` child's session id replaced by its parent pane's. */
 export function withHermesPaneSessionId(
   state: HookListenerState,
   paneKey: string,

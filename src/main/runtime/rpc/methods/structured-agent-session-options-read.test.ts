@@ -1,4 +1,4 @@
-import { agentSessionConversationView } from '../../../../shared/agent-session/lifecycle/agent-session-conversation-view'
+import { agentSessionConversationView } from '../../../../shared/agent-session-conversation-view'
 import '../unused-default-rpc-methods.test-fixture'
 // The catalog read behind the picker: which directory a named worktree runs in on this host.
 
@@ -8,10 +8,10 @@ import { DESKTOP_RENDERER_RUNTIME_CLIENT_CAPABILITIES } from '../../../ipc/deskt
 import { createAgentModelCatalogService } from '../../../native-chat/agent-model-catalog/agent-model-catalog-service'
 import { AgentModelCatalogStore } from '../../../native-chat/agent-model-catalog/agent-model-catalog-store'
 import { createCodexModelCatalogProbe } from '../../../codex/codex-model-catalog-probe'
-import type { runCodexAppServerSession } from '../../../codex/app-server/codex-app-server-session'
-import type { AgentSessionRecord } from '../../../../shared/agent-session/lifecycle/agent-session-record'
-import type { AgentSessionModelCatalogResult } from '../../../../shared/agent-session/agent-session-wire'
-import { agentSessionRecordFixture } from '../../../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
+import type { runCodexAppServerSession } from '../../../codex/codex-app-server-session'
+import type { AgentSessionRecord } from '../../../../shared/agent-session-record'
+import type { AgentSessionModelCatalogResult } from '../../../../shared/agent-session-wire'
+import { agentSessionRecordFixture } from '../../../../shared/agent-session-record.test-fixture'
 import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../../shared/constants'
 import {
   agentModelCatalogFingerprintForRecord,
@@ -34,19 +34,6 @@ afterEach(() => {
   clearStructuredHostStub()
 })
 
-// These are RPC forwarding fixtures; receiving authority is exercised through the real host separately.
-function catalogHost() {
-  const host = hostStub()
-  host.readModelCatalog = async (params) => {
-    const catalog = host.deps.modelCatalog
-    if (!params.savedOnly) {
-      void catalog?.demand(params)
-    }
-    return catalog ? catalog.read(params) : { origin: 'unknown' }
-  }
-  return host
-}
-
 describe('agentSession.modelCatalog', () => {
   const read = vi.fn(async () => ({ origin: 'unknown' as const }))
   let record: AgentSessionRecord | null = null
@@ -55,7 +42,7 @@ describe('agentSession.modelCatalog', () => {
     read.mockClear()
     record = null
     setStructuredAgentSessionHost(
-      Object.assign(catalogHost(), {
+      Object.assign(hostStub(), {
         deps: {
           modelCatalog: { read, demand: vi.fn(async () => {}) },
           store: {
@@ -116,7 +103,7 @@ describe('agentSession.modelCatalog', () => {
       }
     })
     setStructuredAgentSessionHost(
-      Object.assign(catalogHost(), {
+      Object.assign(hostStub(), {
         deps: {
           modelCatalog: catalog,
           store: {
@@ -259,7 +246,7 @@ describe('agentSession.modelCatalog', () => {
       probes: { claude: Object.assign(run, { resolve }) }
     })
     setStructuredAgentSessionHost(
-      Object.assign(catalogHost(), {
+      Object.assign(hostStub(), {
         sessionAgent: () => 'claude',
         deps: {
           modelCatalog: catalog,
@@ -309,7 +296,7 @@ describe('agentSession.modelCatalog before anything built the host', () => {
   }))
   const installHost = vi.fn(async () => {
     setStructuredAgentSessionHost(
-      Object.assign(catalogHost(), {
+      Object.assign(hostStub(), {
         deps: {
           modelCatalog: { read, demand: vi.fn(async () => {}) },
           store: { getRecord: () => null, getConversation: () => null },
@@ -375,7 +362,7 @@ describe('agentSession.modelCatalog for a chat on a model its CLI stopped listin
 
   beforeEach(() => {
     setStructuredAgentSessionHost(
-      Object.assign(catalogHost(), {
+      Object.assign(hostStub(), {
         deps: {
           modelCatalog: { read, demand: vi.fn(async () => {}) },
           store: {
@@ -390,14 +377,7 @@ describe('agentSession.modelCatalog for a chat on a model its CLI stopped listin
   })
 
   it("lists the chat's own model, so an older client that replaces an unlisted one keeps it", async () => {
-    const own = {
-      id: 'opus[1m]',
-      label: 'Opus (1M context)',
-      description: 'opus[1m]',
-      isDefault: false,
-      efforts: [],
-      effortsKnown: false
-    }
+    const own = { id: 'opus[1m]', label: 'opus[1m]', isDefault: false, efforts: [] }
     const forChat = { agent: 'claude', sessionId: record.sessionId }
     expect(await call('agentSession.modelCatalog', forChat, OLD_STRUCTURED_CLIENT)).toMatchObject({
       ok: true,

@@ -1,5 +1,4 @@
 import {
-  isPluginCommandAliasActionId,
   pluginCommandKeybindingActionId,
   type PluginCommandAliasActionId
 } from '../../shared/plugins/contributions/plugin-command-actions'
@@ -27,8 +26,6 @@ export type PluginCommandRegistration = {
   context: 'global' | 'workspace'
   handler: { type: 'built-in'; action: PluginCommandAliasActionId } | { type: 'worker' }
   keybindings: PluginCommandKeybinding[]
-  /** The built-in action this worker command runs in place of. */
-  replaces?: PluginCommandAliasActionId
 }
 
 type CommandOwner = {
@@ -146,10 +143,7 @@ function registrationsForManifest(
       command.action === undefined
         ? { type: 'worker' as const }
         : { type: 'built-in' as const, action: command.action as PluginCommandAliasActionId },
-    keybindings: keybindingsForCommand(command, bindingsByCommand.get(command.id) ?? []),
-    ...(command.replaces !== undefined && isPluginCommandAliasActionId(command.replaces)
-      ? { replaces: command.replaces }
-      : {})
+    keybindings: keybindingsForCommand(command, bindingsByCommand.get(command.id) ?? [])
   }))
 }
 

@@ -1,8 +1,4 @@
-import {
-  classifyTerminalCreationFailure,
-  terminalExitError
-} from '../../../../shared/terminal-start-failure'
-import type { AgentSessionOwnerBinding } from '../../../../shared/agent-session/agent-session-host-authority'
+import type { AgentSessionOwnerBinding } from '../../../../shared/agent-session-host-authority'
 import { ClaimedAgentPtyOwnerRegistry } from '../../../../shared/claimed-agent-pty-owner'
 import { isPtyIncarnationId } from '../../../../shared/pty-incarnation'
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
@@ -41,10 +37,6 @@ export function seedTerminalRestoreRecordsFromSpawnResult(
       ...(lastTitle !== undefined ? { lastTitle } : {})
     })
   }
-  if (result.isReattach === true) {
-    runtime?.startReattachedOutputClock?.(result.id)
-    runtime?.restoreReattachedAgentStatus?.(result.id)
-  }
 }
 
 export function assertSpawnReplyWasLive(result: PtySpawnResult): void {
@@ -52,24 +44,9 @@ export function assertSpawnReplyWasLive(result: PtySpawnResult): void {
     return
   }
   // Lower layers may canonicalize IDs; controller-local pending identity cannot prove this exit.
-  const error = Object.assign(
-    terminalExitError('agent_session_exited_during_start', result.exitCause, result.incarnationId),
-    {
-      agentSessionOperationOutcome: 'unknown' as const
-    }
-  )
-  throw classifyTerminalCreationFailure(error, result)
-}
-
-export function assertSpawnRegistrationAllowed(
-  runtime: Pick<OrcaRuntimeService, 'assertPtyRegistrationAllowed'> | undefined,
-  result: PtySpawnResult
-): void {
-  try {
-    runtime?.assertPtyRegistrationAllowed?.(result.id, result.incarnationId)
-  } catch (error) {
-    throw classifyTerminalCreationFailure(error, result)
-  }
+  throw Object.assign(new Error('agent_session_exited_during_start'), {
+    agentSessionOperationOutcome: 'unknown' as const
+  })
 }
 
 export async function reconcileAgentSessionOwnerListings(): Promise<void> {

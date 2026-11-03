@@ -1,4 +1,3 @@
-// @protected-copy: notebook trust and kernel setup copy.
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
 import { useAppStore } from '@/store'

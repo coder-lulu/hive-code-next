@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { EVERY_AGENT_CHAT } from '../../../../shared/native-chat/every-agent-chat.test-fixture'
 import { act, cleanup, renderHook } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { useAppStore } from '@/store'
@@ -17,7 +16,7 @@ import type { AppState } from '@/store/types'
 import {
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY as CHAT,
   STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY as CLIENT
-} from '../../../../shared/agent-session/agent-session-runtime-capabilities'
+} from '../../../../shared/protocol-version'
 import { useAgentMenuObservation, useNewTabAgentMenuRows } from './use-new-tab-agent-menu-rows'
 const initial = useAppStore.getState()
 afterEach(() => {
@@ -57,7 +56,7 @@ it('settles ownerless continuation and plus inventory without borrowing agents, 
     setLocalRuntimeCapabilitiesForTests(worktreeId.startsWith('folder:') ? null : [CHAT, CLIENT])
     useAppStore.setState({
       ...initial,
-      settings: { ...getDefaultSettings('/home/me'), nativeChatProviders: EVERY_AGENT_CHAT },
+      settings: getDefaultSettings('/home/me'),
       activeWorktreeId: worktreeId,
       activeWorkspaceExecutionHostId: null,
       folderWorkspaces: [],

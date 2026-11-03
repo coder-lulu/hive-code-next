@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useShallow } from 'zustand/react/shallow'
 import { useAppStore } from '@/store'
-import { useRepoAssignees } from '@/hooks/useGitHubRepoMetadata'
+import { useRepoAssignees } from '@/hooks/useIssueMetadata'
 import { useRepoAssigneesBySlug } from '@/hooks/useGitHubSlugMetadata'
 import type { TaskSourceContext } from '../../../../../shared/task-source-context'
 import type { GitHubAssignableUser } from '../../../../../shared/github/pull-request-types'
@@ -26,8 +26,7 @@ export function PRReviewersPanel({
   repoPath,
   sourceContext,
   projectOrigin,
-  onReviewersRequested,
-  onMutated
+  onReviewersRequested
 }: {
   item: GitHubWorkItem
   loading: boolean
@@ -35,7 +34,6 @@ export function PRReviewersPanel({
   sourceContext?: TaskSourceContext | null
   projectOrigin?: PullRequestPageProjectOrigin
   onReviewersRequested: (reviewRequests: GitHubAssignableUser[]) => void
-  onMutated: () => void
 }): React.JSX.Element {
   const [open, setOpen] = useState(false)
   const [reviewerInput, setReviewerInput] = useState('')
@@ -249,7 +247,6 @@ export function PRReviewersPanel({
       reviewerCandidates,
       patchWorkItem,
       onReviewersRequested,
-      onMutated,
       scheduleReviewerInputFocus
     })
 

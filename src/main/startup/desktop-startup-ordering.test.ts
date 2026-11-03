@@ -122,7 +122,7 @@ describe('startup ordering', () => {
       join(process.cwd(), 'src/main/startup/main-process-observers.ts'),
       'utf8'
     )
-    const telemetryInit = source.indexOf('initTelemetry(store)')
+    const telemetryInit = source.indexOf('initTelemetry(store,')
     const authoritySelection = source.indexOf("track('profile_state_authority_selected'")
     expect(telemetryInit).toBeGreaterThanOrEqual(0)
     expect(authoritySelection).toBeGreaterThan(telemetryInit)
@@ -226,7 +226,7 @@ describe('startup ordering', () => {
     expect(barrier).toContain('localPtyProviderStartupReady,')
     expect(barrier).toContain('await state.runtime?.refreshRestoredOrchestrationAuthority()')
     expect(barrier).toContain(
-      'return state.runtime?.reconcileLegacyWorkerTerminals({ materializeRenderer: true })'
+      'return await state.runtime?.reconcileLegacyWorkerTerminals({ materializeRenderer: true })'
     )
   })
 

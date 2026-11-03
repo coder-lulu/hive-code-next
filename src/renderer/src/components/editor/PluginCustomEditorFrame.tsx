@@ -1,38 +1,19 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { translate } from '@/i18n/i18n'
 import { createBrowserUuid } from '@/lib/browser-uuid'
-import {
-  useCustomEditorViewStore,
-  type ActivePluginCustomEditor
-} from '@/store/plugin-custom-editors'
+import type { ActivePluginCustomEditor } from '@/store/plugin-custom-editors'
 import { PLUGIN_PANEL_FRAME_NAME_PREFIX } from '../../../../shared/plugins/frames/plugin-frame-bridge'
 import { CUSTOM_EDITOR_LARGE_DOCUMENT_BYTES } from '../../../../shared/plugins/frames/plugin-custom-editor-bridge'
 import { fillPluginPanelShell } from '../right-sidebar/plugin-panel-design-token-css'
-import {
-  PluginFrameView,
-  pluginFrameWindowOf,
-  usablePluginFrameGuest,
-  type PluginFrameElement
-} from '../right-sidebar/plugin-frame-element'
 import { usePluginFrameHost } from '../right-sidebar/use-plugin-frame-host'
 import { usePluginFrameEntry } from '../right-sidebar/use-plugin-frame-entry'
 import { editorShortcutMatches } from './editor-shortcuts'
-import {
-  countCustomEditorMergingView,
-  useCustomEditorOutsideMerge
-} from './use-custom-editor-outside-merge'
 import { registerEditorFrameFlush } from './editor-pending-flush'
-import { useCustomEditorReloadFlush } from './use-custom-editor-reload-flush'
-import { PluginEditorNeedsDesktopNotice } from './PluginEditorNeedsDesktopNotice'
 import {
-  usePluginEditorCaptureReport,
-  usePluginEditorCaptureView
-} from './plugin-editor-capture-status'
-import { createCustomEditorHost } from './plugin-custom-editor-host'
-import type {
-  CustomEditorBinaryDocument,
-  CustomEditorEditRefusal
-} from './plugin-custom-editor-host-types'
+  createCustomEditorHost,
+  type CustomEditorBinaryDocument,
+  type CustomEditorEditRefusal
+} from './plugin-custom-editor-host'
 
 type PluginCustomEditorFrameProps = {
   editor: ActivePluginCustomEditor
@@ -71,7 +52,7 @@ export default function PluginCustomEditorFrame({
 }: PluginCustomEditorFrameProps): React.JSX.Element {
   const [refusal, setRefusal] = useState<CustomEditorEditRefusal | null>(null)
   const [saveBlocked, setSaveBlocked] = useState(false)
-  const frameRef = useRef<PluginFrameElement | null>(null)
+  const iframeRef = useRef<HTMLIFrameElement | null>(null)
   // Why random: window.name is readable inside the frame, so it must not carry the file's path.
   const [frameName] = useState(
     () => `${PLUGIN_PANEL_FRAME_NAME_PREFIX}editor:${createBrowserUuid()}`
@@ -102,18 +83,19 @@ export default function PluginCustomEditorFrame({
   const isLarge =
     (binaryDocument?.bytes.byteLength ?? content.length) > CUSTOM_EDITOR_LARGE_DOCUMENT_BYTES
 
-  const {
-    entry: liveEntry,
-    markUnresponsive,
-    remountGone
-  } = usePluginFrameEntry('editor', editor.pluginKey, editor.id)
-  const progressRef = useRef<(step: 'delivered' | 'subscribed') => void>(() => {})
-  const mergingRef = useRef<(merging: boolean) => void>(() => {})
-  const countedRef = useRef(false)
+  const { entry, markUnresponsive } = usePluginFrameEntry('editor', editor.pluginKey, editor.id)
+
+  const frameKey = entry.status === 'ready' ? `${editor.key}:${entry.revision}` : null
+  const entryHtml = entry.status === 'ready' ? entry.html : null
+  // Why memoized: a new srcdoc reloads the frame; theme changes arrive as messages instead.
+  const frameDocument = useMemo(
+    () => (entryHtml === null ? null : fillPluginPanelShell(entryHtml)),
+    [entryHtml]
+  )
 
   const host = useMemo(() => {
     const created = createCustomEditorHost({
-      getFrameWindow: () => pluginFrameWindowOf(frameRef.current),
+      getFrameWindow: () => iframeRef.current?.contentWindow ?? null,
       getDocument: () => ({
         text: latestRef.current.content,
         readOnly: latestRef.current.readOnly
@@ -135,14 +117,12 @@ export default function PluginCustomEditorFrame({
           latestRef.current.onDirtyHint?.(true)
         }
       },
-      onFrameProgress: (step) => progressRef.current(step),
-      onMergesOutside: () => mergingRef.current(true),
-      onKeyChord: (chord, context) => {
+      onKeyChord: (chord) => {
         const event = new KeyboardEvent('keydown', chord)
         // Why: chords are posted by frame code, so only one riding real user input may save.
         if (
           latestRef.current.readOnly ||
-          !context.userActivation ||
+          navigator.userActivation?.isActive !== true ||
           !editorShortcutMatches('editor.save', event)
         ) {
           return
@@ -154,58 +134,20 @@ export default function PluginCustomEditorFrame({
     return created
   }, [isBinary])
 
-  const entry = useCustomEditorReloadFlush(liveEntry, host.flush)
-  const { captureLoad, captureSize } = usePluginEditorCaptureView(fileId)
-  const frameKey =
-    entry.status === 'ready' ? `${editor.key}:${entry.revision}:${captureLoad}` : null
-  const guest = usablePluginFrameGuest(entry.status === 'ready' ? entry.guest : undefined)
-  const entryHtml = entry.status === 'ready' && !guest ? entry.html : null
-  // Why memoized: a new srcdoc reloads the frame; theme changes arrive as messages instead.
-  const frameDocument = useMemo(
-    () => (entryHtml === null ? null : fillPluginPanelShell(entryHtml)),
-    [entryHtml]
-  )
-
-  const reportProgress = usePluginEditorCaptureReport(
-    fileId,
-    entry.status,
-    guest?.url ?? null,
-    frameKey
-  )
-  useLayoutEffect(() => {
-    progressRef.current = reportProgress
-    // Counts this view once while its session merges; text editors only.
-    mergingRef.current = (merging) => {
-      if (fileId !== undefined && !isBinary && merging !== countedRef.current) {
-        countedRef.current = merging
-        countCustomEditorMergingView(fileId, merging ? 1 : -1)
-      }
-    }
-  })
-  useCustomEditorOutsideMerge(isBinary ? undefined : fileId, host, content)
-
   const { onFrameLoad } = usePluginFrameHost({
     surface: 'editor',
-    frameRef,
+    iframeRef,
     frameKey,
     sessionToken: entry.status === 'ready' ? entry.sessionToken : null,
     editor: host.channel,
-    onUnresponsive: markUnresponsive,
-    onGuestGone: () => {
-      // A dead guest cannot answer the reload's flush.
-      host.reset()
-      remountGone()
-    }
+    onUnresponsive: markUnresponsive
   })
 
   useEffect(() => {
     if (!frameKey) {
       return
     }
-    return () => {
-      host.reset()
-      mergingRef.current(false)
-    }
+    return () => host.reset()
   }, [frameKey, host])
 
   useEffect(() => {
@@ -241,19 +183,6 @@ export default function PluginCustomEditorFrame({
       </FrameMessage>
     )
   }
-  // An isolated-only editor never runs in the srcdoc fallback main hands back without a guest.
-  if (entry.status === 'ready' && !guest && editor.frame === 'isolated') {
-    return (
-      <PluginEditorNeedsDesktopNotice
-        title={editor.title}
-        onOpenSource={
-          fileId === undefined
-            ? undefined
-            : () => useCustomEditorViewStore.getState().setChoice(fileId, 'source')
-        }
-      />
-    )
-  }
   if (entry.status === 'error') {
     return (
       <FrameMessage>
@@ -266,11 +195,7 @@ export default function PluginCustomEditorFrame({
     )
   }
   return (
-    <div
-      className="flex h-full min-h-0 flex-col"
-      style={captureSize ?? undefined}
-      data-plugin-editor-surface={fileId}
-    >
+    <div className="flex h-full min-h-0 flex-col">
       {saveBlocked ? (
         <div className="border-b border-border px-3 py-1.5 text-xs text-destructive">
           {translate(
@@ -301,14 +226,17 @@ export default function PluginCustomEditorFrame({
           )}
         </div>
       ) : null}
-      <PluginFrameView
+      <iframe
         key={frameKey}
-        frameRef={frameRef}
-        guest={guest}
+        ref={iframeRef}
+        // SECURITY: never add allow-same-origin — the srcdoc frame must stay an opaque origin so
+        // plugin UI cannot reach the app DOM, storage, IPC or the file it edits.
+        sandbox="allow-scripts"
         name={frameName}
         srcDoc={frameDocument ?? ''}
         onLoad={onFrameLoad}
         title={editor.title}
+        className="min-h-0 w-full flex-1 border-0 bg-background"
       />
     </div>
   )

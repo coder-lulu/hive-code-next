@@ -1,3 +1,5 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
+import { translate } from '../i18n/mobile-i18n'
 import { useMemo, useState } from 'react'
 import { Pressable, TextInput, View } from 'react-native'
 import { Search, SlidersHorizontal, X } from 'lucide-react-native'
@@ -13,18 +15,42 @@ export const MOBILE_TASK_EXECUTION_FILTER_OPTIONS: PickerOption<MobileTaskExecut
   [
     {
       value: 'all',
-      label: '全部状态',
-      subtitle: '显示进行中和最近完成'
+      get label() {
+        return translate('auto.mobile.src.tasks.MobileRuntimeTaskSearch.c0c316a1e7', 'All statuses')
+      },
+      get subtitle() {
+        return translate(
+          'auto.mobile.src.tasks.MobileRuntimeTaskSearch.261c12b64d',
+          'Show in-progress and recently completed tasks'
+        )
+      }
     },
     {
       value: 'in-progress',
-      label: '进行中',
-      subtitle: '运行中、等待确认和受阻任务'
+      get label() {
+        return translate('worktree.workspaceListSections.inProgress', 'In progress')
+      },
+      get subtitle() {
+        return translate(
+          'auto.mobile.src.tasks.MobileRuntimeTaskSearch.bd6a1db208',
+          'Running, awaiting confirmation, and blocked tasks'
+        )
+      }
     },
     {
       value: 'recent-completed',
-      label: '最近完成',
-      subtitle: '当前 Runtime 仍保留的完成记录'
+      get label() {
+        return translate(
+          'auto.mobile.src.tasks.MobileRuntimeTaskSearch.f2f1795ca4',
+          'Recently completed'
+        )
+      },
+      get subtitle() {
+        return translate(
+          'auto.mobile.src.tasks.MobileRuntimeTaskSearch.b4538deabc',
+          'Completed records retained by the current Runtime'
+        )
+      }
     }
   ]
 
@@ -39,6 +65,8 @@ export function MobileTaskSearchField(props: {
   readonly theme: MobileTheme
   readonly value: string
 }) {
+  const t = useMobileTranslation()
+
   const [focused, setFocused] = useState(false)
   const styles = useMemo(() => createMobileTaskScreenStyles(props.theme), [props.theme])
   const palette = useMemo(() => createMobileTaskScreenPalette(props.theme), [props.theme])
@@ -68,7 +96,7 @@ export function MobileTaskSearchField(props: {
       />
       {props.showClear ? (
         <Pressable
-          accessibilityLabel="清除搜索"
+          accessibilityLabel={t('components.searchField.clearSearch', 'Clear search')}
           accessibilityRole="button"
           onPress={props.onClear}
           style={({ pressed }) => [styles.clearButton, pressed && styles.clearButtonPressed]}
@@ -88,6 +116,8 @@ export function MobileRuntimeTaskSearch(props: {
   readonly theme: MobileTheme
   readonly value: string
 }) {
+  const t = useMobileTranslation()
+
   const [filterPickerVisible, setFilterPickerVisible] = useState(false)
   const styles = useMemo(() => createMobileTaskScreenStyles(props.theme), [props.theme])
   const palette = useMemo(() => createMobileTaskScreenPalette(props.theme), [props.theme])
@@ -108,7 +138,11 @@ export function MobileRuntimeTaskSearch(props: {
           value={props.value}
         />
         <Pressable
-          accessibilityLabel={`筛选任务状态，${filterLabel}`}
+          accessibilityLabel={t(
+            'auto.mobile.src.tasks.MobileRuntimeTaskSearch.e9dd56c1ca',
+            'Filter task status, {{value0}}',
+            { value0: filterLabel }
+          )}
           accessibilityRole="button"
           accessibilityState={{ selected: filterActive }}
           onPress={() => setFilterPickerVisible(true)}
@@ -131,7 +165,7 @@ export function MobileRuntimeTaskSearch(props: {
         onSelect={props.onFilterChange}
         options={MOBILE_TASK_EXECUTION_FILTER_OPTIONS}
         selected={props.filter}
-        title="筛选任务状态"
+        title={t('auto.mobile.src.tasks.MobileRuntimeTaskSearch.88fe858446', 'Filter task status')}
         visible={filterPickerVisible}
       />
     </>

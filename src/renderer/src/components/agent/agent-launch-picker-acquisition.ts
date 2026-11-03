@@ -1,4 +1,3 @@
-import { shallow } from 'zustand/shallow'
 import type { AgentPickerEntry } from '../../../../shared/agent-launch-picker'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 
@@ -82,7 +81,7 @@ class AgentPickerAcquisition {
     return defaults.map((entry, i) => {
       const read = this.supports.get(i)
       const current = read && !(reopen && read.state === 'settled')
-      const next = {
+      return {
         ...entry,
         catalog: this.entries[i].catalog,
         ...(read
@@ -95,7 +94,6 @@ class AgentPickerAcquisition {
             }
           : {})
       }
-      return shallow(this.entries[i], next) ? this.entries[i] : next
     })
   }
 

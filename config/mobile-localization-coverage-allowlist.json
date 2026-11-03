@@ -281,14 +281,14 @@
   },
   {
     "filePath": "mobile/src/settings/about-screen.tsx",
-    "kind": "jsx-attribute:title",
+    "kind": "jsx-text",
     "text": "@orca_build",
     "dynamic": false,
     "count": 1
   },
   {
     "filePath": "mobile/src/settings/about-screen.tsx",
-    "kind": "jsx-attribute:title",
+    "kind": "jsx-text",
     "text": "onOrca.dev",
     "dynamic": false,
     "count": 1
@@ -302,9 +302,16 @@
   },
   {
     "filePath": "mobile/src/settings/about-screen.tsx",
-    "kind": "jsx-attribute:title",
+    "kind": "jsx-text",
     "text": "stablyai/orca",
     "dynamic": false,
+    "count": 1
+  },
+  {
+    "filePath": "mobile/src/source-control/MobileBranchDiffPreviewDrawer.tsx",
+    "kind": "jsx-expression",
+    "text": "..HEAD",
+    "dynamic": true,
     "count": 1
   },
   {
@@ -574,14 +581,14 @@
     "count": 1
   },
   {
-    "filePath": "mobile/src/transport/web-bundle/mobile-web-bundle-reply-schemas.ts",
+    "filePath": "mobile/src/transport/mobile-web-bundle-reply-schemas.ts",
     "kind": "object-property:message",
     "text": "assets sum to more than the contract total",
     "dynamic": false,
     "count": 1
   },
   {
-    "filePath": "mobile/src/transport/web-bundle/mobile-web-bundle-reply-schemas.ts",
+    "filePath": "mobile/src/transport/mobile-web-bundle-reply-schemas.ts",
     "kind": "object-property:message",
     "text": "buildId must be the content hash of the asset list",
     "dynamic": false,
@@ -630,19 +637,19 @@
     "count": 1
   },
   {
-    "filePath": "mobile/src/automations/automation-reply-schema.ts",
-    "kind": "object-property:message",
-    "text": "Invalid execution host",
+    "filePath": "mobile/src/diagnostics/connection-diagnostics-submission.ts",
+    "kind": "object-property:error",
+    "text": "diagnostics endpoint not configured",
     "dynamic": false,
     "count": 1,
-    "reason": "Internal RPC reply validation diagnostic; the operation reader rejects the reply and the UI renders automationErrorMessage, never the Zod issue text."
+    "reason": "Technical submission result; connection-diagnostics-screen consumes only result.ok and renders a localized failed state, never this diagnostic."
   },
   {
-    "filePath": "mobile/src/automations/automation-reply-schema.ts",
+    "filePath": "mobile/src/runtime-directory/account-runtime-directory-types.ts",
     "kind": "object-property:message",
-    "text": "Automation ownership is missing or ambiguous",
+    "text": "cloudDisplayName requires cloudDisplayNameVersion",
     "dynamic": false,
     "count": 1,
-    "reason": "Internal RPC reply validation diagnostic; the operation reader rejects the reply and the UI renders automationErrorMessage, never the Zod issue text."
+    "reason": "Schema validation diagnostic naming two wire fields; retain exact field identities instead of translating protocol evidence."
   }
 ]

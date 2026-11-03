@@ -2,13 +2,11 @@
 
 import type {
   AgentSessionMutationEnvelope,
-  AgentSessionMutationResult
-} from '../../../shared/agent-session/agent-session-wire'
-import type {
+  AgentSessionMutationResult,
   AgentSessionQueuedMessageEditHoldParams,
   AgentSessionQueuedMessageEditHoldResult,
   AgentSessionQueuedMessageUpdateResult
-} from '../../../shared/agent-session/requests/agent-session-queued-message-wire'
+} from '../../../shared/agent-session-wire'
 import { queuedMessageEditableText } from '../../../shared/queued-message-edit'
 import {
   queuedMessageUpdateDecision,

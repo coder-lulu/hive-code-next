@@ -15,7 +15,7 @@ import {
   resolveCreateReviewDefaultBaseRef,
   stripBaseRef
 } from './create-pull-request-base-ref-normalization'
-import { resolveCreateReviewSeedText } from '../../../../shared/hosted-review-create-seed'
+import { resolveCreateReviewSeedText } from './create-review-draft-title'
 import {
   createInitialPullRequestFieldRevisions,
   type GenerationSeed,

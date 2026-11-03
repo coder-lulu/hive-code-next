@@ -93,7 +93,7 @@ async function resolvePortsTarget(
   const explicit = getOptionalStringFlag(flags, 'worktree')
   const selector =
     !explicit || explicit === 'active' || explicit === 'current'
-      ? await resolveCurrentAgentWorkspaceSelector(cwd, client, 'ports')
+      ? await resolveCurrentAgentWorkspaceSelector(cwd, client)
       : await resolveNativeFolderPathSelector(
           await normalizeWorktreeSelectorForCaller(explicit, cwd, client),
           client

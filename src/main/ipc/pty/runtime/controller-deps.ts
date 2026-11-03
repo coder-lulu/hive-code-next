@@ -1,6 +1,6 @@
 import type { PtyRendererDelivery } from '../session'
 import type { OrcaRuntimeService } from '../../../runtime/orca-runtime'
-import type { Store } from '../../../persistence/loading-store/store'
+import type { Store } from '../../../persistence'
 import type { IPtyProvider } from '../../../providers/pty-provider-contract'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TerminalStartupCwdMissingDirFallback } from '../../../../shared/terminal-startup-cwd'
@@ -26,14 +26,12 @@ export type PtyRuntimeControllerDeps = PtySpawnCodexResumeDeps & {
     worktreeId: string | undefined,
     sessionId?: string,
     cwd?: string,
-    passiveWslRestore?: boolean,
-    connectionId?: string | null
+    passiveWslRestore?: boolean
   ) => Promise<void> | void
   resolvePtySpawnStartupCwd: (
     worktreeId: string | undefined,
     cwd: string | undefined,
-    missingDirFallback?: TerminalStartupCwdMissingDirFallback,
-    connectionId?: string | null
+    missingDirFallback?: TerminalStartupCwdMissingDirFallback
   ) => string | undefined
   requestSerializedBuffer: (
     ptyId: string,

@@ -1,5 +1,5 @@
 import type { Repo } from '../../../shared/repo-types'
-import type { Store } from '../../persistence/loading-store/store'
+import type { Store } from '../../persistence'
 import {
   getLocalProjectWorktreeGitOptions,
   type LocalProjectWorktreeGitOptions

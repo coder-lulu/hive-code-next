@@ -71,9 +71,10 @@ function WorkspaceKanbanLaneCardList({
       scrollElement,
       spacerElement,
       getItemIds: () => itemIds,
+      getWorktreeIds: () => items.map((item) => item.id),
       getMeasurements: () => virtualizer.measurementsCache
     })
-  }, [itemIds, scrollRef, virtualizer])
+  }, [itemIds, items, scrollRef, virtualizer])
 
   return (
     <div

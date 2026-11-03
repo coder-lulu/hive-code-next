@@ -2,8 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { useFocusEffect } from 'expo-router'
 import { KeyRound } from 'lucide-react-native'
-import { LIST_ROW_PADDING } from '../components/list/ListGroup'
-import { colors, feedback, radii, spacing, typography } from '../theme/mobile-theme'
+import { colors, radii, spacing, typography } from '../theme/mobile-theme'
 import { themedStyleSheet } from '../theme/themed-styles'
 import { useMobileColorScheme } from '../theme/use-mobile-color-scheme'
 import {
@@ -12,7 +11,6 @@ import {
 } from '../transport/host-credential-cleanup'
 import { retryPendingHostCredentialCleanup } from '../transport/host-store'
 import { useMobileTranslation } from '../i18n/use-mobile-translation'
-import { SettingsSection } from './settings-screen-frame'
 
 export function PendingCredentialCleanupCard() {
   useMobileColorScheme()
@@ -75,9 +73,8 @@ export function PendingCredentialCleanupCard() {
   }
 
   return (
-    // A custom row: the status line is a live region and Retry sits inline.
-    <SettingsSection>
-      <View key="cleanup" style={styles.credentialCleanupRow}>
+    <View style={[styles.section, styles.sectionSpacer]}>
+      <View style={styles.credentialCleanupRow}>
         <KeyRound size={16} color={colors.statusAmber} />
         <View style={styles.credentialCleanupCopy}>
           <Text style={styles.credentialCleanupTitle}>
@@ -132,39 +129,47 @@ export function PendingCredentialCleanupCard() {
           )}
         </Pressable>
       </View>
-    </SettingsSection>
+    </View>
   )
 }
 
 const styles = themedStyleSheet(() => ({
+  section: {
+    backgroundColor: colors.bgPanel,
+    borderRadius: 12,
+    overflow: 'hidden'
+  },
+  sectionSpacer: {
+    marginTop: spacing.md
+  },
   rowPressed: {
-    opacity: feedback.pressedOpacity
+    backgroundColor: colors.bgRaised
   },
   credentialCleanupRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.md,
+    gap: spacing.sm + 2,
     paddingVertical: spacing.md,
-    paddingHorizontal: LIST_ROW_PADDING
+    paddingHorizontal: spacing.md + 2
   },
   credentialCleanupCopy: {
     flex: 1,
     gap: spacing.xs
   },
   credentialCleanupTitle: {
-    fontSize: 15,
+    fontSize: typography.bodySize,
     fontWeight: '500',
     color: colors.textPrimary
   },
   rowHint: {
-    fontSize: 13,
+    fontSize: typography.metaSize,
     color: colors.textSecondary,
     lineHeight: 17
   },
   retryButton: {
     width: 72,
     height: 32,
-    borderRadius: radii.control,
+    borderRadius: radii.button,
     backgroundColor: colors.bgRaised,
     alignItems: 'center',
     justifyContent: 'center'

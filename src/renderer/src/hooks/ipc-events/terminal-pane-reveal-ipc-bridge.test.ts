@@ -74,6 +74,17 @@ describe('registerTerminalPaneRevealIpcBridge', () => {
     expect(cleanup).toHaveBeenCalledOnce()
   })
 
+  it('finds the owning server from the workspace when the caller names no host', () => {
+    const { deliver } = installBridge()
+    mocks.ownerEnvironmentIdForWorkspace.mockReturnValue('env-1')
+
+    deliver({ ...request, executionHostId: null })
+
+    expect(mocks.revealTerminalPane).toHaveBeenCalledWith(
+      expect.objectContaining({ tabId: toWebTerminalSurfaceTabId('host-tab-1') })
+    )
+  })
+
   it.each<[string, Partial<TerminalPaneRevealRequest>]>([
     ['a local workspace', { executionHostId: null }],
     ['an SSH workspace this app runs', { executionHostId: 'ssh:box' }],
@@ -86,6 +97,15 @@ describe('registerTerminalPaneRevealIpcBridge', () => {
     expect(mocks.revealTerminalPane).toHaveBeenCalledWith(
       expect.objectContaining({ tabId: overrides.tabId ?? 'host-tab-1' })
     )
+  })
+
+  it('answers false when this window does not know the workspace', () => {
+    const { deliver, reply } = installBridge()
+    mocks.revealTerminalPane.mockReturnValue(false)
+
+    deliver(request)
+
+    expect(reply).toHaveBeenCalledWith({ requestId: 'request-1', revealed: false })
   })
 
   it('still answers when the reveal throws, so the caller is not left waiting', () => {

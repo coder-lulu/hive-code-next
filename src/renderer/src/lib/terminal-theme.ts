@@ -12,16 +12,14 @@ import {
   DEFAULT_TERMINAL_THEME_DARK,
   DEFAULT_TERMINAL_THEME_LIGHT,
   lookupTerminalTheme,
-  resolveTerminalPalette,
-  type TerminalPaletteSettings,
-  type TerminalThemeLookupSettings
+  selectTerminalTheme
 } from '../../../shared/terminal-theme-selection'
 
 export const BUILTIN_TERMINAL_THEME_NAMES = getThemeNames()
 
 export { DEFAULT_TERMINAL_THEME_DARK, DEFAULT_TERMINAL_THEME_LIGHT }
 export const DEFAULT_TERMINAL_DIVIDER_DARK = '#3f3f46'
-export const DEFAULT_TERMINAL_DIVIDER_LIGHT = '#d4d4d8'
+const DEFAULT_TERMINAL_DIVIDER_LIGHT = '#d4d4d8'
 
 export type EffectiveTerminalAppearance = {
   mode: 'dark' | 'light'
@@ -53,10 +51,24 @@ export function getBuiltinTheme(name: string): ITheme | null {
 }
 
 export function getTerminalTheme(
-  settings: TerminalThemeLookupSettings | undefined,
+  settings: Pick<GlobalSettings, 'terminalCustomThemes' | 'terminalPluginPalettes'> | undefined,
   selection: string
 ): ITheme | null {
   return lookupTerminalTheme(settings, selection)
+}
+
+function getTerminalThemePreview(
+  name: string,
+  settings?: Pick<GlobalSettings, 'terminalCustomThemes' | 'terminalPluginPalettes'>,
+  fallbackMode: 'dark' | 'light' = 'dark'
+): ITheme | null {
+  const theme = getTerminalTheme(settings, name)
+  if (theme) {
+    return theme
+  }
+  return getTheme(
+    fallbackMode === 'light' ? DEFAULT_TERMINAL_THEME_LIGHT : DEFAULT_TERMINAL_THEME_DARK
+  )
 }
 
 export function getAvailableTerminalThemeOptions(
@@ -102,24 +114,24 @@ export function resolveEffectiveTerminalAppearance(
     | 'terminalCustomThemes'
     | 'terminalPluginPalettes'
     | 'terminalDividerColorLight'
-  > &
-    TerminalPaletteSettings,
+  >,
   systemPrefersDark = getSystemPrefersDark()
 ): EffectiveTerminalAppearance {
-  const { mode, useLightVariant, themeName, theme } = resolveTerminalPalette(
-    settings,
-    systemPrefersDark
-  )
+  const {
+    mode: sourceTheme,
+    useLightVariant,
+    themeName
+  } = selectTerminalTheme(settings, systemPrefersDark)
   const dividerColor = useLightVariant
     ? normalizeColor(settings.terminalDividerColorLight, DEFAULT_TERMINAL_DIVIDER_LIGHT)
     : normalizeColor(settings.terminalDividerColorDark, DEFAULT_TERMINAL_DIVIDER_DARK)
 
   return {
-    mode,
+    mode: sourceTheme,
     sourceTheme: settings.theme,
     themeName,
     dividerColor,
-    theme,
+    theme: getTerminalThemePreview(themeName, settings, useLightVariant ? 'light' : 'dark'),
     systemPrefersDark
   }
 }

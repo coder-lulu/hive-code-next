@@ -1,5 +1,4 @@
 import { parseExecutionHostId } from '../../../shared/execution-host'
-import { authorityKey, type HostAuthority } from '../../../shared/host-authority'
 import {
   getEnvironmentSshStateGeneration,
   getEnvironmentSshTargetConnectionGeneration
@@ -20,7 +19,6 @@ export type WorktreeOperationGenerationGuard = {
 
 export type WorktreeOperationGenerationSnapshot = {
   route: WorktreeOperationRoute
-  authority?: HostAuthority
   runtimeConnectionGeneration: number | null
   runtimePairingRevision: number | undefined
   runtimeSshGeneration: number | null
@@ -29,14 +27,12 @@ export type WorktreeOperationGenerationSnapshot = {
 }
 
 export function captureWorktreeOperationGenerationSnapshot(
-  expectedRoute: WorktreeOperationRoute,
-  authority?: HostAuthority
+  expectedRoute: WorktreeOperationRoute
 ): WorktreeOperationGenerationSnapshot {
   const environmentId = expectedRoute.runtimeEnvironmentId
-  const executionHost = parseExecutionHostId(authority?.at ?? expectedRoute.executionHostId)
+  const executionHost = parseExecutionHostId(expectedRoute.executionHostId)
   return {
     route: expectedRoute,
-    ...(authority ? { authority: { endpoint: { ...authority.endpoint }, at: authority.at } } : {}),
     runtimeConnectionGeneration: environmentId
       ? getRuntimeEnvironmentConnectionGeneration(environmentId)
       : null,
@@ -60,21 +56,15 @@ export function assertWorktreeOperationGenerationSnapshotCurrent(
   worktreeId: string,
   snapshot: WorktreeOperationGenerationSnapshot,
   createError: () => Error,
-  resolveCurrentRoute?: () => WorktreeOperationRoute | null,
-  resolveCurrentAuthority?: () => HostAuthority | undefined
+  resolveCurrentRoute?: () => WorktreeOperationRoute | null
 ): WorktreeOperationRoute {
   const environmentId = snapshot.route.runtimeEnvironmentId
-  const executionHost = parseExecutionHostId(
-    snapshot.authority?.at ?? snapshot.route.executionHostId
-  )
+  const executionHost = parseExecutionHostId(snapshot.route.executionHostId)
   const currentRoute = resolveCurrentRoute
     ? resolveCurrentRoute()
     : resolveWorktreeOperationRoute(getState(), worktreeId)
-  const currentAuthority = snapshot.authority ? resolveCurrentAuthority?.() : undefined
   if (
     JSON.stringify(currentRoute) !== JSON.stringify(snapshot.route) ||
-    (snapshot.authority &&
-      (!currentAuthority || authorityKey(currentAuthority) !== authorityKey(snapshot.authority))) ||
     (environmentId &&
       getRuntimeEnvironmentConnectionGeneration(environmentId) !==
         snapshot.runtimeConnectionGeneration) ||

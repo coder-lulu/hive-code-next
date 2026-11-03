@@ -6,7 +6,7 @@ import type { RpcFailure } from '../transport/types'
 import { isMarkdownPath } from './file-tree'
 import { isTerminalArtifactGrantError } from './terminal-artifact-grant-error'
 
-export type MobileFilePreviewTextKind = 'html' | 'markdown' | 'svg' | 'text'
+export type MobileFilePreviewTextKind = 'html' | 'markdown' | 'text'
 
 export type MobileFilePreviewResult =
   | { status: 'ready'; kind: 'media'; media: MobileFileMedia }
@@ -216,12 +216,8 @@ function normalizeTextPreviewResult(
 }
 
 function textKindForPreviewPath(relativePath: string): MobileFilePreviewTextKind {
-  const artifactKind = classifyMobileArtifact(relativePath)
-  if (artifactKind === 'html') {
+  if (classifyMobileArtifact(relativePath) === 'html') {
     return 'html'
-  }
-  if (artifactKind === 'vector') {
-    return 'svg'
   }
   return isMarkdownPath(relativePath) ? 'markdown' : 'text'
 }

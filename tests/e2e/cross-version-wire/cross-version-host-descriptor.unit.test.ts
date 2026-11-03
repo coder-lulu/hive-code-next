@@ -56,6 +56,10 @@ beforeAll(async () => {
 }, SUITE_TIMEOUT_MS)
 
 describe('cross-version host descriptor in the pairing offer', () => {
+  it('pairs two real builds', () => {
+    expect(released.parsePairingCode).not.toBe(current.parsePairingCode)
+  })
+
   it('an old client pairs with a new host and drops the descriptor', () => {
     const url = current.encodePairingOffer({ ...BASE_OFFER, hostDescriptor: DESCRIPTOR })
     expect(url).toMatch(/^hivecode:\/\/pair\?code=/)

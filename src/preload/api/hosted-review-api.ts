@@ -11,17 +11,11 @@ import type {
   HostedReviewCreationEligibility,
   HostedReviewCreationEligibilityArgs,
   HostedReviewForBranchArgs,
-  HostedReviewForBranchReply,
   HostedReviewInfo
 } from '../../shared/hosted-review'
 
 export type HostedReviewApi = {
-  forBranch: {
-    (
-      args: HostedReviewForBranchArgs & { reportReadOutcome?: false }
-    ): Promise<HostedReviewInfo | null>
-    (args: HostedReviewForBranchArgs): Promise<HostedReviewForBranchReply>
-  }
+  forBranch: (args: HostedReviewForBranchArgs) => Promise<HostedReviewInfo | null>
   getCreationEligibility: (
     args: HostedReviewCreationEligibilityArgs
   ) => Promise<HostedReviewCreationEligibility>

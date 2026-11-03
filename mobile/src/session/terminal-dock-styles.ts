@@ -1,19 +1,9 @@
 import { StyleSheet } from 'react-native'
-import { colors, feedback, radii, spacing, typography } from '../theme/mobile-theme'
+import { colors, spacing, typography } from '../theme/mobile-theme'
 import { themedStyleSheet } from '../theme/themed-styles'
 
 const KEY_HEIGHT = 32
-const KEY_ROW_HEIGHT = 46
-const KEY_GAP = spacing.sm
-const KEY_RADIUS = radii.control
-
-/** Grows each 32 pt key to the row's height and halfway into its neighbours' gaps. */
-export const TERMINAL_KEY_HIT_SLOP = {
-  top: (KEY_ROW_HEIGHT - KEY_HEIGHT) / 2,
-  bottom: (KEY_ROW_HEIGHT - KEY_HEIGHT) / 2,
-  left: KEY_GAP / 2,
-  right: KEY_GAP / 2
-} as const
+const KEY_RADIUS = 9
 
 const key = {
   height: KEY_HEIGHT,
@@ -35,38 +25,60 @@ export const terminalDockStyles = themedStyleSheet(() => ({
   keysBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
-    paddingHorizontal: spacing.md,
+    gap: 2,
+    paddingHorizontal: spacing.sm,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.sm
+    paddingBottom: 6
   },
   liveField: {
     flex: 1,
     minWidth: 0
   },
   composer: {
-    marginHorizontal: spacing.md,
+    marginHorizontal: spacing.sm,
     marginTop: spacing.sm,
-    marginBottom: spacing.sm
+    marginBottom: 6
   },
   keyRow: {
-    height: KEY_ROW_HEIGHT,
+    height: 46,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: KEY_GAP,
-    paddingHorizontal: spacing.sm,
+    gap: 6,
+    paddingHorizontal: 6,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: colors.borderSubtle,
     backgroundColor: colors.bgPanel
+  },
+  // The Duo's side rail is 84pt wide; keys span it less 4pt each side.
+  keyRail: {
+    flex: 1,
+    minHeight: 0,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: spacing.xs
   },
   keyScroll: {
     flex: 1,
     minWidth: 0
   },
+  keyScrollVertical: {
+    flex: 1,
+    minHeight: 0
+  },
+  keyScrollContentVertical: {
+    alignItems: 'stretch',
+    gap: spacing.sm
+  },
+  keyVertical: {
+    width: 'auto',
+    height: 44,
+    alignSelf: 'stretch',
+    paddingHorizontal: 2
+  },
   keyScrollContent: {
     alignItems: 'center',
-    gap: KEY_GAP,
-    paddingVertical: (KEY_ROW_HEIGHT - KEY_HEIGHT) / 2
+    gap: 6,
+    paddingVertical: 7
   },
   // Every key carries the one-shot outline's width so arming ctrl doesn't nudge the row.
   key: {
@@ -82,7 +94,7 @@ export const terminalDockStyles = themedStyleSheet(() => ({
     fontFamily: typography.monoFamily
   },
   keyPressed: {
-    opacity: feedback.pressedOpacity
+    opacity: 0.7
   },
   keyOnce: {
     borderColor: colors.accentBlue
@@ -122,12 +134,12 @@ export const terminalDockStyles = themedStyleSheet(() => ({
     fontWeight: '600'
   },
   disabled: {
-    opacity: feedback.disabledOpacity
+    opacity: 0.35
   },
   arrowPad: {
     width: 66,
     height: KEY_HEIGHT,
-    borderRadius: radii.control,
+    borderRadius: KEY_HEIGHT / 2,
     backgroundColor: colors.bgRaised
   },
   arrowPadDragging: {
@@ -182,13 +194,17 @@ export const terminalDockStyles = themedStyleSheet(() => ({
     fontSize: 14,
     fontWeight: '500'
   },
-  sheetKey: {
-    backgroundColor: colors.sheetGroup
+  sheetHeading: {
+    color: colors.textSecondary,
+    fontSize: typography.metaSize,
+    fontWeight: '600',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase'
   },
   sheetGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: KEY_GAP
+    gap: 6
   },
   sheetEmpty: {
     color: colors.textMuted,

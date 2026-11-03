@@ -58,8 +58,6 @@ export type AgentModelCatalogRunnerOptions = {
   spawnImpl?: PipedProcessSpawner
   platform?: NodeJS.Platform
   inheritedEnv?: NodeJS.ProcessEnv
-  /** Finish required replies even when an optional control request never completes. */
-  partialOutput?: { ready: (stdout: string) => boolean; timeoutMs: number }
 }
 
 /** Bound the listing and await child teardown before success, failure or cancellation settles. */
@@ -85,7 +83,6 @@ export async function runAgentModelCatalogListing(
   const stderrDetail = (): string =>
     providerStderrForDisplay(managed.stderrTail()).trim().slice(0, STDERR_DETAIL_MAX_CHARS)
   let timer: ReturnType<typeof setTimeout> | undefined
-  let partialTimer: ReturnType<typeof setTimeout> | undefined
   let onAbort = (): void => {}
   try {
     return await new Promise<string>((resolve, reject) => {
@@ -102,25 +99,16 @@ export async function runAgentModelCatalogListing(
             failedExit
           )
         )
-      // Required replies already in hand outlive an optional reply that runs out of time or room.
-      const failUnlessReady = (message: string, reason: AgentModelCatalogProbeFailure): void =>
-        partialTimer === undefined ? fail(message, reason) : resolve(output.text())
       onAbort = () => fail(`${launch.command} listing stopped`, 'stopped')
       options.signal?.addEventListener('abort', onAbort, { once: true })
       timer = setTimeout(
-        () =>
-          failUnlessReady(`${launch.command} did not list models within ${timeoutMs}ms`, 'timeout'),
+        () => fail(`${launch.command} did not list models within ${timeoutMs}ms`, 'timeout'),
         timeoutMs
       )
       child.stdout.on('data', (chunk: Buffer | string) => {
         output.write(chunk)
         if (output.truncated()) {
-          failUnlessReady(
-            `${launch.command} listed more than the model catalog reads`,
-            'output-overflow'
-          )
-        } else if (partialTimer === undefined && options.partialOutput?.ready(output.text())) {
-          partialTimer = setTimeout(() => resolve(output.text()), options.partialOutput.timeoutMs)
+          fail(`${launch.command} listed more than the model catalog reads`, 'output-overflow')
         }
       })
       child.stdout.on('error', () => {})
@@ -154,7 +142,6 @@ export async function runAgentModelCatalogListing(
     })
   } finally {
     clearTimeout(timer)
-    clearTimeout(partialTimer)
     options.signal?.removeEventListener('abort', onAbort)
     await managed.close()
   }

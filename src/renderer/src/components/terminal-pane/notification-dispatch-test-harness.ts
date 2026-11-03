@@ -1,9 +1,6 @@
 import { vi } from 'vitest'
 import type { Mock } from 'vitest'
-import type {
-  AgentStatusEntry,
-  AgentStatusOrchestrationContext
-} from '../../../../shared/agent-status-types'
+import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import type { TerminalLayoutSnapshot } from '../../../../shared/terminal-tab-types'
 import type { Tab, TabGroup } from '../../../../shared/tab-types'
 
@@ -35,7 +32,6 @@ export type NotificationDispatchMockState = {
     { launchConfig: { agentArgs: string }; identity: { agentType?: string } }
   >
   agentStatusByPaneKey: Record<string, AgentStatusEntry>
-  runtimeAgentOrchestrationByPaneKey: Record<string, AgentStatusOrchestrationContext>
   worktreesByRepo: Record<
     string,
     {
@@ -105,7 +101,6 @@ function buildNotificationDispatchMockState(): NotificationDispatchMockState {
     retainedAgentsByPaneKey: {},
     agentLaunchConfigByPaneKey: {},
     agentStatusByPaneKey: { [PANE_KEY]: makeAgentStatus(PANE_KEY) },
-    runtimeAgentOrchestrationByPaneKey: {},
     worktreesByRepo: {
       repo1: [
         { id: 'wt-primary', repoId: 'repo1', displayName: 'master', branch: 'master' },

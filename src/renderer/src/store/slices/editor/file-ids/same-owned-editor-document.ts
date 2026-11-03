@@ -2,7 +2,6 @@
 
 import type { OpenFile } from '../types/open-file'
 import { isSameEditorOwner } from './editor-file-ids'
-import { authorityKey } from '../../../../../../shared/host-authority'
 
 function isSameDocumentOwner(candidate: OpenFile, closedFile: OpenFile): boolean {
   const expectedRoute = closedFile.operationProvenance?.generation.route
@@ -22,16 +21,12 @@ export function isSameOwnedDocument(candidate: OpenFile, closedFile: OpenFile): 
   const actual = candidate.operationProvenance
   const expectedGeneration = expected?.generation
   const actualGeneration = actual?.generation
-  const expectedAuthority = expectedGeneration?.authority
-  const actualAuthority = actualGeneration?.authority
   return (
     isSameDocumentOwner(candidate, closedFile) &&
     !closedFile.externalSshTargetId &&
     !candidate.externalSshTargetId &&
     actual?.ownershipProjection === expected?.ownershipProjection &&
     actual?.expectedSshConnectionGeneration === expected?.expectedSshConnectionGeneration &&
-    (actualAuthority ? authorityKey(actualAuthority) : undefined) ===
-      (expectedAuthority ? authorityKey(expectedAuthority) : undefined) &&
     actualGeneration?.runtimeConnectionGeneration ===
       expectedGeneration?.runtimeConnectionGeneration &&
     actualGeneration?.runtimePairingRevision === expectedGeneration?.runtimePairingRevision &&

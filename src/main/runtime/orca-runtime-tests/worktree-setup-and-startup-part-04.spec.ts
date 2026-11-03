@@ -69,7 +69,6 @@ describe('OrcaRuntimeService', () => {
     runtime.attachWindow(1)
     // Delivery waits for composer readiness and pastes; its behaviour is covered with the delivery itself.
     const deliver = vi.spyOn(runtime, 'deliverStartupFollowup').mockResolvedValue(true)
-    const createTerminal = vi.spyOn(runtime, 'createTerminal')
 
     computeWorktreePathMock.mockReturnValue('/tmp/workspaces/runtime-cli-aider-startup')
     ensurePathWithinWorkspaceMock.mockReturnValue('/tmp/workspaces/runtime-cli-aider-startup')
@@ -97,24 +96,9 @@ describe('OrcaRuntimeService', () => {
         worktreeId: result.worktree.id
       })
     )
-    const creation = createTerminal.mock.settledResults[0]
-    if (creation?.type !== 'fulfilled') {
-      throw new Error('Startup terminal creation did not complete')
-    }
-    const terminal = creation.value
-    expect(terminal).toMatchObject({
-      ptyId: 'pty-cli-aider-startup',
-      worktreeId: result.worktree.id,
-      launchAgent: 'aider'
-    })
     await vi.waitFor(() => {
-      expect(deliver).toHaveBeenCalledWith(
-        terminal.handle,
-        { agent: 'aider', prompt: 'fix it' },
-        { terminalCreation: terminal }
-      )
+      expect(deliver).toHaveBeenCalledWith(expect.any(String), { agent: 'aider', prompt: 'fix it' })
     })
-    expect(deliver.mock.calls[0][2]?.terminalCreation).toBe(terminal)
     expect(write).not.toHaveBeenCalledWith('pty-cli-aider-startup', 'fix it\r', 'launch')
   })
 
@@ -309,7 +293,7 @@ describe('OrcaRuntimeService', () => {
       }
     })
     vi.mocked(shouldRunSetupForCreate).mockReturnValue(true)
-    vi.mocked(createSetupRunnerScript).mockResolvedValue({
+    vi.mocked(createSetupRunnerScript).mockReturnValue({
       runnerScriptPath: '/tmp/repo/.git/orca/setup-runner.sh',
       envVars: {
         ORCA_ROOT_PATH: '/tmp/repo',
@@ -441,7 +425,7 @@ describe('OrcaRuntimeService', () => {
       }
     })
     vi.mocked(shouldRunSetupForCreate).mockReturnValue(true)
-    vi.mocked(createSetupRunnerScript).mockResolvedValue({
+    vi.mocked(createSetupRunnerScript).mockReturnValue({
       runnerScriptPath: 'C:\\tmp\\repo\\.git\\orca\\setup-runner.sh',
       shell: { family: 'posix', executable: 'wsl.exe' },
       envVars: {

@@ -1,5 +1,3 @@
-import { useLayoutEffect } from 'react'
-import { useMobileStructuredSessionOpening } from './use-mobile-structured-session-opening'
 import { useNotificationPaneNavigation } from './use-notification-pane-navigation'
 import { useMobileSessionFoundation } from './use-mobile-session-foundation'
 import { useMobileSessionScreenState } from './use-mobile-session-screen-state'
@@ -48,16 +46,6 @@ export function useMobileSessionController() {
     feedbackCapabilities,
     useMobileSessionNativeChatDictation(feedbackCapabilities, sendLiveTerminalInput)
   )
-  // Chat covers a split, so only its own terminal stays visible; this is the ref's one writer per commit.
-  if (nativeChatDictation.showNativeChat) {
-    nativeChatDictation.visibleTerminalHandles = nativeChatDictation.activeHandle
-      ? [nativeChatDictation.activeHandle]
-      : []
-  }
-  const { visibleTerminalHandles, visibleTerminalHandlesRef } = nativeChatDictation
-  useLayoutEffect(() => {
-    visibleTerminalHandlesRef.current = visibleTerminalHandles
-  })
   const subscriptionFoundation = Object.assign(
     nativeChatDictation,
     useMobileSessionTerminalSubscriptionFoundation(nativeChatDictation)
@@ -96,8 +84,7 @@ export function useMobileSessionController() {
   useMobileSessionStartup(keyboardState)
   const preferences = useMobileSessionPreferenceFocus(keyboardState)
   const tabSwitching = Object.assign(keyboardState, useMobileSessionTabSwitching(keyboardState))
-  const openNativeSession = useMobileStructuredSessionOpening(tabSwitching)
-  useNotificationPaneNavigation({ ...tabSwitching, openNativeSession })
+  useNotificationPaneNavigation(tabSwitching)
   const terminalWebview = Object.assign(tabSwitching, useMobileSessionTerminalWebview(tabSwitching))
   const terminalSendActions = Object.assign(
     terminalWebview,

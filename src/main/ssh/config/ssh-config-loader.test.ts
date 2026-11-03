@@ -57,6 +57,24 @@ function writeFile(root: string, relativePath: string, content: string): string 
 }
 
 describe('loadUserSshConfig', () => {
+  it('loads hosts from a single included file', () => {
+    const home = makeHome()
+    writeFile(home, '.ssh/config', 'Include included.conf\n')
+    writeFile(
+      home,
+      '.ssh/included.conf',
+      'Host included\n  HostName included.example.com\n  User deploy\n'
+    )
+
+    expect(loadUserSshConfig()).toEqual([
+      {
+        host: 'included',
+        hostname: 'included.example.com',
+        user: 'deploy'
+      }
+    ])
+  })
+
   it('supports OrbStack includes, Include= syntax, quoted paths, and multiple pathnames', () => {
     const home = makeHome()
     writeFile(
@@ -191,5 +209,10 @@ describe('loadUserSshConfig', () => {
       'nested',
       'recursive'
     ])
+  })
+
+  it('returns an empty array when the user config does not exist', () => {
+    makeHome()
+    expect(loadUserSshConfig()).toEqual([])
   })
 })

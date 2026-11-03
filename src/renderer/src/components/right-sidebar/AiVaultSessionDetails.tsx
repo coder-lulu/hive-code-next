@@ -25,9 +25,6 @@ import { ResumeInNewCliTooltipText } from './ai-vault-session-cli-fork-copy'
 import { sessionDetailConversationTurns, sessionPromptPreview } from './ai-vault-session-display'
 import { SessionSubagentsSection } from './AiVaultSessionSubagents'
 import { SessionUnsavedConversationNotice } from './AiVaultSessionUnsavedNotice'
-import { useAiVaultSessionAccount } from './ai-vault-session-account'
-import { SessionAccountSection } from './AiVaultSessionAccount'
-import { SessionReceiptSection } from './AiVaultSessionReceiptSection'
 import {
   aiVaultResumeInSessionWorkspaceLabel,
   aiVaultSessionWorkspaceHeading,
@@ -81,7 +78,6 @@ export function SessionInlineDetails({
     (!resumeActions.worktree.worktreeId || Boolean(resumeActions.newTab.worktreeId))
   const promptPreview = sessionPromptPreview(session)
   const detailTurns = sessionDetailConversationTurns(session, 3)
-  const accountLabel = useAiVaultSessionAccount(session)
 
   return (
     <div
@@ -284,9 +280,28 @@ export function SessionInlineDetails({
             <WorktreeMetadataLines worktreeInfo={worktreeInfo} vaultScope={vaultScope} />
           </SessionReceiptSection>
         ) : null}
-        <SessionAccountSection accountLabel={accountLabel} />
       </div>
     </div>
+  )
+}
+
+function SessionReceiptSection({
+  icon,
+  label,
+  children
+}: {
+  icon: React.ReactNode
+  label: string
+  children: React.ReactNode
+}): React.JSX.Element {
+  return (
+    <section className="space-y-1.5">
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
+        <span className="text-muted-foreground/80">{icon}</span>
+        <span>{label}</span>
+      </div>
+      {children}
+    </section>
   )
 }
 

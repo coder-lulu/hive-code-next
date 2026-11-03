@@ -53,6 +53,8 @@ type RuntimeServerListProps = {
   onRecheck: () => void
   rechecking: boolean
   onChanged: () => void
+  canRenameCloud?: boolean
+  onRenameCloud?: (environment: PublicKnownRuntimeEnvironment) => void
 }
 
 export function RuntimeServerList({
@@ -75,7 +77,9 @@ export function RuntimeServerList({
   onCheckForUpdates,
   onRecheck,
   rechecking,
-  onChanged
+  onChanged,
+  canRenameCloud,
+  onRenameCloud
 }: RuntimeServerListProps): React.JSX.Element {
   const { api, pending, targets, resumingId, resume, reload } = managedCatalog
 
@@ -125,6 +129,8 @@ export function RuntimeServerList({
           onConnect,
           onDisconnect,
           onRemove,
+          canRenameCloud,
+          onRenameCloud,
           onMakeDefault,
           onCheckForUpdates,
           onRefreshSshTargets: () => void reload().catch(() => {}),

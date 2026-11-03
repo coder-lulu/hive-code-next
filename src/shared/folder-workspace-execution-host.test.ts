@@ -7,8 +7,6 @@ import type { Repo } from './repo-types'
 import {
   findFolderWorkspaceCandidateRepos,
   resolveFolderWorkspaceHost,
-  resolveQualifiedFolderWorkspace,
-  resolveQualifiedFolderWorkspaceResult,
   type FolderWorkspaceHostState
 } from './folder-workspace-execution-host'
 
@@ -62,67 +60,7 @@ function state(overrides: Partial<FolderWorkspaceHostState> = {}): FolderWorkspa
   }
 }
 
-const unavailable = () => new Error('worktree_execution_host_unresolved')
-
 describe('folder workspace execution host', () => {
-  it('keeps absent catalog evidence unknown while honoring own and inherited pins', () => {
-    const row = workspace()
-    expect(resolveQualifiedFolderWorkspaceResult({ folderWorkspaces: [row] }, row.id).kind).toBe(
-      'ambiguous'
-    )
-    expect(
-      resolveQualifiedFolderWorkspaceResult(
-        { folderWorkspaces: [{ ...row, folderPath: undefined }], repos: [], projectGroups: [] },
-        row.id
-      ).kind
-    ).toBe('ambiguous')
-    const inherited = state({
-      repos: [],
-      projectGroups: [
-        { ...state().projectGroups[0], executionHostId: 'runtime:server', connectionId: 'box' }
-      ]
-    })
-    expect(
-      resolveQualifiedFolderWorkspaceResult(inherited, row.id, 'runtime:server')
-    ).toMatchObject({ kind: 'selected', value: { hostId: 'runtime:server', connectionId: 'box' } })
-    expect(
-      resolveQualifiedFolderWorkspaceResult(
-        {
-          ...inherited,
-          folderWorkspaces: [{ ...row, executionHostId: 'local', connectionId: null }]
-        },
-        row.id,
-        'local'
-      )
-    ).toMatchObject({ kind: 'selected', value: { hostId: 'local', connectionId: null } })
-    expect(
-      resolveQualifiedFolderWorkspaceResult(
-        { ...inherited, folderWorkspaces: [{ ...row, executionHostId: 'ssh:own' }] },
-        row.id,
-        'ssh:own'
-      )
-    ).toMatchObject({ kind: 'selected', value: { hostId: 'ssh:own', connectionId: 'own' } })
-  })
-  it.each([false, true])(
-    'canonicalizes equivalent group pins before selecting a row (%s)',
-    (reverse) => {
-      const catalog = state()
-      const group = catalog.projectGroups[0]
-      const groups = [
-        { ...group, connectionId: 'box' },
-        { ...group, executionHostId: 'ssh:box' as const }
-      ]
-      catalog.projectGroups = reverse ? groups.toReversed() : groups
-      expect(
-        resolveQualifiedFolderWorkspace(catalog, 'fw-1', 'ssh:box', unavailable)
-      ).toMatchObject({
-        hostId: 'ssh:box',
-        connectionId: 'box',
-        workspace: { folderPath: '/work/app' }
-      })
-    }
-  )
-
   it('answers with the workspace pin even when every repo under it is local', () => {
     const resolved = resolveFolderWorkspaceHost(
       state({
@@ -345,7 +283,7 @@ describe('folder workspace execution host', () => {
         'fw-1'
       )
     ).toEqual({ kind: 'runtime', environmentId: 'env-1', sshTargetId: 'server-box' })
-    // An unqualified id cannot choose a row from another host's copy.
+    // A same-id copy on another host leaves the selected one unknown here, so no target is named.
     expect(
       resolveFolderWorkspaceHost(
         state({
@@ -356,59 +294,10 @@ describe('folder workspace execution host', () => {
         }),
         'fw-1'
       )
-    ).toEqual({ kind: 'ambiguous' })
+    ).toEqual({ kind: 'runtime', environmentId: 'env-1', sshTargetId: null })
   })
 
-  it.each([false, true])(
-    'qualifies actual folder rows and refuses duplicate ownership (%s)',
-    (reverse) => {
-      const local = workspace({ executionHostId: 'local', folderPath: '/local' })
-      const remote = workspace({ executionHostId: 'ssh:box', folderPath: '/remote' })
-      const catalog = state({ folderWorkspaces: reverse ? [remote, local] : [local, remote] })
-      expect(resolveFolderWorkspaceHost(catalog, 'fw-1')).toEqual({ kind: 'ambiguous' })
-      expect(
-        resolveQualifiedFolderWorkspace(catalog, 'fw-1', 'ssh:box', unavailable).workspace
-      ).toBe(remote)
-      expect(resolveQualifiedFolderWorkspace(catalog, 'fw-1', 'local', unavailable).workspace).toBe(
-        local
-      )
-      expect(() =>
-        resolveQualifiedFolderWorkspace(
-          { ...catalog, folderWorkspaces: [remote, { ...remote }] },
-          'fw-1',
-          'ssh:box',
-          unavailable
-        )
-      ).toThrow('worktree_execution_host_unresolved')
-      const group = catalog.projectGroups[0]
-      expect(() =>
-        resolveQualifiedFolderWorkspace(
-          {
-            ...catalog,
-            folderWorkspaces: [workspace()],
-            projectGroups: [{ ...group, executionHostId: 'ssh:box' }, group]
-          },
-          'fw-1',
-          'local',
-          unavailable
-        )
-      ).toThrow('worktree_execution_host_unresolved')
-      const runtime = { ...group, executionHostId: 'runtime:server', connectionId: 'nested' }
-      expect(
-        resolveQualifiedFolderWorkspace(
-          { ...catalog, folderWorkspaces: [workspace()], projectGroups: [runtime] },
-          'fw-1',
-          'runtime:server',
-          unavailable
-        )
-      ).toMatchObject({ hostId: 'runtime:server', connectionId: 'nested' })
-    }
-  )
-
-  // The candidate FILTER decides which rows reach the resolver, and it read `repo.connectionId` raw
-  // too — so an SSH-only repo outside the project-group subtree was dropped before any of the above
-  // could classify it. Every test before this one uses a repo inside the subtree, which is never
-  // filtered, so none of them could have caught it (found in review by CodeRabbit).
+  // The candidate filter also needs unified host resolution; subtree fixtures bypass it, so use outside-subtree path matches.
   describe('a repo matched only by path, outside the project-group subtree', () => {
     const sshOnlyPathRepo = repo({
       id: 'repo-path',

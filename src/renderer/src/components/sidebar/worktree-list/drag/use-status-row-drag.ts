@@ -93,7 +93,7 @@ export function useWorkspaceStatusRowDrag(args: {
         ? ctx.computeWorktreeStatusDrop({
             pointerY: event.clientY,
             status,
-            draggedKeys: dragSession.reorderDraggedKeys
+            draggedIds: dragSession.reorderDraggedIds
           })
         : null
       setDragOverStatus(null)

@@ -1,3 +1,5 @@
+import type { OrchestrationMailboxLeaf } from './mailbox-owner'
+
 export type OrchestrationMailboxDeliveryFlight = {
   enterTimer: ReturnType<typeof setTimeout> | null
   stagedMessageIds: string[]
@@ -8,15 +10,20 @@ export type OrchestrationMailboxDeliveryFlight = {
   processIncarnation?: string
 }
 
-/** A mailbox waiting behind a terminal's in-flight pointer, with the types its waiters reserve. */
-type ParkedOrchestrationMailboxDeliveries = Map<string, ReadonlySet<string> | undefined>
+export type ParkedOrchestrationMailboxDelivery = {
+  leaf: OrchestrationMailboxLeaf
+  reservedTypes?: ReadonlySet<string>
+}
 
 export class OrchestrationMailboxPointerState {
   private readonly flightsByPtyId = new Map<string, OrchestrationMailboxDeliveryFlight>()
-  private readonly parkedDeliveriesByPtyId = new Map<string, ParkedOrchestrationMailboxDeliveries>()
+  private readonly parkedDeliveriesByPtyId = new Map<
+    string,
+    Map<string, ParkedOrchestrationMailboxDelivery>
+  >()
   private readonly watermarkByMailbox = new Map<
     string,
-    { ptyId: string; sequence: number; active: boolean }
+    { ptyId: string; sequence: number; leafKey: string; active: boolean }
   >()
   private readonly watermarkMailboxesByPtyId = new Map<string, Set<string>>()
   private readonly parkedTypesByMailbox = new Map<string, ReadonlySet<string> | null>()
@@ -74,7 +81,7 @@ export class OrchestrationMailboxPointerState {
   settleFlight(
     ptyId: string,
     flight: OrchestrationMailboxDeliveryFlight
-  ): ParkedOrchestrationMailboxDeliveries | null {
+  ): Map<string, ParkedOrchestrationMailboxDelivery> | null {
     if (!this.isCurrentFlight(ptyId, flight)) {
       return null
     }
@@ -84,18 +91,23 @@ export class OrchestrationMailboxPointerState {
     return parked
   }
 
-  parkDelivery(ptyId: string, mailboxHandle: string, reservedTypes?: ReadonlySet<string>): void {
-    const parked: ParkedOrchestrationMailboxDeliveries =
-      this.parkedDeliveriesByPtyId.get(ptyId) ?? new Map()
-    const prior = parked.get(mailboxHandle)
+  parkDelivery(
+    ptyId: string,
+    mailboxHandle: string,
+    leaf: OrchestrationMailboxLeaf,
+    reservedTypes?: ReadonlySet<string>
+  ): void {
+    const parked = this.parkedDeliveriesByPtyId.get(ptyId) ?? new Map()
+    const priorEntry = parked.get(mailboxHandle)
+    const prior = priorEntry?.reservedTypes
     const current = reservedTypes && reservedTypes.size > 0 ? reservedTypes : undefined
     let merged: Set<string> | undefined
-    if (!parked.has(mailboxHandle)) {
+    if (!priorEntry) {
       merged = current ? new Set(current) : undefined
     } else if (prior && current) {
       merged = new Set([...prior, ...current])
     }
-    parked.set(mailboxHandle, merged)
+    parked.set(mailboxHandle, { leaf, reservedTypes: merged })
     this.parkedDeliveriesByPtyId.set(ptyId, parked)
   }
 
@@ -106,7 +118,8 @@ export class OrchestrationMailboxPointerState {
   releaseSupersededWatermark(
     mailboxHandle: string,
     newestSequence: number,
-    ptyId: string
+    ptyId: string | null,
+    leafKey: string
   ): boolean {
     const owner = this.watermarkByMailbox.get(mailboxHandle)
     if (newestSequence > (owner?.sequence ?? -1)) {
@@ -115,17 +128,17 @@ export class OrchestrationMailboxPointerState {
     return Boolean(
       owner &&
       !owner.active &&
-      owner.ptyId !== ptyId &&
+      !(owner.ptyId === ptyId && owner.leafKey === leafKey) &&
       this.clearWatermark(mailboxHandle, owner.sequence, owner.ptyId)
     )
   }
 
-  setWatermark(mailbox: string, sequence: number, ptyId: string): void {
+  setWatermark(mailbox: string, sequence: number, ptyId: string, leafKey: string): void {
     const prior = this.watermarkByMailbox.get(mailbox)
     if (prior && prior.ptyId !== ptyId) {
       this.removeWatermarkPtyIndex(mailbox, prior.ptyId)
     }
-    this.watermarkByMailbox.set(mailbox, { ptyId, sequence, active: true })
+    this.watermarkByMailbox.set(mailbox, { ptyId, sequence, leafKey, active: true })
     const mailboxes = this.watermarkMailboxesByPtyId.get(ptyId) ?? new Set<string>()
     mailboxes.add(mailbox)
     this.watermarkMailboxesByPtyId.set(ptyId, mailboxes)

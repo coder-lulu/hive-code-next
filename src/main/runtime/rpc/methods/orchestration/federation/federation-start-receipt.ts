@@ -1,4 +1,3 @@
-import { formatTerminalStartFailure } from '../../../../../../shared/terminal-start-failure'
 import type { OrchestrationDb } from '../../../../orchestration/db'
 import { isFederationEffectUnknown } from './federation-effects'
 import type { WorkerSetupReceipt } from '../worker/worker-topology'
@@ -13,9 +12,7 @@ export function failFederatedAttachmentWithReceipt(args: {
   setup: WorkerSetupReceipt
   launch: OrchestrationWorkerLaunchReceipt
 }): unknown {
-  const reason =
-    formatTerminalStartFailure(args.error) ??
-    (args.error instanceof Error ? args.error.message : String(args.error))
+  const reason = args.error instanceof Error ? args.error.message : String(args.error)
   const unknown = isFederationEffectUnknown(args.error, args.failedStage)
   const attachment = args.db.failRemoteAttachment(
     args.dispatchId,

@@ -18,11 +18,9 @@ export type Body = {
   launchToken?: string
   tabId?: string
   worktreeId?: string
-  hookEventName?: string
   env?: string
   version?: string
   agentProcess?: string
-  tmuxPane?: string
   payload: Record<string, unknown>
 }
 

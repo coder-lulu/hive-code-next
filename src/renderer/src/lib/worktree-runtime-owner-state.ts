@@ -6,8 +6,7 @@ import type { Repo } from '../../../shared/repo-types'
 import type { Worktree } from '../../../shared/worktree/types'
 
 export type WorktreeRuntimeOwnerState = {
-  repos?: readonly (Pick<Repo, 'id' | 'connectionId' | 'executionHostId'> &
-    Partial<Pick<Repo, 'path' | 'projectGroupId'>>)[]
+  repos?: readonly Pick<Repo, 'id' | 'connectionId' | 'executionHostId'>[]
   settings?: Pick<GlobalSettings, 'activeRuntimeEnvironmentId'> | null
   worktreesByRepo?: Record<
     string,
@@ -19,13 +18,11 @@ export type WorktreeRuntimeOwnerState = {
       worktrees: readonly Pick<Worktree, 'id' | 'repoId' | 'hostId' | 'runtimeOwnerEnvironmentId'>[]
     }
   >
-  folderWorkspaces?: readonly (Pick<
+  folderWorkspaces?: readonly Pick<
     FolderWorkspace,
     'id' | 'projectGroupId' | 'connectionId' | 'executionHostId'
-  > &
-    Partial<Pick<FolderWorkspace, 'folderPath'>>)[]
-  projectGroups?: readonly (Pick<ProjectGroup, 'id' | 'connectionId' | 'executionHostId'> &
-    Partial<Pick<ProjectGroup, 'parentGroupId'>>)[]
+  >[]
+  projectGroups?: readonly Pick<ProjectGroup, 'id' | 'connectionId' | 'executionHostId'>[]
   restoredRuntimeHostIdByWorkspaceSessionKey?: Record<string, ExecutionHostId>
   activeWorktreeId?: string | null
   activeWorkspaceExecutionHostId?: ExecutionHostId | null

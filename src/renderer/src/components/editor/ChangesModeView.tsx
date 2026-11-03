@@ -78,7 +78,6 @@ export function ChangesModeView({
         <DiffViewer
           key={viewStateScopeId}
           modelKey={diffViewStateKey}
-          modelOwnerKey={activeFile.id}
           originalModelKey={originalModelKey}
           originalContent={dc.originalContent}
           modifiedContent={modifiedContent}
@@ -89,7 +88,6 @@ export function ChangesModeView({
           sideBySide={sideBySide}
           editable={true}
           worktreeId={activeFile.worktreeId}
-          noteSource={activeFile}
           onContentChange={onContentChange}
           onSave={onSave}
         />

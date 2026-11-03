@@ -1,8 +1,6 @@
 export type RpcBinarySendOptions = {
   // Why: a lossy stream resends its newest frame later, so queueing stale frames behind a backlog only delays it.
   dropWhenBacklogged?: boolean
-  // Text-like payloads (terminal output, snapshots) a phone that reads compressed frames receives gzipped.
-  compressible?: boolean
 }
 
 /** False: not sent or queued. 'backlogged': skipped under dropWhenBacklogged; the socket is alive. */

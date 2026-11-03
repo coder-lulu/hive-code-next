@@ -1,4 +1,3 @@
-import { useDiffCommentView } from '../diff-comments/use-diff-comment-owner'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createConnectionIdForFileSelector } from '@/lib/connection-owner-resolution'
 import { computeEditorFontSize } from '@/lib/editor-font-zoom'
@@ -84,12 +83,7 @@ export function useMarkdownPreviewSourceFoundation({
     resolvedSourceWorktreeId,
     filePath
   )
-  // Notes and their owner come from the copy this preview's content does: its source tab's own
-  // provenance and host. The row lookup above only supplies the id and path every copy shares.
-  const { owner: commentOwner, comments: allDiffComments } = useDiffCommentView(
-    sourceWorktree?.id,
-    sourceOpenFile ?? { runtimeEnvironmentId: resolvedSourceRuntimeEnvironmentId }
-  )
+  const allDiffComments = sourceWorktree?.diffComments
   const sourceRoutingWorktreeId = sourceWorktree?.id ?? resolvedSourceWorktreeId
   const runtimeOwnerId = resolvedSourceRuntimeEnvironmentId?.trim()
   const sourceConnectionIdSelector = useMemo(
@@ -201,8 +195,6 @@ export function useMarkdownPreviewSourceFoundation({
     clearDeliveredDiffComments,
     keybindings,
     worktreesByRepo,
-    commentOwner,
-    notesKnown: allDiffComments !== undefined,
     sourceWorktree,
     sourceRoutingWorktreeId,
     sourceConnectionId,

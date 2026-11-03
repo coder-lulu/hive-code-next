@@ -5,8 +5,7 @@ import { dirname, join } from 'node:path'
 
 export type PluginAuditEntry = {
   ts: number
-  /** `cli:<caller>` records approvals granted through the explicit CLI approve flag. */
-  actor: `plugin:${string}` | `cli:${string}`
+  actor: `plugin:${string}`
   method: string
   /** Bounded summary only; full parameters may contain user content. */
   summary: string

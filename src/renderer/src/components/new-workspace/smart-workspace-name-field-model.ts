@@ -105,12 +105,7 @@ export type WorkItemSourceSearchProps = Pick<
   | 'gitlabSourceContext'
   | 'linearSourceContext'
   | 'jiraSourceContext'
-> & {
-  sourceSelected?: boolean
-  gitlabEnabled?: boolean
-  typedTextEnabled?: boolean
-  defaultLinearWorkspaceId?: string
-}
+> & { sourceSelected?: boolean; gitlabEnabled?: boolean; typedTextEnabled?: boolean }
 export type NormalizedWorkItemSourceSearchProps = WorkItemSourceSearchProps & {
   disabled: boolean
   textOnly: boolean

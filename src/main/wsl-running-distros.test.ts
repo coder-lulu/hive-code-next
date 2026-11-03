@@ -1,7 +1,7 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ProcessResult } from '@orca/process-host/process-spec'
 
 const { runProcessMock } = vi.hoisted(() => ({ runProcessMock: vi.fn() }))
@@ -16,7 +16,6 @@ const FAILED = exited('', 1)
 
 import {
   _resetWslCachesForTests,
-  _setWslCachesForTests,
   listRunningWslDistrosAsync,
   listRunningWslHomeDirsAsync
 } from './wsl'
@@ -46,9 +45,6 @@ async function withPlatform<T>(value: NodeJS.Platform, fn: () => Promise<T>): Pr
 }
 
 describe('running WSL distro discovery', () => {
-  // A healthy host whose installed list is known, so an empty running list needs no second look.
-  beforeEach(() => _setWslCachesForTests({ distros: ['Ubuntu'] }))
-
   afterEach(() => {
     runProcessMock.mockReset()
     _resetWslCachesForTests()

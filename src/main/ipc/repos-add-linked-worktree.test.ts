@@ -51,7 +51,7 @@ vi.mock('../git/repo', () => ({
   searchBaseRefs: vi.fn().mockResolvedValue([])
 }))
 
-vi.mock('../repository-icons/repo-icon-autodetect', () => ({
+vi.mock('../repo-icon-autodetect', () => ({
   detectRepoIconAndUpstream: detectRepoIconAndUpstreamMock
 }))
 

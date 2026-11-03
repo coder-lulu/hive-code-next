@@ -1,11 +1,10 @@
-import type { AgentJournalRenderItem } from './agent-session/journal/agent-session-journal-types'
-import { isRootAgentJournalItem } from './agent-session/journal/agent-session-journal-producer'
-import type { AgentSessionLatestTurn } from './agent-session/agent-session-wire'
-import type { AgentSessionBackgroundTaskState } from './agent-session/agent-session-background-task-wire'
+import type { AgentJournalRenderItem } from './agent-session-journal-types'
+import { isRootAgentJournalItem } from './agent-session-journal-producer'
+import type { AgentSessionBackgroundTaskState, AgentSessionLatestTurn } from './agent-session-wire'
 import {
   runningStructuredAgentSessionTurnId,
   runningStructuredAgentSessionTurnScope
-} from './agent-session/view/structured-agent-session-live-turn'
+} from './structured-agent-session-live-turn'
 
 const PRIMARY_COMMAND_PREFIX = 'codex-command:primary:'
 

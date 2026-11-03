@@ -252,8 +252,7 @@ describe('worktree remote runtime mutations', () => {
     expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(1, {
       selector: 'owner-hub',
       method: 'repo.hooksCheck',
-      // Removing is the user's own act, so its hooks check may start a stopped WSL distro.
-      params: { repo: 'repo-ssh', wakeWslDistro: true },
+      params: { repo: 'repo-ssh' },
       timeoutMs: 15_000
     })
     expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(2, {

@@ -1,3 +1,4 @@
+import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -51,7 +52,7 @@ vi.mock('../theme/mobile-theme-provider', () => ({ useMobileTheme: () => lightTh
 vi.mock('../layout/responsive-layout', () => ({
   useResponsiveLayout: () => ({ isWideLayout: false, contentMaxWidth: 600 })
 }))
-vi.mock('../transport/client-context', () => ({
+vi.mock('../transport/host-client-hooks', () => ({
   useHostClient: () => ({ client: null, state: fixture.connected ? 'connected' : 'disconnected' }),
   useDisconnectHostClient: () => fixture.disconnect,
   useForgetHostClient: () => vi.fn(),
@@ -213,13 +214,13 @@ describe('Orca home in the Stack', () => {
       fixture.session = { authorityId: 'cloud', account: { accountId: 'account-a' } }
       fixture.data.hostStates = { [runtimeRecordId]: connected ? 'connected' : 'disconnected' }
       renderer = mount()
-      act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
-      const menu = renderer.root.findByType('ActionSheet')
+      act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
+      const menu = findByHostType(renderer.root, 'ActionSheet')
       expect(menu.props.visible).toBe(true)
       const labels = menu.props.actions.map((action: { label: string }) => action.label)
       expect(labels).toContain('修改云端别名')
-      expect(labels).toContain('会话管理')
-      expect(labels).not.toContain('移除本地配对')
+      expect(labels).toContain('Session management')
+      expect(labels).not.toContain('Remove local pairing')
       act(() =>
         menu.props.actions
           .find((action: { label: string }) => action.label === '修改云端别名')
@@ -235,11 +236,10 @@ describe('Orca home in the Stack', () => {
     Object.assign(hosts[0], { runtimeRecordId, accessSources: ['account-claimed'] })
     fixture.session = { authorityId: 'cloud', account: { accountId: 'account-a' } }
     renderer = mount()
-    act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
+    act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
     act(() =>
-      renderer!.root
-        .findByType('ActionSheet')
-        .props.actions.find((action: { label: string }) => action.label === '会话管理')
+      findByHostType(renderer!.root, 'ActionSheet')
+        .props.actions.find((action: { label: string }) => action.label === 'Session management')
         .onPress()
     )
     expect(fixture.router.push).toHaveBeenCalledWith({
@@ -256,12 +256,12 @@ describe('Orca home in the Stack', () => {
     })
     fixture.session = { authorityId: 'cloud', account: { accountId: 'account-a' } }
     renderer = mount()
-    act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
-    const actions = renderer.root.findByType('ActionSheet').props.actions
+    act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
+    const actions = findByHostType(renderer.root, 'ActionSheet').props.actions
     expect(actions.length).toBeGreaterThan(0)
     fixture.session = { authorityId: 'cloud', account: { accountId: 'account-b' } }
     act(() => renderer!.update(createElement(MainShell)))
-    expect(renderer.root.findByType('ActionSheet').props.visible).toBe(false)
+    expect(findByHostType(renderer.root, 'ActionSheet').props.visible).toBe(false)
     act(() => actions.forEach((action: { onPress: () => void }) => action.onPress()))
     expect(fixture.edit).not.toHaveBeenCalled()
     expect(fixture.reconnect).not.toHaveBeenCalled()
@@ -272,9 +272,9 @@ describe('Orca home in the Stack', () => {
 
   it('shows original pairing onboarding when no computers are paired', () => {
     renderer = mount()
-    expect(renderer.root.findAllByType('Navigation')).toHaveLength(0)
-    expect(renderer.root.findAllByType('HostList')).toHaveLength(0)
-    const empty = renderer.root.findByType('OriginalEmptyState')
+    expect(findAllByHostType(renderer.root, 'Navigation')).toHaveLength(0)
+    expect(findAllByHostType(renderer.root, 'HostList')).toHaveLength(0)
+    const empty = findByHostType(renderer.root, 'OriginalEmptyState')
     expect(empty.props.bottomInset).toBe(0)
     expect(empty.props.method).toBe('scan')
     act(() => empty.props.onPairDesktop())
@@ -285,11 +285,11 @@ describe('Orca home in the Stack', () => {
     const hosts = addRuntimes()
     fixture.params.runtimeId = 'runtime-b'
     renderer = mount()
-    const list = renderer.root.findByType('HostList')
+    const list = findByHostType(renderer.root, 'HostList')
     expect(list.props.hosts).toEqual(hosts)
     expect(list.props.bottomInset).toBe(0)
-    const footer = renderer.root.findByType('OverviewFooter')
-    expect(renderer.root.findAllByType('AccountComputerActions')).toHaveLength(0)
+    const footer = findByHostType(renderer.root, 'OverviewFooter')
+    expect(findAllByHostType(renderer.root, 'AccountComputerActions')).toHaveLength(0)
     expect(footer.props.primaryHost.id).toBe('runtime-b')
     expect(footer.props.primaryTaskProviders).toEqual(['linear'])
     expect(footer.props.connectedHosts).toEqual(hosts.map((host) => host.profile))
@@ -300,20 +300,20 @@ describe('Orca home in the Stack', () => {
     fixture.params.runtimeId = 'runtime-b'
     fixture.connected = false
     renderer = mount()
-    expect(renderer.root.findAllByType('OriginalEmptyState')).toHaveLength(0)
-    expect(renderer.root.findByType('HostList').props.hosts).toEqual(hosts)
-    expect(renderer.root.findByType('Drawer').props.canOpenHostActions).toBe(false)
-    act(() => renderer!.root.findByType('Drawer').props.onManageDevices())
+    expect(findAllByHostType(renderer.root, 'OriginalEmptyState')).toHaveLength(0)
+    expect(findByHostType(renderer.root, 'HostList').props.hosts).toEqual(hosts)
+    expect(findByHostType(renderer.root, 'Drawer').props.canOpenHostActions).toBe(false)
+    act(() => findByHostType(renderer!.root, 'Drawer').props.onManageDevices())
     act(() => renderer!.update(createElement(MainShell)))
-    expect(renderer.root.findByType('DevicesPage').props.hosts).toEqual(hosts)
+    expect(findByHostType(renderer.root, 'DevicesPage').props.hosts).toEqual(hosts)
   })
 
   it('retains the menu control in the home toolbar', () => {
     renderer = mount()
-    act(() => renderer!.root.findByType('Toolbar').props.onOpenMenu())
-    expect(renderer.root.findByType('Drawer').props.visible).toBe(true)
-    act(() => renderer!.root.findByType('Drawer').props.onClose())
-    expect(renderer.root.findByType('Drawer').props.visible).toBe(false)
+    act(() => findByHostType(renderer!.root, 'Toolbar').props.onOpenMenu())
+    expect(findByHostType(renderer.root, 'Drawer').props.visible).toBe(true)
+    act(() => findByHostType(renderer!.root, 'Drawer').props.onClose())
+    expect(findByHostType(renderer.root, 'Drawer').props.visible).toBe(false)
   })
 
   it('shows the home overview directly once an account session exists, even without local pairing', () => {
@@ -321,39 +321,39 @@ describe('Orca home in the Stack', () => {
     hosts.forEach((host) => Object.assign(host, { accessSources: ['account-claimed'] }))
     fixture.connected = false
     renderer = mount()
-    expect(renderer.root.findByType('OriginalEmptyState').props.method).toBe('scan')
+    expect(findByHostType(renderer.root, 'OriginalEmptyState').props.method).toBe('scan')
     fixture.session = { authorityId: 'cloud', account: { accountId: 'account-a' } }
     act(() => renderer!.update(createElement(MainShell)))
-    expect(renderer.root.findAllByType('OriginalEmptyState')).toHaveLength(0)
-    expect(renderer.root.findByType('HostList').props.hosts).toEqual(hosts)
+    expect(findAllByHostType(renderer.root, 'OriginalEmptyState')).toHaveLength(0)
+    expect(findByHostType(renderer.root, 'HostList').props.hosts).toEqual(hosts)
     fixture.session = null
     act(() => renderer!.update(createElement(MainShell)))
-    expect(renderer.root.findByType('OriginalEmptyState').props.method).toBe('scan')
+    expect(findByHostType(renderer.root, 'OriginalEmptyState').props.method).toBe('scan')
   })
 
   it('keeps the chosen Runtime through devices and back to the home overview', () => {
     addRuntimes()
     renderer = mount()
-    act(() => renderer!.root.findByType('RuntimeSelector').props.onSelect('runtime-b'))
-    act(() => renderer!.root.findByType('Drawer').props.onManageDevices())
+    act(() => findByHostType(renderer!.root, 'RuntimeSelector').props.onSelect('runtime-b'))
+    act(() => findByHostType(renderer!.root, 'Drawer').props.onManageDevices())
     act(() => renderer!.update(createElement(MainShell)))
-    const devices = renderer.root.findByType('DevicesPage')
+    const devices = findByHostType(renderer.root, 'DevicesPage')
     expect(devices.props.selectedId).toBe('runtime-b')
-    expect(renderer.root.findAllByType('Toolbar')).toHaveLength(0)
+    expect(findAllByHostType(renderer.root, 'Toolbar')).toHaveLength(0)
     expect(fixture.router.push).toHaveBeenCalledWith('/devices')
     act(() => devices.props.onBack())
     act(() => renderer!.update(createElement(MainShell)))
-    expect(renderer.root.findByType('OverviewFooter').props.primaryHost.id).toBe('runtime-b')
+    expect(findByHostType(renderer.root, 'OverviewFooter').props.primaryHost.id).toBe('runtime-b')
   })
 
   it('offers pairing from the runtime selector without changing the chosen computer', () => {
     addRuntimes()
     renderer = mount()
-    act(() => renderer!.root.findByType('RuntimeSelector').props.onSelect('runtime-b'))
-    expect(renderer.root.findByType('RuntimeSelector').props.onManageDevices).toBeUndefined()
-    act(() => renderer!.root.findByType('RuntimeSelector').props.onPair())
+    act(() => findByHostType(renderer!.root, 'RuntimeSelector').props.onSelect('runtime-b'))
+    expect(findByHostType(renderer.root, 'RuntimeSelector').props.onManageDevices).toBeUndefined()
+    act(() => findByHostType(renderer!.root, 'RuntimeSelector').props.onPair())
     expect(fixture.router.push).toHaveBeenCalledWith('/pair-scan')
-    expect(renderer.root.findByType('OverviewFooter').props.primaryHost.id).toBe('runtime-b')
+    expect(findByHostType(renderer.root, 'OverviewFooter').props.primaryHost.id).toBe('runtime-b')
   })
 
   it.each(['removed', 'credentials', 'access', 'account', 'account-cycle', 'unmount'])(
@@ -363,8 +363,8 @@ describe('Orca home in the Stack', () => {
       fixture.session = { authorityId: 'cloud', account: { accountId: 'a' } }
       fixture.data.hostStates = { 'runtime-a': 'connected' }
       renderer = mount()
-      act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
-      const actions = renderer.root.findByType('ActionSheet').props.actions
+      act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
+      const actions = findByHostType(renderer.root, 'ActionSheet').props.actions
       if (change === 'unmount') {
         act(() => {
           renderer!.unmount()
@@ -388,7 +388,7 @@ describe('Orca home in the Stack', () => {
                 )
         }
         act(() => renderer!.update(createElement(MainShell)))
-        expect(renderer.root.findByType('ActionSheet').props.visible).toBe(false)
+        expect(findByHostType(renderer.root, 'ActionSheet').props.visible).toBe(false)
         if (change === 'account-cycle') {
           fixture.session = { authorityId: 'cloud', account: { accountId: 'a' } }
           act(() => renderer!.update(createElement(MainShell)))
@@ -400,7 +400,7 @@ describe('Orca home in the Stack', () => {
       expect(fixture.edit).not.toHaveBeenCalled()
       expect(fixture.router.push).not.toHaveBeenCalled()
       if (renderer) {
-        expect(renderer.root.findByType('Confirm').props.visible).toBe(false)
+        expect(findByHostType(renderer.root, 'Confirm').props.visible).toBe(false)
       }
     }
   )
@@ -409,27 +409,26 @@ describe('Orca home in the Stack', () => {
     const hosts = addRuntimes()
     fixture.session = { authorityId: 'cloud', account: { accountId: 'a' } }
     renderer = mount()
-    act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
+    act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
     act(() =>
-      renderer!.root
-        .findByType('ActionSheet')
-        .props.actions.find((action: { label: string }) => action.label === '移除本地配对')
+      findByHostType(renderer!.root, 'ActionSheet')
+        .props.actions.find((action: { label: string }) => action.label === 'Remove local pairing')
         .onPress()
     )
-    const confirm = renderer.root.findByType('Confirm').props.onConfirm
+    const confirm = findByHostType(renderer.root, 'Confirm').props.onConfirm
     fixture.menus = []
     fixture.session = { authorityId: 'cloud', account: { accountId: 'b' } }
     act(() => renderer!.update(createElement(MainShell)))
     await act(async () => confirm())
     expect(fixture.remove).not.toHaveBeenCalled()
-    expect(renderer.root.findByType('Confirm').props.visible).toBe(false)
+    expect(findByHostType(renderer.root, 'Confirm').props.visible).toBe(false)
   })
 
   it('hides the previous account menu on the first render after account changes', () => {
     const hosts = addRuntimes()
     fixture.session = { authorityId: 'cloud', account: { accountId: 'a' } }
     renderer = mount()
-    act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
+    act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
     fixture.menus = []
     fixture.session = { authorityId: 'cloud', account: { accountId: 'b' } }
     act(() => renderer!.update(createElement(MainShell)))
@@ -445,33 +444,31 @@ describe('Orca home in the Stack', () => {
     })
     fixture.remove.mockReturnValueOnce(removal)
     renderer = mount()
-    act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
+    act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
     act(() =>
-      renderer!.root
-        .findByType('ActionSheet')
-        .props.actions.find((action: { label: string }) => action.label === '移除本地配对')
+      findByHostType(renderer!.root, 'ActionSheet')
+        .props.actions.find((action: { label: string }) => action.label === 'Remove local pairing')
         .onPress()
     )
-    act(() => renderer!.root.findByType('Confirm').props.onConfirm())
-    act(() => renderer!.root.findByType('Confirm').props.onCancel())
+    act(() => findByHostType(renderer!.root, 'Confirm').props.onConfirm())
+    act(() => findByHostType(renderer!.root, 'Confirm').props.onCancel())
     await act(async () => {
       reject(new Error('storage unavailable'))
       await removal.catch(() => {})
     })
-    expect(renderer.root.findByType('Confirm').props.visible).toBe(false)
+    expect(findByHostType(renderer.root, 'Confirm').props.visible).toBe(false)
   })
 
   it('keeps valid local pairing removal available', async () => {
     const hosts = addRuntimes()
     renderer = mount()
-    act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
+    act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
     act(() =>
-      renderer!.root
-        .findByType('ActionSheet')
-        .props.actions.find((action: { label: string }) => action.label === '移除本地配对')
+      findByHostType(renderer!.root, 'ActionSheet')
+        .props.actions.find((action: { label: string }) => action.label === 'Remove local pairing')
         .onPress()
     )
-    await act(async () => renderer!.root.findByType('Confirm').props.onConfirm())
+    await act(async () => findByHostType(renderer!.root, 'Confirm').props.onConfirm())
     expect(fixture.remove).toHaveBeenCalledWith('runtime-a', expect.any(Function))
     expect(fixture.data.reloadHostCatalog).toHaveBeenCalledOnce()
   })
@@ -479,12 +476,12 @@ describe('Orca home in the Stack', () => {
   it('keeps valid edit navigation available after the native menu finishes closing', () => {
     const hosts = addRuntimes()
     renderer = mount()
-    act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
-    const edit = renderer.root
-      .findByType('ActionSheet')
-      .props.actions.find((action: { label: string }) => action.label === '修改别名与连接地址')
-    act(() => renderer!.root.findByType('ActionSheet').props.onClose())
-    expect(renderer.root.findByType('ActionSheet').props.visible).toBe(false)
+    act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
+    const edit = findByHostType(renderer.root, 'ActionSheet').props.actions.find(
+      (action: { label: string }) => action.label === '修改别名与连接地址'
+    )
+    act(() => findByHostType(renderer!.root, 'ActionSheet').props.onClose())
+    expect(findByHostType(renderer.root, 'ActionSheet').props.visible).toBe(false)
     act(() => edit.onPress())
     expect(fixture.edit).toHaveBeenCalledExactlyOnceWith('runtime-a')
   })
@@ -500,14 +497,15 @@ describe('Orca home in the Stack', () => {
       })
       fixture.remove.mockReturnValueOnce(removal)
       renderer = mount()
-      act(() => renderer!.root.findByType('HostList').props.onOpenActions(hosts[0]))
+      act(() => findByHostType(renderer!.root, 'HostList').props.onOpenActions(hosts[0]))
       act(() =>
-        renderer!.root
-          .findByType('ActionSheet')
-          .props.actions.find((action: { label: string }) => action.label === '移除本地配对')
+        findByHostType(renderer!.root, 'ActionSheet')
+          .props.actions.find(
+            (action: { label: string }) => action.label === 'Remove local pairing'
+          )
           .onPress()
       )
-      act(() => renderer!.root.findByType('Confirm').props.onConfirm())
+      act(() => findByHostType(renderer!.root, 'Confirm').props.onConfirm())
       if (change === 'unmount') {
         act(() => {
           renderer!.unmount()
@@ -522,7 +520,7 @@ describe('Orca home in the Stack', () => {
         await removal.catch(() => {})
       })
       if (renderer) {
-        expect(renderer.root.findByType('Confirm').props.visible).toBe(false)
+        expect(findByHostType(renderer.root, 'Confirm').props.visible).toBe(false)
       }
       expect(fixture.data.reloadHostCatalog).not.toHaveBeenCalled()
     }

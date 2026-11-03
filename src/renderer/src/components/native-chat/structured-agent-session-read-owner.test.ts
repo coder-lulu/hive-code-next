@@ -15,9 +15,16 @@ vi.mock('@/runtime/structured-agent-session-client', () => ({
 
 import {
   getStructuredAgentSessionReadOwner,
+  subscribeStructuredAgentSessionReadSnapshots,
   resetStructuredAgentSessionReadOwnersForTests
 } from './structured-agent-session-read-owner'
 
+const effects = {
+  getState: () => {
+    throw new Error('No PR state requested in receipt tests')
+  },
+  subscribeRetryNow: () => () => {}
+}
 const TARGET = { kind: 'local' } as const
 const SESSION_ID = 'session-a'
 
@@ -59,6 +66,23 @@ describe('structured journal receipt evidence', () => {
     vi.restoreAllMocks()
   })
 
+  it('notifies passive registry observers when an owner is created and receives evidence', () => {
+    const observer = vi.fn()
+    const unsubscribe = subscribeStructuredAgentSessionReadSnapshots(observer)
+    const owner = getStructuredAgentSessionReadOwner(SESSION_ID, TARGET)
+    expect(observer).toHaveBeenCalledOnce()
+    observer.mockClear()
+    owner.publishCreated(page())
+    expect(observer).toHaveBeenCalled()
+    const receipt = owner.getSnapshot().receivedAt
+    owner.getSnapshot()
+    expect(owner.getSnapshot().receivedAt).toBe(receipt)
+    unsubscribe()
+    observer.mockClear()
+    owner.publishCreated(page(3))
+    expect(observer).not.toHaveBeenCalled()
+  })
+
   it('lets passive list subscribers observe the same owner without opening a host stream', async () => {
     const owner = getStructuredAgentSessionReadOwner(SESSION_ID, TARGET)
     const listener = vi.fn()
@@ -69,7 +93,7 @@ describe('structured journal receipt evidence', () => {
 
     const chatOwner = getStructuredAgentSessionReadOwner(SESSION_ID, { kind: 'local' })
     expect(chatOwner).toBe(owner)
-    const stop = chatOwner.activate()
+    const stop = chatOwner.activate(effects)
     await waitFor(() => expect(mocks.subscribe).toHaveBeenCalledOnce())
     expect(listener).toHaveBeenCalled()
     expect(owner.getSnapshot().receivedAt).toEqual(expect.any(Number))
@@ -87,7 +111,7 @@ describe('structured journal receipt evidence', () => {
       return Promise.resolve({ unsubscribe: vi.fn() })
     })
     const owner = getStructuredAgentSessionReadOwner(SESSION_ID, TARGET)
-    owner.activate()
+    owner.activate(effects)
     await waitFor(() => expect(mocks.subscribe).toHaveBeenCalledOnce())
     expect(owner.getSnapshot().receivedAt).toBe(1_000)
     const items = owner.getSnapshot().state.items
@@ -129,7 +153,7 @@ describe('structured journal receipt evidence', () => {
       sequence: index + 201
     }))
     mocks.call.mockResolvedValueOnce({ ok: true, page: initial })
-    owner.activate()
+    owner.activate(effects)
     await waitFor(() => expect(mocks.subscribe).toHaveBeenCalledOnce())
     expect(owner.getSnapshot().receivedAt).toBe(1_000)
     clock.mockReturnValue(4_000)
@@ -147,7 +171,7 @@ describe('structured journal receipt evidence', () => {
       return Promise.resolve({ unsubscribe: vi.fn() })
     })
     const owner = getStructuredAgentSessionReadOwner(SESSION_ID, TARGET)
-    const stop = owner.activate()
+    const stop = owner.activate(effects)
     await waitFor(() => expect(mocks.subscribe).toHaveBeenCalledOnce())
     const event: AgentSessionSubscribeEvent = {
       type: 'snapshot',
@@ -186,7 +210,7 @@ describe('structured journal receipt evidence', () => {
       environmentId: 'remote-a'
     })
     expect(remote).not.toBe(local)
-    local.activate()
+    local.activate(effects)
     await waitFor(() => expect(local.getSnapshot().receivedAt).toEqual(expect.any(Number)))
     expect(remote.getSnapshot().receivedAt).toBeNull()
     expect(remote.getSnapshot().state.items).toHaveLength(0)

@@ -9,7 +9,6 @@ import { isProvenProcessExit } from '../../../../shared/terminal-exit-cause'
 import { EMPTY_DAEMON_SESSION_INVENTORY, inventoryFromSessions } from './resource-session-inventory'
 
 const COOLDOWN_MS = 100
-const EXIT_PUBLICATION_MS = 50
 
 /** One request survives view epochs, but only its dispatching epoch may publish it. */
 export class ResourceSessionInventoryCache {
@@ -34,8 +33,6 @@ export class ResourceSessionInventoryCache {
   private pendingRefresh = false
   private inFlight: Promise<void> | null = null
   private timer: ReturnType<typeof setTimeout> | null = null
-  private exitPublicationTimer: ReturnType<typeof setTimeout> | null = null
-  private inventoryChanged = false
   private lastStarted = -Infinity
 
   constructor(
@@ -56,18 +53,6 @@ export class ResourceSessionInventoryCache {
     }
   }
 
-  private publishInventory(patch: Partial<typeof this.state> = {}): void {
-    if (this.exitPublicationTimer) {
-      clearTimeout(this.exitPublicationTimer)
-      this.exitPublicationTimer = null
-    }
-    this.inventoryChanged = false
-    this.publish({
-      ...patch,
-      sessionInventory: inventoryFromSessions([...this.known.values()])
-    })
-  }
-
   setActive(active: boolean): void {
     if (active === this.active) {
       return
@@ -85,18 +70,7 @@ export class ResourceSessionInventoryCache {
       }
       return
     }
-    if (this.inventoryChanged) {
-      this.publishInventory()
-    }
     void this.refresh()
-  }
-
-  dispose(): void {
-    this.setActive(false)
-    if (this.exitPublicationTimer) {
-      clearTimeout(this.exitPublicationTimer)
-      this.exitPublicationTimer = null
-    }
   }
 
   invalidate = (): void => {
@@ -171,7 +145,8 @@ export class ResourceSessionInventoryCache {
         }
         this.known = deduped
         this.identitiesByIncarnation = identitiesByIncarnation
-        this.publishInventory({
+        this.publish({
+          sessionInventory: inventoryFromSessions([...deduped.values()]),
           sessionsError: false,
           observedAt: Date.now()
         })
@@ -226,14 +201,7 @@ export class ResourceSessionInventoryCache {
       this.invalidate()
       return
     }
-    this.inventoryChanged =
-      this.removeIdentity(event.id, event.incarnationId) || this.inventoryChanged
-    if (this.inventoryChanged && !this.exitPublicationTimer) {
-      this.exitPublicationTimer = setTimeout(() => {
-        this.exitPublicationTimer = null
-        this.publishInventory()
-      }, EXIT_PUBLICATION_MS)
-    }
+    this.remove(event.id, event.incarnationId)
   }
 
   private removeIdentity(id: string, incarnationId?: string): boolean {
@@ -255,10 +223,10 @@ export class ResourceSessionInventoryCache {
   }
 
   remove(id: string, incarnationId?: string): void {
-    this.inventoryChanged = this.removeIdentity(id, incarnationId) || this.inventoryChanged
-    if (this.inventoryChanged) {
-      this.publishInventory()
+    if (!this.removeIdentity(id, incarnationId)) {
+      return
     }
+    this.publish({ sessionInventory: inventoryFromSessions([...this.known.values()]) })
   }
 
   removeMany(sessions: readonly Pick<PtyListedSession, 'id' | 'incarnationId'>[]): void {
@@ -266,8 +234,8 @@ export class ResourceSessionInventoryCache {
     for (const session of sessions) {
       changed = this.removeIdentity(session.id, session.incarnationId) || changed
     }
-    if (changed || this.inventoryChanged) {
-      this.publishInventory()
+    if (changed) {
+      this.publish({ sessionInventory: inventoryFromSessions([...this.known.values()]) })
     }
   }
 }

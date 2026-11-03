@@ -37,7 +37,7 @@ const styles = themedStyleSheet(() => ({
     bottom: spacing.sm,
     paddingHorizontal: spacing.sm,
     paddingVertical: 2,
-    borderRadius: radii.pill,
+    borderRadius: radii.button,
     backgroundColor: colors.bgPanel
   },
   devFactsText: {

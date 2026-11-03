@@ -1,6 +1,4 @@
-import { diffCommentOwnerKey } from '@/store/diff-comment-owner'
 import { useCallback } from 'react'
-import { toast } from 'sonner'
 import { Check, Copy, Plus } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import {
@@ -38,7 +36,6 @@ export function useMarkdownPreviewAnnotationRenderers({
   markdownAnnotationsEnabled: boolean
 }) {
   const {
-    commentOwner,
     sourceWorktree,
     sourceRelativePath,
     activeAnnotationBlockKey,
@@ -64,7 +61,7 @@ export function useMarkdownPreviewAnnotationRenderers({
       blockKey: string,
       annotationQuote?: string
     ): React.ReactNode => {
-      if (!commentOwner || !sourceWorktree || sourceRelativePath === null) {
+      if (!sourceWorktree || sourceRelativePath === null) {
         return null
       }
       if (!markdownAnnotationsEnabled) {
@@ -73,7 +70,7 @@ export function useMarkdownPreviewAnnotationRenderers({
       const commentsForBlock = getMarkdownCommentsForRange(range)
 
       const handleSubmit = async (body: string): Promise<boolean> => {
-        const result = await addDiffComment(commentOwner, {
+        const result = await addDiffComment({
           worktreeId: sourceWorktree.id,
           filePath: sourceRelativePath,
           source: 'markdown',
@@ -87,10 +84,6 @@ export function useMarkdownPreviewAnnotationRenderers({
           setActiveAnnotationBlockKey(null)
           return true
         }
-        // The composer keeps the draft for retry.
-        toast.error(
-          translate('auto.components.editor.diffCommentSaveFailed', 'Failed to save comment')
-        )
         return false
       }
 
@@ -112,7 +105,6 @@ export function useMarkdownPreviewAnnotationRenderers({
           </button>
           {activeAnnotationBlockKey === blockKey ? (
             <MarkdownPreviewAnnotationComposer
-              key={diffCommentOwnerKey(commentOwner)}
               lineNumber={range.endLine}
               startLine={range.startLine === range.endLine ? undefined : range.startLine}
               onCancel={() => setActiveAnnotationBlockKey(null)}
@@ -122,7 +114,7 @@ export function useMarkdownPreviewAnnotationRenderers({
           <div className="markdown-annotation-note-stack">
             {commentsForBlock.map((comment) => (
               <div
-                key={`${diffCommentOwnerKey(commentOwner)}:${comment.id}`}
+                key={comment.id}
                 data-markdown-review-note-id={comment.id}
                 className={`markdown-annotation-card ${
                   activeReviewCommentId === comment.id ? 'is-active' : ''
@@ -139,14 +131,8 @@ export function useMarkdownPreviewAnnotationRenderers({
                   }
                   body={comment.body}
                   sentAt={comment.sentAt}
-                  onDelete={() =>
-                    void (commentOwner && deleteDiffComment(commentOwner, comment.id))
-                  }
-                  onSubmitEdit={(body) =>
-                    commentOwner
-                      ? updateDiffComment(commentOwner, comment.id, body)
-                      : Promise.resolve(false)
-                  }
+                  onDelete={() => void deleteDiffComment(sourceWorktree.id, comment.id)}
+                  onSubmitEdit={(body) => updateDiffComment(sourceWorktree.id, comment.id, body)}
                   headerActions={
                     <>
                       <button
@@ -187,14 +173,13 @@ export function useMarkdownPreviewAnnotationRenderers({
                         )}
                       </button>
                       <MarkdownPreviewSingleNoteSendMenu
-                        owner={commentOwner}
                         worktreeId={sourceWorktree.id}
                         filePath={filePath}
                         content={renderedContent}
                         note={comment as MarkdownReviewNote}
                         modeSlot="preview-inline"
                         onDelivered={(notes) =>
-                          void (commentOwner && clearDeliveredDiffComments(commentOwner, notes))
+                          void clearDeliveredDiffComments(sourceWorktree.id, notes)
                         }
                       />
                     </>
@@ -222,7 +207,6 @@ export function useMarkdownPreviewAnnotationRenderers({
       renderedContent,
       setActiveAnnotationBlockKey,
       sourceRelativePath,
-      commentOwner,
       sourceWorktree,
       updateDiffComment
     ]

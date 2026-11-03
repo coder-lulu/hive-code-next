@@ -356,7 +356,7 @@ export function HtmlDocPreview({
         <DocPreviewDirectoryAccessBanner
           requests={accessRequests}
           busy={accessRequestBusy}
-          worktreeRoot={grant?.location.requestBase ?? worktreeRoot}
+          worktreeRoot={worktreeRoot}
           onDismiss={dismissDirectoryAccess}
           onAllow={allowDirectoryAccess}
         />

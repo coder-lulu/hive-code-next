@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../../i18n/use-mobile-translation'
 import { hostOs } from '../../platform/host-os'
 import { useState } from 'react'
 import {
@@ -20,6 +21,8 @@ export function PairingCodeSheet(props: {
   onSubmit: (value: string) => void
   visible: boolean
 }) {
+  const t = useMobileTranslation()
+
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createStyles)
   const [value, setValue] = useState('')
@@ -51,7 +54,10 @@ export function PairingCodeSheet(props: {
         style={styles.modal}
       >
         <Pressable
-          accessibilityLabel="关闭输入配对码"
+          accessibilityLabel={t(
+            'auto.mobile.src.components.pairing.PairingCodeSheet.038830a905',
+            'Close pairing code entry'
+          )}
           accessibilityRole="button"
           onPress={props.onCancel}
           style={styles.backdrop}
@@ -59,19 +65,28 @@ export function PairingCodeSheet(props: {
         <SafeAreaView edges={['bottom']} style={styles.sheet}>
           <View style={styles.handle} />
           <Text accessibilityRole="header" style={styles.title}>
-            输入配对码
+            {t(
+              'auto.mobile.src.components.pairing.PairingCodeSheet.6b9900af4a',
+              'Enter pairing code'
+            )}
           </Text>
           <Text style={styles.message}>
             {productNameText('复制电脑版 Orca 二维码下方的配对码。')}
           </Text>
           <TextInput
-            accessibilityLabel="配对码"
+            accessibilityLabel={t(
+              'auto.mobile.src.components.pairing.PairingCodeSheet.9f41911b98',
+              'Pairing code'
+            )}
             autoCapitalize="none"
             autoCorrect={false}
             autoFocus
             onChangeText={setValue}
             onSubmitEditing={submit}
-            placeholder="hivecode://pair?code=… 或配对码"
+            placeholder={t(
+              'auto.mobile.src.components.pairing.PairingCodeSheet.fb813efeb6',
+              'hivecode://pair?code=… or pairing code'
+            )}
             placeholderTextColor={theme.color.text.tertiary}
             returnKeyType="done"
             selectionColor={theme.color.brand.primary}
@@ -79,8 +94,19 @@ export function PairingCodeSheet(props: {
             value={value}
           />
           <View style={styles.actions}>
-            <PairingActionButton label="取消" onPress={props.onCancel} variant="secondary" />
-            <PairingActionButton disabled={!trimmedValue} label="验证并连接" onPress={submit} />
+            <PairingActionButton
+              label={t('common.cancel', 'Cancel')}
+              onPress={props.onCancel}
+              variant="secondary"
+            />
+            <PairingActionButton
+              disabled={!trimmedValue}
+              label={t(
+                'auto.mobile.src.components.pairing.PairingCodeSheet.3636547c38',
+                'Verify and connect'
+              )}
+              onPress={submit}
+            />
           </View>
         </SafeAreaView>
       </KeyboardAvoidingView>

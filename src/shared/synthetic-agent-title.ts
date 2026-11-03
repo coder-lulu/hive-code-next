@@ -48,8 +48,9 @@ export const SYNTHETIC_AGENT_TITLE_PROFILES: Record<string, SyntheticAgentTitleP
     permissionLabel: 'Pi - action required',
     idleLabel: 'Pi ready',
     titleIdentityGroup: 'pi-compatible',
-    // Pi and Orca's titlebar extension own session titles, including idle and permission states.
-    synthesizeTerminalTitle: false
+    // Pi animates working titles every 80ms with session labels; synthesis fights those frames.
+    // Synthesize terminal states because Pi is quiet at rest and pane identity still needs a title.
+    synthesizeWorkingTitle: false
   },
   omp: {
     workingLabel: 'OMP',

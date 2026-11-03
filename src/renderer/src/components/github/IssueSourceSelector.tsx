@@ -21,8 +21,6 @@ export type IssueSourceSelectorProps = {
   density?: 'labeled' | 'compact'
   /** Omit redundant source tooltips on issue-only surfaces; mixed issue/PR views need the routing caveat. */
   suppressTooltip?: boolean
-  /** The listed issues' resolved source; when given, the tooltip names it instead of predicting from the pill. */
-  issueSource?: GitHubOwnerRepo | null
 }
 
 type PillState = 'active' | 'inactive'
@@ -51,8 +49,7 @@ export default function IssueSourceSelector({
   disabled,
   className,
   density = 'labeled',
-  suppressTooltip = false,
-  issueSource
+  suppressTooltip = false
 }: IssueSourceSelectorProps): React.JSX.Element | null {
   if (!origin || !upstream) {
     return null
@@ -64,6 +61,9 @@ export default function IssueSourceSelector({
   // A rendered auto selector has upstream available, so the heuristic selects it.
   const effective: 'upstream' | 'origin' =
     preference === 'upstream' || preference === 'origin' ? preference : 'upstream'
+
+  const upstreamSlug = `${upstream.owner}/${upstream.repo}`
+  const originSlug = `${origin.owner}/${origin.repo}`
 
   // An auto-selected pill still needs an explicit write; skip only an already persisted match.
   const persistedMatches = (target: 'upstream' | 'origin'): boolean => preference === target
@@ -118,10 +118,8 @@ export default function IssueSourceSelector({
     </div>
   )
 
-  const shownIssueSource =
-    issueSource === undefined ? (effective === 'upstream' ? upstream : origin) : issueSource
   // Let issue-only callers omit the tooltip without coupling this control to page identity.
-  if (suppressTooltip || !shownIssueSource) {
+  if (suppressTooltip) {
     return group
   }
 
@@ -137,7 +135,9 @@ export default function IssueSourceSelector({
           )}
           components={{
             repo: (
-              <span className="font-mono">{`${shownIssueSource.owner}/${shownIssueSource.repo}`}</span>
+              <span className="font-mono">
+                {effective === 'upstream' ? upstreamSlug : originSlug}
+              </span>
             )
           }}
         />

@@ -7,13 +7,11 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import {
   AGENT_JOURNAL_THREAD_SCOPE,
-  AGENT_SESSION_JOURNAL_SCHEMA_VERSION
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
-import type {
-  AgentJournalItemIdentity,
-  AgentSessionJournalIdentity
-} from '../../../shared/agent-session/journal/agent-session-journal-identity'
-import { codexProviderHandle } from '../../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
+  AGENT_SESSION_JOURNAL_SCHEMA_VERSION,
+  type AgentJournalItemIdentity,
+  type AgentSessionJournalIdentity
+} from '../../../shared/agent-session-journal-types'
+import { codexProviderHandle } from '../../../shared/agent-session-provider-handle-encoding'
 import {
   closeTestJournalHostDatabase,
   createTrackedJournalOpener,
@@ -34,7 +32,7 @@ export function registerJournalUnknownContentTests(): void {
   const SCOPE = { fence: 1, turnScope: AGENT_JOURNAL_THREAD_SCOPE }
 
   let root: string
-  const journals = createTrackedJournalOpener({ legacyInputs: true })
+  const journals = createTrackedJournalOpener()
 
   beforeEach(async () => {
     root = await mkdtemp(join(tmpdir(), 'orca-journal-newer-content-'))
@@ -73,7 +71,7 @@ export function registerJournalUnknownContentTests(): void {
       seq += 1
       insertTestJournalRowJson(db, IDENTITY.sessionId, seq, JSON.stringify({ ...row, seq }), 5_000)
     }
-    await closeTestJournalHostDatabase(root)
+    closeTestJournalHostDatabase(root)
     return { written: stored() }
   }
 
@@ -118,26 +116,36 @@ export function registerJournalUnknownContentTests(): void {
     expect(stored()).toEqual(written)
   }
 
-  // An input row's union tags are closed like its keys: a newer kind refuses the chat before main's
-  // reader could keep it undrawn and this build restate the chat without it.
-  describe("a newer build's body kind", () => {
+  /** Verify writable downgrade compatibility without rewriting stored rows. */
+  async function expectWritableAndKept(
+    written: { seq: number; rowJson: string }[],
+    itemId: string
+  ) {
+    const journal = await open()
+    expect(journal.snapshot().items.some((entry) => entry.itemId === itemId)).toBe(true)
+    await journal.appendItem(item(5), { kind: 'status', text: 'taken' }, SCOPE)
+    await journals.closeAll()
+    expect(stored().slice(0, written.length)).toEqual(written)
+  }
+
+  describe("a newer build's body kind, kept and writable", () => {
     it.each([
       ['an item body of a newer kind', NEWER_BODY],
       ['a plan subject of a newer kind', { ...PLAN_APPROVAL, subject: { kind: 'diff' } }]
-    ])('fails the load on %s and keeps the row', async (_name, body) => {
+    ])('keeps %s and stays writable', async (_name, body) => {
       const { written } = await journalWith((epoch) => [
         itemRow(epoch, 'codex:thread-1:turn-1:2', body)
       ])
-      await expectNewerAndKept(written)
+      await expectWritableAndKept(written, 'codex:thread-1:turn-1:2')
     })
 
-    it('fails the load on a lifecycle mutation whose body is a newer kind', async () => {
+    it('keeps a lifecycle mutation whose body is a newer kind, and stays writable', async () => {
       const { written } = await journalWith((epoch) => [
         batchRow(epoch, [
           { kind: 'item', itemId: 'codex:thread-1:turn-1:4', revision: 1, body: NEWER_BODY }
         ])
       ])
-      await expectNewerAndKept(written)
+      await expectWritableAndKept(written, 'codex:thread-1:turn-1:4')
     })
   })
 
@@ -222,7 +230,7 @@ export function registerJournalUnknownContentTests(): void {
   })
 
   describe("a turn's context usage of a newer shape", () => {
-    it('fails the load and keeps the row', async () => {
+    it('is dropped like an unusable annotation: the chat stays writable and keeps the row', async () => {
       const { written } = await journalWith((epoch) => [
         itemRow(epoch, 'codex:thread-1:turn-1:2', {
           kind: 'turn',
@@ -231,7 +239,14 @@ export function registerJournalUnknownContentTests(): void {
           contextUsage: { used: { kind: 'measured', capturedAt: 1 } }
         })
       ])
-      await expectNewerAndKept(written)
+      const journal = await open()
+      expect(journal.snapshot().items[2]?.body).toEqual({
+        kind: 'turn',
+        turnId: 'turn-1',
+        state: 'completed'
+      })
+      await journals.closeAll()
+      expect(stored()).toEqual(written)
     })
   })
 

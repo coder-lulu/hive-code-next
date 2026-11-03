@@ -3,7 +3,6 @@ import { PLUGIN_ENUM_SINCE_KEY } from '../manifest/plugin-engine-floor-keys'
 import {
   pluginFieldDoc,
   PLUGIN_MANIFEST_V2_SINCE,
-  PLUGIN_PANEL_BRIDGE_SINCE,
   PLUGIN_SCHEMA_SINCE_V1
 } from '../manifest/plugin-schema-field-docs'
 import type { PluginCapabilityKind } from '../capabilities/plugin-capabilities'
@@ -13,8 +12,7 @@ import type { PluginCapabilityKind } from '../capabilities/plugin-capabilities'
 export const PLUGIN_EVENT_NAMES = [
   'workspace.created',
   'workspace.removed',
-  'agent.status.changed',
-  'workspace.changed'
+  'agent.status.changed'
 ] as const
 export const PLUGIN_EVENT_SUBSCRIPTION_LIMIT = PLUGIN_EVENT_NAMES.length
 
@@ -24,8 +22,7 @@ export type PluginEventName = (typeof PLUGIN_EVENT_NAMES)[number]
 export const PLUGIN_EVENT_SINCE: Record<PluginEventName, string> = {
   'workspace.created': PLUGIN_MANIFEST_V2_SINCE,
   'workspace.removed': PLUGIN_MANIFEST_V2_SINCE,
-  'agent.status.changed': PLUGIN_SCHEMA_SINCE_V1,
-  'workspace.changed': PLUGIN_PANEL_BRIDGE_SINCE
+  'agent.status.changed': PLUGIN_SCHEMA_SINCE_V1
 }
 
 /** Format 1 event names, rewritten on parse and still dispatched to handlers registered under them. */
@@ -38,8 +35,7 @@ export const PLUGIN_V1_EVENT_ALIASES: ReadonlyMap<string, PluginEventName> = new
 export const PLUGIN_EVENT_CAPABILITY: Record<PluginEventName, PluginCapabilityKind> = {
   'workspace.created': 'workspace:read',
   'workspace.removed': 'workspace:read',
-  'agent.status.changed': 'agent:read',
-  'workspace.changed': 'workspace:read'
+  'agent.status.changed': 'agent:read'
 }
 
 export const pluginEventContributionSchema = z

@@ -20,6 +20,7 @@ export type LinearEditState = {
 export type LinearIssueEditSectionProps = {
   issue: LinearIssue
   editState: LinearEditState
+  onEditStateChange: (patch: Partial<LinearEditState>) => void
   layout?: 'chips' | 'properties'
   sourceContext?: TaskSourceContext | null
 }

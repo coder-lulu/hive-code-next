@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef } from 'react'
-import type { AgentSessionFailureFact } from '../../../../shared/agent-session/failures/agent-session-failure'
-import type { AgentJournalRenderItem } from '../../../../shared/agent-session/journal/agent-session-journal-types'
+import type { AgentSessionFailureFact } from '../../../../shared/agent-session-failure'
+import type { AgentJournalRenderItem } from '../../../../shared/agent-session-journal-types'
 import {
   sameAgentSessionFailureFact,
-  agentSessionVisibleFailureFacts
-} from '../../../../shared/agent-session/failures/agent-session-visible-failures'
+  structuredAgentSessionStartFailureFacts
+} from './structured-agent-session-delivery-notices'
 
 const NO_FACTS: readonly AgentSessionFailureFact[] = []
 
@@ -14,7 +14,7 @@ export function useStructuredAgentSessionStartFailureFacts(
   enabled: boolean
 ): readonly AgentSessionFailureFact[] {
   const facts = useMemo(
-    () => (enabled ? agentSessionVisibleFailureFacts(items) : NO_FACTS),
+    () => (enabled ? structuredAgentSessionStartFailureFacts(items) : NO_FACTS),
     [enabled, items]
   )
   const previousRef = useRef<readonly AgentSessionFailureFact[]>(NO_FACTS)

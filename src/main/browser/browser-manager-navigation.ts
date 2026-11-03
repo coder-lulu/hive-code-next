@@ -25,10 +25,10 @@ export abstract class BrowserManagerNavigation extends BrowserManagerVisibility 
       request.webContentsId === undefined
         ? undefined
         : this.pendingNavigationByGuestId.get(request.webContentsId)
-    // Only a UA distinct from the process UA can mark a request as part of sign-in.
-    const authUaIsDistinct = googleAuth.userAgent !== processIdentity.userAgent
+    // Keep Firefox auth overrides in clean mode to avoid mixing them with native worker identity.
+    const googleAuthEnabled = processIdentity.mode === 'clean'
     if (
-      authUaIsDistinct &&
+      googleAuthEnabled &&
       request.currentUserAgent === googleAuth.userAgent &&
       (!pendingNavigation || isGoogleAuthUrl(pendingNavigation.currentUrl))
     ) {
@@ -39,14 +39,14 @@ export abstract class BrowserManagerNavigation extends BrowserManagerVisibility 
         ? undefined
         : this.standingCdpUserAgentOverride(request.webContentsId)
     if (
-      authUaIsDistinct &&
+      googleAuthEnabled &&
       !standingOverride &&
       request.effectiveUserAgent === googleAuth.userAgent &&
       (!pendingNavigation || isGoogleAuthUrl(pendingNavigation.currentUrl))
     ) {
       return googleAuth
     }
-    if (authUaIsDistinct && standingOverride?.userAgent === googleAuth.userAgent) {
+    if (googleAuthEnabled && standingOverride?.userAgent === googleAuth.userAgent) {
       return googleAuth
     }
     // Shared/service workers lack a guest ID and retain the process identity.
@@ -259,19 +259,10 @@ export abstract class BrowserManagerNavigation extends BrowserManagerVisibility 
       this.attachGuestPolicies(contents, owner)
       return true
     })
-    const opened = Boolean(options.webContents || options.nativeWindow)
     this.forwardOrQueuePopupEvent(openerGuest.id, {
       origin: safeOrigin(targetUrl),
-      action: opened ? 'opened-in-orca' : 'blocked'
+      action: options.webContents || options.nativeWindow ? 'opened-in-orca' : 'blocked'
     })
-    const ownerTabId = this.resolveBrowserTabIdForGuestWebContentsId(openerGuest.id)
-    if (opened && ownerTabId) {
-      this.pageEvents.emit(ownerTabId, {
-        kind: 'popup',
-        action: 'window',
-        origin: safeOrigin(targetUrl)
-      })
-    }
     // Close session-bearing popups with their owning guest to avoid orphan windows.
     const closePopupWithOpener = (): void => popup.close()
     openerGuest.once('destroyed', closePopupWithOpener)

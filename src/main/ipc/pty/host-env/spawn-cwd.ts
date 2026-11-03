@@ -1,11 +1,5 @@
-import { resolveQualifiedFolderWorkspaceResult } from '../../../../shared/folder-workspace-execution-host'
-import type { FolderWorkspace } from '../../../../shared/folder-workspace-types'
-import {
-  getConnectionExecutionHostId,
-  type ExecutionHostId
-} from '../../../../shared/execution-host'
 import { stat } from 'node:fs/promises'
-import type { Store } from '../../../persistence/loading-store/store'
+import type { Store } from '../../../persistence'
 import { parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { isWslUncPath } from '../../../../shared/wsl-paths'
 import {
@@ -15,7 +9,7 @@ import {
 import {
   assertFolderWorkspacePathUsable,
   getFolderWorkspacePathStatus,
-  getResolvedFolderWorkspacePathStatus
+  resolveFolderWorkspaceStatusPath
 } from '../../../project-groups/folder-workspace-path-status'
 import {
   isWslMoveCwdFenced,
@@ -43,16 +37,15 @@ export function assertWorkspaceAcceptsNewPty(
   worktreeId: string | undefined,
   sessionId?: string,
   cwd?: string,
-  passiveWslRestore?: boolean,
-  connectionId?: string | null
+  passiveWslRestore?: boolean
 ): Promise<void> | void {
   const fencedByCwd = !!cwd && isWslMoveCwdFenced(cwd)
   if (fencedByCwd || isWslMoveWorkspaceBlocked(store, worktreeId)) {
     return assertReattachesLiveSession(sessionId, worktreeId).then(() =>
-      assertFolderWorkspacePtyPathUsable(store, worktreeId, passiveWslRestore, connectionId)
+      assertFolderWorkspacePtyPathUsable(store, worktreeId, passiveWslRestore)
     )
   }
-  return assertFolderWorkspacePtyPathUsable(store, worktreeId, passiveWslRestore, connectionId)
+  return assertFolderWorkspacePtyPathUsable(store, worktreeId, passiveWslRestore)
 }
 
 /** Only a spawn on this machine starts in a folder a WSL move can be taking. */
@@ -80,51 +73,41 @@ async function assertReattachesLiveSession(
 export function assertFolderWorkspacePtyPathUsable(
   store: Store | undefined,
   worktreeId: string | undefined,
-  passiveWslRestore = false,
-  connectionId?: string | null
+  passiveWslRestore = false
 ): Promise<void> | void {
   const workspaceScope = typeof worktreeId === 'string' ? parseWorkspaceKey(worktreeId) : null
   if (!store || workspaceScope?.type !== 'folder') {
     return
   }
-  const selected = resolveSpawnFolder(store, workspaceScope.folderWorkspaceId, connectionId)
-  if (selected.kind === 'missing') {
-    throw new Error('folder_workspace_path_scope_not_found')
-  }
-  if (selected.kind !== 'selected') {
-    return getFolderWorkspacePathStatus(store, {
-      scope: 'folder-workspace',
-      folderWorkspaceId: workspaceScope.folderWorkspaceId
-    }).then(assertFolderWorkspacePathUsable)
-  }
-  return checkFolderWorkspacePtyPath(
-    selected.value.workspace,
-    selected.value.hostId,
-    passiveWslRestore
-  )
+  const request = {
+    scope: 'folder-workspace',
+    folderWorkspaceId: workspaceScope.folderWorkspaceId
+  } as const
+  return checkFolderWorkspacePtyPath(store, request, passiveWslRestore)
 }
 
-/** A passive check holds before touching a stopped distro; only the user's spawn may start it. */
+/**
+ * A spawn the user asked for may start the folder's stopped WSL distro (as before): its check runs
+ * as their act. A passive restore holds with Start instead, the same as a bridge pane's (E9).
+ */
 async function checkFolderWorkspacePtyPath(
-  workspace: Pick<FolderWorkspace, 'folderPath'>,
-  hostId: ExecutionHostId,
+  store: Store,
+  request: { scope: 'folder-workspace'; folderWorkspaceId: string },
   passiveWslRestore: boolean
 ): Promise<void> {
-  const checkPath = () => getResolvedFolderWorkspacePathStatus(workspace, hostId)
-  if (hostId !== 'local') {
-    assertFolderWorkspacePathUsable(await checkPath())
-    return
-  }
+  const { folderPath } = resolveFolderWorkspaceStatusPath({ store, request })
   if (passiveWslRestore) {
-    const blocked = await blockedWslDistroForPath(workspace.folderPath)
+    const blocked = await blockedWslDistroForPath(folderPath)
     if (blocked) {
       throw new Error(wslDistroHoldMessage(blocked.distro, blocked.state))
     }
-    assertFolderWorkspacePathUsable(await checkPath())
+    assertFolderWorkspacePathUsable(await getFolderWorkspacePathStatus(store, request))
     return
   }
   assertFolderWorkspacePathUsable(
-    await runAsWslUserAct(wslDistroForPath(workspace.folderPath), checkPath)
+    await runAsWslUserAct(wslDistroForPath(folderPath), () =>
+      getFolderWorkspacePathStatus(store, request)
+    )
   )
 }
 
@@ -132,41 +115,15 @@ export function resolvePtySpawnStartupCwd(
   store: Store | undefined,
   worktreeId: string | undefined,
   cwd: string | undefined,
-  missingDirFallback?: TerminalStartupCwdMissingDirFallback,
-  connectionId?: string | null
+  missingDirFallback?: TerminalStartupCwdMissingDirFallback
 ): string | undefined {
   return resolveTerminalStartupCwdForWorkspace({
     workspaceId: worktreeId,
     requestedCwd: cwd,
     missingDirFallback,
     resolveFolderWorkspacePath: (folderWorkspaceId) =>
-      store
-        ? (() => {
-            const result = resolveQualifiedFolderWorkspaceResult(
-              {
-                folderWorkspaces: store.getFolderWorkspaces(),
-                projectGroups: store.getProjectGroups(),
-                repos: store.getRepos()
-              },
-              folderWorkspaceId,
-              getConnectionExecutionHostId(connectionId)
-            )
-            return result.kind === 'selected' ? result.value.workspace.folderPath : undefined
-          })()
-        : undefined
+      store?.getFolderWorkspace(folderWorkspaceId)?.folderPath
   })
-}
-
-function resolveSpawnFolder(store: Store, id: string, connectionId?: string | null) {
-  return resolveQualifiedFolderWorkspaceResult(
-    {
-      folderWorkspaces: store.getFolderWorkspaces(),
-      projectGroups: store.getProjectGroups(),
-      repos: store.getRepos()
-    },
-    id,
-    getConnectionExecutionHostId(connectionId)
-  )
 }
 
 export async function localStartupCwdDirectoryExists(path: string): Promise<boolean> {

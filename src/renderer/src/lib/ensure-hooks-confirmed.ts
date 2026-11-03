@@ -91,10 +91,9 @@ async function confirmScriptContent(
   scriptKind: HookScriptKind,
   scriptContent: string,
   hostId?: ExecutionHostId,
-  isCancelled: () => boolean = NEVER_CANCEL_TRUST_CHECK,
-  signal?: AbortSignal
+  isCancelled: () => boolean = NEVER_CANCEL_TRUST_CHECK
 ): Promise<'run' | 'skip'> {
-  if (isCancelled() || signal?.aborted) {
+  if (isCancelled()) {
     return 'skip'
   }
   if (canUseRepoWideTrust(state.trustedOrcaHooks, state.repos, repoId) || !scriptContent) {
@@ -102,7 +101,7 @@ async function confirmScriptContent(
   }
 
   const contentHash = await hashOrcaHookScript(scriptContent)
-  if (isCancelled() || signal?.aborted) {
+  if (isCancelled()) {
     return 'skip'
   }
   const existingHash = state.trustedOrcaHooks[repoId]?.[scriptKind]?.contentHash
@@ -121,18 +120,8 @@ async function confirmScriptContent(
         return
       }
       settled = true
-      signal?.removeEventListener('abort', cancel)
       resolve(decision)
     }
-    const cancel = (): void => {
-      // Eviction settles first, so an abort can only close this prompt.
-      if (settled) {
-        return
-      }
-      settle('skip')
-      state.closeModal()
-    }
-    signal?.addEventListener('abort', cancel, { once: true })
     state.openModal('confirm-orca-yaml-hooks', {
       repoId,
       repoName,
@@ -235,11 +224,10 @@ export async function ensureHooksConfirmed(
   scriptKind: HookScriptKind,
   hostId?: ExecutionHostId,
   runtimeOwnerEnvironmentId?: string | null,
-  isCancelled: () => boolean = NEVER_CANCEL_TRUST_CHECK,
-  signal?: AbortSignal
+  isCancelled: () => boolean = NEVER_CANCEL_TRUST_CHECK
 ): Promise<'run' | 'skip'> {
   return enqueueTrustPrompt(async () => {
-    if (isCancelled() || signal?.aborted) {
+    if (isCancelled()) {
       return 'skip'
     }
     const state = typeof stateOrGetter === 'function' ? stateOrGetter() : stateOrGetter
@@ -299,14 +287,6 @@ export async function ensureHooksConfirmed(
       return 'skip'
     }
 
-    return confirmScriptContent(
-      state,
-      repoId,
-      scriptKind,
-      scriptContent,
-      hostId,
-      isCancelled,
-      signal
-    )
+    return confirmScriptContent(state, repoId, scriptKind, scriptContent, hostId, isCancelled)
   })
 }

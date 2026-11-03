@@ -3,7 +3,7 @@
 import type {
   AgentSessionBackgroundTask,
   AgentSessionBackgroundTaskRunState
-} from '../../shared/agent-session/agent-session-background-task-wire'
+} from '../../shared/agent-session-wire'
 
 const MAX_RETAINED_TASKS = 256
 

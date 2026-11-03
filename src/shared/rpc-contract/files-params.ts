@@ -62,8 +62,7 @@ export const FileOpenTab = FileOpenTarget.extend({
 })
 
 export const FileOpenDiff = FileOpenTarget.extend({
-  staged: z.boolean().optional(),
-  oldPath: z.string().optional()
+  staged: z.boolean().optional()
 })
 
 export const DocPreviewFileRead = FileOpen.extend({

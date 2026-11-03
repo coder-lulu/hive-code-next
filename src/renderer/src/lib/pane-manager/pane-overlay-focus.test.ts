@@ -31,43 +31,23 @@ function fixture() {
   const panes = new Map([[pane.id, pane]])
   const publishPaneCreated = vi.fn()
   const onActivePaneChange = vi.fn()
-  function unexpectedHostOperation(): never {
-    throw new Error('Unexpected host operation in overlay focus fixture')
-  }
-  const options = { onActivePaneChange, linkOpenHint: unexpectedHostOperation }
   const manager = Object.create(PaneManager.prototype) as PaneManager
   Object.assign(manager, {
     panes,
     activePaneId: null,
     styleOptions: {},
-    options
+    options: { onActivePaneChange }
   })
-  const host: PaneManagerHost = {
-    options,
+  const host = {
+    options: {},
     root,
     panes,
-    get identities() {
-      return unexpectedHostOperation()
-    },
-    get dragState() {
-      return unexpectedHostOperation()
-    },
-    isDestroyed: unexpectedHostOperation,
-    isRenderingSuspended: unexpectedHostOperation,
-    allocatePaneId: unexpectedHostOperation,
-    createDivider: unexpectedHostOperation,
-    getDragCallbacks: unexpectedHostOperation,
-    setActivePane: (paneId, opts) => manager.setActivePane(paneId, opts),
-    requestPaneReparentFrame: unexpectedHostOperation,
     createPaneInternal: () => pane,
-    setActivePaneId: vi.fn((activePaneId: number | null) => {
-      Object.assign(manager, { activePaneId })
-    }),
-    getActivePaneId: () => manager.getActivePane()?.id ?? null,
+    setActivePaneId: vi.fn(),
+    getActivePaneId: () => pane.id,
     getStyleOptions: () => ({}),
     publishPaneCreated
-  }
-  Object.assign(manager, { host })
+  } as unknown as PaneManagerHost
   return { root, container, textarea, pane, host, manager, publishPaneCreated, onActivePaneChange }
 }
 
@@ -178,6 +158,12 @@ describe.each(['initial', 'active'] as const)('%s pane focus', (operation) => {
     const cover = coverPane(f)
     focus(f)
     expect(document.activeElement).toBe(cover)
+    expect(f.pane.terminal.focus).not.toHaveBeenCalled()
+  })
+
+  it('honors an explicit no-focus request', () => {
+    const f = fixture()
+    focus(f, false)
     expect(f.pane.terminal.focus).not.toHaveBeenCalled()
   })
 })

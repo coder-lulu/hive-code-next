@@ -23,9 +23,7 @@ const sendRequest = vi.fn<RpcClient['sendRequest']>()
 const client: RpcClient = {
   sendRequest,
   subscribe: vi.fn<RpcClient['subscribe']>((_method, _params, onData) => {
-    if (_method === 'agentSession.subscribe') {
-      listener = onData
-    }
+    listener = onData
     return vi.fn()
   }),
   updateTerminalSubscriptionViewport: () => {},
@@ -40,7 +38,6 @@ const client: RpcClient = {
 function Harness(): null {
   hook = useMobileStructuredAgentSession({
     client,
-    pairedHostClient: client,
     sessionId: SESSION_ID,
     sourceIdentity: 'host-a\0workspace-a',
     enabled: true,

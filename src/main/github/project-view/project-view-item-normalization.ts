@@ -57,9 +57,6 @@ type NormalizedItemOutcome =
   | { ok: false; drift: GitHubProjectViewError }
 
 function mapItemType(raw: string | undefined, hasContent: boolean): GitHubProjectRowItemType {
-  if (raw === 'REDACTED' || !hasContent) {
-    return 'REDACTED'
-  }
   if (raw === 'ISSUE') {
     return 'ISSUE'
   }
@@ -68,6 +65,9 @@ function mapItemType(raw: string | undefined, hasContent: boolean): GitHubProjec
   }
   if (raw === 'DRAFT_ISSUE') {
     return 'DRAFT_ISSUE'
+  }
+  if (raw === 'REDACTED' || !hasContent) {
+    return 'REDACTED'
   }
   // Unknown item type with content — treat as redacted rather than dropping.
   return 'REDACTED'

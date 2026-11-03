@@ -1,6 +1,6 @@
 import { withClaudeProfileTerminalEnv } from '../../../claude-accounts/claude-profile-installed-router'
 import { mintPtySessionId } from '../../../daemon/pty-session-id'
-import { LocalPtyProvider } from '../../../providers/local-pty/local-pty-provider'
+import { LocalPtyProvider } from '../../../providers/local-pty-provider'
 import {
   isClaudeLaunchCommand,
   recoverFreshSpawnProviderRouting,
@@ -35,8 +35,7 @@ export async function preparePtyIpcSpawnPreflight(ctx: PtyIpcSpawnState): Promis
       args.worktreeId,
       args.sessionId,
       localPtySpawnCwd(args),
-      args.wslPassiveRestore === true,
-      args.connectionId
+      args.wslPassiveRestore === true
     )
     if (admission) {
       await admission
@@ -50,8 +49,7 @@ export async function preparePtyIpcSpawnPreflight(ctx: PtyIpcSpawnState): Promis
       args.worktreeId,
       args.sessionId,
       localPtySpawnCwd(args),
-      args.wslPassiveRestore === true,
-      args.connectionId
+      args.wslPassiveRestore === true
     )
     if (admission) {
       await admission
@@ -93,8 +91,7 @@ export async function preparePtyIpcSpawnPreflight(ctx: PtyIpcSpawnState): Promis
     projectRuntimeSource: { kind: 'sent', projectRuntime: args.projectRuntime },
     preAdopted: ctx.preAdoptedStablePane !== null,
     getSettings: ctx.deps.getSettings,
-    resolveStartupCwd: (id, cwd, fallback) =>
-      ctx.deps.resolvePtySpawnStartupCwd(id, cwd, fallback, args.connectionId),
+    resolveStartupCwd: ctx.deps.resolvePtySpawnStartupCwd,
     ...(args.wslPassiveRestore === true
       ? {
           wslStartHold: {

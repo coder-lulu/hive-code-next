@@ -51,7 +51,7 @@ describe('workspace layout Loader and Serializer', () => {
       assignedAt: 123
     }
     row.projectAssignment = assignment
-    row.pinnedSetupRuntimeEnvironmentId = 'transient-setup-owner'
+    Reflect.set(row, 'pinnedSetupRuntimeEnvironmentId', 'transient-setup-owner')
     entry.projectAssignment = assignment
     entry.structuredSessionId = 'adopted-session'
     const { saved } = roundTrip(LOCAL_EXECUTION_HOST_ID, stored)
@@ -64,7 +64,7 @@ describe('workspace layout Loader and Serializer', () => {
     expect(restored.projectAssignment).toEqual(assignment)
     expect(restoredEntry.projectAssignment).toEqual(assignment)
     expect(restoredEntry.structuredSessionId).toBe('adopted-session')
-    expect(restored.pinnedSetupRuntimeEnvironmentId).toBeUndefined()
+    expect(restored).not.toHaveProperty('pinnedSetupRuntimeEnvironmentId')
   })
 
   it.each(PROFILES)(

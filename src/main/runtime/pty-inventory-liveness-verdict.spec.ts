@@ -91,11 +91,7 @@ export function registerPtyInventoryLivenessVerdictTests(): void {
 
       runtime.onPtyExit(REMOTE_PTY_ID, -1, undefined, { hostExitConfirmed: true })
 
-      expect(runtime.getPtyLivenessVerdict(REMOTE_PTY_ID)).toEqual({
-        status: 'exited',
-        incarnationId: undefined,
-        cause: { kind: 'unknown', reason: 'stop_unverified' }
-      })
+      expect(runtime.getPtyLivenessVerdict(REMOTE_PTY_ID)).toEqual({ status: 'exited' })
     })
 
     it('records lost contact when no provider can answer for the PTY', async () => {
@@ -224,11 +220,7 @@ export function registerPtyInventoryLivenessVerdictTests(): void {
       }
 
       expect(runtime.getPtyLivenessVerdict('ssh:conn-1@@churn-0')).toBeNull()
-      expect(runtime.getPtyLivenessVerdict('ssh:conn-1@@churn-399')).toEqual({
-        status: 'exited',
-        incarnationId: undefined,
-        cause: { kind: 'unknown', reason: 'cause_unreported' }
-      })
+      expect(runtime.getPtyLivenessVerdict('ssh:conn-1@@churn-399')).toEqual({ status: 'exited' })
       expect(
         (runtime as unknown as { ptyLivenessVerdictByPtyId: Map<string, unknown> })
           .ptyLivenessVerdictByPtyId.size

@@ -22,7 +22,6 @@ function Chat(): React.JSX.Element {
       composerElementRef.current?.focus()
       return true
     },
-    insertAgentReferences: () => false,
     insertTypedText: () => true,
     acceptsText: () => true,
     appendText: () => {},

@@ -24,7 +24,6 @@ export function useSourceControlActionModel({
   hostedReviewStateForActions,
   isHostedReviewStateLoading,
   inFlightRemoteOpKind,
-  isRemoteOperationInAnotherWorktree,
   hostedReviewCreation,
   branchSummary,
   branchName,
@@ -50,7 +49,6 @@ export function useSourceControlActionModel({
   remoteStatusForActions: PrimaryInput['upstreamStatus']
   hostedReviewStateForActions: PrimaryInput['prState']
   isHostedReviewStateLoading: boolean
-  isRemoteOperationInAnotherWorktree: boolean
   inFlightRemoteOpKind: PrimaryInput['inFlightRemoteOpKind']
   hostedReviewCreation: PrimaryInput['hostedReviewCreation']
   branchSummary: GitBranchCompareSummary | null
@@ -103,7 +101,6 @@ export function useSourceControlActionModel({
         prState: hostedReviewStateForActions,
         isPRStateLoading: isHostedReviewStateLoading,
         inFlightRemoteOpKind,
-        isRemoteOperationInAnotherWorktree,
         hostedReviewCreation: createReviewEligibility,
         branchCommitsAhead:
           branchSummary?.status === 'ready' ? (branchSummary.commitsAhead ?? 0) : undefined,
@@ -121,7 +118,6 @@ export function useSourceControlActionModel({
       isAbortingOperation,
       isRemoteOperationActive,
       inFlightRemoteOpKind,
-      isRemoteOperationInAnotherWorktree,
       createReviewEligibility,
       isHostedReviewStateLoading,
       hostedReviewStateForActions,

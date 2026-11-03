@@ -1,12 +1,5 @@
-import {
-  hostTestCatalogReadOperation,
-  HOST_TEST_SESSION as SESSION
-} from '../native-chat/agent-session-wire/structured-agent-session-host-test-data'
 import { AcpStructuredOptions } from './acp-structured-options'
-import {
-  createAgentModelCatalogService,
-  type AgentModelCatalogService
-} from '../native-chat/agent-model-catalog/agent-model-catalog-service'
+import { createAgentModelCatalogService } from '../native-chat/agent-model-catalog/agent-model-catalog-service'
 import {
   AgentModelCatalogStore,
   type AgentModelCatalogEntry
@@ -15,12 +8,14 @@ import {
   agentReadsProjectModelConfig,
   workspaceMayOverrideDefaultModel
 } from '../native-chat/agent-model-catalog/agent-project-model-override'
-import type { AgentSessionRecordStore } from '../runtime/agent-session/records/agent-session-record-store'
+import type { AgentSessionRecordStore } from '../runtime/agent-session-record-store'
 import { CALLER } from '../native-chat/agent-session-wire/structured-agent-session-host-test-harness'
 import { GROK_CONFIG_OPTIONS, PROVIDER_SESSION } from './acp-structured-adapter.test-support'
 
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { closeProviderTimelineRigs } from '../native-chat/agent-session-timeline/provider-timeline-assembler-test-support'
+import { HOST_TEST_SESSION as SESSION } from '../native-chat/agent-session-wire/structured-agent-session-host-test-data'
+import type { AgentModelCatalogService } from '../native-chat/agent-model-catalog/agent-model-catalog-service'
 import { attachParams, openAttachedHostRig, openHostRig } from './acp-structured-host.test-support'
 
 afterEach(async () => {
@@ -97,7 +92,6 @@ describe('a live Grok listing', () => {
 
   it('starts the chat even when saving its start listing throws', async () => {
     const modelCatalog: AgentModelCatalogService = {
-      captureRead: hostTestCatalogReadOperation,
       snapshot: vi.fn(() => ({ origin: 'unknown' as const })),
       demand: vi.fn(async () => {}),
       prepareSaved: vi.fn(async () => ({ origin: 'unknown' as const })),

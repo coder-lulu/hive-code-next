@@ -116,15 +116,12 @@ export function clearRuntimeCompatibilityCache(environmentId?: string | null): v
   runtimeCompatibilityChecks.clear()
 }
 
-export function markRuntimeEnvironmentCompatible(
-  environmentId: string,
-  status?: RuntimeStatus
-): void {
+export function markRuntimeEnvironmentCompatible(environmentId: string): void {
   const trimmed = environmentId.trim()
   if (!trimmed) {
     return
   }
-  rememberRuntimeEnvironmentCompatibility(trimmed, compatibilityEntry(status ?? null, true))
+  rememberRuntimeEnvironmentCompatibility(trimmed, compatibilityEntry(null, true))
 }
 
 /**
@@ -133,15 +130,13 @@ export function markRuntimeEnvironmentCompatible(
  */
 export function peekRuntimeEnvironmentCapability(
   environmentId: string,
-  capability: RuntimeCapability,
-  runtimeId?: string
+  capability: RuntimeCapability
 ): boolean | undefined {
   const cached = runtimeCompatibilityChecks.get(environmentId.trim())
   if (
     !cached ||
     cached.failedAt !== null ||
     !cached.status ||
-    (runtimeId !== undefined && cached.status.runtimeId !== runtimeId) ||
     cached.statusObservedAt === null ||
     Date.now() - cached.statusObservedAt >= RUNTIME_CAPABILITY_STATUS_TTL_MS
   ) {

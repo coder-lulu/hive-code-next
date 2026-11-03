@@ -6,7 +6,6 @@ import { markRpcDeliveryUnknown, isRpcDeliveryUnknown } from './rpc-delivery-amb
 import { LogicalClientCutoverError, isLogicalClientCutoverError } from './stable-logical-rpc-client'
 import {
   settingsRead,
-  nativeChatQueueFollowUpsRead,
   optionalSettingsRead,
   botOverridesRead,
   newTabSettingsRead,
@@ -51,32 +50,6 @@ async function drain() {
 }
 
 describe('settings historical acceptance', () => {
-  it.each([
-    undefined,
-    null,
-    {},
-    { nativeChatQueueFollowUps: true },
-    { nativeChatQueueFollowUps: false },
-    { nativeChatQueueFollowUps: 'false' }
-  ])(
-    'distinguishes an explicit queue boolean from a missing older-host report (%j)',
-    async (settings) => {
-      const response = await nativeChatQueueFollowUpsRead.request(replyWith(success({ settings })))
-      expect(nativeChatQueueFollowUpsRead.interpret(response)).toEqual({
-        accepted: true,
-        value:
-          typeof settings?.nativeChatQueueFollowUps === 'boolean'
-            ? settings.nativeChatQueueFollowUps
-            : null
-      })
-      expect(
-        nativeChatQueueFollowUpsRead.interpret(
-          await nativeChatQueueFollowUpsRead.request(replyWith(refusal()))
-        )
-      ).toEqual({ accepted: false })
-    }
-  )
-
   it('distinguishes a skipped refusal from an accepted absent settings member', async () => {
     const skipped = await settingsRead.request(replyWith(refusal()))
     const missing = await settingsRead.request(replyWith(success({})))

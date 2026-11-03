@@ -8,6 +8,7 @@ import { useAppStore } from '@/store'
 import { isCustomAgentId } from '../../../../shared/commit-message-agent-spec'
 import { pickSourceControlLaunchAgent } from '../../../../shared/source-control-launch-agent-selection'
 import type { SelectedSourceControlActionRecipe } from '../../../../shared/source-control-action-selection'
+import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { Repo } from '../../../../shared/repo-types'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import { isTuiAgentEnabled } from '../../../../shared/tui-agent-selection'
@@ -41,6 +42,7 @@ export function useSourceControlActionAgentChoice(args: {
   recipe: SelectedSourceControlActionRecipe
   /** This open's deliberate pick; absent replays the saved recipe. */
   livePick: AgentLaunchSurface | undefined
+  settings: GlobalSettings | null
 }) {
   const { recipe } = args
   const worktreeDetectionTarget = useAgentDetectionTargetForWorktree(args.worktreeId ?? null)

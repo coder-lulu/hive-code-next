@@ -29,13 +29,13 @@ export function RuntimeConnectionTroubleshooting(): React.JSX.Element {
         <ol className="ml-4 list-decimal space-y-1 text-xs text-muted-foreground">
           <li>
             {translate(
-              'auto.components.settings.RuntimeEnvironmentsPane.troubleshootStepShare',
+              'auto.components.settings.RuntimeConnectionTroubleshooting.troubleshootStepShare',
               'On the other computer, open Devices & connections → Connect to this computer → Direct address.'
             )}
           </li>
           <li>
             {translate(
-              'auto.components.settings.RuntimeEnvironmentsPane.troubleshootStepAddress',
+              'auto.components.settings.RuntimeConnectionTroubleshooting.troubleshootStepAddress',
               'Choose Another device and select a reachable LAN or VPN address, or enter your own address.'
             )}
           </li>
@@ -48,7 +48,7 @@ export function RuntimeConnectionTroubleshooting(): React.JSX.Element {
         </ol>
         <div className="rounded-md border border-border/60 bg-muted/30 p-3 text-xs">
           {translate(
-            'auto.components.settings.RuntimeEnvironmentsPane.troubleshootTunnel',
+            'auto.components.settings.RuntimeConnectionTroubleshooting.troubleshootTunnel',
             'Using an SSH local forward? Open My hosts, paste the loopback link, then enable “I am using an SSH tunnel” under Advanced.'
           )}
         </div>

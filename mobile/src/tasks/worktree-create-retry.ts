@@ -72,7 +72,7 @@ export async function createWorktreeWithNameRetry(
         return {
           error: translate(
             'workspace.branchChoice.hostUpdateRequired',
-            'Update Orca on the workspace host to reuse a branch or explicitly create a separate branch.'
+            'Update HiveCode on the workspace host to reuse a branch or explicitly create a separate branch.'
           )
         }
       }

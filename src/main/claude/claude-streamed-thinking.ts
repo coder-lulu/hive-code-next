@@ -1,7 +1,9 @@
-import type { AgentJournalItemIdentity } from '../../shared/agent-session/journal/agent-session-journal-identity'
-import type { AgentJournalMessageItem } from '../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentJournalTurnScope } from '../../shared/agent-session/journal/agent-session-journal-turn-scope'
-import { agentJournalItemKey } from '../../shared/agent-session/journal/agent-session-journal-item-key'
+import type {
+  AgentJournalItemIdentity,
+  AgentJournalMessageItem,
+  AgentJournalTurnScope
+} from '../../shared/agent-session-journal-types'
+import { agentJournalItemKey } from '../../shared/agent-session-journal-item-key'
 import {
   endedJournalReasoning,
   journalReasoningBody
@@ -19,7 +21,7 @@ import {
   claudeThinkingIdentity,
   claudeThinkingText,
   type ClaudeMessageEnvelope
-} from './structured/journal/claude-structured-item-translation'
+} from './claude-structured-item-translation'
 import type { ClaudeSubagentLinkageSource } from './claude-subagent-linkage'
 
 function streamScope(frame: Record<string, unknown>): string | null {

@@ -51,8 +51,7 @@ describe('runtime environment removal storage clearing', () => {
       store: {
         getSettings: () => ({}),
         removeWorkspaceSessionHost: vi.fn(),
-        setRemoteLayoutSnapshot: vi.fn(),
-        setHostRepoCatalogSnapshot: vi.fn()
+        setRemoteLayoutSnapshot: vi.fn()
       } as never,
       getUserDataPath: () => '/tmp/orca-user-data',
       invalidateTransport: () => teardown
@@ -77,8 +76,7 @@ describe('runtime environment removal storage clearing', () => {
       store: {
         getSettings: () => ({}),
         removeWorkspaceSessionHost: vi.fn(),
-        setRemoteLayoutSnapshot: vi.fn(),
-        setHostRepoCatalogSnapshot: vi.fn()
+        setRemoteLayoutSnapshot: vi.fn()
       } as never,
       getUserDataPath: () => '/tmp/orca-user-data',
       invalidateTransport: () => Promise.resolve()

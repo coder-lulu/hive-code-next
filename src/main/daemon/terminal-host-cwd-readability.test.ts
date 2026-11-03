@@ -188,12 +188,7 @@ describe('TerminalHost cwd readability verdict', () => {
     host = new TerminalHost({
       spawnSubprocess: async (opts) => {
         if (opts.cwd) {
-          try {
-            await validateWorkingDirectoryAsync(opts.cwd, { signal: opts.cancelSignal })
-          } catch (error) {
-            opts.onCreationDisposition?.({ kind: 'no-fork' })
-            throw error
-          }
+          await validateWorkingDirectoryAsync(opts.cwd, { signal: opts.cancelSignal })
         }
         return createMockSubprocess()
       }

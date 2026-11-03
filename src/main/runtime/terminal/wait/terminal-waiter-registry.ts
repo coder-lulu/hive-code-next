@@ -1,22 +1,21 @@
 import type { RuntimeTerminalWait } from '../../../../shared/runtime-terminal-contracts'
 import type { TerminalWaiter } from '../../runtime-terminal-contracts'
 
-/** Waits keyed by the terminal they follow; the handle they were asked through only labels the result. */
 export class RuntimeTerminalWaiterRegistry {
-  private readonly byPtyId = new Map<string, Set<TerminalWaiter>>()
+  private readonly byHandle = new Map<string, Set<TerminalWaiter>>()
 
-  has(waiter: TerminalWaiter): boolean {
-    return this.byPtyId.get(waiter.ptyId)?.has(waiter) ?? false
+  get(handle: string): ReadonlySet<TerminalWaiter> | undefined {
+    return this.byHandle.get(handle)
   }
 
-  forPty(ptyId: string): TerminalWaiter[] {
-    return [...(this.byPtyId.get(ptyId) ?? [])]
+  handles(): Iterable<string> {
+    return this.byHandle.keys()
   }
 
   add(waiter: TerminalWaiter): void {
-    const waiters = this.byPtyId.get(waiter.ptyId) ?? new Set<TerminalWaiter>()
+    const waiters = this.byHandle.get(waiter.handle) ?? new Set<TerminalWaiter>()
     waiters.add(waiter)
-    this.byPtyId.set(waiter.ptyId, waiters)
+    this.byHandle.set(waiter.handle, waiters)
   }
 
   resolve(waiter: TerminalWaiter, result: RuntimeTerminalWait): void {
@@ -40,20 +39,20 @@ export class RuntimeTerminalWaiterRegistry {
     return true
   }
 
-  reject(waiter: TerminalWaiter, code: string): void {
-    this.remove(waiter)
-    waiter.reject(new Error(code))
-  }
-
-  rejectPty(ptyId: string, code: string): void {
-    for (const waiter of this.forPty(ptyId)) {
-      this.reject(waiter, code)
+  rejectHandle(handle: string, code: string): void {
+    const waiters = this.byHandle.get(handle)
+    if (!waiters) {
+      return
+    }
+    for (const waiter of Array.from(waiters)) {
+      this.remove(waiter)
+      waiter.reject(new Error(code))
     }
   }
 
   rejectAll(code: string): void {
-    for (const ptyId of this.byPtyId.keys()) {
-      this.rejectPty(ptyId, code)
+    for (const handle of Array.from(this.byHandle.keys())) {
+      this.rejectHandle(handle, code)
     }
   }
 
@@ -68,13 +67,13 @@ export class RuntimeTerminalWaiterRegistry {
       waiter.abortCleanup()
       waiter.abortCleanup = null
     }
-    const waiters = this.byPtyId.get(waiter.ptyId)
+    const waiters = this.byHandle.get(waiter.handle)
     if (!waiters) {
       return
     }
     waiters.delete(waiter)
     if (waiters.size === 0) {
-      this.byPtyId.delete(waiter.ptyId)
+      this.byHandle.delete(waiter.handle)
     }
   }
 }

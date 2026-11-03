@@ -69,8 +69,6 @@ export type AgentActivityInput = Pick<
 
 type AgentActivityCache = {
   tabsByWorktree: AgentActivityTabsByWorktree
-  unifiedTabsByWorktree: AgentActivityInput['unifiedTabsByWorktree']
-  agentStatusByPaneKey: AgentActivityInput['agentStatusByPaneKey']
   agentStatusEpoch: number
   migrationUnsupportedByPtyId: AppState['migrationUnsupportedByPtyId']
   retainedAgentsByPaneKey: AppState['retainedAgentsByPaneKey']
@@ -94,8 +92,6 @@ function getWorktreeAgentActivitySummaries(
   if (
     agentActivityCache &&
     agentActivityCache.tabsByWorktree === state.tabsByWorktree &&
-    agentActivityCache.unifiedTabsByWorktree === state.unifiedTabsByWorktree &&
-    agentActivityCache.agentStatusByPaneKey === state.agentStatusByPaneKey &&
     agentActivityCache.agentStatusEpoch === state.agentStatusEpoch &&
     agentActivityCache.migrationUnsupportedByPtyId === state.migrationUnsupportedByPtyId &&
     agentActivityCache.retainedAgentsByPaneKey === state.retainedAgentsByPaneKey &&
@@ -198,8 +194,6 @@ function getWorktreeAgentActivitySummaries(
 
   agentActivityCache = {
     tabsByWorktree: state.tabsByWorktree,
-    unifiedTabsByWorktree: state.unifiedTabsByWorktree,
-    agentStatusByPaneKey: state.agentStatusByPaneKey,
     agentStatusEpoch: state.agentStatusEpoch,
     migrationUnsupportedByPtyId: state.migrationUnsupportedByPtyId,
     retainedAgentsByPaneKey: state.retainedAgentsByPaneKey,

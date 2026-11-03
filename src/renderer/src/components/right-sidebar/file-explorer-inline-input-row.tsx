@@ -1,6 +1,5 @@
 import React, { useCallback, useRef } from 'react'
-import { File } from 'lucide-react'
-import { FolderIcon } from '@/components/FileTypeIcon'
+import { File, Folder } from 'lucide-react'
 import {
   isImeCompositionKeyDown,
   useImeEnterGestureOwnership
@@ -139,7 +138,7 @@ export function InlineInputRow({
     >
       <span className="size-3 shrink-0" />
       {inlineInput.type === 'folder' ? (
-        <FolderIcon open={false} className="size-3 shrink-0 text-muted-foreground" />
+        <Folder className="size-3 shrink-0 text-muted-foreground" />
       ) : (
         <File className="size-3 shrink-0 text-muted-foreground" />
       )}

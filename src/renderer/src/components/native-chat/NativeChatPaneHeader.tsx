@@ -1,13 +1,11 @@
-import { Fragment } from 'react'
 import { MessageSquarePlus, SquareSplitVertical, X } from 'lucide-react'
-import { ShortcutKeyCombo } from '@/components/ShortcutKeyCombo'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { translate } from '@/i18n/i18n'
-import { useShortcutKeyComboDetails } from '@/hooks/useShortcutLabel'
+import { useAppStore } from '@/store'
 import { agentForksConversations } from '../../../../shared/agent-resume-argv'
 import type { NativeChatTabSession } from '../tab-bar/tab-session-history-switch'
-import { useDocumentDarkTheme } from '@/hooks/use-document-dark-theme'
+import { useSystemPrefersDark } from '../terminal-pane/use-system-prefers-dark'
 import { useStructuredChatPaneActions } from './use-structured-chat-pane-actions'
 import { NativeChatResumeInCliButton } from './NativeChatResumeInCliButton'
 import type { NativeChatStructuredViewProps } from './native-chat-view-types'
@@ -37,10 +35,12 @@ export function NativeChatPaneHeader({
   handOff?: NativeChatHeaderHandOff
 }): React.JSX.Element {
   const actions = useStructuredChatPaneActions(tabId, worktreeId, groupId)
-  const documentDark = useDocumentDarkTheme()
-  const light = colorScheme ? colorScheme === 'light' : !documentDark
+  const theme = useAppStore((state) => state.settings?.theme)
+  const systemDark = useSystemPrefersDark()
+  const light = colorScheme
+    ? colorScheme === 'light'
+    : theme === 'light' || (theme === 'system' && !systemDark)
   const split = translate('auto.components.cmd.j.quick.actions.splitChatRight', 'Split Chat Right')
-  const splitShortcutCombos = useShortcutKeyComboDetails('terminal.splitRight')
   const handOffLabel = translate(
     'components.agentSessionContinuation.handOffToAnotherAgent',
     'Hand Off to Another Agent'
@@ -99,24 +99,7 @@ export function NativeChatPaneHeader({
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={4}>
-            <span className="inline-flex items-center gap-1.5">
-              <span>
-                {split}
-                {splitShortcutCombos.length > 0 ? ': ' : null}
-              </span>
-              {splitShortcutCombos.map((shortcut, index) => (
-                <Fragment key={JSON.stringify([shortcut.keys, shortcut.doubleTap])}>
-                  {index > 0 ? <span>{', '}</span> : null}
-                  <ShortcutKeyCombo
-                    keys={shortcut.keys}
-                    doubleTap={shortcut.doubleTap}
-                    className="gap-0.5"
-                    keyCapClassName="min-w-0 border-background/30 bg-background/10 px-1 py-0 text-3xs text-background shadow-none"
-                    separatorClassName="mx-0 text-3xs text-background/70"
-                  />
-                </Fragment>
-              ))}
-            </span>
+            {split}
           </TooltipContent>
         </Tooltip>
         {actions.canClosePane ? (

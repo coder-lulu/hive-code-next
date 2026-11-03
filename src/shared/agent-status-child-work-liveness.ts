@@ -1,4 +1,3 @@
-import { ORCA_ORCHESTRATION_WAIT_COMMAND } from './orca-cli-invocations'
 import type {
   AgentChildWorkKind,
   AgentChildWorkMembership,
@@ -11,8 +10,6 @@ export type AgentChildWorkLiveness = 'waiting' | 'working' | 'monitoring' | null
 export type AgentChildWorkLivenessCandidate = {
   kind: AgentChildWorkKind
   state?: AgentChildWorkState
-  /** What the child runs; a producer marks a worker wait with the canonical wait command, which is agent work. */
-  operation?: { input?: string } | null
 }
 
 export type AgentChildWorkLivenessEvidence = {
@@ -25,12 +22,6 @@ export type AgentChildWorkLivenessEvidence = {
 /** Classify each new kind here. Workflows are not agent work: their agents announce upstream, leaving shell/workflow rows. */
 export function isAgentChildWorkKind(kind: AgentChildWorkKind): boolean {
   return kind === 'agent'
-}
-
-function isAgentChildWork(child: AgentChildWorkLivenessCandidate): boolean {
-  return (
-    isAgentChildWorkKind(child.kind) || child.operation?.input === ORCA_ORCHESTRATION_WAIT_COMMAND
-  )
 }
 
 /** Only explicit settlement retires work: missing states, unknown kinds and lost contact stay active. Roster lifetime bounds this fail-active policy (session close; Claude provider ended); in-place blocked failures would remain working until then. */
@@ -66,9 +57,8 @@ export function agentChildWorkLiveness(
       continue
     }
     hasWaitingChildWork ||= isWaitingChildWork(child)
-    const agentWork = isAgentChildWork(child)
-    hasLiveAgentWork ||= agentWork
-    hasLiveNonAgentWork ||= !agentWork
+    hasLiveAgentWork ||= isAgentChildWorkKind(child.kind)
+    hasLiveNonAgentWork ||= !isAgentChildWorkKind(child.kind)
   }
   return agentChildWorkLivenessFromEvidence({
     hasWaitingChildWork,

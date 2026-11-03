@@ -1,6 +1,5 @@
 // ELECTRON_RUN_AS_NODE entry: imports must stay transitively Electron-free.
 import { createPluginWorkerRuntime } from './plugin-host-runtime'
-import { registerPluginWorkerSourceHooks } from './plugin-worker-source-hooks'
 import { pluginWorkerFatal } from '../../../shared/plugins/workers/plugin-host-protocol'
 import type { PluginEnvelope } from '../../../shared/plugins/frames/plugin-protocol'
 
@@ -8,10 +7,7 @@ function sendToParent(message: PluginEnvelope): void {
   process.send?.(message)
 }
 
-const runtime = createPluginWorkerRuntime({
-  send: sendToParent,
-  prepareModuleLoading: registerPluginWorkerSourceHooks
-})
+const runtime = createPluginWorkerRuntime({ send: sendToParent })
 
 process.on('message', (raw: unknown) => {
   void runtime.handleMessage(raw)

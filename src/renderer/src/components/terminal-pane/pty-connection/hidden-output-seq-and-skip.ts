@@ -37,11 +37,7 @@ export function bindHiddenOutputSeqAndSkip(session: ConnectPanePtySession): void
       session.deps.paneMode2031Ref.current.delete(session.pane.id)
       session.deps.paneLastThemeModeRef.current.delete(session.pane.id)
     }
-    // A repeated DECSET must not overwrite a report still owed after a hold or outage.
-    if (
-      result.decision !== 'subscribed' ||
-      session.deps.paneMode2031Ref.current.get(session.pane.id)
-    ) {
+    if (result.decision !== 'subscribed') {
       return
     }
     const settings = useAppStore.getState().settings
@@ -153,7 +149,6 @@ export function bindHiddenOutputSeqAndSkip(session: ConnectPanePtySession): void
       session.clearRestoredSnapshotBaseline()
     }
     if (session.rendererOrderedPtyId === exitedPtyId) {
-      session.resumeEscapeGap.reset()
       session.rendererOrderedPtyId = null
       session.rendererOrderedSeq = null
     }

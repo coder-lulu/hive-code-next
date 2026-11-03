@@ -28,7 +28,7 @@ export function renderAppearanceSettingsSection(context: SettingsRenderContext):
           terminalFontSuggestions={model.terminalFontSuggestions}
           onRequestFontSuggestions={interactions.requestFontSuggestions}
           systemPrefersDark={model.systemPrefersDark}
-          terminalConfigImport={model.terminalConfigImport}
+          ghostty={model.ghostty}
           warpThemes={model.warpThemes}
         />
       ) : null}
@@ -60,8 +60,6 @@ export function renderChatSettingsSection(context: ChatSettingsRenderContext): R
   return (
     <ChatSettingsSection
       settings={model.settings}
-      fontSuggestions={model.fontSuggestions}
-      onRequestFontSuggestions={interactions.requestFontSuggestions}
       updateSettings={model.updateSettings}
       writeSourceControlAiSettings={interactions.writeSourceControlAiSettingsOrThrow}
       onChatPromptDirtyChange={model.setHasUnsavedChatPromptChanges}

@@ -27,7 +27,6 @@ import type {
   SkillShareResolvedOperation
 } from '../../shared/skill-sharing-contract'
 import type {
-  BundledSkillAutoUpdateRequest,
   BundledSkillExecuteRequest,
   BundledSkillInstallResult,
   BundledSkillPlan,
@@ -45,7 +44,6 @@ export type SkillsApi = {
   /** This machine's plan for Orca's installed skills; paired hosts plan over RPC. */
   bundledPlan: (request?: BundledSkillPlanRequest) => Promise<BundledSkillPlan>
   bundledExecute: (request: BundledSkillExecuteRequest) => Promise<BundledSkillInstallResult>
-  bundledAutoUpdate: (request: BundledSkillAutoUpdateRequest) => Promise<BundledSkillInstallResult>
   prepareShare: (input: {
     skillIds: string[]
     skillDirectories?: string[]

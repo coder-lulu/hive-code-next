@@ -1,6 +1,5 @@
 import {
   clearWindowTimer,
-  noWorkspaceImage,
   windowDocument,
   windowSelection,
   type RichMarkdownEditorHost,
@@ -39,8 +38,6 @@ export type RichMarkdownEditorState = {
   removeKeyboardInset: (() => void) | null
   /** `create-rich-markdown-editor-document`: whether the host has taken this document down. */
   stopped: boolean
-  /** `editor-content`: this render's workspace image loads, by markdown path. */
-  workspaceImageSources: Map<string, Promise<string>>
 }
 
 /** The document's whole scope: its state, and the seams to the page that mounted it. */
@@ -60,8 +57,7 @@ function createRichMarkdownEditorState(): RichMarkdownEditorState {
     lastInset: -1,
     removeEditorListeners: null,
     removeKeyboardInset: null,
-    stopped: false,
-    workspaceImageSources: new Map()
+    stopped: false
   }
 }
 
@@ -74,7 +70,6 @@ export function createRichMarkdownEditorScope(
     getSelection: host.getSelection ?? windowSelection,
     getDocument: host.getDocument ?? windowDocument,
     root: host.root ?? null,
-    loadImageSource: host.loadImageSource ?? noWorkspaceImage,
     postToHost: host.postToHost,
     promptForUrl: host.promptForUrl,
     keyboardInsetSource: host.keyboardInsetSource

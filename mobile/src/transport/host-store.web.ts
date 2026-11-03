@@ -9,7 +9,6 @@ function pageHosts(): HostProfile[] {
 }
 
 export const loadHosts = (): Promise<HostProfile[]> => Promise.resolve(pageHosts())
-export const peekHosts = (): HostProfile[] | null => pageHosts()
 
 export const loadHostCatalog = (): Promise<HostCatalogEntry[]> =>
   Promise.resolve(

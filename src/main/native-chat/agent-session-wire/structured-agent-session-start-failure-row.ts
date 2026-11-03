@@ -1,23 +1,22 @@
-import { selectedStructuredSubmission } from './structured-agent-session-input-selection'
-import type { AgentSessionFailureWordsContext } from '../../../shared/agent-session/failures/agent-session-failure-words'
-import {
-  structuredAgentSessionStartFailure,
-  type StructuredAgentSessionStartFailureWords,
-  type StructuredAgentSessionStartFailureCause
-} from './structured-agent-session-failure-text'
-import { agentJournalItemKey } from '../../../shared/agent-session/journal/agent-session-journal-item-key'
-import {
-  AGENT_JOURNAL_THREAD_SCOPE,
-  type AgentJournalSubmission
-} from '../../../shared/agent-session/journal/agent-session-journal-types'
-import { isQueuedAgentJournalSubmission } from '../../../shared/agent-session/requests/agent-session-queued-submission'
-import { structuredAgentSessionStartFailureRowIdentity } from '../../../shared/agent-session/failures/structured-agent-session-start-failure-row-key'
+import type { AgentSessionFailureWordsContext } from '../../../shared/agent-session-failure-words'
+import { structuredAgentSessionStartFailure } from './structured-agent-session-failure-text'
+import { agentJournalItemKey } from '../../../shared/agent-session-journal-item-key'
+import { AGENT_JOURNAL_THREAD_SCOPE } from '../../../shared/agent-session-journal-types'
+import { isQueuedAgentJournalSubmission } from '../../../shared/agent-session-queued-submission'
+import { structuredAgentSessionStartFailureRowIdentity } from '../../../shared/structured-agent-session-start-failure-row-key'
 import type { JournalLifecycleMutationInput } from '../agent-session-journal/journal-row-builders'
 import type { StructuredAgentSessionHostSession } from './structured-agent-session-host-types'
+import type {
+  StructuredAgentSessionStartFailureWords,
+  StructuredAgentSessionStartFailureCause
+} from './structured-agent-session-failure-text'
 import type { StructuredAgentSessionResumeOutcome } from './structured-agent-session-agent-start'
-import type { AgentSessionRecord } from '../../../shared/agent-session/lifecycle/agent-session-record'
-import { agentSessionFailureFact } from '../../../shared/agent-session/failures/agent-session-failure'
-import type { AgentJournalCursor } from '../../../shared/agent-session/journal/agent-session-journal-identity'
+import type { AgentSessionRecord } from '../../../shared/agent-session-record'
+import { agentSessionFailureFact } from '../../../shared/agent-session-failure'
+import type {
+  AgentJournalCursor,
+  AgentJournalSubmission
+} from '../../../shared/agent-session-journal-types'
 import { failedProviderChildStart } from './structured-agent-session-provider-child'
 import { structuredAgentSessionEndedChildFailure } from './structured-agent-session-ended-child-failure'
 
@@ -146,7 +145,16 @@ export function acceptedNoLaterThan(
 export function oldestQueuedSubmission(
   session: Pick<StructuredAgentSessionHostSession, 'journal'>
 ): ReturnType<StructuredAgentSessionHostSession['journal']['submissions']>[number] | undefined {
-  return selectedStructuredSubmission(session.journal)
+  let oldest: ReturnType<typeof oldestQueuedSubmission>
+  for (const submission of session.journal.submissions()) {
+    if (
+      isQueuedAgentJournalSubmission(submission) &&
+      (oldest === undefined || (submission.acceptedSequence ?? 0) < (oldest.acceptedSequence ?? 0))
+    ) {
+      oldest = submission
+    }
+  }
+  return oldest
 }
 
 export async function recordStructuredAgentSessionDeliveryFailure(

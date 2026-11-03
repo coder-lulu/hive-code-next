@@ -182,9 +182,7 @@ describe('useNativeChatLiveSession — file watcher pagination composition', () 
           'applied'
         )
       })
-      expect(transport.readSession).toHaveBeenLastCalledWith(AGENT, SESSION, 500, undefined, {
-        wakeWslDistro: true
-      })
+      expect(transport.readSession).toHaveBeenLastCalledWith(AGENT, SESSION, 500, undefined)
       expect(ids()).toEqual(Array.from({ length: 500 }, (_, i) => String(i + 1).padStart(4, '0')))
       await appendFile(filePath, line(501))
       await within('watcher append of line 501', appendCommitted.promise)

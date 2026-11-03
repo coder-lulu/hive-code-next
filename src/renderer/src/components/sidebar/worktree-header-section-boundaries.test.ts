@@ -26,11 +26,10 @@ const startOfB = 28 + 116
 const startOfC = startOfB + 32 + 116
 
 describe('getRepoHeaderSectionEndByRepoId', () => {
-  it('uses project-tree header heights for drag section boundaries', () => {
+  it('uses the active row estimator for grouped drag section boundaries', () => {
     const ends = getRepoHeaderSectionEndByRepoId({
       rows: [groupHeader('group'), repoHeader('a'), item, repoHeader('b')],
       firstHeaderIndex: 0,
-      projectTree: true,
       sidebarRepoHeaderIdsByBucket: new Map([['group', ['a', 'b']]]),
       repoHeaderBucketByRepoId: new Map([
         ['a', 'group'],
@@ -38,7 +37,7 @@ describe('getRepoHeaderSectionEndByRepoId', () => {
       ])
     })
 
-    expect(ends.get('a')).toBe(32 + 40 + 116)
+    expect(ends.get('a')).toBe(28 + 32 + 116)
   })
 
   it('ends a section at the successor from the header’s own bucket', () => {
@@ -59,6 +58,17 @@ describe('getRepoHeaderSectionEndByRepoId', () => {
     // Regression: a successor index keyed on id alone picked `b` from the first bucket.
     expect(ends.get('a')).toBe(startOfC)
     expect(ends.get('b')).toBe(startOfC)
+  })
+
+  it('falls back to the next header when a bucket has no successor', () => {
+    const ends = getRepoHeaderSectionEndByRepoId({
+      rows,
+      firstHeaderIndex: 0,
+      sidebarRepoHeaderIdsByBucket: new Map([['ungrouped', ['a']]]),
+      repoHeaderBucketByRepoId: new Map([['a', 'ungrouped']])
+    })
+
+    expect(ends.get('a')).toBe(startOfB)
   })
 
   it('resolves a header id that renders twice to its first row, matching findIndex', () => {

@@ -9,8 +9,7 @@ export function createWebPlatformApi(): Partial<PreloadApi> {
         osRelease: '',
         arch: '',
         shell: '',
-        displayServer: null,
-        windowMaterial: 'off'
+        displayServer: null
       })
     }
   }

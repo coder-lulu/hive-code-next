@@ -2,7 +2,7 @@ import {
   structuredAgentLaunchSupport,
   type AgentLaunchRoutingInput
 } from '@/lib/agent-launch-routing'
-import { STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY as CATALOG } from '../../../shared/agent-session/structured-agent-session-surface-capabilities'
+import { STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY as CATALOG } from '../../../shared/protocol-version'
 import type { HostChatAnswer } from '../../../shared/agent-launch-picker-rows'
 export { buildNewTabAgentMenuRows } from '../../../shared/agent-launch-picker-rows'
 export type {
@@ -33,6 +33,8 @@ export function hostChatAnswer(input: AgentLaunchRoutingInput): HostChatAnswer {
       return 'no-chats'
     case 'custom-start-directory':
       return 'subfolder'
+    case 'tui-launch-command':
+      return 'no-chats'
     case 'reused-terminal':
       return 'yes'
   }

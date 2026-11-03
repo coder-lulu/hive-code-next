@@ -1,4 +1,4 @@
-import { MobileThemeProvider } from '../theme/mobile-theme-provider'
+import { MobileThemeProvider } from '../../../theme/mobile-theme-provider'
 import { createElement, type ReactNode } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'

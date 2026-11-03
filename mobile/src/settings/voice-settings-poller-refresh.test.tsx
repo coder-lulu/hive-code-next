@@ -6,29 +6,33 @@ import type { VoiceSettingsOperations } from './voice-settings-operations'
 import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 
 // Use the real focus-gated poller to verify rejected saves trigger a load; the sibling state test stubs it.
-vi.mock(
-  './settings-screen-frame',
-  async () => (await import('../test-support/settings-chrome-test-double')).settingsFrameDouble
-)
-vi.mock(
-  '../components/list/ListGroup',
-  async () => (await import('../test-support/settings-chrome-test-double')).listGroupDouble
-)
 vi.mock('react-native', () => ({
   View: 'View',
   Text: 'Text',
   Pressable: 'Pressable',
+  Switch: 'Switch',
   ScrollView: 'ScrollView',
   ActivityIndicator: 'ActivityIndicator',
   StyleSheet: { create: (value: unknown) => value, hairlineWidth: 1 },
   AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }
 }))
-vi.mock('../components/MobileSwitch', () => ({ MobileSwitch: 'Switch' }))
 vi.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: 'SafeAreaView',
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 })
 }))
-vi.mock('lucide-react-native', () => ({ ChevronLeft: 'Icon', ChevronRight: 'Icon' }))
-vi.mock('../components/bottom-drawer/BottomDrawer', () => ({ BottomDrawer: () => null }))
+vi.mock('lucide-react-native', () => ({
+  ChevronLeft: 'Icon',
+  ChevronRight: 'Icon',
+  Settings: 'Icon'
+}))
+vi.mock('../theme/mobile-theme-provider', async () => {
+  const { lightTheme } = await import('../theme/mobile-theme')
+  return {
+    useMobileTheme: () => lightTheme,
+    useMobileThemeStyles: <T,>(factory: (theme: typeof lightTheme) => T) => factory(lightTheme)
+  }
+})
+vi.mock('../components/BottomDrawer', () => ({ BottomDrawer: () => null }))
 vi.mock('../components/VoiceModelList', () => ({ VoiceModelList: () => null }))
 
 let renderer: ReactTestRenderer

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { BOTTOM_DRAWER_HIDE_DURATION_MS } from './bottom-drawer-constants'
+import { resolveNewWorktreeFormSheetVisible } from './new-worktree-form-sheet-visibility'
 
 export type NewWorktreeDrawerView =
   | 'form'
@@ -10,8 +12,8 @@ export type NewWorktreeDrawerView =
   | 'agent'
   | 'trust'
 
-// One frame: every sheet shares BottomDrawerModalHost's one native Modal, so there is no second iOS presentation to wait out.
-const NEW_WORKTREE_DRAWER_TRANSITION_MS = 16
+// iOS needs the first modal’s exit committed before presenting another; wait an extra frame on slower devices.
+const NEW_WORKTREE_DRAWER_TRANSITION_MS = BOTTOM_DRAWER_HIDE_DURATION_MS + 16
 
 export function useNewWorktreeDrawerNavigation(modalVisible: boolean): {
   drawerView: NewWorktreeDrawerView
@@ -65,8 +67,7 @@ export function useNewWorktreeDrawerNavigation(modalVisible: boolean): {
 
   return {
     drawerView,
-    // Pickers stack over the pinned form, so closing one reveals it in place and the host is never empty (#16165).
-    formSheetVisible: modalVisible,
+    formSheetVisible: resolveNewWorktreeFormSheetVisible({ modalVisible, drawerView }),
     formSheetInteractive: drawerView === 'form',
     transitionDrawer,
     openSourceDrawer

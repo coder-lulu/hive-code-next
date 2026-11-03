@@ -172,7 +172,6 @@ function coldRestoredRuntime(host: RestoreHost = LOCAL_HOST): {
   }
   setRuntimeDesktopSurface({
     showNotification: () => false,
-    waitForBrowserTabRegistration: async () => {},
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the runtime reads only liveness and send off its authoritative window on these paths.
     findWindowById: () => liveWindow as never,
     onIpc: () => {},
@@ -567,7 +566,6 @@ async function runtimeWithUnpublishedPhoneCreate(): Promise<OrcaRuntimeService> 
   }
   setRuntimeDesktopSurface({
     showNotification: () => false,
-    waitForBrowserTabRegistration: async () => {},
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: the create path reads only liveness and these webContents members off its authoritative window.
     findWindowById: () => ({ isDestroyed: () => false, webContents }) as never,
     // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: only the tab-create reply channel is registered on this path.

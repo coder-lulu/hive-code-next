@@ -15,8 +15,10 @@ const mocks = vi.hoisted(() => {
   return {
     ...listeners,
     getState: vi.fn(),
+    subscribe: vi.fn(),
     replyTabCreate: vi.fn(),
-    createBrowserTab: vi.fn()
+    createBrowserTab: vi.fn(),
+    browserTabRequestsReady: vi.fn()
   }
 })
 
@@ -24,13 +26,16 @@ vi.mock('@/components/browser-pane/host-guest/webview-registry', () => ({
   destroyPersistentWebview: vi.fn()
 }))
 vi.mock('../../store', () => ({
-  useAppStore: { getState: mocks.getState }
+  useAppStore: { getState: mocks.getState, subscribe: mocks.subscribe }
 }))
 vi.mock('./browser-automation-bootstrap-lease', () => ({
   acquireBrowserAutomationBootstrapLease: vi.fn()
 }))
 
-import { registerBrowserRequestIpcBridge } from './browser-request-ipc-bridge'
+import {
+  registerBrowserRequestIpcBridge,
+  signalBrowserTabRequestsReadyAfterRestore
+} from './browser-request-ipc-bridge'
 
 const ACTIVE_WT = 'repo-local::/Users/me/app'
 const RECENT_WT = 'repo-local::/Users/me/app-2'
@@ -84,6 +89,7 @@ describe('an extension tab with no active workspace', () => {
             return () => {}
           },
           replyTabCreate: mocks.replyTabCreate,
+          browserTabRequestsReady: mocks.browserTabRequestsReady,
           onRequestRemoteCliBrowserScope: () => () => {},
           onRequestTabSetProfile: () => () => {},
           onRequestTabClose: () => () => {}
@@ -92,6 +98,24 @@ describe('an extension tab with no active workspace', () => {
     })
     mocks.getState.mockReturnValue(storeState(null))
     registerBrowserRequestIpcBridge([])
+  })
+
+  it('tells main it can take tab requests once workspaces are restored', () => {
+    signalBrowserTabRequestsReadyAfterRestore([])
+    expect(mocks.browserTabRequestsReady).toHaveBeenCalledTimes(1)
+    vi.clearAllMocks()
+    const listeners: ((state: { workspaceSessionReady: boolean }) => void)[] = []
+    mocks.subscribe.mockImplementation(
+      (listener: (state: { workspaceSessionReady: boolean }) => void) => {
+        listeners.push(listener)
+        return () => {}
+      }
+    )
+    mocks.getState.mockReturnValue({ ...storeState(null), workspaceSessionReady: false })
+    signalBrowserTabRequestsReadyAfterRestore([])
+    expect(mocks.browserTabRequestsReady).not.toHaveBeenCalled()
+    listeners.forEach((listener) => listener({ workspaceSessionReady: true }))
+    expect(mocks.browserTabRequestsReady).toHaveBeenCalledTimes(1)
   })
 
   it("opens in the workspace the profile's tabs were last used in", () => {
@@ -121,6 +145,17 @@ describe('an extension tab with no active workspace', () => {
       'https://a.test',
       expect.anything()
     )
+  })
+
+  it('fails clearly when there is nowhere to open it', () => {
+    mocks.getState.mockReturnValue(storeState(null))
+    mocks.createListener?.({ requestId: 'r3', url: 'https://a.test', fallbackWorktreeId: 'gone' })
+    mocks.createListener?.({ requestId: 'r4', url: 'https://a.test' })
+    expect(mocks.createBrowserTab).not.toHaveBeenCalled()
+    expect(mocks.replyTabCreate.mock.calls).toEqual([
+      [{ requestId: 'r3', error: 'No active worktree' }],
+      [{ requestId: 'r4', error: 'No active worktree' }]
+    ])
   })
 
   it("never falls back into a paired server's workspace", () => {

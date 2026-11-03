@@ -47,21 +47,27 @@ describe('sidebar worktree activation', () => {
   })
 })
 
-it('notifies only after a successful worktree activation', async () => {
-  const notify = vi.fn()
+it('preserves an explicit worktree owner across refused and successful activation', async () => {
+  vi.clearAllMocks()
   mocks.activateAndRevealWorktree.mockReturnValue(false)
-  await activateWorktreeFromSidebar('main', 'local', notify)
-  expect(notify).not.toHaveBeenCalled()
+  await activateWorktreeFromSidebar('main', 'local')
+  expect(mocks.activateAndRevealWorktree).toHaveBeenLastCalledWith('main', {
+    navigationIntent: 'user-open',
+    revealInSidebar: false,
+    executionHostId: 'local'
+  })
   mocks.activateAndRevealWorktree.mockReturnValue({ primaryTabId: null })
-  await activateWorktreeFromSidebar('main', 'local', notify)
-  expect(notify).toHaveBeenCalledOnce()
+  await activateWorktreeFromSidebar('main', 'local')
+  expect(mocks.activateAndRevealWorktree).toHaveBeenCalledTimes(2)
 })
-it('keeps a refused folder activation open and notifies on success', async () => {
-  const notify = vi.fn()
+it('preserves an explicit folder owner across refused and successful activation', async () => {
   mocks.activateAndRevealFolderWorkspace.mockReturnValue(false)
-  await activateWorktreeFromSidebar('folder:notes', 'local', notify)
-  expect(notify).not.toHaveBeenCalled()
+  await activateWorktreeFromSidebar('folder:notes', 'local')
+  expect(mocks.activateAndRevealFolderWorkspace).toHaveBeenLastCalledWith('notes', {
+    navigationIntent: 'user-open',
+    executionHostId: 'local'
+  })
   mocks.activateAndRevealFolderWorkspace.mockReturnValue({ primaryTabId: null })
-  await activateWorktreeFromSidebar('folder:notes', 'local', notify)
-  expect(notify).toHaveBeenCalledOnce()
+  await activateWorktreeFromSidebar('folder:notes', 'local')
+  expect(mocks.activateAndRevealFolderWorkspace).toHaveBeenCalledTimes(2)
 })

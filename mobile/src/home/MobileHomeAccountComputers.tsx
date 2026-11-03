@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { Monitor, RefreshCw } from 'lucide-react-native'
 import { Pressable, Text, View } from 'react-native'
 import { MobileGroupedList, MobileGroupedListRow } from '../components/ui/MobileGroupedList'
@@ -15,16 +16,27 @@ export function MobileHomeAccountComputers(props: {
   onRefresh: () => void
   onOpen: (host: HostCatalogEntry) => void
 }) {
+  const t = useMobileTranslation()
+
   const styles = useMobileThemeStyles(createMobileHomeConnectionStyles)
   const theme = useMobileTheme()
   return (
     <View style={styles.panelCopy}>
       {props.entries.length > 0 ? (
-        <MobileGroupedList accessibilityLabel="账号中的电脑">
+        <MobileGroupedList
+          accessibilityLabel={t(
+            'auto.mobile.src.home.MobileHomeAccountComputers.71d807d73d',
+            'Computers in your account'
+          )}
+        >
           {props.entries.map((entry) => (
             <MobileGroupedListRow
               key={entry.id}
-              accessibilityLabel={`连接${entry.name}，${entry.statusLabel}`}
+              accessibilityLabel={t(
+                'auto.mobile.src.home.MobileHomeAccountComputers.a820e741bb',
+                'Connect to {{value0}}, {{value1}}',
+                { value0: entry.name, value1: entry.statusLabel }
+              )}
               busy={entry.statusLabel === '连接中' || entry.statusLabel === '正在重连'}
               title={entry.name}
               value={entry.statusLabel}
@@ -42,17 +54,27 @@ export function MobileHomeAccountComputers(props: {
       ) : null}
       {props.empty ? (
         <Text maxFontSizeMultiplier={1.3} style={styles.hint}>
-          还没有已认领的电脑。请在电脑端登录同一账号并发起认领。
+          {t(
+            'auto.mobile.src.home.MobileHomeAccountComputers.a47a79d9b4',
+            'No computers claimed yet. Sign in to the same account on your computer and start a claim.'
+          )}
         </Text>
       ) : null}
       {props.error ? (
         <Text accessibilityRole="alert" maxFontSizeMultiplier={1.3} style={styles.error}>
-          电脑列表获取失败：{props.error}
+          {t(
+            'auto.mobile.src.home.MobileHomeAccountComputers.13830414d1',
+            'Could not load the computer list: '
+          )}
+          {props.error}
         </Text>
       ) : null}
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="刷新账号电脑"
+        accessibilityLabel={t(
+          'auto.mobile.src.home.MobileHomeAccountComputers.5e260adf7a',
+          'Refresh account computers'
+        )}
         accessibilityState={{ busy: props.loading, disabled: props.loading }}
         disabled={props.loading}
         onPress={props.onRefresh}
@@ -64,7 +86,12 @@ export function MobileHomeAccountComputers(props: {
       >
         <RefreshCw size={16} strokeWidth={2} color={theme.color.text.secondary} />
         <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.hint}>
-          {props.loading ? '正在获取电脑…' : '刷新账号电脑'}
+          {props.loading
+            ? t('auto.mobile.src.home.MobileHomeAccountComputers.5eac5ed38a', 'Loading computers…')
+            : t(
+                'auto.mobile.src.home.MobileHomeAccountComputers.5e260adf7a',
+                'Refresh account computers'
+              )}
         </Text>
       </Pressable>
     </View>

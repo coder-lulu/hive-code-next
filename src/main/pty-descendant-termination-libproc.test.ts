@@ -79,8 +79,8 @@ describe('descendant teardown over the in-process process table', () => {
         .mockImplementation(async () => [row(1, 0), row(100, 1), row(200, 1), row(300, 100)])
       setLibprocAddonForTests({
         readProcessTable,
-        readProcessCwd: async () => null,
-        readProcessPath: async () => null
+        processCwd: () => null,
+        processPath: () => null
       })
       expect(await captureDescendantSnapshot(100, { timeoutMs: 10 })).toBeNull()
 
@@ -106,8 +106,8 @@ describe('descendant teardown over the in-process process table', () => {
     vi.useFakeTimers()
     setLibprocAddonForTests({
       readProcessTable: () => new Promise<never>(() => {}),
-      readProcessCwd: async () => null,
-      readProcessPath: async () => null
+      processCwd: () => null,
+      processPath: () => null
     })
     // A 750ms ps, killed at its timeout like execFile.
     execFile.mockImplementation((_file, _args, { timeout }, callback) => {

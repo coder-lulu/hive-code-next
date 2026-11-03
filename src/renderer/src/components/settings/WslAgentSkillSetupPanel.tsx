@@ -77,13 +77,12 @@ export function WslAgentSkillSetupPanel({
   )
   const activeCommand = installed ? (installedCommand ?? command) : command
   // Pin open terminals to click-time command/runtime because command changes trigger auto-insertion.
-  const openTerminalCommand = terminalSnapshot?.copiedCommand ?? activeCommand
 
   const openSetupTerminal = (): void => {
     if (terminalOpening || setupAttemptRunning) {
       return
     }
-    const nextSnapshot = createTerminalSnapshot(activeCommand, shellOverride, runtime)
+    const nextSnapshot = createTerminalSnapshot(activeCommand, shellOverride, runtime, null)
     setTerminalOpening(true)
     if (setupCommandFailedCode !== null) {
       setTerminalOpen(false)
@@ -92,6 +91,9 @@ export function WslAgentSkillSetupPanel({
       let shouldOpenTerminal = false
       try {
         await onBeforeOpenTerminal?.()
+        if (getPrerequisiteStatus && !isPrerequisiteAvailable(await readPrerequisiteStatus())) {
+          throw new Error('CLI registration is unavailable on the selected host.')
+        }
         await refreshPreInstallNotice()
         shouldOpenTerminal = true
       } catch {
@@ -184,7 +186,7 @@ export function WslAgentSkillSetupPanel({
 
   const copyActiveCommand = async (): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(openTerminalCommand)
+      await window.api.ui.writeClipboardText(terminalSnapshot?.copiedCommand ?? activeCommand)
       toast.success(
         translate('auto.components.settings.AgentSkillSetupPanel.copiedCommand', 'Copied command.')
       )
@@ -361,7 +363,7 @@ export function WslAgentSkillSetupPanel({
         >
           <div className="flex min-w-0 max-w-full items-center gap-2 overflow-hidden rounded-md border border-border bg-muted/35 px-3 py-2">
             <code className="scrollbar-sleek min-w-0 flex-1 overflow-x-auto whitespace-nowrap font-mono text-xs text-muted-foreground">
-              {openTerminalCommand}
+              {terminalSnapshot?.copiedCommand ?? activeCommand}
             </code>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -390,7 +392,7 @@ export function WslAgentSkillSetupPanel({
           <OnboardingInlineCommandTerminal
             key={terminalAttempt}
             worktreeId={terminalWorktreeId}
-            command={openTerminalCommand}
+            command={terminalSnapshot?.copiedCommand ?? activeCommand}
             prepareCommandForShell={terminalSnapshot.prepareCommandForShell}
             title={terminalTitle}
             description={translate(

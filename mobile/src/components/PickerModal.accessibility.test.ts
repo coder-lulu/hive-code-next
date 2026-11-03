@@ -13,7 +13,7 @@ vi.mock('react-native', () => ({
 
 vi.mock('lucide-react-native', () => ({ Check: 'Check' }))
 
-vi.mock('./bottom-drawer/BottomDrawer', async () => {
+vi.mock('./BottomDrawer', async () => {
   const React = await import('react')
   return {
     BottomDrawer: ({ children }: { children?: ReactNode }) =>

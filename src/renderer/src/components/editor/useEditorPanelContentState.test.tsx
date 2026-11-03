@@ -69,10 +69,9 @@ vi.mock('@/store', () => ({
 }))
 
 import { useEditorPanelContentState } from './useEditorPanelContentState'
-import { createTestStore, makeWorktree } from '@/store/slices/store-test-helpers'
+import { createTestStore } from '@/store/slices/store-test-helpers'
 import { getDiskBaselineSignature } from '../../../../shared/disk-baseline-signature'
 import { ORCA_EDITOR_EXTERNAL_FILE_CHANGE_EVENT } from './editor-autosave'
-import { registerEditorPanelHostContentRecoveryTests } from './editor-panel-host-content-recovery.spec'
 
 type Deferred<T> = {
   promise: Promise<T>
@@ -149,26 +148,6 @@ function createOpenFile(overrides: Partial<OpenFile> = {}): OpenFile {
   }
 }
 
-function mockDiskBaselineStore(activeFile: OpenFile) {
-  const setLastKnownDiskSignature = vi.fn()
-  const store = createTestStore()
-  const worktree = makeWorktree({
-    id: activeFile.worktreeId,
-    repoId: 'repo-1',
-    path: '/repo',
-    hostId: 'local'
-  })
-  store.setState({
-    settings: null,
-    openFiles: [activeFile],
-    worktreesByRepo: { 'repo-1': [worktree] },
-    setLastKnownDiskSignature
-  })
-  mocks.getState.mockImplementation(store.getState)
-  mocks.readRuntimeFileContent.mockResolvedValue({ content: 'disk content', isBinary: false })
-  return setLastKnownDiskSignature
-}
-
 describe('useEditorPanelContentState', () => {
   let container: HTMLDivElement | null = null
   let root: Root | null = null
@@ -205,18 +184,29 @@ describe('useEditorPanelContentState', () => {
     root = null
   })
 
-  registerEditorPanelHostContentRecoveryTests(
-    mocks,
-    () => latestFileContents,
-    createOpenFile,
-    (file, options) => latestReloadContent(file, options),
-    async (file) => {
-      container = document.createElement('div')
-      document.body.appendChild(container)
-      root = createRoot(container)
-      await act(async () => root?.render(<HookProbe activeFile={file} openFiles={[file]} />))
-    }
-  )
+  it('lets the active tab load and its Retry start a stopped WSL distro, but not other reloads', async () => {
+    const activeFile = createOpenFile()
+    mocks.readRuntimeFileContent.mockResolvedValue({ content: 'text', isBinary: false })
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = createRoot(container)
+    await act(async () => {
+      root?.render(<HookProbe activeFile={activeFile} openFiles={[activeFile]} />)
+    })
+    await vi.waitFor(() => expect(latestFileContents[activeFile.id]?.content).toBe('text'))
+    expect(mocks.readRuntimeFileContent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ wakeWslDistro: true })
+    )
+
+    await act(async () => latestReloadContent(activeFile))
+    expect(mocks.readRuntimeFileContent).toHaveBeenLastCalledWith(
+      expect.not.objectContaining({ wakeWslDistro: true })
+    )
+    await act(async () => latestReloadContent(activeFile, { wakeWslDistro: true }))
+    expect(mocks.readRuntimeFileContent).toHaveBeenLastCalledWith(
+      expect.objectContaining({ wakeWslDistro: true })
+    )
+  })
 
   it('loads folder workspace files through the path-specific SSH connection', async () => {
     const activeFile = createOpenFile({
@@ -880,7 +870,14 @@ describe('useEditorPanelContentState', () => {
 
   it('stamps the disk baseline when a clean tab load resolves', async () => {
     const activeFile = createOpenFile()
-    const setLastKnownDiskSignature = mockDiskBaselineStore(activeFile)
+    const setLastKnownDiskSignature = vi.fn()
+    mocks.getState.mockReturnValue({
+      ...createTestStore().getState(),
+      settings: null,
+      openFiles: [activeFile],
+      setLastKnownDiskSignature
+    })
+    mocks.readRuntimeFileContent.mockResolvedValue({ content: 'disk content', isBinary: false })
 
     container = document.createElement('div')
     document.body.appendChild(container)
@@ -900,7 +897,14 @@ describe('useEditorPanelContentState', () => {
   it('keeps a dirty tab baseline untouched by content loads', async () => {
     // Dirty drafts retain their original disk baseline so content loading cannot hide external conflicts.
     const activeFile = createOpenFile({ isDirty: true })
-    const setLastKnownDiskSignature = mockDiskBaselineStore(activeFile)
+    const setLastKnownDiskSignature = vi.fn()
+    mocks.getState.mockReturnValue({
+      ...createTestStore().getState(),
+      settings: null,
+      openFiles: [activeFile],
+      setLastKnownDiskSignature
+    })
+    mocks.readRuntimeFileContent.mockResolvedValue({ content: 'disk content', isBinary: false })
 
     container = document.createElement('div')
     document.body.appendChild(container)

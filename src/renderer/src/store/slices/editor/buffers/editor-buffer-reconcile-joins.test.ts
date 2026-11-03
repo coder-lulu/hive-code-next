@@ -57,3 +57,15 @@ it('a clean view that saw the file deleted keeps the deleted banner on every vie
   expect(view('a')?.externalMutation).toBe('deleted')
   expect(view('b')?.externalMutation).toBe('deleted')
 })
+
+it('a deleted banner does not leak onto a dirty target', () => {
+  useAppStore.setState({
+    openFiles: [tab('a', { isDirty: true })],
+    editorDrafts: { a: 'mine' }
+  })
+  useAppStore.setState((s) => ({
+    openFiles: [...s.openFiles, tab('b', { externalMutation: 'deleted' })]
+  }))
+
+  expect(view('a')?.externalMutation).toBeUndefined()
+})

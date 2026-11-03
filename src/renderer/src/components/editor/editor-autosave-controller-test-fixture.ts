@@ -126,8 +126,6 @@ export function createEditorStore(): StoreApi<AppState> {
       ...emptyTabLayoutState(),
       activeWorktreeId: 'wt-1',
       repos: [],
-      folderWorkspaces: [],
-      projectGroups: [],
       worktreesByRepo: {
         'repo-1': [{ id: 'wt-1', repoId: 'repo-1', hostId: 'local' }]
       },

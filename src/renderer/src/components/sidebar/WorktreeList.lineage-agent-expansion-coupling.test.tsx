@@ -451,14 +451,13 @@ describe('WorktreeCard agent-list <-> child-worktrees expansion coupling', () =>
 
     expect(container.textContent).toContain('Parent Terminal')
     expect(container.textContent).not.toContain('PARENT_AGENT_PROMPT')
-    // Child agents stay collapsed until the user opens them; child worktrees stay open.
-    expect(container.textContent).not.toContain('CHILD_AGENT_PROMPT')
+    expect(container.textContent).toContain('CHILD_AGENT_PROMPT')
 
     expect(childWorktreeChip(container)).not.toBeNull()
     expect(agentChildDisclosure(container)).not.toBeNull()
 
     expect(childWorktreeChip(container)!.getAttribute('aria-expanded')).toBe('true')
-    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('false')
+    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('true')
     expect(childWorktreeCardPresent(container)).toBe(true)
   })
 
@@ -466,13 +465,13 @@ describe('WorktreeCard agent-list <-> child-worktrees expansion coupling', () =>
     setAgentLineageState({ agentActivityDisplayMode: 'full' })
     const { container } = await renderWorktreeList()
 
-    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('false')
+    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('true')
     expect(childWorktreeCardPresent(container)).toBe(true)
 
     await click(agentChildDisclosure(container)!)
 
-    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('true')
-    expect(container.textContent).toContain('CHILD_AGENT_PROMPT')
+    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('false')
+    expect(container.querySelector('.worktree-agent-lineage-children')).toBeNull()
     expect(childWorktreeChip(container)!.getAttribute('aria-expanded')).toBe('true')
     expect(childWorktreeCardPresent(container)).toBe(true)
     expect((mockStore.state.collapsedGroups as Set<string>).size).toBe(0)
@@ -485,7 +484,7 @@ describe('WorktreeCard agent-list <-> child-worktrees expansion coupling', () =>
     expect(parentVirtualRowKey(container)).toBe('lineage-group:all:lineage:parent')
 
     await click(agentChildDisclosure(container)!)
-    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('true')
+    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('false')
 
     await click(childWorktreeChip(container)!)
     expect(mockStore.state.toggleCollapsedGroup).toHaveBeenCalledWith('lineage:parent')
@@ -495,8 +494,8 @@ describe('WorktreeCard agent-list <-> child-worktrees expansion coupling', () =>
     expect(parentVirtualRowKey(container)).toBe('wt:all:|parent')
     expect(childWorktreeCardPresent(container)).toBe(false)
 
-    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('true')
-    expect(container.textContent).toContain('CHILD_AGENT_PROMPT')
+    expect(agentChildDisclosure(container)!.getAttribute('aria-expanded')).toBe('false')
+    expect(container.querySelector('.worktree-agent-lineage-children')).toBeNull()
   })
 
   it('[compact mode] toggling CHILD WORKTREES preserves the compact agent summary expansion (regression)', async () => {

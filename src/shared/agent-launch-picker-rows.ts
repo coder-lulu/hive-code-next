@@ -1,12 +1,10 @@
 import type { GlobalSettings } from './global-settings-types'
-import {
-  nativeChatPreferenceFor,
-  type NativeChatDefaultSettings
-} from './structured-native-chat-launch-route'
+import { isNativeChatProviderDisplayedOn } from './native-chat/native-chat-providers'
+import type { NativeChatDefaultSettings } from './structured-native-chat-launch-route'
 import type { ExecutionHostId } from './execution-host'
 import type { TuiAgent } from './tui-agent'
 import { filterEnabledTuiAgents, TUI_AGENT_AUTO_PICK_ORDER } from './tui-agent-selection'
-import type { AgentSessionChatProgram } from './agent-session/agent-session-agent-availability'
+import type { AgentSessionChatProgram } from './agent-session-agent-availability'
 
 export type HostChatAnswer =
   | 'yes'
@@ -70,12 +68,14 @@ export function buildNewTabAgentMenuRows(args: {
   const runnable: TuiAgent[] = []
   const unavailable = new Map<TuiAgent, ChatUnavailableReason>()
   const chatAgents = filterEnabledTuiAgents(args.chatAgents, settings?.disabledTuiAgents)
+  // An unchosen provider is on wherever its chat program is, whether or not its CLI is.
   const canOpen = (agent: TuiAgent): boolean =>
     chatProgramOffered(args.chatProgram(agent)) ||
     (args.chatProgram(agent) === 'unknown' && installed.includes(agent))
+  const providedHere = chatAgents.filter(canOpen)
   const chatToo = new Set<TuiAgent>()
   for (const agent of chatAgents) {
-    const displayed = nativeChatPreferenceFor(settings, agent)
+    const displayed = isNativeChatProviderDisplayedOn(settings, agent, providedHere)
     if (!displayed && (!installed.includes(agent) || !canOpen(agent))) {
       continue
     }

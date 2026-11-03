@@ -41,10 +41,7 @@ vi.mock('@/lib/worktree-runtime-owner', () => ({
 vi.mock('@/components/contextual-tours/use-contextual-tour', () => ({
   useContextualTour: () => {}
 }))
-vi.mock('../host-guest/webview-registry', () => ({
-  destroyPersistentWebview: mocks.destroy,
-  webviewRegistry: new Map()
-}))
+vi.mock('../host-guest/webview-registry', () => ({ destroyPersistentWebview: mocks.destroy }))
 vi.mock('./BrowserMobileDriverOverlay', () => ({ BrowserMobileDriverOverlay: () => null }))
 vi.mock('./browser-page-pane', () => ({
   BrowserPagePane: ({ browserTab, isActive }: { browserTab: BrowserPage; isActive: boolean }) => (
@@ -57,16 +54,13 @@ vi.mock('../workspace-doc/workspace-doc-page-pane', () => ({
   )
 }))
 
-import type BrowserPaneOverlayLayerComponent from './BrowserPaneOverlayLayer'
-import type * as AutomationVisibility from '../host-guest/browser-automation-visibility'
-import type * as MobileDriverState from '@/lib/pane-manager/browser-mobile-driver-state'
-import type * as RemoteViewerState from '@/lib/pane-manager/browser-remote-viewer-state'
-
-let BrowserPaneOverlayLayer: typeof BrowserPaneOverlayLayerComponent
-let acquireBrowserAutomationVisibility: typeof AutomationVisibility.acquireBrowserAutomationVisibility
-let releaseBrowserAutomationVisibility: typeof AutomationVisibility.releaseBrowserAutomationVisibility
-let hydrateBrowserDrivers: typeof MobileDriverState.hydrateBrowserDrivers
-let hydrateBrowserRemoteViewerPages: typeof RemoteViewerState.hydrateBrowserRemoteViewerPages
+import BrowserPaneOverlayLayer from './BrowserPaneOverlayLayer'
+import {
+  acquireBrowserAutomationVisibility,
+  releaseBrowserAutomationVisibility
+} from '../host-guest/browser-automation-visibility'
+import { hydrateBrowserDrivers } from '@/lib/pane-manager/browser-mobile-driver-state'
+import { hydrateBrowserRemoteViewerPages } from '@/lib/pane-manager/browser-remote-viewer-state'
 
 function createState(): MockState {
   const browsers: BrowserWorkspace[] = ['a', 'b'].map((id) => ({
@@ -153,15 +147,7 @@ function redraw(view: ReturnType<typeof render>, active = true): void {
 const settle = () => act(async () => {})
 
 describe('deferred browser lifecycle through the overlay and SSH gate', () => {
-  beforeEach(async () => {
-    // Verified SSH routes outlive mounts at module scope; each test starts unverified.
-    vi.resetModules()
-    ;({ default: BrowserPaneOverlayLayer } = await import('./BrowserPaneOverlayLayer'))
-    ;({ acquireBrowserAutomationVisibility, releaseBrowserAutomationVisibility } =
-      await import('../host-guest/browser-automation-visibility'))
-    ;({ hydrateBrowserDrivers } = await import('@/lib/pane-manager/browser-mobile-driver-state'))
-    ;({ hydrateBrowserRemoteViewerPages } =
-      await import('@/lib/pane-manager/browser-remote-viewer-state'))
+  beforeEach(() => {
     mocks.state = createState()
     mocks.store = createStore(() => mocks.state!)
     mocks.executionHostId = 'local'

@@ -38,7 +38,12 @@ describe('terminal live accessory raw send', () => {
       // Never park accessory keys to fire into a reconnected PTY long after the tap.
       { failWhenDisconnected: true }
     )
-    expect(sendRequest).toHaveBeenCalledTimes(1)
+    expect(sendRequest).toHaveBeenCalledTimes(2)
+    expect(sendRequest).toHaveBeenLastCalledWith(
+      'orchestration.workerTerminalUserInput',
+      { terminal: 'terminal-a' },
+      { timeoutMs: 5_000, budgetSpansConnect: true, failWhenDisconnected: true }
+    )
   })
 
   it('drops the bytes instead of sending while disconnected', async () => {

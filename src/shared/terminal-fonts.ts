@@ -4,11 +4,7 @@ export const TERMINAL_FONT_WEIGHT_MAX = 900
 export const TERMINAL_FONT_WEIGHT_STEP = 100
 export const DEFAULT_TERMINAL_FONT_WEIGHT_BOLD = 700
 
-/** Clamps any font weight to the CSS 100–900 range shared by terminal and editor settings. */
-export function normalizeFontWeight(
-  fontWeight: number | null | undefined,
-  fallback: number
-): number {
+function normalizeWeight(fontWeight: number | null | undefined, fallback: number): number {
   const numericFontWeight = typeof fontWeight === 'number' ? fontWeight : Number.NaN
 
   if (!Number.isFinite(numericFontWeight)) {
@@ -22,11 +18,11 @@ export function normalizeFontWeight(
 }
 
 export function normalizeTerminalFontWeight(fontWeight: number | null | undefined): number {
-  return normalizeFontWeight(fontWeight, DEFAULT_TERMINAL_FONT_WEIGHT)
+  return normalizeWeight(fontWeight, DEFAULT_TERMINAL_FONT_WEIGHT)
 }
 
 export function normalizeTerminalFontWeightBold(fontWeight: number | null | undefined): number {
-  return normalizeFontWeight(fontWeight, DEFAULT_TERMINAL_FONT_WEIGHT_BOLD)
+  return normalizeWeight(fontWeight, DEFAULT_TERMINAL_FONT_WEIGHT_BOLD)
 }
 
 // Numeric weight gaps do not guarantee distinct font faces, so bold stays independently configurable.

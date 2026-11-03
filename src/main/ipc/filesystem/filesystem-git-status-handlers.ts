@@ -198,12 +198,7 @@ export function registerFilesystemGitStatusHandlers(context: FilesystemHandlerCo
         wakeWslDistro?: boolean
       } & GitHistoryOptions
     ): Promise<GitHistoryResult> => {
-      const options: GitHistoryOptions = {
-        limit: args.limit,
-        baseRef: args.baseRef,
-        branchOnly: args.branchOnly,
-        skip: args.skip
-      }
+      const options: GitHistoryOptions = { limit: args.limit, baseRef: args.baseRef }
       requireReachableGitRoute(getConnectionExecutionHostId(args.connectionId))
       return readWorktreeGitUnlessWslStopped(
         store,
@@ -288,7 +283,6 @@ export function registerFilesystemGitStatusHandlers(context: FilesystemHandlerCo
         filePath: string
         staged: boolean
         compareAgainstHead?: boolean
-        oldPath?: string
         connectionId?: string
         /** Showing the diff tab or its Retry: a user act that may start a stopped WSL distro. */
         wakeWslDistro?: boolean
@@ -305,13 +299,7 @@ export function registerFilesystemGitStatusHandlers(context: FilesystemHandlerCo
             validateGitRelativeFilePath(worktreePath, args.filePath),
             args.staged,
             args.compareAgainstHead,
-            {
-              ...gitOptions,
-              admissionTier: 'interactive',
-              ...(args.oldPath
-                ? { oldPath: validateGitRelativeFilePath(worktreePath, args.oldPath) }
-                : {})
-            }
+            { ...gitOptions, admissionTier: 'interactive' }
           )
       )
     }

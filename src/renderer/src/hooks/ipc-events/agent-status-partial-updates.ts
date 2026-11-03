@@ -1,4 +1,3 @@
-import { RESUMABLE_TUI_AGENTS } from '../../../../shared/agent-session/lifecycle/agent-session-resume'
 import type { AgentStatusIpcPayload } from '../../../../shared/agent-status-types'
 import type { ProgramStatusFacet } from '../../../../shared/program-status/facet'
 import type { AppState } from '@/store/types'
@@ -49,14 +48,13 @@ export function applyProviderSessionOnlyUpdate(args: {
   routing: NonNullable<AgentProviderSessionUpdate['routing']>
 }): AgentStatusApplyResult {
   const { store, batch, data, paneKey, routing } = args
-  const agent = RESUMABLE_TUI_AGENTS.find((candidate) => candidate === data.agentType)
-  if (!data.providerSession || !agent) {
+  if (!data.providerSession || data.agentType !== 'pi') {
     return 'dropped'
   }
   const update: AgentProviderSessionUpdate = {
     kind: 'providerSession',
     paneKey,
-    agent,
+    agent: 'pi',
     providerSession: data.providerSession,
     timing: { updatedAt: data.receivedAt },
     routing,

@@ -1,5 +1,5 @@
 import { appendFileSync, globSync, readFileSync } from 'node:fs'
-import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { nodeServerTestPaths } from './node-server-test-paths.mjs'
 import { nodeServerQualification } from './node-server-qualification.mjs'
@@ -134,12 +134,8 @@ export async function collectNodeServerInputs({ root = ROOT, entryPoints } = {})
     metafile: true,
     logLevel: 'silent'
   })
-  // esbuild parses every ancestor package.json; a checkout nested in another one must not fail on it.
-  const warnings = result.warnings.filter(
-    ({ location }) => !location || isInsideRoot(root, location.file)
-  )
-  if (warnings.length > 0) {
-    throw new Error(warnings.map((warning) => warning.text).join('\n'))
+  if (result.warnings.length > 0) {
+    throw new Error(result.warnings.map((warning) => warning.text).join('\n'))
   }
   return new Set([
     ...manifests,
@@ -147,11 +143,6 @@ export async function collectNodeServerInputs({ root = ROOT, entryPoints } = {})
       file.replaceAll('\\', '/').replace(/\?.*$/, '')
     )
   ])
-}
-
-function isInsideRoot(root, file) {
-  const path = relative(root, resolve(root, file))
-  return !isAbsolute(path) && path !== '..' && !path.startsWith(`..${sep}`)
 }
 
 function isSourceUnitTest(file) {

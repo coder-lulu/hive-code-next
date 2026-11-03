@@ -1,4 +1,3 @@
-// @protected-copy: delete-workspace confirmation buttons.
 import type { JSX, Ref } from 'react'
 import { LoaderCircle, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'

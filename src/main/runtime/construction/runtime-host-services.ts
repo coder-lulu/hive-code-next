@@ -135,8 +135,8 @@ export abstract class OrcaRuntimeWithPreservedBranchCleanup extends OrcaRuntimeW
   }
 
   /** Includes resume-identity-only provider rows. */
-  getAgentProviderSessionRows(tabId?: string): AgentStatusIpcPayload[] {
-    return this.getAgentProviderSessionSnapshotFn?.(tabId) ?? []
+  getAgentProviderSessionRows(): AgentStatusIpcPayload[] {
+    return this.getAgentProviderSessionSnapshotFn?.() ?? []
   }
 
   getAgentStatusRowsForPane(paneKey: string): AgentStatusIpcPayload[] {

@@ -1,3 +1,4 @@
+import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useEffect, useRef, useState } from 'react'
 import { useMobileAuthSession } from '../auth/mobile-auth-session'
 import type { MobileSession } from '../auth/mobile-sms-auth'
@@ -23,6 +24,8 @@ import {
 import { requestMobileRuntimeUnlinkSms, unlinkMobileRuntime } from './mobile-runtime-unlink-client'
 
 export function useMobileRuntimeDelete(runtimeRecordId: string, session: MobileSession) {
+  const t = useMobileTranslation()
+
   const auth = useMobileAuthSession()
   const directory = useAccountRuntimeDirectory()
   const { forgetHostClient } = useRpcClientContext()
@@ -97,7 +100,12 @@ export function useMobileRuntimeDelete(runtimeRecordId: string, session: MobileS
       }
     } catch {
       if (isCurrent()) {
-        patch({ error: '已从账号解除认领，但手机连接记录尚未清理完成，请重试清理。' })
+        patch({
+          error: t(
+            'auto.mobile.src.runtime.directory.use.mobile.runtime.delete.944f6af738',
+            'Unclaimed from the account, but phone connection records have not been cleared. Retry cleanup.'
+          )
+        })
       }
     }
   }
@@ -220,7 +228,12 @@ export function useMobileRuntimeDelete(runtimeRecordId: string, session: MobileS
         )
       } catch {
         if (isCurrent()) {
-          patch({ error: '无法保存本机清理记录，请稍后重试。' })
+          patch({
+            error: t(
+              'auto.mobile.src.runtime.directory.use.mobile.runtime.delete.361af6506f',
+              'Could not save the local cleanup record. Try again later.'
+            )
+          })
         }
         return
       }

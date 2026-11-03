@@ -3,7 +3,7 @@
 import type {
   AgentSessionBackgroundTask,
   AgentSessionBackgroundTaskState
-} from './agent-session/agent-session-background-task-wire'
+} from './agent-session-wire'
 import { agentChildWorkLiveness } from './agent-status-child-work-liveness'
 import type { AgentChildWorkView } from './agent-status-child-work-view'
 

@@ -6,8 +6,7 @@ export const MOBILE_WEB_PAGE_ROUTES = [
   {
     pathname: '/h/[hostId]',
     grants: ['navigate', 'storage', 'externalLink', 'haptics'],
-    canOwnHostArea: true,
-    canOwnHostAreaAcrossLayouts: true
+    canOwnHostArea: true
   },
   // History needs navigate for session/resume, storage for shared sidebar width and externalLink for layout protocol wall.
   {
@@ -18,10 +17,6 @@ export const MOBILE_WEB_PAGE_ROUTES = [
   {
     pathname: '/h/[hostId]/tasks',
     grants: ['navigate', 'storage', 'externalLink', 'haptics', 'native.clipboard.write']
-  },
-  {
-    pathname: '/h/[hostId]/automations',
-    grants: ['navigate', 'storage', 'externalLink', 'haptics']
   },
   // Accounts needs navigate/storage/externalLink for Back/shared layout wall; haptics census requires seam grant.
   {
@@ -80,12 +75,7 @@ export const MOBILE_WEB_PAGE_ROUTES = [
       'native.audio.read',
       'native.audio.stop'
     ],
-    // Optional media.name falls back to the file type; terminalKeyRail falls back to the page's row.
-    optionalGrants: [
-      'externalNavigation',
-      'native.media.name',
-      'native.pdf.view',
-      'terminalKeyRail'
-    ]
+    // Optional media.name preserves attachment on older shells by falling back to filename derived from type.
+    optionalGrants: ['externalNavigation', 'native.media.name', 'native.pdf.view']
   }
 ]

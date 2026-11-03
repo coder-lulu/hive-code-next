@@ -2,7 +2,7 @@
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { describe, expect, it, vi } from 'vitest'
 import { MOBILE_WEB_BUNDLE_CAPABILITY } from '../../../src/shared/mobile-web-bundle/mobile-web-bundle-capability'
-import type { MobileWebBundleManifestRead } from '../transport/web-bundle/mobile-web-bundle-reply-schemas'
+import type { MobileWebBundleManifestRead } from '../transport/mobile-web-bundle-reply-schemas'
 import type { GenerationStore } from './generation-store'
 import type { MobileWebShellSessionState } from './mobile-web-shell-session-contract'
 
@@ -60,7 +60,7 @@ vi.mock('../transport/rpc-operation', () => ({
     return { manifest: doubles.manifest() }
   }
 }))
-vi.mock('../transport/web-bundle/mobile-web-bundle-fetch', () => ({
+vi.mock('../transport/mobile-web-bundle-fetch', () => ({
   fetchMobileWebBundle: () => new Promise(() => {})
 }))
 
@@ -87,13 +87,12 @@ const store: GenerationStore = {
   forgetHostUpdateFailures: async () => undefined
 }
 
-function routes(declares: boolean, acrossLayouts = true): MobileWebBundleManifestRead['routes'] {
+function routes(declares: boolean): MobileWebBundleManifestRead['routes'] {
   return [
     {
       pathname: '/h/[hostId]',
       grants: ['navigate'],
-      ...(declares ? { canOwnHostArea: true } : {}),
-      ...(declares && acrossLayouts ? { canOwnHostAreaAcrossLayouts: true } : {})
+      ...(declares ? { canOwnHostArea: true } : {})
     },
     { pathname: '/h/[hostId]/session/[worktreeId]', grants: ['navigate'] }
   ]
@@ -102,10 +101,9 @@ function routes(declares: boolean, acrossLayouts = true): MobileWebBundleManifes
 async function settledKinds(
   declares: boolean,
   widths: readonly boolean[],
-  routePathname = '/h/host-1/session/wt-1',
-  acrossLayouts = true
+  routePathname = '/h/host-1/session/wt-1'
 ) {
-  doubles.routes = routes(declares, acrossLayouts)
+  doubles.routes = routes(declares)
   doubles.manifestReads = 0
   doubles.gates.hostCapabilities = [MOBILE_WEB_BUNDLE_CAPABILITY]
   const seen: MobileWebShellSessionState[] = []
@@ -144,16 +142,9 @@ async function settledKinds(
 }
 
 describe('a detail session across a layout-class change', () => {
-  // Ownership and route grants belong to the document, not its changing viewport.
-  it('preserves the open page across rotation under a declaring bundle', async () => {
+  // Each layout flip must reconsider which host-route hops the page may keep.
+  it('restarts an open page once per flip under a declaring bundle', async () => {
     expect(await settledKinds(true, [false, true, false])).toEqual({
-      kinds: ['ready session-1', 'ready session-1', 'ready session-1'],
-      manifestReads: 1
-    })
-  })
-
-  it('keeps legacy declaring pages usable under their original layout-specific sessions', async () => {
-    expect(await settledKinds(true, [false, true, false], '/h/host-1', false)).toEqual({
       kinds: ['ready session-1', 'ready session-2', 'ready session-3'],
       manifestReads: 3
     })
@@ -166,9 +157,9 @@ describe('a detail session across a layout-class change', () => {
     })
   })
 
-  it('preserves the host-area document and its in-page workspace across rotation', async () => {
-    const { kinds } = await settledKinds(true, [false, true, false], '/h/host-1')
-    expect(kinds).toEqual(['ready session-1', 'ready session-1', 'ready session-1'])
+  it('rebuilds the host route, whose wide session owns the area under other grants', async () => {
+    const { kinds } = await settledKinds(true, [false, true], '/h/host-1')
+    expect(kinds).toEqual(['ready session-1', 'ready session-2'])
   })
 })
 

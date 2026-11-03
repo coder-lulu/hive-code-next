@@ -37,14 +37,8 @@ export function writeNewLinearProjectDraft(draft: NewLinearProjectDraft | null):
     state.clearNewLinearProjectDraft()
   }
 }
-export function writeNewLinearIssueDraft(
-  draft: NewLinearIssueDraft | null,
-  expected?: NewLinearIssueDraft
-): void {
+export function writeNewLinearIssueDraft(draft: NewLinearIssueDraft | null): void {
   const state = useAppStore.getState()
-  if (expected && state.newLinearIssueDraft !== expected) {
-    return
-  }
   if (draft && isTaskCreationDraftContentful(draft)) {
     state.setNewLinearIssueDraft(draft)
   } else {

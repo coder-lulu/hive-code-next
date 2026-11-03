@@ -2,10 +2,9 @@
 import type { ITheme } from '@xterm/xterm'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
 import type { TerminalColorSchemeMode } from '../../../../shared/terminal-color-scheme-protocol'
-import {
-  terminalColorSchemeReport,
-  type TerminalViewAttributes,
-  type TerminalViewRgb
+import type {
+  TerminalViewAttributes,
+  TerminalViewRgb
 } from '../../../../shared/terminal-view-attributes'
 import type { TerminalOscColorQueryReplyColors } from '../../../../shared/terminal-osc-color-reply'
 
@@ -156,14 +155,6 @@ function blendOverBackground(background: TerminalViewRgb, color: ParsedCssColor)
     background[1] + Math.round((color.rgb[1] - background[1]) * a),
     background[2] + Math.round((color.rgb[2] - background[2]) * a)
   ]
-}
-
-/** The ?996n reply xterm would derive from this theme's luminance. */
-export function terminalThemeColorSchemeReport(theme: ITheme | undefined): string {
-  return terminalColorSchemeReport(
-    parseThemeColor(theme?.foreground, DEFAULT_FOREGROUND).rgb,
-    parseThemeColor(theme?.background, DEFAULT_BACKGROUND).rgb
-  )
 }
 
 export function composeTerminalViewAttributes(

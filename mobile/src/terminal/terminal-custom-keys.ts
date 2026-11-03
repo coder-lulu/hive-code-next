@@ -8,7 +8,6 @@ export type CustomKey = {
   label: string
   bytes: string
   enter: boolean
-  visible?: boolean
 }
 
 function isCustomKey(value: unknown): value is CustomKey {
@@ -22,8 +21,7 @@ function isCustomKey(value: unknown): value is CustomKey {
     'bytes' in value &&
     typeof value.bytes === 'string' &&
     'enter' in value &&
-    typeof value.enter === 'boolean' &&
-    (!('visible' in value) || typeof value.visible === 'boolean')
+    typeof value.enter === 'boolean'
   )
 }
 

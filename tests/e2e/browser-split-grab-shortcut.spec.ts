@@ -8,13 +8,7 @@ import path from 'node:path'
 import type { ElectronApplication, Page } from '@stablyai/playwright-test'
 import { expect, test } from './helpers/orca-app'
 import { ensureTerminalVisible, waitForActiveWorktree, waitForSessionReady } from './helpers/store'
-import {
-  waitForActivePaneHookDescriptor,
-  waitForActivePanePtyId,
-  waitForActiveTerminalManager,
-  waitForPaneIdentitySnapshot
-} from './helpers/terminal'
-import { waitForPtyShellEcho } from './terminal-pty-readiness'
+import { waitForActivePaneHookDescriptor, waitForActiveTerminalManager } from './helpers/terminal'
 import {
   browserOverlay,
   createBrowserSplit,
@@ -74,9 +68,7 @@ async function expectToolbarCopyChordArmsGrab(page: Page, browserTabId: string):
 
 async function enableNativeChat(page: Page): Promise<void> {
   await page.evaluate(async () => {
-    const nextSettings = await window.api.settings.set({
-      nativeChatProviders: { claude: true, codex: true }
-    })
+    const nextSettings = await window.api.settings.set({ experimentalNativeChat: true })
     window.__store?.setState({ settings: nextSettings })
   })
 }
@@ -220,11 +212,7 @@ test.describe('browser split grab shortcut', () => {
     orcaPage
   }) => {
     await waitForActiveTerminalManager(orcaPage, 30_000)
-    const boundPane = await waitForPaneIdentitySnapshot(orcaPage, 1)
-    const ptyId = await waitForActivePanePtyId(orcaPage)
-    await waitForPtyShellEcho(orcaPage, ptyId, 15_000)
     const descriptor = await waitForActivePaneHookDescriptor(orcaPage)
-    expect(descriptor.paneKey).toBe(`${boundPane.tabId}:${boundPane.activeLeafId}`)
     const fixture = await createTerminalBrowserSplit(orcaPage, server.pageUrl('a', 1))
     await waitForGuestUrl(orcaPage, fixture.browserTabId, server.pageUrl('a', 1))
     const reply = `Selectable transcript reply ${randomUUID()}`
@@ -255,10 +243,5 @@ test.describe('browser split grab shortcut', () => {
     await expect(grabBanner(orcaPage, fixture.browserTabId)).toBeHidden()
 
     await expectToolbarCopyChordArmsGrab(orcaPage, fixture.browserTabId)
-    const finalPane = await waitForPaneIdentitySnapshot(orcaPage, 1)
-    expect(finalPane.tabId).toBe(boundPane.tabId)
-    expect(finalPane.activeLeafId).toBe(boundPane.activeLeafId)
-    expect(finalPane.ptyIdsByLeafId).toEqual(boundPane.ptyIdsByLeafId)
-    await expect(orcaPage.locator('[data-native-chat-root="true"]')).toBeVisible()
   })
 })

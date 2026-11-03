@@ -1,12 +1,13 @@
-import { hostQualifiedRepoSelector } from './runtime-repo-selector'
-import { parseExecutionHostId } from '../../shared/execution-host'
 import type { AutomationService } from '../automations/service'
 import type {
   Automation,
+  AutomationCreateInput,
   AutomationRun,
-  AutomationUpdateInput
+  AutomationUpdateInput,
+  AutomationWorkspaceMode
 } from '../../shared/automations-types'
 import type { Repo } from '../../shared/repo-types'
+import type { Worktree } from '../../shared/worktree/types'
 import type { RuntimeStore } from './runtime-store-contract'
 import type { AutomationListParams, AutomationListResult } from '../../shared/automation-list-scope'
 import type {
@@ -17,18 +18,31 @@ import type {
 import { runAutomationNowFenced } from '../automations/refused-manual-run'
 import { paginateAutomationRuns } from '../../shared/automation-run-cursor'
 import { hasRuntimeAutomationUpdateValue } from './runtime-automation-update-value'
-import {
-  assertAutomationRunContextMatchesTarget,
-  type RuntimeAutomationTargetResolvers,
-  type RuntimeAutomationTargetInput,
-  type RuntimeAutomationCreateInput,
-  type RuntimeAutomationUpdateInput
-} from './runtime-automation-run-context'
+import { assertAutomationRunContextMatchesTarget } from './runtime-automation-run-context'
 
-export type {
-  RuntimeAutomationCreateInput,
-  RuntimeAutomationUpdateInput
-} from './runtime-automation-run-context'
+export type RuntimeAutomationCreateInput = Omit<
+  AutomationCreateInput,
+  'projectId' | 'workspaceId' | 'workspaceMode' | 'timezone'
+> & {
+  repo?: string
+  workspace?: string
+  workspaceMode?: AutomationWorkspaceMode
+  timezone?: string
+  destination?: AutomationDestination
+}
+
+export type RuntimeAutomationUpdateInput = Omit<
+  AutomationUpdateInput,
+  'projectId' | 'workspaceId'
+> & {
+  repo?: string
+  workspace?: string
+}
+
+type RuntimeAutomationTargetResolvers = {
+  showRepo: (selector: string) => Promise<Repo>
+  showManagedWorktree: (selector: string) => Promise<Pick<Worktree, 'id' | 'repoId' | 'path'>>
+}
 
 export class RuntimeAutomationController {
   private service: AutomationService | null = null
@@ -113,7 +127,6 @@ export class RuntimeAutomationController {
         precheck: input.precheck,
         agentId: input.agentId,
         extraAgentArgs: input.extraAgentArgs,
-        launchSetupPatch: input.launchSetupPatch,
         runContext: input.runContext,
         sourceContext: input.sourceContext,
         projectId: target.projectId,
@@ -128,7 +141,9 @@ export class RuntimeAutomationController {
         enabled: input.enabled,
         missedRunGraceMinutes: input.missedRunGraceMinutes
       },
-      { destination: destination ?? input.destination, resolvedRepo: target.repo ?? undefined }
+      (destination ?? input.destination)
+        ? { destination: destination ?? input.destination }
+        : undefined
     )
     await this.store.flushPendingOrThrowAsync?.({ drainToStableGeneration: false })
     return automation
@@ -137,8 +152,7 @@ export class RuntimeAutomationController {
   async update(
     id: string,
     updates: RuntimeAutomationUpdateInput,
-    // Forwarded unchanged so the store checks every precondition against the record it writes.
-    options?: Parameters<NonNullable<RuntimeStore['updateAutomation']>>[2]
+    options?: { expectedOwner?: AutomationOwnerPrecondition; destination?: AutomationDestination }
   ): Promise<Automation> {
     if (!this.store?.updateAutomation) {
       throw new Error('runtime_unavailable')
@@ -150,10 +164,8 @@ export class RuntimeAutomationController {
       hasRuntimeAutomationUpdateValue(updates, 'repo') ||
       hasRuntimeAutomationUpdateValue(updates, 'workspace') ||
       hasRuntimeAutomationUpdateValue(updates, 'workspaceMode')
-    let resolvedRepo: Repo | undefined
     if (targetChanged) {
       const target = await this.resolveTarget(updates, current)
-      resolvedRepo = target.repo ?? undefined
       assertAutomationRunContextMatchesTarget(updates.runContext, target.repo)
       if (patch.reuseSession === true && target.workspaceMode !== 'existing') {
         throw new Error('Session reuse requires an existing workspace target.')
@@ -170,19 +182,13 @@ export class RuntimeAutomationController {
       hasRuntimeAutomationUpdateValue(updates, 'runContext') &&
       current.projectId
     ) {
-      const host = parseExecutionHostId(updates.runContext?.hostId ?? current.runContext?.hostId)
-      const repo = await this.resolvers.showRepo(
-        hostQualifiedRepoSelector(
-          `id:${current.projectId}`,
-          host?.kind === 'runtime' ? 'local' : host?.id
-        )
-      )
+      const repo = await this.resolvers.showRepo(`id:${current.projectId}`)
       assertAutomationRunContextMatchesTarget(updates.runContext, repo)
     }
     if (!targetChanged && patch.reuseSession && current.workspaceMode !== 'existing') {
       throw new Error('Session reuse requires an existing workspace target.')
     }
-    const automation = this.store.updateAutomation(id, patch, { ...options, resolvedRepo })
+    const automation = this.store.updateAutomation(id, patch, options)
     await this.store.flushPendingOrThrowAsync?.({ drainToStableGeneration: false })
     return automation
   }
@@ -235,7 +241,6 @@ export class RuntimeAutomationController {
       'precheck',
       'agentId',
       'extraAgentArgs',
-      'launchSetupPatch',
       'runContext',
       'sourceContext',
       'baseBranch',
@@ -253,12 +258,18 @@ export class RuntimeAutomationController {
       }
     }
   }
+
   private async resolveTarget(
-    input: RuntimeAutomationTargetInput,
+    input: {
+      repo?: string
+      workspace?: string
+      workspaceMode?: AutomationWorkspaceMode
+      baseBranch?: string | null
+    },
     current?: Automation
   ): Promise<{
     projectId: string
-    workspaceMode: Automation['workspaceMode']
+    workspaceMode: AutomationWorkspaceMode
     workspaceId?: string | null
     repo: Repo | null
   }> {
@@ -274,13 +285,8 @@ export class RuntimeAutomationController {
         'Repo updates for existing-workspace automation require workspaceMode new_per_run.'
       )
     }
-    const contextHost = parseExecutionHostId(
-      input.runContext?.hostId ??
-        (!input.repo && !input.workspace ? current?.runContext?.hostId : undefined)
-    )
-    const hostId = contextHost?.kind === 'runtime' ? 'local' : contextHost?.id
     const workspace = input.workspace
-      ? await this.resolvers.showManagedWorktree(input.workspace, hostId)
+      ? await this.resolvers.showManagedWorktree(input.workspace)
       : null
     const repoSelector =
       input.repo ??
@@ -289,11 +295,7 @@ export class RuntimeAutomationController {
         : current?.projectId
           ? `id:${current.projectId}`
           : null)
-    const repo = repoSelector
-      ? await this.resolvers.showRepo(
-          hostQualifiedRepoSelector(repoSelector, hostId ?? workspace?.hostId)
-        )
-      : null
+    const repo = repoSelector ? await this.resolvers.showRepo(repoSelector) : null
     const workspaceMode =
       input.workspaceMode ??
       (workspace

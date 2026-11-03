@@ -18,7 +18,6 @@ export {
   type ComputerWindowListWindow
 } from './computer-use-runtime-types'
 export type {
-  BrowserActionEffects,
   BrowserBackResult,
   BrowserCaptureStartResult,
   BrowserCaptureStopResult,
@@ -61,7 +60,6 @@ export type {
   BrowserScreencastErrorResult,
   BrowserScreencastReadyResult,
   BrowserScreencastResult,
-  BrowserScreenshotAnnotation,
   BrowserScreenshotResult,
   BrowserScrollResult,
   BrowserSelectAllResult,
@@ -198,8 +196,11 @@ export type {
   RuntimeWorktreeAgentRow,
   RuntimeWorktreeCreateResult,
   RuntimeWorktreeListResult,
+  RuntimeWorktreePsConditionalResult,
   RuntimeWorktreePsResult,
+  RuntimeWorktreePsSnapshotResult,
   RuntimeWorktreePsSummary,
+  RuntimeWorktreePsUnchangedResult,
   RuntimeWorktreeRecord,
   RuntimeWorktreeRemoveResult,
   RuntimeWorktreeSetResult,

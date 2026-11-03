@@ -1,4 +1,3 @@
-import { retireRemovedNativeChatDraftPositions } from '@/components/native-chat/native-chat-draft-cache'
 // Select moved tabs with the frame showing the move (L120); a later reply may already be superseded by another drag.
 
 import type { AppState } from '../../types'
@@ -86,20 +85,12 @@ export function withMovedTabsSelected(
 /** Writes a frame's patch, with the selection of each moved tab it shows; returns those moves. */
 export function showFramePatch(
   store: { getState: () => AppState; setState: (patch: Partial<AppState>) => void },
-  patch: Partial<AppState>,
-  rebuiltWorkspaces: readonly string[] = []
+  patch: Partial<AppState>
 ): MovedTabSelection[] {
   if (Object.keys(patch).length === 0) {
     return []
   }
-  const before = store.getState()
-  const shown = withMovedTabSelections(before, patch)
-  for (const key of rebuiltWorkspaces) {
-    retireRemovedNativeChatDraftPositions(
-      before.unifiedTabsByWorktree[key] ?? [],
-      (shown.patch.unifiedTabsByWorktree ?? before.unifiedTabsByWorktree)[key] ?? []
-    )
-  }
+  const shown = withMovedTabSelections(store.getState(), patch)
   store.setState(shown.patch)
   return shown.taken
 }

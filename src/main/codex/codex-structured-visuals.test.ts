@@ -1,10 +1,11 @@
+import { launchRecordStore } from '../runtime/structured-agent-launch-composition.test-support'
 import { describe, expect, it, vi } from 'vitest'
 import {
   NATIVE_CHAT_SCRATCH_DIR_ENV,
   type NativeChatVisualsLaunch
 } from '../native-chat/native-chat-visuals-delivery'
 import { CodexAppServerRequestError } from './app-server/codex-app-server-request-error'
-import { CodexAppServerTimeoutError } from './app-server/codex-app-server-session'
+import { CodexAppServerTimeoutError } from './codex-app-server-session'
 import {
   adapterFor,
   acquireReadyCodexForTest,
@@ -14,9 +15,11 @@ import {
 } from './codex-structured-session-adapter-fixture'
 import { createCodexStructuredLaunchResolver } from '../runtime/structured-agent-launch-composition.test-support'
 import { agentSessionRecordFixture } from '../native-chat/agent-session-record-test-fixture'
-import { codexProviderHandle } from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
-import { prepareCodexThreadForVisuals } from './codex-structured-visuals'
-
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
+import {
+  CODEX_VISUALS_SETUP_BUDGET_MS,
+  prepareCodexThreadForVisuals
+} from './codex-structured-visuals'
 import { codexStructuredPermissionPolicy } from '../../shared/codex-permission-policy'
 
 const VISUALS: NativeChatVisualsLaunch = {
@@ -49,6 +52,34 @@ const configWithRoots = (roots: unknown) => () => ({
 })
 
 describe('setting up a Codex app-server for a chat with visuals', () => {
+  it("names the skill root and adds the chat folder to the user's writable roots", async () => {
+    const { calls, connection } = connectionAnswering({
+      'config/read': configWithRoots(['/home/me/scratch'])
+    })
+    const config = await prepareCodexThreadForVisuals(connection, {
+      cwd: '/work/repo',
+      visuals: VISUALS,
+      permissionPolicy: MANUAL
+    })
+    expect(config).toEqual({
+      'sandbox_workspace_write.writable_roots': ['/home/me/scratch', VISUALS.folder]
+    })
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        {
+          method: 'skills/extraRoots/set',
+          params: { extraRoots: [VISUALS.skill.skillsRoot] },
+          timeoutMs: CODEX_VISUALS_SETUP_BUDGET_MS
+        },
+        {
+          method: 'config/read',
+          params: { cwd: '/work/repo' },
+          timeoutMs: CODEX_VISUALS_SETUP_BUDGET_MS
+        }
+      ])
+    )
+  })
+
   it('grants just the folder when the user has no writable roots of their own', async () => {
     for (const answer of [() => ({ config: {} }), configWithRoots([])]) {
       const { connection } = connectionAnswering({ 'config/read': answer })
@@ -123,6 +154,12 @@ describe('setting up a Codex app-server for a chat with visuals', () => {
       )
     }
   })
+
+  it('sends nothing for a chat without visuals', async () => {
+    const { calls, connection } = connectionAnswering({})
+    await expect(prepareCodexThreadForVisuals(connection, { cwd: '/w' })).resolves.toBeNull()
+    expect(calls).toEqual([])
+  })
 })
 
 async function acquired(
@@ -151,7 +188,7 @@ async function acquired(
   })
   const adapter = adapterFor(codex, {}, [], {
     resolveLaunch: createCodexStructuredLaunchResolver({
-      store: { getRecord: () => record, pinLaunchDirectory: vi.fn() },
+      store: launchRecordStore(() => record, vi.fn()),
       resolveWorkspacePath: async () => '/work/repo',
       resolveEnvironment: async () => launch.env ?? {},
       resolveCommand: () => ({ command: 'codex', prefixArgs: [] }),
@@ -195,7 +232,7 @@ describe('a Codex chat acquisition with visuals', () => {
     const methods = connection.calls.map((call) => call.method)
     expect(methods.slice(0, 2)).toEqual(['initialize', 'thread/start'])
     expect(methods).not.toContain('skills/extraRoots/set')
-    const config = connection.calls[1]?.params?.config
+    const config = connection.calls[1]?.params?.config ?? {}
     const scratchDirOverride = `shell_environment_policy.set.${NATIVE_CHAT_SCRATCH_DIR_ENV}`
     expect(config).not.toHaveProperty(['sandbox_workspace_write.writable_roots'])
     expect(config).not.toHaveProperty([scratchDirOverride])

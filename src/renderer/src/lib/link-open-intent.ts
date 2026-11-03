@@ -2,7 +2,6 @@ import type { AppState } from '@/store/types'
 import type { Tab } from '../../../shared/tab-types'
 import type { EditorOpenLinkIntent } from '@/store/slices/editor/types/editor-open-link-intent'
 import { collectTabGroupLayoutGroupIds } from '../../../shared/workspace-layout/tab-group-moves'
-import { resolveLinkOpenSidePlacement } from './adjacent-link-open-group'
 
 export type LinkOpenIntent = EditorOpenLinkIntent & { initialGroupId?: string }
 export type LinkSourceTab = Pick<Tab, 'id' | 'entityId' | 'groupId'> &
@@ -68,7 +67,7 @@ export function isLiveLinkOpenGroup(
   return liveLinkOpenGroupIds(state, worktreeId).has(groupId)
 }
 
-/** Offer an explicit source target when automatic placement opens beside it. */
+/** "Open in this group" only differs from automatic placement when the source has company. */
 export function canOpenLinkInSourceGroup(
   state: Partial<Pick<LinkPlacementState, 'groupsByWorktree' | 'layoutByWorktree'>> &
     LinkSourceState,
@@ -81,10 +80,6 @@ export function canOpenLinkInSourceGroup(
   if (!tab) {
     return false
   }
-  const placement = resolveLinkOpenSidePlacement({
-    layout: state.layoutByWorktree?.[workspaceId],
-    groups: state.groupsByWorktree?.[workspaceId] ?? [],
-    sourceGroupId: tab.groupId
-  })
-  return placement !== null && ('split' in placement || placement.groupId !== tab.groupId)
+  const groupIds = liveLinkOpenGroupIds(state, workspaceId)
+  return groupIds.has(tab.groupId) && groupIds.size > 1
 }

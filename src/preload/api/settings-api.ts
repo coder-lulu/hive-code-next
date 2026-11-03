@@ -3,11 +3,7 @@ import type {
   WarpThemeImportPreview,
   WarpThemeImportSource
 } from '../../shared/terminal-custom-themes'
-import type { GlobalSettings } from '../../shared/global-settings-types'
-import type {
-  TerminalConfigImportPreview,
-  TerminalConfigImportSource
-} from '../../shared/terminal-config-import-preview'
+import type { GhosttyImportPreview, GlobalSettings } from '../../shared/global-settings-types'
 
 export type SettingsApi = {
   get: () => Promise<GlobalSettings>
@@ -19,10 +15,7 @@ export type SettingsApi = {
   }) => Promise<GlobalSettings>
   updatePRBotAuthorOverride: (args: { author: string; isBot: boolean }) => Promise<GlobalSettings>
   listFonts: () => Promise<string[]>
-  previewGhosttyImport: (
-    source?: TerminalConfigImportSource
-  ) => Promise<TerminalConfigImportPreview>
-  previewKittyImport: (source?: TerminalConfigImportSource) => Promise<TerminalConfigImportPreview>
+  previewGhosttyImport: () => Promise<GhosttyImportPreview>
   previewWarpThemeImport: (source: WarpThemeImportSource) => Promise<WarpThemeImportPreview>
   onChanged: (callback: (updates: Partial<GlobalSettings>) => void) => () => void
 }

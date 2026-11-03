@@ -8,40 +8,35 @@ const LOCAL_WORKTREE_PATH_PROBE_CONCURRENCY = 2
 export const LOCAL_WORKTREE_PATH_PROBE_TIMEOUT_MS = 2_000
 const localWorktreePathProbeSemaphore = new PrioritySemaphore(LOCAL_WORKTREE_PATH_PROBE_CONCURRENCY)
 
-type LocalWorktreePathPresence = 'directory' | 'other' | 'missing' | 'unknown'
-
-async function probeLocalWorktreePath(
-  pathValue: string,
-  signal: AbortSignal
-): Promise<LocalWorktreePathPresence> {
+async function probeLocalWorktreePath(pathValue: string, signal: AbortSignal): Promise<boolean> {
   let release: () => void
   try {
     release = await localWorktreePathProbeSemaphore.acquire(0, signal)
   } catch {
-    return 'unknown'
+    return true
   }
   if (signal.aborted) {
     release()
-    return 'unknown'
+    return true
   }
   const presence = stat(pathValue)
     .then(
-      (info) => (info.isDirectory() ? ('directory' as const) : ('other' as const)),
+      () => true,
       (error) => {
         const code = (error as NodeJS.ErrnoException | undefined)?.code
-        return code === 'ENOENT' || code === 'ENOTDIR' ? ('missing' as const) : ('unknown' as const)
+        return code !== 'ENOENT' && code !== 'ENOTDIR'
       }
     )
     .finally(release)
   if (signal.aborted) {
-    return 'unknown'
+    return true
   }
   return new Promise((resolve) => {
-    const finish = (value: LocalWorktreePathPresence): void => {
+    const finish = (value: boolean): void => {
       signal.removeEventListener('abort', onAbort)
       resolve(value)
     }
-    const onAbort = (): void => finish('unknown')
+    const onAbort = (): void => finish(true)
     signal.addEventListener('abort', onAbort, { once: true })
     void presence.then(finish)
   })
@@ -52,13 +47,6 @@ export function localWorktreePathExistsOrIsUnverifiable(
   pathValue: string,
   options: { signal?: AbortSignal } = {}
 ): Promise<boolean> {
-  return localWorktreePathPresence(pathValue, options).then((presence) => presence !== 'missing')
-}
-
-export function localWorktreePathPresence(
-  pathValue: string,
-  options: { signal?: AbortSignal } = {}
-): Promise<LocalWorktreePathPresence> {
   return probeLocalWorktreePath(
     pathValue,
     abortSignalWithTimeout(options.signal, LOCAL_WORKTREE_PATH_PROBE_TIMEOUT_MS)
@@ -77,8 +65,7 @@ export async function localWorktreePathsExistOrAreUnverifiable(
   const results = await mapWithConcurrency(
     uniquePaths,
     LOCAL_WORKTREE_PATH_PROBE_CONCURRENCY,
-    async (pathValue) =>
-      [pathValue, (await probeLocalWorktreePath(pathValue, signal)) !== 'missing'] as const
+    async (pathValue) => [pathValue, await probeLocalWorktreePath(pathValue, signal)] as const
   )
   return new Map(results)
 }

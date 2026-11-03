@@ -7,7 +7,7 @@ import { usePdfOpener } from '../platform/pdf-opener'
 import { PdfOpenRefusedError } from '../platform/pdf-opener-contract'
 import type { MobileFileMedia } from './mobile-file-media'
 import { filePreviewStyles as styles } from './mobile-file-preview-styles'
-import { MobileLoadErrorState, MobileStateButton } from '../components/MobileStateView'
+import { MobileLoadErrorState, MobileStateButton } from '../components/MobileLoadErrorState'
 import { translate } from '../i18n/mobile-i18n'
 import { useMobileTranslation } from '../i18n/use-mobile-translation'
 
@@ -62,13 +62,13 @@ export function MobilePdfPreview({ media }: { media: MobileFileMedia }) {
     return (
       <View style={styles.state}>
         <Text style={styles.stateText}>
-          {t('files.pdfPreview.updateRequired', 'Update Orca Mobile to open PDFs')}
+          {t('files.pdfPreview.updateRequired', 'Update HiveCode Mobile to open PDFs')}
         </Text>
       </View>
     )
   }
   if (state.status === 'failed') {
-    return <MobileLoadErrorState error={state.message} onRetry={state.retryable ? open : null} />
+    return <MobileLoadErrorState message={state.message} onRetry={state.retryable ? open : null} />
   }
   if (state.status === 'opening') {
     return (

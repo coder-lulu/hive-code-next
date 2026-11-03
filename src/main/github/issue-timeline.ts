@@ -125,7 +125,7 @@ function mapRestTimelineEvent(event: RestTimelineEvent): GitHubIssueTimelineItem
   return base
 }
 
-function parseRestTimelineEventLines(stdout: string, strict = false): RestTimelineEvent[] {
+function parseRestTimelineEventLines(stdout: string): RestTimelineEvent[] {
   const events: RestTimelineEvent[] = []
   for (const line of stdout.split('\n')) {
     const trimmed = line.trim()
@@ -138,10 +138,7 @@ function parseRestTimelineEventLines(stdout: string, strict = false): RestTimeli
         events.push(parsed)
       }
     } catch {
-      if (strict) {
-        throw new Error('GitHub timeline unavailable')
-      }
-      // Timeline activity is auxiliary to ordinary issue details.
+      // Timeline activity is auxiliary to issue details.
     }
   }
   return events
@@ -150,30 +147,27 @@ function parseRestTimelineEventLines(stdout: string, strict = false): RestTimeli
 export async function getIssueTimelineItems(
   repository: GitHubApiRepository,
   issueNumber: number,
-  ghOptions: GitHubRepoExecOptions,
-  fresh = false
+  ghOptions: GitHubRepoExecOptions
 ): Promise<GitHubIssueTimelineItem[]> {
   try {
     const items: GitHubIssueTimelineItem[] = []
     for (let page = 1; items.length < MAX_ISSUE_TIMELINE_ITEMS; page += 1) {
       if (repositoryRateLimitGuard(repository, 'core', ghOptions).blocked) {
-        if (fresh) {
-          throw new Error('GitHub timeline unavailable')
-        }
         return items
       }
       noteRepositoryRateLimitSpend(repository, 'core', 1, ghOptions)
       const { stdout } = await ghExecFileAsync(
         [
           'api',
-          ...(fresh ? [] : ['--cache', '60s']),
+          '--cache',
+          '60s',
           `repos/${repository.owner}/${repository.repo}/issues/${issueNumber}/timeline?per_page=${GITHUB_REST_PAGE_SIZE}&page=${page}`,
           '--jq',
           '.[] | @json'
         ],
         { ...ghOptions, ...githubHostExecOptions(repository) }
       )
-      const pageEvents = parseRestTimelineEventLines(stdout, fresh)
+      const pageEvents = parseRestTimelineEventLines(stdout)
       for (const event of pageEvents) {
         const item = mapRestTimelineEvent(event)
         if (!item) {
@@ -189,10 +183,7 @@ export async function getIssueTimelineItems(
       }
     }
     return items
-  } catch (error) {
-    if (fresh) {
-      throw error
-    }
+  } catch {
     return []
   }
 }

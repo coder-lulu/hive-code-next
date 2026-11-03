@@ -1,6 +1,5 @@
 import { vi } from 'vitest'
 import type { Mock } from 'vitest'
-import type { ITerminalOptions } from '@xterm/xterm'
 import type { PtyReplayDataMeta, PtyTransport } from './pty-transport-types'
 
 export const LEAF_1 = '11111111-1111-4111-8111-111111111111' as const
@@ -51,7 +50,7 @@ export type MockTransport = {
 
 export function createMockTransport(initialPtyId: string | null = null): MockTransport {
   let ptyId = initialPtyId
-  const sendInput = vi.fn<(data: string) => boolean>(() => true)
+  const sendInput = vi.fn((_data: string) => true)
   const transport: MockTransport = {
     attach: vi.fn<PtyTransport['attach']>(({ existingPtyId }) => {
       ptyId = existingPtyId
@@ -67,9 +66,9 @@ export function createMockTransport(initialPtyId: string | null = null): MockTra
       ptyId = null
     }),
     sendInput,
-    // Query replies use the same spy as ordinary input (#7329).
-    sendInputImmediate: vi.fn((data: string): boolean => sendInput(data)),
-    sendInputAccepted: vi.fn(async (data: string): Promise<boolean> => sendInput(data)),
+    // Query replies delegate to the same spy so reply-delivery assertions observe them (#7329).
+    sendInputImmediate: vi.fn((data: string) => sendInput(data)),
+    sendInputAccepted: vi.fn(async (data: string) => sendInput(data)),
     claimViewport: vi.fn(() => true),
     resize: vi.fn(() => true),
     getPtyId: vi.fn(() => ptyId),
@@ -106,7 +105,6 @@ export type MockPaneTerminal = {
   buffer: { active: MockPaneBuffer }
   modes: { bracketedPasteMode: boolean; sendFocusMode: boolean }
   options: {
-    windowsPty?: ITerminalOptions['windowsPty']
     scrollback: number
     ignoreBracketedPasteMode: boolean
     theme: { foreground: string; background: string }

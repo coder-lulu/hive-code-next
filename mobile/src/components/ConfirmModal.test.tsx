@@ -1,3 +1,4 @@
+import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -45,7 +46,7 @@ describe('ConfirmModal', () => {
       )
     })
 
-    const buttons = renderer.root.findAllByType('Pressable')
+    const buttons = findAllByHostType(renderer!.root, 'Pressable')
     act(() => buttons[1]?.props.onPress())
     expect(calls).toEqual(['confirm', 'cancel'])
 

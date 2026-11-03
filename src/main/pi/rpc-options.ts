@@ -1,9 +1,11 @@
 import { withLiveCatalogListing } from '../native-chat/agent-model-catalog/agent-model-catalog-entry'
 import { z } from 'zod'
-import { PI_THINKING_LEVELS } from '../../shared/agent-session/options/structured-agent-session-effective-effort'
+import { PI_THINKING_LEVELS } from '../../shared/structured-agent-session-effective-effort'
 import { waitForPromiseWithSignal } from '../../shared/abort-signal-reason'
-import type { AgentSessionCommandsResult } from '../../shared/agent-session/agent-session-wire'
-import type { AgentSessionOptionsResult } from '../../shared/agent-session/options/agent-session-options-result'
+import type {
+  AgentSessionCommandsResult,
+  AgentSessionOptionsResult
+} from '../../shared/agent-session-wire'
 import { piRpcModelSchema, piRpcStateSchema } from './rpc-protocol'
 
 export type PiRpcRequester = {
@@ -106,7 +108,7 @@ export type PiRpcOptionProof = {
 
 /** Held reports belong to one child; a report cannot cross its native write lifetime. */
 export class PiRpcOptionObservations {
-  private observed: AgentSessionOptionsResult = { models: [], modelsKnown: false, current: {} }
+  private observed: AgentSessionOptionsResult = { models: [], current: {} }
   private writes = new Map<string, PiRpcOptionWrite>()
   private consumed = new Map<string, string>()
   constructor(
@@ -115,7 +117,7 @@ export class PiRpcOptionObservations {
   ) {}
 
   seed(state: Parameters<typeof piRpcStateOptions>[0]): void {
-    this.observed = { models: [], modelsKnown: false, current: piRpcStateOptions(state) }
+    this.observed = { models: [], current: piRpcStateOptions(state) }
   }
 
   prepare(): (options: AgentSessionOptionsResult) => boolean {
@@ -128,11 +130,7 @@ export class PiRpcOptionObservations {
       if (
         [...this.proof.writes].some(([key, token]) => token.pending || writes.get(key) !== token)
       ) {
-        this.observed = {
-          ...this.observed,
-          models: options.models,
-          modelsKnown: options.modelsKnown
-        }
+        this.observed = { ...this.observed, models: options.models }
         return false
       }
       this.observed = options

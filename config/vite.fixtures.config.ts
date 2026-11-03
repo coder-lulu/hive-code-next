@@ -4,7 +4,6 @@ import webConfig from '../vite.web.config'
 
 // Dev-only component fixture explorer; never part of a production build input.
 export default mergeConfig(webConfig, {
-  tsconfig: resolve('config/tsconfig.web.json'),
   cacheDir: resolve('.cache/vite/fixtures'),
   base: '/',
   server: {

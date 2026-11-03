@@ -3,7 +3,7 @@
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import type { AgentJournalRenderItem } from '../../../src/shared/agent-session/journal/agent-session-journal-types'
+import type { AgentJournalRenderItem } from '../../../src/shared/agent-session-journal-types'
 import type { RpcClient } from '../transport/rpc-client'
 import { useMobileStructuredAgentSession } from './use-mobile-structured-agent-session'
 import {
@@ -30,9 +30,7 @@ const sendRequest = vi.fn<RpcClient['sendRequest']>()
 const client: RpcClient = {
   sendRequest,
   subscribe: vi.fn<RpcClient['subscribe']>((_method, _params, onData) => {
-    if (_method === 'agentSession.subscribe') {
-      listener = onData
-    }
+    listener = onData
     return vi.fn()
   }),
   updateTerminalSubscriptionViewport: () => {},
@@ -47,7 +45,6 @@ const client: RpcClient = {
 function Harness(): null {
   hook = useMobileStructuredAgentSession({
     client,
-    pairedHostClient: client,
     sessionId: SESSION_ID,
     sourceIdentity: 'host-a\0workspace-a',
     enabled: true,
@@ -85,7 +82,7 @@ async function sentDelivery(items: AgentJournalRenderItem[]): Promise<unknown> {
   })
   await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
   const event = snapshotEvent({ items })
-  await act(async () => listener?.(event))
+  act(() => listener?.(event))
   await act(async () => {
     await hook!.sendWithOutcome('carry on')
   })
@@ -101,9 +98,7 @@ beforeEach(() => {
       ? mutationOk({ clientMessageId: 'client-1' })
       : method === 'agentSession.options'
         ? ok({ models: [], current: {} })
-        : method === 'settings.get'
-          ? ok({ settings: { nativeChatQueueFollowUps: true } })
-          : ok({})
+        : ok({})
   )
 })
 
@@ -141,16 +136,14 @@ async function afterStop(items: AgentJournalRenderItem[]): Promise<unknown> {
       ? new Promise(() => undefined)
       : method === 'agentSession.options'
         ? ok({ models: [], current: {} })
-        : method === 'settings.get'
-          ? ok({ settings: { nativeChatQueueFollowUps: true } })
-          : ok({})
+        : ok({})
   )
   act(() => {
     renderer = create(createElement(Harness))
   })
   await vi.waitFor(() => expect(listener).toEqual(expect.any(Function)))
   const event = snapshotEvent({ items: [...items, RUNNING_TURN] })
-  await act(async () => listener?.(event))
+  act(() => listener?.(event))
   act(() => hook?.cancel())
   expect(hook?.turnIndicator.stopping).toBe(true)
   return hook?.turnIndicator.afterStop

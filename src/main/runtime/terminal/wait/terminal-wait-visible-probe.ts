@@ -21,9 +21,10 @@ import type {
 } from '../../../../shared/runtime-terminal-contracts'
 import {
   buildPtyTerminalWaitBlockedResult,
-  buildPtyTerminalWaitResult
+  buildPtyTerminalWaitResult,
+  buildTerminalWaitBlockedResult,
+  buildTerminalWaitResult
 } from '../../terminal-wait-results'
-import { outputClockOf } from '../../tui-idle-evidence-source'
 import { createSetupCompletionScanner } from '../../orchestration/setup-completion-signal'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 
@@ -62,12 +63,10 @@ export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRu
       null
     )
       .then((projection) => {
-        const pty = this.ptysById.get(waiter.ptyId)
         if (
           !projection ||
           projection.source !== 'screen' ||
-          !pty ||
-          !this.terminalWaiters.has(waiter)
+          !this.terminalWaiters.get(waiter.handle)?.has(waiter)
         ) {
           return
         }
@@ -80,15 +79,16 @@ export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRu
               agent,
               () => restoreProjectedComposerDraft(projection.tail, projection.draft),
               // Why read now: output since the probe started makes the pane clocked.
-              outputClockOf(this.tuiIdleEvidenceSource, pty) !== null
+              (
+                this.getLivePtyForHandle(waiter.handle)?.pty ??
+                this.getLiveLeafForHandle(waiter.handle).leaf
+              ).lastOutputAt !== null
             )
           : isKnownReadyPromptSettled(snapshotText)
         if (!blockedReason && !ready) {
           return
         }
-        const result = blockedReason
-          ? buildPtyTerminalWaitBlockedResult(waiter.handle, 'tui-idle', pty, blockedReason)
-          : buildPtyTerminalWaitResult(waiter.handle, 'tui-idle', pty)
+        const result = this.buildTuiIdleProbeResult(waiter.handle, blockedReason)
         if (waiter.cancelIdlePoll) {
           waiter.cancelIdlePoll()
         }
@@ -101,10 +101,16 @@ export abstract class OrcaRuntimeWithStartTuiIdleVisibleReadProbe extends OrcaRu
     handle: string,
     blockedReason: RuntimeTerminalWaitBlockedReason | null
   ): RuntimeTerminalWait {
-    const { pty } = this.getTerminalPtyForHandle(handle)
+    const pty = this.getLivePtyForHandle(handle)
+    if (pty) {
+      return blockedReason
+        ? buildPtyTerminalWaitBlockedResult(handle, 'tui-idle', pty.pty, blockedReason)
+        : buildPtyTerminalWaitResult(handle, 'tui-idle', pty.pty)
+    }
+    const { leaf } = this.getLiveLeafForHandle(handle)
     return blockedReason
-      ? buildPtyTerminalWaitBlockedResult(handle, 'tui-idle', pty, blockedReason)
-      : buildPtyTerminalWaitResult(handle, 'tui-idle', pty)
+      ? buildTerminalWaitBlockedResult(handle, 'tui-idle', leaf, blockedReason)
+      : buildTerminalWaitResult(handle, 'tui-idle', leaf)
   }
 
   async waitForSetupTerminalCompletion(

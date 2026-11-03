@@ -17,6 +17,7 @@ import {
 import { readHookEndpoint } from './helpers/agent-hook-endpoint'
 import {
   claudeTranscriptLines,
+  enableNativeChatSetting,
   toggleTerminalTabToChatView
 } from './helpers/native-chat-transcript-fixture'
 import { createDesktopMobilePairingOffer } from './helpers/paired-electron-client'
@@ -98,6 +99,7 @@ test('idle Claude keeps chat, mobile transcript, and return identity through nes
       )
     )
     .toBe('done')
+  await enableNativeChatSetting(orcaPage)
   await toggleTerminalTabToChatView(orcaPage, { tabId, worktreeId: descriptor.worktreeId })
   const chat = orcaPage.locator('[data-native-chat-root="true"]')
   await expect(chat.getByText(REPLY, { exact: true })).toBeVisible()

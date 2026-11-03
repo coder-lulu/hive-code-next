@@ -24,7 +24,6 @@ describe('reconcileManagedWslCliRegistrations', () => {
       isPackaged: true,
       userDataPath: '/user-data',
       listDistros: async () => ['Ubuntu', 'Debian', 'Fedora'],
-      listOrcaHostDistros: () => ['Debian'],
       listRunningDistros: async () => ['Ubuntu', 'Debian', 'Fedora'],
       isDistroRunning: async (distro: string) => ['Ubuntu', 'Debian', 'Fedora'].includes(distro),
       registry,
@@ -38,8 +37,7 @@ describe('reconcileManagedWslCliRegistrations', () => {
 
     expect(registry.getCandidates).toHaveBeenCalledWith(['Ubuntu', 'Debian', 'Fedora'], {
       currentTarget: null,
-      appVersion: '',
-      inspectableDistros: ['Debian']
+      appVersion: ''
     })
     expect(registry.recordObservations).toHaveBeenCalledTimes(2)
     expect(registry.recordObservations).toHaveBeenCalledWith([
@@ -197,7 +195,6 @@ describe('reconcileManagedWslCliRegistrations', () => {
       isPackaged: true,
       userDataPath: '/user-data',
       listDistros: async () => ['Ubuntu', 'Debian'],
-      listOrcaHostDistros: () => [],
       listRunningDistros: async () => running,
       isDistroRunning: async (distro: string) => running.includes(distro),
       deferUntilRunning: (distro: string, _key: string, task: () => unknown) => {
@@ -224,8 +221,7 @@ describe('reconcileManagedWslCliRegistrations', () => {
     expect(repaired).toEqual(['Ubuntu', 'Debian'])
     expect(registry.getCandidates).toHaveBeenLastCalledWith(['Debian'], {
       currentTarget: null,
-      appVersion: '',
-      inspectableDistros: []
+      appVersion: ''
     })
   })
 
@@ -258,31 +254,5 @@ describe('reconcileManagedWslCliRegistrations', () => {
     expect(repaired).toEqual(['Ubuntu'])
     expect(deferred).toEqual(['Debian'])
     expect(results).toContainEqual({ distro: 'Debian', outcome: 'deferred' })
-  })
-
-  it("asks the registry to inspect only distros Orca deployed a host into, read from the user's store", async () => {
-    const registry = {
-      getCandidates: vi.fn(async () => []),
-      recordObservations: vi.fn(async () => undefined)
-    }
-    const createInstaller = vi.fn()
-
-    await reconcileManagedWslCliRegistrations({
-      platform: 'win32',
-      isPackaged: true,
-      userDataPath: '/user-data-without-hosts',
-      listDistros: async () => ['Ubuntu', 'MyDevBox'],
-      getHostLauncherTarget: async () => null,
-      registry,
-      createInstaller
-    })
-
-    // No deployment store exists for this profile: no host, so no distro is inspectable.
-    expect(registry.getCandidates).toHaveBeenCalledWith(['Ubuntu', 'MyDevBox'], {
-      currentTarget: null,
-      appVersion: '',
-      inspectableDistros: []
-    })
-    expect(createInstaller).not.toHaveBeenCalled()
   })
 })

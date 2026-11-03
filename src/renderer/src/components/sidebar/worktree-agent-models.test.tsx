@@ -16,10 +16,7 @@ import {
   WorktreeCardDisplayMenuItem,
   WorktreeCardPropertiesMenuItem
 } from './worktree-card-option-items'
-import {
-  clearWorktreeAgentExpansionStateForTests,
-  seedWorktreeAgentExpansionStateForTests
-} from './worktree-card-agents-expansion-state'
+import { clearWorktreeAgentExpansionStateForTests } from './worktree-card-agents-expansion-state'
 import type { AgentStatusEntry } from '../../../../shared/agent-status-types'
 import type { TerminalTab } from '../../../../shared/terminal-tab-types'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -197,12 +194,6 @@ beforeEach(() => {
   unsubs = []
   stateChanged = undefined
   clearWorktreeAgentExpansionStateForTests()
-  // Child lists start collapsed; open the subagent parent so its model chip is rendered.
-  seedWorktreeAgentExpansionStateForTests('folder-1', {
-    expandedLineageParents: new Set([`hook:${LEAF}`]),
-    expandedIdleChildGroups: new Set(),
-    compactRootListExpanded: false
-  })
   Object.defineProperty(window, 'api', {
     configurable: true,
     value: {

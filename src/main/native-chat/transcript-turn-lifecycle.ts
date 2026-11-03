@@ -1,7 +1,6 @@
-import type { AgentType } from '../../shared/agent-status-types'
-import type { NativeChatTurnLifecycle } from '../../shared/native-chat/native-chat-types'
-import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat/native-chat-agent-support'
-import { isNoiseMessage } from '../../shared/native-chat/native-chat-noise'
+import type { AgentType, NativeChatTurnLifecycle } from '../../shared/native-chat-types'
+import { resolveNativeChatTranscriptAgent } from '../../shared/native-chat-agent-support'
+import { isNoiseMessage } from '../../shared/native-chat-noise'
 import { claudeBashInputAsTypedCommand } from '../../shared/claude-bash-input'
 import {
   asRecord,

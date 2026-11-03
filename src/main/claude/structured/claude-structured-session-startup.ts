@@ -1,6 +1,6 @@
 // Initialize gates host open after process publication; settings enrichment runs independently.
 
-import type { AgentSessionAccountKind } from '../../../shared/agent-session/agent-session-availability'
+import type { AgentSessionAccountKind } from '../../../shared/agent-session-availability'
 import type { StructuredAgentSessionProviderOpenResult } from '../../native-chat/agent-session-wire/structured-agent-session-provider-open-contract'
 import { withProviderRequestTimeout } from '../../provider-process/provider-request-timeout'
 import type { ClaudeStreamJsonConnection } from '../claude-stream-json-connection'
@@ -17,15 +17,15 @@ import {
 import {
   claudeStructuredSessionPublicationOptions,
   prepareClaudeStructuredSessionAcquisitionOptions
-} from './launch/claude-structured-session-acquisition-options'
+} from '../claude-structured-session-acquisition-options'
 import {
   claudeStructuredSessionOptionsFrom,
   observeClaudeSettingsApplied,
   readClaudeSettingsApplied,
   readClaudeFastModeFacts,
   readClaudeSettingsEffort
-} from './launch/claude-structured-session-options'
-import { claudeExecutionObservations } from './claude-structured-execution-observations'
+} from '../claude-structured-session-options'
+import { claudeExecutionObservations } from '../claude-structured-execution-observations'
 import type {
   ClaudeAuthDiagnostic,
   ClaudeSession,
@@ -127,7 +127,9 @@ function applyClaudeInitializeFacts(session: ClaudeSession, facts: ClaudeInitial
   const fastModeFacts = readClaudeFastModeFacts(initialization)
   if (session.fastModeState === undefined && fastModeFacts.state) {
     session.fastModeState = fastModeFacts.state
+    session.fastModeReportedMutation = 0
   }
+  session.fastModeDisabledReason ??= fastModeFacts.disabledReason
   session.capabilities = readClaudeCapabilities(session.capabilities, initialization, init?.message)
   // Streamed catalog updates take precedence over initialize.
   if (session.commands.commands === undefined) {
@@ -175,6 +177,9 @@ function applyClaudeSettingsFacts(
   }
   if (published.fastMode !== null) {
     session.reportedOptions.fastMode = published.fastMode
+    if (!published.fastMode) {
+      delete session.fastModeReportedMutation
+    }
     if (agrees('fastMode', String(published.fastMode))) {
       session.confirmedOptions.add('fastMode')
     }

@@ -57,10 +57,8 @@ vi.mock('@/components/ui/popover', () => ({
   PopoverContent: vi.fn(),
   PopoverTrigger: vi.fn()
 }))
-vi.mock('@/hooks/useGitHubRepoMetadata', () => ({
-  useRepoAssignees: () => ({ data: [], loading: false, error: null })
-}))
 vi.mock('@/hooks/useIssueMetadata', () => ({
+  useRepoAssignees: () => ({ data: [], loading: false, error: null }),
   useImmediateMutation: () => ({
     isPending: () => false,
     run: (_key: string, spec: { mutate: () => Promise<unknown> }) => {
@@ -94,12 +92,8 @@ vi.mock('../../src/main/git/remote-name-listing', () => ({
 import { PRAssigneesPanel } from '../../src/renderer/src/components/github/PRAssigneesPanel'
 import { updateIssue } from '../../src/main/github/issue-update'
 import { _resetOriginGitHubApiRepositoryCache } from '../../src/main/github/github-api-repository'
-import { onGitHubWorkItemDetailsCacheMutation } from '../../src/renderer/src/lib/github-work-item-details-cache-events'
 
 const repoPath = join(tmpdir(), 'orca-pr-assignee-repository-fixture')
-const notifyWorkItemMutated = vi.fn(async () => {})
-const localMutation = vi.fn()
-let stopListening: (() => void) | undefined
 
 beforeEach(() => {
   fixture.callbacks = []
@@ -143,22 +137,10 @@ beforeEach(() => {
         args.ownerRepo
       )
   )
-  notifyWorkItemMutated.mockClear()
-  localMutation.mockClear()
-  vi.stubGlobal(
-    'window',
-    Object.assign(new EventTarget(), {
-      api: { gh: { updateIssue: fixture.apiUpdate, notifyWorkItemMutated } }
-    })
-  )
-  stopListening = onGitHubWorkItemDetailsCacheMutation(localMutation)
+  vi.stubGlobal('window', { api: { gh: { updateIssue: fixture.apiUpdate } } })
 })
 
-afterEach(() => {
-  stopListening?.()
-  stopListening = undefined
-  vi.unstubAllGlobals()
-})
+afterEach(() => vi.unstubAllGlobals())
 
 it.each([
   { owner: 'upstream-owner', preference: 'origin', assigned: false, legacy: false },
@@ -192,19 +174,6 @@ it.each([
     }
     toggleAssignee('octo')
     await fixture.mutation
-    expect(localMutation).toHaveBeenCalledExactlyOnceWith({
-      repoPath,
-      repoId: item.repoId,
-      sourceContext: undefined,
-      type: 'pr',
-      number: 5
-    })
-    expect(notifyWorkItemMutated).toHaveBeenCalledExactlyOnceWith({
-      repoPath,
-      repoId: item.repoId,
-      type: 'pr',
-      number: 5
-    })
     expect(fixture.requests).toEqual([
       {
         args: [

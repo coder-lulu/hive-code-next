@@ -1,5 +1,8 @@
 import { BROWSER_GOOGLE_COOKIE_CLEAR_CAPABILITY } from '../../shared/browser-runtime-capabilities'
+import { mkdtemp } from 'node:fs/promises'
 import { createServer, type AddressInfo } from 'node:net'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
 import { z } from 'zod'
 import { BrowserError } from '../browser/browser-error'
@@ -18,11 +21,6 @@ import { sendOrcadSidecarRequest } from './orcad-sidecar-runtime-client'
 import { browserWaitRequestTimeoutMs } from '../../shared/browser-wait-timeout'
 import { electronServeEnvironment } from './electron-serve-browser-environment'
 import {
-  createElectronSidecarProfile,
-  removeLeftoverElectronSidecarProfile,
-  stopElectronSidecar
-} from './electron-sidecar-profile'
-import {
   ElectronSidecarTabRegistry,
   ElectronSidecarTabSchema,
   type ElectronSidecarPage
@@ -33,6 +31,7 @@ import {
 } from './electron-sidecar-method-routing'
 
 const START_TIMEOUT_MS = 120_000
+const STOP_TIMEOUT_MS = 5_000
 const BrowserPageResult = z.object({ browserPageId: z.string() }).passthrough()
 const BrowserCloseResult = z.object({ closed: z.boolean() }).passthrough()
 const BrowserTabListResult = z.object({ tabs: z.array(ElectronSidecarTabSchema) }).passthrough()
@@ -59,6 +58,13 @@ async function reserveLoopbackPort(): Promise<number> {
   })
   return address.port
 }
+function signalProcess(pid: number, signal: NodeJS.Signals): void {
+  try {
+    process.kill(pid, signal)
+  } catch {
+    // The sidecar already exited.
+  }
+}
 
 export class ElectronServeBrowserProcess {
   private child: ReturnType<typeof spawnProcess> | null = null
@@ -67,16 +73,13 @@ export class ElectronServeBrowserProcess {
   private googleCookieClearSupported = false
   private sidecarDataPath: string | null = null
 
-  constructor(
-    private readonly executablePath: string,
-    private readonly orcadUserDataPath: string
-  ) {}
+  constructor(private readonly executablePath: string) {}
 
   async start(signal?: AbortSignal): Promise<void> {
     this.googleCookieClearSupported = false
     signal?.throwIfAborted()
-    await removeLeftoverElectronSidecarProfile(this.orcadUserDataPath)
-    const userDataPath = await createElectronSidecarProfile(this.orcadUserDataPath)
+    const temporaryRoot = process.platform === 'win32' ? tmpdir() : '/tmp'
+    const userDataPath = await mkdtemp(join(temporaryRoot, 'orcad-browser-'))
     this.sidecarDataPath = userDataPath
     const port = await reserveLoopbackPort()
     signal?.throwIfAborted()
@@ -181,7 +184,14 @@ export class ElectronServeBrowserProcess {
     this.sidecarDataPath = null
     this.tabs.clear()
     if (sidecarPid) {
-      await stopElectronSidecar(sidecarPid)
+      signalProcess(sidecarPid, 'SIGTERM')
+      const deadline = Date.now() + STOP_TIMEOUT_MS
+      while (isProcessAlive(sidecarPid) && Date.now() < deadline) {
+        await delay(50)
+      }
+      if (isProcessAlive(sidecarPid)) {
+        signalProcess(sidecarPid, 'SIGKILL')
+      }
     }
     if (sidecarDataPath) {
       // Windows helpers may briefly hold this temp profile; cleanup failure must not strand the instance lock.

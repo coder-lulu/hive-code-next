@@ -1,10 +1,12 @@
+import { launchRecordStore } from './structured-agent-launch-composition.test-support'
 import { createAcpStructuredLaunchResolver } from './structured-agent-launch-composition.test-support'
+import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../shared/global-settings-types'
-import { agentSessionRecordFixture } from '../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
+import { agentSessionRecordFixture } from '../../shared/agent-session-record.test-fixture'
 import { acpLaunchSpecFor } from '../acp/acp-launch-specs'
 import { structuredAgentSupportsLaunch } from './structured-agent-launch-support'
 
@@ -42,15 +44,17 @@ const workspace = async () => root
 
 function launchWith(settings: Settings) {
   return createAcpStructuredLaunchResolver(acpLaunchSpecFor('omp')!, {
-    store: {
-      getRecord: () => ({
+    dataDirectory: root,
+    logger: createStructuredAgentSessionLogger(),
+    store: launchRecordStore(
+      () => ({
         ...agentSessionRecordFixture(),
         provider: 'omp',
         providerHandleChain: [],
         accountHome: { variable: 'PI_CODING_AGENT_DIR', path: join(root, '.omp', 'agent') }
       }),
-      pinLaunchDirectory: vi.fn()
-    },
+      vi.fn()
+    ),
     readJournal: () => null,
     resolveWorkspacePath: async () => root,
     resolveEnvironment: async () => loginShell.env,

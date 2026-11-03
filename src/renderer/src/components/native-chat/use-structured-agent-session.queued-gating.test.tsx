@@ -7,20 +7,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   AgentJournalRenderItem,
   AgentJournalSubmission
-} from '../../../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentSessionQueuedMessage } from '../../../../shared/agent-session/requests/agent-session-queued-message-wire'
+} from '../../../../shared/agent-session-journal-types'
+import type { AgentSessionQueuedMessage } from '../../../../shared/agent-session-wire'
 import type { StructuredAgentSessionPendingSend } from './structured-agent-session-pending-sends'
-import { agentJournalSubmissionKey } from '../../../../shared/agent-session/journal/agent-session-journal-item-key'
+import { agentJournalSubmissionKey } from '../../../../shared/agent-session-journal-item-key'
 import { structuredAgentSessionDeliveryNotices } from './structured-agent-session-delivery-notices'
 import type * as RewindModule from './use-structured-agent-session-rewind'
-import {
-  structuredAgentSessionSendQueues,
-  type StructuredAgentSessionQueueDelivery
-} from './structured-agent-session-queue-request'
 
 const mocks = vi.hoisted(() => ({
   call: vi.fn(),
-  sendArgs: Array.of<{ queue?: StructuredAgentSessionQueueDelivery }>(),
+  sendArgs: Array.of<{ queue?: { capability: string; enabled: boolean } }>(),
   operations: 0,
   rewindPending: false
 }))
@@ -67,7 +63,7 @@ vi.mock('./use-structured-agent-session-rewind', async (importOriginal) => {
 })
 
 vi.mock('./use-structured-agent-session-sends', () => ({
-  useStructuredAgentSessionSends: (args: { queue?: StructuredAgentSessionQueueDelivery }) => {
+  useStructuredAgentSessionSends: (args: { queue?: { capability: string; enabled: boolean } }) => {
     mocks.sendArgs.push(args)
     return {
       pending: pendingSends,
@@ -78,14 +74,14 @@ vi.mock('./use-structured-agent-session-sends', () => ({
   }
 }))
 
-import { AGENT_SESSION_CONVERSATION_STOP_RUNTIME_CAPABILITY } from '../../../../shared/agent-session/lifecycle/agent-session-stop-capabilities'
 import {
+  AGENT_SESSION_CONVERSATION_STOP_RUNTIME_CAPABILITY,
   AGENT_SESSION_QUEUED_COMMANDS_RUNTIME_CAPABILITY,
   AGENT_SESSION_QUEUED_MESSAGES_RUNTIME_CAPABILITY
-} from '../../../../shared/agent-session/agent-session-runtime-capabilities'
+} from '../../../../shared/protocol-version'
 import { setLocalRuntimeCapabilitiesForTests } from '@/runtime/local-runtime-capabilities'
 import { ConversationCommandParams } from '../../../../shared/rpc-contract/structured-agent-session-params'
-import { structuredAgentSessionPayloadFingerprint } from '../../../../shared/agent-session/lifecycle/structured-agent-session-mutation'
+import { structuredAgentSessionPayloadFingerprint } from '../../../../shared/structured-agent-session-mutation'
 import {
   clearNativeChatDraftCacheForTests,
   readNativeChatDraftCache
@@ -131,7 +127,6 @@ function draft(id: string): AgentSessionQueuedMessage {
   }
 }
 
-// Omit the preference to exercise the production default; explicit OFF stays separate.
 function render(queueFollowUps?: boolean) {
   return renderHook(() =>
     useStructuredAgentSession({
@@ -140,18 +135,9 @@ function render(queueFollowUps?: boolean) {
       target: { kind: 'local' },
       isVisible: true,
       composerScopeKey: 'scope-1',
-      queueFollowUps
+      ...(queueFollowUps === undefined ? {} : { queueFollowUps })
     })
   )
-}
-
-/** The last render's sends: the host's answer, and whether a send queues (or its alternate). */
-function lastQueue(alternate?: boolean): { capability: string; enabled: boolean } {
-  const queue = mocks.sendArgs.at(-1)!.queue!
-  return {
-    capability: queue.capability,
-    enabled: structuredAgentSessionSendQueues(queue, alternate)
-  }
 }
 
 function cancels(): unknown[] {
@@ -197,14 +183,18 @@ describe('against a capable host', () => {
     ])
   })
 
-  it('queues sends with Queue, immediately with Steer, and the alternate does the other mid-turn', () => {
+  it('queues sends while the setting is on, immediately when it is off', () => {
     render()
-    expect(lastQueue()).toEqual({ capability: 'supported', enabled: true })
-    expect(lastQueue(true).enabled).toBe(false)
+    expect(mocks.sendArgs.at(-1)?.queue).toEqual({
+      capability: 'supported',
+      enabled: true
+    })
     mocks.sendArgs.length = 0
     render(false)
-    expect(lastQueue()).toEqual({ capability: 'supported', enabled: false })
-    expect(lastQueue(true).enabled).toBe(true)
+    expect(mocks.sendArgs.at(-1)?.queue).toEqual({
+      capability: 'supported',
+      enabled: false
+    })
   })
 
   describe('the words for a send after a Stop', () => {
@@ -232,14 +222,14 @@ describe('against a capable host', () => {
     const newer = newerApproval()
     items = [newer]
     render()
-    expect(lastQueue()).toEqual({
+    expect(mocks.sendArgs.at(-1)?.queue).toEqual({
       capability: 'supported',
       enabled: false
     })
     mocks.sendArgs.length = 0
     items = [newer, approval({ kind: 'plan', text: 'do it' })]
     render()
-    expect(lastQueue()).toEqual({
+    expect(mocks.sendArgs.at(-1)?.queue).toEqual({
       capability: 'supported',
       enabled: true
     })
@@ -654,7 +644,7 @@ describe('a /compact against a host that holds commands in line', () => {
   it('a send behind a waiting command card queues, even with follow-ups off', () => {
     queuedMessages = [compactCard(false)]
     render(false)
-    expect(lastQueue()).toEqual({
+    expect(mocks.sendArgs.at(-1)?.queue).toEqual({
       capability: 'supported',
       enabled: true
     })
@@ -663,7 +653,7 @@ describe('a /compact against a host that holds commands in line', () => {
   it('a send-failed command card, which the queue skips, does not force a send to queue', () => {
     queuedMessages = [compactCard(true)]
     render(false)
-    expect(lastQueue()).toEqual({
+    expect(mocks.sendArgs.at(-1)?.queue).toEqual({
       capability: 'supported',
       enabled: false
     })
@@ -775,10 +765,10 @@ describe('against a host without the capability', () => {
     )
   })
 
-  it('steering the head card is inert', () => {
+  it('steering the newest card is inert', () => {
     queuedMessages = [draft('draft-1')]
     const { result } = render()
-    expect(result.current.queuedMessages.steerHead()).toBe(false)
+    expect(result.current.queuedMessages.steerNewest()).toBe(false)
     expect(
       mocks.call.mock.calls.filter(([, method]) =>
         String(method).startsWith('agentSession.queuedMessage')

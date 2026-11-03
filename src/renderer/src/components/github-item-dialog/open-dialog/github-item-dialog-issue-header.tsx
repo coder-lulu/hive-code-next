@@ -9,8 +9,7 @@ import {
   Copy,
   ExternalLink,
   FolderKanban,
-  Plus,
-  RefreshCw
+  Plus
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ButtonGroup } from '@/components/ui/button-group'
@@ -32,10 +31,6 @@ import { openAppHttpLink } from '@/lib/app-http-link-open'
 
 export function GitHubItemDialogIssueHeader({
   workItem,
-  refreshTask,
-  refreshing,
-  canRefreshTask,
-  refreshUnsupported,
   backLabel,
   onClose,
   linkCopied,
@@ -49,10 +44,6 @@ export function GitHubItemDialogIssueHeader({
   repoPath,
   issueAttachedWorkspaceLabel
 }: {
-  refreshTask?: () => Promise<void>
-  refreshing: boolean
-  canRefreshTask: boolean
-  refreshUnsupported: boolean
   workItem: GitHubWorkItem
   backLabel: string
   onClose: () => void
@@ -99,36 +90,6 @@ export function GitHubItemDialogIssueHeader({
           ) : null}
           <span className="font-mono text-muted-foreground">#{workItem.number}</span>
           <div className="ml-auto flex items-center gap-1">
-            {refreshTask ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  {/* A disabled button gets no pointer events; the span keeps its reason reachable. */}
-                  <span className="inline-flex">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      disabled={!canRefreshTask || refreshing}
-                      onClick={() => void refreshTask()}
-                      aria-label={translate(
-                        'auto.components.GitHubItemDialog.refreshTask',
-                        'Refresh task'
-                      )}
-                    >
-                      <RefreshCw className={cn('size-4', refreshing && 'animate-spin')} />
-                    </Button>
-                  </span>
-                </TooltipTrigger>
-                <TooltipContent side="bottom" sideOffset={6}>
-                  {refreshUnsupported
-                    ? translate(
-                        'auto.components.GitHubItemDialog.refreshTaskUnsupported',
-                        'Update Orca on this server to refresh tasks here.'
-                      )
-                    : translate('auto.components.GitHubItemDialog.refreshTask', 'Refresh task')}
-                </TooltipContent>
-              </Tooltip>
-            ) : null}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button

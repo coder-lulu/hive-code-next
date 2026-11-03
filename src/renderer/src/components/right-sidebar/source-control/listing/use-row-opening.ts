@@ -20,14 +20,12 @@ export function useSourceControlRowOpening({
   activeWorktreeId,
   worktreePath,
   visibleSelectionEntries,
-  visibleBranchRowKeys,
   branchSummary
 }: {
   isMac: boolean
   activeWorktreeId: string | null
   worktreePath: string | null
   visibleSelectionEntries: FlatEntry[]
-  visibleBranchRowKeys: readonly string[]
   branchSummary: GitBranchCompareSummary | null
 }) {
   const activeGroupIdByWorktree = useAppStore((s) => s.activeGroupIdByWorktree)
@@ -68,21 +66,16 @@ export function useSourceControlRowOpening({
       (file) => file.id === activeFileId && file.worktreeId === activeWorktreeId
     )
     return activeFile
-      ? buildActiveOpenFileSignature(
-          activeFile.diffSource,
-          activeFile.relativePath,
-          activeFile.branchCompare,
-          branchSummary
-        )
+      ? buildActiveOpenFileSignature(activeFile.diffSource, activeFile.relativePath)
       : null
   })
   const activeOpenAvailableRowKeys = useMemo(() => {
-    const keys = new Set(visibleBranchRowKeys)
+    const keys = new Set<string>()
     for (const entry of visibleSelectionEntries) {
       keys.add(entry.key)
     }
     return keys
-  }, [visibleSelectionEntries, visibleBranchRowKeys])
+  }, [visibleSelectionEntries])
   const activeOpenRowKeys = useMemo(
     () => buildActiveOpenRowKeys(activeOpenFileSignature, activeOpenAvailableRowKeys),
     [activeOpenAvailableRowKeys, activeOpenFileSignature]

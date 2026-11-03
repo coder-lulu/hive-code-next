@@ -20,14 +20,8 @@ export function useRouteCapability(capability: string): boolean {
   )
 }
 
-export function useWorkspaceClient(hostId: string | undefined): ReturnType<typeof useHostClient> & {
-  /** The route's own paired host, which stays the phone's peer when a server executes the workspace. */
-  pairedHostClient: RpcClient | null
-} {
+export function useWorkspaceClient(hostId: string | undefined): ReturnType<typeof useHostClient> {
   const host = useHostClient(hostId)
   const server = useContext(WorkspaceServerContext)
-  const pairedHostClient = host.client
-  return server === undefined
-    ? { ...host, pairedHostClient }
-    : { ...host, client: server.client, state: server.state, pairedHostClient }
+  return server === undefined ? host : { ...host, client: server.client, state: server.state }
 }

@@ -237,6 +237,10 @@ export type OrcaRuntimeService = InstanceType<typeof importedValues.exportedOrca
 export type EventEmitter = InstanceType<typeof importedValues.exportedEventEmitter>
 export type OrchestrationDb = InstanceType<typeof importedValues.exportedOrchestrationDb>
 
+export type {
+  AgentSessionExecutionClaim,
+  AgentSessionSurfaceBinding
+} from '../../shared/agent-session-host-authority'
 export type { BrowserClientHostCommandEvent } from '../../shared/browser-client-host-protocol'
 export type { FolderWorkspace } from '../../shared/folder-workspace-types'
 export type { GitUsernameModule }
@@ -252,6 +256,7 @@ export type {
   RuntimeTerminalCreate
 } from '../../shared/runtime-types'
 export type { RuntimeTerminalAgentStatusEvent } from './orca-runtime'
+export type { SleepingAgentSessionRecord } from '../../shared/agent-session-resume'
 export type { Tab } from '../../shared/tab-types'
 export type { TerminalLayoutSnapshot } from '../../shared/terminal-tab-types'
 export type { TerminalSideEffectBatch } from '../../shared/terminal-side-effect-facts'

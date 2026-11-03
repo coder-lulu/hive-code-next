@@ -1,5 +1,3 @@
-import type { AppState } from '@/store'
-import type { DiffCommentOwner } from '@/store/diff-comment-owner'
 import type { DiffSection } from './diff-section-types'
 import { toast } from 'sonner'
 import { translate } from '@/i18n/i18n'
@@ -9,8 +7,17 @@ type DiffSectionCommentTarget = {
   startLine?: number
 }
 
+type AddDiffComment = (args: {
+  worktreeId: string
+  filePath: string
+  source: 'diff'
+  startLine?: number
+  lineNumber: number
+  body: string
+  side: 'modified'
+}) => Promise<unknown>
+
 export async function submitDiffSectionComment({
-  owner,
   addDiffComment,
   body,
   onAddLineComment,
@@ -18,8 +25,7 @@ export async function submitDiffSectionComment({
   section,
   worktreeId
 }: {
-  owner: DiffCommentOwner | null
-  addDiffComment: AppState['addDiffComment']
+  addDiffComment: AddDiffComment
   body: string
   onAddLineComment?: (
     section: DiffSection,
@@ -40,11 +46,11 @@ export async function submitDiffSectionComment({
       body
     })
   }
-  if (!worktreeId || !owner) {
+  if (!worktreeId) {
     return false
   }
   // Close only after persistence succeeds; rollback must leave the draft available for retry.
-  const result = await addDiffComment(owner, {
+  const result = await addDiffComment({
     worktreeId,
     filePath: section.path,
     source: 'diff',

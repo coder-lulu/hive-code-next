@@ -30,8 +30,11 @@ import {
   detachManagedPaneForExternalMove,
   retireManagedPanePreservingPty
 } from './pane-split-close'
-import { bindTerminalScrollIntentKey, markTerminalPinnedViewport } from './terminal-scroll-intent'
-import type { TerminalScrollIntentTarget } from './terminal-scroll-intent'
+import {
+  bindTerminalScrollIntentKey,
+  markTerminalPinnedViewport,
+  type TerminalScrollIntentTarget
+} from './terminal-scroll-intent'
 import {
   readTerminalScrollIntentKeyRetention,
   releaseTerminalScrollIntentKey

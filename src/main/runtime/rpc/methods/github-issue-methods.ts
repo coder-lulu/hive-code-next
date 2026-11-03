@@ -32,12 +32,7 @@ export const GITHUB_ISSUE_METHODS = [
     permission: 'workspace',
     params: UpdateIssue,
     handler: async (params, { runtime }) =>
-      runtime.updateRepoIssue(
-        params.repo,
-        params.number,
-        params.updates,
-        ...(params.ownerRepo ? ([params.ownerRepo] as const) : ([] as const))
-      )
+      runtime.updateRepoIssue(params.repo, params.number, params.updates)
   }),
   defineMethod({
     name: 'github.addIssueComment',

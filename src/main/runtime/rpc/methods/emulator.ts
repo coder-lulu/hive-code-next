@@ -19,8 +19,7 @@ import {
   RotateParams,
   ShutdownParams,
   TapParams,
-  TypeParams,
-  WorktreeParam
+  TypeParams
 } from '../../../../shared/rpc-contract/emulator-params'
 
 const InstallParams = z.object({
@@ -69,12 +68,6 @@ export const EMULATOR_METHODS = [
     permission: 'workspace',
     params: ButtonParams,
     handler: async (params, { runtime }) => runtime.emulatorButton(params)
-  }),
-  defineMethod({
-    name: 'emulator.checkInput',
-    permission: 'workspace',
-    params: WorktreeParam,
-    handler: async (params, { runtime }) => runtime.emulatorCheckInput(params)
   }),
   defineMethod({
     name: 'emulator.rotate',

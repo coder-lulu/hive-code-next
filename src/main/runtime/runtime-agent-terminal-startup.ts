@@ -1,6 +1,6 @@
 import type { SessionOptionValue } from '../../shared/native-chat/input/native-chat-session-options'
 import type { TuiAgent } from '../../shared/tui-agent'
-import type { AgentLaunchPreferences } from '../../shared/agent-session/agent-session-host-authority'
+import type { AgentLaunchPreferences } from '../../shared/agent-session-host-authority'
 import {
   agentLaunchQuotingShell,
   remoteExecutionPlatform,
@@ -24,7 +24,7 @@ import { resolveAgentStartupPlanInputs } from '../../shared/agent-startup-plan-i
 import { agentStartedTelemetry } from '../agent-launch/agent-started-telemetry'
 import { terminalShellOverrideRefusal } from './terminal-shell-override-host-support'
 import {
-  resolvePlainTerminalProjectRuntime,
+  resolveLocalProjectRuntimeForWorktreeId,
   resolvePlainTerminalPtyOptions
 } from '../local-project-runtime-resolution'
 import {
@@ -83,13 +83,7 @@ export async function resolveAgentTerminalCreateOptions(
       opts.shellOverride && store
         ? plannedAgent || opts.launchRuntime
           ? agentLaunchProjectRuntime(store, workspace, plannedAgent ?? opts.launchAgent)
-          : resolvePlainTerminalProjectRuntime(
-              store,
-              workspace.id,
-              workspace,
-              opts.tabId,
-              workspace.connectionId
-            )
+          : resolveLocalProjectRuntimeForWorktreeId(store, workspace.id)
         : undefined,
     cwd: resolveTerminalStartupCwd(workspace.path, opts.cwd) ?? workspace.path,
     workspacePath: workspace.path
@@ -264,9 +258,7 @@ function resolveQoderLaunchCommand(
       store,
       store.getSettings(),
       workspace.id,
-      launch.shellOverride,
-      workspace,
-      launch.tabId
+      launch.shellOverride
     )
   }
   // Where the process runs: a `\\wsl$` cwd first, then a WSL shell, as the spawn decides it.

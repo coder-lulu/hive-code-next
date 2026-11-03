@@ -3,7 +3,6 @@ import type { AgentModelCatalogSource } from '../agent-model-catalog/agent-model
 // the session's events go through, and its open begins.
 
 import type { AttachedJournal } from './structured-agent-session-attach'
-import type { AgentSessionAccountHome } from '../../../shared/agent-session/lifecycle/agent-session-account-home'
 import type { AgentSessionJournal } from '../agent-session-journal/journal-store'
 import type { AttachedOwner } from './structured-agent-session-attach-flow'
 import type { StructuredAgentSessionAttachContext } from './structured-agent-session-attach-context'
@@ -26,8 +25,6 @@ export type AttachCandidate = {
 
 export type BoundAttach = {
   acquisitionGeneration: string | null
-  /** The account home the spawned child launched under, when its adapter reports one. */
-  accountHome?: AgentSessionAccountHome
   owner: AttachedOwner
   fence: number
   journal: AgentSessionJournal
@@ -79,10 +76,9 @@ export async function publishAttachedChild(
     return false
   }
   const { acquisitionGeneration, owner, fence, current, eventSink } = bound
-  // A re-attach to a live child keeps the mode and account that child was launched with.
+  // Retained children keep their original launch mode.
   const permissionMode =
     owner === 'acquired' ? attempt.startup?.permissionMode : current?.permissionMode
-  const accountHome = owner === 'acquired' ? bound.accountHome : current?.accountHome
   const startedFor = owner === 'acquired' ? input.startedFor : current?.startedFor
   const child =
     owner === 'acquired'
@@ -94,8 +90,7 @@ export async function publishAttachedChild(
           heldSends: () => context.deps.adapter.heldSends?.(sessionId),
           exitObservation: eventSink.exitObservation,
           ...(startedFor === undefined ? {} : { startedFor }),
-          ...(permissionMode === undefined ? {} : { permissionMode }),
-          ...(accountHome === undefined ? {} : { accountHome })
+          ...(permissionMode === undefined ? {} : { permissionMode })
         }
       : owner === 'kept' && current
         ? current

@@ -1,9 +1,9 @@
-import { CODEX_SESSION_OPTION_CATALOG } from '../../../shared/agent-session/options/agent-session-option-catalog-claude-codex'
+import { CODEX_SESSION_OPTION_CATALOG } from '../../../shared/agent-session-option-catalog-claude-codex'
 import {
   structuredAgentSessionMessageSelection,
   structuredAgentSessionOptionView
-} from '../../../shared/agent-session/options/structured-agent-session-option-view'
-import { claudeOpened } from '../../claude/structured/claude-structured-startup-settled-test-support'
+} from '../../../shared/structured-agent-session-option-view'
+import { claudeOpened } from '../../claude/claude-structured-startup-settled-test-support'
 
 import type { ClaudeStructuredSessionEvent } from '../../claude/structured/claude-structured-session-state'
 
@@ -12,23 +12,22 @@ import {
   fakeClaude,
   claudeFrame,
   USER_MESSAGE
-} from '../../claude/structured/claude-structured-session-test-support'
+} from '../../claude/claude-structured-session-test-support'
 
 import {
   applyStructuredAgentSessionOptions,
   createStructuredAgentSessionOptionState
-} from '../../../shared/agent-session/options/structured-agent-session-options'
+} from '../../../shared/structured-agent-session-options'
 
 import { expect, it, vi } from 'vitest'
 import {
-  hostTestCatalogReadOperation,
   hostTestRestingOptionsRecord as restingRecord,
   HOST_TEST_RESTING_OPTIONS_CREATED_LINKS as created,
   hostTestRestingOptionsJournal as restingJournal,
   hostTestOptionsReadStore
 } from './structured-agent-session-host-test-data'
 
-import type { AgentSessionModelOption } from '../../../shared/agent-session/agent-session-wire'
+import type { AgentSessionModelOption } from '../../../shared/agent-session-wire'
 
 import type { StructuredAgentSessionMutationContext } from './structured-agent-session-host-mutations'
 import { readStructuredAgentSessionOptions } from './structured-agent-session-options-read'
@@ -194,10 +193,7 @@ it.each([false, true])(
             current: { model: 'opus[1m]', effort: 'high', confirmed: ['model', 'effort'] }
           })
         },
-        modelCatalog: {
-          captureRead: hostTestCatalogReadOperation,
-          read: async () => ({ origin: 'probe', fetchedAt: 1, models })
-        },
+        modelCatalog: { read: async () => ({ origin: 'probe', fetchedAt: 1, models }) },
         agents: NO_STRUCTURED_AGENTS,
         store: hostTestOptionsReadStore(() => record)
       },

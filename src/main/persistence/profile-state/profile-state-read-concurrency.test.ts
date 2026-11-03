@@ -81,7 +81,7 @@ describe('profile state reads during concurrent commits', () => {
     ['read-only', openProfileStateDatabaseReadOnly],
     ['writable', openProfileStateDatabase]
   ] as const)(
-    'opens a healthy %s database structurally and keeps its first full read consistent',
+    'opens a healthy %s database when automation state changes between validation reads',
     (_, open) => {
       const { path, db: writer } = fixture()
       const readRevision = revisions.readProfileStateRevision
@@ -100,14 +100,12 @@ describe('profile state reads during concurrent commits', () => {
       try {
         const opened = open(path, 'profile-a')
         try {
-          // Why: opening checks structure only; automation content is read by ordinary reads.
-          expect(committed).toBe(false)
-          expect(readProfileStateParsedSnapshot(opened.db)).toEqual({
-            revision: 1,
-            state: { automationRuns: [{ id: 'run-1', status: 'pending' }] }
-          })
           expect(committed).toBe(true)
           expect(opened.db.isTransaction).toBe(false)
+          expect(readProfileStateParsedSnapshot(opened.db)).toEqual({
+            revision: 2,
+            state: { automationRuns: [] }
+          })
           expect(readProfileStateSnapshot(opened.db)).toMatchObject({
             revision: 2,
             json: '{"automationRuns":[]}'
@@ -153,9 +151,7 @@ describe('profile state reads during concurrent commits', () => {
           db.exec('BEGIN IMMEDIATE')
         }
         db.exec('DELETE FROM profile_state_automation_runs_meta')
-        // Why: schema verification is structural so section repair can still open this profile.
-        expect(() => verifyProfileStateSchema(db, 'profile-a')).not.toThrow()
-        expect(db.isTransaction).toBe(ownership === 'caller')
+        expect(() => verifyProfileStateSchema(db, 'profile-a')).toThrow('metadata is malformed')
         expect(() => readProfileStateSnapshot(db)).toThrow('metadata is malformed')
         expect(() => readProfileStateParsedSnapshot(db)).toThrow('metadata is malformed')
         expect(readProfileStateDomainsWithRevisionFromDatabase(db, ['automationRuns']).kind).toBe(

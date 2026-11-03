@@ -1,8 +1,7 @@
 // @vitest-environment happy-dom
 
 import '@testing-library/jest-dom/vitest'
-import { cleanup, render, screen } from '@testing-library/react'
-
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Repo } from '../../../../shared/repo-types'
@@ -160,6 +159,12 @@ describe('DeleteWorktreeDialog unsaved edits', () => {
     cleanup()
   })
 
+  it('shows no warning and focuses Delete when nothing unsaved closes', () => {
+    render(<DeleteWorktreeDialog />)
+    expect(screen.queryByText(/Unsaved edits/)).toBeNull()
+    expect(mocks.preventFocus).toHaveBeenCalled()
+  })
+
   it('lists the files whose edits are discarded and leaves focus off Delete', async () => {
     mocks.state.openFiles = [
       dirty('a.ts', '/workspaces/wt/a.ts'),
@@ -172,5 +177,13 @@ describe('DeleteWorktreeDialog unsaved edits', () => {
     expect(screen.getByText('a.ts')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Save/ })).toBeNull()
     expect(mocks.preventFocus).not.toHaveBeenCalled()
+  })
+
+  it('still deletes from the same dialog once the list was shown', async () => {
+    mocks.state.openFiles = [dirty('a.ts', '/workspaces/wt/a.ts')]
+    render(<DeleteWorktreeDialog />)
+    await screen.findByText('Unsaved edits in 1 file will be discarded:')
+    fireEvent.click(screen.getByRole('button', { name: /Delete Workspace/ }))
+    expect(runWorktreeDeletesInParallel).toHaveBeenCalledWith([workspace], expect.anything())
   })
 })

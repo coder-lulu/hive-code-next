@@ -21,7 +21,7 @@ import type {
 import type {
   AgentSessionExecutionClaim,
   AgentSessionSurfaceBinding
-} from '../../../shared/agent-session/agent-session-host-authority'
+} from '../orca-runtime-test-mocks.spec'
 import {
   HEADLESS_LEAF_ID,
   RESTORED_AUTHORITY_TOKEN,

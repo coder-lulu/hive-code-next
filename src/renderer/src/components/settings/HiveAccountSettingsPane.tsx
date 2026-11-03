@@ -33,7 +33,7 @@ function errorCopy(error: HiveAccountErrorCode | undefined): string {
     case 'session_expired':
       return translate(
         'auto.components.settings.orcaAccount.sessionExpired',
-        'This session has expired. Sign in again.'
+        'This session has expired. Refresh it or sign in again.'
       )
     case 'network_unavailable':
       return translate(

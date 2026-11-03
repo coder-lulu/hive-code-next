@@ -51,7 +51,6 @@ function createController() {
     notifyReposChanged,
     resolveFolderConnectionId: () => null,
     teardownFolderWorkspacePtys: async () => undefined,
-    acquireFileWatcherRemoval: unused,
     cleanupRemovedFolderWorkspaceState: () => undefined,
     emitWorktreeLifecycle: () => undefined
   })

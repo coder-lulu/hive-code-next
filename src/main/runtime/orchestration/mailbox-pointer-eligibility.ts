@@ -27,7 +27,7 @@ export function hasUnfilteredOrchestrationWaiter(
 
 export type OrchestrationPointerBatch = {
   messages: MessageRow[]
-  /** The consumer's unacked batch, named in the reminder. */
+  /** The consumer's unacked batch; set means the nudge waits for its idle edge and names it. */
   heldDeliveryId: string | undefined
 }
 

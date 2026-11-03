@@ -18,6 +18,7 @@ export function hostPlannableAgentLaunch(
   if (
     !request.agent ||
     !request.startupPlan ||
+    request.startupPlan.agentPermissionMode !== undefined ||
     request.launchDraftPrompt ||
     request.agentLaunchRoute === 'structured-native-chat' ||
     request.ephemeralVmRecipe

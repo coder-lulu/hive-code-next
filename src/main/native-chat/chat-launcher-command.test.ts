@@ -5,10 +5,20 @@ import {
   createAcpStructuredLaunchResolver,
   createClaudeStructuredLaunchResolver,
   createCodexStructuredLaunchResolver,
-  createPiRpcLaunchResolver
+  createPiRpcLaunchResolver,
+  launchRecordStore
 } from '../runtime/structured-agent-launch-composition.test-support'
 import { acpLaunchSpecFor } from '../acp/acp-launch-specs'
 import { buildPiRpcLaunch } from '../pi/rpc-launch'
+import type * as WindowsProcessTable from '../windows/windows-process-table'
+
+const { processStartTimeAvailable } = vi.hoisted(() => ({
+  processStartTimeAvailable: vi.fn(() => true)
+}))
+vi.mock('../windows/windows-process-table', async (original) => ({
+  ...(await original<typeof WindowsProcessTable>()),
+  isWindowsProcessStartTimeAvailable: processStartTimeAvailable
+}))
 
 const agents = ['claude', 'codex', 'pi', 'grok'] as const
 
@@ -33,7 +43,7 @@ describe('chat launcher argv', () => {
       })
       const settings = { agentCmdOverrides: { [agent]: '' } }
       const common = {
-        store: { getRecord: () => record, pinLaunchDirectory: vi.fn() },
+        store: launchRecordStore(() => record, vi.fn()),
         resolveWorkspacePath: async () => '/workspace',
         resolveEnvironment: async () => ({ HOME: '/home', PATH: '/bin' }),
         resolveCommandSettings: () => settings
@@ -72,11 +82,17 @@ describe('chat launcher argv', () => {
                   })(sessionIdentity)
               : createAcpStructuredLaunchResolver(spec, {
                   ...common,
+                  dataDirectory: `${process.cwd()}/logs/upstream-sync/20261102/chat-launcher-fixtures`,
                   readJournal: () => null,
                   resolveCommand: () => process.execPath,
                   probeVersion: readVersion
                 })
       const launches: Awaited<ReturnType<typeof resolve>>[] = []
+      if (agent === 'pi' && process.platform === 'win32') {
+        processStartTimeAvailable.mockReturnValue(false)
+        await expect(resolve({ identity })).rejects.toThrow('Windows process creation-time proof')
+        processStartTimeAvailable.mockReturnValue(true)
+      }
       for (const command of [
         '',
         `"${process.execPath}"`,

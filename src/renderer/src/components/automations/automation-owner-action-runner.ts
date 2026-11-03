@@ -31,7 +31,6 @@ import {
   listAutomationRunsForOwner,
   listAutomationRunsPageForOwner,
   listAutomationsForOwner,
-  listScopedAutomations,
   listOrphanAutomationRuns,
   listOrphanAutomationRunsPage,
   matchAutomationOwnerConflict,
@@ -62,27 +61,12 @@ const CONFLICT_RECOVERY: Record<AutomationOwnerConflictCode, AutomationHostRecov
     automation_destination_invalid: 'retry'
   }
 
-function conflictOutcome(
-  code: AutomationOwnerConflictCode,
-  error: unknown
-): AutomationActionOutcome<never> {
-  const message =
-    typeof error === 'string'
-      ? error
-      : error &&
-          typeof error === 'object' &&
-          'message' in error &&
-          typeof error.message === 'string'
-        ? error.message
-        : null
+function conflictOutcome(code: AutomationOwnerConflictCode): AutomationActionOutcome<never> {
   return {
     status: 'conflict',
     conflict: {
       code,
-      message:
-        message && message.trim() !== code
-          ? stripAutomationOwnerConflictCode(message)
-          : automationOwnerConflictMessage(code),
+      message: automationOwnerConflictMessage(code),
       recovery: CONFLICT_RECOVERY[code]
     }
   }
@@ -91,7 +75,7 @@ function conflictOutcome(
 function classify(error: unknown): AutomationActionOutcome<never> {
   const conflict = matchAutomationOwnerConflict(error)
   if (conflict) {
-    return conflictOutcome(conflict, error)
+    return conflictOutcome(conflict)
   }
   if (error instanceof AutomationHostScopeUnsupportedError) {
     return {
@@ -166,7 +150,7 @@ export async function updateOwnedAutomation(
   return await attempt(
     availability,
     (owner) => updateAutomationForOwner(owner, id, updates, destination),
-    () => updateOrphanAutomation(authority, id, updates, destination)
+    () => updateOrphanAutomation(authority, id, updates)
   )
 }
 
@@ -192,22 +176,12 @@ export async function runOwnedAutomationNow(
 /** Re-read edit data within its captured scope so a moved row cannot silently become another authority’s same-ID record. */
 export async function showOwnedAutomation(
   availability: AutomationActionAvailability,
-  id: string,
-  authority?: AutomationAuthorityRef
+  id: string
 ): Promise<AutomationActionResult<Automation | null>> {
-  return await attempt(
-    availability,
-    async (owner) => {
-      const result = await listAutomationsForOwner(owner)
-      return result.automations.find((automation) => automation.id === id) ?? null
-    },
-    authority
-      ? async () => {
-          const result = await listScopedAutomations(authority, { kind: 'orphan' })
-          return result.automations.find((automation) => automation.id === id) ?? null
-        }
-      : undefined
-  )
+  return await attempt(availability, async (owner) => {
+    const result = await listAutomationsForOwner(owner)
+    return result.automations.find((automation) => automation.id === id) ?? null
+  })
 }
 
 export async function listOwnedAutomationRuns(

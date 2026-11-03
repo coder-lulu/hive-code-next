@@ -4,43 +4,12 @@
   "family": "session.terminal-inventory",
   "namedDeltas": [],
   "values": {
-    "475f23d61c0e": {
+    "34f7b35ae07c": {
       "name": "terminal.list#1",
       "ordinal": 2,
-      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"terminal.list\",\"params\":{\"worktree\":\"id:workspace-1\",\"includeVisualLayouts\":false,\"includePreview\":false}}"
+      "json": "{\"id\":\"frame-1\",\"deviceToken\":\"recording-device\",\"method\":\"terminal.list\",\"params\":{\"worktree\":\"id:workspace-1\",\"includeVisualLayouts\":false}}"
     },
-    "580c77c4c1df": {
-      "known": [
-        {
-          "handle": "terminal-1",
-          "terminalTheme": {
-            "$rpc": "undefined"
-          },
-          "title": "one"
-        }
-      ],
-      "terminals": [
-        {
-          "handle": "terminal-1",
-          "terminalTheme": {
-            "$rpc": "undefined"
-          },
-          "title": "one"
-        }
-      ]
-    },
-    "84e5ca07cb7a": {
-      "status": "fulfilled",
-      "startedAt": 0,
-      "settledAt": 0,
-      "value": true
-    },
-    "baced0d54c65": {
-      "name": "default-live-input",
-      "ordinal": 4,
-      "value": ["terminal-1"]
-    },
-    "c7073e587980": {
+    "43914be59abe": {
       "name": "terminal.list#1",
       "ordinal": 1,
       "args": [
@@ -51,7 +20,6 @@
         {
           "name": "params",
           "value": {
-            "includePreview": false,
             "includeVisualLayouts": false,
             "worktree": "id:workspace-1"
           }
@@ -85,6 +53,37 @@
         }
       }
     },
+    "580c77c4c1df": {
+      "known": [
+        {
+          "handle": "terminal-1",
+          "terminalTheme": {
+            "$rpc": "undefined"
+          },
+          "title": "one"
+        }
+      ],
+      "terminals": [
+        {
+          "handle": "terminal-1",
+          "terminalTheme": {
+            "$rpc": "undefined"
+          },
+          "title": "one"
+        }
+      ]
+    },
+    "84e5ca07cb7a": {
+      "status": "fulfilled",
+      "startedAt": 0,
+      "settledAt": 0,
+      "value": true
+    },
+    "baced0d54c65": {
+      "name": "default-live-input",
+      "ordinal": 4,
+      "value": ["terminal-1"]
+    },
     "d217e810766d": {
       "name": "prune-live-input",
       "ordinal": 3,
@@ -97,8 +96,8 @@
       {
         "id": "deduped",
         "observation": {
-          "sender": ["c7073e587980"],
-          "payloads": ["475f23d61c0e"],
+          "sender": ["43914be59abe"],
+          "payloads": ["34f7b35ae07c"],
           "settlements": {
             "fetch": "84e5ca07cb7a"
           },

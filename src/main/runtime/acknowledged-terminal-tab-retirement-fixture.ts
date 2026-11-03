@@ -95,8 +95,7 @@ export function createAcknowledgedTabRetirementFixture(bound = false) {
       } as never
     },
     onIpc: () => {},
-    removeIpcListener: () => {},
-    waitForBrowserTabRegistration: async () => {}
+    removeIpcListener: () => {}
   })
   const runtime = new OrcaRuntimeService(store)
   runtime.attachWindow(1)

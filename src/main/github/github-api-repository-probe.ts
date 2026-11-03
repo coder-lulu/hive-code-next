@@ -1,4 +1,4 @@
-import { githubRepoContext, type LocalGitExecOptions } from './github-repository-identity'
+import type { LocalGitExecOptions } from './github-repository-identity'
 
 export function githubApiRepositoryProbeCacheKey(
   repoPath: string,
@@ -10,8 +10,7 @@ export function githubApiRepositoryProbeCacheKey(
   const runtimeKey = connectionId
     ? `ssh:${connectionId}`
     : `local:${localGitOptions.wslDistro ?? 'host'}`
-  const { ghAccount } = githubRepoContext(repoPath, connectionId, localGitOptions)
-  return `${runtimeKey}\0${repoPath}\0${remoteName}\0${requireVerifiedSshProbe ? 'verified' : 'tolerant'}\0${JSON.stringify(ghAccount ?? null)}`
+  return `${runtimeKey}\0${repoPath}\0${remoteName}\0${requireVerifiedSshProbe ? 'verified' : 'tolerant'}`
 }
 
 export function resolveGitHubApiRepositoryProbe<T>(

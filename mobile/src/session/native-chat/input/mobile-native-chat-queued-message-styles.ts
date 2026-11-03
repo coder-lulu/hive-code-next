@@ -19,8 +19,8 @@ export const queuedMessageStyles = themedStyleSheet(() => ({
   box: {
     paddingBottom: COMPOSER_TUCK,
     backgroundColor: colors.bgPanel,
-    borderTopLeftRadius: radii.surface,
-    borderTopRightRadius: radii.surface,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
     borderBottomWidth: 0,
     borderColor: colors.composerBorder,
@@ -95,7 +95,7 @@ export const queuedMessageStyles = themedStyleSheet(() => ({
     justifyContent: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,
-    borderRadius: radii.control
+    borderRadius: radii.button
   },
   chevron: {
     width: 36,
@@ -151,14 +151,14 @@ export const queuedMessageStyles = themedStyleSheet(() => ({
     justifyContent: 'center',
     gap: spacing.xs,
     paddingHorizontal: spacing.sm,
-    borderRadius: radii.control
+    borderRadius: radii.button
   },
   iconAction: {
     minHeight: MIN_TOUCH_TARGET,
     width: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radii.control
+    borderRadius: radii.button
   },
   lastIconAction: {
     width: MIN_TOUCH_TARGET

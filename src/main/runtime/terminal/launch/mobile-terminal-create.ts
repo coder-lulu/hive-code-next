@@ -5,7 +5,8 @@ import type { TuiAgent } from '../../../../shared/tui-agent'
 import type {
   AgentProviderSessionMetadata,
   SleepingAgentLaunchConfig
-} from '../../../../shared/agent-session/lifecycle/agent-session-resume'
+} from '../../../../shared/agent-session-resume'
+import type { RuntimeNavigationTarget } from '../../../../shared/runtime-navigation'
 import type {
   RuntimeTerminalCreate,
   RuntimeMobileSessionCreateTerminalResult,
@@ -13,10 +14,7 @@ import type {
 } from '../../../../shared/runtime-types'
 import type { SpawnIntent } from '../../../../shared/host-spawn-admission'
 import type { AgentLaunchRuntime } from '../../../../shared/agent-launch-runtime'
-import {
-  type RuntimeNavigationTarget,
-  navigationTargetsHost
-} from '../../../../shared/runtime-navigation'
+import { navigationTargetsHost } from '../../../../shared/runtime-navigation'
 import { MOBILE_TERMINAL_CREATE_RESULT_TTL_MS } from '../../orca-runtime-core'
 import { seedResumeLaunchIdentity } from '../../../ipc/pty/pane/resume-launch-identity'
 
@@ -69,7 +67,6 @@ export type OwnedMobileTerminalCreateOptions = {
   signal?: AbortSignal
   refuseSleptWorktree?: boolean
   resumesSleepingRecord?: true
-  reopensPane?: true
   /** See TerminalCreateOptions; a create that throws before it proves nothing spawned. */
   onPtySpawnDispatched?: () => void
   /** The PTY this create produced, reported before publication can fail. */

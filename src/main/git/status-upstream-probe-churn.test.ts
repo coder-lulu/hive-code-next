@@ -75,7 +75,7 @@ describe('getStatus missing-upstream polling churn', () => {
         }
       }
       if (args[0] === 'symbolic-ref' && args.includes('HEAD')) {
-        return { stdout: 'refs/heads/Initi-Project\n' }
+        return { stdout: 'Initi-Project\n' }
       }
       if (args[0] === 'rev-parse' && args.includes('HEAD@{u}')) {
         throw new Error("fatal: no upstream configured for branch 'Initi-Project'")
@@ -116,7 +116,7 @@ describe('getStatus missing-upstream polling churn', () => {
         }
       }
       if (args[0] === 'symbolic-ref' && args.includes('HEAD')) {
-        return { stdout: 'refs/heads/Initi-Project\n' }
+        return { stdout: 'Initi-Project\n' }
       }
       if (args[0] === 'rev-parse' && args.includes('HEAD@{u}')) {
         throw new Error("fatal: no upstream configured for branch 'Initi-Project'")
@@ -150,7 +150,7 @@ describe('getStatus missing-upstream polling churn', () => {
         }
       }
       if (args[0] === 'symbolic-ref' && args.includes('HEAD')) {
-        return { stdout: 'refs/heads/Initi-Project\n' }
+        return { stdout: 'Initi-Project\n' }
       }
       if (args[0] === 'rev-parse' && args.includes('HEAD@{u}')) {
         await Promise.resolve()
@@ -191,7 +191,7 @@ describe('getStatus missing-upstream polling churn', () => {
         }
       }
       if (args[0] === 'symbolic-ref' && args.includes('HEAD')) {
-        return { stdout: 'refs/heads/bench/feature\n' }
+        return { stdout: 'bench/feature\n' }
       }
       if (args[0] === 'rev-parse' && args.includes('HEAD@{u}')) {
         throw new Error("fatal: no upstream configured for branch 'bench/feature'")
@@ -268,7 +268,7 @@ describe('getStatus missing-upstream polling churn', () => {
         }
       }
       if (args[0] === 'symbolic-ref' && args.includes('HEAD')) {
-        return { stdout: 'refs/heads/feature/fix\n' }
+        return { stdout: 'feature/fix\n' }
       }
       if (args[0] === 'rev-parse' && args.includes('HEAD@{u}')) {
         throw new Error("fatal: no upstream configured for branch 'feature/fix'")
@@ -305,7 +305,7 @@ describe('getStatus missing-upstream polling churn', () => {
         }
       }
       if (args[0] === 'symbolic-ref' && args.includes('HEAD')) {
-        return { stdout: `refs/heads/${currentStatusBranch}\n` }
+        return { stdout: `${currentStatusBranch}\n` }
       }
       if (args[0] === 'rev-parse' && args.includes('HEAD@{u}')) {
         throw new Error('fatal: no upstream configured')
@@ -341,7 +341,7 @@ describe('getStatus missing-upstream polling churn', () => {
         }
       }
       if (args[0] === 'symbolic-ref' && args.includes('HEAD')) {
-        return { stdout: 'refs/heads/Initi-Project\n' }
+        return { stdout: 'Initi-Project\n' }
       }
       if (args[0] === 'rev-parse' && args.includes('HEAD@{u}')) {
         throw new Error("fatal: no upstream configured for branch 'Initi-Project'")

@@ -23,16 +23,32 @@ describe('shared build toolchain contract', () => {
     expect(packageJson.scripts['clients:build']).toBe(
       'node --use-env-proxy config/scripts/client-build.mjs build'
     )
-    for (const name of ['build:win', 'build:linux', 'build:mac']) {
-      expect(packageJson.scripts[name]).toContain('clients:build')
+    for (const [name, target] of [
+      ['build:win', 'windows-x64'],
+      ['build:linux', 'linux'],
+      ['build:mac', 'macos']
+    ]) {
+      expect(packageJson.scripts[name]).toBe(`pnpm run clients:build -- --target ${target}`)
     }
   })
 
   it('keeps Node-based build containers on the shared immutable baseline', () => {
-    const dockerfiles = [
-      'config/docker/headless-pairing/Dockerfile.build',
-      'tests/e2e/fixtures/docker-ssh-host/Dockerfile'
-    ]
+    const dockerfiles = ['config/docker/headless-pairing/Dockerfile.build']
+
+    // SSH exercises the Node22 line and preserves upstream October security fix eb9d2f9a06.
+    const sshDockerfile = readFileSync(
+      join(projectDir, 'tests/e2e/fixtures/docker-ssh-host/Dockerfile'),
+      'utf8'
+    )
+    expect(sshDockerfile.split(/\r?\n/)[0]).toBe(
+      'FROM node:22.23.4-bookworm@sha256:2bd396628eceb5c999a6e43731fab69d5fb98b94ba9d9d90b5f64575c5178765 AS patched-node'
+    )
+    expect(sshDockerfile).toContain(
+      'FROM node:22-bookworm@sha256:5647be709086c696ff32edaaf1c70cd26d1da6ab2b39c32f3c7b4c4a31957e37'
+    )
+    expect(sshDockerfile).toContain(
+      'COPY --from=patched-node /usr/local/bin/node /usr/local/bin/node'
+    )
 
     for (const relativePath of dockerfiles) {
       const firstLine = readFileSync(join(projectDir, relativePath), 'utf8').split(/\r?\n/, 1)[0]

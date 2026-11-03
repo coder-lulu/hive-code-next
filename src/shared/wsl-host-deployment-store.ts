@@ -61,8 +61,6 @@ export type WslHostDeployments = {
   deployments: WslHostDeploymentRecord[]
   /** Environment ids whose record this build cannot read; those environments must not be used. */
   unreadableEnvironmentIds: Set<string>
-  /** The whole file is unreadable (corrupt, or a newer envelope): any server that could be a WSL host is. */
-  fileUnreadable?: boolean
 }
 
 export class WslHostDeploymentStoreInvalidError extends Error {
@@ -183,13 +181,13 @@ export function hasNonWslOwner(environment: KnownRuntimeEnvironment): boolean {
 /** Overlay WSL links and hide unreadable records’ environments. Ignore stale links that conflict with SSH state or pairing. */
 export function overlayWslHostDeployments(
   environments: readonly KnownRuntimeEnvironment[],
-  { deployments, unreadableEnvironmentIds, fileUnreadable = false }: WslHostDeployments
+  { deployments, unreadableEnvironmentIds }: WslHostDeployments
 ): KnownRuntimeEnvironment[] {
   const byEnvironmentId = new Map(deployments.map((record) => [record.environmentId, record]))
   // Only a loopback pairing with no SSH link can be a WSL host; an unreadable record hides no other.
   const hidden = environments.filter(
     (environment) =>
-      (fileUnreadable || unreadableEnvironmentIds.has(environment.id)) &&
+      unreadableEnvironmentIds.has(environment.id) &&
       !hasNonWslOwner(environment) &&
       getPreferredLoopbackRuntimePort(environment) !== null
   )

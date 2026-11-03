@@ -3,8 +3,10 @@ import type {
   StructuredAgentSessionOptionsReportedEvent
 } from '../native-chat/agent-session-wire/structured-agent-session-adapter'
 import type { StructuredAgentSessionProviderOpenResult } from '../native-chat/agent-session-wire/structured-agent-session-provider-open-contract'
-import type { AgentJournalMessageItem } from '../../shared/agent-session/journal/agent-session-journal-types'
-import type { AgentSessionJournalIdentity } from '../../shared/agent-session/journal/agent-session-journal-identity'
+import type {
+  AgentJournalMessageItem,
+  AgentSessionJournalIdentity
+} from '../../shared/agent-session-journal-types'
 import type {
   CodexAppServerConnection,
   CodexAppServerConnectionHandlers
@@ -12,15 +14,14 @@ import type {
 import type {
   CodexAppServerLaunch,
   openCodexAppServerConnection
-} from './app-server/codex-app-server-connection'
-import { CodexStructuredSessionAdapter } from './codex-structured-session-adapter'
-import type {
-  CodexStructuredLaunch,
-  CodexStructuredSessionEvent,
-  CodexStructuredSessionAdapterDeps
-} from './codex-structured-session-state'
-
-import { codexProviderHandle } from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
+} from './codex-app-server-connection'
+import {
+  CodexStructuredSessionAdapter,
+  type CodexStructuredLaunch,
+  type CodexStructuredSessionEvent
+} from './codex-structured-session-adapter'
+import type { CodexStructuredSessionAdapterDeps } from './codex-structured-session-state'
+import { codexProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
 
 const startLinks = new WeakMap<
   CodexStructuredSessionAdapter,
@@ -90,7 +91,10 @@ type FakeConnection = Omit<CodexAppServerConnection, 'closed'> & {
   closeCount: number
 }
 
-export function fakeCodex(routes: Record<string, Route> = {}): {
+export function fakeCodex(
+  routes: Record<string, Route> = {},
+  closeResult?: CodexAppServerConnection['closeResult']
+): {
   connections: FakeConnection[]
   openConnection: typeof openCodexAppServerConnection
   routes: Record<string, Route>
@@ -105,6 +109,10 @@ export function fakeCodex(routes: Record<string, Route> = {}): {
       closeCount: 0,
       pid: 4321,
       closed: false,
+      // Tests must opt into workload-exit evidence separately from the root's close event.
+      get closeResult() {
+        return connection.closed ? closeResult : null
+      },
       request: async (method, params) => {
         connection.calls.push({ method, params })
         const route = routes[method]

@@ -4,7 +4,6 @@ import type {
   LinearCollectionResult,
   LinearConnectionStatus,
   LinearViewer,
-  LinearWorkspace,
   LinearWorkspaceSelection
 } from '../../../shared/linear/workspace-types'
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from './runtime-rpc-client'
@@ -35,9 +34,7 @@ export function isLinearIssueAttributeFilterUnsupportedError(
 }
 
 export type LinearIssueFilter = 'assigned' | 'created' | 'all' | 'completed'
-export type LinearConnectResult =
-  | { ok: true; viewer: LinearViewer; workspace?: LinearWorkspace }
-  | { ok: false; error: string }
+export type LinearConnectResult = { ok: true; viewer: LinearViewer } | { ok: false; error: string }
 export type LinearCreateIssueResult =
   | { ok: true; id: string; identifier: string; title: string; url: string }
   | { ok: false; error: string }

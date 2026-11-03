@@ -122,8 +122,7 @@ async function createStore(
   }
   vi.resetModules()
   installFakeAppEnvironment({ getPath: () => testState.dir })
-  const { Store } = await import('../persistence/loading-store/store')
-  const { initDataPath } = await import('../persistence/loading-store/user-data-path')
+  const { Store, initDataPath } = await import('../persistence')
   initDataPath()
   return createSqliteTestStore(Store, { dataFile: join(testState.dir, 'orca-data.json') })
 }
