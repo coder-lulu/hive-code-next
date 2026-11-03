@@ -112,7 +112,7 @@ async function main() {
       trackedDiffSha256: sha256(diff),
       untracked: untracked
         .split('\0')
-        .filter(Boolean)
+        .filter((file) => file && file !== '.client-build.lock')
         .map((file) => ({ file, sha256: sha256(readFileSync(join(root, file))) }))
     }
     context.env.HIVECODE_COMMIT_SHA = commit
