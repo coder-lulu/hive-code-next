@@ -151,6 +151,7 @@ export function AppWorkspaceShell(props: {
                       // Why: size from the wrapper's live width so the header tracks in-flight drag resizes (persisted to Zustand only on mouseup).
                       width: layout.sidebarOpen ? '100%' : undefined
                     }}
+                    ref={layout.titlebarLeftHeaderRef}
                   >
                     {titlebarLeftControls}
                   </div>

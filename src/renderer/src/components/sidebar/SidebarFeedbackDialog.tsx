@@ -26,9 +26,9 @@ import { useSidebarFeedbackEnvironmentPrefill } from './use-sidebar-feedback-env
 import { useSidebarFeedbackImages } from './use-sidebar-feedback-images'
 import { openAppHttpLink } from '@/lib/app-http-link-open'
 
-const GITHUB_ISSUES_URL = 'https://github.com/stablyai/orca/issues/'
-const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
-const X_URL = 'https://x.com/orca_build'
+const GITHUB_ISSUES_URL = 'https://github.com/coder-lulu/hive-code-next/issues/'
+const DISCORD_URL = 'https://github.com/coder-lulu/hive-code-next'
+const X_URL = 'https://github.com/coder-lulu/hive-code-next'
 
 type SubmitIdentity = {
   githubLogin: string | null

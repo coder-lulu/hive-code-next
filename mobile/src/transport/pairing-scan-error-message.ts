@@ -7,8 +7,7 @@ function isOrcaInstallUrl(data: string): boolean {
     switch (url.origin) {
       case 'https://apps.apple.com':
         return /^\/(?:[a-z]{2}\/)?app\/(?:[^/]+\/)?id6766130217$/.test(path)
-      case 'https://www.onorca.dev':
-      case 'https://onorca.dev':
+      case 'https://github.com/coder-lulu/hive-code-next':
         return path === '/download/android'
       // Older desktops offered TestFlight and versioned APK downloads.
       case 'https://testflight.apple.com':

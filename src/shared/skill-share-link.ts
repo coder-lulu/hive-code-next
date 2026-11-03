@@ -1,7 +1,7 @@
 import { PRIMARY_SCHEME, SCHEME_COMPATIBILITY_ALIASES } from './brand'
 
 const SHARE_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
-const LEGACY_PRODUCTION_HOSTS = new Set(['app.orca.dev', 'share.onorca.dev'])
+const LEGACY_PRODUCTION_HOSTS = new Set(['app.hivecode.dev', 'share.hivecode.dev'])
 const SUPPORTED_PROTOCOLS = new Set([
   `${PRIMARY_SCHEME}:`,
   ...SCHEME_COMPATIBILITY_ALIASES.map((scheme) => `${scheme}:`)

@@ -82,7 +82,7 @@ export default function AboutScreen({
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           accessibilityRole="button"
           accessibilityLabel={t('settings.aboutScreen.sourceCode', 'HiveCode source code')}
-          onPress={() => openLink('https://github.com/stablyai/orca')}
+          onPress={() => openLink('https://github.com/coder-lulu/hive-code-next')}
         >
           <GithubIcon />
           <Text style={styles.rowValue}>stablyai/orca</Text>
@@ -92,7 +92,7 @@ export default function AboutScreen({
           style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
           accessibilityRole="button"
           accessibilityLabel={t('settings.aboutScreen.socialProfile', 'HiveCode on X')}
-          onPress={() => openLink('https://x.com/orca_build')}
+          onPress={() => openLink('https://github.com/coder-lulu/hive-code-next')}
         >
           <XIcon />
           <Text style={styles.rowValue}>@orca_build</Text>

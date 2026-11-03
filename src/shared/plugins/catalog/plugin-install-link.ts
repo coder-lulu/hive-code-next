@@ -12,7 +12,7 @@ const PLUGIN_INSTALL_LINK_PREFIX = 'orca://plugins'
 
 export const COMMUNITY_MARKETPLACE_GIT_SOURCE: PluginMarketplaceGitSource = {
   kind: 'git',
-  url: 'https://github.com/stablyai/orca-community-plugins.git',
+  url: 'https://github.com/coder-lulu/hive-code-next',
   ref: 'main'
 }
 

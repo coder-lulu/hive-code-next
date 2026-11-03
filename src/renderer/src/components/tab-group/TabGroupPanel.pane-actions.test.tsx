@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => {
   }
   const useAppStore = (selector: (current: typeof state) => unknown): unknown => selector(state)
   useAppStore.getState = () => state
-  return { useAppStore }
+  return { state, useAppStore }
 })
 vi.mock('@/store', () => ({ useAppStore: mocks.useAppStore }))
 vi.mock('../../store', () => ({ useAppStore: mocks.useAppStore }))
@@ -39,7 +39,7 @@ vi.mock('./useTabGroupWorkspaceModel', () => ({
 import { TooltipProvider } from '@/components/ui/tooltip'
 import TabGroupPanel from './TabGroupPanel'
 
-function panel(isFocused: boolean): React.JSX.Element {
+function panel(isFocused: boolean, reserveCollapsedSidebarHeaderSpace = false): React.JSX.Element {
   return (
     <TooltipProvider>
       <TabGroupPanel
@@ -51,7 +51,7 @@ function panel(isFocused: boolean): React.JSX.Element {
         touchesLeftEdge={false}
         touchesRightEdge={false}
         reserveClosedExplorerToggleSpace={false}
-        reserveCollapsedSidebarHeaderSpace={false}
+        reserveCollapsedSidebarHeaderSpace={reserveCollapsedSidebarHeaderSpace}
       />
     </TooltipProvider>
   )
@@ -60,6 +60,10 @@ function panel(isFocused: boolean): React.JSX.Element {
 afterEach(cleanup)
 
 describe('TabGroupPanel Pane Actions menu', () => {
+  afterEach(() => {
+    mocks.state.sidebarOpen = true
+  })
+
   it('closes without restoring focus to the old group', async () => {
     const view = render(panel(true))
     const trigger = view.getByRole('button', { name: 'Pane Actions' })
@@ -82,5 +86,18 @@ describe('TabGroupPanel Pane Actions menu', () => {
 
     view.rerender(panel(true))
     expect(view.queryByRole('menuitem', { name: 'Close split pane' })).toBeNull()
+  })
+
+  it('keeps the collapsed-sidebar hit area in the tab layout', () => {
+    mocks.state.sidebarOpen = false
+    const view = render(panel(true, true))
+    const strip = view.container.querySelector<HTMLElement>('[data-tab-group-strip-id="group-a"]')
+    const hitArea = strip?.querySelector<HTMLElement>(
+      'div[style*="collapsed-sidebar-header-width"]'
+    )
+
+    expect(hitArea).not.toBeNull()
+    expect(hitArea?.className).toContain('shrink-0')
+    expect(hitArea?.style.width).toBe('var(--collapsed-sidebar-header-width)')
   })
 })

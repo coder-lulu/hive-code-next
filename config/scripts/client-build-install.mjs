@@ -78,10 +78,34 @@ export function canReuseInstalledDependencies(context, name, directory) {
       return false
     }
     const pkg = readJson(join(cwd, 'package.json'))
+    const semver = (() => {
+      try {
+        return require('semver')
+      } catch {
+        return null
+      }
+    })()
     for (const kind of ['dependencies', 'devDependencies', 'optionalDependencies']) {
       for (const [dependency, specifier] of Object.entries(pkg[kind] || {})) {
-        if (source.importers['.'][kind]?.[dependency]?.specifier !== specifier) {
-          return false
+        const locked = source.importers['.'][kind]?.[dependency]
+        if (locked?.specifier !== specifier) {
+          // pnpm records an override's effective specifier in the lockfile. For
+          // example, the mobile workspace pins markdown-it to 14.3.3 while
+          // the manifest keeps its compatible ^14.3.2 range. Frozen install
+          // already validates that relationship; accept it here when the
+          // locked concrete version satisfies the declared range so a valid
+          // prepared graph can be reused by an offline build.
+          const lockedVersion =
+            typeof locked?.version === 'string' ? locked.version.split('(')[0] : undefined
+          if (
+            !semver ||
+            !lockedVersion ||
+            !semver.valid(lockedVersion) ||
+            !semver.validRange(String(specifier)) ||
+            !semver.satisfies(lockedVersion, String(specifier))
+          ) {
+            return false
+          }
         }
         if (kind !== 'optionalDependencies' && !existsSync(join(cwd, 'node_modules', dependency))) {
           return false

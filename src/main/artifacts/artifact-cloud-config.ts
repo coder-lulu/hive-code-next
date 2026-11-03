@@ -20,9 +20,9 @@ export function resolveArtifactCloudApiUrl(
   const apiUrl = validateArtifactCloudApiUrl(candidate, packaged)
   const url = new URL(apiUrl)
   const loopback = ['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname)
-  const firstParty = url.hostname === 'onorca.dev' || url.hostname.endsWith('.onorca.dev')
+  const firstParty = url.hostname === 'hivecode.dev' || url.hostname.endsWith('.hivecode.dev')
   if (!firstParty && !loopback) {
-    throw new Error('Artifact API URLs must use an onorca.dev or loopback host.')
+    throw new Error('Artifact API URLs must use an hivecode.dev or loopback host.')
   }
   return apiUrl
 }

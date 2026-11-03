@@ -12,8 +12,7 @@ import { isReservedPluginPublisher } from './plugin-publisher-reservation'
 
 const NEXT = PLUGIN_MANIFEST_V2_SINCE
 
-// Why frozen: v1 entries are strict, so shipped clients reject any new field. New catalogs live
-// in orca-catalog.json (plugin-catalog.ts); this file is generated from it for old clients.
+// Why frozen: v1 entries are strict, so shipped clients reject new fields; old clients use this generated catalog.
 export const PLUGIN_MARKETPLACE_FILENAME = 'orca-marketplace.json'
 export const PLUGIN_MARKETPLACE_ENTRY_LIMIT = 2_048
 export const PLUGIN_MARKETPLACE_CATEGORY_LIMIT = 16
@@ -23,9 +22,7 @@ export const OFFICIAL_PLUGIN_ID_PREFIX = 'orca-'
 export const OFFICIAL_MARKETPLACE_OWNER = 'stablyai'
 export const OFFICIAL_MARKETPLACE_REPOSITORY = 'orca-plugins'
 
-// Why: skill contributions are not supported, so a plugin declaring one fails to install.
-// Shared catalogs this build does not control still list such packs; hide them so users never
-// reach a dead install.
+// Why: skill contributions are unsupported; hide shared catalog packs that would reach a dead install.
 export const UNSUPPORTED_MARKETPLACE_CATEGORIES: readonly string[] = ['skills']
 
 export function isMarketplaceListingSupported(categories: readonly string[]): boolean {
@@ -57,8 +54,7 @@ const gitSourceFields = {
         'https://github.com/acme/orca-gleam-syntax.git'
       ])
     ),
-  // Why: marketplace installs must first resolve a named ref to an exact
-  // commit; an omitted remote default would make the listing irreproducible.
+  // Why: marketplace installs resolve a named ref to an exact commit; an omitted ref is irreproducible.
   ref: z
     .string()
     .trim()
@@ -101,8 +97,7 @@ export const catalogV2GitSourceSchema = z
   .object(catalogGitSourceFields)
   .meta({ id: 'CatalogGitSource', description: 'Where the plugin source lives.' })
 
-// Why regex then refine: the regex is the published `pattern`; the refine adds length and
-// reserved-name rules without reporting a bad key twice.
+// Why regex then refine: the published pattern plus refinement adds length and reserved-name rules once.
 const QUALIFIED_PLUGIN_KEY_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*\.[a-z0-9]+(?:-[a-z0-9]+)*$/
 
 export const marketplaceEntryFields = {
@@ -225,7 +220,7 @@ export type PluginCatalogGitSource = z.infer<typeof catalogV2GitSourceSchema>
 
 export const OFFICIAL_MARKETPLACE_GIT_SOURCE: PluginMarketplaceGitSource = {
   kind: 'git',
-  url: 'https://github.com/stablyai/orca-plugins.git',
+  url: 'https://github.com/coder-lulu/hive-code-next',
   ref: 'main'
 }
 
@@ -268,8 +263,7 @@ type GitRepositoryIdentity = {
 // Why only these: a self-hosted server may serve `team/Plugin` and `team/plugin` as two repositories.
 const CASE_INSENSITIVE_GIT_HOSTS = new Set(['github.com', 'gitlab.com', 'bitbucket.org'])
 
-/** Extracts the host and first owner segment from the HTTPS/SSH Git forms the
- * installer accepts. It is intentionally only a provenance parser. */
+/** Extracts host and owner segments from the HTTPS/SSH Git forms accepted by the installer. */
 export function parseGitRepositoryIdentity(url: string): GitRepositoryIdentity | null {
   const trimmed = url.trim()
   const scp = /^[^\s@/:]+@([^\s:]+):(.+)$/.exec(trimmed)
@@ -332,36 +326,9 @@ export function isSamePluginSource(
   return isSameGitRepository(left.url, right.url) && (left.path ?? '') === (right.path ?? '')
 }
 
-/** Display form of a plugin location, naming the directory when it is not the repository root. */
-export function pluginSourceLabel(source: { url: string; path?: string }): string {
-  return source.path ? `${source.url} (${source.path})` : source.url
-}
-
-export function isOfficialOrganizationGitSource(url: string): boolean {
-  const source = parseGitRepositoryIdentity(url)
-  return source?.host === 'github.com' && source.owner.toLowerCase() === OFFICIAL_PLUGIN_PUBLISHER
-}
-
-export function isOfficialMarketplaceGitSource(url: string): boolean {
-  const source = parseGitRepositoryIdentity(url)
-  return (
-    source?.host === 'github.com' &&
-    source.owner.toLowerCase() === OFFICIAL_MARKETPLACE_OWNER &&
-    source.repository.toLowerCase() === OFFICIAL_MARKETPLACE_REPOSITORY
-  )
-}
-
-export function isConfiguredMarketplaceGitSource(
-  url: string,
-  configuredUrl: string | null
-): boolean {
-  if (!configuredUrl) return false
-  const source = parseGitRepositoryIdentity(url)
-  const configured = parseGitRepositoryIdentity(configuredUrl)
-  return (
-    source !== null &&
-    configured !== null &&
-    source.host === configured.host &&
-    source.path === configured.path
-  )
-}
+export {
+  isConfiguredMarketplaceGitSource,
+  isOfficialMarketplaceGitSource,
+  isOfficialOrganizationGitSource,
+  pluginSourceLabel
+} from './plugin-marketplace-source-policy'

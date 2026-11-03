@@ -23,7 +23,7 @@ const TUI_AGENT_CONFIG_SOURCE: Record<TuiAgent, TuiAgentConfigSource> = {
     detectCmd: 'claude',
     promptInjectionMode: 'argv',
     pasteNeedsTypedRequest: true,
-    // Native --prefill avoids paste-after-ready races (https://github.com/stablyai/orca/pull/926).
+    // Native --prefill avoids paste-after-ready races (https://github.com/coder-lulu/hive-code-next/pull/926).
     draftPromptFlag: '--prefill',
     preflightTrust: 'claude',
     // Why: CLAUDE_CODE_DISABLE_TERMINAL_TITLE drops the `✳` title tui-idle waits on (#22655).

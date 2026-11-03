@@ -276,7 +276,7 @@ export default function TabGroupPanel({
           data-worktree-id={worktreeId}
         >
           <div className="flex h-full items-stretch pr-1.5">
-            {/* Why: Electron drag hit-test respects no-drag only on DOM descendants, not z-index siblings, so this no-drag spacer keeps the collapsed left-sidebar's floating toggle clickable. */}
+            {/* Electron needs a same-tree no-drag region beneath the floating header controls. Keep this in flow so the first tab remains clickable. */}
             {reserveCollapsedSidebarHeaderSpace && !sidebarOpen ? (
               <div
                 className="shrink-0"

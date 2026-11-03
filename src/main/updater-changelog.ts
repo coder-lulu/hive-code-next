@@ -10,7 +10,7 @@ type ChangelogEntry = {
   releaseNotesUrl: string
 }
 
-const CHANGELOG_URL = 'https://onorca.dev/changelog'
+const CHANGELOG_URL = 'https://github.com/coder-lulu/hive-code-next/changelog'
 
 function isValidEntry(entry: ChangelogEntry): boolean {
   return (
@@ -29,9 +29,12 @@ export async function fetchChangelog(
   incomingVersion: string,
   localVersion: string
 ): Promise<ChangelogData | null> {
-  const res = await net.fetch('https://onorca.dev/whats-new/changelog.json', {
-    signal: AbortSignal.timeout(5000)
-  })
+  const res = await net.fetch(
+    'https://github.com/coder-lulu/hive-code-next/whats-new/changelog.json',
+    {
+      signal: AbortSignal.timeout(5000)
+    }
+  )
   if (!res.ok) {
     return null
   }

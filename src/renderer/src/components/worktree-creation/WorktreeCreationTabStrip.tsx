@@ -17,7 +17,7 @@ export default function WorktreeCreationTabStrip({
   return (
     <div className="flex h-[36px] shrink-0 items-stretch border-b border-border bg-card">
       {reserveCollapsedSidebarHeaderSpace ? (
-        // Reserve the real tab strip’s measured collapsed-sidebar width so title/cancel remain unobstructed.
+        // Keep the creation title clear of the floating sidebar controls and preserve their no-drag hit area.
         <div
           className="shrink-0"
           style={

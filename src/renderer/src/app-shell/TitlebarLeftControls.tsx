@@ -29,9 +29,8 @@ export function TitlebarLeftControls({ layout }: { layout: AppChromeLayout }): R
   const historyBackShortcutLabel = useShortcutLabel('worktree.history.back')
   const historyForwardShortcutLabel = useShortcutLabel('worktree.history.forward')
   return (
-    // Measure the whole row for tab-strip spacing. w-max prevents the collapsed w-0 wrapper shrinking Windows text to one glyph.
+    // w-max prevents the collapsed w-0 wrapper shrinking Windows text to one glyph.
     <div
-      ref={layout.titlebarLeftControlsRef}
       className={`flex h-full shrink-0 items-center${
         layout.leftTitlebarChromeLayout.isFloating ? ' w-max' : ' w-full'
       }`}

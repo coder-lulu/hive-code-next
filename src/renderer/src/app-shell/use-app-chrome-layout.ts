@@ -97,23 +97,29 @@ export function useAppChromeLayout() {
     window.dispatchEvent(new CustomEvent(SYNC_FIT_PANES_EVENT))
   }, [sidebarOpen, rightSidebarOpen])
 
-  const titlebarLeftControlsRef = useRef<HTMLDivElement | null>(null)
+  // The tab-strip spacer must match the floating header's painted box, including its seam border.
+  const titlebarLeftHeaderRef = useRef<HTMLDivElement | null>(null)
   const [collapsedSidebarHeaderWidth, setCollapsedSidebarHeaderWidth] = useState(0)
   useLayoutEffect(() => {
-    const controls = titlebarLeftControlsRef.current
-    if (!controls) {
+    if (!leftTitlebarChromeLayout.isFloating) {
+      setCollapsedSidebarHeaderWidth(0)
+      return
+    }
+    const header = titlebarLeftHeaderRef.current
+    if (!header) {
+      setCollapsedSidebarHeaderWidth(0)
       return
     }
 
     const updateWidth = (): void => {
-      setCollapsedSidebarHeaderWidth(controls.getBoundingClientRect().width)
+      setCollapsedSidebarHeaderWidth(header.getBoundingClientRect().width)
     }
 
     updateWidth()
     const observer = new ResizeObserver(() => {
       updateWidth()
     })
-    observer.observe(controls)
+    observer.observe(header)
     return () => observer.disconnect()
   }, [
     isFullScreen,
@@ -145,7 +151,7 @@ export function useAppChromeLayout() {
     stackedSidebarOpen,
     // Retained workbench panes need a separate visibility condition.
     terminalWorkbenchVisible: workspaceChromeActive,
-    titlebarLeftControlsRef,
+    titlebarLeftHeaderRef,
     workspaceChromeActive
   }
 }
