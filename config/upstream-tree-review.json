@@ -3,13 +3,31 @@
   "kind": "frozen-upstream-review",
   "sourceProductSha": "0bdf023229b17cc6968f41fd819103747cbbf24e",
   "baseUpstreamSha": "8e350554480ac5b77d3050a2040541fd334dad7c",
-  "upstreamSha": "0377e8bd41ddeab0f44809d5177ebe4c57df6a40",
-  "documentation": {
+  "upstreamSha": "b89cfbd09d6bb99e637a6f4f5bfcad5a4fcf3a12",
+  {
     "privateRepository": "coder-lulu/hive-code-docs",
-    "privateCommitSha": "a2ac8843c3e751958be3e84c096c59cf82005a5d",
-    "receiptBlobSha": "4481b53f2135b89d59e27d277fd9e9ddcc8b1f5d",
+    "privateCommitSha": "ea4511d796b44485acd56095d1ff25df90e1ac26",
+    "receiptBlobSha": "1a4057d43bf893ce8d0e9968c53ded64f2bc6181",
     "authentication": "authenticated-private-github-repository",
     "documentationShas": [
+      "36f17a04a7886725dabaee55df27f5752d8b4552",
+      "cb031c45173bbfd65ee0dd5eecf0906cf942dccb",
+      "5846caf2ba7a629625654f5b74e6e855ee4973c2",
+      "c8112e643faf96fbde8ebe6889d08eaaa3f3cba0",
+      "999160b3db73e18dc11d63ddc83329912a6e2baf",
+      "2fb3a0975ede2dfdd215b2a4068a1bc71d0109c0",
+      "544577fe02ce5f8b5a05e950d087b88a4ee82e05",
+      "06b8f7dc378daf483cbb620c165436a65ae0303f",
+      "f908d2f40abd8b51a4587095bf5006b9f47e1387",
+      "fa7c3f95fe178306f7fe3a70ddfc360674a6d2a0",
+      "7989c05ad38b71340e45d1bb9c80258717265cb7",
+      "60d262ebee9a2aaf568832bb615b399aeff053b8",
+      "ac8c1125f05698131e34571f16795198e4ff9db8",
+      "a9b1041ecc8ff44d58178da8a2f11eb08c7eac87",
+      "fbe891ce8b50bd810f9e1b1bfb2b273af846a676",
+      "4a0ee07bd2436f64ecbe075dff845cd14a702af4",
+      "51f302167e7c481b308923705065ecdec6a6c6ca",
+      "54b496cef10454787663edf47e8a13d4f68577a4",
       "29479ddd3e6f7b01d6658689ef14bbb26fe724e1",
       "923be3509011ab177dfdc7be98de98be233d16e0",
       "ac99f1cb3925be868433b84ab651e0bec3011236",
@@ -231,29 +249,29 @@
       {
         "path": "docs/reference/plugin-authoring.md",
         "privatePath": "reference/plugin-authoring.md",
-        "upstreamBlobSha": "96e6ca63ed6743c995f6df8cc646dab440a3b2fe",
-        "privateBlobSha": "85c0821446ee875baea551369e0b1a2ac33508eb",
+        "upstreamBlobSha": "dea06aa405e0a2390f69b81dd3d788c0e0dd8906",
+        "privateBlobSha": "860b975d37afa4f4a55dcedd069d6683bcf1d77f",
         "reason": "Apply the reviewed upstream documentation update in the private mirror while preserving HiveCode compatibility, branding, and private documentation ownership."
       },
       {
         "path": "docs/reference/plugin-catalog.md",
         "privatePath": "reference/plugin-catalog.md",
-        "upstreamBlobSha": "40b15e7d2e17155c27e67ca38f5a7728f9fb94ad",
-        "privateBlobSha": "c9b9db62922c899ef3e635233d2ab4b612241b21",
+        "upstreamBlobSha": "2cae274eaf2dc13a551ca45fd44aa1b44fc8caf6",
+        "privateBlobSha": "53222d67f6d6d684a00ff8de49c6a7899c19fcd6",
         "reason": "Apply the reviewed upstream documentation update in the private mirror while preserving HiveCode compatibility, branding, and private documentation ownership."
       },
       {
         "path": "docs/reference/plugin-host-api.md",
         "privatePath": "reference/plugin-host-api.md",
-        "upstreamBlobSha": "971177136291600777856f3c60de0c3c5c0c772f",
-        "privateBlobSha": "1c3429eca2178c1e58819629a463fe3ee76d621f",
+        "upstreamBlobSha": "9353629e25706781177314670c5592f89eaaf2ab",
+        "privateBlobSha": "16a678ada36ce22e42ba6be1a8d060dc3e06914e",
         "reason": "Apply the reviewed upstream documentation update in the private mirror while preserving HiveCode compatibility, branding, and private documentation ownership."
       },
       {
         "path": "docs/reference/plugin-manifest.md",
         "privatePath": "reference/plugin-manifest.md",
-        "upstreamBlobSha": "5a9dbf9da675be965ea7ca81d1271c22fc73614b",
-        "privateBlobSha": "41d3f3e5ed4cd88f4c2cf2cd7ebe09c306cfd5a3",
+        "upstreamBlobSha": "eb54356f7e660ebcd89a765325b836b5ca45d2a4",
+        "privateBlobSha": "1def1b7ce423246927822a59d43a2f11dd18097e",
         "reason": "Apply the reviewed upstream documentation update in the private mirror while preserving HiveCode compatibility, branding, and private documentation ownership."
       },
       {
@@ -273,15 +291,15 @@
       {
         "path": "docs/schemas/plugins/orca-catalog.v2.schema.json",
         "privatePath": "schemas/plugins/orca-catalog.v2.schema.json",
-        "upstreamBlobSha": "558a2f4f7c1a1f01d67ec9b9985b0afac1dd2e1c",
-        "privateBlobSha": "558a2f4f7c1a1f01d67ec9b9985b0afac1dd2e1c",
+        "upstreamBlobSha": "807b4940845c5f046932486597312f7de8409d3b",
+        "privateBlobSha": "807b4940845c5f046932486597312f7de8409d3b",
         "reason": "Apply the reviewed upstream documentation update in the private mirror while preserving HiveCode compatibility, branding, and private documentation ownership."
       },
       {
         "path": "docs/schemas/plugins/orca-plugin.v2.schema.json",
         "privatePath": "schemas/plugins/orca-plugin.v2.schema.json",
-        "upstreamBlobSha": "8326d8407223f4359563adbf6ce0ad6c92c4213b",
-        "privateBlobSha": "8326d8407223f4359563adbf6ce0ad6c92c4213b",
+        "upstreamBlobSha": "371a7b1e9409f91a608ea575d25cbc5afb22e8a8",
+        "privateBlobSha": "371a7b1e9409f91a608ea575d25cbc5afb22e8a8",
         "reason": "Apply the reviewed upstream documentation update in the private mirror while preserving HiveCode compatibility, branding, and private documentation ownership."
       },
       {
@@ -294,8 +312,8 @@
       {
         "path": "docs/site/content/docs/settings.mdx",
         "privatePath": "site/content/docs/settings.mdx",
-        "upstreamBlobSha": "f2f522aba8e97c76025645cd9044b06ee4a875f9",
-        "privateBlobSha": "ebf880ad503d37e39eadbd1abc2bf9167c6cc90e",
+        "upstreamBlobSha": "a6302adfd3bb528ae4fd9e4c3ad26adde7a51b1e",
+        "privateBlobSha": "af414273170ee0195b5057d857cc0087e66af2e8",
         "reason": "Apply the reviewed upstream documentation update in the private mirror while preserving HiveCode compatibility, branding, and private documentation ownership."
       },
       {
@@ -329,8 +347,8 @@
       {
         "path": "docs/reference/plugin-declarative-ui.md",
         "privatePath": "reference/plugin-declarative-ui.md",
-        "upstreamBlobSha": "c9e827b4a81b03cd18a1125322219fb4a53d6c6f",
-        "privateBlobSha": "c9e827b4a81b03cd18a1125322219fb4a53d6c6f",
+        "upstreamBlobSha": "e57696383b748a16ff2c0e1bb8223564b44107bb",
+        "privateBlobSha": "e57696383b748a16ff2c0e1bb8223564b44107bb",
         "reason": "Apply the reviewed upstream documentation update in the private mirror while preserving HiveCode compatibility, branding, and private documentation ownership."
       },
       {
@@ -2933,8 +2951,8 @@
       {
         "path": "docs/site/content/docs/agents/native-chat.mdx",
         "privatePath": "site/content/docs/agents/native-chat.mdx",
-        "upstreamBlobSha": "dfbd68108cc0344380a5ff8b4f632b38d2acc7da",
-        "privateBlobSha": "e4aa542491964f8fc0b7a76f556c009a9a303ff3",
+        "upstreamBlobSha": "287c56e517e37675df78ea89b870549448f0d942",
+        "privateBlobSha": "1b020b0e80db5c41789b8553d2a30640ee30974c",
         "reason": "Preserve HiveCode agent, transcript and remote-continuation guidance; record global/per-agent Chat versus Terminal changes as an unverified upstream adaptation rather than assert merged UI availability."
       },
       {
@@ -2989,8 +3007,8 @@
       {
         "path": "docs/site/content/docs/cli/reference.mdx",
         "privatePath": "site/content/docs/cli/reference.mdx",
-        "upstreamBlobSha": "198814984cc9212588beb020ad2091bc8d5925a1",
-        "privateBlobSha": "965345da1a7391e2e5b099d554e73e47e2b7f76d",
+        "upstreamBlobSha": "d18b4cea146b61e52ce8f95b12a61110888e6b62",
+        "privateBlobSha": "c9cb94511a4ce084329b3f6fc3877aad27888881",
         "reason": "Add scoped upstream snapshot filtering, delta and screenshot-location guidance pending candidate validation; preserve HiveCode CLI and independent skill-installation text and correct the third-party GNOME Orca name."
       },
       {
