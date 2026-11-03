@@ -2,15 +2,9 @@ import { applyRemoteViewerLaunchEnv } from '../remote-viewer-launch-env'
 import type { RuntimeManagedWorktreeCreateArgs } from '../runtime-managed-worktree-create-types'
 import { isTuiAgentEnabled } from '../../../shared/tui-agent-selection'
 import type { TuiAgent } from '../../../shared/tui-agent'
-import type { AgentLaunchPreferences } from '../../../shared/agent-session-host-authority'
-import { isAgentPermissionChoice } from '../../../shared/tui-agent-permission-choice'
-import { agentLaunchQuotingShell } from '../../../shared/agent-launch-runtime'
-import { withAgentSessionAccountEnv } from '../agent-session-account-env'
 import {
   type buildWorktreeStartupForDraft,
-  type WorktreeStartupInputs,
-  resolveWorktreeCreateAgentStartup,
-  worktreeStartupInputs
+  resolveWorktreeCreateAgentStartup
 } from '../runtime-worktree-agent-startup'
 
 type StartupBuilders = {
@@ -18,9 +12,7 @@ type StartupBuilders = {
   draft: (
     draft: string,
     requestedAgent?: TuiAgent,
-    launchSource?: string,
-    launchPreferences?: AgentLaunchPreferences,
-    inputs?: WorktreeStartupInputs
+    launchSource?: string
   ) => ReturnType<typeof buildWorktreeStartupForDraft>
 }
 
@@ -49,43 +41,15 @@ export async function resolveManagedWorktreeCreateStartup(
       ? await build.draft(
           args.startupDraft,
           args.startupDraftAgent ?? requestedAgent,
-          args.startupLaunchSource,
-          args.startupLaunchPreferences,
-          worktreeStartupInputs(args)
+          args.startupLaunchSource
         )
       : null
   const resolvedStartup = args.startup ?? agentStartup?.startup ?? draftStartup?.startup
-  const hostLaunch = agentStartup ?? draftStartup
-  const permissionChoice = args.startupLaunchPreferences?.mode
-  const hostStartup =
-    resolvedStartup && !args.startup
-      ? {
-          ...resolvedStartup,
-          ...(args.startupLaunchToken ? { launchToken: args.startupLaunchToken } : {}),
-          ...(args.startupAccountEnv
-            ? {
-                env: withAgentSessionAccountEnv(
-                  resolvedStartup.env,
-                  args.startupAccountEnv,
-                  hostLaunch &&
-                    !(hostLaunch.launchRuntime instanceof Error) &&
-                    isAgentPermissionChoice(permissionChoice)
-                    ? {
-                        agent: hostLaunch.agent,
-                        choice: permissionChoice,
-                        shell: agentLaunchQuotingShell(hostLaunch.launchRuntime)
-                      }
-                    : undefined
-                )
-              }
-            : {})
-        }
-      : resolvedStartup
-  const effectiveStartup = hostStartup
+  const effectiveStartup = resolvedStartup
     ? applyRemoteViewerLaunchEnv(
-        hostStartup,
+        resolvedStartup,
         args.terminalImageViewerSupported,
-        hostStartup.launchAgent ??
+        resolvedStartup.launchAgent ??
           args.startupAgent ??
           args.createdWithAgent ??
           agentStartup?.agent ??

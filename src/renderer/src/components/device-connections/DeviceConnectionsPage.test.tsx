@@ -18,7 +18,6 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import DeviceConnectionsPage from './DeviceConnectionsPage'
 import { DeviceConnectionsPane } from '../settings/DeviceConnectionsPane'
 import type { GlobalSettings } from '../../../../shared/global-settings-types'
-import type { AppState } from '@/store/types'
 
 const mocks = vi.hoisted(() => ({
   state: {} as {
@@ -36,10 +35,6 @@ const mocks = vi.hoisted(() => ({
     openSettingsTarget: ReturnType<typeof vi.fn>
     refreshAccountRuntimeCloud: ReturnType<typeof vi.fn>
     claimLocalRuntimeForAccount: ReturnType<typeof vi.fn>
-    remoteServerUpdates: AppState['remoteServerUpdates']
-    remoteServerUpdatesChecking: boolean
-    remoteServerUpdatesRunning: boolean
-    setRemoteServerUpdateDialogOpen: ReturnType<typeof vi.fn>
   },
   getState: vi.fn(),
   getPairingQR: vi.fn(),
@@ -116,11 +111,7 @@ beforeEach(() => {
     openSettingsPage: vi.fn(),
     openSettingsTarget: vi.fn(),
     refreshAccountRuntimeCloud: vi.fn().mockResolvedValue(undefined),
-    claimLocalRuntimeForAccount: vi.fn(),
-    remoteServerUpdates: new Map(),
-    remoteServerUpdatesChecking: false,
-    remoteServerUpdatesRunning: false,
-    setRemoteServerUpdateDialogOpen: vi.fn()
+    claimLocalRuntimeForAccount: vi.fn()
   }
   mocks.getState.mockResolvedValue(signedOut)
   mocks.refresh.mockResolvedValue({ status: 'refreshed', state: signedOut })
@@ -161,8 +152,7 @@ beforeEach(() => {
         getWindowsFirewallStatus: vi.fn().mockResolvedValue({ supported: false })
       },
       ui: { writeClipboardText: vi.fn().mockResolvedValue(undefined) },
-      shell: { openUrl: vi.fn() },
-      runtimeEnvironments: {}
+      shell: { openUrl: vi.fn() }
     }
   })
 })
@@ -221,7 +211,7 @@ describe('Devices & connections', () => {
       'aria-selected',
       'true'
     )
-    await screen.findByRole('heading', { name: 'HiveCloud access sessions' })
+    await screen.findByText('Shared Server Access')
     expect(mocks.state.openDeviceConnectionsPage).not.toHaveBeenCalled()
     rerender(
       <DeviceConnectionsPane

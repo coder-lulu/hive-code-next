@@ -7,7 +7,6 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { encodePairingOffer } from './pairing'
-import { pairedRuntimeConnectionFromOffer } from './paired-runtime-connection'
 import {
   addEnvironmentFromPairingCode,
   getEnvironmentStorePath,
@@ -64,10 +63,10 @@ describe('runtime environment sidecar across a downgrade', () => {
       expectedEnvironment: prepared,
       requestId: 'link-request',
       verifiedRuntimeId: 'host-runtime',
-      verifiedConnection: pairedRuntimeConnectionFromOffer({
+      verifiedConnection: {
         ...pairing,
         endpoint: 'ws://127.0.0.1:41000/runtime'
-      }),
+      },
       tunnel,
       now: 90
     })

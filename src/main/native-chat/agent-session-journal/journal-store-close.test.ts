@@ -134,7 +134,9 @@ describe('closed-state admission happens at enqueue', () => {
       settle(
         journal.queuedMessages.insert({
           messageId: 'closed-draft',
-          body: { kind: 'message', role: 'user', blocks: [] }
+          body: { kind: 'message', role: 'user', blocks: [] },
+          fingerprint: 'closed-draft-fp',
+          hostInstance: 'host-1'
         })
       )
     ]

@@ -13,6 +13,7 @@ describe('Agent Dashboard daily visible use', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-10-22T12:00:00Z'))
     state = setupTelemetryClientTest()
+    state.settings.experimentalAgentDashboardPopout = true
   })
 
   afterEach(() => {
@@ -67,13 +68,15 @@ describe('Agent Dashboard daily visible use', () => {
     expect(track('app_opened', {})).toBe(true)
   })
 
-  it.each(['opt_out', 'pending_banner', 'do_not_track', 'orca_disabled', 'ci'])(
+  it.each(['opt_out', 'pending_banner', 'do_not_track', 'orca_disabled', 'ci', 'dashboard_off'])(
     'does not send or consume the daily allowance while blocked by %s',
     (block) => {
       if (block === 'opt_out') {
         state.settings.telemetry!.optedIn = false
       } else if (block === 'pending_banner') {
         state.settings.telemetry!.optedIn = null
+      } else if (block === 'dashboard_off') {
+        state.settings.experimentalAgentDashboardPopout = false
       } else if (block === 'do_not_track') {
         process.env.DO_NOT_TRACK = '1'
       } else if (block === 'orca_disabled') {
@@ -87,6 +90,7 @@ describe('Agent Dashboard daily visible use', () => {
       expect(state.store.updateSettings).not.toHaveBeenCalled()
 
       state.settings.telemetry!.optedIn = true
+      state.settings.experimentalAgentDashboardPopout = true
       delete process.env.DO_NOT_TRACK
       delete process.env.ORCA_TELEMETRY_DISABLED
       delete process.env.CI

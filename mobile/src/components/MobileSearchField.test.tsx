@@ -1,4 +1,3 @@
-import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -53,13 +52,13 @@ describe('MobileSearchField', () => {
       )
     })
 
-    const shell = findAllByHostType(renderer!.root, 'View')[0]!
+    const shell = renderer!.root.findAllByType('View')[0]!
     expect(resolvedStyle(shell)).toMatchObject({
       minHeight: 44,
       backgroundColor: mobileThemes[scheme].color.bg.surface,
       borderColor: mobileThemes[scheme].color.border.default
     })
-    expect(findByHostType(renderer!.root, 'TextInput').props).toMatchObject({
+    expect(renderer!.root.findByType('TextInput').props).toMatchObject({
       placeholderTextColor: mobileThemes[scheme].color.text.tertiary,
       selectionColor: mobileThemes[scheme].color.brand.primary
     })
@@ -76,8 +75,8 @@ describe('MobileSearchField', () => {
       )
     })
 
-    act(() => findByHostType(renderer!.root, 'TextInput').props.onFocus())
-    expect(resolvedStyle(findAllByHostType(renderer!.root, 'View')[0]!)).toMatchObject({
+    act(() => renderer!.root.findByType('TextInput').props.onFocus())
+    expect(resolvedStyle(renderer!.root.findAllByType('View')[0]!)).toMatchObject({
       borderColor: mobileThemes.light.color.brand.primary
     })
   })

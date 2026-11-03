@@ -32,17 +32,8 @@ const worktree = makeWorktree({
 })
 const forget = vi.fn(async () => ({ forgottenWorktreeIds: [worktree.id] }))
 
-function catalog(
-  host: FetchedRepoCatalog['hostId'],
-  repos: Repo[] = [],
-  reposAtRequest: readonly Repo[] = [repo]
-): FetchedRepoCatalog {
-  return {
-    hostId: host,
-    reposAtRequest,
-    repos,
-    projectHostSetupCompatibility: { projects: [], setups: [] }
-  }
+function catalog(host: FetchedRepoCatalog['hostId'], repos: Repo[] = []): FetchedRepoCatalog {
+  return { hostId: host, repos, projectHostSetupCompatibility: { projects: [], setups: [] } }
 }
 
 beforeEach(() => {
@@ -54,8 +45,8 @@ beforeEach(() => {
       worktrees: { forgetRemovedForExecutionHost: forget }
     }
   })
-  vi.mocked(fetchRepoCatalogForTarget).mockImplementation(async (target, reposAtRequest) =>
-    catalog(target.kind === 'local' ? 'local' : hostId, [], reposAtRequest)
+  vi.mocked(fetchRepoCatalogForTarget).mockImplementation(async (target) =>
+    catalog(target.kind === 'local' ? 'local' : hostId)
   )
 })
 
@@ -147,30 +138,6 @@ describe('authoritative repo catalog removal', () => {
     expect(store.getState().worktreesByRepo[repo.id]).toBeUndefined()
   })
 
-  it('preserves registrations and workspace rows added after the catalog request', async () => {
-    const store = createTestStore()
-    store.setState({ repos: [repo], worktreesByRepo: { [repo.id]: [worktree] } })
-    const { promise, resolve } = Promise.withResolvers<FetchedRepoCatalog>()
-    vi.mocked(fetchRepoCatalogForTarget).mockReturnValueOnce(promise)
-    const refresh = store.getState().fetchRuntimeEnvironmentRepos('catalog-removal')
-    const added = { ...repo, id: 'new-registration' }
-    const addedWorktree = { ...worktree, id: 'new-registration::/new', repoId: added.id }
-    store.setState({
-      repos: [repo, added],
-      worktreesByRepo: { [repo.id]: [worktree], [added.id]: [addedWorktree] }
-    })
-    resolve(catalog(hostId))
-    await refresh
-    expect(store.getState().repos).toEqual([added])
-    expect(store.getState().worktreesByRepo[repo.id]).toBeUndefined()
-    expect(store.getState().worktreesByRepo[added.id]).toEqual([addedWorktree])
-    expect(forget).toHaveBeenCalledExactlyOnceWith({
-      repoId: repo.id,
-      executionHostId: hostId,
-      worktreeIds: [worktree.id]
-    })
-  })
-
   it('allows a newly added project to appear after deletion', async () => {
     const store = createTestStore()
     store.setState({ repos: [repo], worktreesByRepo: { [repo.id]: [worktree] } })
@@ -199,7 +166,7 @@ describe('authoritative repo catalog removal', () => {
     await store.getState().fetchRuntimeEnvironmentRepos('catalog-removal')
     expect(store.getState().detectedWorktreesByRepo[repo.id]).toBeUndefined()
     expect(
-      mergeFetchedWorktrees(store.setState, store.getState, {
+      mergeFetchedWorktrees(store.setState, {
         repoId: repo.id,
         hostId,
         ownerWasMissingAtStart: true,

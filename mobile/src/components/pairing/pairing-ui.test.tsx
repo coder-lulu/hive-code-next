@@ -1,7 +1,3 @@
-import {
-  findAllByHostType,
-  findByHostType
-} from '../../test-support/react-test-renderer-host-nodes'
 import { createElement, type ReactNode } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import type { LucideIcon } from 'lucide-react-native'
@@ -67,17 +63,14 @@ describe('pairing UI', () => {
         onPress: () => {}
       })
     )
-    const button = findByHostType(renderer.root, 'Pressable')
+    const button = renderer.root.findByType('Pressable')
     expect(resolvedStyle(button)).toMatchObject({
       minHeight: 48,
       borderRadius: 8,
       backgroundColor: '#17191D'
     })
     expect(button.props.accessibilityState).toEqual({ busy: false, disabled: false })
-    expect(findByHostType(renderer.root, 'TestIcon').props).toMatchObject({
-      size: 20,
-      strokeWidth: 2
-    })
+    expect(renderer.root.findByType('TestIcon').props).toMatchObject({ size: 20, strokeWidth: 2 })
   })
 
   it('keeps manual pairing disabled until a non-empty code is entered', () => {
@@ -85,16 +78,16 @@ describe('pairing UI', () => {
     renderer = renderWithTheme(
       createElement(PairingCodeSheet, { onCancel: () => {}, onSubmit, visible: true })
     )
-    const input = findByHostType(renderer.root, 'TextInput')
-    const submitLabel = findAllByHostType(renderer.root, 'Text').find((node) =>
-      node.children.includes('验证并连接')
-    )!
+    const input = renderer.root.findByType('TextInput')
+    const submitLabel = renderer.root
+      .findAllByType('Text')
+      .find((node) => node.children.includes('验证并连接'))!
     expect(submitLabel.parent!.props.disabled).toBe(true)
 
     act(() => input.props.onChangeText('  hivecode://pair?code=abc  '))
-    const updatedSubmitLabel = findAllByHostType(renderer.root, 'Text').find((node) =>
-      node.children.includes('验证并连接')
-    )!
+    const updatedSubmitLabel = renderer.root
+      .findAllByType('Text')
+      .find((node) => node.children.includes('验证并连接'))!
     expect(updatedSubmitLabel.parent!.props.disabled).toBe(false)
     act(() => updatedSubmitLabel.parent!.props.onPress())
     expect(onSubmit).toHaveBeenCalledWith('hivecode://pair?code=abc')
@@ -113,11 +106,11 @@ describe('pairing UI', () => {
         createElement(PairingSecurityNotice)
       )
     )
-    const text = findAllByHostType(renderer.root, 'Text').flatMap((node) => node.children)
+    const text = renderer.root.findAllByType('Text').flatMap((node) => node.children)
     expect(text).toContain('设备授权失败')
     expect(text).toContain('配对凭据保存在本机，通信使用端到端加密')
-    expect(findByHostType(renderer.root, 'TestIcon').props.color).toBe('#E5484D')
-    expect(findByHostType(renderer.root, 'LockKeyhole')).toBeTruthy()
+    expect(renderer.root.findByType('TestIcon').props.color).toBe('#E5484D')
+    expect(renderer.root.findByType('LockKeyhole')).toBeTruthy()
   })
 })
 

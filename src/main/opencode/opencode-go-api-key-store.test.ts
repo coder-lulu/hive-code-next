@@ -29,6 +29,7 @@ vi.mock('node:fs', async (importOriginal) => {
 beforeEach(() =>
   setSecretStore({
     isEncryptionAvailable: () => true,
+    getSelectedStorageBackend: () => 'gnome_libsecret',
     encryptString: (key: string) => Buffer.from(`encrypted:${key}`),
     decryptString: (bytes: Buffer) => bytes.toString().slice('encrypted:'.length),
     describeProtectionGap: () => null

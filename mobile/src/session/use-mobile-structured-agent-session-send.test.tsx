@@ -1,4 +1,3 @@
-import { findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import {
   updateMobileNativeChatDraftInputs,
   resetMobileNativeChatDraftInputsForTests
@@ -6,8 +5,8 @@ import {
 import { createElement, useState } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { AgentJournalDispatchState } from '../../../src/shared/agent-session-journal-types'
-import { DISPATCH_REJECTED_CANCELLED } from '../../../src/shared/structured-agent-session-dispatch-rejection'
+import type { AgentJournalDispatchState } from '../../../src/shared/agent-session/journal/agent-session-journal-types'
+import { DISPATCH_REJECTED_CANCELLED } from '../../../src/shared/agent-session/requests/structured-agent-session-dispatch-rejection'
 import type { RpcClient } from '../transport/rpc-client'
 import {
   fieldsOf,
@@ -19,18 +18,18 @@ import { structuredSendResultFixture } from './structured-agent-send-result.test
 import { useMobileStructuredAgentSession } from './use-mobile-structured-agent-session'
 import { useMobileStructuredNativeChatSendBridge } from './use-mobile-structured-native-chat-send-bridge'
 import { useMobileNativeChatDrafts } from './native-chat/composer/use-mobile-native-chat-drafts'
-import type { AgentSessionSlashCommand } from '../../../src/shared/agent-session-wire'
+import type { AgentSessionSlashCommand } from '../../../src/shared/agent-session/agent-session-wire'
 import {
   AGENT_SESSION_SEND_OPTIONS_RUNTIME_CAPABILITY,
   AGENT_SESSION_SEND_SKILLS_RUNTIME_CAPABILITY
-} from '../../../src/shared/agent-session-create-capabilities'
+} from '../../../src/shared/agent-session/agent-session-create-capabilities'
 import {
   structuredAgentSessionHostSupport,
   type StructuredAgentSessionHostSupport
 } from './mobile-structured-agent-session-host-support'
-import { agentSessionFailureWords } from '../../../src/shared/agent-session-failure-words'
-import { mobileNativeChatUnsentNotices } from './mobile-native-chat-unsent-notices'
-import { agentJournalSubmissionKey } from '../../../src/shared/agent-session-journal-item-key'
+import { agentSessionFailureWords } from '../../../src/shared/agent-session/failures/agent-session-failure-words'
+import { mobileNativeChatUnsentNotices } from './native-chat/mobile-native-chat-unsent-notices'
+import { agentJournalSubmissionKey } from '../../../src/shared/agent-session/journal/agent-session-journal-item-key'
 import {
   useMobileNativeChatSendError,
   type MobileNativeChatSendErrorDetails
@@ -75,7 +74,9 @@ describe('mobile structured send actions', () => {
   const onSendError = vi.fn()
   const sendRequest = vi.fn<RpcClient['sendRequest']>()
   const subscribe = vi.fn<RpcClient['subscribe']>((_method, _params, onData) => {
-    listener = onData
+    if (_method === 'agentSession.subscribe') {
+      listener = onData
+    }
     return vi.fn()
   })
   const client: RpcClient = {
@@ -112,6 +113,7 @@ describe('mobile structured send actions', () => {
     banner.bannerMountedRef.current = true
     hook = useMobileStructuredAgentSession({
       client,
+      pairedHostClient: client,
       sessionId: 'session-1',
       sourceIdentity: 'host-a\0workspace-a',
       composerScopeKey: 'ordinary-draft',
@@ -412,7 +414,7 @@ describe('mobile structured send actions', () => {
     expect(messages[0]?.unsent).toBeUndefined()
     expect(hook!.isWorking).toBe(false)
     expect(mobileNativeChatUnsentNotices(event.page, agent).size).toBe(0)
-    expect(findByHostType(renderer!.root, 'span').children).toEqual([])
+    expect(renderer!.root.findByType('span').children).toEqual([])
     await act(async () => {
       expect(await hook!.sendWithOutcome('same text')).toBe('accepted')
     })
@@ -513,7 +515,7 @@ describe('mobile structured send actions', () => {
         act(() => listener?.(event))
       }
       expect(onSendError).not.toHaveBeenCalled()
-      expect(findByHostType(renderer!.root, 'span').children).toEqual([])
+      expect(renderer!.root.findByType('span').children).toEqual([])
       expect(hook!.session.messages.find((message) => message.id === sentRow)).toMatchObject({
         unsent: true
       })

@@ -1,4 +1,3 @@
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useMemo } from 'react'
 import { ArrowLeft, Menu, RefreshCw } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
@@ -21,8 +20,6 @@ export function MobileHomeToolbar({
   onRefresh,
   refreshing = false
 }: MobileHomeToolbarProps) {
-  const t = useMobileTranslation()
-
   const { width } = useWindowDimensions()
   const compact = width < theme.size.compactLayoutBreakpoint
   const styles = useMemo(() => createStyles(theme, compact), [compact, theme])
@@ -31,11 +28,7 @@ export function MobileHomeToolbar({
       <View style={styles.sideSlot}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={
-            onBack
-              ? t('common.back', 'Back')
-              : t('auto.mobile.src.home.MobileHomeToolbar.c1a022a94e', 'Open navigation menu')
-          }
+          accessibilityLabel={onBack ? '返回' : '打开导航菜单'}
           onPress={onBack ?? onOpenMenu}
           style={({ pressed }) => [styles.menuButton, pressed && styles.pressed]}
         >
@@ -65,10 +58,7 @@ export function MobileHomeToolbar({
         {onRefresh ? (
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t(
-              'auto.mobile.src.home.MobileHomeToolbar.fcc31873da',
-              'Refresh devices'
-            )}
+            accessibilityLabel="刷新设备"
             accessibilityState={{ busy: refreshing, disabled: refreshing }}
             disabled={refreshing}
             onPress={onRefresh}
@@ -76,9 +66,7 @@ export function MobileHomeToolbar({
           >
             <RefreshCw size={20} strokeWidth={2} color={theme.color.text.primary} />
             <Text maxFontSizeMultiplier={1.3} style={styles.runtimeLabel}>
-              {refreshing
-                ? t('auto.mobile.src.home.MobileHomeToolbar.d1e832936d', 'Refreshing')
-                : t('common.refresh', 'Refresh')}
+              {refreshing ? '刷新中' : '刷新'}
             </Text>
           </Pressable>
         ) : null}

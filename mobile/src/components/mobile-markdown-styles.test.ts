@@ -1,35 +1,34 @@
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-native', () => ({
-  Platform: { select: (choices: Record<string, unknown>) => choices.default },
-  StyleSheet: { hairlineWidth: 1, create: <T>(styles: T) => styles }
+  StyleSheet: {
+    hairlineWidth: 1,
+    create: <T>(styles: T) => styles
+  }
 }))
 
-import { styles } from './mobile-markdown-styles'
-import { applyMobileColorScheme, paletteForScheme, radii, spacing } from '../theme/mobile-theme'
-
-afterEach(() => applyMobileColorScheme('dark'))
+import { darkTheme, lightTheme } from '../theme/mobile-theme'
+import { createMobileMarkdownStyles } from './mobile-markdown-styles'
 
 describe('MobileMarkdown presentation', () => {
-  it.each(['light', 'dark', 'light'] as const)(
-    'uses readable %s colors on the live stylesheet',
-    (scheme) => {
-      applyMobileColorScheme(scheme)
-      const palette = paletteForScheme(scheme)
-      expect(styles.paragraph.color).toBe(palette.textPrimary)
-      expect(styles.heading.color).toBe(palette.textPrimary)
-      expect(styles.quoteText.color).toBe(palette.textSecondary)
-      expect(styles.link.color).toBe(palette.accentBlue)
-      expect(styles.codeBlock.backgroundColor).toBe(palette.bgRaised)
-      expect(styles.codeText.color).toBe(palette.textPrimary)
-    }
-  )
+  it.each([lightTheme, darkTheme])('uses readable $scheme semantic colors', (theme) => {
+    const styles = createMobileMarkdownStyles(theme)
 
-  it('keeps prose readable and uses shared radii and spacing', () => {
-    expect(styles.paragraph).toMatchObject({ fontSize: 13, lineHeight: 19 })
-    expect(styles.paragraph.lineHeight).toBeGreaterThan(styles.paragraph.fontSize)
-    expect(styles.inlineCode.borderRadius).toBe(radii.row)
-    expect(styles.codeBlock.borderRadius).toBe(radii.input)
-    expect(styles.root.gap).toBe(spacing.md)
+    expect(styles.paragraph.color).toBe(theme.color.text.primary)
+    expect(styles.heading.color).toBe(theme.color.text.primary)
+    expect(styles.quoteText.color).toBe(theme.color.text.secondary)
+    expect(styles.link.color).toBe(theme.color.brand.primary)
+    expect(styles.codeBlock.backgroundColor).toBe(theme.color.bg.subtle)
+    expect(styles.codeText.color).toBe(theme.color.text.primary)
+  })
+
+  it('uses the documented typography, radii, and spacing tokens', () => {
+    const styles = createMobileMarkdownStyles(lightTheme)
+
+    expect(styles.paragraph.fontSize).toBe(lightTheme.typography.meta.fontSize)
+    expect(styles.paragraph.lineHeight).toBe(lightTheme.typography.meta.lineHeight)
+    expect(styles.inlineCode.borderRadius).toBe(lightTheme.radii.small)
+    expect(styles.codeBlock.borderRadius).toBe(lightTheme.radii.control)
+    expect(styles.root.gap).toBe(lightTheme.spacing.space8)
   })
 })

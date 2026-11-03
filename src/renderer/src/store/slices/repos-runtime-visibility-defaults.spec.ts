@@ -1,7 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import {
   MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
-  PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
   RUNTIME_PROTOCOL_VERSION,
   WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
 } from '../../../../shared/protocol-version'
@@ -21,10 +20,7 @@ export function registerReposRuntimeVisibilityDefaultsTests(): void {
                 graphStatus: 'ready',
                 runtimeProtocolVersion: RUNTIME_PROTOCOL_VERSION,
                 minCompatibleRuntimeClientVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
-                capabilities: [
-                  PROJECT_HOST_SETUP_RUNTIME_CAPABILITY,
-                  WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY
-                ]
+                capabilities: [WORKTREE_VISIBILITY_SOURCE_DEFAULTS_RUNTIME_CAPABILITY]
               }
             : method === 'repo.list'
               ? { repos: [] }
@@ -67,16 +63,11 @@ export function registerReposRuntimeVisibilityDefaultsTests(): void {
                   runtimeId: 'runtime-1',
                   graphStatus: 'ready',
                   runtimeProtocolVersion: RUNTIME_PROTOCOL_VERSION,
-                  minCompatibleRuntimeClientVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
-                  capabilities: [PROJECT_HOST_SETUP_RUNTIME_CAPABILITY]
+                  minCompatibleRuntimeClientVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION
                 }
               : method === 'repo.list'
                 ? { repos: [] }
-                : method === 'project.list'
-                  ? { projects: [] }
-                  : method === 'projectHostSetup.list'
-                    ? { setups: [] }
-                    : { settings: {} },
+                : { settings: {} },
           _meta: { runtimeId: 'runtime-1' }
         })
       )
@@ -115,14 +106,9 @@ export function registerReposRuntimeVisibilityDefaultsTests(): void {
                       runtimeId: 'runtime-1',
                       graphStatus: 'ready',
                       runtimeProtocolVersion: RUNTIME_PROTOCOL_VERSION,
-                      minCompatibleRuntimeClientVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION,
-                      capabilities: [PROJECT_HOST_SETUP_RUNTIME_CAPABILITY]
+                      minCompatibleRuntimeClientVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION
                     }
-                  : method === 'project.list'
-                    ? { projects: [] }
-                    : method === 'projectHostSetup.list'
-                      ? { setups: [] }
-                      : { repos: [] },
+                  : { repos: [] },
               _meta: { runtimeId: 'runtime-1' }
             })
       )

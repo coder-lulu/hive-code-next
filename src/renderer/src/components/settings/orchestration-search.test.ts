@@ -18,7 +18,7 @@ describe('Orchestration settings search', () => {
     expect(
       matchesSettingsSearch(
         'nested worker',
-        getOrchestrationPaneSearchEntries({ includeLocalRuntimeSettings: false })
+        getOrchestrationPaneSearchEntries({ includeNestedWorkerDepth: false })
       )
     ).toBe(false)
   })

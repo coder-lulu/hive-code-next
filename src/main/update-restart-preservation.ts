@@ -3,7 +3,7 @@ import {
   type CodexRuntimeAuthSync,
   type ClaudeRuntimeAuthSync
 } from './agent-auth-restart-preservation'
-import type { Store } from './persistence'
+import type { Store } from './persistence/loading-store/store'
 
 // Save agent auth before checkpointing the store on desktop and headless restarts.
 export async function preserveStateBeforeUpdateRestart({

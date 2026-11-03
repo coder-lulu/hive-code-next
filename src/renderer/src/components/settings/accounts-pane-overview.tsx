@@ -69,7 +69,7 @@ function RuntimeScopeControl({ model }: { model: AccountsPaneSectionModel }): Re
           },
           {
             value: 'wsl',
-            label: translate('auto.components.tab.bar.TabBar.d1afac112b', 'WSL'),
+            label: 'WSL',
             disabled: model.wslCapabilitiesLoading || !model.wslAvailable
           }
         ]}
@@ -219,9 +219,7 @@ function CliAccountCard({
     >
       <h4 className="flex items-center gap-3 text-lg font-semibold">
         {isCodex ? <OpenAIIcon size={24} /> : <ClaudeIcon size={24} />}
-        {isCodex
-          ? translate('auto.lib.agent.catalog.760bc6883d', 'Codex')
-          : translate('auto.lib.agent.catalog.0708ed89f1', 'Claude')}
+        {isCodex ? 'Codex' : 'Claude'}
       </h4>
       <div className="mt-5 min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
@@ -311,20 +309,6 @@ export function AccountsPaneOverview({
           </div>
           <RuntimeScopeControl model={model} />
         </div>
-        <p className="text-xs text-muted-foreground">
-          {model.isRemoteAccountScope
-            ? translate(
-                'accounts.remoteScopeAccountsAddHere',
-                'Showing accounts managed by {{value0}}. New accounts sign in there; you finish in this device’s browser.',
-                { value0: model.accountRuntimeSentenceLabel }
-              )
-            : translate(
-                'auto.components.settings.AccountsPane.c0a52abfc5',
-                'Showing accounts for {{value0}}. New accounts are added there.',
-                { value0: model.accountRuntimeSentenceLabel }
-              )}
-        </p>
-        {model.remoteAccountScopeNotice}
         <div className="grid grid-cols-[repeat(auto-fit,minmax(min(22rem,100%),1fr))] gap-3">
           <CliAccountCard
             provider="claude"

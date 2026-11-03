@@ -146,8 +146,7 @@ export function ComputerUsePermissionsView({
         : missingCount === 1
           ? translate(
               'auto.components.settings.computerUseSummary.permissionsRequired_one',
-              '{{value0}} permission required before agents can operate app windows.',
-              { value0: missingCount }
+              '1 permission required before agents can operate app windows.'
             )
           : translate(
               'auto.components.settings.computerUseSummary.permissionsRequired_other',

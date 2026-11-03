@@ -47,7 +47,7 @@ const body = {
 }
 
 afterEach(async () => {
-  await Promise.all(createdPaths.splice(0).map((path) => removeTree(path)))
+  await Promise.all(createdPaths.splice(0).map(removeTree))
 })
 
 describe('artifact create intent store', () => {

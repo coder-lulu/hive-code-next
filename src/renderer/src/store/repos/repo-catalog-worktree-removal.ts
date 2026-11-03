@@ -18,8 +18,7 @@ export type RepoCatalogWorktreeRemoval = {
 export function reconcileRepoCatalogWorktrees(
   state: AppState,
   nextRepos: readonly Repo[],
-  hostId: ExecutionHostId,
-  reposAtRequest: readonly Repo[]
+  hostId: ExecutionHostId
 ): RepoCatalogWorktreeRemoval {
   const present = new Set(
     nextRepos.filter((repo) => getRepoExecutionHostId(repo) === hostId).map((repo) => repo.id)
@@ -36,17 +35,7 @@ export function reconcileRepoCatalogWorktrees(
     if (present.has(repoId)) {
       continue
     }
-    // A registration added after dispatch is outside this catalog's deletion authority.
-    const currentOwners = state.repos.filter((repo) => repo.id === repoId)
-    if (
-      currentOwners.some((repo) => getRepoExecutionHostId(repo) === hostId) &&
-      !reposAtRequest.some((repo) => repo.id === repoId && getRepoExecutionHostId(repo) === hostId)
-    ) {
-      continue
-    }
-    const owners = currentOwners.length
-      ? currentOwners
-      : reposAtRequest.filter((repo) => repo.id === repoId)
+    const owners = state.repos.filter((repo) => repo.id === repoId)
     if (owners.some((repo) => repo.kind === 'folder' && getRepoExecutionHostId(repo) === hostId)) {
       continue
     }

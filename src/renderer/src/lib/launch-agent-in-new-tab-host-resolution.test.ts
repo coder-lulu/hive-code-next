@@ -38,10 +38,8 @@ const store = {
     ['openclaw', { status: 'connected', remotePlatform: 'linux' }],
     ['m4air', { status: 'connected', remotePlatform: 'linux' }]
   ]),
-  sshStateByEnvironment: new Map([
-    ['vm-1', { connectionStates: new Map([['nested', { remotePlatform: 'linux' }]]) }]
-  ]),
-  runtimeStatusByEnvironmentId: new Map([['vm-1', { status: { hostPlatform: 'linux' } }]]),
+  sshStateByEnvironment: new Map(),
+  runtimeStatusByEnvironmentId: new Map(),
   transientClearedAgentStatusConnectionIds: {} as Record<string, true>,
   worktreesByRepo: {} as Record<string, StoreWorktree[]>,
   allWorktrees: vi.fn(() => store.worktreesByRepo['repo-1'] ?? []),
@@ -105,8 +103,7 @@ async function launchOnLinux(): Promise<void> {
     requestId: 'request-1',
     agent: 'claude-agent-teams',
     worktreeId: 'wt-1',
-    launchPlatform: 'linux',
-    requestedSurface: 'terminal'
+    launchPlatform: 'linux'
   })
 }
 
@@ -142,7 +139,7 @@ describe('launchAgentInNewTab execution host resolution', () => {
 
     await launchOnLinux()
 
-    expect(queuedCommand()).toBe('orca-ide claude-teams')
+    expect(queuedCommand()).toBe("orca-ide claude-teams '--dangerously-skip-permissions'")
   })
 
   it('keeps a worktree on one SSH host remote while a rival row names another', async () => {
@@ -154,28 +151,6 @@ describe('launchAgentInNewTab execution host resolution', () => {
 
     await launchOnLinux()
 
-    expect(queuedCommand()).toBe('orca claude-teams')
-  })
-
-  it('keeps a runtime host reaching a nested SSH target on the relay shim name', async () => {
-    store.repos = [
-      { id: 'repo-1', connectionId: 'nested', executionHostId: 'runtime:vm-1', path: '/srv/vm' }
-    ]
-    store.worktreesByRepo = { 'repo-1': [worktreeOn('runtime:vm-1', '/srv/vm/worktree')] }
-
-    await launchOnLinux()
-
-    expect(queuedCommand()).toBe('orca claude-teams')
-  })
-
-  it('uses the headless runtime CLI with no nested SSH target (#33920)', async () => {
-    store.repos = [
-      { id: 'repo-1', connectionId: null, executionHostId: 'runtime:vm-1', path: '/srv/vm' }
-    ]
-    store.worktreesByRepo = { 'repo-1': [worktreeOn('runtime:vm-1', '/srv/vm/worktree')] }
-
-    await launchOnLinux()
-
-    expect(queuedCommand()).toBe('orca claude-teams')
+    expect(queuedCommand()).toBe("orca claude-teams '--dangerously-skip-permissions'")
   })
 })

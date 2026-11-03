@@ -8,7 +8,7 @@ import type {
 import { structuredAgentSessionConversationFence } from './structured-agent-session-provider-child'
 
 type ConversationCloseDeps = Pick<StructuredAgentSessionHostDeps, 'logger'> & {
-  store: Pick<StructuredAgentSessionHostDeps['store'], 'getConversation'>
+  store: Pick<StructuredAgentSessionHostDeps['store'], 'getRecord'>
 }
 
 /** Rejects the queued messages a conversation close left behind; logs and returns false on failure. */

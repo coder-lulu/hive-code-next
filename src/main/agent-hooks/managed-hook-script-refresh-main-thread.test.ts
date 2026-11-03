@@ -37,9 +37,9 @@ vi.mock('node:os', async (importOriginal) => {
 vi.mock('electron', () => ({ app: { getPath: () => '/tmp/orca-user-data' } }))
 
 import { MANAGED_AGENT_HOOK_SCRIPT_REFRESHERS } from './managed-agent-hook-registry'
-import { ClaudeAgentViewService } from '../claude/agent-view-service'
-import { reconcileClaudeAgentViewConfig } from '../claude/agent-view-config'
-import { ensureClaudeAgentViewPluginAsync } from '../claude/agent-view-plugin'
+import { ClaudeAgentViewService } from '../claude/agent-view/agent-view-service'
+import { reconcileClaudeAgentViewConfig } from '../claude/agent-view/agent-view-config'
+import { ensureClaudeAgentViewPluginAsync } from '../claude/agent-view/agent-view-plugin'
 import { listClaudeProfileHomesAsync } from '../claude-accounts/claude-profile-homes'
 
 function syncCallsUnderHome(): string[] {
@@ -120,7 +120,9 @@ describe('managed hook script refresh stays off the main thread', () => {
     expect(syncCallsUnderHome()).toEqual([])
     const refreshed = await readFile(claudeScript, 'utf8')
     expect(refreshed).not.toBe('stale')
-    expect(refreshed).toContain(process.platform === 'win32' ? 'echo {}' : 'printf "{}\\n"')
+    expect(refreshed).toContain(
+      process.platform === 'win32' ? 'echo {}' : 'trap orca_hook_finish EXIT'
+    )
     await expect(readFile(modScript, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
     for (const mod of profileMods) {
       await expect(readFile(mod, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' })
@@ -161,7 +163,11 @@ describe('managed hook script refresh stays off the main thread', () => {
       listProfiles: listClaudeProfileHomesAsync,
       loginEnv: async () => ({ CLAUDE_CONFIG_DIR: config })
     })
-    await Promise.all(Array.from({ length: 100 }, () => service.reconcile({})))
+    await Promise.all(
+      Array.from({ length: 100 }, () =>
+        service.reconcile({ claudeSubagentNavigationEnabled: true })
+      )
+    )
     const root = service.read()?.pluginDir
     expect(root).toBeTruthy()
     expect(await readFile(join(root!, 'hooks', 'register.js'), 'utf8')).toContain('$.ui.view(')
@@ -170,7 +176,9 @@ describe('managed hook script refresh stays off the main thread', () => {
       expect(service.read()?.pluginDir).toBe(root)
     }
     await Promise.all(
-      Array.from({ length: 100 }, () => service.reconcile({ disabledTuiAgents: ['claude'] }))
+      Array.from({ length: 100 }, () =>
+        service.reconcile({ claudeSubagentNavigationEnabled: false })
+      )
     )
     expect(JSON.parse(await readFile(join(config, 'keybindings.json'), 'utf8')).bindings).toEqual(
       []

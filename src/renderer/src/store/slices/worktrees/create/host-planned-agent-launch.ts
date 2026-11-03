@@ -1,8 +1,3 @@
-import {
-  AGENT_SESSION_LAUNCH_PERMISSION_CAPABILITY,
-  AGENT_SESSION_HOST_AUTHORITY_CAPABILITY
-} from '../../../../../../shared/agent-session-host-authority'
-import { captureRuntimeEnvironmentRequestRevision } from '@/runtime/runtime-environment-revision'
 import { isRuntimeCompatBlockError } from '@/runtime/runtime-protocol-compat'
 import { callRuntimeRpc, runtimeEnvironmentSupportsCapability } from '@/runtime/runtime-rpc-client'
 import { RuntimeRpcCallError } from '@/runtime/runtime-rpc-result'
@@ -25,25 +20,6 @@ export async function createWorktreeOnRuntimeHost(
   attempt: WorktreeCreateAttempt,
   clientCreateSettings: ClientWorktreeCreateSettings
 ): Promise<CreatedWorktreeResult> {
-  const expectedEnvironmentPairingRevision = captureRuntimeEnvironmentRequestRevision(environmentId)
-  if (
-    request.startup?.agentPermissionMode ||
-    request.options?.requiresAgentLaunchPermissionCapability
-  ) {
-    const permission = await hostSupportsCapability(
-      environmentId,
-      AGENT_SESSION_LAUNCH_PERMISSION_CAPABILITY
-    )
-    const authority = await hostSupportsCapability(
-      environmentId,
-      AGENT_SESSION_HOST_AUTHORITY_CAPABILITY
-    )
-    if (!permission || !authority) {
-      throw new Error(
-        'This host does not support permission-aware agent launches. Update the host before creating the workspace.'
-      )
-    }
-  }
   const clientAutomationProvenance = request.options?.clientAutomationProvenance
   // Why: only a capable host accepts the field; older ones create the same plain workspace as before.
   const provenanceParams =
@@ -64,7 +40,7 @@ export async function createWorktreeOnRuntimeHost(
         // Why: the host's own store defaults would otherwise override the user's choices.
         ...clientCreateSettings
       },
-      { timeoutMs: 10 * 60_000, expectedEnvironmentPairingRevision }
+      { timeoutMs: 10 * 60_000 }
     )
   const launch = request.options?.hostAgentLaunch
   if (!launch || !(await hostSupportsCapability(environmentId, AGENT_LAUNCH_RUNTIME_CAPABILITY))) {

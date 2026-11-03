@@ -47,10 +47,6 @@ describe('orcad idle-stop record', () => {
     expect(consumeOrcadIdleStopRecord(root)).toBeNull()
   })
 
-  it('reads a start with no record as "not an idle stop"', () => {
-    expect(consumeOrcadIdleStopRecord(root)).toBeNull()
-  })
-
   it('drops a corrupt record instead of trusting it', () => {
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {

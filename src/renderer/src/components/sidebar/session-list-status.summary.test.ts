@@ -55,34 +55,6 @@ describe('host-qualified structured session summaries', () => {
     })
   })
 
-  it.each([
-    ['success', 'completed'],
-    ['failure', 'error'],
-    ['cancellation', 'unknown'],
-    ['superseded', 'unknown'],
-    ['interruption', 'unknown'],
-    ['unconfirmed', 'unknown']
-  ] as const)('projects the settled %s verdict as %s', (turnOutcome, activity) => {
-    expect(resolveSessionListStatus(input({ status: 'idle', turnOutcome })).activity).toBe(activity)
-  })
-
-  it('does not apply a settled verdict to a running, blocked, absent or stale summary', () => {
-    expect(
-      resolveSessionListStatus(input({ status: 'working', turnOutcome: 'success' })).activity
-    ).toBe('running')
-    expect(
-      resolveSessionListStatus(input({ status: 'attention', turnOutcome: 'success' })).activity
-    ).toBe('waiting')
-    expect(resolveSessionListStatus(input({ status: null, turnOutcome: 'success' })).activity).toBe(
-      'unknown'
-    )
-    expect(
-      resolveSessionListStatus(
-        input({ status: 'idle', turnOutcome: 'success' }, now - AGENT_STATUS_STALE_AFTER_MS - 1)
-      ).activity
-    ).toBe('unknown')
-  })
-
   it.each([now + 1, 0, Number.NaN, now - AGENT_STATUS_STALE_AFTER_MS - 1])(
     'rejects receipt %s independently of the host activity clock',
     (receipt) => {

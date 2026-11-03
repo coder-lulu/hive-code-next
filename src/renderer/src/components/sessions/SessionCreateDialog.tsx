@@ -109,7 +109,7 @@ export default function SessionCreateDialog({
         setError(
           translate(
             'components.sessions.create.unknown',
-            'The session has not appeared yet. Check the session list before trying again.'
+            'The session has not appeared yet. Check the session list before starting another.'
           )
         )
       }
@@ -119,8 +119,7 @@ export default function SessionCreateDialog({
       const result = launchAgentInNewTab({
         requestId: newAgentLaunchRequestId(),
         agent: selectedAgent,
-        worktreeId: owner.worktreeId,
-        selectedExecutionHostId: owner.executionHostId,
+        ...owner,
         prompt: prompt.trim() || undefined,
         launchSource: 'session_create'
       })
@@ -129,7 +128,7 @@ export default function SessionCreateDialog({
           translate('components.sessions.create.failed', 'Could not start the session.')
         )
       }
-      tracker.markLaunched(result.surface.kind === 'host-published' ? null : result.surface.tabId)
+      tracker.markLaunched(result.tabId ?? null)
     } catch (cause) {
       tracker.stop()
       setPending(false)
@@ -153,7 +152,7 @@ export default function SessionCreateDialog({
           <DialogDescription>
             {translate(
               'components.sessions.create.description',
-              'Choose a workspace and agent. Your current sessions stay open.'
+              'Start an agent in an existing workspace or a local temporary session.'
             )}
           </DialogDescription>
         </DialogHeader>
@@ -182,7 +181,7 @@ export default function SessionCreateDialog({
               <SelectContent>
                 {allowTemporary && (
                   <SelectItem value="temporary">
-                    {translate('components.sessions.create.temporary', 'Temporary session (local)')}
+                    {translate('components.sessions.create.temporary', 'Local temporary session')}
                   </SelectItem>
                 )}
                 {workspaces.map((w) => (
@@ -196,7 +195,7 @@ export default function SessionCreateDialog({
               <p className="text-sm text-muted-foreground">
                 {translate(
                   'components.sessions.create.noWorkspace',
-                  'No workspace is available. Create a worktree from the + menu first.'
+                  'Create a workspace in this project first.'
                 )}
               </p>
             )}
@@ -214,7 +213,7 @@ export default function SessionCreateDialog({
                 <SelectValue
                   placeholder={translate(
                     'components.sessions.create.chooseAgent',
-                    'Choose an agent'
+                    'Choose an installed agent'
                   )}
                 />
               </SelectTrigger>
@@ -235,7 +234,7 @@ export default function SessionCreateDialog({
                 ) : agents.length === 0 ? (
                   translate(
                     'components.sessions.create.noAgents',
-                    'No available agents on this device.'
+                    'No enabled agents detected on this host.'
                   )
                 ) : null}
                 <Button
@@ -246,7 +245,7 @@ export default function SessionCreateDialog({
                     void detection.refresh().catch((cause) => setError(String(cause)))
                   }}
                 >
-                  {translate('components.sessions.create.refresh', 'Refresh')}
+                  {translate('components.sessions.create.refresh', 'Refresh agents')}
                 </Button>
               </div>
             )}

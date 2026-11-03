@@ -8,7 +8,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { encodePairingOffer } from './pairing'
 import { APP_DISPLAY_NAME } from './brand'
 import {
@@ -38,7 +38,17 @@ function pairingCode(
 
 describe('runtime environment store', () => {
   const tempDirs: string[] = []
+  const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform')
+
+  beforeEach(() => {
+    // Why: this suite tests store timestamps, while secure-file tests cover Windows ACLs.
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' })
+  })
+
   afterEach(() => {
+    if (originalPlatform) {
+      Object.defineProperty(process, 'platform', originalPlatform)
+    }
     for (const dir of tempDirs.splice(0)) {
       rmSync(dir, { recursive: true, force: true })
     }

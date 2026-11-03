@@ -81,14 +81,14 @@ describe("pinning existing hosts' orca CLI control switch on upgrade", () => {
     expect(isRemoteCliControlAllowed(store.getSshTarget('absent'))).toBe(false)
     expect(store.getSshTarget('on')?.allowRemoteCliControl).toBe(true)
     expect(store.getSshTarget('off')?.allowRemoteCliControl).toBe(false)
-    expect(store.getSettings()).not.toHaveProperty('sshRemoteCliControlExistingHostsMigrated')
+    expect(store.getSettings().sshRemoteCliControlExistingHostsMigrated).toBe(true)
 
     store.flush()
     expect(readDataFile()).toMatchObject({
       sshTargets: expect.arrayContaining([
         expect.objectContaining({ id: 'absent', allowRemoteCliControl: false })
       ]),
-      settings: expect.not.objectContaining({ sshRemoteCliControlExistingHostsMigrated: true })
+      settings: expect.objectContaining({ sshRemoteCliControlExistingHostsMigrated: true })
     })
   })
 
@@ -119,11 +119,6 @@ describe("pinning existing hosts' orca CLI control switch on upgrade", () => {
 
     const store = await createStore()
 
-    expect(store.getSshTarget('added-by-older-build')?.allowRemoteCliControl).toBe(true)
-    store.flush()
-    expect((await reopenStore()).getSshTarget('added-by-older-build')?.allowRemoteCliControl).toBe(
-      true
-    )
-    expect(readDataFile()).not.toHaveProperty('settings.sshRemoteCliControlExistingHostsMigrated')
+    expect(store.getSshTarget('added-by-older-build')).not.toHaveProperty('allowRemoteCliControl')
   })
 })

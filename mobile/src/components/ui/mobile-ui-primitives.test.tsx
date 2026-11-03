@@ -1,7 +1,3 @@
-import {
-  findAllByHostType,
-  findByHostType
-} from '../../test-support/react-test-renderer-host-nodes'
 import { createElement, type ReactNode } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -59,14 +55,11 @@ describe('Graphite Precision mobile UI primitives', () => {
         onPress: () => {}
       })
     )
-    const button = findByHostType(renderer.root, 'Pressable')
+    const button = renderer.root.findByType('Pressable')
     expect(button.props.accessibilityLabel).toBe('Open menu')
     expect(button.props.accessibilityState).toEqual({ disabled: false, selected: false })
     expect(resolvedStyle(button)).toMatchObject({ width: 44, height: 44, borderRadius: 8 })
-    expect(findByHostType(renderer.root, 'TestIcon').props).toMatchObject({
-      size: 20,
-      strokeWidth: 2
-    })
+    expect(renderer.root.findByType('TestIcon').props).toMatchObject({ size: 20, strokeWidth: 2 })
   })
 
   it('exposes a disabled loading state for icon buttons', () => {
@@ -78,10 +71,10 @@ describe('Graphite Precision mobile UI primitives', () => {
         onPress: () => {}
       })
     )
-    const button = findByHostType(renderer.root, 'Pressable')
+    const button = renderer.root.findByType('Pressable')
     expect(button.props.disabled).toBe(true)
     expect(button.props.accessibilityState.disabled).toBe(true)
-    expect(findAllByHostType(renderer.root, 'ActivityIndicator')).toHaveLength(1)
+    expect(renderer.root.findAllByType('ActivityIndicator')).toHaveLength(1)
   })
 
   it('uses graphite inversion and 44dp options for the two-state segmented control', () => {
@@ -97,7 +90,7 @@ describe('Graphite Precision mobile UI primitives', () => {
         value: 'cloud'
       })
     )
-    const options = findAllByHostType(renderer.root, 'Pressable')
+    const options = renderer.root.findAllByType('Pressable')
     expect(resolvedStyle(options[0])).toMatchObject({
       minWidth: 44,
       minHeight: 44,
@@ -117,11 +110,11 @@ describe('Graphite Precision mobile UI primitives', () => {
         trailing: createElement('Trailing')
       })
     )
-    expect(findByHostType(renderer.root, 'SafeAreaView').props.edges).toEqual(['top'])
-    const views = findAllByHostType(renderer.root, 'View')
+    expect(renderer.root.findByType('SafeAreaView').props.edges).toEqual(['top'])
+    const views = renderer.root.findAllByType('View')
     expect(views.some((node) => resolvedStyle(node).height === 56)).toBe(true)
     expect(views.filter((node) => resolvedStyle(node).width === 44)).toHaveLength(2)
-    expect(findByHostType(renderer.root, 'Text').props.maxFontSizeMultiplier).toBe(1.3)
+    expect(renderer.root.findByType('Text').props.maxFontSizeMultiplier).toBe(1.3)
   })
 
   it('supports the connection choice surface with named linear icons and a readable selected state', () => {
@@ -137,32 +130,32 @@ describe('Graphite Precision mobile UI primitives', () => {
         ]
       })
     )
-    const options = findAllByHostType(renderer.root, 'Pressable')
+    const options = renderer.root.findAllByType('Pressable')
     expect(resolvedStyle(options[0]).backgroundColor).toBe('#FFFFFF')
     expect(options[0].props.accessibilityState.selected).toBe(true)
-    expect(findAllByHostType(renderer.root, 'ScanIcon')).toHaveLength(1)
-    expect(findAllByHostType(renderer.root, 'AccountIcon')).toHaveLength(1)
+    expect(renderer.root.findAllByType('ScanIcon')).toHaveLength(1)
+    expect(renderer.root.findAllByType('AccountIcon')).toHaveLength(1)
     expect(
-      findAllByHostType(renderer.root, 'Text').every(
-        (node) => node.props.maxFontSizeMultiplier === 1.3
-      )
+      renderer.root.findAllByType('Text').every((node) => node.props.maxFontSizeMultiplier === 1.3)
     ).toBe(true)
   })
 
   it('groups rows in one card with dividers and accessible press behavior', () => {
     const onPress = vi.fn()
     renderer = renderWithTheme(
-      <MobileGroupedList title="客户端">
-        <MobileGroupedListRow title="通知" onPress={onPress} />
-        <MobileGroupedListRow title="关于" value="1.0.0" />
-      </MobileGroupedList>
+      createElement(
+        MobileGroupedList,
+        { title: '客户端' },
+        createElement(MobileGroupedListRow, { title: '通知', onPress }),
+        createElement(MobileGroupedListRow, { title: '关于', value: '1.0.0' })
+      )
     )
-    const button = findByHostType(renderer.root, 'Pressable')
+    const button = renderer.root.findByType('Pressable')
     expect(button.props.accessibilityLabel).toBe('通知')
     expect(resolvedStyle(button).minHeight).toBe(56)
     act(() => button.props.onPress())
     expect(onPress).toHaveBeenCalledOnce()
-    const views = findAllByHostType(renderer.root, 'View')
+    const views = renderer.root.findAllByType('View')
     expect(views.some((node) => resolvedStyle(node).borderRadius === 12)).toBe(true)
     expect(views.filter((node) => resolvedStyle(node).height === 1)).toHaveLength(1)
   })

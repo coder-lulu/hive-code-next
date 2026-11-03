@@ -111,7 +111,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = createSetupRunnerScript(
+      const result = await createSetupRunnerScript(
         makeRepo(),
         'C:\\repo-worktree',
         '#!/usr/bin/env bash\r\npnpm install\r\nnpm run build',
@@ -150,7 +150,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = createSetupRunnerScript(
+      const result = await createSetupRunnerScript(
         makeRepo(),
         'C:\\repo-worktree',
         'copy .env.example .env\r\nxcopy /E assets dist',
@@ -187,7 +187,7 @@ describe('createSetupRunnerScript', () => {
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
       const { buildSetupRunnerCommand } = await import('../shared/setup-runner-command')
-      const result = createSetupRunnerScript(
+      const result = await createSetupRunnerScript(
         makeRepo(),
         'C:\\repo-worktree',
         'copy .env.example .env',
@@ -217,7 +217,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      createSetupRunnerScript(
+      await createSetupRunnerScript(
         makeRepo(),
         'C:\\repo-worktree',
         '#!/usr/bin/env -S bash -euo pipefail\nmake build | tee build.log',
@@ -246,7 +246,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = createSetupRunnerScript(
+      const result = await createSetupRunnerScript(
         makeRepo(),
         'C:\\repo-worktree',
         'pnpm install\nnpm run build',
@@ -287,7 +287,7 @@ describe('createSetupRunnerScript', () => {
 
     try {
       const { createSetupRunnerScript } = await import('./worktree-runner-script')
-      const result = createSetupRunnerScript(makeRepo(), '/test/worktree', 'pnpm install')
+      const result = await createSetupRunnerScript(makeRepo(), '/test/worktree', 'pnpm install')
 
       expect(gitExecFileSyncMock).toHaveBeenCalledWith(
         ['rev-parse', '--git-path', 'orca/setup-runner.sh'],
@@ -311,34 +311,39 @@ describe('createSetupRunnerScript', () => {
     const { createSetupRunnerScript } = await import('./worktree-runner-script')
 
     expect(
-      createSetupRunnerScript(makeRepo(), '/test/worktree', 'echo setup').waitForAgentStartup
-    ).toBeUndefined()
-    expect(
-      createSetupRunnerScript(makeRepo('start-immediately'), '/test/worktree', 'echo setup')
+      (await createSetupRunnerScript(makeRepo(), '/test/worktree', 'echo setup'))
         .waitForAgentStartup
     ).toBeUndefined()
     expect(
-      createSetupRunnerScript(makeRepo('wait-for-setup'), '/test/worktree', 'echo setup')
+      (await createSetupRunnerScript(makeRepo('start-immediately'), '/test/worktree', 'echo setup'))
+        .waitForAgentStartup
+    ).toBeUndefined()
+    expect(
+      (await createSetupRunnerScript(makeRepo('wait-for-setup'), '/test/worktree', 'echo setup'))
         .waitForAgentStartup
     ).toBe(true)
     expect(
-      createSetupRunnerScript(
-        makeRepo('start-immediately'),
-        '/test/worktree',
-        'echo setup',
-        undefined,
-        undefined,
-        'wait-for-setup'
+      (
+        await createSetupRunnerScript(
+          makeRepo('start-immediately'),
+          '/test/worktree',
+          'echo setup',
+          undefined,
+          undefined,
+          'wait-for-setup'
+        )
       ).waitForAgentStartup
     ).toBe(true)
     expect(
-      createSetupRunnerScript(
-        makeRepo('wait-for-setup'),
-        '/test/worktree',
-        'echo setup',
-        undefined,
-        undefined,
-        'start-immediately'
+      (
+        await createSetupRunnerScript(
+          makeRepo('wait-for-setup'),
+          '/test/worktree',
+          'echo setup',
+          undefined,
+          undefined,
+          'start-immediately'
+        )
       ).waitForAgentStartup
     ).toBe(true)
   })
@@ -348,7 +353,7 @@ describe('createSetupRunnerScript', () => {
     gitExecFileSyncMock.mockReturnValue('/test/repo/.git/orca/setup-runner.sh\n')
     const { createSetupRunnerScript } = await import('./worktree-runner-script')
 
-    const setup = createSetupRunnerScript(makeRepo(), '/test/worktree', 'git fetch')
+    const setup = await createSetupRunnerScript(makeRepo(), '/test/worktree', 'git fetch')
 
     expect(setup.envVars).toMatchObject({
       ORCA_ROOT_PATH: '/test/repo',

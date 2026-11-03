@@ -48,6 +48,7 @@ function createStructuredTab(overrides: Partial<Tab> = {}): Tab {
 
 function state(overrides: Partial<NativeChatFileLinkState> = {}): NativeChatFileLinkState {
   return {
+    getKnownWorktreeById: () => undefined,
     detectedWorktreesByRepo: {},
     folderWorkspaces: [],
     floatingWorkspacePath: null,
@@ -73,25 +74,26 @@ const context: NativeChatFileLinkContext = {
 
 describe('resolveNativeChatFileLinkContext', () => {
   it('uses the unique structured runtime owner instead of the globally selected runtime', () => {
-    const worktree = worktreeFixture('wt-1', '/peer/worktree', { hostId: 'runtime:peer' })
+    const worktree = {
+      id: 'wt-1',
+      repoId: 'repo',
+      path: '/peer/worktree',
+      hostId: 'runtime:peer'
+    } as const
     expect(
       resolveNativeChatFileLinkContext(
         state({
-          settings: { ...getDefaultSettings('/home/me'), activeRuntimeEnvironmentId: 'other' },
+          settings: { activeRuntimeEnvironmentId: 'other' } as AppState['settings'],
           tabsByWorktree: {},
           unifiedTabsByWorktree: {
             'wt-1': [createStructuredTab({ executionHostId: 'runtime:peer' })]
           },
-          worktreesByRepo: { repo: [worktree] }
+          worktreesByRepo: { repo: [worktree as never] },
+          getKnownWorktreeById: () => worktree as never
         }),
         'chat'
       )
-    ).toEqual({
-      worktreeId: 'wt-1',
-      worktreePath: '/peer/worktree',
-      runtimeEnvironmentId: 'peer',
-      sourceTabId: 'chat'
-    })
+    ).toEqual({ worktreeId: 'wt-1', worktreePath: '/peer/worktree', runtimeEnvironmentId: 'peer' })
   })
 
   it('refuses an ambiguous workspace catalog even when the structured tab id is unique', () => {
@@ -103,8 +105,8 @@ describe('resolveNativeChatFileLinkContext', () => {
             'wt-1': [createStructuredTab()]
           },
           worktreesByRepo: {
-            local: [worktreeFixture('wt-1', '/local', { repoId: 'local', hostId: 'local' })],
-            peer: [worktreeFixture('wt-1', '/peer', { repoId: 'peer', hostId: 'runtime:peer' })]
+            local: [{ id: 'wt-1', repoId: 'local', path: '/local', hostId: 'local' } as never],
+            peer: [{ id: 'wt-1', repoId: 'peer', path: '/peer', hostId: 'runtime:peer' } as never]
           }
         }),
         'chat'
@@ -152,7 +154,7 @@ describe('resolveNativeChatFileLinkContext', () => {
             'wt-1': [createStructuredTab({ executionHostId: 'runtime:peer' })]
           },
           worktreesByRepo: {
-            repo: [worktreeFixture('wt-1', '/local', { hostId: 'local' })]
+            repo: [{ id: 'wt-1', repoId: 'repo', path: '/local', hostId: 'local' } as never]
           }
         }),
         'chat'

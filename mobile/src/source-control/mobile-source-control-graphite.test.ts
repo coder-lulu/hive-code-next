@@ -1,19 +1,17 @@
 import { readFileSync } from 'node:fs'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-native', () => ({
-  Platform: { select: (choices: Record<string, unknown>) => choices.default },
-  StyleSheet: { hairlineWidth: 1, create: <T>(styles: T) => styles }
+  StyleSheet: {
+    hairlineWidth: 1,
+    create: <T>(styles: T) => styles
+  }
 }))
 
-import { styles } from './mobile-source-control-styles'
-import { hubStyles } from './mobile-source-control-hub-styles'
-import { COMPOSER_CONTROL_SIZE } from '../components/composer-input/composer-input-styles'
-import { activateMobileUiLocale, translate } from '../i18n/mobile-i18n'
-import { applyMobileColorScheme, paletteForScheme, radii } from '../theme/mobile-theme'
+import { darkTheme, lightTheme } from '../theme/mobile-theme'
+import { createMobileSourceControlHubStyles } from './mobile-source-control-hub-styles'
+import { createMobileSourceControlStyles } from './mobile-source-control-styles'
 
-afterEach(() => applyMobileColorScheme('dark'))
-afterEach(() => activateMobileUiLocale('en'))
 const contentSource = readFileSync(
   new URL('./MobileSourceControlContent.tsx', import.meta.url),
   'utf8'
@@ -23,50 +21,48 @@ const prChipSource = readFileSync(
   'utf8'
 )
 
-describe('mobile source control presentation', () => {
-  it.each(['light', 'dark', 'light'] as const)('uses the %s semantic palette', (scheme) => {
-    applyMobileColorScheme(scheme)
-    const palette = paletteForScheme(scheme)
-    expect(styles.container.backgroundColor).toBe(palette.bgBase)
-    expect(styles.header.backgroundColor).toBe(palette.bgPanel)
+describe('mobile source control Graphite presentation', () => {
+  it.each([lightTheme, darkTheme])('uses the $scheme semantic theme', (theme) => {
+    const styles = createMobileSourceControlStyles(theme)
+    const hubStyles = createMobileSourceControlHubStyles(theme)
+
+    expect(styles.container.backgroundColor).toBe(theme.color.bg.canvas)
+    expect(styles.header.backgroundColor).toBe(theme.color.bg.surface)
     expect(styles.summaryCard).toMatchObject({
-      backgroundColor: palette.bgPanel,
-      borderColor: palette.borderSubtle,
-      borderRadius: radii.card
+      backgroundColor: theme.color.bg.surface,
+      borderColor: theme.color.border.default,
+      borderRadius: theme.radii.card
     })
-    expect(styles.commitBar.backgroundColor).toBe(palette.bgPanel)
-    expect(styles.commitButton.backgroundColor).toBe(palette.surfaceBright)
-    expect(styles.commitButtonText.color).toBe(palette.bgBase)
-    expect(hubStyles.segments.backgroundColor).toBe(palette.bgPanel)
-    expect(hubStyles.segmentActive.borderBottomColor).toBe(palette.textPrimary)
-    expect(hubStyles.chipCreateText.color).toBe(palette.accentBlue)
+    expect(styles.commitBar.backgroundColor).toBe(theme.color.bg.surface)
+    expect(styles.commitButton.backgroundColor).toBe(theme.color.bg.selected)
+    expect(styles.commitButtonText.color).toBe(theme.color.text.inverse)
+    expect(hubStyles.segments.backgroundColor).toBe(theme.color.bg.surface)
+    expect(hubStyles.segmentActive.borderBottomColor).toBe(theme.color.text.primary)
+    expect(hubStyles.chipCreateText.color).toBe(theme.color.brand.primary)
   })
 
-  it('preserves full-height file rows and compact toolbar and composer controls', () => {
-    expect(styles.backButton).toMatchObject({ width: 36, height: 36 })
-    expect(styles.refreshButton).toMatchObject({ width: 36, height: 36 })
-    expect(styles.fileRow.minHeight).toBeGreaterThanOrEqual(44)
-    expect(styles.iconButton).toMatchObject({ width: 32, height: 32 })
-    expect(styles.commitButton.height).toBe(COMPOSER_CONTROL_SIZE)
-    expect(hubStyles.segment.minHeight).toBe(40)
-    expect(hubStyles.segment.borderBottomWidth).toBe(2)
+  it('keeps source-control controls at the shared minimum touch target', () => {
+    const styles = createMobileSourceControlStyles(lightTheme)
+    const hubStyles = createMobileSourceControlHubStyles(lightTheme)
+
+    expect(styles.backButton.width).toBe(lightTheme.size.minimumTouchTarget)
+    expect(styles.refreshButton.width).toBe(lightTheme.size.minimumTouchTarget)
+    expect(styles.fileRow.minHeight).toBe(lightTheme.size.groupedListRowMinHeight)
+    expect(styles.iconButton.width).toBe(lightTheme.size.minimumTouchTarget)
+    expect(styles.commitButton.minHeight).toBe(lightTheme.size.minimumTouchTarget)
+    expect(styles.generateButton.width).toBe(lightTheme.size.minimumTouchTarget)
+    expect(hubStyles.segment.minHeight).toBe(lightTheme.size.minimumTouchTarget)
   })
 
-  it('translates fixed source-control chrome through the actual Chinese catalog', async () => {
-    await activateMobileUiLocale('zh')
-    for (const [key, label] of [
-      ['sourceControl.content.stageAll', '暂存全部'],
-      ['sourceControl.content.unstageAll', '取消全部暂存'],
-      ['sourceControl.content.commitMessagePlaceholder', '提交信息']
-    ]) {
-      expect(contentSource).toContain(key)
-      expect(translate(key, 'missing translation')).toBe(label)
-    }
-    expect(prChipSource).toContain('sourceControl.prChip.createPr')
-    expect(translate('sourceControl.prChip.createPr', 'missing translation')).toBe('创建 PR')
+  it('renders the reported fixed source-control chrome in Chinese', () => {
+    expect(contentSource).toContain('>全部暂存</Text>')
+    expect(contentSource).toContain('>全部取消暂存</Text>')
+    expect(contentSource).toContain('placeholder="提交说明"')
     expect(contentSource).not.toContain('>Stage All</Text>')
     expect(contentSource).not.toContain('>Unstage All</Text>')
     expect(contentSource).not.toContain('placeholder="Commit message"')
+    expect(prChipSource).toContain('创建拉取请求')
     expect(prChipSource).not.toContain('>Create pull request</Text>')
+    expect(prChipSource).not.toContain('Loading pull request…')
   })
 })

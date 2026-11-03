@@ -1,18 +1,16 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('react-native', () => ({
-  Platform: { select: (choices: Record<string, unknown>) => choices.default },
-  StyleSheet: { hairlineWidth: 1, create: <T>(styles: T) => styles }
+  StyleSheet: {
+    create: <T>(styles: T) => styles
+  }
 }))
 
-import { terminalSettingsScreenStyles as styles } from '../terminal/terminal-settings-screen-styles'
-import { activateMobileUiLocale, translate } from '../i18n/mobile-i18n'
-import { applyMobileColorScheme, paletteForScheme, radii, spacing } from '../theme/mobile-theme'
+import { darkTheme, lightTheme } from '../theme/mobile-theme'
+import { createTerminalSettingsScreenStyles } from '../terminal/terminal-settings-screen-styles'
 
-afterEach(() => applyMobileColorScheme('dark'))
-afterEach(() => activateMobileUiLocale('en'))
 const sources = {
   chat: readFileSync(
     fileURLToPath(new URL('./native-chat-settings-screen.tsx', import.meta.url)),
@@ -28,59 +26,65 @@ const sources = {
   )
 } as const
 
-describe('Terminal and Native Chat presentation', () => {
-  it.each(['light', 'dark', 'light'] as const)(
-    'uses the %s palette without freezing settings styles',
-    (scheme) => {
-      applyMobileColorScheme(scheme)
-      const palette = paletteForScheme(scheme)
-      expect(styles.container.backgroundColor).toBe(palette.bgBase)
-      expect(styles.container.paddingHorizontal).toBe(spacing.lg)
-      expect(styles.scrollContent.paddingBottom).toBe(spacing.xl)
-      expect(styles.section).toMatchObject({
-        backgroundColor: palette.bgPanel,
-        borderRadius: radii.card
-      })
-      expect(styles.groupHeading.color).toBe(palette.textMuted)
-      expect(styles.rowLabel.color).toBe(palette.textPrimary)
-      expect(styles.row.paddingVertical).toBe(spacing.md)
-    }
-  )
+describe('Terminal and Native Chat Graphite presentation', () => {
+  it.each([lightTheme, darkTheme])('uses the $scheme semantic theme', (theme) => {
+    const styles = createTerminalSettingsScreenStyles(theme)
 
-  it('subscribes all settings surfaces to the live theme with maintained token owners', () => {
-    for (const source of Object.values(sources)) {
-      expect(source).toContain('useMobileColorScheme()')
-      // These two deliberate destructive hover tints are the current exception; neutral chrome
-      // must still use live tokens. Do not redesign that surface from this fixture migration.
-      const fixedColors = source.match(/#[0-9a-f]{3,8}\b|rgba?\([^)]*\)/gi) ?? []
-      expect(fixedColors).toEqual(
-        source === sources.shortcuts ? ['rgba(239, 68, 68, 0.1)', 'rgba(239, 68, 68, 0.2)'] : []
-      )
-    }
-    expect(sources.chat).toContain('themedStyleSheet(')
-    expect(sources.shortcuts).toContain('themedStyleSheet(')
-    expect(sources.terminal).toContain('terminalSettingsScreenStyles as styles')
+    expect(styles.screen.backgroundColor).toBe(theme.color.bg.canvas)
+    expect(styles.scrollContent.paddingHorizontal).toBe(theme.spacing.space20)
+    expect(styles.settingsGroup.gap).toBe(theme.spacing.space8)
+    expect(styles.groupHeading.color).toBe(theme.color.text.secondary)
+    expect(styles.emptyState.minHeight).toBe(theme.size.groupedListRowMinHeight)
   })
 
-  it('renders settings chrome through the actual Simplified Chinese catalog', async () => {
-    await activateMobileUiLocale('zh')
-    const cases = [
-      [sources.chat, 'settings.nativeChatSettingsScreen.title', '聊天界面'],
-      [sources.chat, 'settings.nativeChatSettingsScreen.openInChatUi', '在聊天界面中打开会话'],
-      [sources.terminal, 'app.terminalSettings.leaveAppHeading', '离开应用时'],
-      [sources.terminal, 'app.terminalSettings.textSizeHeading', '文字大小'],
-      [sources.terminal, 'app.terminalSettings.keyboardInputHeading', '键盘输入'],
-      [sources.terminal, 'app.terminalSettings.autocomplete', '自动补全与自动纠正'],
-      [sources.terminal, 'app.terminalSettings.textSizePickerTitle', '终端文字大小'],
-      [sources.shortcuts, 'components.terminalShortcutSettings.resetDefaults', '恢复默认设置'],
-      [sources.shortcuts, 'components.terminalShortcutSettings.customShortcuts', '自定义快捷键'],
-      [sources.shortcuts, 'components.terminalShortcutSettings.empty', '尚未设置自定义快捷键。'],
-      [sources.shortcuts, 'components.terminalShortcutSettings.addShortcut', '添加自定义快捷键…']
-    ]
-    for (const [source, key, label] of cases) {
-      expect(source).toContain(key)
-      expect(translate(key, 'missing translation')).toBe(label)
+  it('uses shared settings primitives without legacy palette or hard-coded colors', () => {
+    for (const route of [sources.chat, sources.terminal]) {
+      expect(route).toContain('useMobileTheme')
+      expect(route).toContain('MobileScreenHeader')
+      expect(route).toContain('MobileIconButton')
+      expect(route).toContain('MobileGroupedList')
     }
-    expect(sources.chat).not.toContain('title="聊天界面"')
+    expect(sources.shortcuts).toContain('useMobileTheme')
+    expect(sources.shortcuts).toContain('MobileGroupedList')
+    expect(sources.shortcuts).toContain('MobileIconButton')
+
+    for (const source of Object.values(sources)) {
+      expect(source).not.toMatch(
+        /import\s*\{[^}]*\b(?:colors|spacing|typography|radii)\b[^}]*\}\s*from\s*['"][^'"]*mobile-theme['"]/i
+      )
+      expect(source).not.toMatch(/\bcolors\.|#[0-9a-f]{3,8}|rgba?\(/i)
+    }
+  })
+
+  it('renders fixed settings chrome in Simplified Chinese', () => {
+    expect(sources.chat).toContain('title="聊天界面"')
+    expect(sources.chat).toContain('默认以聊天界面打开')
+    expect(sources.chat).not.toContain('Open sessions in Chat UI')
+
+    for (const label of [
+      '离开应用时',
+      '文字大小',
+      '键盘输入',
+      '自动补全与自动更正',
+      '终端文字大小'
+    ]) {
+      expect(sources.terminal).toContain(label)
+    }
+    expect(sources.terminal).not.toContain('WHEN YOU LEAVE THE APP')
+    expect(sources.terminal).not.toContain('Autocomplete &amp; autocorrect')
+    expect(sources.terminal).not.toContain('Terminal text size')
+
+    for (const label of [
+      '快捷键栏',
+      '恢复默认设置',
+      '自定义快捷键',
+      '尚未添加自定义快捷键',
+      '添加自定义快捷键…'
+    ]) {
+      expect(sources.shortcuts).toContain(label)
+    }
+    expect(sources.shortcuts).not.toContain('SHORTCUT BAR')
+    expect(sources.shortcuts).not.toContain('Reset Defaults')
+    expect(sources.shortcuts).not.toContain('Add Custom Shortcut…')
   })
 })

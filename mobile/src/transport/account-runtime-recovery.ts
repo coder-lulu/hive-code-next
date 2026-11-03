@@ -1,4 +1,3 @@
-import { translate } from '../i18n/mobile-i18n'
 import { classifyHiveAccountRelayError } from '../../../src/shared/hive-account-relay-errors'
 import type { ConnectionLogSink } from './types'
 
@@ -7,10 +6,7 @@ export function logAccountRuntimeDialFailure(onLog: ConnectionLogSink, generatio
     id: `account-connect-${generation}`,
     ts: Date.now(),
     level: 'warn',
-    message: translate(
-      'auto.mobile.src.transport.account.runtime.recovery.31b537211c',
-      'Account remote connection failed. Recovering automatically.'
-    ),
+    message: '账号远程连接失败，正在自动恢复',
     code: 'relay-dial-failed',
     path: 'relay'
   })
@@ -52,10 +48,7 @@ export function logAccountRuntimeRecovery(
     level: 'warn',
     code: 'retry-scheduled',
     path: 'relay',
-    message: translate(
-      'auto.mobile.src.transport.account.runtime.recovery.a5e35c1823',
-      'Account remote connection was interrupted. Recovering automatically.'
-    ),
+    message: '账号远程连接中断，正在自动恢复',
     detail: `scope=${scope}; attempt=${attempt}; delayMs=${delayMs}`,
     relayCloseCode: closeCode
   })

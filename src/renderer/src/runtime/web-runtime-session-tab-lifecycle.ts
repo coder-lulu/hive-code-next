@@ -44,6 +44,7 @@ export async function activateWebRuntimeSessionTab(args: {
   leafId?: string | null
   /** The local tab visible at the gesture; later navigation away cancels the deferred focus. */
   expectedCurrentLocalTabId?: string | null
+  expectedPairingRevision?: number
 }): Promise<boolean> {
   return (await callWebRuntimeSessionTabMethod('session.tabs.activate', args)) === 'applied'
 }

@@ -49,7 +49,7 @@ import type {
   WorktreeGroupBy
 } from './row-types'
 import type { SidebarFeedDomains } from './sidebar-feed-domains'
-import { planSidebarRows, type SidebarRowPlanInputs } from './sidebar-row-plan'
+import { planSidebarRows } from './sidebar-row-plan'
 import type { SortBy } from './smart-sort'
 import { selectVisibleSidebarWorktrees } from './visible-worktrees'
 import { isIdleWorkspaceActivity } from './workspace-activity-facts'
@@ -99,7 +99,6 @@ export type SidebarFeedWindowExtras = {
 
 export type SidebarFeedPlan = {
   visibleWorktrees: Worktree[]
-  rowInputs: SidebarRowPlanInputs
   plan: ReturnType<typeof planSidebarRows>
   worktreeMap: Map<string, Worktree>
   lineageById: Record<string, WorktreeLineage>
@@ -112,7 +111,7 @@ export type SidebarFeedPlan = {
 
 const NO_LINEAGE_MAP: Record<string, WorktreeLineage> = {}
 
-/** Filters, groups and nests the feed's workspaces in rankedIdentities order; collapse comes after. */
+/** Filters, groups and nests the feed's workspaces in `rankedIdentities` order; collapse comes after. */
 export function planSidebarFeedRows(
   domains: SidebarFeedDomains,
   index: SidebarFeedIndex,
@@ -135,7 +134,12 @@ export function planSidebarFeedRows(
     if (!worktree.isArchived) {
       ancestorByIdentity.set(getWorktreeHostIdentity(worktree), worktree)
     }
-    ;(worktreesByRepo[worktree.repoId] ??= []).push(worktree)
+    const repoWorktrees = worktreesByRepo[worktree.repoId]
+    if (repoWorktrees) {
+      repoWorktrees.push(worktree)
+    } else {
+      worktreesByRepo[worktree.repoId] = [worktree]
+    }
   }
   // Each row carries its own edge (sidebar-feed-worktrees.ts); an id-keyed map would keep one host's.
   const lineageById = NO_LINEAGE_MAP
@@ -221,7 +225,7 @@ export function planSidebarFeedRows(
   })
   // The catalog's order, not the feed's repoOrder: only it places a paired server's projects.
   const repoOrder = getLogicalRepoOrderRankById(repos.map((repo) => repo.id))
-  const rowInputs: SidebarRowPlanInputs = {
+  const plan = planSidebarRows({
     groupBy,
     worktrees: visibleWorktrees,
     repoMap,
@@ -245,11 +249,10 @@ export function planSidebarFeedRows(
     defaultHostId,
     pinnedDisplayPolicy: view.pinnedDisplayPolicy,
     filterRepoIds: view.filters.filterRepoIds
-  }
+  })
   return {
-    rowInputs,
     visibleWorktrees,
-    plan: planSidebarRows(rowInputs),
+    plan,
     worktreeMap,
     lineageById,
     placeholderRepoIds,
@@ -264,7 +267,7 @@ export function planSidebarFeedRows(
   }
 }
 
-/** The planned rows under collapsedGroups, wrapped in host sections. */
+/** The planned rows under `collapsedGroups`, wrapped in host sections. */
 export function renderSidebarFeedRows(
   planned: SidebarFeedPlan,
   view: SidebarFeedView,

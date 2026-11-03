@@ -65,7 +65,7 @@ function setHostConnected(connected: boolean): void {
   })
 }
 
-async function renderPanel(installed = false, command?: string): Promise<void> {
+async function renderPanel(installed = false): Promise<void> {
   container = document.createElement('div')
   document.body.appendChild(container)
   root = createRoot(container)
@@ -74,7 +74,6 @@ async function renderPanel(installed = false, command?: string): Promise<void> {
       <AgentSkillSetupPanel
         title="Orchestration skill"
         description={null}
-        command={command}
         skillNames={['orchestration']}
         installed={installed}
         loading={false}
@@ -133,19 +132,6 @@ describe('remote skill setup availability', () => {
     container?.remove()
     container = null
     useAppStore.setState({ runtimeEnvironments: [], runtimeStatusByEnvironmentId: new Map() })
-  })
-
-  it('does not execute a local product command for a selected remote host', async () => {
-    await renderPanel(false, 'hive skills install orchestration')
-    expect(container?.textContent).toContain(
-      'CLI installation is unavailable on the selected host.'
-    )
-    const installButton = Array.from(container?.querySelectorAll('button') ?? []).find(
-      (button) => button.textContent?.trim() === 'Install'
-    )
-    expect(installButton).toBeDefined()
-    expect(installButton?.disabled).toBe(true)
-    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
   it.each([false, true])(

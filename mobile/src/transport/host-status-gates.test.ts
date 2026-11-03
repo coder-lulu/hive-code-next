@@ -44,7 +44,7 @@ describe('useHostStatusGates', () => {
         result: { runtimeRecordId }
       })
     } as unknown as RpcClient
-    let renderer: ReactTestRenderer | undefined
+    let renderer: ReactTestRenderer | null = null
 
     function Probe(): null {
       useHostStatusGates({ hostId: 'host-1', client, connState: 'connected' })
@@ -74,7 +74,7 @@ describe('useHostStatusGates', () => {
         result: { runtimeRecordId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }
       })
     } as unknown as RpcClient
-    let renderer: ReactTestRenderer | undefined
+    let renderer: ReactTestRenderer | null = null
 
     function Probe(): null {
       useHostStatusGates({ hostId: 'host-1', client, connState: 'connected' })

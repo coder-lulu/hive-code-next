@@ -3,12 +3,12 @@
 import { agentVerdictFields } from './agent-main-agent-verdict'
 import {
   agentProviderSessionsEqual,
-  getAgentResumeArgv,
   isResumableTuiAgent,
   type AgentProviderSessionMetadata,
   type SleepingAgentLaunchConfig,
   type SleepingAgentSessionRecord
-} from './agent-session-resume'
+} from './agent-session/lifecycle/agent-session-resume'
+import { getAgentResumeArgv } from './agent-resume-argv'
 import type { AgentStatusEntry } from './agent-status-types'
 import {
   recoveryRecordMatches,
@@ -39,8 +39,6 @@ export type ResumeRecordTab = { id: string; title?: string }
 export function copyLaunchConfig(config: SleepingAgentLaunchConfig): SleepingAgentLaunchConfig {
   return {
     ...(config.agentCommand ? { agentCommand: config.agentCommand } : {}),
-    ...(config.hostDefaultsAuthoritative ? { hostDefaultsAuthoritative: true as const } : {}),
-    ...(config.agentPermissionMode ? { agentPermissionMode: config.agentPermissionMode } : {}),
     agentArgs: config.agentArgs,
     agentEnv: { ...config.agentEnv },
     ...(config.ompResumeFilePath ? { ompResumeFilePath: config.ompResumeFilePath } : {})

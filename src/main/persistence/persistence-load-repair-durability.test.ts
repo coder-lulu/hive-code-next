@@ -95,6 +95,36 @@ describe('load-time normalization durability', () => {
     rmSync(testState.dir, { recursive: true, force: true })
   })
 
+  it('durably migrates Agents model and effort on an already typed permission profile', async () => {
+    const settled = await settledProfile()
+    await closeTestStores()
+    delete settled.settings.agentLaunchChoices
+    settled.settings.agentPermissionDefault = 'ask'
+    settled.settings.agentDefaultArgs = {
+      claude: '--model saved-unlisted-id --effort high --verbose',
+      codex: '-c model_reasoning_effort=low --search'
+    }
+    writeDataFile(settled)
+    const saved = await reloadAndSettleWrites()
+    expect(saved.settings.agentLaunchChoices).toEqual({
+      claude: { model: 'saved-unlisted-id', options: { effort: 'high' } },
+      codex: { options: { effort: 'low' } }
+    })
+    expect(saved.settings.agentDefaultArgs).toMatchObject({
+      claude: '--verbose',
+      codex: '--search'
+    })
+    await closeTestStores()
+    const reopened = await createStore()
+    expect(reopened.getSettings().agentLaunchChoices).toEqual(saved.settings.agentLaunchChoices)
+    reopened.updateSettings({ agentLaunchChoices: {} })
+    reopened.flush()
+    await closeTestStores()
+    const cleared = await createStore()
+    expect(cleared.getSettings().agentLaunchChoices).toEqual({})
+    expect(cleared.getSettings().agentDefaultArgs?.claude).toBe('--verbose')
+  })
+
   it.each(['claude', 'codex'] as const)(
     'retains independent %s effort when lifting a model through load, save and reopen',
     async (agent) => {
@@ -236,9 +266,8 @@ describe('load-time normalization durability', () => {
       )
       writeDataFile(settled)
       const store = createStore()
-      // Every owned raw recipe is reconciled; canonical validation must remain bounded.
-      expect(lift.mock.calls.length).toBeGreaterThanOrEqual(n + 4)
-      expect(lift.mock.calls.length).toBeLessThanOrEqual(n + 10)
+      // Four global raw recipes plus validation of their six newly canonical terms.
+      expect(lift).toHaveBeenCalledTimes(n + 10)
       const work = [
         cut.mock.calls.length,
         tokenize.mock.calls.length,

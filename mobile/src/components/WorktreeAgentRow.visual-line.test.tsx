@@ -1,3 +1,4 @@
+import { lightTheme } from '../theme/mobile-theme'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -42,6 +43,7 @@ describe('WorktreeAgentRow visual lines', () => {
     act(() => {
       renderer = create(
         createElement(WorktreeAgentRow, {
+          theme: lightTheme,
           agent: row,
           depth: 0,
           now: 2_000,

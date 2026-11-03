@@ -8,6 +8,7 @@ import {
   type PluginHostImages
 } from '../../shared/plugins/images/plugin-image-url'
 import { pluginInstalledHostImages } from './plugin-manifest-images'
+import { markCommandReplacementOwners } from './plugin-command-replacement-owners'
 import type { PluginService } from './plugin-service'
 import { listPluginVmRecipeCommands } from '../../shared/plugins/artifacts/plugin-vm-recipe-artifact'
 import {
@@ -18,7 +19,10 @@ import {
 import { pluginCatalogTypes } from '../../shared/plugins/catalog/plugin-catalog-types'
 import { mapWithConcurrency } from '../../shared/map-with-concurrency'
 import type { PluginHostListEntry, PluginHostStatus } from '../../shared/plugins/plugin-list-entry'
-import { customEditorContentKind } from '../../shared/plugins/contributions/plugin-custom-editor-contribution'
+import {
+  customEditorContentKind,
+  customEditorFrame
+} from '../../shared/plugins/contributions/plugin-custom-editor-contribution'
 import { pluginExecutionProfile } from '../../shared/plugins/contributions/plugin-execution-profile'
 
 const PLUGIN_LIST_PROJECTION_CONCURRENCY = 4
@@ -68,7 +72,7 @@ export async function buildPluginList(
     pluginConsents: service.options.getPluginConsents(),
     disabledPlugins: service.options.getDisabledPlugins()
   }
-  return mapWithConcurrency(
+  const entries = await mapWithConcurrency(
     discovered,
     PLUGIN_LIST_PROJECTION_CONCURRENCY,
     async (plugin, index): Promise<PluginHostListEntry> => {
@@ -177,6 +181,7 @@ export async function buildPluginList(
           filenames: editor.filenames,
           priority: editor.priority ?? 'default',
           contentKind: customEditorContentKind(editor),
+          frame: customEditorFrame(editor),
           ...contributionIcon(`editor-${index}`, editor.icon)
         })),
         newFiles: plugin.manifest.contributes.newFiles.map((newFile, index) => ({
@@ -190,8 +195,11 @@ export async function buildPluginList(
           title: command.title,
           context: command.context,
           handler: command.handler,
-          keybindings: command.keybindings
+          keybindings: command.keybindings,
+          ...(command.replaces ? { replaces: command.replaces } : {})
         })),
+        statusBarItems: plugin.manifest.contributes.statusBarItems,
+        hooks: plugin.manifest.contributes.hooks.map((hook) => hook.event),
         hasWorker: Boolean(plugin.manifest.main),
         vmRecipes: service.contentPacks.vmRecipes.preview(plugin.pluginKey).map(({ recipe }) => ({
           id: recipe.id,
@@ -211,5 +219,8 @@ export async function buildPluginList(
         ...lockEntrySource(lockEntry)
       }
     }
+  )
+  return markCommandReplacementOwners(entries, lock, (pluginKey, line) =>
+    service.captureLog(pluginKey)('warn', line)
   )
 }

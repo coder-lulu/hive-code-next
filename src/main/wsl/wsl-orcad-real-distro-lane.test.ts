@@ -12,10 +12,6 @@ import { runProcess } from '@orca/process-host'
 import { setAppEnvironment } from '../../shared/app-environment'
 import { ELECTRON_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../shared/electron-remote-runtime-client-capabilities'
 import { parsePairingCode } from '../../shared/pairing'
-import {
-  pairedRuntimeConnectionFromOffer,
-  type PairedRuntimeConnection
-} from '../../shared/paired-runtime-connection'
 import { sendRemoteRuntimeRequest } from '../../shared/remote-runtime/remote-runtime-client'
 import { buildWslExecArgs } from '../../shared/wsl-login-shell-command'
 import {
@@ -197,12 +193,12 @@ function waitForStatus<S extends WslOrcadConnectionStatus['state']>(
   )
 }
 
-function pairedConnection(connection: WslOrcadConnection): PairedRuntimeConnection {
+function pairedConnection(connection: WslOrcadConnection) {
   const offer = parsePairingCode(connection.pairingOffer)
   if (!offer) {
     throw new Error(`Unparseable pairing offer for ${connection.distro}`)
   }
-  return pairedRuntimeConnectionFromOffer(offer)
+  return offer
 }
 
 async function rpc<T>(connection: WslOrcadConnection, method: string, params?: unknown) {

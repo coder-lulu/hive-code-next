@@ -148,7 +148,7 @@ export function useWorktreeCardController(props: ResolvedWorktreeCardProps) {
     linkedGiteaPR: review.linkedGiteaPR,
     newCardStyle: foundation.newCardStyle,
     compactCards: foundation.compactCards,
-    cardProps: foundation.cardProps,
+    cardDetails: foundation.cardDetails,
     agentActivityDisplayMode: foundation.agentActivityDisplayMode,
     workspacePorts: foundation.workspacePorts,
     openTaskPage: foundation.openTaskPage,

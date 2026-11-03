@@ -2,7 +2,6 @@ import { beforeAll, describe, expect, it, vi } from 'vitest'
 import type * as ChildProcess from 'node:child_process'
 
 const {
-  actualCatalog,
   callMock,
   runtimeClientConstructorMock,
   serveOrcaAppMock,
@@ -10,29 +9,17 @@ const {
   addEnvironmentFromPairingCodeMock,
   listEnvironmentsMock,
   spawnMock
-} = vi.hoisted(() => {
-  const actualCatalog: { current?: RuntimeAgentLineageCatalogTestModule } = {}
-  return {
-    actualCatalog,
-    callMock: vi.fn(),
-    runtimeClientConstructorMock: vi.fn(),
-    serveOrcaAppMock: vi.fn(),
-    getDefaultUserDataPathMock: vi.fn(() => '/tmp/orca-user-data'),
-    addEnvironmentFromPairingCodeMock: vi.fn(),
-    listEnvironmentsMock: vi.fn(),
-    spawnMock: vi.fn()
-  }
-})
+} = vi.hoisted(() => ({
+  callMock: vi.fn(),
+  runtimeClientConstructorMock: vi.fn(),
+  serveOrcaAppMock: vi.fn(),
+  getDefaultUserDataPathMock: vi.fn(() => '/tmp/orca-user-data'),
+  addEnvironmentFromPairingCodeMock: vi.fn(),
+  listEnvironmentsMock: vi.fn(),
+  spawnMock: vi.fn()
+}))
 
 vi.mock('./runtime-client', async () => {
-  // Await the real catalog during collection: its cold runtime transform can exceed
-  // the hook budget. importActual keeps the CLI Node16 type graph on its facade.
-  await vi.importActual('../main/runtime/rpc/unused-default-rpc-methods.test-fixture')
-  actualCatalog.current = (
-    await vi.importActual<{ default: RuntimeAgentLineageCatalogTestModule }>(
-      '../main/runtime/runtime-agent-lineage-catalog.test-fixture'
-    )
-  ).default
   const { createRuntimeClientModuleMock } = await import('./index-test-harness.js')
   return createRuntimeClientModuleMock({
     callMock,
@@ -55,9 +42,6 @@ vi.mock('child_process', async (importOriginal) => {
   return { ...actual, ...createChildProcessModuleMock(spawnMock) }
 })
 
-// Preload the existing client mock so its real catalog dependency is collected
-// before timed hooks; CLI command handlers otherwise load this module lazily.
-import './runtime-client'
 import { main } from './index'
 import type {
   RuntimeAgentLineageTestModule,
@@ -72,13 +56,14 @@ let catalog: RuntimeAgentLineageCatalogTestModule
 
 // The CLI's Node16 program needs a hook; each test still creates its own DB and runtime.
 beforeAll(async () => {
-  if (!actualCatalog.current) {
-    throw new Error('Real lineage catalog was not loaded during collection')
-  }
-  catalog = actualCatalog.current
   lineage = (
     await vi.importActual<{ default: RuntimeAgentLineageTestModule }>(
       '../main/runtime/runtime-agent-lineage.test-fixture'
+    )
+  ).default
+  catalog = (
+    await vi.importActual<{ default: RuntimeAgentLineageCatalogTestModule }>(
+      '../main/runtime/runtime-agent-lineage-catalog.test-fixture'
     )
   ).default
 })

@@ -12,45 +12,6 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: permission.settings
 }))
 
-it('reveals before launch Retry, but waits for a successful queue Resume', async () => {
-  const order: string[] = []
-  const controller = {
-    capturePresentation: () => () => true,
-    respond: vi.fn(async () => null),
-    queuedMessages: {
-      queueCapable: true,
-      clearCapable: true,
-      cards: [],
-      pause: null,
-      clear: vi.fn(async () => true),
-      queuePending: null,
-      pending: () => null,
-      resume: vi.fn(async () => {
-        order.push('resume')
-        return true
-      }),
-      steer: vi.fn(async () => {}),
-      remove: vi.fn(async () => {}),
-      edit: vi.fn(async () => {}),
-      editCapable: false,
-      editor: undefined,
-      steerNewest: vi.fn(() => false)
-    }
-  }
-  const retryLaunch = (): number => order.push('launch')
-  const { result } = renderHook(() => useStructuredNativeChatSubmitReveal(controller, retryLaunch))
-  result.current.messageListRef.current = {
-    revealLatest: () => order.push('reveal'),
-    revealFindMatch: () => {},
-    messageCopyText: () => null
-  }
-
-  act(() => result.current.retryLaunch())
-  await act(() => result.current.queuedMessages.resume())
-
-  expect(order).toEqual(['reveal', 'launch', 'resume', 'reveal'])
-})
-
 // STA-10671: an older host held for its permission mode would run a queued card unprompted.
 it('sends no queued card and retries no start on a host held for its permission mode', async () => {
   const queuedMessages = {
@@ -67,7 +28,8 @@ it('sends no queued card and retries no start on a host held for its permission 
     edit: vi.fn(async () => {}),
     editCapable: false,
     editor: undefined,
-    steerNewest: vi.fn(() => true)
+    steerHead: vi.fn(() => true),
+    isWorking: false
   }
   const controller = {
     capturePresentation: () => () => true,
@@ -76,7 +38,7 @@ it('sends no queued card and retries no start on a host held for its permission 
   }
   const retryLaunch = vi.fn()
   useAppStore.setState({
-    settings: { ...useAppStore.getState().settings!, agentPermissionDefault: 'ask' }
+    settings: { ...useAppStore.getState().settings!, nativeChatPermissionMode: 'ask' }
   })
   permission.capability.mockResolvedValue(false)
   permission.settings.mockRejectedValue(new Error('unreachable'))
@@ -112,15 +74,15 @@ it('sends no queued card and retries no start on a host held for its permission 
   await vi.waitFor(() => expect(result.current.notices[0]?.action?.label).toBe('Check again'))
 
   expect(result.current.publishedNotices[0]).toMatchObject({
-    text: `${APP_DISPLAY_NAME} couldn't confirm the host's permissions for Claude.`,
+    text: "Orca couldn't confirm the host's permissions for Claude.",
     action: { label: 'Check again' }
   })
   await act(() => result.current.queuedMessages.resume())
   await act(() => result.current.queuedMessages.steer('m1'))
-  expect(result.current.queuedMessages.steerNewest()).toBe(false)
+  expect(result.current.queuedMessages.steerHead()).toBe(false)
   expect(queuedMessages.resume).not.toHaveBeenCalled()
   expect(queuedMessages.steer).not.toHaveBeenCalled()
-  expect(queuedMessages.steerNewest).not.toHaveBeenCalled()
+  expect(queuedMessages.steerHead).not.toHaveBeenCalled()
   act(() => result.current.retryLaunch())
   expect(retryLaunch).not.toHaveBeenCalled()
   let allow!: (allowed: boolean) => void
@@ -137,5 +99,3 @@ it('sends no queued card and retries no start on a host held for its permission 
   act(() => result.current.notices[0]?.action?.onClick())
   expect(retryLaunch).toHaveBeenCalledOnce()
 })
-
-import { APP_DISPLAY_NAME } from '@/product-brand'

@@ -127,7 +127,7 @@ describe('filesystem watcher renderer document ownership', () => {
     const closeLate = vi.fn(async () => {})
     install.resolve(localRoot(closeLate))
     await Promise.all([first, pendingJoiner, fresh])
-    expect(createLocal.mock.calls.filter(([path]) => path === key)).toHaveLength(1)
+    expect(createLocal.mock.calls.filter(([path]) => path === '/folder')).toHaveLength(1)
     expect(closeLate).toHaveBeenCalledTimes(1)
     expect(state.watchedRoots.has(key)).toBe(false)
     expect(createLocal).toHaveBeenCalledTimes(2)

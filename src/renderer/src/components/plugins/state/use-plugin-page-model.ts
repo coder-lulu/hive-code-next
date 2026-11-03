@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import type {
-  PluginHostListEntry,
   PluginMarketplaceHostInstallPreview,
   PluginMarketplaceHostListing
 } from '../../../../../preload/api-types'
 import { pluginExecutionProfile } from '../../../../../shared/plugins/contributions/plugin-execution-profile'
 import { PLUGIN_CONTRIBUTION_SUMMARY_LIMIT } from '../../../../../shared/plugins/contributions/plugin-contribution-summary'
-import type { PluginHostImages } from '../../../../../shared/plugins/images/plugin-image-url'
+import {
+  servedPluginHostImages,
+  type PluginHostImages
+} from '../../../../../shared/plugins/images/plugin-image-url'
 import type { PluginListEntry } from '../list/plugin-list-entries'
 import {
   installedPluginTrust,
@@ -18,11 +20,12 @@ import {
 } from '../presentation/plugin-access-profile'
 import type { PluginPagePreview } from './use-plugin-catalog'
 import { useInstalledPluginManifest } from './use-plugin-contribution-source'
-import { pluginNeedsReview } from '../presentation/plugin-status-presentation'
 import type { PluginFileMatch } from '../../../../../shared/plugins/contributions/plugin-file-match'
 
 /** A shortcut a plugin binds, by the key as written and the command it runs. */
 export type PluginPageShortcut = { key: string; command: string }
+/** A command that runs in place of a built-in action (`replaces`), named before consent. */
+export type PluginPageReplacement = { command: string; action: string }
 
 /**
  * Whether a fetched preview is the release the page rendered. Preview reads the current catalog,
@@ -65,18 +68,7 @@ export function usePluginPageModel({
   /** A catalog refresh is in flight; what the page shows may be about to change. */
   refreshing: boolean
 }) {
-  const incomingReview =
-    entry.installed && pluginNeedsReview(entry.installed) ? entry.installed : null
-  const [reviewed, setReviewed] = useState<PluginHostListEntry | null>(incomingReview)
-  if (reviewed?.pluginKey !== incomingReview?.pluginKey) {
-    setReviewed(incomingReview)
-  }
-  // A refresh must not replace the permissions above an armed approval for the same plugin.
-  const plugin = incomingReview
-    ? reviewed?.pluginKey === incomingReview.pluginKey
-      ? reviewed
-      : incomingReview
-    : entry.installed
+  const plugin = entry.installed
   // Why pinned: a catalog refresh mid-view must never swap the rows above an armed button.
   const [pinned, setPinned] = useState(entry.listing)
   const listing = plugin ? entry.listing : pinned
@@ -170,6 +162,13 @@ export function usePluginPageModel({
         .map((item) => ({ key: item.name, command: item.detail ?? item.name })) ?? null
   }
 
+  const replacingCommands = plugin?.commands ?? shownPreview?.manifest.contributes.commands
+  const replacements: PluginPageReplacement[] | null = replacingCommands
+    ? replacingCommands.flatMap((command) =>
+        command.replaces ? [{ command: command.title, action: command.replaces }] : []
+      )
+    : null
+
   // Extensions and file names the plugin's custom editors open and edit, named in the consent.
   const customEditors: readonly PluginFileMatch[] | undefined = plugin
     ? (plugin.customEditors ?? [])
@@ -180,8 +179,9 @@ export function usePluginPageModel({
         ?.filter((item) => item.kind === 'customEditors')
         .flatMap((item) => (item.detail ? item.detail.split(', ') : [])) ?? null)
 
-  const images: PluginHostImages | undefined =
+  const images: PluginHostImages | undefined = servedPluginHostImages(
     plugin?.images ?? listing?.images ?? shownPreview?.images
+  )
   return {
     plugin,
     listing,
@@ -197,6 +197,7 @@ export function usePluginPageModel({
     trust,
     capabilities,
     shortcuts,
+    replacements,
     editorFileTypes: editorFileTypes ? [...new Set(editorFileTypes)] : null,
     images
   }

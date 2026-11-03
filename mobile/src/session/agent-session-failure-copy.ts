@@ -2,7 +2,7 @@ import type {
   AgentSessionFailureCopyId,
   AgentSessionFailureCopyValues,
   AgentSessionFailureSay
-} from '../../../src/shared/agent-session-failure-copy'
+} from '../../../src/shared/agent-session/failures/agent-session-failure-copy'
 import { translate } from '../i18n/mobile-i18n'
 import { START_FAILURE_COPY } from './agent-session-start-failure-copy'
 import { SEND_FAILURE_COPY } from './agent-session-send-failure-copy'
@@ -79,19 +79,19 @@ const COPY: Record<AgentSessionFailureCopyId, (values: AgentSessionFailureCopyVa
   hostFault: (values) =>
     translate(
       'session.failure.hostFault',
-      "HiveCode ran into a problem, so this didn't go through.",
+      "Orca ran into a problem, so this didn't go through.",
       values
     ),
   hostFaultTryAgain: (values) =>
     translate(
       'session.failure.hostFaultTryAgain',
-      "HiveCode ran into a problem, so this didn't go through. Try again.",
+      "Orca ran into a problem, so this didn't go through. Try again.",
       values
     ),
   hostStopped: (values) =>
     translate(
       'session.failure.hostStopped',
-      '{{agent}} never finished starting, so HiveCode stopped it.',
+      '{{agent}} never finished starting, so Orca stopped it.',
       values
     ),
   providerRateLimited: (values) =>

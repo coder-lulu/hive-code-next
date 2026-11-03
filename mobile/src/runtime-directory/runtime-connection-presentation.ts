@@ -1,4 +1,3 @@
-import { translate } from '../i18n/mobile-i18n'
 import type { ConnectionState, HostCatalogEntry } from '../transport/types'
 import { presentRuntimeCatalogStatus } from './runtime-selector-presentation'
 
@@ -17,62 +16,15 @@ export function presentRuntimeConnection(
 ): RuntimeConnectionPresentation {
   switch (state) {
     case 'connected':
-      return {
-        accessibilityLabel: translate(
-          'diagnostics.useTroubleshootDiagnostics.connected',
-          'Connected'
-        ),
-        label: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.6f3345b9c1',
-          'Online'
-        ),
-        tone: 'success'
-      }
+      return { accessibilityLabel: '已连接', label: '在线', tone: 'success' }
     case 'connecting':
-      return {
-        accessibilityLabel: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.16ec92e865',
-          'Connecting'
-        ),
-        label: translate('hostScreen.hostListActionSheetActions.connect', 'Connect'),
-        tone: 'warning'
-      }
+      return { accessibilityLabel: '正在连接', label: '连接', tone: 'warning' }
     case 'handshaking':
-      return {
-        accessibilityLabel: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.7c482782c7',
-          'Verifying connection'
-        ),
-        label: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.2febb61c00',
-          'Verify'
-        ),
-        tone: 'warning'
-      }
+      return { accessibilityLabel: '正在验证连接', label: '验证', tone: 'warning' }
     case 'reconnecting':
-      return {
-        accessibilityLabel: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.9795c9bcab',
-          'Reconnecting'
-        ),
-        label: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.7b43a8cfcf',
-          'Reconnect'
-        ),
-        tone: 'warning'
-      }
+      return { accessibilityLabel: '正在重连', label: '重连', tone: 'warning' }
     case 'auth-failed':
-      return {
-        accessibilityLabel: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.9e399d5289',
-          'Pairing expired'
-        ),
-        label: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.6e75413aa0',
-          'Expired'
-        ),
-        tone: 'danger'
-      }
+      return { accessibilityLabel: '配对已失效', label: '失效', tone: 'danger' }
     case 'disconnected':
       if (runtime) {
         const { statusLabel, tone } = presentRuntimeCatalogStatus(runtime, state)
@@ -82,16 +34,6 @@ export function presentRuntimeConnection(
           tone
         }
       }
-      return {
-        accessibilityLabel: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.0d75f871c4',
-          'No connection established yet'
-        ),
-        label: translate(
-          'auto.mobile.src.runtime.directory.runtime.connection.presentation.df445ce40f',
-          'Disconnected'
-        ),
-        tone: 'neutral'
-      }
+      return { accessibilityLabel: '尚未建立连接', label: '未连接', tone: 'neutral' }
   }
 }

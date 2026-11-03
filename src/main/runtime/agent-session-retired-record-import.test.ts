@@ -1,31 +1,19 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import {
-  agentSessionLeaseFixture,
-  agentSessionRecordFixture
-} from '../../shared/agent-session-record.test-fixture'
+import { agentSessionRecordFixture } from '../../shared/agent-session-record.test-fixture'
 import { encodeAgentSessionRecord } from '../../shared/agent-session-record-stored-form'
+import { legacyAgentSessionStorePath } from './agent-session-record-store-file'
 import {
-  legacyAgentSessionStorePath,
-  loadAgentSessionStore
-} from './agent-session-record-store-file'
-import {
-  openTestAgentSessionRecordStore,
-  readPersistedTestAgentSessionStore,
-  seedTestAgentSessionRecordStore
+  importTestLegacyAgentSessionRecordStore,
+  readPersistedTestAgentSessionStore
 } from './agent-session-record-store-test-harness'
-import {
-  closeTestJournalHostDatabase,
-  openTestJournalHostDatabase
-} from '../native-chat/agent-session-journal/journal-host-database-test-support'
+import { closeTestJournalHostDatabase } from '../native-chat/agent-session-journal/journal-host-database-test-support'
 
 const NOW = 1_800_000_000_000
 let directory: string
 beforeEach(async () => {
-  const root = resolve(
-    'logs/upstream-sync/20261102/node-fixtures/source-final-next/import-fixtures'
-  )
+  const root = resolve('logs/paperclip-removal/recheck-3/import-fixtures')
   await mkdir(root, { recursive: true })
   directory = await mkdtemp(join(root, 'retired-'))
 })
@@ -87,7 +75,7 @@ function retiredRecord(ordinary: ReturnType<typeof encodeAgentSessionRecord>, ki
   }
 }
 
-describe('retired execution records stay quarantined in file recovery and current journal rows', () => {
+describe('retired execution records stay quarantined through legacy import', () => {
   it.each(['shadowed-raw', 'invalid-metadata'])(
     'keeps retired primary evidence through %s fallback',
     async (scenario) => {
@@ -121,10 +109,12 @@ describe('retired execution records stay quarantined in file recovery and curren
           unusableRecords: {}
         })
       )
-      const loaded = await loadAgentSessionStore(path, 'local')
-      expect(loaded.state.records.has(ordinary.sessionId)).toBe(false)
-      expect(loaded.state.unreadableRecords.has(ordinary.sessionId)).toBe(true)
-      expect(loaded.state.unreadableRecords.get(ordinary.sessionId)?.raw).toEqual(retired)
+      const store = await importTestLegacyAgentSessionRecordStore(directory)
+      expect(store.getRecord(ordinary.sessionId)).toBeNull()
+      expect(store.isSessionUnreadable(ordinary.sessionId)).toBe(true)
+      expect(
+        (await readPersistedTestAgentSessionStore(directory)).records[ordinary.sessionId]
+      ).toEqual(retired)
     }
   )
 
@@ -153,24 +143,21 @@ describe('retired execution records stay quarantined in file recovery and curren
       })
       await writeFile(path, primary)
       await writeFile(`${path}.bak`, backup)
-      const loaded = await loadAgentSessionStore(path, 'local')
-      expect(loaded.state.records.has(ordinary.sessionId)).toBe(false)
-      expect(loaded.state.unreadableRecords.has(ordinary.sessionId)).toBe(true)
-      expect(loaded.state.unreadableRecords.get(ordinary.sessionId)?.raw).toEqual(retired)
+      const store = await importTestLegacyAgentSessionRecordStore(directory)
+      expect(store.getRecord(ordinary.sessionId)).toBeNull()
+      expect(store.isSessionUnreadable(ordinary.sessionId)).toBe(true)
+      expect(
+        (await readPersistedTestAgentSessionStore(directory)).records[ordinary.sessionId]
+      ).toEqual(retired)
       expect(await readFile(path, 'utf8')).toBe(primary)
       expect(await readFile(`${path}.bak`, 'utf8')).toBe(backup)
     }
   )
 
   it.each(['damaged-record', 'truncated-file'])(
-    'keeps %s file evidence out of the current store without replacing a valid owner',
+    'preserves ordinary %s backup recovery and fence floor',
     async (scenario) => {
       const ordinary = encodeAgentSessionRecord(agentSessionRecordFixture())
-      const damaged = {
-        ...ordinary,
-        provider: 'damaged',
-        lease: { ...ordinary.lease, runtimeFence: 50 }
-      }
       const state = (record: unknown) => ({
         schemaVersion: 4,
         hostId: 'local',
@@ -181,41 +168,26 @@ describe('retired execution records stay quarantined in file recovery and curren
       })
       const path = legacyAgentSessionStorePath(directory)
       await mkdir(dirname(path), { recursive: true })
-      const primary = scenario === 'truncated-file' ? '{"records":' : JSON.stringify(state(damaged))
-      const backup = JSON.stringify(state(ordinary))
-      await writeFile(path, primary)
-      await writeFile(`${path}.bak`, backup)
-
-      // The retained reader may read a backup; it grants no current journal ownership.
-      const loaded = await loadAgentSessionStore(path, 'local')
-      expect(loaded.state.records.get(ordinary.sessionId)?.lease).toEqual(ordinary.lease)
-      expect(loaded.recoveredFromBackup).toBe(scenario === 'truncated-file')
-      if (scenario === 'damaged-record') {
-        expect(loaded.state.unreadableRecords.get(ordinary.sessionId)?.raw).toEqual(damaged)
-      }
-      const empty = await openTestAgentSessionRecordStore(directory)
-      expect(empty.getRecord(ordinary.sessionId)).toBeNull()
-      expect(empty.listRecords()).toEqual([])
-
-      const current = agentSessionRecordFixture(agentSessionLeaseFixture({ runtimeFence: 83 }))
-      await seedTestAgentSessionRecordStore(directory, { records: [current] })
-      const ownerBefore = (await openTestAgentSessionRecordStore(directory)).getRecord(
-        current.sessionId
+      await writeFile(
+        path,
+        scenario === 'truncated-file'
+          ? '{"records":'
+          : JSON.stringify(
+              state({
+                ...ordinary,
+                provider: 'damaged',
+                lease: { ...ordinary.lease, runtimeFence: 50 }
+              })
+            )
       )
-      // Opening the current journal requires fresh owner proof, independently of legacy files.
-      expect(ownerBefore).toEqual({
-        ...current,
-        lease: { ...current.lease, unreconciled: true }
+      await writeFile(`${path}.bak`, JSON.stringify(state(ordinary)))
+      const store = await importTestLegacyAgentSessionRecordStore(directory)
+      expect(store.getRecord(ordinary.sessionId)?.lease).toMatchObject({
+        runtimeFence: 7,
+        minimumNextFence: scenario === 'damaged-record' ? 51 : 9,
+        unreconciled: true
       })
-      await loadAgentSessionStore(path, 'local')
-      const reopened = await openTestAgentSessionRecordStore(directory)
-      expect(reopened.getRecord(current.sessionId)).toEqual(ownerBefore)
-      expect(reopened.getRecord(current.sessionId)?.lease).toEqual(ownerBefore?.lease)
-      expect((await readPersistedTestAgentSessionStore(directory)).records).toEqual({
-        [current.sessionId]: encodeAgentSessionRecord(current)
-      })
-      expect(await readFile(path, 'utf8')).toBe(primary)
-      expect(await readFile(`${path}.bak`, 'utf8')).toBe(backup)
+      expect(store.isSessionUnreadable(ordinary.sessionId)).toBe(false)
     }
   )
 
@@ -246,17 +218,7 @@ describe('retired execution records stay quarantined in file recovery and curren
     const backup = JSON.stringify(state({ [ordinary.sessionId]: ordinary }))
     await writeFile(path, primary)
     await writeFile(`${path}.bak`, backup)
-    const loaded = await loadAgentSessionStore(path, 'local')
-    expect(loaded.state.records.has(ordinary.sessionId)).toBe(false)
-    expect(loaded.state.unreadableRecords.has(ordinary.sessionId)).toBe(true)
-    expect(loaded.state.unreadableRecords.get(ordinary.sessionId)?.raw).toEqual(retired)
-    // The current journal row reader independently rejects raw retired provenance.
-    const db = openTestJournalHostDatabase(directory).db
-    db.prepare('INSERT INTO agent_session_records (session_id, record_json) VALUES (?, ?)').run(
-      ordinary.sessionId,
-      JSON.stringify(retired)
-    )
-    const store = await openTestAgentSessionRecordStore(directory)
+    const store = await importTestLegacyAgentSessionRecordStore(directory)
     expect(store.getRecord(ordinary.sessionId)).toBeNull()
     expect(store.isSessionUnreadable(ordinary.sessionId)).toBe(true)
     expect(
@@ -313,9 +275,11 @@ describe('retired execution records stay quarantined in file recovery and curren
         retiredClaimKeys: []
       })
     )
-    const loaded = await loadAgentSessionStore(path, 'local')
-    expect(loaded.state.records.has(ordinary.sessionId)).toBe(false)
-    expect(loaded.state.unreadableRecords.has(ordinary.sessionId)).toBe(true)
-    expect(loaded.state.unreadableRecords.get(ordinary.sessionId)?.raw).toEqual(retired)
+    const store = await importTestLegacyAgentSessionRecordStore(directory)
+    expect(store.getRecord(ordinary.sessionId)).toBeNull()
+    expect(store.isSessionUnreadable(ordinary.sessionId)).toBe(true)
+    expect(
+      (await readPersistedTestAgentSessionStore(directory)).records[ordinary.sessionId]
+    ).toEqual(retired)
   })
 })

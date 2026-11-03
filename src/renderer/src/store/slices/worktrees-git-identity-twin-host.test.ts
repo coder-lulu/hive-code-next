@@ -1,46 +1,7 @@
-import type * as MetadataPersistence from './worktrees/metadata/worktree-meta-persist'
-import type { WorktreeMeta } from '../../../../shared/worktree/meta-types'
-import type { GitHubLinkBase } from '../../../../shared/worktree/github-link-base'
-import type { ExecutionHostId } from '../../../../shared/execution-host'
-const persistedMetadata = vi.hoisted(() =>
-  vi.fn<
-    (args: {
-      worktreeId: string
-      executionHostId?: ExecutionHostId
-      updates: Partial<WorktreeMeta>
-    }) => Promise<void>
-  >()
-)
-vi.mock('./worktrees/metadata/worktree-meta-persist', async (importOriginal) => ({
-  ...(await importOriginal<typeof MetadataPersistence>()),
-  persistWorktreeMeta: (
-    _target: unknown,
-    worktreeId: string,
-    updates: Partial<WorktreeMeta>,
-    executionHostId?: ExecutionHostId,
-    _identityKey?: string,
-    base?: GitHubLinkBase | null
-  ) => {
-    if (updates.linkedPR === null || 'suppressedGitHubPR' in updates) {
-      expect(base).toBeTruthy()
-      expect(base?.hostId).toBe(executionHostId ?? 'local')
-      expect(base?.instanceId).toBe('generation-1')
-    }
-    return persistedMetadata({
-      worktreeId,
-      updates,
-      ...(executionHostId && executionHostId !== 'local' ? { executionHostId } : {})
-    })
-  }
-}))
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Worktree } from '../../../../shared/worktree/types'
 import { resetHostedReviewLinkMutationGenerationForTests } from './worktrees'
-import { makeWorktree as fixtureWorktree } from './worktrees-slice-test-fixtures'
-
-function makeWorktree(overrides: Parameters<typeof fixtureWorktree>[0]) {
-  return fixtureWorktree({ instanceId: 'generation-1', ...overrides })
-}
+import { makeWorktree } from './worktrees-slice-test-fixtures'
 import {
   bumpHostedReviewLinkMutationGeneration,
   migrateHostedReviewLinkMutationGeneration,
@@ -48,6 +9,7 @@ import {
 } from './worktrees/metadata/hosted-review-link-mutation'
 import {
   createTestStore,
+  mockApi,
   resetRemoteRuntimeMocks,
   resetWorktreeSliceModuleMemory
 } from './worktrees-slice-test-harness'
@@ -57,7 +19,6 @@ vi.mock('sonner', () => ({
 }))
 
 beforeEach(() => {
-  persistedMetadata.mockReset().mockResolvedValue(undefined)
   vi.clearAllMocks()
   resetWorktreeSliceModuleMemory()
   resetRemoteRuntimeMocks()
@@ -117,8 +78,8 @@ describe('updateWorktreeGitIdentity with a same-path twin on another host', () =
 
     store.getState().updateWorktreeGitIdentity(id, { branch: 'refs/heads/stack/two' }, 'ssh:box-b')
 
-    await vi.waitFor(() => expect(persistedMetadata).toHaveBeenCalledTimes(1))
-    expect(persistedMetadata).toHaveBeenCalledWith(
+    await vi.waitFor(() => expect(mockApi.worktrees.updateMeta).toHaveBeenCalledTimes(1))
+    expect(mockApi.worktrees.updateMeta).toHaveBeenCalledWith(
       expect.objectContaining({
         worktreeId: id,
         executionHostId: 'ssh:box-b',
@@ -209,13 +170,13 @@ describe('a twin review-clear tombstone after the sibling goes away', () => {
       { hostId: 'ssh:box-b', branch: 'refs/heads/b1', linkedPR: 2 }
     )
     store.getState().updateWorktreeGitIdentity(id, { branch: 'refs/heads/b2' }, 'ssh:box-b')
-    await vi.waitFor(() => expect(persistedMetadata).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(mockApi.worktrees.updateMeta).toHaveBeenCalledTimes(1))
     const [, remote] = store.getState().worktreesByRepo.repo1
     store.setState({ worktreesByRepo: { repo1: [remote] } })
 
     store.getState().updateWorktreeGitIdentity(id, { branch: 'refs/heads/b3' }, 'ssh:box-b')
 
-    await vi.waitFor(() => expect(persistedMetadata).toHaveBeenCalledTimes(2))
+    await vi.waitFor(() => expect(mockApi.worktrees.updateMeta).toHaveBeenCalledTimes(2))
   })
 })
 

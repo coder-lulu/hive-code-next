@@ -190,14 +190,9 @@ function createV2Handshake(args: PairedE2EEClientHandshakeArgs): PairedE2EEClien
       // Why read first: throws before the ready, so nothing is signed without a transcript.
       const transcriptHashB64 = session.transcriptHashB64
       if (credential.kind === 'token') {
-        // Capabilities are declarations inside the authenticated v2 transcript-bound envelope.
+        // Why no capabilities: v2 token auth is an exact key set on every host.
         return session.sealText(
-          serializeJson({
-            ...pairedE2EEV2TokenAuth(transcriptHashB64, credential.deviceToken),
-            ...(options?.clientCapabilities
-              ? { clientCapabilities: options.clientCapabilities }
-              : {})
-          })
+          serializeJson(pairedE2EEV2TokenAuth(transcriptHashB64, credential.deviceToken))
         )
       }
       const signature = await credential.sign(

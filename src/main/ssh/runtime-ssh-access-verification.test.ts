@@ -17,12 +17,10 @@ const pairing = {
   publicKeyB64: Buffer.alloc(32, 1).toString('base64'),
   pairedDeviceId: 'existing-paired-client'
 }
-const tunneledConnection = {
-  credential: { kind: 'token', deviceToken: pairing.deviceToken },
-  hostPublicKeyB64: pairing.publicKeyB64,
-  pairedDeviceId: pairing.pairedDeviceId,
+const tunneledConnection = ({
+  ...pairing,
   endpoint: 'ws://127.0.0.1:41000'
-}
+})
 function environment() {
   return createEnvironmentFromPairingOffer({
     id: 'environment',

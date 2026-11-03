@@ -1,4 +1,3 @@
-import { findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -44,9 +43,9 @@ describe('PickerListDrawer selection handoff', () => {
     act(() => {
       renderer = create(createElement(PickerListDrawer, props))
     })
-    const list = findByHostType(renderer.root, 'FlatList')
+    const list = renderer.root.findByType('FlatList')
     act(() => list.props.renderItem({ item: props.items[0] }).props.onPress())
-    const finishHide = findByHostType(renderer.root, 'BottomDrawer').props.onAfterClose
+    const finishHide = renderer.root.findByType('BottomDrawer').props.onAfterClose
     act(() => renderer.update(createElement(PickerListDrawer, { ...props, visible: false })))
     act(() => finishHide())
     expect(onSelect).not.toHaveBeenCalled()
@@ -75,21 +74,17 @@ describe('PickerListDrawer selection handoff', () => {
       renderer = create(createElement(Probe))
     })
     act(() => nav.transitionDrawer('runTarget'))
-    act(() => {
-      vi.advanceTimersByTime(500)
-    })
-    const list = findByHostType(renderer.root, 'FlatList')
+    act(() => vi.advanceTimersByTime(500))
+    const list = renderer.root.findByType('FlatList')
     const row = list.props.renderItem({ item: list.props.data[0] })
     act(() => row.props.onPress())
     expect(selected).not.toHaveBeenCalled()
-    const closingDrawer = findByHostType(renderer.root, 'BottomDrawer')
+    const closingDrawer = renderer.root.findByType('BottomDrawer')
     expect(closingDrawer.props.visible).toBe(false)
     const delayedDismiss = closingDrawer.props.onClose
     act(() => closingDrawer.props.onAfterClose())
     act(() => delayedDismiss())
-    act(() => {
-      vi.advanceTimersByTime(500)
-    })
+    act(() => vi.advanceTimersByTime(500))
     expect(selected).toHaveBeenCalledOnce()
     expect(nav.drawerView).toBe('runtime')
     act(() => closingDrawer.props.onAfterClose())

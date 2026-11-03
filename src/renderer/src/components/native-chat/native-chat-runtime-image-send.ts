@@ -1,5 +1,5 @@
 import { sendNativeChatObservedWrites } from './native-chat-observed-send'
-import { agentImagePasteWrites, formatAgentImagePath } from '../../../../shared/agent-image-paste'
+import { agentImagePasteWrites } from '../../../../shared/agent-image-paste'
 import { agentImagePastePath } from '../../../../shared/agent-image-paste-path'
 import type { AgentType } from '../../../../shared/agent-status-types'
 import { sendRuntimePtyInput } from '@/runtime/runtime-terminal-inspection'
@@ -8,7 +8,7 @@ import {
   buildNativeChatImagePasteBytes,
   buildNativeChatPasteBytes,
   NATIVE_CHAT_SUBMIT
-} from '../../../../shared/native-chat-paste-bytes'
+} from '../../../../shared/native-chat/input/native-chat-paste-bytes'
 import { enqueueNativeChatPtySend } from './native-chat-pty-send-queue'
 import {
   clearConfirmDurationMs,

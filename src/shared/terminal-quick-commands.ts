@@ -1,5 +1,4 @@
 import { isTuiAgent, TUI_AGENT_CONFIG } from './tui-agent-config'
-import { LEGACY_MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH } from './terminal-quick-command-prompt-limit'
 import type {
   TerminalAgentQuickCommand,
   TerminalCommandQuickCommand,
@@ -12,8 +11,6 @@ export const MAX_QUICK_COMMAND_ID_LENGTH = 80
 export const MAX_QUICK_COMMAND_LABEL_LENGTH = 80
 export const MAX_QUICK_COMMAND_REPO_ID_LENGTH = 200
 export const MAX_QUICK_COMMAND_TERMINAL_TEXT_LENGTH = 4000
-// Retain the product-facing legacy name while the limit implementation lives with the prompt policy.
-export const MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH = LEGACY_MAX_QUICK_COMMAND_AGENT_PROMPT_LENGTH
 const REMOVED_PRESET_IDS = new Set(['default-pwd', 'default-git-status'])
 
 const DEFAULT_TERMINAL_QUICK_COMMANDS: TerminalQuickCommand[] = []

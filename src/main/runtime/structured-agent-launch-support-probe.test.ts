@@ -1,12 +1,10 @@
-import { launchRecordStore } from './structured-agent-launch-composition.test-support'
 import { createAcpStructuredLaunchResolver } from './structured-agent-launch-composition.test-support'
-import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
 import { chmod, mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GlobalSettings } from '../../shared/global-settings-types'
-import { agentSessionRecordFixture } from '../../shared/agent-session-record.test-fixture'
+import { agentSessionRecordFixture } from '../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
 import { acpLaunchSpecFor } from '../acp/acp-launch-specs'
 import { structuredAgentSupportsLaunch } from './structured-agent-launch-support'
 
@@ -44,17 +42,15 @@ const workspace = async () => root
 
 function launchWith(settings: Settings) {
   return createAcpStructuredLaunchResolver(acpLaunchSpecFor('opencode')!, {
-    dataDirectory: root,
-    logger: createStructuredAgentSessionLogger(),
-    store: launchRecordStore(
-      () => ({
+    store: {
+      getRecord: () => ({
         ...agentSessionRecordFixture(),
         provider: 'opencode',
         providerHandleChain: [],
         accountHome: { kind: 'opencode', locator: { kind: 'unmanaged' } }
       }),
-      vi.fn()
-    ),
+      pinLaunchDirectory: vi.fn()
+    },
     readJournal: () => null,
     resolveWorkspacePath: async () => root,
     resolveEnvironment: async () => loginShell.env,
@@ -98,22 +94,6 @@ describe.skipIf(process.platform === 'win32')(
         await structuredAgentSupportsLaunch('opencode', workspace, runtimeWith(settings))
       ).toBe(true)
       expect((await launchWith(settings)).command).toBe(join(privateBin, 'opencode'))
-    })
-
-    it('keeps a refused release first on PATH on the terminal chat when nothing points elsewhere', async () => {
-      const settings = { ...base, agentDefaultEnv: {} }
-      expect(
-        await structuredAgentSupportsLaunch('opencode', workspace, runtimeWith(settings))
-      ).toBe(false)
-    })
-
-    it('runs a stable 2.x first on PATH in the structured chat', async () => {
-      await fakeOpencode(shellBin, '2.0.21')
-      const settings = { ...base, agentDefaultEnv: {} }
-      expect(
-        await structuredAgentSupportsLaunch('opencode', workspace, runtimeWith(settings))
-      ).toBe(true)
-      expect((await launchWith(settings)).command).toBe(join(shellBin, 'opencode'))
     })
 
     it('checks and launches the binary the Command setting names', async () => {

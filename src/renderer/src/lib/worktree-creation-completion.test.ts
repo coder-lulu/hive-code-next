@@ -2,10 +2,11 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import type { WorktreeCreationRequest } from './pending-worktree-creation'
 import { completeWorktreeCreation } from './worktree-creation-completion'
 
-const mocks = vi.hoisted(() => {
-  const pending: Record<string, { returnToSessions?: boolean }> = {}
-  return { pending, navigate: vi.fn(), remove: vi.fn() }
-})
+const mocks = vi.hoisted(() => ({
+  pending: {} as Record<string, { returnToSessions?: boolean }>,
+  navigate: vi.fn(),
+  remove: vi.fn()
+}))
 vi.mock('@/store', () => ({
   useAppStore: {
     getState: () => ({
@@ -34,23 +35,12 @@ beforeEach(() => {
 })
 const args = () => ({
   creationId: 'create',
-  request: {
-    repoId: 'repo',
-    name: 'new-owner',
-    setupDecision: 'inherit',
-    agent: null,
-    pendingFirstAgentMessageRename: false,
-    note: '',
-    startupPlan: null,
-    quickPrompt: '',
-    quickTelemetry: null
-  } satisfies WorktreeCreationRequest,
+  request: {} as WorktreeCreationRequest,
   worktreeId: 'new-owner',
   structuredLaunchAccepted: true,
-  activation: { primaryTabId: null },
+  activation: false as const,
   primaryTabId: null,
   backendSpawned: false,
-  hostPlannedStartup: false,
   focusOnCompletion: true
 })
 it('returns to the created owner only after successful foreground completion', async () => {
@@ -58,11 +48,6 @@ it('returns to the created owner only after successful foreground completion', a
   await completeWorktreeCreation(args())
   expect(mocks.navigate).toHaveBeenCalledWith('new-owner')
   expect(mocks.remove).toHaveBeenCalledWith('create', { cleanupVm: false })
-})
-it('does not navigate when activation fails', async () => {
-  mocks.pending.create = { returnToSessions: true }
-  await completeWorktreeCreation({ ...args(), activation: false })
-  expect(mocks.navigate).not.toHaveBeenCalled()
 })
 it('does not redirect a cancelled creation with no pending entry', async () => {
   await completeWorktreeCreation(args())

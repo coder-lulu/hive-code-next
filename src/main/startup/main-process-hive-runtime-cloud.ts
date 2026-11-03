@@ -1,7 +1,3 @@
-import { createRuntimeEnvironmentMobileRelayHosts } from '../ipc/runtime-environments/runtime-environment-mobile-relay-hosts'
-import { MobileRelayHostCatalog } from '../runtime/mobile-desktop-relay/mobile-relay-host-catalog'
-import { OnDemandServerWorktreeRows } from '../runtime/mobile-desktop-relay/on-demand-server-worktree-rows'
-import { getHostDisplayLabelOverrides } from '../../shared/host-setting-overrides'
 import { app } from 'electron'
 import { HiveAccountService } from '../hive-account/hive-account-service'
 import { getHiveRuntimeCloudConfig } from '../hive-runtime-cloud/hive-runtime-cloud-config'
@@ -152,18 +148,6 @@ export function initializeHiveRuntimeCloud(runtimeService: OrcaRuntimeService): 
 }
 
 export function installHiveRuntimeCloudWebLaunch(runtimeRpc: OrcaRuntimeRpcServer): void {
-  const store = state.store
-  if (store) {
-    const hosts = createRuntimeEnvironmentMobileRelayHosts()
-    runtimeRpc.setMobileRelayHostCatalog(
-      new MobileRelayHostCatalog({
-        hosts,
-        serverRows: new OnDemandServerWorktreeRows(hosts),
-        hostLabelOverrides: () => getHostDisplayLabelOverrides(store.getSettings()),
-        getWorkspaceSession: (hostId) => store.getWorkspaceSession(hostId)
-      })
-    )
-  }
   const runtimeCloudConfig = getHiveRuntimeCloudConfig()
   const processRuntimeCloudPresence = state.runtimeCloudPresence
   if (!processRuntimeCloudPresence) {

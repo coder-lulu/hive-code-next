@@ -219,10 +219,7 @@ function RuntimeMetadataSyncNotice({ state }: { state: string }): React.JSX.Elem
       role="status"
       className="fixed inset-x-2 bottom-2 z-50 rounded-md border bg-popover px-3 py-2 text-sm text-popover-foreground shadow-sm sm:inset-x-auto sm:left-3 sm:max-w-lg"
     >
-      {t(
-        'web.runtime.nameSyncUnverified',
-        'Name sync could not be verified. Showing the last confirmed name.'
-      )}
+      {t('web.runtime.nameSyncUnverified', '名称同步暂不可验证，显示上次已确认名称。')}
     </div>
   )
 }

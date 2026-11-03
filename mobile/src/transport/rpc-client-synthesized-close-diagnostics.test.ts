@@ -1,6 +1,7 @@
 // Pin diagnostic clocks and auth-failed latches when RN omits close and later delivers the stale event.
 import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from 'vitest'
 import { connect } from './rpc-client'
+import { PAIRED_E2EE_HANDSHAKE_DEADLINE_MS } from '../../../src/shared/paired-e2ee-handshake-deadline'
 import { diagnoseConnection } from '../diagnostics/connection-diagnostics-analysis'
 import type { ConnectionLogEntry } from './types'
 import { recordSocketDeadlineAppState } from './socket-deadline-clock'
@@ -117,7 +118,7 @@ describe('synthesized close diagnostics', () => {
       if (kind === 'handshake') {
         lastSocket().open()
       }
-      const timeout = kind === 'connect' ? 12_000 : 5_000
+      const timeout = kind === 'connect' ? 12_000 : PAIRED_E2EE_HANDSHAKE_DEADLINE_MS
       try {
         elapsed = 164 * 60_000
         vi.setSystemTime(Date.now() + elapsed - timeout)
@@ -220,7 +221,7 @@ describe('synthesized close diagnostics', () => {
     const client = connect('ws://desktop.invalid', 'token', 'server-key')
     lastSocket().open()
 
-    await vi.advanceTimersByTimeAsync(5_000)
+    await vi.advanceTimersByTimeAsync(PAIRED_E2EE_HANDSHAKE_DEADLINE_MS)
     expect(client.getState()).toBe('reconnecting')
 
     await vi.advanceTimersByTimeAsync(500)
@@ -239,7 +240,7 @@ describe('synthesized close diagnostics', () => {
 
     await vi.advanceTimersByTimeAsync(100)
     wedged.receive(JSON.stringify({ type: 'e2ee_ready' }))
-    await vi.advanceTimersByTimeAsync(4_900)
+    await vi.advanceTimersByTimeAsync(PAIRED_E2EE_HANDSHAKE_DEADLINE_MS - 100)
     await vi.advanceTimersByTimeAsync(500)
     expect(sockets).toHaveLength(2)
     const replacement = lastSocket()
@@ -253,9 +254,9 @@ describe('synthesized close diagnostics', () => {
     const staleCloseLog = logFields(
       logSpy.mock.calls.findLast((call) => call[0] === '[net] ws.onclose')?.[1]
     )
-    expect(staleCloseLog?.constructToCloseMs).toBe(5_700)
+    expect(staleCloseLog?.constructToCloseMs).toBe(PAIRED_E2EE_HANDSHAKE_DEADLINE_MS + 700)
     expect(staleCloseLog?.aliveMs).toBeNull()
-    expect(staleCloseLog?.inboundIdleMs).toBe(5_600)
+    expect(staleCloseLog?.inboundIdleMs).toBe(PAIRED_E2EE_HANDSHAKE_DEADLINE_MS + 600)
 
     await vi.advanceTimersByTimeAsync(300)
     lastSocket().deliverClose(1006)
@@ -273,7 +274,7 @@ describe('synthesized close diagnostics', () => {
     const client = connect('ws://desktop.invalid', 'token', 'server-key')
     const wedged = lastSocket()
     wedged.open()
-    await vi.advanceTimersByTimeAsync(5_000)
+    await vi.advanceTimersByTimeAsync(PAIRED_E2EE_HANDSHAKE_DEADLINE_MS)
     expect(client.getState()).toBe('reconnecting')
     await vi.advanceTimersByTimeAsync(500)
     const replacement = lastSocket()
@@ -312,7 +313,7 @@ describe('synthesized close diagnostics', () => {
     const client = connect('ws://desktop.invalid', 'token', 'server-key')
     const wedged = lastSocket()
     wedged.open()
-    await vi.advanceTimersByTimeAsync(5_500)
+    await vi.advanceTimersByTimeAsync(PAIRED_E2EE_HANDSHAKE_DEADLINE_MS + 500)
 
     const replacement = lastSocket()
     replacement.open()

@@ -50,6 +50,7 @@ function shortcutState(): AppShortcutState {
     activeView: 'terminal',
     activeWorktreeId: 'parent',
     actions: {
+      openNewTaskHome: vi.fn(),
       toggleSidebar: vi.fn(),
       toggleRightSidebar: vi.fn(),
       setRightSidebarOpen: vi.fn(),

@@ -87,7 +87,7 @@ describe('getRenderRowKey', () => {
 describe('project tree header geometry', () => {
   it('reserves the rendered group and project heights before the next row', () => {
     const headers: RenderRow[] = [
-      { ...groupRow('group'), projectGroup: { id: null, name: 'Ungrouped', tabOrder: 0 } },
+      { ...groupRow('group'), projectGroup: { id: null, name: 'Group', tabOrder: 0 } },
       repoRow('repo'),
       itemStub('first-worktree')
     ]
@@ -105,7 +105,7 @@ describe('project tree header geometry', () => {
   it('includes the larger top inset on a secondary top-level project group', () => {
     const headers: RenderRow[] = [
       groupRow('previous'),
-      { ...groupRow('group'), projectGroup: { id: null, name: 'Ungrouped', tabOrder: 0 } },
+      { ...groupRow('group'), projectGroup: { id: null, name: 'Group', tabOrder: 0 } },
       repoRow('repo')
     ]
 

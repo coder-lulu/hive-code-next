@@ -404,10 +404,7 @@ describe('mobile SMS authentication client', () => {
     const fetchMock = vi.fn().mockResolvedValue(response({ revoked: true }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await revokeMobileSession({
-      ...parseSession(session),
-      accessToken: `header.${payload}.signature`
-    })
+    await revokeMobileSession({ ...session, accessToken: `header.${payload}.signature` })
 
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe(
@@ -438,10 +435,7 @@ describe('mobile SMS authentication client', () => {
     const fetchMock = vi.fn().mockResolvedValue(response({ revoked: true }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await revokeMobileSession({
-      ...parseSession(session),
-      accessToken: `header.${payload}.signature`
-    })
+    await revokeMobileSession({ ...session, accessToken: `header.${payload}.signature` })
 
     const [url, options] = fetchMock.mock.calls[0] as [string, RequestInit]
     expect(url).toBe(

@@ -10,8 +10,6 @@ export type AgentSkillSetupPanelProps = {
   title: string
   description: ReactNode
   skillNames: readonly string[]
-  command?: string
-  installedCommand?: string
   target?: BundledSkillTarget | null
   // COMPAT(wsl-bridge): removed when WSL runs as an orcad host.
   terminalRuntime?: LocalAgentRuntime
@@ -28,12 +26,6 @@ export type AgentSkillSetupPanelProps = {
   // Enclosing modals can own the title and status.
   hideHeader?: boolean
   onBeforeInstall?: () => void | Promise<void>
-  preInstallNotice?: ReactNode
-  getPrerequisiteStatus?: () => Promise<Awaited<ReturnType<typeof window.api.cli.getInstallStatus>>>
-  isPrerequisiteAvailable?: (
-    status: Awaited<ReturnType<typeof window.api.cli.getInstallStatus>>
-  ) => boolean
-  onBeforeOpenTerminal?: () => void | Promise<void>
   showInstallWhenInstalled?: boolean
   showRecheckWhenInstalled?: boolean
   installLabel?: string

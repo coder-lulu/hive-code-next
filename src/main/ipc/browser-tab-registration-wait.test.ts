@@ -18,9 +18,7 @@ vi.mock('../browser/browser-manager', () => ({
 
 import {
   waitForAnyTabRegistration,
-  waitForTabRegistration,
   waitForNextTabRegistration,
-  resolveTabRegistrationWaiters,
   waitForWorktreeTabRegistration
 } from './browser-tab-registration-wait'
 import { installDocPreviewGuestPolicy } from '../browser/doc-preview-guest-policy'
@@ -77,26 +75,6 @@ afterEach(() => {
 })
 
 describe('a workspace document registering', () => {
-  it('holds a page-specific caller until its actual guest registers', async () => {
-    const settled = track(waitForTabRegistration('page-a', WAIT_MS))
-    resolveTabRegistrationWaiters('page-b', 'worktree')
-    await vi.advanceTimersByTimeAsync(0)
-    expect(settled()).toBe('pending')
-    resolveTabRegistrationWaiters('page-a', 'worktree')
-    await vi.advanceTimersByTimeAsync(0)
-    expect(settled()).toBe('resolved')
-  })
-
-  it('rejects a page registration deadline so the caller can retry', async () => {
-    const waiting = waitForTabRegistration('page-timeout', WAIT_MS)
-    const failure = expect(waiting).rejects.toThrow('Tab registration timed out')
-    await vi.advanceTimersByTimeAsync(WAIT_MS)
-    await failure
-    const retry = waitForTabRegistration('page-timeout', WAIT_MS)
-    resolveTabRegistrationWaiters('page-timeout', 'worktree')
-    await expect(retry).resolves.toBeUndefined()
-  })
-
   it('settles a wait that already names its page', async () => {
     const settled = track(waitForNextTabRegistration('doc-page-1', WAIT_MS))
 

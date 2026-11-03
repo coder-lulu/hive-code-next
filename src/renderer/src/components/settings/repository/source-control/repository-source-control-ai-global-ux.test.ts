@@ -18,7 +18,7 @@ import { sourceControlActionSelectedPreferences } from '../../../../../../shared
 import { liftActionPermissionArgs } from '../../../../../../shared/source-control-action-permission-lift'
 import { resolveSourceControlActionRecipe } from '../../../../../../shared/source-control-ai-operation-policy'
 
-const source = normalizeSourceControlAiSettings(undefined)
+const source = normalizeSourceControlAiSettings(undefined, undefined)
 
 function setup(
   persistedRepoAi: RepoSourceControlAiOverrides,

@@ -3,7 +3,6 @@ import {
   AGENT_SESSION_LAUNCH_PERMISSION_CAPABILITY
 } from '../../../shared/agent-session-host-authority'
 import type { TuiAgent } from '../../../shared/tui-agent'
-import type { RuntimeCapability } from '../../../shared/protocol-version'
 import type { AgentExplicitLaunchPermissionMode } from '../../../shared/tui-agent-permissions'
 import { useAppStore } from '../store'
 import { agentResumeHostAuthorityCapability } from './agent-resume-host-authority-capability'
@@ -12,9 +11,8 @@ import { toWebTerminalSurfaceTabId } from '../../../shared/terminal-surface-id'
 export function resolveWebRuntimeAgentHostAuthorityCapabilities(args: {
   agent: TuiAgent
   agentSessionKind: 'fresh' | 'resume' | undefined
-  /** Every permission payload needs host authority; the host validates its value. */
-  agentPermissionMode: string | undefined
-}): RuntimeCapability[] {
+  agentPermissionMode: AgentExplicitLaunchPermissionMode | undefined
+}): string[] {
   const resumeCapability =
     args.agentSessionKind === 'resume' ? agentResumeHostAuthorityCapability(args.agent) : undefined
   return [

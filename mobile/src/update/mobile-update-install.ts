@@ -1,4 +1,3 @@
-import { translate } from '../i18n/mobile-i18n'
 import { AppState, Linking, Platform } from 'react-native'
 import {
   subscribeApkDownloadProgress,
@@ -48,10 +47,7 @@ async function installUpdate(): Promise<MobileUpdateSnapshot> {
       return publish({
         ...snapshot,
         state: 'ready-to-install',
-        message: translate(
-          'auto.mobile.src.update.mobile.update.install.9079e7f6cd',
-          'Opened App Store/TestFlight.'
-        )
+        message: '已打开 App Store/TestFlight。'
       })
     } catch (error) {
       return publish({
@@ -74,10 +70,7 @@ async function installUpdate(): Promise<MobileUpdateSnapshot> {
         ...target,
         state: 'awaiting-permission',
         promptVisible: true,
-        message: translate(
-          'auto.mobile.src.update.mobile.update.install.e5f134866a',
-          'Allow HiveCode to install unknown apps. The update will continue automatically when you return.'
-        )
+        message: '请允许 HiveCode 安装未知应用，返回后将自动继续更新。'
       })
     }
     if (downloadedApk?.sha256 !== artifact.sha256) {
@@ -128,10 +121,7 @@ async function installUpdate(): Promise<MobileUpdateSnapshot> {
         // foreground observer will show it when Android resumes the app.
         promptVisible: true,
         downloadedBytes: artifact.size!,
-        message: translate(
-          'auto.mobile.src.update.mobile.update.install.d9e66f793d',
-          'Download complete. Open the installer to finish updating.'
-        )
+        message: '下载完成，请打开安装器完成更新。'
       })
     }
     publish({
@@ -146,14 +136,7 @@ async function installUpdate(): Promise<MobileUpdateSnapshot> {
       downloadedApk = null
       throw error
     }
-    return publish({
-      ...snapshot,
-      state: 'ready-to-install',
-      message: translate(
-        'auto.mobile.src.update.mobile.update.install.c49f8392f7',
-        'Handed off to the system installer.'
-      )
-    })
+    return publish({ ...snapshot, state: 'ready-to-install', message: '已交给系统安装器。' })
   } catch (error) {
     return publish({
       ...snapshot,

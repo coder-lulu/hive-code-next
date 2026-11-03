@@ -148,11 +148,11 @@ export function getRuntimeEnvironmentRemovalPresentation(
     description: isActive
       ? translate(
           'auto.components.settings.RuntimeEnvironmentsPane.removeActiveServerDescription',
-          'This server is the default host for new projects. Choose another one in Advanced before removing it. Existing host sessions are left alone.'
+          'Choose another Active Server in Advanced before removing this server. Existing host sessions are left alone.'
         )
       : translate(
           'auto.components.settings.RuntimeEnvironmentsPane.ed3e3f069d',
-          'This removes the saved server from HiveCode. It does not change the default host for new projects.'
+          'This removes the saved server from HiveCode. It does not change the active server.'
         ),
     actionLabel: translate('auto.components.settings.RuntimeEnvironmentsPane.d25f0688b1', 'Remove'),
     actionAriaLabel: translate(

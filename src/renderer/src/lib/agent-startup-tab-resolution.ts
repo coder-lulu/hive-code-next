@@ -4,7 +4,7 @@ import {
   toWebTerminalSurfaceTabId
 } from '../../../shared/terminal-surface-id'
 import { parsePaneKey } from '../../../shared/stable-pane-id'
-import { runtimeEnvironmentIdOrLocalUnlessTwin } from './worktree-runtime-owner'
+import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'
 
 type AppStoreSnapshot = ReturnType<typeof useAppStore.getState>
 
@@ -28,7 +28,7 @@ export function resolveAgentStartupTabId(
     }
     if (
       !isWebTerminalSurfaceTabId(primaryTabId) &&
-      runtimeEnvironmentIdOrLocalUnlessTwin(state, worktreeId)
+      getRuntimeEnvironmentIdForWorktree(state, worktreeId)
     ) {
       // A paired Host can return its raw tab id before the Renderer has
       // materialized the mirrored surface. Bind the follow-up to that future

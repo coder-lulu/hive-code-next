@@ -32,9 +32,6 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 })
 }))
-vi.mock('./layout/side-safe-area', () => ({
-  SideSafeArea: ({ children }: { children: unknown }) => children
-}))
 
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({ hostId: dependencies.hostId }),
@@ -141,7 +138,7 @@ describe('edit host route accessibility', () => {
     ])
     const renderer = await renderEditHostRoute()
 
-    expect(findAllByHostType(renderer.root, 'TextInput')).toHaveLength(2)
+    expect(renderer.root.findAllByType('TextInput')).toHaveLength(2)
 
     act(() => renderer.unmount())
   })
@@ -151,7 +148,7 @@ describe('edit host route accessibility', () => {
     dependencies.directoryEntries = [CLOUD_RUNTIME]
     dependencies.loadHosts.mockResolvedValueOnce([])
     const renderer = await renderEditHostRoute()
-    const inputs = findAllByHostType(renderer.root, 'TextInput')
+    const inputs = renderer.root.findAllByType('TextInput')
 
     expect(inputs).toHaveLength(1)
     expect(inputs[0]?.props.accessibilityLabel).toBe('Name')

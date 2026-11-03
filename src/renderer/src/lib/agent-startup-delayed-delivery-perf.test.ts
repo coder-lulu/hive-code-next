@@ -142,45 +142,6 @@ describe('delayed agent startup subscription', () => {
     expect(deliver).toHaveBeenCalledWith('tab-background', 'pty-background', startup)
   })
 
-  it('binds the recorded host pane when its PTY appears and delivers only once', () => {
-    seedPendingState()
-    const deliver = vi.fn().mockResolvedValue(undefined)
-    const startup = {
-      agent: 'codex' as const,
-      launchCommand: 'codex',
-      expectedProcess: 'codex',
-      followupPrompt: 'review',
-      launchConfig: { agentArgs: '', agentEnv: {} }
-    }
-    queuePendingAgentStartupDelivery({
-      worktreeId: 'wt-background',
-      tabId: 'tab-background',
-      launchToken: 'target-launch',
-      startup,
-      hostPane: { tabId: 'tab-background', leafId: LEAF_ID },
-      deliver
-    })
-    expect(deliver).not.toHaveBeenCalled()
-    useAppStore.setState({
-      ptyIdsByTabId: { 'tab-background': ['pty-background'] },
-      terminalLayoutsByTabId: {
-        'tab-background': {
-          root: { type: 'leaf', leafId: LEAF_ID },
-          activeLeafId: LEAF_ID,
-          expandedLeafId: null,
-          ptyIdsByLeafId: { [LEAF_ID]: 'pty-background' }
-        }
-      }
-    })
-    expect(deliver).toHaveBeenCalledExactlyOnceWith('tab-background', 'pty-background', startup)
-    expect(
-      useAppStore.getState().agentLaunchConfigByPaneKey[`tab-background:${LEAF_ID}`]
-    ).toMatchObject({
-      launchConfig: { hostDefaultsAuthoritative: true },
-      identity: { launchToken: 'target-launch', leafId: LEAF_ID, agentType: 'codex' }
-    })
-  })
-
   it('drops a delivery when its tab is removed before PTY binding', () => {
     seedPendingState()
     const deliver = vi.fn().mockResolvedValue(undefined)

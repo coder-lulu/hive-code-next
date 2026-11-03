@@ -43,7 +43,7 @@ describe('worktree permission startup RPC', () => {
         startupEnv: { GOOSE_MODE: 'auto' },
         startupLaunchToken: 'launch-token',
         startupPermissionMode: 'yolo',
-        startupLaunchPreferences: { model: 'gpt-5.6-sol', effort: 'high', mode: 'ask' },
+        startupLaunchPreferences: { model: 'gpt-5.6-sol', effort: 'high' },
         startupPrompt: 'implement the task',
         activate: true
       })
@@ -55,7 +55,8 @@ describe('worktree permission startup RPC', () => {
         repoSelector: 'repo-1',
         startup: undefined,
         startupAgent: 'goose',
-        startupLaunchPreferences: { model: 'gpt-5.6-sol', effort: 'high', mode: 'full-access' },
+        startupPermissionMode: 'yolo',
+        startupLaunchPreferences: { model: 'gpt-5.6-sol', effort: 'high' },
         startupLaunchToken: 'launch-token',
         startupPrompt: 'implement the task'
       })

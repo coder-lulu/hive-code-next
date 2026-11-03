@@ -1,4 +1,3 @@
-import { findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -70,8 +69,8 @@ describe('Mobile Session header actions', () => {
         })
       )
     })
-    const button = findByHostType(renderer!.root, 'Pressable')
-    const icon = findByHostType(renderer!.root, 'HeaderIcon')
+    const button = renderer!.root.findByType('Pressable')
+    const icon = renderer!.root.findByType('HeaderIcon')
     const restStyle = flattenStyle(button.props.style({ pressed: false }))
 
     expect(button.props).toMatchObject({
@@ -105,7 +104,7 @@ describe('Mobile Session header actions', () => {
         })
       )
     })
-    const sheet = findByHostType(renderer!.root, 'ActionSheetModal')
+    const sheet = renderer!.root.findByType('ActionSheetModal')
 
     expect(sheet.props.actions.map((action: { label: string }) => action.label)).toEqual([
       'Agent 会话历史',
@@ -150,7 +149,7 @@ describe('Mobile Session header actions', () => {
         })
       )
     })
-    const sheet = findByHostType(renderer!.root, 'ActionSheetModal')
+    const sheet = renderer!.root.findByType('ActionSheetModal')
     const actions = sheet.props.actions as { label: string; onPress: () => void }[]
 
     expect(actions.map((action) => action.label)).toEqual([
@@ -202,6 +201,6 @@ describe('Mobile Session header actions', () => {
       )
     })
 
-    expect(findByHostType(renderer!.root, 'ActionSheetModal').props.title).toBe('新建浏览器')
+    expect(renderer!.root.findByType('ActionSheetModal').props.title).toBe('新建浏览器')
   })
 })

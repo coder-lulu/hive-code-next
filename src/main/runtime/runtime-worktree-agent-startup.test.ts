@@ -4,7 +4,6 @@ import { tuiAgentToAgentKind } from '../../shared/agent-kind'
 import { getDefaultSettings } from '../../shared/constants'
 import type { RuntimeManagedWorktreeCreateArgs } from './runtime-managed-worktree-create-types'
 import type { AgentLaunchRuntime } from '../../shared/agent-launch-runtime'
-import { resolveManagedWorktreeCreateStartup } from './workspaces/managed-worktree-create-startup'
 
 const mocks = vi.hoisted(() => ({
   detectInstalledAgentsWithShellPathHydration: vi.fn()
@@ -211,28 +210,6 @@ describe('buildWorktreeStartupForAgent blank prompt', () => {
 })
 
 describe('buildWorktreeStartupForDraft agent detection', () => {
-  it('keeps model and permission preferences when a Windows draft exceeds the inline limit', async () => {
-    const draft = 'x'.repeat(24_001)
-    const result = await buildWorktreeStartupForDraft({
-      repo: makeRepo({}),
-      settings: { ...settings, agentDefaultArgs: { claude: '--dangerously-skip-permissions' } },
-      requestedAgent: 'claude',
-      draft,
-      sessionOptions: { model: 'opus', permissionMode: 'ask' },
-      getLaunchRuntime: () => ({
-        platform: 'win32',
-        shell: 'powershell',
-        launchRuntime: {
-          platform: 'win32',
-          pty: { shellOverride: 'powershell.exe', terminalWindowsWslDistro: null }
-        }
-      })
-    })
-    expect(result?.draftPaste).toEqual({ agent: 'claude', content: draft })
-    expect(result?.startup.command).toContain('opus')
-    expect(result?.startup.command).toContain('default')
-    expect(result?.startup.command).not.toContain('--dangerously-skip-permissions')
-  })
   it('never probes this client for an SSH host named only by executionHostId', async () => {
     mocks.detectInstalledAgentsWithShellPathHydration.mockResolvedValue(['claude'])
 
@@ -342,25 +319,24 @@ describe('buildWorktreeStartupForAgent extra agent args', () => {
     })
   })
 
-  it("merges a launch's account env over the startup plan's env", async () => {
+  it("merges a launch's account env over the startup plan's env", () => {
     const build = vi.fn(() => ({
       agent: 'codex' as const,
       startup: { command: 'codex', env: { CODEX_HOME: '/stale', KEEP: '1' } },
       launchRuntime: LINUX_FACT
     }))
-    const resolved = await resolveManagedWorktreeCreateStartup(
+    const resolved = resolveWorktreeCreateAgentStartup(
       {
         repoSelector: 'repo-1',
         name: 'Review',
         startupAgent: 'codex',
         startupAccountEnv: { CODEX_HOME: '/home/u/.codex-b' }
       },
-      [],
-      { agent: build, draft: async () => null }
+      build
     )
 
-    expect(resolved.effectiveStartup?.env).toEqual({ CODEX_HOME: '/home/u/.codex-b', KEEP: '1' })
-    expect(resolved.startupLaunchRuntime).toBe(LINUX_FACT)
+    expect(resolved?.startup.env).toEqual({ CODEX_HOME: '/home/u/.codex-b', KEEP: '1' })
+    expect(resolved?.launchRuntime).toBe(LINUX_FACT)
   })
 })
 

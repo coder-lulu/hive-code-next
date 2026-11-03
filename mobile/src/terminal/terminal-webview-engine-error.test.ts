@@ -96,9 +96,7 @@ describe('TerminalWebView engine errors', () => {
     vi.useFakeTimers()
     const ref = createRef<TerminalWebViewHandle>()
     const { renderer } = createTerminalWebViewRenderer(vi.fn(), { ref })
-    act(() => {
-      vi.advanceTimersByTime(300)
-    })
+    act(() => vi.advanceTimersByTime(300))
     expect(renderedText(renderer)).toContain('正在加载会话内容')
     postWebViewMessage(renderer, { type: 'web-ready' })
     expect(renderedText(renderer)).toContain('正在加载会话内容')
@@ -109,10 +107,8 @@ describe('TerminalWebView engine errors', () => {
       vi.advanceTimersByTime(300)
     })
     expect(renderedText(renderer)).not.toContain('正在加载会话内容')
-    act(() => findByHostType(renderer.root, 'WebView').props.onLoadStart())
-    act(() => {
-      vi.advanceTimersByTime(300)
-    })
+    act(() => renderer.root.findByType('WebView').props.onLoadStart())
+    act(() => vi.advanceTimersByTime(300))
     expect(renderedText(renderer)).toContain('正在加载会话内容')
   })
 

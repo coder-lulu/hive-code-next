@@ -11,39 +11,19 @@ function item(id: string, displayName: string, depth = 0): HostSectionRow {
     groupDepth: 1,
     depth,
     repo: undefined,
+    lineageTrail: [],
     isLastLineageChild: false,
     lineageChildCount: 0,
     worktree: makeWorktree({ id, displayName, branch: id, sortOrder: 0, instanceId: id })
   }
 }
 const rows: HostSectionRow[] = [
-  {
-    type: 'header',
-    key: 'group',
-    label: 'Team',
-    projectGroupDepth: 0,
-    count: 1,
-    icon: { kind: 'project' }
-  },
-  {
-    type: 'header',
-    key: 'repo',
-    label: 'api',
-    projectGroupDepth: 1,
-    count: 3,
-    icon: { kind: 'project' }
-  },
+  { type: 'header', key: 'group', label: 'Team', projectGroupDepth: 0, count: 1, tone: '' },
+  { type: 'header', key: 'repo', label: 'api', projectGroupDepth: 1, count: 3, tone: '' },
   item('main', 'main'),
   item('child', 'fix login', 1),
   item('sibling', 'other'),
-  {
-    type: 'header',
-    key: 'group2',
-    label: 'Personal',
-    projectGroupDepth: 0,
-    count: 1,
-    icon: { kind: 'project' }
-  },
+  { type: 'header', key: 'group2', label: 'Personal', projectGroupDepth: 0, count: 1, tone: '' },
   {
     type: 'folder-workspace',
     key: 'folder',

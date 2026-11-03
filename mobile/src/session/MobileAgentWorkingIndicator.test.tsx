@@ -1,4 +1,3 @@
-import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -45,8 +44,8 @@ describe('MobileAgentWorkingIndicator', () => {
       renderer = create(createElement(MobileAgentWorkingIndicator))
     })
     const row = renderer!.root.findByProps({ accessibilityLiveRegion: 'polite' })
-    const label = findByHostType(renderer!.root, 'Text')
-    const dots = findAllByHostType(renderer!.root, 'AnimatedView')
+    const label = renderer!.root.findByType('Text')
+    const dots = renderer!.root.findAllByType('AnimatedView')
 
     expect(row.props).toMatchObject({
       accessibilityLabel: 'Agent 正在工作',

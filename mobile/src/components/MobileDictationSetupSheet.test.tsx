@@ -1,4 +1,3 @@
-import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -123,19 +122,19 @@ describe('MobileDictationSetupSheet', () => {
     })
 
     expect(sendRequest).toHaveBeenCalledWith('speech.models.list', null)
-    const modelsGroup = findAllByHostType(renderer!.root, 'View').find(
-      (node) => resolvedStyle(node).overflow === 'hidden'
-    )!
+    const modelsGroup = renderer!.root
+      .findAllByType('View')
+      .find((node) => resolvedStyle(node).overflow === 'hidden')!
     expect(resolvedStyle(modelsGroup)).toMatchObject({
       borderRadius: 12,
       backgroundColor: mobileThemes.dark.color.bg.surface,
       borderColor: mobileThemes.dark.color.border.default
     })
     expect(
-      findAllByHostType(renderer!.root, 'View').filter((node) => resolvedStyle(node).height === 1)
+      renderer!.root.findAllByType('View').filter((node) => resolvedStyle(node).height === 1)
     ).toHaveLength(2)
 
-    const dictationSwitch = findByHostType(renderer!.root, 'Switch')
+    const dictationSwitch = renderer!.root.findByType('Switch')
     expect(dictationSwitch.props.accessibilityLabel).toBe('Dictation enabled')
     expect(dictationSwitch.props.trackColor.true).toBe(mobileThemes.dark.color.bg.selected)
     await act(async () => {
@@ -144,9 +143,9 @@ describe('MobileDictationSetupSheet', () => {
     })
     expect(sendRequest).toHaveBeenCalledWith('speech.dictation.setup', { enabled: false })
 
-    const useButton = findAllByHostType(renderer!.root, 'Pressable').find(
-      (node) => node.props.accessibilityLabel === 'Use voice model Accurate local'
-    )!
+    const useButton = renderer!.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityLabel === 'Use voice model Accurate local')!
     expect(resolvedStyle(useButton).minHeight).toBe(44)
     await act(async () => {
       useButton.props.onPress()
@@ -159,9 +158,9 @@ describe('MobileDictationSetupSheet', () => {
     expect(haptics.success).toHaveBeenCalledOnce()
     expect(onReady).toHaveBeenCalledOnce()
 
-    const downloadButton = findAllByHostType(renderer!.root, 'Pressable').find(
-      (node) => node.props.accessibilityLabel === 'Download voice model Compact local'
-    )!
+    const downloadButton = renderer!.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityLabel === 'Download voice model Compact local')!
     await act(async () => {
       downloadButton.props.onPress()
       await flush()

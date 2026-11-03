@@ -8,7 +8,7 @@ import type {
 import type { ExecutionHostId } from '../../../shared/execution-host'
 import type { StateWriteListener } from './write-scheduling'
 import type { PartitionEditorViews } from './layout-editor-views'
-import type { ActiveViewPreference } from '../../active-view-preference'
+import type { ActiveViewPreference } from '../preferences/active-view-preference'
 import {
   getProfileTerminalScrollbackSnapshotRoot,
   type TerminalScrollbackSnapshotStorage
@@ -91,6 +91,7 @@ export class StoreRuntimeState {
   readonly gitUsernameCache = new Map<string, string>()
   readonly protectedSecrets = new ProtectedSecretPersistence()
   loadNeedsSave = false
+  originalExperimentalNativeChat?: { readonly experimentalNativeChat: unknown }
   flushOrThrow!: () => void
   runDurableMutation!: <T>(mutate: () => DurableProfileStateMutation<T>) => Promise<T>
   settingsChangeListeners = new Set<

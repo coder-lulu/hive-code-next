@@ -7,6 +7,7 @@ import { activateAndRevealWorkspace } from '@/lib/worktree-activation'
 import { deleteHoveredWorkspaceImmediately } from '@/components/sidebar/hovered-workspace-delete'
 import { isFloatingWorkspacePanelFocused } from '@/lib/floating-workspace-terminal-actions'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
+import { runBuiltInOrReplacement } from '@/lib/plugin-command-replacements'
 import { useAppStore } from '../../store'
 import { toggleAgentDashboardFromShortcut } from './agent-dashboard-command'
 import { openNewWorkspaceFromShortcut } from './new-workspace-command'
@@ -60,8 +61,10 @@ export function registerWorkspaceShortcutIpcBridge(unsubs: (() => void)[]): void
         if (store.activeView === 'settings') {
           return
         }
-        store.setSidebarOpen(true)
-        window.dispatchEvent(new CustomEvent(TOGGLE_WORKSPACE_BOARD_EVENT))
+        runBuiltInOrReplacement('workspace.openBoard', () => {
+          store.setSidebarOpen(true)
+          window.dispatchEvent(new CustomEvent(TOGGLE_WORKSPACE_BOARD_EVENT))
+        })
       })
     )
   }
@@ -80,7 +83,7 @@ export function registerWorkspaceShortcutIpcBridge(unsubs: (() => void)[]): void
       if (store.activeView === 'settings' || !store.repos.some((repo) => isGitRepoKind(repo))) {
         return
       }
-      store.openTaskPage()
+      runBuiltInOrReplacement('view.tasks', () => store.openTaskPage())
     })
   )
 
@@ -126,9 +129,9 @@ export function registerWorkspaceShortcutIpcBridge(unsubs: (() => void)[]): void
         return
       }
       if (direction === 'back') {
-        store.goBackWorktree()
+        runBuiltInOrReplacement('worktree.history.back', () => store.goBackWorktree())
       } else {
-        store.goForwardWorktree()
+        runBuiltInOrReplacement('worktree.history.forward', () => store.goForwardWorktree())
       }
     })
   )

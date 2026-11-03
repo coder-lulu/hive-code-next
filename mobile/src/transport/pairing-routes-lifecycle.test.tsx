@@ -1,5 +1,4 @@
-import { findByHostType, isHostType } from '../test-support/react-test-renderer-host-nodes'
-import { createElement, type ReactNode } from 'react'
+import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PreProfilePairingAttempt } from './pre-profile-pairing-coordinator'
@@ -13,7 +12,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 const offer = {
-  v: 2 as const,
+  v: 1 as const,
   endpoint: 'ws://runtime.test',
   deviceToken: 'device-token',
   publicKeyB64: 'public-key'
@@ -46,11 +45,7 @@ vi.mock('expo-router', () => ({
 }))
 vi.mock('expo-camera', () => ({
   CameraView: 'CameraView',
-  useCameraPermissions: () => [
-    { canAskAgain: true, granted: true },
-    vi.fn(),
-    vi.fn(async () => ({ granted: true }))
-  ]
+  useCameraPermissions: () => [{ canAskAgain: true, granted: true }, vi.fn()]
 }))
 vi.mock('lucide-react-native', () => ({
   AlertTriangle: 'AlertTriangle',
@@ -58,15 +53,12 @@ vi.mock('lucide-react-native', () => ({
   ClipboardPaste: 'ClipboardPaste',
   Monitor: 'Monitor',
   QrCode: 'QrCode',
-  Clipboard: 'Clipboard',
   RefreshCw: 'RefreshCw',
   Settings: 'Settings',
   ShieldCheck: 'ShieldCheck'
 }))
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
-  Pressable: 'Pressable',
-  AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   BackHandler: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
   Linking: { openSettings: vi.fn() },
   ScrollView: 'ScrollView',
@@ -81,7 +73,6 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0 })
 }))
-vi.mock('../components/TextInputModal', () => ({ TextInputModal: 'TextInputModal' }))
 vi.mock('../components/ConnectionLog', () => ({ ConnectionLog: 'ConnectionLog' }))
 vi.mock('../components/pairing/PairingActionButton', () => ({
   PairingActionButton: 'PairingActionButton'
@@ -104,18 +95,18 @@ vi.mock('../components/ui/MobileIconButton', () => ({
   MobileIconButton: 'MobileIconButton'
 }))
 vi.mock('../components/ui/MobileScreenHeader', () => ({
-  MobileScreenHeader: ({ leading, title }: { leading: ReactNode; title: string }) =>
+  MobileScreenHeader: ({ leading, title }: { leading: unknown; title: string }) =>
     createElement('MobileScreenHeader', { title }, leading)
 }))
 vi.mock('../onboarding/mobile-onboarding-plan', () => ({
   loadMobileOnboardingSteps: () => mocks.loadOnboarding(),
-  mobileOnboardingDestination: mocks.onboardingDestination
+  mobileOnboardingDestination: (...args: unknown[]) => mocks.onboardingDestination(...args)
 }))
 vi.mock('../theme/mobile-theme-provider', () => ({
   useMobileTheme: () => theme,
   useMobileThemeStyles: <T,>(factory: (value: typeof theme) => T) => factory(theme)
 }))
-vi.mock('./host-client-hooks', () => ({
+vi.mock('./client-context', () => ({
   useRefreshHostClient: () => mocks.refreshHostClient
 }))
 vi.mock('./pair-confirm-state', () => ({
@@ -168,7 +159,7 @@ describe('pairing route async lifecycle', () => {
   })
 
   it.each([
-    ['confirmation', () => createElement(PairConfirmScreen), 'Pair'],
+    ['confirmation', () => createElement(PairConfirmScreen), '确认并连接'],
     ['scanner', () => createElement(PairScanScreen), 'CameraView']
   ])('does not reopen onboarding after leaving the %s route', async (_name, screen, trigger) => {
     const onboarding = deferred<never[]>()
@@ -180,23 +171,18 @@ describe('pairing route async lifecycle', () => {
 
     await act(async () => {
       if (trigger === 'CameraView') {
-        findByHostType(renderer.root, 'CameraView').props.onBarcodeScanned({ data: 'code' })
+        renderer.root.findByType('CameraView').props.onBarcodeScanned({ data: 'code' })
       } else {
-        const label = renderer.root.find(
-          (node) => isHostType(node, 'Text') && node.props.children === trigger
-        )
-        expect(label.parent?.type).toBe('Pressable')
-        label.parent!.props.onPress()
+        renderer.root
+          .findAllByType('PairingActionButton')
+          .find((button) => button.props.label === trigger)!
+          .props.onPress()
       }
       await flushPromises()
     })
     expect(mocks.loadOnboarding).toHaveBeenCalledOnce()
 
-    act(() =>
-      renderer.root
-        .find((node) => isHostType(node, 'Pressable') && node.props.accessibilityLabel === 'Back')
-        .props.onPress()
-    )
+    act(() => renderer.root.findByType('MobileIconButton').props.onPress())
     await act(async () => {
       onboarding.resolve([])
       await onboarding.promise

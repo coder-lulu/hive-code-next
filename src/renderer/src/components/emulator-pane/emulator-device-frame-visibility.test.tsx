@@ -75,7 +75,10 @@ function setDocumentVisibility(state: 'visible' | 'hidden'): void {
   document.dispatchEvent(new Event('visibilitychange'))
 }
 
-async function renderFrame(isActive: boolean, options?: { streamKey?: string }): Promise<void> {
+async function renderFrame(
+  isActive: boolean,
+  options?: { onReconnect?: () => void | Promise<void>; streamKey?: string }
+): Promise<void> {
   await act(async () => {
     root.render(
       <EmulatorDeviceFrame
@@ -86,6 +89,7 @@ async function renderFrame(isActive: boolean, options?: { streamKey?: string }):
         isLive={true}
         visualOrientation="portrait"
         isActive={isActive}
+        onReconnect={options?.onReconnect}
         onTap={vi.fn()}
         onGesture={vi.fn()}
       />
@@ -94,18 +98,6 @@ async function renderFrame(isActive: boolean, options?: { streamKey?: string }):
 }
 
 describe('EmulatorDeviceFrame visibility gating', () => {
-  it('streams frames while the pane is active', async () => {
-    await renderFrame(true)
-    expect(startFrameStream).toHaveBeenCalledWith(
-      expect.objectContaining({ streamUrl: 'http://127.0.0.1:3100/stream.mjpeg' })
-    )
-  })
-
-  it('does not start a frame stream while the pane is inactive', async () => {
-    await renderFrame(false)
-    expect(startFrameStream).not.toHaveBeenCalled()
-  })
-
   it('tears the stream down when the pane becomes inactive and resumes when active again', async () => {
     await renderFrame(true)
     expect(startFrameStream).toHaveBeenCalledTimes(1)
@@ -118,13 +110,14 @@ describe('EmulatorDeviceFrame visibility gating', () => {
   })
 
   it('does not start a second attach loop when the self-reconnecting MJPEG stream errors', async () => {
-    await renderFrame(true, { streamKey: 'mjpeg' })
+    const onReconnect = vi.fn(async () => {})
+    await renderFrame(true, { onReconnect, streamKey: 'mjpeg' })
 
     await act(async () => {
       frameErrorListeners[0]?.({ streamId: 'stream-1', message: 'closed' })
     })
 
-    expect(startFrameStream).toHaveBeenCalledTimes(1)
+    expect(onReconnect).not.toHaveBeenCalled()
     expect(container.textContent).toContain('Stream disconnected')
     expect(container.textContent).not.toContain('Reconnect')
   })

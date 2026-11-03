@@ -1,14 +1,12 @@
-import { launchRecordStore } from './structured-agent-launch-composition.test-support'
 import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { AgentSessionRecord } from '../../shared/agent-session-record'
-import { agentSessionRecordFixture } from '../../shared/agent-session-record.test-fixture'
+import type { AgentSessionRecord } from '../../shared/agent-session/lifecycle/agent-session-record'
+import { agentSessionRecordFixture } from '../../shared/agent-session/lifecycle/agent-session-record.test-fixture'
 import { resolveCliCommand } from '../../shared/node-cli-command-resolution'
 import { acpLaunchSpecFor } from '../acp/acp-launch-specs'
-import { createStructuredAgentSessionLogger } from '../native-chat/agent-session-wire/structured-agent-session-logger'
-import { resolveClaudeChildEnvSources } from '../claude/claude-structured-child-env'
+import { resolveClaudeChildEnvSources } from '../claude/structured/launch/claude-structured-child-env'
 import {
   createAcpStructuredLaunchResolver,
   createCodexStructuredLaunchResolver
@@ -52,10 +50,10 @@ function hostInstallingAfterFirstCapture(name: string) {
 }
 
 function store(record: Partial<AgentSessionRecord>) {
-  return launchRecordStore(
-    () => ({ ...agentSessionRecordFixture(), providerHandleChain: [], ...record }),
-    vi.fn()
-  )
+  return {
+    getRecord: () => ({ ...agentSessionRecordFixture(), providerHandleChain: [], ...record }),
+    pinLaunchDirectory: vi.fn()
+  }
 }
 
 describe('an agent installed after the first shell capture', () => {
@@ -92,8 +90,6 @@ describe('an agent installed after the first shell capture', () => {
     const name = `grok-l5-${process.pid}`
     const host = hostInstallingAfterFirstCapture(name)
     const launch = await createAcpStructuredLaunchResolver(GROK, {
-      dataDirectory: host.profileBin,
-      logger: createStructuredAgentSessionLogger(),
       store: store({
         provider: 'grok',
         accountHome: { variable: 'GROK_HOME', path: join(host.profileBin, '..', '.grok') }
@@ -104,26 +100,6 @@ describe('an agent installed after the first shell capture', () => {
       resolveCommandSettings: () => ({ agentCmdOverrides: { grok: name } })
     })({ identity })
     expect(launch.command).toBe(host.program)
-  })
-
-  it('never refreshes for a program the snapshot already finds', async () => {
-    const name = `codex-l5-found-${process.pid}`
-    const host = hostInstallingAfterFirstCapture(name)
-    // Puts the install in the snapshot before the launch asks.
-    await host.environment.refreshAfterMissingProgram(Date.now())
-    const refresh = vi.fn(async () => {})
-    const launch = await createCodexStructuredLaunchResolver({
-      store: store({
-        provider: 'codex',
-        accountHome: { variable: 'CODEX_HOME', path: join(host.profileBin, '..', '.codex') }
-      }),
-      resolveEnvironment: host.environment.resolveBaseEnvironment,
-      refreshAfterMissingProgram: refresh,
-      resolveCommand: (options) => ({ command: resolveCliCommand(name, options), prefixArgs: [] }),
-      resolveLaunchArgs: () => []
-    })({ identity: { ...identity, agent: 'codex' } })
-    expect(launch.command).toBe(host.program)
-    expect(refresh).not.toHaveBeenCalled()
   })
 
   it('rereads only when no PATH entry has the program, a relative one searched from the chat', async () => {

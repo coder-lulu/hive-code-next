@@ -1,4 +1,3 @@
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import {
   ChevronRight,
   Clock3,
@@ -52,22 +51,20 @@ export function MobileHomeDrawer({
   onSettings,
   onFeedback
 }: MobileHomeDrawerProps) {
-  const t = useMobileTranslation()
-
   const { hydrated, session } = useMobileAuthSession()
   const insets = useSafeAreaInsets()
   const styles = createStyles(theme)
   const rows: readonly DrawerRow[] = [
     {
       key: 'devices',
-      label: t('auto.mobile.src.home.MobileHomeDrawer.0a290eace9', 'Device management'),
+      label: '设备管理',
       supporting: pairedComputerCount > 0 ? `${pairedComputerCount} 台` : '尚未配对',
       Icon: Monitor,
       onPress: onManageDevices
     },
     {
       key: 'tasks',
-      label: t('auto.mobile.src.home.MobileHomeDrawer.0436f6d35c', 'Task center'),
+      label: '任务中心',
       supporting: canOpenHostActions ? undefined : '连接电脑后可用',
       Icon: ListTodo,
       onPress: onTasks,
@@ -75,7 +72,7 @@ export function MobileHomeDrawer({
     },
     {
       key: 'recent',
-      label: t('auto.mobile.src.home.MobileHomeDrawer.02a39e79d5', 'Recent work'),
+      label: '最近工作',
       supporting: canOpenHostActions ? undefined : '暂无记录',
       Icon: Clock3,
       onPress: onRecentWork,
@@ -95,10 +92,7 @@ export function MobileHomeDrawer({
       <View style={styles.backdrop}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t(
-            'auto.mobile.src.home.MobileHomeDrawer.7ed7bc883b',
-            'Close navigation menu'
-          )}
+          accessibilityLabel="关闭导航菜单"
           onPress={onClose}
           style={styles.backdropDismiss}
         />
@@ -129,22 +123,14 @@ export function MobileHomeDrawer({
                 <View style={styles.accountSupportingRow}>
                   <LogIn size={16} strokeWidth={2} color={theme.color.text.secondary} />
                   <Text maxFontSizeMultiplier={1.3} style={styles.accountSupporting}>
-                    {hydrated && session
-                      ? t('auto.mobile.src.home.MobileHomeDrawer.403a19bd59', 'Account synced')
-                      : t(
-                          'auto.mobile.src.home.MobileHomeDrawer.150356eda9',
-                          'Sign in to sync account settings'
-                        )}
+                    {hydrated && session ? '账号已同步' : '登录后同步账号设置'}
                   </Text>
                 </View>
               </View>
             </Pressable>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={t(
-                'auto.mobile.src.home.MobileHomeDrawer.98eb09dab2',
-                'Open settings'
-              )}
+              accessibilityLabel="打开设置"
               onPress={onSettings}
               style={({ pressed }) => [styles.headerButton, pressed && styles.rowPressed]}
             >
@@ -165,7 +151,7 @@ export function MobileHomeDrawer({
               <DrawerNavRow
                 row={{
                   key: 'feedback',
-                  label: t('auto.mobile.src.home.MobileHomeDrawer.dfc5aa023f', 'Help and feedback'),
+                  label: '帮助与反馈',
                   Icon: MessageCircleQuestion,
                   onPress: onFeedback
                 }}

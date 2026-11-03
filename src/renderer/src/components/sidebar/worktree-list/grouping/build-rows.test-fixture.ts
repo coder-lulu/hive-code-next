@@ -25,7 +25,7 @@ import type { PRCacheView } from '../../../../../../shared/sidebar-list/workspac
 import { createSidebarPRGroupReader } from './pr-group-key'
 
 /** Test-only positional entry to the shared row builder, with the window's defaults. */
-export function sidebarRowPlanInputs(
+export function buildSidebarRowPlan(
   groupBy: WorktreeGroupBy,
   worktrees: Worktree[],
   repoMap: Map<string, Repo>,
@@ -53,7 +53,7 @@ export function sidebarRowPlanInputs(
   pinnedDisplayPolicy: PinnedWorktreeDisplayPolicy = getPinnedWorktreeDisplayPolicy(settings),
   filterRepoIds: readonly string[] = []
 ) {
-  return {
+  return planSidebarRows({
     groupBy,
     worktrees,
     repoMap,
@@ -75,11 +75,7 @@ export function sidebarRowPlanInputs(
     defaultHostId,
     pinnedDisplayPolicy,
     filterRepoIds
-  }
-}
-
-export function buildSidebarRowPlan(...args: Parameters<typeof sidebarRowPlanInputs>) {
-  return planSidebarRows(sidebarRowPlanInputs(...args))
+  })
 }
 
 export function buildRows(...args: Parameters<typeof buildSidebarRowPlan>): Row[] {

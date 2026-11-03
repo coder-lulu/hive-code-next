@@ -5,6 +5,7 @@ import {
   createElectronMock,
   createKeychainMock,
   createManagedClaudeAuth,
+  createOauthRefreshMock,
   createSettings,
   createStore,
   expectedRuntimeConfigDir,
@@ -30,6 +31,8 @@ import { join } from 'node:path'
 import type { GlobalSettings } from '../../shared/global-settings-types'
 
 vi.mock('electron', () => createElectronMock())
+
+vi.mock('./oauth-refresh', () => createOauthRefreshMock())
 
 vi.mock('node:os', async () => {
   const actual = await vi.importActual<typeof import('node:os')>('node:os') // eslint-disable-line @typescript-eslint/consistent-type-imports -- vi.importActual requires inline import()

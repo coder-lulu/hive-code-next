@@ -69,7 +69,7 @@ describe('notes send targets across UI languages', () => {
     await i18n.changeLanguage(locale)
     for (const state of ['waiting', 'blocked'] as const) {
       for (const split of [false, true]) {
-        const targets = deriveNotesSendAgentTargets(targetState(state, split), 'wt', new Map(), NOW)
+        const targets = deriveNotesSendAgentTargets(targetState(state, split), 'wt', NOW)
         expect(targets).toEqual([
           expect.objectContaining({
             paneKey: PANE_KEY,
@@ -85,7 +85,7 @@ describe('notes send targets across UI languages', () => {
     await i18n.changeLanguage(locale)
     const state = targetState('done')
     state.agentStatusByPaneKey[PANE_KEY].updatedAt = NOW - AGENT_STATUS_STALE_AFTER_MS - 1
-    expect(deriveNotesSendAgentTargets(state, 'wt', new Map(), NOW)).toEqual([
+    expect(deriveNotesSendAgentTargets(state, 'wt', NOW)).toEqual([
       expect.objectContaining({ paneKey: PANE_KEY, status: 'eligible' })
     ])
   })
@@ -95,7 +95,7 @@ describe('notes send targets across UI languages', () => {
     const state = targetState('done')
     state.agentStatusByPaneKey = {}
     state.runtimePaneTitlesByTabId = { tab: { 1: 'Codex - action required' } }
-    expect(deriveNotesSendAgentTargets(state, 'wt', new Map(), NOW)).toEqual([
+    expect(deriveNotesSendAgentTargets(state, 'wt', NOW)).toEqual([
       expect.objectContaining({
         paneKey: PANE_KEY,
         status: 'disabled',

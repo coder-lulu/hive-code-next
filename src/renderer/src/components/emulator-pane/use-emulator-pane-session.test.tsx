@@ -271,7 +271,7 @@ describe('useEmulatorPaneSession', () => {
     )
   })
 
-  it('retains the running device when another attach attempt fails', async () => {
+  it('marks a stale live session disconnected when stream recovery fails', async () => {
     const runtimeCall = vi.fn(async ({ method }: RuntimeCallRequest) => {
       if (method === 'emulator.listDevices') {
         return runtimeSuccess(deviceList)
@@ -293,38 +293,12 @@ describe('useEmulatorPaneSession', () => {
     expect(latest?.isLive).toBe(true)
 
     await act(async () => {
-      await latest?.attach('device-a')
+      await latest?.reconnectStream()
     })
 
-    expect(latest?.loading).toBe(false)
-    expect(latest?.isLive).toBe(true)
-    expect(latest?.selectedUdid).toBe('device-a')
-    expect(latest?.error).toBeNull()
-  })
-
-  it('marks the preview disconnected when its host reports a detached device', async () => {
-    Object.defineProperty(window, 'api', {
-      configurable: true,
-      value: {
-        runtime: {
-          call: vi.fn(async ({ method }: RuntimeCallRequest) => {
-            if (method === 'emulator.listDevices') {
-              return runtimeSuccess(deviceList)
-            }
-            if (method === 'emulator.attach') {
-              return runtimeSuccess({ attached: false, info: { deviceUdid: 'device-a' } })
-            }
-            throw new Error(`Unexpected RPC method: ${method}`)
-          })
-        }
-      }
-    })
-    await act(async () => root.render(<Probe />))
-    await flushEffects()
-    expect(latest?.isLive).toBe(true)
-    await act(async () => latest?.attach('device-a'))
     expect(latest?.loading).toBe(false)
     expect(latest?.isLive).toBe(false)
     expect(latest?.selectedUdid).toBe('device-a')
+    expect(latest?.error).toContain('scrcpy restart failed')
   })
 })

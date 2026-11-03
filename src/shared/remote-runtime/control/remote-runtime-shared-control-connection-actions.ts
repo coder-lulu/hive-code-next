@@ -13,9 +13,9 @@ export function sendSharedControlRequest(args: {
   requestId: string
   state: Parameters<typeof sharedControlProtocol.sendSharedControlEncryptedSerialized>[0]['state']
   ws: Parameters<typeof sharedControlProtocol.sendSharedControlEncryptedSerialized>[0]['ws']
-  handshake: Parameters<
+  session: Parameters<
     typeof sharedControlProtocol.sendSharedControlEncryptedSerialized
-  >[0]['handshake']
+  >[0]['session']
 }): void {
   sharedControlSend.sendSharedControlRequest({
     pendingRequests: args.pendingRequests,
@@ -24,7 +24,7 @@ export function sendSharedControlRequest(args: {
       sharedControlProtocol.sendSharedControlEncryptedSerialized({
         state: args.state,
         ws: args.ws,
-        handshake: args.handshake,
+        session: args.session,
         serialized
       }),
     reject: (id, error) =>

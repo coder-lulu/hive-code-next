@@ -1,8 +1,3 @@
-import * as runtimeRpc from '@/runtime/runtime-rpc-client'
-import {
-  loadHostStructuredAgents,
-  resetHostStructuredAgentsForTests
-} from '@/runtime/host-structured-agents'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getDefaultSettings } from '../../../../shared/constants'
 import { getDefaultOnboardingState } from '../../../../shared/onboarding-defaults'
@@ -14,9 +9,8 @@ import {
 } from '@/lib/onboarding-folder-agent-launch'
 import {
   STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
-  STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
-  STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY
-} from '../../../../shared/protocol-version'
+  STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY
+} from '../../../../shared/agent-session/agent-session-runtime-capabilities'
 import { createTestStore, makeWorktree } from './store-test-helpers'
 import { makeDetectedResult } from './worktrees-detected-listing-fixtures'
 
@@ -33,10 +27,7 @@ vi.mock('@/lib/new-workspace', async (importOriginal) => ({
   CLIENT_PLATFORM: 'win32'
 }))
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }))
-afterEach(() => {
-  vi.restoreAllMocks()
-  resetHostStructuredAgentsForTests()
-})
+afterEach(() => vi.restoreAllMocks())
 
 const reposAdd = vi.fn()
 const worktreesListDetected = vi.fn()
@@ -82,8 +73,7 @@ describe('repo slice skipped-onboarding folder startup', () => {
     store.setState({
       settings: {
         ...getDefaultSettings('/tmp/orca-workspaces'),
-        defaultTuiAgent: 'codex',
-        agentPermissionDefault: 'full-access'
+        defaultTuiAgent: 'codex'
       }
     })
 
@@ -128,16 +118,7 @@ it.each(['paired-linux', 'local-bash', 'withheld', 'structured-withheld'] as con
     const hostId = target === 'local-bash' ? 'local' : 'runtime:box'
     const worktree = makeWorktree({ id: 'repo::/folder', repoId: 'repo', path: '/folder', hostId })
     store.setState({
-      repos: [
-        {
-          id: 'repo',
-          path: '/folder',
-          displayName: 'Folder',
-          badgeColor: '',
-          addedAt: 1,
-          executionHostId: hostId
-        }
-      ],
+      repos: [{ id: 'repo', path: '/folder', displayName: 'Folder', badgeColor: '', addedAt: 1 }],
       worktreesByRepo: { repo: [worktree] },
       settings: {
         ...getDefaultSettings('/tmp/orca-workspaces'),
@@ -162,24 +143,13 @@ it.each(['paired-linux', 'local-bash', 'withheld', 'structured-withheld'] as con
               ...(target === 'paired-linux' ? { hostPlatform: 'linux' as const } : {}),
               capabilities: [
                 STRUCTURED_AGENT_SESSION_RUNTIME_CAPABILITY,
-                STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY,
-                STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY
+                STRUCTURED_AGENT_SESSION_CLIENT_LAUNCH_MODE_CAPABILITY
               ]
             }
           }
         ]
       ])
     })
-    if (target === 'structured-withheld') {
-      vi.spyOn(runtimeRpc, 'callRuntimeRpc').mockResolvedValue({
-        agents: [{ agent: 'claude', capabilities: {} }]
-      })
-      await loadHostStructuredAgents(
-        hostId,
-        [STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY],
-        'box'
-      )
-    }
     vi.spyOn(useAppStore, 'getState').mockImplementation(store.getState)
     const launch = await resolveDismissedOnboardingFolderAgentLaunch({
       store: store.getState(),

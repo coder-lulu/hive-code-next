@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 
 import { act } from 'react'
-import { APP_DISPLAY_NAME } from '@/product-brand'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
@@ -172,6 +171,68 @@ describe('PluginDetailPage', () => {
     )
     await act(async () => button?.click())
     expect(install.install).toHaveBeenCalledWith(listing, { preview })
+  })
+
+  it('shows author links and hotlinked images as nothing, and links only the install source', async () => {
+    const container = await render(
+      pluginListEntryFromListing({
+        ...listing,
+        source: { kind: 'git', url: 'https://github.com/Acme/icons.git', ref: 'main' },
+        description: 'Docs at https://evil.example and [click](javascript:alert(1))',
+        homepage: 'https://evil.example/home',
+        repository: 'https://evil.example/repo',
+        changelog: 'See <a href="https://evil.example">notes</a>',
+        images: { cover: { url: 'https://tracker.example/pixel.png', alt: 'Cover' } }
+      }),
+      () => Promise.resolve({ ok: true, preview })
+    )
+    expect(container.querySelectorAll('a, img')).toHaveLength(0)
+    expect(container.textContent).toContain('See <a href="https://evil.example">notes</a>')
+    expect(container.textContent).not.toContain('Homepage')
+    const repository = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Repository'
+    )
+    await act(async () => repository?.click())
+    expect(window.api.shell.openUrl).toHaveBeenCalledWith('https://github.com/acme/icons')
+    const readme = Array.from(container.querySelectorAll('button')).find(
+      (button) => button.textContent === 'Read the README on GitHub'
+    )
+    await act(async () => readme?.click())
+    expect(window.api.shell.openUrl).toHaveBeenCalledWith(
+      `https://github.com/acme/icons/tree/${'d'.repeat(40)}#readme`
+    )
+  })
+
+  it("links a mirrored community plugin to its author's repository at the pinned commit", async () => {
+    const container = await render(
+      pluginListEntryFromListing({
+        ...listing,
+        pluginKey: 'acme.icons',
+        official: false,
+        source: {
+          kind: 'git',
+          url: 'https://github.com/stablyai/orca-community-mirror.git',
+          ref: 'refs/tags/acme/icons/1.0.0'
+        },
+        release: { ...listing.release!, repository: 'https://github.com/Acme/Icons' }
+      }),
+      () => Promise.resolve({ ok: true, preview })
+    )
+    const click = async (label: string) => {
+      const button = Array.from(container.querySelectorAll('button')).find(
+        (candidate) => candidate.textContent === label
+      )
+      await act(async () => button?.click())
+    }
+    await click('Repository')
+    expect(window.api.shell.openUrl).toHaveBeenCalledWith('https://github.com/acme/icons')
+    await click('Read the README on GitHub')
+    expect(window.api.shell.openUrl).toHaveBeenCalledWith(
+      `https://github.com/acme/icons/tree/${'d'.repeat(40)}#readme`
+    )
+    expect(window.api.shell.openUrl).not.toHaveBeenCalledWith(
+      expect.stringContaining('orca-community-mirror')
+    )
   })
 
   it('never claims no access when the plugin could not be read, and retries', async () => {
@@ -405,7 +466,7 @@ describe('PluginDetailPage', () => {
         expect(banner(container) !== null).toBe(shown)
         if (shown) {
           expect(banner(container)?.textContent).toBe(
-            `Not an official plugin: Make sure you trust stablyai before installing. This plugin runs the publisher’s code inside ${APP_DISPLAY_NAME}.`
+            'Not an official plugin: Make sure you trust stablyai before installing. This plugin runs the publisher’s code inside Orca.'
           )
           expect(banner(container)?.querySelector('button')).toBeNull()
         }
@@ -421,7 +482,7 @@ describe('PluginDetailPage', () => {
       const container = await render(pluginListEntryFromListing(page), () => new Promise(() => {}))
       expect(banner(container)?.getAttribute('data-plugin-not-official')).toBe('translations')
       expect(banner(container)?.textContent).toBe(
-        `Not an official plugin: Translations can change any text in ${APP_DISPLAY_NAME}. Make sure you trust stablyai.`
+        'Not an official plugin: Translations can change any text in Orca. Make sure you trust stablyai.'
       )
     })
 

@@ -79,6 +79,13 @@ function WorktreeListRowComponent({
     .join(', ')
   // Why: the desktop's compact card keeps an icon-only glyph for remote projects after the host badge goes.
   const showHostGlyph = !cardDetails.metaRow && isRemoteExecutionHostId(hostId)
+  // Agent rows take their own taps, so they share the card's long-press menu.
+  const openActions = onLongPress
+    ? () => {
+        triggerMediumImpact()
+        onLongPress(item)
+      }
+    : undefined
 
   return (
     <Pressable
@@ -90,14 +97,7 @@ function WorktreeListRowComponent({
       ]}
       disabled={isReadOnly}
       onPress={() => onPress(item)}
-      onLongPress={
-        onLongPress
-          ? () => {
-              triggerMediumImpact()
-              onLongPress(item)
-            }
-          : undefined
-      }
+      onLongPress={openActions}
       delayLongPress={400}
     >
       <View style={styles.indicatorCol}>
@@ -214,6 +214,7 @@ function WorktreeListRowComponent({
             statusLive={statusLive}
             isReadOnly={isReadOnly}
             onAgentPress={onAgentPress ? (paneKey) => onAgentPress(item, paneKey) : undefined}
+            onAgentLongPress={openActions}
             fullList={agentActivityDisplayMode === 'full'}
           />
         ) : null}

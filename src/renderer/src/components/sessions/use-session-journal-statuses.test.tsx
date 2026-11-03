@@ -33,7 +33,7 @@ vi.mock('@/runtime/structured-agent-session-client', () => ({
 }))
 
 import {
-  findStructuredAgentSessionReadOwner,
+  getExistingStructuredAgentSessionReadOwner,
   getStructuredAgentSessionReadOwner,
   resetStructuredAgentSessionReadOwnersForTests
 } from '../native-chat/structured-agent-session-read-owner'
@@ -45,12 +45,6 @@ import { useSessionJournalStatuses } from './use-session-journal-statuses'
 
 const LOCAL = { kind: 'local' } as const
 const INITIAL_NOW = 2_000_000
-const readEffects = {
-  getState: () => {
-    throw new Error('No PR state requested in session list receipt tests')
-  },
-  subscribeRetryNow: () => () => {}
-}
 
 function item(host: ExecutionHostId = 'local', sessionId = 'session-1'): SessionListItem {
   const bucket = `${host}|workspace`
@@ -169,7 +163,7 @@ describe('session list journal and host-summary projection', () => {
     const items = Array.from({ length: 100 }, (_, index) => item('local', `session-${index}`))
     const view = renderHook(() => useSessionJournalStatuses(items))
     expect(view.result.current).toBe(items)
-    expect(findStructuredAgentSessionReadOwner('session-1', LOCAL)).toBeUndefined()
+    expect(getExistingStructuredAgentSessionReadOwner('session-1', LOCAL)).toBeNull()
     expect(mocks.call).not.toHaveBeenCalled()
     expect(mocks.subscribe).not.toHaveBeenCalled()
     expect(mocks.subscribeStatus).not.toHaveBeenCalled()
@@ -207,7 +201,7 @@ describe('session list journal and host-summary projection', () => {
       })
     })
     await act(async () => {
-      getStructuredAgentSessionReadOwner('session-1', LOCAL).activate(readEffects)
+      getStructuredAgentSessionReadOwner('session-1', LOCAL).activate()
       await vi.advanceTimersByTimeAsync(0)
     })
     expect(view.result.current[0].status.activity).toBe('permission')
@@ -243,7 +237,7 @@ describe('session list journal and host-summary projection', () => {
     ]
     mocks.call.mockResolvedValue({ ok: true, page: rejected })
     await act(async () => {
-      getStructuredAgentSessionReadOwner('session-1', LOCAL).activate(readEffects)
+      getStructuredAgentSessionReadOwner('session-1', LOCAL).activate()
       await vi.advanceTimersByTimeAsync(0)
     })
     expect(view.result.current[0].status).toMatchObject({
@@ -286,7 +280,7 @@ describe('session list journal and host-summary projection', () => {
     })
     mocks.call.mockResolvedValue({ ok: true, page: current })
     await act(async () => {
-      getStructuredAgentSessionReadOwner('session-1', LOCAL).activate(readEffects)
+      getStructuredAgentSessionReadOwner('session-1', LOCAL).activate()
       await vi.advanceTimersByTimeAsync(0)
     })
     let renders = 0
@@ -326,15 +320,14 @@ describe('session list journal and host-summary projection', () => {
     expect(view.result.current[0].status.activity).toBe('unknown')
     expect(view.result.current[0].lastActivityAt).toBe(10)
   })
-  it.each([
-    ['success', 'completed'],
-    ['failure', 'error']
-  ] as const)(
-    'shows summary verdict %s as %s without opening a journal',
-    async (turnOutcome, activity) => {
+  it.each(['completed', 'error', 'permission'] as const)(
+    'shows summary %s without opening a journal',
+    async (activity) => {
       const items = [item()]
       await activateHost()
-      act(() => emitSummary({ ...summary('idle'), turnOutcome }))
+      act(() =>
+        emitSummary({ ...summary(activity === 'permission' ? 'attention' : 'idle'), activity })
+      )
       const view = renderHook(() => useSessionJournalStatuses(items))
       expect(view.result.current[0].status.activity).toBe(activity)
       expect(mocks.subscribe).not.toHaveBeenCalled()
@@ -357,7 +350,7 @@ describe('session list journal and host-summary projection', () => {
     ]
     mocks.call.mockResolvedValue({ ok: true, page: current })
     await act(async () => {
-      getStructuredAgentSessionReadOwner('session-1', LOCAL).activate(readEffects)
+      getStructuredAgentSessionReadOwner('session-1', LOCAL).activate()
       await vi.advanceTimersByTimeAsync(0)
     })
     const view = renderHook(() => useSessionJournalStatuses(items))

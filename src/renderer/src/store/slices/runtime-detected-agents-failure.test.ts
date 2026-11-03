@@ -1,29 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { create } from 'zustand'
-import {
-  createRuntimeDetectedAgentsSlice,
-  type RuntimeDetectedAgentsStoreState
-} from './runtime-detected-agents'
+import type { AppState } from '../types'
+import { createRuntimeDetectedAgentsSlice } from './runtime-detected-agents'
 
 const { callRuntimeRpc } = vi.hoisted(() => ({ callRuntimeRpc: vi.fn() }))
 vi.mock('@/runtime/runtime-rpc-client', () => ({
-  callRuntimeRpc
+  callRuntimeRpc,
+  RuntimeRpcCallError: class extends Error {}
 }))
 
 function createTestStore() {
-  return create<RuntimeDetectedAgentsStoreState>()((...args) => ({
-    repos: [],
-    worktreesByRepo: {},
-    folderWorkspaces: [],
-    projectGroups: [],
-    ...createRuntimeDetectedAgentsSlice(...args)
-  }))
+  return create<AppState>()((...args) => createRuntimeDetectedAgentsSlice(...args) as AppState)
 }
 
 describe('runtime detected agent failure state', () => {
   beforeEach(() => {
     callRuntimeRpc.mockReset()
-    createTestStore().getState().retainRuntimeDetectedAgents([])
   })
 
   it('keeps first failures unknown, isolates targets, and clears the error on successful probing', async () => {
@@ -34,13 +26,13 @@ describe('runtime detected agent failure state', () => {
     const store = createTestStore()
     await store.getState().ensureRuntimeDetectedAgents('failed')
     expect(store.getState().runtimeDetectedAgentIds.failed).toBeUndefined()
-    expect(store.getState().runtimeAgentInventoryOutcome('failed')).toBe('failed')
+    expect(store.getState().didRuntimeAgentDetectionFail).toEqual({ failed: true })
     await store.getState().ensureRuntimeDetectedAgents('empty')
     expect(store.getState().runtimeDetectedAgentIds.empty).toEqual([])
-    expect(store.getState().runtimeAgentInventoryOutcome('empty')).toBe('successful')
+    expect(store.getState().didRuntimeAgentDetectionFail.empty).toBeUndefined()
     await store.getState().ensureRuntimeDetectedAgents('failed')
     expect(store.getState().runtimeDetectedAgentIds.failed).toEqual(['codex'])
-    expect(store.getState().runtimeAgentInventoryOutcome('failed')).toBe('successful')
+    expect(store.getState().didRuntimeAgentDetectionFail.failed).toBeUndefined()
   })
 
   it('preserves verified agents after a failed refresh and clears errors on recovery and environment removal', async () => {
@@ -53,20 +45,18 @@ describe('runtime detected agent failure state', () => {
       retained: ['claude'],
       removed: ['codex']
     })
-    expect(store.getState().runtimeAgentInventoryOutcome('retained')).toBe('failed')
-    expect(store.getState().runtimeAgentInventoryOutcome('removed')).toBe('failed')
+    expect(store.getState().didRuntimeAgentDetectionFail).toEqual({ retained: true, removed: true })
 
     store.getState().retainRuntimeDetectedAgents(['retained'])
-    expect(store.getState().runtimeAgentInventoryOutcome('retained')).toBe('failed')
-    expect(store.getState().runtimeAgentInventoryOutcome('removed')).toBe('pending')
+    expect(store.getState().didRuntimeAgentDetectionFail).toEqual({ retained: true })
     callRuntimeRpc.mockResolvedValueOnce({ agents: [] })
     await store.getState().refreshRuntimeDetectedAgents('retained')
-    expect(store.getState().runtimeAgentInventoryOutcome('retained')).toBe('successful')
+    expect(store.getState().didRuntimeAgentDetectionFail).toEqual({})
     expect(store.getState().runtimeDetectedAgentIds.retained).toEqual([])
 
     await store.getState().refreshRuntimeDetectedAgents('retained')
     store.getState().clearRuntimeDetectedAgents('retained')
-    expect(store.getState().runtimeAgentInventoryOutcome('retained')).toBe('pending')
+    expect(store.getState().didRuntimeAgentDetectionFail).toEqual({})
   })
 
   it('does not restore an error after a failed in-flight request was cleared', async () => {
@@ -81,6 +71,6 @@ describe('runtime detected agent failure state', () => {
     store.getState().retainRuntimeDetectedAgents([])
     rejectProbe(new Error('disconnected'))
     await pending
-    expect(store.getState().runtimeAgentInventoryOutcome('removed')).toBe('pending')
+    expect(store.getState().didRuntimeAgentDetectionFail).toEqual({})
   })
 })

@@ -1,4 +1,3 @@
-import { useMobileTranslation } from '../src/i18n/use-mobile-translation'
 import { useCallback, useRef, useState } from 'react'
 import { Alert } from 'react-native'
 import { useFocusEffect, useLocalSearchParams } from 'expo-router'
@@ -44,8 +43,6 @@ type RevokeOperation = {
 }
 
 export default function RuntimeSessionsScreen() {
-  const t = useMobileTranslation()
-
   const params = useLocalSearchParams<{ runtimeRecordId?: string }>()
   const runtimeRecordId = typeof params.runtimeRecordId === 'string' ? params.runtimeRecordId : null
   const { hydrated, session: accountSession } = useMobileAuthSession()
@@ -95,10 +92,7 @@ export default function RuntimeSessionsScreen() {
         if (generation === generationRef.current && scopeRef.current === requestedScope) {
           setScopedError({
             scopeKey: requestedScope,
-            message: t(
-              'auto.mobile.app.runtime.sessions.2b51e265d4',
-              'Could not read Runtime sessions. Try again later.'
-            )
+            message: '无法读取 Runtime 会话，请稍后重试。'
           })
         }
       } finally {
@@ -107,7 +101,7 @@ export default function RuntimeSessionsScreen() {
         }
       }
     },
-    [listSessions, scopeKey, t]
+    [listSessions, scopeKey]
   )
 
   useFocusEffect(
@@ -144,19 +138,13 @@ export default function RuntimeSessionsScreen() {
         }
       } catch {
         if (scopeRef.current === requestedScope) {
-          Alert.alert(
-            t('auto.mobile.app.runtime.sessions.177a74b0f7', 'Could not revoke session'),
-            t(
-              'auto.mobile.app.runtime.sessions.b4ace88a90',
-              'Could not revoke this Runtime session. Refresh and try again.'
-            )
-          )
+          Alert.alert('撤销失败', '无法撤销此 Runtime 会话，请刷新后重试。')
         }
       } finally {
         setRevokeOperation((current) => (current?.operationId === operationId ? null : current))
       }
     },
-    [revokeSession, t]
+    [revokeSession]
   )
 
   const confirmRevoke = useCallback(
@@ -166,11 +154,8 @@ export default function RuntimeSessionsScreen() {
         return
       }
       Alert.alert(
-        t('auto.mobile.app.runtime.sessions.30277d9b05', 'Revoke Runtime session?'),
-        t(
-          'auto.mobile.app.runtime.sessions.54c85e1666',
-          'This client will immediately lose account access. Local QR pairings and local credentials will remain.'
-        ),
+        '撤销 Runtime 会话？',
+        '该客户端会立即失去账号访问权限。本地扫码配对和本地凭据不会被删除。',
         [
           { text: '取消', style: 'cancel' },
           {
@@ -181,66 +166,36 @@ export default function RuntimeSessionsScreen() {
         ]
       )
     },
-    [revoke, t]
+    [revoke]
   )
 
   const signedIn = hydrated && scopeKey !== null
   return (
     <FutureFeatureScreen
       capabilityId="account"
-      title={t('auto.mobile.app.runtime.sessions.c0b479171e', 'Runtime sessions')}
+      title="Runtime 会话"
       description={
         runtimeRecordId
-          ? t(
-              'auto.mobile.app.runtime.sessions.8b3023af8b',
-              'View this runtime environment’s access sessions on the web, computers, and phones, and revoke sessions you no longer use.'
-            )
-          : t(
-              'auto.mobile.app.runtime.sessions.c990a45e97',
-              'View the current account’s Runtime access sessions on the web, computers, and phones, and force-revoke sessions you no longer use.'
-            )
+          ? '查看此运行环境在 Web、电脑和手机上的访问会话，并撤销不再使用的会话。'
+          : '查看当前账号在 Web、电脑和手机上的 Runtime 访问会话，并强制撤销不再使用的会话。'
       }
     >
-      <FutureFeatureNotice
-        title={
-          signedIn
-            ? t('auto.mobile.app.runtime.sessions.5b1d62c6ad', 'Account sessions')
-            : t('auto.mobile.app.runtime.sessions.d9113519c3', 'Sign in first')
-        }
-      >
+      <FutureFeatureNotice title={signedIn ? '账号会话' : '请先登录'}>
         {signedIn
-          ? t(
-              'auto.mobile.app.runtime.sessions.75fb69c3a4',
-              'Revocation affects account cloud access only. Anonymous local pairings remain independent.'
-            )
-          : t(
-              'auto.mobile.app.runtime.sessions.9d7f4b4194',
-              'Sign in to view and revoke Runtime sessions.'
-            )}
+          ? '撤销只影响账号云端访问；匿名本地配对始终独立保留。'
+          : '登录账号后才能查看和撤销 Runtime 会话。'}
       </FutureFeatureNotice>
 
-      <FutureFeatureSection
-        title={t('auto.mobile.app.runtime.sessions.897f77ddf0', 'Session list')}
-      >
+      <FutureFeatureSection title="会话列表">
         {!signedIn ? (
-          <FutureFeatureRow
-            label={t('auto.mobile.app.runtime.sessions.c0b479171e', 'Runtime sessions')}
-            value="未登录"
-          />
+          <FutureFeatureRow label="Runtime 会话" value="未登录" />
         ) : error ? (
-          <FutureFeatureRow
-            detail={error}
-            label={t('auto.mobile.app.runtime.sessions.81dfe211c3', 'Could not load')}
-            value="可重试"
-          />
+          <FutureFeatureRow detail={error} label="加载失败" value="可重试" />
         ) : loading && sessions.length === 0 ? (
-          <FutureFeatureRow
-            label={t('auto.mobile.app.runtime.sessions.c0b479171e', 'Runtime sessions')}
-            value="读取中"
-          />
+          <FutureFeatureRow label="Runtime 会话" value="读取中" />
         ) : sessions.length === 0 ? (
           <FutureFeatureRow
-            label={t('auto.mobile.app.runtime.sessions.c0b479171e', 'Runtime sessions')}
+            label="Runtime 会话"
             value={runtimeRecordId ? '本页暂无此运行环境的会话' : '暂无会话'}
           />
         ) : (
@@ -271,32 +226,18 @@ export default function RuntimeSessionsScreen() {
 
       {signedIn && page ? (
         <>
-          <FutureFeatureNotice
-            title={t(
-              'auto.mobile.app.runtime.sessions.24f4fff0bd',
-              'Page {{value0}} · records on this page: {{value1}}',
-              { value0: page.cursors.length, value1: sessions.length }
-            )}
-          >
-            {t(
-              'auto.mobile.app.runtime.sessions.b8debcc981',
-              'Up to 25 records per page. Reconnecting creates a separate access record. Ended sessions remain available to view.'
-            )}
-            {runtimeRecordId
-              ? t(
-                  'auto.mobile.app.runtime.sessions.94f48cf381',
-                  'Filter this page’s account sessions by the current runtime environment. Go to the next page to see more.'
-                )
-              : null}
+          <FutureFeatureNotice title={`第 ${page.cursors.length} 页 · 本页 ${sessions.length} 条`}>
+            每页最多 25 条。重连会产生独立的访问记录，已结束的记录仍可查看。
+            {runtimeRecordId ? '按当前运行环境筛选本页的账号会话，可继续翻页查看更多。' : null}
           </FutureFeatureNotice>
           <FutureFeatureAction
             disabled={loading || revokingId !== null || page.cursors.length <= 1}
-            label={t('auto.mobile.app.runtime.sessions.1ddf333095', 'Previous page')}
+            label="上一页"
             onPress={() => void loadPage(page.cursors.slice(0, -1))}
           />
           <FutureFeatureAction
             disabled={loading || revokingId !== null || !page.nextCursor}
-            label={t('auto.mobile.app.runtime.sessions.e01877fa61', 'Next page')}
+            label="下一页"
             onPress={() => {
               if (page.nextCursor) {
                 void loadPage([...page.cursors, page.nextCursor])
@@ -308,7 +249,7 @@ export default function RuntimeSessionsScreen() {
 
       <FutureFeatureAction
         disabled={!signedIn || loading || revokingId !== null}
-        label={t('auto.mobile.app.runtime.sessions.c50befd860', 'Refresh sessions')}
+        label="刷新会话"
         loading={loading}
         onPress={() => void loadPage(page?.cursors ?? [null])}
       />

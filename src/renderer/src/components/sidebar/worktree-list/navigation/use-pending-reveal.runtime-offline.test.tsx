@@ -1,4 +1,3 @@
-import { sidebarRowPlanInputs } from '../grouping/build-rows.test-fixture'
 // @vitest-environment happy-dom
 import { act, useState } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
@@ -98,7 +97,7 @@ function renderProbe(
     const [collapsedGroups, setCollapsedGroups] = useState(
       new Set(collapsed ? [OFFLINE_RUNTIME_GROUP_KEY] : [])
     )
-    const rowArgs: Parameters<typeof sidebarRowPlanInputs> = [
+    const rowArgs: Parameters<typeof buildRuntimeOfflineRows>[0] = [
       'repo',
       includeOnline ? [worktree, remoteTree] : [remoteTree],
       includeOnline ? repoMap : new Map([[remoteRepo.id, remoteRepo]]),
@@ -106,11 +105,7 @@ function renderProbe(
       collapsedGroups
     ]
     rowArgs[17] = projectGrouping
-    const result = buildRuntimeOfflineRows(
-      sidebarRowPlanInputs(...rowArgs),
-      offlineIds,
-      collapsedGroups
-    )
+    const result = buildRuntimeOfflineRows(rowArgs, offlineIds)
     const renderRows = appendRuntimeOfflineDirectory(
       result.onlineRows,
       result.offlineRows,
@@ -138,7 +133,7 @@ function renderProbe(
     })
     return renderRows.map((row) =>
       row.type === 'header' ? (
-        <div key={row.key} id={getWorktreeOptionId(row.key)}>
+        <div key={row.renderKey ?? row.key} id={getWorktreeOptionId(row.renderKey ?? row.key)}>
           {row.label}
         </div>
       ) : null

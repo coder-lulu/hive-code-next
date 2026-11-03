@@ -55,12 +55,9 @@ export function registerReposStaleFetchTests(): void {
   beforeEach(() => {
     clearRuntimeCompatibilityCacheForTests()
     reposList.mockReset()
+    // Missing projects API forces compatibility fallback to repos; only repos.list is exercised.
     vi.stubGlobal('window', {
       api: {
-        projects: {
-          list: vi.fn().mockResolvedValue([]),
-          listHostSetups: vi.fn().mockResolvedValue([])
-        },
         repos: {
           list: reposList,
           removeForHost: vi.fn().mockResolvedValue(undefined)

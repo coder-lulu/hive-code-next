@@ -16,7 +16,7 @@ describe('PostHog transport', () => {
   const capture = async (consent: Parameters<typeof createPostHogClient>[1]) => {
     vi.stubGlobal('fetch', globalFetch)
     setMainHttpClient({ fetch: mainFetch, proxySession: () => null })
-    const client = createPostHogClient('test-key', consent, 'https://telemetry.example.test/')
+    const client = createPostHogClient('test-key', consent)
     client.capture({ distinctId: 'install-1', event: 'app_opened' })
     await client.shutdown()
   }
@@ -25,7 +25,7 @@ describe('PostHog transport', () => {
   it('sends through the main HTTP client, not global fetch', async () => {
     await capture({ effective: 'enabled' })
     expect(mainFetch).toHaveBeenCalledWith(
-      'https://telemetry.example.test/batch/',
+      expect.stringContaining('/batch'),
       expect.objectContaining({ method: 'POST', credentials: 'omit' })
     )
     expect(globalFetch).not.toHaveBeenCalled()

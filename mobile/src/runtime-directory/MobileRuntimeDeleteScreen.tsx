@@ -1,4 +1,3 @@
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { ArrowLeft } from 'lucide-react-native'
@@ -21,8 +20,6 @@ import { useMobileRuntimeDelete } from './use-mobile-runtime-delete'
 const RuntimeIdSchema = z.uuid().refine((value) => value === value.toLowerCase())
 
 export function MobileRuntimeDeleteScreen() {
-  const t = useMobileTranslation()
-
   const router = useRouter()
   const { runtimeRecordId } = useLocalSearchParams<{ runtimeRecordId?: string | string[] }>()
   const target = RuntimeIdSchema.safeParse(runtimeRecordId)
@@ -34,13 +31,10 @@ export function MobileRuntimeDeleteScreen() {
   return (
     <SafeAreaView edges={['bottom', 'left', 'right']} style={styles.screen}>
       <MobileScreenHeader
-        title={t(
-          'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.84f877b018',
-          'Delete Runtime'
-        )}
+        title="删除 Runtime"
         leading={
           <MobileIconButton
-            accessibilityLabel={t('common.back', 'Back')}
+            accessibilityLabel="返回"
             icon={ArrowLeft}
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
           />
@@ -60,17 +54,11 @@ export function MobileRuntimeDeleteScreen() {
         >
           {!target.success ? (
             <Text accessibilityRole="alert" maxFontSizeMultiplier={1.3} style={styles.error}>
-              {t(
-                'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.1f16553c0e',
-                'Invalid Runtime ID. Return to the list and select it again.'
-              )}
+              Runtime 标识无效，请返回列表重新选择。
             </Text>
           ) : !hydrated ? (
             <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.body}>
-              {t(
-                'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.7b605810be',
-                'Reading account…'
-              )}
+              正在读取账号…
             </Text>
           ) : session ? (
             <SignedInDeleteForm
@@ -81,18 +69,9 @@ export function MobileRuntimeDeleteScreen() {
           ) : (
             <>
               <Text maxFontSizeMultiplier={1.3} style={styles.body}>
-                {t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.1b83b444cb',
-                  'Sign in to the HiveCloud account that claimed this Runtime.'
-                )}
+                请登录认领这台 Runtime 的 HiveCloud 账号。
               </Text>
-              <PairingActionButton
-                label={t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.c3c5f91052',
-                  'Sign in to HiveCloud'
-                )}
-                onPress={() => router.push('/login')}
-              />
+              <PairingActionButton label="登录 HiveCloud" onPress={() => router.push('/login')} />
             </>
           )}
         </ScrollView>
@@ -108,8 +87,6 @@ function SignedInDeleteForm({
   runtimeRecordId: string
   session: MobileSession
 }) {
-  const t = useMobileTranslation()
-
   const router = useRouter()
   const deletion = useMobileRuntimeDelete(runtimeRecordId, session)
   const styles = useMobileThemeStyles(createMobileRuntimeClaimStyles)
@@ -119,10 +96,7 @@ function SignedInDeleteForm({
   if (deletion.unsupported) {
     return (
       <Text maxFontSizeMultiplier={1.3} style={styles.body}>
-        {t(
-          'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.651e7ac7da',
-          'Delete the Runtime and clear its connection records in the mobile app.'
-        )}
+        请在手机 APP 中删除 Runtime 并清理连接记录。
       </Text>
     )
   }
@@ -132,33 +106,18 @@ function SignedInDeleteForm({
         <>
           <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.value}>
             {deletion.superseded
-              ? t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.a0b78f20c3',
-                  'This Runtime’s claim or deletion has changed. Your current connection is preserved. Return to the list for the latest status.'
-                )
-              : t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.f8d4b984be',
-                  'The Runtime was unclaimed from the account and local connection records were cleared. Projects and sessions on the computer remain.'
-                )}
+              ? '此 Runtime 的认领或删除操作已更新，已保留当前连接。请返回列表查看最新状态。'
+              : 'Runtime 已从账号解除认领，本机连接记录已清理。电脑上的项目和会话数据仍保留。'}
           </Text>
-          <PairingActionButton
-            label={t('app.pairConfirm.backToHome', 'Back to home')}
-            onPress={() => router.replace('/')}
-          />
+          <PairingActionButton label="返回首页" onPress={() => router.replace('/')} />
         </>
       ) : deletion.cloudConfirmed ? (
         <>
           <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.body}>
-            {t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.0cff92c209',
-              'Unclaimed from the account. Clearing connection records on this phone. If cleanup fails, retry without verifying another SMS code.'
-            )}
+            已从账号解除认领，正在清理这台手机的连接记录。若清理失败，可以重试，无需再次验证短信。
           </Text>
           <PairingActionButton
-            label={t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.80167cf832',
-              'Retry clearing local records'
-            )}
+            label="重试清理本机记录"
             loading={deletion.busy}
             disabled={unavailable}
             onPress={() => void deletion.retryCleanup()}
@@ -167,16 +126,10 @@ function SignedInDeleteForm({
       ) : deletion.uncertain ? (
         <>
           <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.body}>
-            {t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.c5815852e6',
-              'The deletion result cannot be confirmed right now. Check the Runtime’s status in your account before continuing.'
-            )}
+            暂时无法确认删除结果。请先核对账号中的 Runtime 状态，再继续操作。
           </Text>
           <PairingActionButton
-            label={t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.3ef28ad7bc',
-              'Check deletion result'
-            )}
+            label="核对删除结果"
             loading={deletion.busy}
             disabled={unavailable}
             onPress={() => void deletion.review()}
@@ -184,10 +137,7 @@ function SignedInDeleteForm({
         </>
       ) : deletion.loading ? (
         <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.body}>
-          {t(
-            'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.6776dc9e67',
-            'Checking Runtime ownership…'
-          )}
+          正在核对 Runtime 归属…
         </Text>
       ) : deletion.entry ? (
         <>
@@ -200,28 +150,17 @@ function SignedInDeleteForm({
             </Text>
           </View>
           <Text maxFontSizeMultiplier={1.3} style={styles.body}>
-            {t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.ec15a7ec25',
-              'Deleting will unclaim this Runtime from the account, revoke existing connection access, and clear all associated connection records on this phone. You can do this even when the computer is offline.'
-            )}
+            删除后，这台 Runtime
+            将从账号解除认领，已有连接授权将被撤销，并清理这台手机上与它关联的全部连接记录。电脑离线时也可以操作。
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.body}>
-            {t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.9e76c31057',
-              'Projects and sessions on the computer will remain. Claim or pair it again to use it later.'
-            )}
+            电脑上的项目和会话数据会保留。重新使用需要再次认领或配对。
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.label}>
-            {t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.4c5c8107c5',
-              'Enter the full name shown above to confirm'
-            )}
+            请输入上方完整名称以确认
           </Text>
           <TextInput
-            accessibilityLabel={t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.3d7c55162a',
-              'Confirm Runtime name'
-            )}
+            accessibilityLabel="确认 Runtime 名称"
             value={deletion.confirmationName}
             onChangeText={deletion.setConfirmationName}
             editable={!unavailable}
@@ -239,21 +178,11 @@ function SignedInDeleteForm({
                 maxFontSizeMultiplier={1.3}
                 style={styles.hint}
               >
-                {t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.40d7acefbc',
-                  'Verification code sent to '
-                )}
-                {deletion.sms.phoneNumberMasked}
+                验证码已发送至 {deletion.sms.phoneNumberMasked}
               </Text>
               <TextInput
-                accessibilityLabel={t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.78695e14bb',
-                  'Delete Runtime SMS verification code'
-                )}
-                placeholder={t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.64ea7ccbea',
-                  'Six-digit verification code'
-                )}
+                accessibilityLabel="删除 Runtime 短信验证码"
+                placeholder="六位验证码"
                 placeholderTextColor={theme.color.text.tertiary}
                 value={deletion.smsCode}
                 onChangeText={deletion.setSmsCode}
@@ -271,52 +200,26 @@ function SignedInDeleteForm({
           ) : null}
           {deletion.smsExpired ? (
             <Text accessibilityRole="alert" maxFontSizeMultiplier={1.3} style={styles.error}>
-              {t(
-                'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.7a910173ad',
-                'The verification code expired. Send a new one.'
-              )}
+              验证码已过期，请重新发送。
             </Text>
           ) : null}
           <PairingActionButton
             variant="secondary"
             label={
               deletion.smsDailyLimited
-                ? t(
-                    'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.7f39a47882',
-                    'Today’s SMS limit has been reached'
-                  )
+                ? '今日短信次数已用完'
                 : deletion.resendRemaining > 0
-                  ? t(
-                      'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.d0c37e0ba9',
-                      'Resend in {{value0}}s',
-                      { value0: deletion.resendRemaining }
-                    )
+                  ? `${deletion.resendRemaining} 秒后可重新发送`
                   : deletion.sms
-                    ? t(
-                        'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.ab211599b5',
-                        'Resend verification code'
-                      )
-                    : t(
-                        'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.4c9f7f87e3',
-                        'Send verification code to your linked phone number'
-                      )
+                    ? '重新发送验证码'
+                    : '发送验证码到绑定手机号'
             }
             labelStyle={{ flexShrink: 1, textAlign: 'center' }}
             disabled={unavailable || deletion.smsDailyLimited || deletion.resendRemaining > 0}
             onPress={() => void deletion.sendSms()}
           />
           <PairingActionButton
-            label={
-              deletion.busy
-                ? t(
-                    'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.0d555121ca',
-                    'Processing…'
-                  )
-                : t(
-                    'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.18fb79cfaa',
-                    'Verify and delete Runtime'
-                  )
-            }
+            label={deletion.busy ? '正在处理…' : '验证并删除 Runtime'}
             variant="secondary"
             labelStyle={styles.error}
             disabled={!deletion.canSubmit}
@@ -326,16 +229,10 @@ function SignedInDeleteForm({
       ) : (
         <>
           <Text maxFontSizeMultiplier={1.3} style={styles.body}>
-            {t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.c85a2d4d2b',
-              'There is no Runtime available to delete. Check the devices in your account again.'
-            )}
+            当前没有可删除的 Runtime，请重新核对账号中的设备。
           </Text>
           <PairingActionButton
-            label={t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.f21084a498',
-              'Check again'
-            )}
+            label="重新核对"
             disabled={unavailable}
             onPress={() => void deletion.review()}
           />
@@ -347,13 +244,7 @@ function SignedInDeleteForm({
         </Text>
       ) : null}
       {deletion.requiresLogin ? (
-        <PairingActionButton
-          label={t(
-            'auto.mobile.src.runtime.directory.MobileRuntimeDeleteScreen.d84aac680a',
-            'Sign in again'
-          )}
-          onPress={() => router.push('/login')}
-        />
+        <PairingActionButton label="重新登录" onPress={() => router.push('/login')} />
       ) : null}
     </View>
   )

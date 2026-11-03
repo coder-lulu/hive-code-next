@@ -1,4 +1,3 @@
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useRouter } from 'expo-router'
 import { RefreshCw, UserRound } from 'lucide-react-native'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -8,8 +7,6 @@ import type { MobileTheme } from '../theme/mobile-theme'
 import { useMobileTheme, useMobileThemeStyles } from '../theme/mobile-theme-provider'
 
 export function MobileAccountComputerActions() {
-  const t = useMobileTranslation()
-
   const router = useRouter()
   const { hydrated, session } = useMobileAuthSession()
   const { state, refresh } = useAccountRuntimeDirectory()
@@ -38,23 +35,14 @@ export function MobileAccountComputerActions() {
       </Pressable>
       <Text maxFontSizeMultiplier={1.3} style={styles.description}>
         {session
-          ? t(
-              'auto.mobile.src.home.MobileAccountComputerActions.cb06cc4f70',
-              'Sign in to the same HiveCloud account on your computer and start a claim, then enter the claim code to confirm.'
-            )
-          : t(
-              'auto.mobile.src.home.MobileAccountComputerActions.d04f3ea375',
-              'Sign in to HiveCloud to view and connect to computers claimed by your account.'
-            )}
+          ? '在电脑端登录同一 HiveCloud 账号并发起认领，然后输入认领码确认。'
+          : '登录 HiveCloud，查看并连接账号下已认领的电脑。'}
       </Text>
       {session ? (
         <>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t(
-              'auto.mobile.src.home.MobileAccountComputerActions.3fd6dac79f',
-              'Refresh account computers'
-            )}
+            accessibilityLabel="刷新账号电脑"
             accessibilityState={{ disabled: syncing, busy: syncing }}
             disabled={syncing}
             onPress={() => void refresh()}
@@ -66,24 +54,12 @@ export function MobileAccountComputerActions() {
           >
             <RefreshCw size={16} strokeWidth={2} color={theme.color.text.secondary} />
             <Text maxFontSizeMultiplier={1.3} style={styles.description}>
-              {syncing
-                ? t(
-                    'auto.mobile.src.home.MobileAccountComputerActions.d9d423ac9d',
-                    'Syncing account computers…'
-                  )
-                : t(
-                    'auto.mobile.src.home.MobileAccountComputerActions.3fd6dac79f',
-                    'Refresh account computers'
-                  )}
+              {syncing ? '正在同步账号电脑…' : '刷新账号电脑'}
             </Text>
           </Pressable>
           {state.error ? (
             <Text accessibilityRole="alert" maxFontSizeMultiplier={1.3} style={styles.error}>
-              {t(
-                'auto.mobile.src.home.MobileAccountComputerActions.26eb3bcf24',
-                'Could not sync account computers: '
-              )}
-              {state.error}
+              账号电脑同步失败：{state.error}
             </Text>
           ) : null}
         </>

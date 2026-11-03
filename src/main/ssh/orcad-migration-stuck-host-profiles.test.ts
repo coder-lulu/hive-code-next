@@ -9,7 +9,10 @@ import type { SshRemotePtyLease, SshTarget } from '../../shared/ssh-types'
 import type { WorkspaceSessionState } from '../../shared/workspace-session-state-types'
 import { closeTestStores, createSqliteTestStore } from '../persistence/persistence-test-harness'
 import { Store } from '../persistence/loading-store/store'
-import { fenceOrcadMigrationSource } from './orcad-migration-source-fence'
+import {
+  fenceOrcadMigrationSource,
+  ORCAD_MIGRATION_LEAVE_BEHIND_TERMINALS
+} from './orcad-migration-source-fence'
 import {
   assessOrcadMigrationTerminals,
   retireProvenExitedLeases,
@@ -286,14 +289,10 @@ describe('#29083: about 14 projects, folders, a saved session and relay-era leas
     ).toBe(true)
   })
 
-  it('refuses conversion when old relays may run, retiring nothing', async () => {
+  it('still converts through the bridge when old relays may run, retiring nothing', async () => {
     const loaded = load(reportedProfile())
     const result = await connectMove(loaded, { verdict: 'live', count: 2 })
-    expect(result).toMatchObject({
-      outcome: 'refused',
-      reason: 'terminals on this host are still running'
-    })
-    expect(listOrcadMigrationSourceCutovers(loaded.userDataPath)).toEqual([])
+    expect(result).toMatchObject({ outcome: 'fenced' })
     expect(
       loaded.store
         .getSshRemotePtyLeases(TARGET.id)
@@ -539,7 +538,8 @@ describe('"Move anyway"', () => {
     const result = await connectMove(loaded, { verdict: 'live', count: 1 })
     expect(result).toMatchObject({
       outcome: 'refused',
-      reason: 'terminals on this host are still running'
+      code: ORCAD_MIGRATION_LEAVE_BEHIND_TERMINALS,
+      reason: expect.stringContaining('every terminal on this host closed first')
     })
     const target = loaded.store.getSshTarget(TARGET.id)!
     expect(getManagedOrcadFenceEnvironmentId(target)).toBeNull()

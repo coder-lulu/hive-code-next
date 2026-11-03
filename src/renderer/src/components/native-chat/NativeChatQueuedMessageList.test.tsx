@@ -21,7 +21,7 @@ vi.mock('../../store', () => {
 })
 
 import { TooltipProvider } from '@/components/ui/tooltip'
-import type { QueuedMessageCard } from '../../../../shared/structured-agent-session-queued-cards'
+import type { QueuedMessageCard } from '../../../../shared/agent-session/view/structured-agent-session-queued-cards'
 import { NativeChatQueuedMessageList } from './NativeChatQueuedMessageList'
 import { queuedMessageCardSendNow } from './NativeChatQueuedMessageCard'
 import {

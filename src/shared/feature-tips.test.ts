@@ -13,7 +13,7 @@ describe('feature tips', () => {
     const tips = getOrderedUnseenFeatureTips({ seenTipIds: new Set<FeatureTipId>() })
 
     expect(tips.map((tip) => tip.id)).toEqual([
-      'native-chat-upgrade',
+      'chat-ui-here',
       'agent-session-search',
       'orca-cli',
       'cmd-j-palette',
@@ -21,28 +21,10 @@ describe('feature tips', () => {
     ])
   })
 
-  it('treats the native chat upgrade tip as done for every profile outside its audience', () => {
-    const base = {
-      cliInstalled: true,
-      voiceDictationEnabled: true,
-      sessionSearchTipCompleted: true
-    }
-    expect(
-      getCompletedFeatureTipIds({ ...base, inNativeChatUpgradeTipAudience: false }).has(
-        'native-chat-upgrade'
-      )
-    ).toBe(true)
-    expect(
-      getCompletedFeatureTipIds({ ...base, inNativeChatUpgradeTipAudience: true }).has(
-        'native-chat-upgrade'
-      )
-    ).toBe(false)
-  })
-
   it('skips tips the user has already seen', () => {
     const tips = getOrderedUnseenFeatureTips({
       seenTipIds: new Set<FeatureTipId>([
-        'native-chat-upgrade',
+        'chat-ui-here',
         'voice-dictation',
         'orca-cli',
         'cmd-j-palette',
@@ -61,7 +43,7 @@ describe('feature tips', () => {
         cliInstalled: true,
         voiceDictationEnabled: true,
         sessionSearchTipCompleted: true,
-        inNativeChatUpgradeTipAudience: false
+        chatUiLaunchTipCompleted: true
       })
     })
 
@@ -75,7 +57,7 @@ describe('feature tips', () => {
         cliInstalled: true,
         voiceDictationEnabled: false,
         sessionSearchTipCompleted: true,
-        inNativeChatUpgradeTipAudience: false
+        chatUiLaunchTipCompleted: true
       })
     })
 
@@ -89,7 +71,7 @@ describe('feature tips', () => {
         cliInstalled: false,
         voiceDictationEnabled: false,
         sessionSearchTipCompleted: true,
-        inNativeChatUpgradeTipAudience: false,
+        chatUiLaunchTipCompleted: true,
         featureInteractions: {
           'voice-dictation': { firstInteractedAt: 100, interactionCount: 1 }
         }

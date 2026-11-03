@@ -30,8 +30,8 @@ const macOSComputerUseHelper = readFileSync(
     'native',
     'computer-use-macos',
     'Sources',
-    'OrcaComputerUseMacOSCore',
-    'TrustedOrcaApplication.swift'
+    'OrcaComputerUseMacOS',
+    'main.swift'
   ),
   'utf8'
 )
@@ -99,13 +99,12 @@ describe('HiveCode product identity integration', () => {
     expect(rendererBrand).toContain('../../../resources/product-logo.png')
 
     const logoConsumers = [
-      'src/renderer/src/app-shell/TitlebarLeftControls.tsx',
+      'src/renderer/src/App.tsx',
       'src/renderer/src/components/Landing.tsx',
       'src/renderer/src/components/onboarding/OnboardingFlow.tsx',
       'src/renderer/src/components/settings/orca-logo-settings-icon.tsx',
       'src/renderer/src/components/sidebar/SidebarSettingsHelpMenu.tsx',
-      'src/renderer/src/components/stats/ShareUsageCard.tsx',
-      'src/renderer/src/components/mobile/slides/HomeSlide.tsx'
+      'src/renderer/src/components/stats/ShareUsageCard.tsx'
     ]
     for (const relativePath of logoConsumers) {
       const source = readFileSync(path.join(repoRoot, relativePath), 'utf8')
@@ -113,6 +112,9 @@ describe('HiveCode product identity integration', () => {
       expect(source, relativePath).not.toContain('resources/logo.svg')
       expect(source, relativePath).not.toContain('function OrcaLogo()')
     }
+    expect(
+      existsSync(path.join(repoRoot, 'src/renderer/src/components/mobile/slides/HomeSlide.tsx'))
+    ).toBe(false)
   })
 
   it('locks desktop and mobile distribution icons to the approved HiveCode exports', () => {
@@ -296,51 +298,6 @@ describe('HiveCode product identity integration', () => {
     })
   })
 
-  it('preserves published mobile release metadata and upstream localization/security configuration', () => {
-    const expo = mobileApp.expo
-    expect(expo.version).toBe(packageManifest.version)
-    expect(expo.scheme).toEqual([manifest.schemes.primary, ...manifest.schemes.aliases])
-    expect(expo.ios.buildNumber).toBe('4')
-    expect(expo.android.versionCode).toBe(49)
-    expect(expo.android.allowBackup).toBe(false)
-    expect(expo.android.permissions).toEqual(
-      expect.arrayContaining(['RECORD_AUDIO', 'MODIFY_AUDIO_SETTINGS', 'REQUEST_INSTALL_PACKAGES'])
-    )
-    expect(expo.android.googleServicesFile).toBeUndefined()
-    expect(Object.keys(expo.locales)).toEqual([
-      'en',
-      'zh-Hans',
-      'zh-Hant',
-      'ja',
-      'ko',
-      'es',
-      'fr',
-      'pt-BR',
-      'ru',
-      'tr',
-      'de'
-    ])
-    expect(expo.plugins).toContainEqual([
-      'expo-localization',
-      { supportedLocales: { ios: Object.keys(expo.locales) } }
-    ])
-    expect(expo.plugins).toContainEqual([
-      './plugins/android-locale-config.js',
-      { locales: Object.keys(expo.locales) }
-    ])
-    expect(expo.ios.infoPlist.CFBundleAllowMixedLocalizations).toBe(true)
-    expect(expo.ios.infoPlist.ITSAppUsesNonExemptEncryption).toBe(false)
-    expect(expo.ios.privacyManifests.NSPrivacyTracking).toBe(false)
-    for (const key of [
-      'NSLocalNetworkUsageDescription',
-      'NSMicrophoneUsageDescription',
-      'NSPhotoLibraryUsageDescription'
-    ]) {
-      expect(expo.ios.infoPlist[key]).toContain(manifest.displayName)
-      expect(expo.ios.infoPlist[key]).not.toContain('Orca')
-    }
-  })
-
   it('uses the Expo-generated HiveCode project identity in Fastlane', () => {
     expect(mobileFastfile).toContain('"ios", "HiveCode.xcworkspace"')
     expect(mobileFastfile).toContain('SCHEME = "HiveCode"')
@@ -376,11 +333,6 @@ describe('HiveCode product identity integration', () => {
   })
 
   it('authorizes the approved desktop and dev bundle identities in the macOS helper', () => {
-    const helperEntry = readFileSync(
-      path.join(repoRoot, 'native/computer-use-macos/Sources/OrcaComputerUseMacOS/main.swift'),
-      'utf8'
-    )
-    expect(helperEntry).toContain('TrustedOrcaApplication.isTrusted(bundleId: bundleId)')
     expect(macOSComputerUseHelper).toContain(`bundleId == "${manifest.desktop.appId}"`)
     expect(macOSComputerUseHelper).toContain(`bundleId == "${manifest.desktop.appId}.dev"`)
     expect(macOSComputerUseHelper).toContain(`bundleId.hasPrefix("${manifest.desktop.appId}.dev.")`)

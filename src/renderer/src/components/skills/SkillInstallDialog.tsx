@@ -227,7 +227,7 @@ export function SkillInstallDialog({
       setError(
         translate(
           'auto.components.skills.install.requestedVersionVerificationFailed',
-          'Installation failed before HiveCode could verify the requested version.'
+          'Installation failed before Orca could verify the requested version.'
         )
       )
     } finally {

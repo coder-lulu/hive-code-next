@@ -27,7 +27,7 @@ vi.mock('./host-store', () => ({
 }))
 vi.mock('../runtime-directory/account-runtime-profile-registry', () => ({
   findAccountRuntimeProfile: (...args: unknown[]) => findAccountRuntimeProfileMock(...args),
-  mergeAccountRuntimeProfiles: (profiles: unknown[]) => mergeAccountRuntimeProfilesMock(profiles)
+  mergeAccountRuntimeProfiles: (...args: unknown[]) => mergeAccountRuntimeProfilesMock(...args)
 }))
 vi.mock('./connection-revival-triggers', () => ({
   subscribeConnectionRevivalTriggers: (callback: (reason: 'focus') => void) => {

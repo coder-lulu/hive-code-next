@@ -171,28 +171,6 @@ describe('paired E2EE client handshake: v2 framing', () => {
     )
   })
 
-  it('carries token client capabilities inside the authenticated v2 frame', async () => {
-    const { fixture, handshake } = v2Handshake()
-    handshake.acceptReadyText(JSON.stringify(fixture.ready))
-    const frame = Buffer.from(
-      await handshake.sealAuth(token, { clientCapabilities: ['browser.client-host.v1'] }),
-      'base64'
-    )
-    const plaintext = openMobileE2EEV2Frame({
-      frame,
-      key: Buffer.from(MOBILE_E2EE_V2_VECTOR.mobileToDesktopKeyHex, 'hex'),
-      sessionId: Buffer.from(MOBILE_E2EE_V2_VECTOR.sessionIdHex, 'hex'),
-      direction: 'mobile-to-desktop',
-      payloadKind: 'text',
-      expectedCounter: 0n
-    })
-    expect(JSON.parse(Buffer.from(plaintext!).toString())).toMatchObject({
-      type: 'e2ee_auth',
-      v: 2,
-      clientCapabilities: ['browser.client-host.v1']
-    })
-  })
-
   it('accepts only the authenticated reply that echoes its transcript', () => {
     const { fixture, handshake } = v2Handshake()
     handshake.acceptReadyText(JSON.stringify(fixture.ready))

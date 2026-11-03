@@ -1,4 +1,3 @@
-import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement, type ComponentProps } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
@@ -45,7 +44,6 @@ function computer(id: string, account: boolean): HostCatalogEntry {
     id,
     name: id,
     endpoint: 'wss://test.invalid',
-    publicKeyB64: 'test-key',
     credentialStatus: 'ready',
     lastConnected: 0,
     runtimeRecordId: account ? 'runtime-account' : undefined,
@@ -86,14 +84,15 @@ function mount(overrides: Partial<ComponentProps<typeof MobileRuntimeSelector>> 
   })
 }
 function labels() {
-  return findAllByHostType(renderer!.root, 'Text')
+  return renderer!.root
+    .findAllByType('Text')
     .map((node) => node.children.join(''))
     .join('\n')
 }
 function row() {
-  return findAllByHostType(renderer!.root, 'Pressable').find((node) =>
-    String(node.props.accessibilityLabel).includes('账号电脑')
-  )!
+  return renderer!.root
+    .findAllByType('Pressable')
+    .find((node) => String(node.props.accessibilityLabel).includes('账号电脑'))!
 }
 beforeEach(() => {
   vi.clearAllMocks()
@@ -110,7 +109,7 @@ it('only shows claimed computers and commits selection after a successful connec
   expect(fixture.connect).toHaveBeenCalledWith(account.profile)
   expect(fixture.close).toHaveBeenCalledOnce()
   expect(fixture.select).not.toHaveBeenCalled()
-  act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+  act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
   expect(fixture.select).toHaveBeenCalledWith(account.id)
 })
 
@@ -150,11 +149,11 @@ it('keeps an offline claimed computer visible but unselectable', async () => {
 
 it('keeps claim separate from manual pairing when the account directory is empty', () => {
   mount({ catalog: [] })
-  const action = findAllByHostType(renderer!.root, 'Pressable').find(
-    (node) => node.props.accessibilityLabel === '认领电脑'
-  )!
+  const action = renderer!.root
+    .findAllByType('Pressable')
+    .find((node) => node.props.accessibilityLabel === '认领电脑')!
   act(() => action.props.onPress())
-  act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+  act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
   expect(fixture.claim).toHaveBeenCalledOnce()
   expect(fixture.pair).not.toHaveBeenCalled()
 })
@@ -167,7 +166,7 @@ it.each([false, true])(
     act(() => renderer!.root.findByProps({ accessibilityLabel: '配对新设备' }).props.onPress())
     expect(fixture.close).toHaveBeenCalledOnce()
     expect(fixture.pair).not.toHaveBeenCalled()
-    act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+    act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
     expect(fixture.pair).toHaveBeenCalledOnce()
     expect(fixture.select).not.toHaveBeenCalled()
     expect(fixture.claim).not.toHaveBeenCalled()
@@ -250,7 +249,7 @@ it.each(['removed', 'unavailable', 'credentials', 'selection'])(
         )
       )
     )
-    act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+    act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
     expect(fixture.select).not.toHaveBeenCalled()
     if (change !== 'selection') {
       expect(fixture.alert).toHaveBeenCalledOnce()
@@ -279,14 +278,14 @@ it('allows a directory metadata refresh without discarding valid connection conf
       )
     )
   )
-  act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+  act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
   expect(fixture.select).toHaveBeenCalledExactlyOnceWith(account.id)
 })
 
 it('does not execute a deferred pairing action after selector unmount', () => {
   mount({ accountOnly: false })
   act(() => renderer!.root.findByProps({ accessibilityLabel: '配对新设备' }).props.onPress())
-  const afterClose = findByHostType(renderer!.root, 'Drawer').props.onAfterClose
+  const afterClose = renderer!.root.findByType('Drawer').props.onAfterClose
   act(() => {
     renderer!.unmount()
     renderer = null
@@ -327,7 +326,7 @@ it('permits a refreshed relay callback when the connection target and route vers
       createElement(MobileRuntimeSelector, props({ visible: false, catalog: [accountRoute(1)] }))
     )
   )
-  act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+  act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
   expect(fixture.select).toHaveBeenCalledExactlyOnceWith(account.id)
 })
 
@@ -363,7 +362,7 @@ it('cancels a deferred pairing action across an account switch, even when switch
   act(() => renderer!.update(createElement(MobileRuntimeSelector, props({ visible: false }))))
   fixture.session = { authorityId: 'cloud', account: { accountId: 'a' } }
   act(() => renderer!.update(createElement(MobileRuntimeSelector, props({ visible: false }))))
-  act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+  act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
   expect(fixture.pair).not.toHaveBeenCalled()
 })
 
@@ -395,7 +394,7 @@ it.each([false, true])('offers offline deletion for account and merged entries (
       createElement(MobileRuntimeSelector, props({ visible: false, catalog: [offline] }))
     )
   )
-  act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+  act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
   expect(fixture.push).toHaveBeenCalledExactlyOnceWith({
     pathname: '/runtime-delete',
     params: { runtimeRecordId: 'runtime-account' }
@@ -422,7 +421,7 @@ it.each(['logout', 'account', 'removed', 'replaced'])(
     act(() =>
       renderer!.update(createElement(MobileRuntimeSelector, props({ visible: false, catalog })))
     )
-    act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+    act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
     expect(fixture.push).not.toHaveBeenCalled()
   }
 )
@@ -455,6 +454,6 @@ it('does not restore cancelled deletion when a removed catalog target returns', 
     renderer!.update(createElement(MobileRuntimeSelector, props({ visible: false, catalog: [] })))
   )
   act(() => renderer!.update(createElement(MobileRuntimeSelector, props({ visible: false }))))
-  act(() => findByHostType(renderer!.root, 'Drawer').props.onAfterClose())
+  act(() => renderer!.root.findByType('Drawer').props.onAfterClose())
   expect(fixture.push).not.toHaveBeenCalled()
 })

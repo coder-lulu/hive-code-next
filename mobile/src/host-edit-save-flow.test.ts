@@ -1,4 +1,3 @@
-import { findAllByHostType } from './test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -32,9 +31,6 @@ vi.mock('react-native', () => ({
 
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 0, left: 0, right: 0, top: 0 })
-}))
-vi.mock('./layout/side-safe-area', () => ({
-  SideSafeArea: ({ children }: { children: unknown }) => children
 }))
 
 vi.mock('expo-router', () => ({
@@ -215,9 +211,9 @@ describe('edit host handleSave', () => {
       { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
     ])
     const renderer = await renderEditHostRoute()
-    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
-      (node) => node.props.accessibilityLabel === 'Name'
-    )
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
 
     expect(nameInput?.props.value).toBe('Pending Desk')
     expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
@@ -260,9 +256,9 @@ describe('edit host handleSave', () => {
       await Promise.resolve()
     })
 
-    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
-      (node) => node.props.accessibilityLabel === 'Name'
-    )
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
     expect(nameInput?.props.value).toBe('Account B Desk')
     expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
 
@@ -302,7 +298,7 @@ describe('edit host handleSave', () => {
       { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
     ])
     const renderer = await renderEditHostRoute()
-    expect(findAllByHostType(renderer.root, 'TextInput')).toHaveLength(0)
+    expect(renderer.root.findAllByType('TextInput')).toHaveLength(0)
 
     dependencies.directoryStatus = 'ready'
     dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
@@ -362,9 +358,9 @@ describe('edit host handleSave', () => {
     const renderer = await renderEditHostRoute()
 
     expect(
-      findAllByHostType(renderer.root, 'TextInput').some(
-        (node) => node.props.accessibilityLabel === 'Address'
-      )
+      renderer.root
+        .findAllByType('TextInput')
+        .some((node) => node.props.accessibilityLabel === 'Address')
     ).toBe(false)
     setFieldValue(renderer, 'Name', 'Phone Alias')
     await pressSave(renderer)
@@ -390,9 +386,9 @@ describe('edit host handleSave', () => {
       const renderer = await renderEditHostRoute()
       setFieldValue(renderer, 'Name', invalidName)
       expect(findText(renderer, '名称需为 1–128 个字符')).toBe(true)
-      const save = findAllByHostType(renderer.root, 'Pressable').find(
-        (node) => node.props.accessibilityLabel === 'Save host'
-      )!
+      const save = renderer.root
+        .findAllByType('Pressable')
+        .find((node) => node.props.accessibilityLabel === 'Save host')!
       expect(save.props.disabled).toBe(true)
       expect(dependencies.queueDisplayNameUpdate).not.toHaveBeenCalled()
       act(() => renderer.unmount())
@@ -405,9 +401,9 @@ describe('edit host handleSave', () => {
       { ...HOST_FIXTURE, runtimeRecordId: CLOUD_RUNTIME_FIXTURE.runtimeRecordId }
     ])
     const renderer = await renderEditHostRoute()
-    const clearButton = findAllByHostType(renderer.root, 'Pressable').find(
-      (node) => node.props.accessibilityLabel === 'Clear HiveCloud name'
-    )
+    const clearButton = renderer.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')
     if (!clearButton) {
       throw new Error('Clear HiveCloud name button not found')
     }
@@ -424,9 +420,9 @@ describe('edit host handleSave', () => {
       expectedCloudDisplayNameVersion: 3
     })
     expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
-    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
-      (node) => node.props.accessibilityLabel === 'Name'
-    )
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
     expect(nameInput?.props.value).toBe('Reported Desk')
     expect(dependencies.back).toHaveBeenCalledOnce()
     act(() => renderer.unmount())
@@ -437,9 +433,9 @@ describe('edit host handleSave', () => {
     dependencies.directoryEntries = [CLOUD_RUNTIME_FIXTURE]
     dependencies.loadHosts.mockResolvedValue([])
     const renderer = await renderEditHostRoute()
-    const clearButton = findAllByHostType(renderer.root, 'Pressable').find(
-      (node) => node.props.accessibilityLabel === 'Clear HiveCloud name'
-    )
+    const clearButton = renderer.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')
     if (!clearButton) {
       throw new Error('Clear HiveCloud name button not found')
     }
@@ -448,9 +444,9 @@ describe('edit host handleSave', () => {
       await clearButton.props.onPress()
     })
 
-    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
-      (node) => node.props.accessibilityLabel === 'Name'
-    )
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
     expect(nameInput?.props.value).toBe('Reported Desk')
     expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
     act(() => renderer.unmount())
@@ -463,9 +459,9 @@ describe('edit host handleSave', () => {
     ])
     dependencies.queueDisplayNameUpdate.mockRejectedValueOnce(new Error('storage unavailable'))
     const renderer = await renderEditHostRoute()
-    const clearButton = findAllByHostType(renderer.root, 'Pressable').find(
-      (node) => node.props.accessibilityLabel === 'Clear HiveCloud name'
-    )
+    const clearButton = renderer.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')
     if (!clearButton) {
       throw new Error('Clear HiveCloud name button not found')
     }
@@ -486,21 +482,23 @@ describe('edit host handleSave', () => {
     expect(dependencies.updateHostNameAndEndpoint).not.toHaveBeenCalled()
     expect(dependencies.back).not.toHaveBeenCalled()
     expect(
-      findAllByHostType(renderer.root, 'Text').some(
-        (node) =>
-          node.props.accessibilityRole === 'alert' &&
-          node.props.accessibilityLiveRegion === 'polite' &&
-          node.props.children === '无法排队清除 HiveCloud 名称。请稍后重试。'
-      )
+      renderer.root
+        .findAllByType('Text')
+        .some(
+          (node) =>
+            node.props.accessibilityRole === 'alert' &&
+            node.props.accessibilityLiveRegion === 'polite' &&
+            node.props.children === '无法排队清除 HiveCloud 名称。请稍后重试。'
+        )
     ).toBe(true)
-    const nameInput = findAllByHostType(renderer.root, 'TextInput').find(
-      (node) => node.props.accessibilityLabel === 'Name'
-    )
+    const nameInput = renderer.root
+      .findAllByType('TextInput')
+      .find((node) => node.props.accessibilityLabel === 'Name')
     expect(nameInput?.props.value).toBe('Cloud Desk')
     expect(
-      findAllByHostType(renderer.root, 'Pressable').find(
-        (node) => node.props.accessibilityLabel === 'Clear HiveCloud name'
-      )?.props.disabled
+      renderer.root
+        .findAllByType('Pressable')
+        .find((node) => node.props.accessibilityLabel === 'Clear HiveCloud name')?.props.disabled
     ).toBe(false)
     act(() => renderer.unmount())
   })

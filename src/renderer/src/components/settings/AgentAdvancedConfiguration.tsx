@@ -11,6 +11,7 @@ import {
   AgentDefaultEnvInput
 } from './AgentLaunchDefaultsEditor'
 import { AgentSessionSourceHomeInput } from './codex-session-source-home-control'
+import { stringifyAgentDefaultEnvDraft } from './agent-default-env-draft'
 
 export function AgentAdvancedConfiguration({
   catalog,
@@ -65,6 +66,8 @@ export function AgentAdvancedConfiguration({
       {catalog.map((agent) => {
         const props = getRowProps(agent, detectedIds?.has(agent.id) === true)
         const canEditCommand = props.isDetected || Boolean(props.cmdOverride?.trim())
+        const envSummary = stringifyAgentDefaultEnvDraft(props.envOverride)
+        const defaultEnvSummary = stringifyAgentDefaultEnvDraft(props.defaultEnv)
         return (
           <section
             key={agent.id}
@@ -83,6 +86,7 @@ export function AgentAdvancedConfiguration({
             </h3>
             {canEditCommand ? (
               <AgentCommandOverrideInput
+                key={props.cmdOverride ?? props.defaultCmd}
                 defaultCmd={props.defaultCmd}
                 cmdOverride={props.cmdOverride}
                 onSaveOverride={props.onSaveOverride}
@@ -91,18 +95,20 @@ export function AgentAdvancedConfiguration({
             {props.isDetected ? (
               <>
                 <AgentDefaultArgsInput
+                  key={props.argsOverride}
                   defaultArgs={props.defaultArgs}
                   argsOverride={props.argsOverride}
                   onSaveArgs={props.onSaveArgs}
                 />
-                {props.environmentEditor ?? (
-                  <AgentDefaultEnvInput
-                    showEmpty
-                    defaultEnv={props.defaultEnv}
-                    envOverride={props.envOverride}
-                    onSaveEnv={props.onSaveEnv}
-                  />
-                )}
+                {props.environmentEditor ??
+                  (defaultEnvSummary || envSummary ? (
+                    <AgentDefaultEnvInput
+                      key={envSummary}
+                      defaultEnv={props.defaultEnv}
+                      envOverride={props.envOverride}
+                      onSaveEnv={props.onSaveEnv}
+                    />
+                  ) : null)}
                 {props.sessionSourceHome ? (
                   <AgentSessionSourceHomeInput
                     key={`${props.sessionSourceHome.runtimeLabel}:${props.sessionSourceHome.value}`}

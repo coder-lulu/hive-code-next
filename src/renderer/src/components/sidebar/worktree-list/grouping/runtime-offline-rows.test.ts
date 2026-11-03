@@ -9,7 +9,7 @@ import type { Repo } from '../../../../../../shared/repo-types'
 import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import type { FolderWorkspace } from '../../../../../../shared/folder-workspace-types'
 import { getRenderRowKey } from '../listing/render-row'
-import { sidebarRowPlanInputs, type buildRows } from './build-rows.test-fixture'
+import type { buildRows } from './build-rows'
 import { appendRuntimeOfflineDirectory, buildRuntimeOfflineRows } from './runtime-offline-rows'
 import { OFFLINE_RUNTIME_GROUP_KEY } from './group-keys'
 import { getWorktreeDragGroups, getWorktreeDragIndexes } from '../drag/groups'
@@ -63,7 +63,7 @@ function input(): Parameters<typeof buildRows> {
 
 describe('runtime offline project rows', () => {
   it('keeps drag groups, indexes and session refresh scoped to each directory', () => {
-    const result = buildRuntimeOfflineRows(sidebarRowPlanInputs(...input()), new Set(['remote']))
+    const result = buildRuntimeOfflineRows(input(), new Set(['remote']))
     const rows = appendRuntimeOfflineDirectory(
       result.onlineRows,
       result.offlineRows,
@@ -84,7 +84,6 @@ describe('runtime offline project rows', () => {
     expect(
       refreshWorktreeSidebarDragSession({
         session: {
-          draggedCopies: [],
           draggingWorktreeId: remoteWorktree.id,
           sourceGroupKey: offlineKey,
           draggedIds: [remoteWorktree.id],
@@ -113,7 +112,7 @@ describe('runtime offline project rows', () => {
 
   it('separates checkouts of the same project while keeping header identities unique', () => {
     const { onlineRows, offlineRows, offlineCount } = buildRuntimeOfflineRows(
-      sidebarRowPlanInputs(...input()),
+      input(),
       new Set(['remote'])
     )
     expect(onlineRows).toMatchObject([
@@ -127,7 +126,7 @@ describe('runtime offline project rows', () => {
     const keys = [...onlineRows, ...offlineRows].map((row) => getRenderRowKey(row))
     expect(new Set(keys).size).toBe(keys.length)
     expect(offlineCount).toBe(1)
-    const reconnected = buildRuntimeOfflineRows(sidebarRowPlanInputs(...input()), new Set())
+    const reconnected = buildRuntimeOfflineRows(input(), new Set())
     expect(reconnected.offlineRows).toEqual([])
     expect(reconnected.onlineRows.filter((row) => row.type === 'item')).toHaveLength(2)
   })
@@ -139,7 +138,7 @@ describe('runtime offline project rows', () => {
       { ...remoteWorktree, isPinned: true }
     ]
     args[0] = 'workspace-status'
-    const result = buildRuntimeOfflineRows(sidebarRowPlanInputs(...args), new Set(['remote']))
+    const result = buildRuntimeOfflineRows(args, new Set(['remote']))
     expect(
       result.onlineRows.filter((row) => row.type === 'item').map((row) => row.worktree.id)
     ).toEqual([worktree.id])
@@ -157,7 +156,7 @@ describe('runtime offline project rows', () => {
       { ...remoteWorktree, isPinned: true }
     ]
     args[21] = 'duplicate-in-groups'
-    const result = buildRuntimeOfflineRows(sidebarRowPlanInputs(...args), new Set(['remote']))
+    const result = buildRuntimeOfflineRows(args, new Set(['remote']))
     const rows = appendRuntimeOfflineDirectory(
       result.onlineRows,
       result.offlineRows,
@@ -216,7 +215,7 @@ describe('runtime offline project rows', () => {
     args[12] = [group]
     args[13] = new Set([remoteRepo.id])
     args[18] = [folder]
-    const result = buildRuntimeOfflineRows(sidebarRowPlanInputs(...args), new Set(['remote']))
+    const result = buildRuntimeOfflineRows(args, new Set(['remote']))
     expect(result.onlineRows.some((row) => row.type === 'folder-workspace')).toBe(false)
     expect(result.offlineRows).toEqual(
       expect.arrayContaining([
@@ -229,7 +228,7 @@ describe('runtime offline project rows', () => {
   })
 
   it('collapses only offline contents and does not show an empty offline directory after filtering', () => {
-    const result = buildRuntimeOfflineRows(sidebarRowPlanInputs(...input()), new Set(['remote']))
+    const result = buildRuntimeOfflineRows(input(), new Set(['remote']))
     const collapsed = appendRuntimeOfflineDirectory(
       result.onlineRows,
       result.offlineRows,
@@ -247,10 +246,7 @@ describe('runtime offline project rows', () => {
     const filtered = input()
     filtered[1] = [worktree]
     filtered[2] = new Map([[repo.id, repo]])
-    const filteredResult = buildRuntimeOfflineRows(
-      sidebarRowPlanInputs(...filtered),
-      new Set(['remote'])
-    )
+    const filteredResult = buildRuntimeOfflineRows(filtered, new Set(['remote']))
     expect(filteredResult.offlineRows).toEqual([])
     expect(appendRuntimeOfflineDirectory(filteredResult.onlineRows, [], 0, new Set())).toBe(
       filteredResult.onlineRows
@@ -273,7 +269,7 @@ describe('runtime offline project rows', () => {
       updatedAt: 1
     }
     args[12] = [local, { ...local, name: 'Offline space', executionHostId: 'runtime:remote' }]
-    const result = buildRuntimeOfflineRows(sidebarRowPlanInputs(...args), new Set(['remote']))
+    const result = buildRuntimeOfflineRows(args, new Set(['remote']))
     expect(
       result.onlineRows.filter((row) => row.type === 'header').map((row) => row.label)
     ).not.toContain('Offline space')

@@ -1,4 +1,5 @@
 // @vitest-environment happy-dom
+import { EVERY_AGENT_CHAT } from '../../../../../../shared/native-chat/every-agent-chat.test-fixture'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, render, cleanup, fireEvent } from '@testing-library/react'
 import '../../__fixtures__/settings-persistence-test-fixture'
@@ -27,7 +28,7 @@ import { TooltipProvider } from '../../../ui/tooltip'
 import { setLocalRuntimeCapabilitiesForTests } from '@/runtime/local-runtime-capabilities'
 import { projectAgentLaunchSettings } from '../../../../../../shared/agent-launch-settings'
 import { TEST_REPO } from '@/store/slices/worktrees-slice-test-fixtures'
-import { clearHostAgentMenuSettingsForTests } from '../../use-host-agent-launch-preferences'
+import { clearHostAgentMenuSettingsForTests } from '../../host-agent-launch-preferences-resource'
 import { mutateHostAgentLaunchSettings } from '../../agent-launch-settings-transport'
 import { getRuntimeAgentInventoryKey } from '@/store/slices/runtime-agent-inventory-key'
 import { resetHostStructuredAgentsForTests } from '@/runtime/host-structured-agents'
@@ -139,7 +140,7 @@ describe('RepositorySourceControlAiActionRows', () => {
         repos: [{ ...TEST_REPO, id: 'repo-1' }],
         settings: {
           ...settings,
-          nativeChatProviders: { claude: false, codex: false },
+          nativeChatProviders: {},
           defaultTuiAgent: 'claude',
           sourceControlAi: source
         },
@@ -221,12 +222,12 @@ describe('RepositorySourceControlAiActionRows', () => {
           )
         ).toBe(true)
       }
-      for (const chatPreferred of [true, false]) {
+      for (const chat of [true, false]) {
         await act(() =>
           useAppStore.setState({
             settings: {
               ...useAppStore.getState().settings!,
-              nativeChatProviders: { claude: chatPreferred, codex: chatPreferred }
+              nativeChatProviders: chat ? EVERY_AGENT_CHAT : {}
             }
           })
         )
@@ -235,7 +236,7 @@ describe('RepositorySourceControlAiActionRows', () => {
           expect(input?.value).toBe(
             surface === 'terminal'
               ? '--saved-cli'
-              : surface === 'chat' || (chatPreferred && agent !== 'opencode')
+              : surface === 'chat' || (chat && agent !== 'opencode')
                 ? undefined
                 : '--saved-cli'
           )
@@ -318,7 +319,7 @@ it.each(['', '--model raw'])(
 it('keeps default and missing-agent editors disabled only until the host inventory settles', async () => {
   const settings = useAppStore.getState().settings!
   useAppStore.setState({
-    settings: { ...settings, nativeChatProviders: { claude: false, codex: false } },
+    settings: { ...settings, nativeChatProviders: {} },
     detectedAgentIds: null,
     ensureDetectedAgents: vi.fn(() => new Promise<TuiAgent[]>(() => {}))
   })
@@ -381,7 +382,7 @@ it.each([1, 10])(
     useAppStore.setState({
       settings: {
         ...settings,
-        nativeChatProviders: { claude: false, codex: false },
+        nativeChatProviders: {},
         defaultTuiAgent: 'claude',
         disabledTuiAgents: ['codex']
       },

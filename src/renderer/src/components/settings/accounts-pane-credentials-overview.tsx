@@ -1,5 +1,3 @@
-import { SearchableSetting } from './SearchableSetting'
-import { getAccountsGrokSearchEntries, getAccountsCursorSearchEntries } from './accounts-search'
 import { ChevronRight, Info } from 'lucide-react'
 import { translate } from '@/i18n/i18n'
 import { Button } from '../ui/button'
@@ -68,9 +66,7 @@ function CredentialSettingsSheet({
         <SheetHeader className="border-b border-border/60 px-8 py-7 pr-14">
           <SheetTitle className="flex items-center gap-3 text-xl">
             {miniMax ? <MiniMaxIcon size={28} /> : <OpenCodeGoIcon size={28} />}
-            {miniMax
-              ? translate('auto.components.settings.AccountsPane.5d63bbfbec', 'MiniMax')
-              : translate('auto.components.settings.AccountsPane.4ac10b4d08', 'OpenCode Go')}
+            {miniMax ? 'MiniMax' : 'OpenCode Go'}
           </SheetTitle>
           <SheetDescription>
             {miniMax
@@ -101,6 +97,15 @@ export function AccountsCredentialsOverview({
   sheet: CredentialSheetKind | null
   onSheetChange: (sheet: CredentialSheetKind | null) => void
 }): React.JSX.Element {
+  const miniMaxConfigured = model.miniMaxConfigured || model.miniMaxApiKeyConfigured
+  const miniMaxStatus =
+    model.miniMaxCredentialLoadState === 'loading'
+      ? translate('auto.components.settings.AccountsPane.loading', 'Loading…')
+      : model.miniMaxCredentialLoadState === 'error'
+        ? translate('auto.components.settings.AccountsPane.readFailed', 'Read failed')
+        : miniMaxConfigured
+          ? translate('auto.components.settings.AccountsPane.configured', 'Configured')
+          : translate('auto.components.settings.AccountsPane.notConfigured', 'Not configured')
   return (
     <TooltipProvider>
       <section aria-labelledby="accounts-credentials-title" className="space-y-3">
@@ -124,7 +129,7 @@ export function AccountsCredentialsOverview({
             icon={<GeminiIcon size={22} />}
             name={
               <span className="flex items-center gap-2">
-                {translate('auto.lib.agent.catalog.12e6baa4f7', 'Gemini')}{' '}
+                Gemini{' '}
                 <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
                   {translate('auto.components.settings.AccountsPane.experimental', 'Experimental')}
                 </span>
@@ -169,7 +174,7 @@ export function AccountsCredentialsOverview({
                   <TooltipContent className="max-w-72">
                     {translate(
                       'auto.components.settings.AccountsPane.d676c41fc6',
-                      'Extracts OAuth credentials from your local Gemini CLI installation to authenticate with Google. This uses credentials issued to the Gemini CLI app, not Orca. May break if Google updates the CLI. Use at your own risk.'
+                      'Extracts OAuth credentials from your local Gemini CLI installation to authenticate with Google. This may stop working if Google changes the CLI.'
                     )}
                   </TooltipContent>
                 </Tooltip>
@@ -196,13 +201,43 @@ export function AccountsCredentialsOverview({
               </Button>
             }
           />
-          {renderMiniMaxAccountsSection(model)}
-          <SearchableSetting {...getAccountsGrokSearchEntries()[0]}>
-            <GrokAccountsSection />
-          </SearchableSetting>
-          <SearchableSetting {...getAccountsCursorSearchEntries()[0]}>
-            <CursorAccountsSection />
-          </SearchableSetting>
+          <ProviderRow
+            id="accounts-minimax"
+            icon={<MiniMaxIcon size={22} />}
+            name="MiniMax"
+            detail={translate(
+              'auto.components.settings.AccountsPane.miniMaxScope',
+              'Local · {{value0}} · API key / Cookie',
+              {
+                value0:
+                  model.settings.minimaxEndpoint === 'cn'
+                    ? translate('auto.components.settings.AccountsPane.endpointChinaShort', 'China')
+                    : translate(
+                        'auto.components.settings.AccountsPane.endpointOverseasShort',
+                        'Overseas'
+                      )
+              }
+            )}
+            status={miniMaxStatus}
+            action={
+              model.miniMaxCredentialLoadState === 'error' ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void model.refreshMiniMaxCredentialStatus()}
+                >
+                  {translate('auto.components.settings.AccountsPane.retry', 'Retry')}
+                </Button>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => onSheetChange('minimax')}>
+                  {translate('auto.components.settings.AccountsPane.configure', 'Configure')}
+                  <ChevronRight className="size-4" />
+                </Button>
+              )
+            }
+          />
+          <GrokAccountsSection />
+          <CursorAccountsSection />
         </div>
         <CredentialSettingsSheet
           kind="opencode"

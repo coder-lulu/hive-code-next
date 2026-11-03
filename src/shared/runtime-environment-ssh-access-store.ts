@@ -1,7 +1,4 @@
-import {
-  pairedRuntimeConnectionToken,
-  type PairedRuntimeConnection
-} from './paired-runtime-connection'
+import type { PairingOffer } from './pairing'
 import { randomUUID } from 'node:crypto'
 import { runtimeEnvironmentSshAccessBinding } from './runtime-environment-authority-binding'
 export { runtimeEnvironmentSshAccessBinding } from './runtime-environment-authority-binding'
@@ -69,7 +66,7 @@ export function linkVerifiedRuntimeEnvironmentSshAccess(
     expectedEnvironment: KnownRuntimeEnvironment
     requestId: string
     verifiedRuntimeId: string
-    verifiedConnection: PairedRuntimeConnection
+    verifiedConnection: PairingOffer
     tunnel: RuntimeSshTunnelLink
     now?: number
   }
@@ -96,8 +93,8 @@ export function linkVerifiedRuntimeEnvironmentSshAccess(
   if (
     !args.verifiedRuntimeId.trim() ||
     (existing.runtimeId !== null && existing.runtimeId !== args.verifiedRuntimeId) ||
-    args.verifiedConnection.hostPublicKeyB64 !== offer.publicKeyB64 ||
-    pairedRuntimeConnectionToken(args.verifiedConnection) !== offer.deviceToken ||
+    args.verifiedConnection.publicKeyB64 !== offer.publicKeyB64 ||
+    args.verifiedConnection.deviceToken !== offer.deviceToken ||
     args.verifiedConnection.pairedDeviceId !== offer.pairedDeviceId
   ) {
     throw invalid('The SSH endpoint did not verify as this paired server.')
@@ -222,8 +219,8 @@ function requireMatchingCompletedLink(
   if (
     linkedRuntime !== args.verifiedRuntimeId ||
     offer.endpoint !== args.verifiedConnection.endpoint ||
-    offer.deviceToken !== pairedRuntimeConnectionToken(args.verifiedConnection) ||
-    offer.publicKeyB64 !== args.verifiedConnection.hostPublicKeyB64 ||
+    offer.deviceToken !== args.verifiedConnection.deviceToken ||
+    offer.publicKeyB64 !== args.verifiedConnection.publicKeyB64 ||
     offer.pairedDeviceId !== args.verifiedConnection.pairedDeviceId ||
     access.sshTargetId !== args.tunnel.sshTargetId ||
     access.sshTargetGeneration !== args.tunnel.sshTargetGeneration ||

@@ -7,7 +7,6 @@ import { RUNTIME_NAVIGATION_TARGETS } from '../runtime-navigation'
 import { sleepingAgentLaunchConfigSchema } from '../workspace-session-sleeping-agents'
 import { isTuiAgent } from '../tui-agent-config'
 import { supportsTuiAgentLaunchPermission } from '../tui-agent-permissions'
-import { agentPermissionHasTerminalChoice } from '../tui-agent-permission-choice'
 import { LaunchSourceParam } from './launch-source-param'
 import {
   OptionalBoolean,
@@ -92,6 +91,8 @@ export const WorktreeCreate = z
     envParentWorkspace: OptionalString,
     parentWorktree: OptionalString,
     cwdParentWorktree: OptionalString,
+    // Absent on older clients: retain the existing cwd parent.
+    cwdParentAmbiguous: z.literal(true).optional(),
     noParent: OptionalBoolean,
     callerTerminalHandle: OptionalString,
     orchestrationContext: z
@@ -118,7 +119,7 @@ export const WorktreeCreate = z
     startupCommandDelivery: z.enum(['fast', 'shell-ready']).optional(),
     // Quote agent launches on the execution host because SSH shells can differ from the client’s.
     startupAgent: OptionalTuiAgent,
-    startupPermissionMode: z.enum(['manual', 'yolo', 'auto']).optional(),
+    startupPermissionMode: z.enum(['manual', 'yolo']).optional(),
     startupLaunchPreferences: z
       .object({
         model: z.string().trim().min(1).max(512).optional(),
@@ -195,17 +196,6 @@ export const WorktreeCreate = z
         code: z.ZodIssueCode.custom,
         path: ['startupPermissionMode'],
         message: 'This agent does not support an explicit launch permission mode'
-      })
-    }
-    if (
-      params.startupPermissionMode === 'auto' &&
-      permissionAgent !== undefined &&
-      !agentPermissionHasTerminalChoice(permissionAgent, 'auto')
-    ) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['startupPermissionMode'],
-        message: 'Automatic approval is unavailable for this agent'
       })
     }
   })

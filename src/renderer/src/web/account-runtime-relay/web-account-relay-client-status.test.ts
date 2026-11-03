@@ -5,16 +5,12 @@ const mocks = vi.hoisted<{
   pool: null | {
     options: { onStateChange: () => void; onStatusReceiptLost: () => void }
     requestStatus: ReturnType<typeof vi.fn>
-    request: ReturnType<typeof vi.fn>
-    connectionEpoch: number
     subscribe: ReturnType<typeof vi.fn>
   }
 }>(() => ({ pool: null }))
 
 vi.mock('../../../../shared/hive-account-relay-pool', () => ({
   HiveAccountRelayPool: class {
-    connectionEpoch = 0
-    request = vi.fn(async () => ({ id: 'write', ok: true, result: null }))
     requestStatus = vi.fn(async () => ({
       id: 'proof',
       ok: true,
@@ -41,35 +37,6 @@ afterEach(() => {
 })
 
 describe('account Relay connection-owned status', () => {
-  it('forwards cancellation, status deadlines and the pool receipt epoch', async () => {
-    const client = createWebAccountRelayClient(vi.fn())
-    const controller = new AbortController()
-    await client.call('status.get', undefined, { signal: controller.signal, timeoutMs: 1234 })
-    expect(mocks.pool!.requestStatus).toHaveBeenCalledWith(controller.signal, 1234)
-    mocks.pool!.connectionEpoch = 7
-    expect(client.connectionEpoch).toBe(7)
-    await client.call(
-      'files.write',
-      { path: 'file' },
-      {
-        signal: controller.signal,
-        timeoutMs: 2345,
-        expectedConnectionEpoch: client.connectionEpoch
-      }
-    )
-    expect(mocks.pool!.request).toHaveBeenCalledWith(
-      'files.write',
-      { path: 'file' },
-      2345,
-      undefined,
-      controller.signal,
-      7
-    )
-    mocks.pool!.connectionEpoch = 8
-    expect(client.connectionEpoch).toBe(8)
-    client.close()
-  })
-
   it('verifies real channel status, has no successful polling loop, and retires its exact owner', async () => {
     vi.useFakeTimers()
     const client = createWebAccountRelayClient(vi.fn())

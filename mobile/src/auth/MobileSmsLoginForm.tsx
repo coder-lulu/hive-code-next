@@ -1,4 +1,3 @@
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { ArrowLeft } from 'lucide-react-native'
 import { useEffect, useState } from 'react'
 import {
@@ -24,8 +23,6 @@ type MobileSmsLoginFormProps = {
 }
 
 export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: MobileSmsLoginFormProps) {
-  const t = useMobileTranslation()
-
   const theme = useMobileTheme()
   const styles = useMobileThemeStyles(createMobileSmsLoginStyles)
   const insets = useSafeAreaInsets()
@@ -100,10 +97,7 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
       style={styles.screen}
     >
       <Pressable
-        accessibilityLabel={t(
-          'auto.mobile.src.auth.MobileSmsLoginForm.0cc5baccbd',
-          'Close phone sign-in'
-        )}
+        accessibilityLabel="关闭手机号登录"
         accessibilityRole="button"
         onPress={onClose}
         style={styles.backdrop}
@@ -119,10 +113,7 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
       >
         <View style={styles.topRow}>
           <Pressable
-            accessibilityLabel={t(
-              'auto.mobile.src.auth.MobileSmsLoginForm.9b3c193464',
-              'Back to sign-in options'
-            )}
+            accessibilityLabel="返回登录方式"
             accessibilityRole="button"
             onPress={onClose}
             style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
@@ -130,27 +121,18 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
             <ArrowLeft color={theme.color.text.primary} size={20} strokeWidth={1.9} />
           </Pressable>
           <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>
-            {t(
-              'auto.mobile.src.auth.MobileSmsLoginForm.db7f60aec7',
-              'Sign in or register with phone number'
-            )}
+            手机号登录/注册
           </Text>
         </View>
         <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           <Text maxFontSizeMultiplier={1.3} style={styles.subtitle}>
-            {t(
-              'auto.mobile.src.auth.MobileSmsLoginForm.48aaa96f37',
-              'A verification code will be sent to your phone number.'
-            )}
+            验证码将发送至你的手机号。
           </Text>
           <Text maxFontSizeMultiplier={1.3} style={styles.inputLabel}>
-            {t('auto.mobile.src.auth.MobileSmsLoginForm.dd1b7afb0e', 'Phone number')}
+            手机号
           </Text>
           <TextInput
-            accessibilityLabel={t(
-              'auto.mobile.src.auth.MobileSmsLoginForm.dd1b7afb0e',
-              'Phone number'
-            )}
+            accessibilityLabel="手机号"
             autoComplete="tel"
             autoCorrect={false}
             keyboardType="phone-pad"
@@ -158,24 +140,13 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
             onBlur={() => setFocused(null)}
             onChangeText={(value) => setPhoneNumber(value.replace(/\D/g, '').slice(0, 11))}
             onFocus={() => setFocused('phone')}
-            placeholder={t(
-              'auto.mobile.src.auth.MobileSmsLoginForm.ee385b7714',
-              'Enter an 11-digit phone number'
-            )}
+            placeholder="请输入 11 位手机号"
             placeholderTextColor={theme.color.text.tertiary}
             style={inputStyle('phone')}
             value={phoneNumber}
           />
           <Pressable
-            accessibilityLabel={
-              countdown > 0
-                ? t(
-                    'auto.mobile.src.auth.MobileSmsLoginForm.04f0eea0ef',
-                    'Verification code countdown: {{value0}}s',
-                    { value0: countdown }
-                  )
-                : t('auto.mobile.src.auth.MobileSmsLoginForm.84bfac9bc3', 'Send verification code')
-            }
+            accessibilityLabel={countdown > 0 ? `验证码倒计时 ${countdown} 秒` : '发送验证码'}
             accessibilityRole="button"
             accessibilityState={{ busy, disabled: !canSend }}
             disabled={!canSend}
@@ -192,51 +163,32 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
               <Text style={styles.actionLabel}>
                 {challengeId
                   ? countdown > 0
-                    ? t(
-                        'auto.mobile.src.auth.MobileSmsLoginForm.ecfb4979c0',
-                        'Resend in {{value0}}s',
-                        { value0: countdown }
-                      )
-                    : t(
-                        'auto.mobile.src.auth.MobileSmsLoginForm.a2e3e19a24',
-                        'Resend verification code'
-                      )
-                  : t(
-                      'auto.mobile.src.auth.MobileSmsLoginForm.84bfac9bc3',
-                      'Send verification code'
-                    )}
+                    ? `${countdown}s 后重新发送`
+                    : '重新发送验证码'
+                  : '发送验证码'}
               </Text>
             )}
           </Pressable>
           {challengeId ? (
             <>
               <Text maxFontSizeMultiplier={1.3} style={styles.inputLabel}>
-                {t('auto.mobile.src.auth.MobileSmsLoginForm.3ef28ec077', 'Verification code')}
+                验证码
               </Text>
               <TextInput
-                accessibilityLabel={t(
-                  'auto.mobile.src.auth.MobileSmsLoginForm.c7427b3cb0',
-                  'SMS verification code'
-                )}
+                accessibilityLabel="短信验证码"
                 autoComplete="one-time-code"
                 keyboardType="number-pad"
                 maxLength={6}
                 onBlur={() => setFocused(null)}
                 onChangeText={(value) => setSmsCode(value.replace(/\D/g, '').slice(0, 6))}
                 onFocus={() => setFocused('code')}
-                placeholder={t(
-                  'auto.mobile.src.auth.MobileSmsLoginForm.ce517ab65d',
-                  'Enter the 6-digit verification code'
-                )}
+                placeholder="请输入 6 位验证码"
                 placeholderTextColor={theme.color.text.tertiary}
                 style={inputStyle('code')}
                 value={smsCode}
               />
               <Pressable
-                accessibilityLabel={t(
-                  'auto.mobile.src.auth.MobileSmsLoginForm.e02fef04f5',
-                  'Confirm sign-in'
-                )}
+                accessibilityLabel="确认登录"
                 accessibilityRole="button"
                 accessibilityState={{ busy, disabled: !canLogin }}
                 disabled={!canLogin}
@@ -250,9 +202,7 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
                 {busy && challengeId ? (
                   <ActivityIndicator color={theme.color.text.inverse} />
                 ) : (
-                  <Text style={styles.actionLabel}>
-                    {t('auto.mobile.src.auth.MobileSmsLoginForm.0332991359', 'Sign in')}
-                  </Text>
+                  <Text style={styles.actionLabel}>登录</Text>
                 )}
               </Pressable>
             </>
@@ -263,10 +213,7 @@ export function MobileSmsLoginForm({ onClose, onSuccess, termsAccepted }: Mobile
             </Text>
           ) : null}
           <Text maxFontSizeMultiplier={1.3} style={styles.helper}>
-            {t(
-              'auto.mobile.src.auth.MobileSmsLoginForm.0865c6b4d6',
-              'The verification code is used for this sign-in only and is not saved to this device.'
-            )}
+            验证码仅用于本次登录，不会保存到设备。
           </Text>
         </ScrollView>
       </View>

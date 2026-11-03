@@ -1,16 +1,18 @@
-import { reduceStructuredReadSnapshot } from './structured-agent-session-read-receipt'
-import type { AgentJournalRenderItem } from '../../../../shared/agent-session-journal-types'
-import type { AgentProviderSessionMetadata } from '../../../../shared/agent-session-resume'
-import { agentProviderSessionsEqual } from '../../../../shared/agent-session-resume'
+import type { AgentJournalRenderItem } from '../../../../shared/agent-session/journal/agent-session-journal-types'
+import {
+  type AgentProviderSessionMetadata,
+  agentProviderSessionsEqual
+} from '../../../../shared/agent-session/lifecycle/agent-session-resume'
 import {
   AGENT_SESSION_HISTORY_MAX_LIMIT,
   type AgentSessionHistoryResult
-} from '../../../../shared/agent-session-wire'
+} from '../../../../shared/agent-session/agent-session-wire'
 import {
   EMPTY_STRUCTURED_AGENT_SESSION,
   oldestStructuredAgentSessionCursor,
+  reduceStructuredAgentSession,
   type StructuredAgentSessionAction
-} from '../../../../shared/structured-agent-session-reducer'
+} from '../../../../shared/agent-session/structured-agent-session-reducer'
 import type { RuntimeClientTarget } from '../../../../shared/runtime-client-target'
 import { callStructuredAgentSession } from '@/runtime/structured-agent-session-client'
 import { NATIVE_CHAT_INITIAL_LIMIT } from './native-chat-pagination'
@@ -28,7 +30,6 @@ import type {
 
 import {
   adoptStructuredReadOwner,
-  notifyStructuredReadSnapshots,
   forgetStructuredReadOwner
 } from './structured-agent-session-read-owner-registry'
 
@@ -43,7 +44,6 @@ export function createReadOwner(
 ): StructuredAgentSessionReadOwner {
   let snapshot: StructuredAgentSessionReadSnapshot = {
     state: EMPTY_STRUCTURED_AGENT_SESSION,
-    receivedAt: null,
     loadingOlder: false,
     olderHistoryGeneration: 0,
     current: false
@@ -74,19 +74,25 @@ export function createReadOwner(
     }
     snapshot = next
     emit()
-    notifyStructuredReadSnapshots()
   }
   const apply = (action: StructuredAgentSessionAction): void => {
-    const next = reduceStructuredReadSnapshot(snapshot, action)
+    const state = reduceStructuredAgentSession(snapshot.state, action, Date.now())
     if (
-      next.state.submissions !== snapshot.state.submissions ||
-      next.state.queuedMessages !== snapshot.state.queuedMessages
+      state.submissions !== snapshot.state.submissions ||
+      state.queuedMessages !== snapshot.state.queuedMessages
     ) {
-      activity.observe(next.state)
+      activity.observe(state)
     }
-    setSnapshot(next)
+    // Published even when the frame changed nothing: a caught-up resume is an empty batch.
+    const current =
+      snapshot.current ||
+      (action.type === 'event' &&
+        action.event.type !== 'end' &&
+        !(action.event.type === 'batch' && action.event.hasNewer))
+    if (state !== snapshot.state || current !== snapshot.current) {
+      setSnapshot({ ...snapshot, state, current })
+    }
   }
-
   const markStale = (): void => {
     if (snapshot.current) {
       setSnapshot({ ...snapshot, current: false })

@@ -90,9 +90,7 @@ it('respects SMS resend cooldown and expiry without submitting expired proof', a
   await reviewAndSend()
   await act(async () => claim.sendSms())
   expect(api.sms).toHaveBeenCalledOnce()
-  act(() => {
-    vi.advanceTimersByTime(121_000)
-  })
+  act(() => vi.advanceTimersByTime(121_000))
   expect(claim.smsExpired).toBe(true)
   await act(async () => claim.confirm())
   expect(api.approve).not.toHaveBeenCalled()

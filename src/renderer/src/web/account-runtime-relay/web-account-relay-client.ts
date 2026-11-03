@@ -6,10 +6,7 @@ import { NATIVE_REMOTE_RUNTIME_CLIENT_CAPABILITIES } from '../../../../shared/pr
 import { RuntimeHostStatusOwner } from '../../../../shared/runtime-host-status-owner'
 import type { RuntimeHostStatusResponse } from '../../../../shared/runtime-host-status'
 
-export type WebAccountRuntimeClient = Pick<
-  WebRuntimeClient,
-  'call' | 'subscribe' | 'close' | 'connectionEpoch'
-> & {
+export type WebAccountRuntimeClient = Pick<WebRuntimeClient, 'call' | 'subscribe' | 'close'> & {
   readonly statusOwner?: RuntimeHostStatusOwner
   configureStatusOwner?: (options: WebRuntimeStatusOptions) => void
 }
@@ -44,9 +41,6 @@ export function createWebAccountRelayClient(
     }
   })
   return {
-    get connectionEpoch() {
-      return pool.connectionEpoch
-    },
     get statusOwner() {
       return statusOwner
     },
@@ -75,16 +69,7 @@ export function createWebAccountRelayClient(
     call: (method, params, options) =>
       method === 'status.get' && statusOwner
         ? statusOwner.refresh(options)
-        : method === 'status.get'
-          ? pool.requestStatus(options?.signal, options?.timeoutMs)
-          : pool.request(
-              method,
-              params,
-              options?.timeoutMs,
-              undefined,
-              options?.signal,
-              options?.expectedConnectionEpoch
-            ),
+        : pool.request(method, params, options?.timeoutMs),
     subscribe: async (method, params, callbacks, options) => {
       const handle = await pool.subscribe(method, params, callbacks, options?.timeoutMs)
       return {

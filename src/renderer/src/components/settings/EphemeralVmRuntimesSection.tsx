@@ -74,11 +74,7 @@ export function getEphemeralVmRuntimeStatusLabel(runtime: EphemeralVmRuntimeReco
   return runtime.status
 }
 
-export function EphemeralVmRuntimesSection({
-  active = true
-}: {
-  active?: boolean
-}): React.JSX.Element | null {
+export function EphemeralVmRuntimesSection(): React.JSX.Element | null {
   const [runtimes, setRuntimes] = useState<EphemeralVmRuntimeRecord[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [cleaningId, setCleaningId] = useState<string | null>(null)
@@ -117,14 +113,12 @@ export function EphemeralVmRuntimesSection({
   )
 
   useEffect(() => {
-    if (active) {
-      void refresh()
-    }
-  }, [active, refresh])
+    void refresh()
+  }, [refresh])
 
   const hasRunningCleanup = runtimes.some(isCleanupRunning) || cleaningId !== null
   useEffect(() => {
-    if (!active || !hasRunningCleanup) {
+    if (!hasRunningCleanup) {
       return
     }
     let cancelled = false
@@ -142,7 +136,7 @@ export function EphemeralVmRuntimesSection({
         clearTimeout(timer)
       }
     }
-  }, [active, hasRunningCleanup, refresh])
+  }, [hasRunningCleanup, refresh])
 
   const cleanupRuntime = async (runtime: EphemeralVmRuntimeRecord): Promise<void> => {
     setCleaningId(runtime.id)

@@ -747,7 +747,7 @@ describe('moving the host again after its SSH target was deleted and re-created'
   })
 
   // Folder relay leases use folder:<id> keys, not worktree ids.
-  describe('with folder terminals whose exit is unproven', () => {
+  describe('with relay terminals the bridge still serves', () => {
     const lease = (targetId: string, folderId: string) => ({
       targetId,
       ptyId: 'relay-pty',
@@ -758,7 +758,7 @@ describe('moving the host again after its SSH target was deleted and re-created'
       updatedAt: 1
     })
 
-    it('refuses the move before linking while the moving folder terminal is unproven', async () => {
+    it('still links when the terminal runs in a folder workspace that moves', async () => {
       const { groupId, folderId } = folderInGroup()
       await convert()
       const recreated = recreateTarget()
@@ -767,40 +767,24 @@ describe('moving the host again after its SSH target was deleted and re-created'
         folderPath: '/root/later'
       })
       vi.spyOn(store, 'getSshRemotePtyLeases').mockReturnValue([lease(recreated, later.id)])
-      const retireLease = vi.spyOn(store, 'markSshRemotePtyLease')
       await expect(convert(true, 'unverifiable', recreated)).resolves.toMatchObject({
-        outcome: 'refused',
-        verdict: 'unverifiable',
-        code: 'orcad_migration_terminals'
+        outcome: 'converted'
       })
-      expect(server.getFolderWorkspace(later.id)).toBeUndefined()
-      expect(store.getFolderWorkspace(folderId)).toBeDefined()
-      expect(retireLease).not.toHaveBeenCalled()
+      expect(server.getFolderWorkspace(later.id)).toBeDefined()
       const journal = listOrcadMigrationSourceCutovers(userDataPath).find(
         (entry) => entry.sshTargetId === recreated
       )
-      expect(journal).toBeUndefined()
+      expect(journal?.linkedFolderWorkspaceIds).toEqual([folderId])
     })
 
-    it('refuses before relinking the server-held folder and preserves its terminal', async () => {
+    it('refuses to link the folder workspace the terminal runs in, naming it', async () => {
       const { folderId } = folderInGroup()
       await convert()
       const recreated = recreateTarget()
       vi.spyOn(store, 'getSshRemotePtyLeases').mockReturnValue([lease(recreated, folderId)])
-      const retireLease = vi.spyOn(store, 'markSshRemotePtyLease')
-      await expect(convert(true, 'unverifiable', recreated)).resolves.toMatchObject({
-        outcome: 'refused',
-        verdict: 'unverifiable',
-        code: 'orcad_migration_terminals'
-      })
-      expect(store.getFolderWorkspace(folderId)).toBeDefined()
-      expect(server.getFolderWorkspace(folderId)).toBeDefined()
-      expect(retireLease).not.toHaveBeenCalled()
-      expect(
-        listOrcadMigrationSourceCutovers(userDataPath).filter(
-          (entry) => entry.sshTargetId === recreated
-        )
-      ).toEqual([])
+      await expect(convert(true, 'unverifiable', recreated)).rejects.toThrow(
+        'orcad_migration_linked_project_terminals:/root/notes'
+      )
     })
   })
 

@@ -54,7 +54,7 @@ export function buildOrchestrationRecoveryCommand(
           : method === 'orchestration.workerRelease'
             ? 'worker-release'
             : method === 'orchestration.workerRetain'
-              ? 'worker-retain'
+              ? 'worker-keep-open'
               : undefined
   if (!command || params === null || typeof params !== 'object') {
     return undefined

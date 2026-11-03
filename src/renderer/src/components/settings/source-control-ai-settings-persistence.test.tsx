@@ -56,6 +56,7 @@ it('consumes an actual Git toggle failure and lets the following Chat write succ
   if (!naming) {
     throw new Error('Chat naming section is missing')
   }
+  fireEvent.click(within(naming).getByRole('button', { name: 'Advanced' }))
   const toggle = screen.getByRole('switch', { name: 'Show Source Control AI actions' })
   fireEvent.click(toggle)
   await waitFor(() =>
@@ -98,6 +99,7 @@ it('does not let a failed actual Git agent selection roll back a queued Chat sel
   if (!naming) {
     throw new Error('Chat naming section is missing')
   }
+  fireEvent.click(within(naming).getByRole('button', { name: 'Advanced' }))
   const agents = screen.getAllByRole('combobox')
   const gitAgent = agents[0]
   const chatAgent = agents.at(-1)
@@ -171,7 +173,6 @@ it('global owner: bounded controlled edits, failed/same selection and no-op save
   summary.mockClear()
   lift.mockClear()
   const inputWork: number[][] = []
-  const editsStartedAt = performance.now()
   for (const n of [32, 320]) {
     tokenize.mockClear()
     for (let i = 0; i < n; i++) {
@@ -190,7 +191,7 @@ it('global owner: bounded controlled edits, failed/same selection and no-op save
     }
     inputWork.push(work)
     process.stdout.write(
-      `${JSON.stringify({ metric: 'permission-global-input-work', edits: n, work, elapsedMs: Math.round(performance.now() - editsStartedAt) })}\n`
+      `${JSON.stringify({ metric: 'permission-global-input-work', edits: n, work })}\n`
     )
   }
   fireEvent.change(input, { target: { value: '--dangerously-skip-permissions --verbose' } })
@@ -204,7 +205,7 @@ it('global owner: bounded controlled edits, failed/same selection and no-op save
       })
   )
   fireEvent.click(row.getAllByRole('combobox')[0])
-  fireEvent.click(screen.getByRole('option', { name: 'Codex (CLI)' }))
+  fireEvent.click(screen.getByRole('option', { name: 'Codex' }))
   await waitFor(() => expect(persist).toHaveBeenCalledTimes(1))
   // Actual global writer publishes only after success; failed selection must retain this later edit.
   fireEvent.change(input, { target: { value: '--verbose newer' } })
@@ -218,7 +219,7 @@ it('global owner: bounded controlled edits, failed/same selection and no-op save
   expect(input).toHaveProperty('value', '--verbose newer')
   fireEvent.click(row.getAllByRole('combobox')[0])
   await act(async () => {
-    fireEvent.click(screen.getByRole('option', { name: 'Claude (CLI)' }))
+    fireEvent.click(screen.getByRole('option', { name: 'Claude' }))
   })
   expect(persist).toHaveBeenCalledTimes(2)
   expect(input).toHaveProperty('value', '--verbose newer')

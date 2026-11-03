@@ -1,4 +1,3 @@
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { useState } from 'react'
 import { useRouter } from 'expo-router'
 import { ArrowLeft } from 'lucide-react-native'
@@ -51,8 +50,6 @@ function ClaimAction({
 }
 
 export function MobileRuntimeClaimScreen() {
-  const t = useMobileTranslation()
-
   const router = useRouter()
   const { hydrated, session } = useMobileAuthSession()
   const theme = useMobileTheme()
@@ -72,17 +69,14 @@ export function MobileRuntimeClaimScreen() {
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={t('common.back', 'Back')}
+            accessibilityLabel="返回"
             onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))}
             style={({ pressed }) => [styles.back, pressed && styles.pressed]}
           >
             <ArrowLeft size={24} strokeWidth={2} color={theme.color.text.primary} />
           </Pressable>
           <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.title}>
-            {t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.750a727be2',
-              'Claim computer'
-            )}
+            认领电脑
           </Text>
         </View>
         <ScrollView
@@ -92,10 +86,7 @@ export function MobileRuntimeClaimScreen() {
         >
           {!hydrated ? (
             <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.body}>
-              {t(
-                'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.904613f373',
-                'Reading account…'
-              )}
+              正在读取账号…
             </Text>
           ) : session ? (
             <SignedInClaimForm
@@ -105,17 +96,9 @@ export function MobileRuntimeClaimScreen() {
           ) : (
             <>
               <Text maxFontSizeMultiplier={1.3} style={styles.body}>
-                {t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.7cdde1f2ad',
-                  'Sign in to the same HiveCloud account used on your computer, then enter the claim code to confirm the computer.'
-                )}
+                请登录电脑端使用的同一 HiveCloud 账号，再输入认领码确认电脑。
               </Text>
-              <ClaimAction onPress={() => router.push('/login')}>
-                {t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.1dd1c45a66',
-                  'Sign in to HiveCloud'
-                )}
-              </ClaimAction>
+              <ClaimAction onPress={() => router.push('/login')}>登录 HiveCloud</ClaimAction>
             </>
           )}
         </ScrollView>
@@ -125,8 +108,6 @@ export function MobileRuntimeClaimScreen() {
 }
 
 function SignedInClaimForm({ session }: { session: MobileSession }) {
-  const t = useMobileTranslation()
-
   const router = useRouter()
   const directory = useAccountRuntimeDirectory()
   const styles = useMobileThemeStyles(createMobileRuntimeClaimStyles)
@@ -141,58 +122,31 @@ function SignedInClaimForm({ session }: { session: MobileSession }) {
     return (
       <View style={styles.form}>
         <Text accessibilityRole="header" maxFontSizeMultiplier={1.3} style={styles.label}>
-          {t(
-            'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.f4fe1279b6',
-            'Claim confirmed'
-          )}
+          认领已确认
         </Text>
         <Text accessibilityLiveRegion="polite" maxFontSizeMultiplier={1.3} style={styles.body}>
-          {t(
-            'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.508f4095f0',
-            'Return to your computer to finish linking it. Once linked, the computer will appear on this account’s home page and device list.'
-          )}
+          请返回电脑端完成绑定。完成后，电脑会同步到此账号的首页和设备列表。
         </Text>
-        <ClaimAction onPress={viewComputers}>
-          {t(
-            'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.526cda3915',
-            'View my computers'
-          )}
-        </ClaimAction>
+        <ClaimAction onPress={viewComputers}>查看我的电脑</ClaimAction>
       </View>
     )
   }
   return (
     <View style={styles.form}>
       <Text maxFontSizeMultiplier={1.3} style={styles.body}>
-        {t(
-          'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.9fdb3ba07d',
-          'Sign in to the same HiveCloud account in your computer’s connection settings, start a device claim, and enter the claim code shown there.'
-        )}
+        在电脑端的连接设置中登录同一 HiveCloud 账号，发起设备认领，再输入电脑端显示的认领码。
       </Text>
       <Text maxFontSizeMultiplier={1.3} style={styles.hint}>
-        {t(
-          'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.309caf2496',
-          'Current account: '
-        )}
-        {session.account.displayName}
+        当前账号：{session.account.displayName}
       </Text>
       {!claim.preview ? (
         <>
           <Text maxFontSizeMultiplier={1.3} style={styles.label}>
-            {t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.8b77a05a30',
-              'Claim code'
-            )}
+            认领码
           </Text>
           <TextInput
-            accessibilityLabel={t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.051c4a18dc',
-              'Computer claim code'
-            )}
-            placeholder={t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.668f5d86e0',
-              'ABCD-EFGH'
-            )}
+            accessibilityLabel="电脑认领码"
+            placeholder="ABCD-EFGH"
             placeholderTextColor={theme.color.text.tertiary}
             value={claim.code}
             onChangeText={claim.setCode}
@@ -211,46 +165,23 @@ function SignedInClaimForm({ session }: { session: MobileSession }) {
             disabled={claim.busy || claim.uncertain || claim.requiresLogin || !claim.code.trim()}
             onPress={() => void claim.review()}
           >
-            {claim.busy
-              ? t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.c4b3ad345a',
-                  'Checking…'
-                )
-              : t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.4daac65445',
-                  'View computer awaiting claim'
-                )}
+            {claim.busy ? '正在核对…' : '查看待认领电脑'}
           </ClaimAction>
         </>
       ) : (
         <>
           <View style={styles.details}>
             <Text maxFontSizeMultiplier={1.3} style={styles.label}>
-              {t(
-                'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.f0b07fd798',
-                'Check that this is the computer you requested to claim'
-              )}
+              请核对，这是你发起认领的电脑
             </Text>
             <Text maxFontSizeMultiplier={1.3} style={styles.value}>
-              {t(
-                'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.73c955fb60',
-                'Claim code: '
-              )}
-              {claim.code}
+              认领码：{claim.code}
             </Text>
             <Text selectable maxFontSizeMultiplier={1.3} style={styles.hint}>
-              {t(
-                'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.20ddea628e',
-                'Computer ID: '
-              )}
-              {claim.preview.runtimeRecordId}
+              电脑标识：{claim.preview.runtimeRecordId}
             </Text>
             <Text maxFontSizeMultiplier={1.3} style={styles.hint}>
-              {t(
-                'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.fbf37c2ffa',
-                'HiveCode version: '
-              )}
-              {claim.preview.runtimeVersion}
+              HiveCode 版本：{claim.preview.runtimeVersion}
             </Text>
           </View>
           {claim.sms ? (
@@ -260,21 +191,11 @@ function SignedInClaimForm({ session }: { session: MobileSession }) {
                 maxFontSizeMultiplier={1.3}
                 style={styles.body}
               >
-                {t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.cf08d5eabf',
-                  'Verification code sent to '
-                )}
-                {claim.sms.phoneNumberMasked}
+                验证码已发送至 {claim.sms.phoneNumberMasked}
               </Text>
               <TextInput
-                accessibilityLabel={t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.012b3628ff',
-                  'Claim SMS verification code'
-                )}
-                placeholder={t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.f8f9d7c2d3',
-                  'Six-digit verification code'
-                )}
+                accessibilityLabel="认领短信验证码"
+                placeholder="六位验证码"
                 placeholderTextColor={theme.color.text.tertiary}
                 value={claim.smsCode}
                 onChangeText={claim.setSmsCode}
@@ -292,15 +213,7 @@ function SignedInClaimForm({ session }: { session: MobileSession }) {
                 disabled={claim.unavailable || claim.smsExpired || !/^\d{6}$/.test(claim.smsCode)}
                 onPress={() => void claim.confirm()}
               >
-                {claim.busy
-                  ? t(
-                      'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.f3f1601ce0',
-                      'Confirming…'
-                    )
-                  : t(
-                      'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.da4bbd0ad0',
-                      'Verify and confirm claim'
-                    )}
+                {claim.busy ? '正在确认…' : '验证并确认认领'}
               </ClaimAction>
             </>
           ) : null}
@@ -310,43 +223,24 @@ function SignedInClaimForm({ session }: { session: MobileSession }) {
             onPress={() => void claim.sendSms()}
           >
             {claim.resendRemaining > 0
-              ? t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.b2316a4dca',
-                  'Resend in {{value0}}s',
-                  { value0: claim.resendRemaining }
-                )
+              ? `${claim.resendRemaining} 秒后可重新发送`
               : claim.sms
-                ? t(
-                    'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.05f5b8cbbd',
-                    'Resend verification code'
-                  )
-                : t(
-                    'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.c91f5ffa64',
-                    'Send verification code to your linked phone number'
-                  )}
+                ? '重新发送验证码'
+                : '发送验证码到绑定手机号'}
           </ClaimAction>
           <ClaimAction secondary disabled={claim.busy || claim.uncertain} onPress={claim.reset}>
-            {t(
-              'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.75ec8ec840',
-              'Enter claim code again'
-            )}
+            重新输入认领码
           </ClaimAction>
         </>
       )}
       {claim.expired ? (
         <Text accessibilityRole="alert" maxFontSizeMultiplier={1.3} style={styles.error}>
-          {t(
-            'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.026364dcb1',
-            'The claim request expired. Start it again on your computer.'
-          )}
+          认领请求已过期，请在电脑端重新发起。
         </Text>
       ) : null}
       {claim.smsExpired && !claim.expired ? (
         <Text accessibilityRole="alert" maxFontSizeMultiplier={1.3} style={styles.error}>
-          {t(
-            'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.39cf8a99c0',
-            'The verification code expired. Send a new one.'
-          )}
+          验证码已过期，请重新发送。
         </Text>
       ) : null}
       {claim.error ? (
@@ -355,26 +249,15 @@ function SignedInClaimForm({ session }: { session: MobileSession }) {
         </Text>
       ) : null}
       {claim.requiresLogin ? (
-        <ClaimAction onPress={() => router.push('/login')}>
-          {t(
-            'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.a0bfe787f6',
-            'Sign in again'
-          )}
-        </ClaimAction>
+        <ClaimAction onPress={() => router.push('/login')}>重新登录</ClaimAction>
       ) : null}
       {claim.uncertain ? (
         <ClaimAction secondary onPress={viewComputers}>
-          {t(
-            'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.526cda3915',
-            'View my computers'
-          )}
+          查看我的电脑
         </ClaimAction>
       ) : null}
       <Text maxFontSizeMultiplier={1.3} style={styles.hint}>
-        {t(
-          'auto.mobile.src.runtime.directory.MobileRuntimeClaimScreen.3a2a5963d2',
-          'Claiming grants this account cloud access only. Connection status depends on whether the computer is online.'
-        )}
+        认领只授予此账号的云端访问权限，连接状态以电脑是否在线为准。
       </Text>
     </View>
   )

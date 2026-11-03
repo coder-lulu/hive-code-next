@@ -290,7 +290,7 @@ export function DesktopHomeComposerFooter({
           icon={<FolderGit2 className="size-5" />}
           ariaLabel={translate(
             'components.desktopHome.composer.selectProjectOrWorkspace',
-            'Select a project or workspace'
+            'Select project or workspace'
           )}
           onChange={onWorkspaceChange}
           className="desktop-home-context-trigger desktop-home-project-trigger"
@@ -310,7 +310,7 @@ export function DesktopHomeComposerFooter({
             contentClassName="min-w-[18rem]"
             emptyLabel={translate(
               'components.desktopHome.composer.noInstalledAgents',
-              'No installed agents found'
+              'No installed agents detected'
             )}
             triggerClassName="desktop-home-context-trigger"
           />

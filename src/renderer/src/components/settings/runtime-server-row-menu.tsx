@@ -1,7 +1,6 @@
 import {
   ArrowUpCircle,
   Info,
-  Pencil,
   RefreshCw,
   Server,
   ServerOff,
@@ -35,9 +34,6 @@ type RuntimeServerRowMenuProps = {
   onSshAccess: () => void
   onToggleDetails: () => void
   onRemove: () => void
-  showRemove?: boolean
-  removeLabel?: string
-  onRename?: () => void
 }
 
 export function RuntimeServerRowMenuItems({
@@ -58,10 +54,7 @@ export function RuntimeServerRowMenuItems({
   onCheckForUpdates,
   onSshAccess,
   onToggleDetails,
-  onRemove,
-  showRemove = true,
-  removeLabel,
-  onRename
+  onRemove
 }: RuntimeServerRowMenuProps): React.JSX.Element {
   return (
     <>
@@ -115,21 +108,10 @@ export function RuntimeServerRowMenuItems({
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       {managedItems}
-      {onRename ? (
-        <DropdownMenuItem disabled={isBusy} onSelect={onRename}>
-          <Pencil />
-          {translate(
-            'auto.components.settings.RuntimeEnvironmentsPane.renameCloudRuntime',
-            'Rename HiveCloud Runtime'
-          )}
-        </DropdownMenuItem>
-      ) : null}
-      {showRemove ? (
-        <DropdownMenuItem variant="destructive" disabled={isBusy} onSelect={onRemove}>
-          <Trash2 />
-          {removeLabel ?? translate('auto.components.settings.serverList.remove', 'Remove…')}
-        </DropdownMenuItem>
-      ) : null}
+      <DropdownMenuItem variant="destructive" disabled={isBusy} onSelect={onRemove}>
+        <Trash2 />
+        {translate('auto.components.settings.serverList.remove', 'Remove…')}
+      </DropdownMenuItem>
     </>
   )
 }

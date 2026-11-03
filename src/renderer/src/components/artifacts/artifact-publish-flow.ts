@@ -130,7 +130,7 @@ function artifactPreparationErrorDescription(code: ArtifactPublishPreparationErr
     case 'too-large':
       return translate(
         'auto.components.artifacts.artifact-publish-flow.6112db5a1c',
-        'Artifacts shared from Orca must be smaller than 800 KB.'
+        'This artifact is too large to share.'
       )
     case 'unreadable':
       return translate(

@@ -8,10 +8,11 @@ import type { Repo } from '../../../../shared/repo-types'
 import type { Worktree } from '../../../../shared/worktree/types'
 import WorkspaceKanbanDrawer from './WorkspaceBoardDrawer'
 import type * as WorkspaceBoardTaskStatusSync from './workspace-board-task-status-sync'
+import { getWorktreeHostIdentity } from '../../../../shared/worktree/host-qualified-identity'
 
 type PointerDragParams = {
   onDropWorktreesInStatus: (args: {
-    worktreeIds: readonly string[]
+    worktreeKeys: readonly string[]
     status: string
     dropIndex: number
   }) => void
@@ -325,7 +326,7 @@ describe('WorkspaceKanbanDrawer task status sync wiring', () => {
 
     expect(syncWorkspaceBoardTaskStatusesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        worktreeIds: [item.id],
+        worktreeKeys: [getWorktreeHostIdentity(item)],
         targetStatus: { id: 'in-review', label: 'In review' },
         getSettingsForWorktree: expect.any(Function),
         getLatestWorkspaceStatus: expect.any(Function)
@@ -350,7 +351,7 @@ describe('WorkspaceKanbanDrawer task status sync wiring', () => {
 
     act(() => {
       pointerDragState.current?.onDropWorktreesInStatus({
-        worktreeIds: [item.id],
+        worktreeKeys: [getWorktreeHostIdentity(item)],
         status: 'in-review',
         dropIndex: 0
       })
@@ -358,7 +359,7 @@ describe('WorkspaceKanbanDrawer task status sync wiring', () => {
 
     expect(syncWorkspaceBoardTaskStatusesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        worktreeIds: [item.id],
+        worktreeKeys: [getWorktreeHostIdentity(item)],
         targetStatus: { id: 'in-review', label: 'In review' }
       })
     )
@@ -370,7 +371,7 @@ describe('WorkspaceKanbanDrawer task status sync wiring', () => {
 
     act(() => {
       pointerDragState.current?.onDropWorktreesInStatus({
-        worktreeIds: [item.id],
+        worktreeKeys: [getWorktreeHostIdentity(item)],
         status: 'in-review',
         dropIndex: 0
       })
@@ -425,7 +426,7 @@ describe('WorkspaceKanbanDrawer task status sync wiring', () => {
 
     expect(syncWorkspaceBoardTaskStatusesMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        worktreeIds: [item.id],
+        worktreeKeys: [getWorktreeHostIdentity(item)],
         targetStatus: { id: 'in-review', label: 'In review' }
       })
     )

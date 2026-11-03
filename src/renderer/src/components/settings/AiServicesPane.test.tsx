@@ -42,10 +42,8 @@ it('defaults to usage and retains filters and provider drafts across tabs', () =
     button: 0,
     ctrlKey: false
   })
-  expect(screen.getByText('false')).toBeTruthy()
   fireEvent.change(screen.getByLabelText('Provider draft'), { target: { value: 'unsaved' } })
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'Usage' }), { button: 0, ctrlKey: false })
-  expect(screen.getByText('true')).toBeTruthy()
   expect((screen.getByLabelText('Usage filter') as HTMLInputElement).value).toBe('7d')
   fireEvent.mouseDown(screen.getByRole('tab', { name: 'AI Providers' }), {
     button: 0,

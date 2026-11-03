@@ -1,3 +1,4 @@
+// @protected-copy: skill install trust review.
 import type { ReactNode } from 'react'
 import { AlertTriangle, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -181,10 +182,7 @@ export function SkillInstallReview({
             )}
           </div>
           <p className="text-xs leading-5 text-muted-foreground">
-            {translate(
-              'auto.components.skills.SkillInstallReviewContent.2a31912f14',
-              'HiveCode found'
-            )}{' '}
+            {translate('auto.components.skills.SkillInstallReviewContent.2a31912f14', 'Orca found')}{' '}
             {result?.conflict?.kind ||
               destinationPreview?.currentState ||
               translate(

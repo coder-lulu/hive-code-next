@@ -83,32 +83,6 @@ describe('Store', () => {
     expect(store.getRepos()).toEqual([])
   }, 15_000)
 
-  it('persists monotonic Dashboard day cursors across partial settings writes and restart', async () => {
-    const store = createStore()
-    const telemetry = store.getSettings().telemetry
-    if (!telemetry) throw new Error('Missing default telemetry settings')
-    store.updateSettings({
-      telemetry: { ...telemetry, agentDashboardActiveDays: { in_window: 20_000 } }
-    })
-    for (const day of [19_999, -1, undefined, NaN, Infinity, 1.5]) {
-      store.updateSettings({
-        telemetry: { ...telemetry, agentDashboardActiveDays: { in_window: day } }
-      })
-    }
-    store.updateSettings({
-      telemetry: { ...telemetry, agentDashboardActiveDays: { popout: 20_001 } }
-    })
-    store.updateSettings({ telemetry: { ...telemetry, optedIn: false } })
-    store.flushOrThrow()
-    await closeTestStores()
-
-    expect(createStore().getSettings().telemetry).toEqual({
-      optedIn: false,
-      installId: telemetry.installId,
-      agentDashboardActiveDays: { in_window: 20_000, popout: 20_001 }
-    })
-  })
-
   it('clone-reads and durably persists the main-owned Codex reset ledger', async () => {
     const store = await createStore()
     const ledger = {
@@ -461,7 +435,7 @@ describe('Store', () => {
     })
   })
 
-  it('preserves an explicit host runtime preference without an age marker', async () => {
+  it('migrates the legacy host account-runtime default to auto once', async () => {
     writeDataFile({
       schemaVersion: 1,
       repos: [],
@@ -473,12 +447,12 @@ describe('Store', () => {
 
     const store = await createStore()
 
-    expect(store.getSettings().localAccountRuntime).toBe('host')
-    expect(store.getSettings()).not.toHaveProperty('localAccountRuntimeDefaultedToAutoForAllUsers')
+    expect(store.getSettings().localAccountRuntime).toBe('auto')
+    expect(store.getSettings().localAccountRuntimeDefaultedToAutoForAllUsers).toBe(true)
     store.flush()
     const persisted = (readDataFile() as PersistedState).settings
-    expect(persisted.localAccountRuntime).toBe('host')
-    expect(persisted).not.toHaveProperty('localAccountRuntimeDefaultedToAutoForAllUsers')
+    expect(persisted.localAccountRuntime).toBe('auto')
+    expect(persisted.localAccountRuntimeDefaultedToAutoForAllUsers).toBe(true)
   })
 
   it('preserves an explicit WSL account-runtime pin through the migration', async () => {
@@ -495,7 +469,7 @@ describe('Store', () => {
     const store = await createStore()
 
     expect(store.getSettings().localAccountRuntime).toBe('wsl')
-    expect(store.getSettings()).not.toHaveProperty('localAccountRuntimeDefaultedToAutoForAllUsers')
+    expect(store.getSettings().localAccountRuntimeDefaultedToAutoForAllUsers).toBe(true)
   })
 
   it('does not re-flip an explicit host pin chosen after migration', async () => {

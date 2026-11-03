@@ -1,4 +1,3 @@
-import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -82,7 +81,7 @@ it(
         throw new Error('invalid pairing')
       }
       const connection = new RemoteRuntimeRequestConnection(
-        pairedRuntimeConnectionFromOffer(pairing)
+        pairing
       )
       try {
         await expect(

@@ -1,9 +1,8 @@
+import { EVERY_AGENT_CHAT } from '../../shared/native-chat/every-agent-chat.test-fixture'
 import { describe, expect, it, vi } from 'vitest'
 import { executeAgentLaunch, type AgentLaunchExecution } from './agent-launch-executor'
 import { AgentLaunchStructuredSessionRefusedError } from './agent-launch-surface-factories'
 import type { AgentLaunchIntent } from '../../shared/agent-launch-intent'
-import { RuntimeClientSettingsController } from '../runtime/runtime-client-settings'
-import { partialRuntimeStore } from '../runtime/runtime-store-partial-fixture'
 
 const PROMPT = { text: 'fix the flaky test', delivery: 'submit' as const }
 
@@ -65,12 +64,9 @@ function harness(options: {
     return true
   })
   const runtime: AgentLaunchExecution['runtime'] = {
-    getClientSettings: () =>
-      new RuntimeClientSettingsController(
-        partialRuntimeStore({
-          getSettings: () => ({ nativeChatProviders: { claude: options.structured === true } })
-        })
-      ).get(),
+    requireStore: () => ({
+      getSettings: () => (options.structured ? { nativeChatProviders: EVERY_AGENT_CHAT } : null)
+    }),
     getStructuredAgentSessionCreateSupport
   }
   return {

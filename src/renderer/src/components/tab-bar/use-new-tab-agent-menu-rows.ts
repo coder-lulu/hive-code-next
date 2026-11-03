@@ -1,14 +1,15 @@
+import { nativeChatPreferenceFor } from '../../../../shared/structured-native-chat-launch-route'
 import type { AgentMenuRowsTarget, NewTabAgentMenuModel } from './new-tab-agent-menu-model'
 export type { AgentMenuRowsTarget, NewTabAgentMenuModel } from './new-tab-agent-menu-model'
 import { useSyncExternalStore } from 'react'
 import { useShallow } from 'zustand/react/shallow'
-import {
-  STRUCTURED_AGENT_SESSION_AVAILABILITY_RUNTIME_CAPABILITY as AVAILABILITY,
-  STRUCTURED_AGENT_SESSION_REGISTERED_AGENTS_RUNTIME_CAPABILITY as CATALOG
-} from '../../../../shared/protocol-version'
+import { STRUCTURED_AGENT_SESSION_AVAILABILITY_RUNTIME_CAPABILITY as AVAILABILITY } from '../../../../shared/agent-session/structured-agent-session-surface-capabilities'
 import { LOCAL_EXECUTION_HOST_ID, parseExecutionHostId } from '../../../../shared/execution-host'
 import { lastVerifiedRuntimeStatus } from '../../../../shared/runtime-host-status'
-import { runtimeHostContactForEntry } from '../../../../shared/runtime-host-contact'
+import {
+  isRuntimeHostContactRevokedVerdict,
+  runtimeHostContactForEntry
+} from '../../../../shared/runtime-host-contact'
 import { isTuiAgent } from '../../../../shared/tui-agent-config'
 import { useAppStore } from '@/store'
 import { useAgentPickerRefusedWake } from './use-agent-picker-refused-wake'
@@ -20,8 +21,7 @@ import { useHostStructuredAgentsVersion } from '@/lib/chat-provider-agents'
 import { structuredAgentSessionTargetForHost } from '@/runtime/structured-agent-session-owner'
 import {
   readHostStructuredAgents,
-  readHostStructuredAgentsForRuntime,
-  hostStructuredAgentsReadFailed
+  hostStructuredAgentsCatalogUnlearned as catalogUnlearned
 } from '@/runtime/host-structured-agents'
 import { getRuntimeEnvironmentRevision } from '@/runtime/runtime-environment-revision'
 import { useHostStructuredAgentAvailability } from '@/runtime/use-host-structured-agent-availability'
@@ -42,19 +42,6 @@ import { resolveAgentMenuSelection } from '@/lib/agent-menu-selection'
 import { useHostAgentMenuSettings } from '@/components/settings/use-host-agent-launch-preferences'
 import type { TuiAgent } from '../../../../shared/tui-agent'
 import type { AgentLaunchSurface } from '@/lib/agent-session-launch-plan'
-
-function catalogUnlearned(
-  host: string,
-  runtimeId: string | null | undefined,
-  capabilities: readonly string[] | null | undefined
-): boolean {
-  return (
-    runtimeId !== undefined &&
-    capabilities?.includes(CATALOG) === true &&
-    !readHostStructuredAgentsForRuntime(host, runtimeId) &&
-    !hostStructuredAgentsReadFailed(host, runtimeId)
-  )
-}
 
 /** `detectionTarget` is the workspace's agent-inventory host, resolved by the caller. */
 export function useNewTabAgentMenuRows(
@@ -101,17 +88,6 @@ export function useAgentMenuObservation(
     readLocalRuntimeCapabilityObservation,
     readLocalRuntimeCapabilityObservation
   )
-  useAppStore(
-    useShallow((state) => [
-      state.settings?.defaultTuiAgent,
-      state.settings?.disabledTuiAgents,
-      state.settings?.nativeChatProviders,
-      state.settings?.agentDefaultArgs,
-      state.settings?.agentPermissionDefault,
-      state.settings?.agentPermissionOverrides,
-      state.settings?.nativeChatSessionOptions
-    ])
-  )
   // The observation owns these settings; picker consumers reuse its snapshot.
   const desktopSettings = useAppStore.getState().settings
   const workspace =
@@ -132,7 +108,7 @@ export function useAgentMenuObservation(
         runtimeId: host?.kind === 'runtime' ? lastVerifiedRuntimeStatus(status)?.runtimeId : null,
         pairingRevision:
           host?.kind === 'runtime' ? getRuntimeEnvironmentRevision(host.environmentId) : undefined,
-        contact: `${status?.connectionGeneration}:${status?.hostContactEpoch}`,
+        contact: `${status?.connectionGeneration}:${status?.hostContactEpoch}:${isRuntimeHostContactRevokedVerdict(contact)}`,
         checking:
           contact.verdict === 'unverifiable' &&
           ['checking', 'transport-connecting'].includes(contact.reason),
@@ -147,6 +123,22 @@ export function useAgentMenuObservation(
     desktopSettings,
     open || worktreeShown,
     open
+  )
+  useAppStore(
+    useShallow((state) => [
+      state.settings?.defaultTuiAgent,
+      state.settings?.disabledTuiAgents,
+      state.settings?.agentDefaultSurface,
+      state.settings?.nativeChatProviders,
+      state.settings?.agentDefaultArgs,
+      state.settings?.agentPermissionDefault,
+      state.settings?.agentPermissionOverrides,
+      state.settings?.nativeChatSessionOptions,
+      settings?.agentLaunchChoices === desktopSettings?.agentLaunchChoices
+        ? state.settings?.agentLaunchChoices
+        : undefined,
+      state.settings?.nativeChatPermissionMode
+    ])
   )
   const plain = hostChatAnswer(input) === 'no-chats'
   const local = facts.executionHostId === LOCAL_EXECUTION_HOST_ID
@@ -185,7 +177,7 @@ export function useAgentMenuObservation(
       ...(hostCatalog ?? []),
       ...Object.keys(settings?.nativeChatProviders ?? {})
         .filter(isTuiAgent)
-        .filter((agent) => settings?.nativeChatProviders?.[agent] === true)
+        .filter((agent) => nativeChatPreferenceFor(settings, agent))
     ])
   ].filter(isTuiAgent)
   const inventoryFailed =
@@ -269,10 +261,10 @@ export function useAgentMenuObservation(
           key: JSON.stringify([workspace, launchCwd, facts])
         }
       }
-  const { defaultTuiAgent, disabledTuiAgents } = settings ?? {}
+  const { defaultTuiAgent, disabledTuiAgents, agentLaunchChoices } = settings ?? {}
   return {
     model,
-    preferences: { defaultTuiAgent, disabledTuiAgents },
+    preferences: { defaultTuiAgent, disabledTuiAgents, agentLaunchChoices },
     preferencesPending,
     detection,
     contextKey: JSON.stringify([workspace, launchCwd, facts]),

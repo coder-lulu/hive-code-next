@@ -102,7 +102,7 @@ export async function setupTerminalCreateSurfacing(
     clearTabPtyId: vi.fn(),
     settings: {
       terminalFontSize: 13,
-      experimentalNativeChat: false,
+      nativeChatProviders: { claude: false, codex: false },
       activeRuntimeEnvironmentId: undefined as string | undefined
     }
   }

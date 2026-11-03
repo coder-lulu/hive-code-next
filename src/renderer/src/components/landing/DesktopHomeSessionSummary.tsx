@@ -92,7 +92,7 @@ function SessionSummaryRow({
         aria-label={translate('components.desktopHome.saveSessionToProject', 'Save to project')}
         title={translate(
           'components.desktopHome.saveSessionToProjectHint',
-          'Choose a project for this session'
+          'Choose the project that should own this session'
         )}
       >
         <FolderInput aria-hidden />
@@ -142,7 +142,7 @@ export default function DesktopHomeSessionSummary({
           <span>
             {translate(
               'components.desktopHome.noSessions',
-              'No temporary sessions yet. Start a new task to see it here.'
+              'No temporary sessions yet — start a new task to see them here.'
             )}
           </span>
         </div>

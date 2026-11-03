@@ -203,9 +203,7 @@ export function HiveAccountSignInConfirmDialog({
             <div className="hive-account-brand-lockup">
               <img src={PRODUCT_LOGO_URL} alt="" />
               <div>
-                <strong>
-                  {translate('auto.components.settings.DevToolsPane.orcaCloud', 'HiveCloud')}
-                </strong>
+                <strong>HiveCloud</strong>
                 <span>
                   {translate('components.hiveAccountSignIn.cloudConsole', 'Cloud control plane')}
                 </span>
@@ -252,7 +250,7 @@ export function HiveAccountSignInConfirmDialog({
                     )
                   : translate(
                       'components.hiveAccountSignIn.browserDescription',
-                      'You will return to HiveCode automatically after authentication.'
+                      'Complete secure authentication in your system browser and return to HiveCode automatically.'
                     )}
               </DialogDescription>
             </DialogHeader>
@@ -417,7 +415,7 @@ export function HiveAccountSignInConfirmDialog({
                 </strong>
                 <p>
                   {translate(
-                    'components.hiveAccountSignIn.browserReturnDescription',
+                    'components.hiveAccountSignIn.browserDescription',
                     'You will return to HiveCode automatically after authentication.'
                   )}
                 </p>

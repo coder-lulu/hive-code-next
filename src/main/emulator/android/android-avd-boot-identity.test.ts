@@ -1,14 +1,15 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ChildProcess } from 'node:child_process'
 import { bootAndroidDevice } from './android-avd-boot'
-import { AndroidManagedAvdProcesses } from './android-managed-avd-processes'
 import type { AndroidSdkPaths } from './android-sdk-discovery'
+
+vi.mock('node:child_process', () => ({
+  spawn: () => ({ on: vi.fn(), unref: vi.fn() })
+}))
 
 const sdk: AndroidSdkPaths = {
   sdkRoot: 'sdk',
   adb: 'adb',
-  emulator: 'emulator',
-  avdmanager: 'avdmanager'
+  emulator: 'emulator'
 }
 type Device = { serial: string; name: string; booted: boolean }
 const other: Device = { serial: 'emulator-5556', name: 'Other', booted: true }
@@ -37,11 +38,7 @@ function bootWithInventory(snapshots: Device[][]) {
   return bootAndroidDevice(runner, sdk, 'Wanted', {
     bootTimeoutMs: 30,
     pollIntervalMs: 10,
-    sleep: async () => {},
-    managedAvds: new AndroidManagedAvdProcesses(
-      () => new ChildProcess(),
-      async () => true
-    )
+    sleep: async () => {}
   })
 }
 

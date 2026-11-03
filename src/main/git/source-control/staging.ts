@@ -147,10 +147,7 @@ export async function stageWorktreeChanges(
       scope,
       (args, stdin) =>
         gitExecFileAsync(args, stdin === undefined ? gitOptions : { ...gitOptions, stdin }),
-      {
-        excludedUntrackedPaths,
-        caseSensitive: Boolean(options.wslDistro) || process.platform !== 'win32'
-      }
+      { excludedUntrackedPaths }
     )
     await redoWriteForDriveCheckoutSuspects(worktreePath, ['.'], STAGE_WRITE, options)
     return receipt

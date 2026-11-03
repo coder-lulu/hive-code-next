@@ -80,12 +80,7 @@ vi.mock('../../../src/shared/hive-account-relay-pool', () => ({
       return { close, sendRequest: fixture.probe }
     }
     async request() {
-      return {
-        id: 'request',
-        ok: true,
-        result: {},
-        _meta: { runtimeId: 'host' }
-      }
+      return { id: 'request', ok: true, result: {}, _meta: { runtimeId: 'host' } }
     }
   }
 }))
@@ -100,9 +95,7 @@ describe('account Runtime independent stream recovery', () => {
     fixture.pools.length = 0
     fixture.connectError = null
     fixture.subscriptionGate = null
-    fixture.probe
-      .mockReset()
-      .mockResolvedValue({ id: 'health', ok: true, _meta: { runtimeId: 'runtime' }, result: {} })
+    fixture.probe.mockReset().mockResolvedValue({ id: 'health', ok: true, result: {} })
     AppState.currentState = 'active'
     vi.spyOn(Math, 'random').mockReturnValue(0.5)
     client = new AccountRuntimeRpcClient(
@@ -150,12 +143,7 @@ describe('account Runtime independent stream recovery', () => {
     pool.subscriptions[1]!.callbacks.onClose?.()
     expect(pool.close).not.toHaveBeenCalled()
     expect(client.getState()).toBe('connected')
-    const response = {
-      id: 'event',
-      ok: true as const,
-      _meta: { runtimeId: 'runtime' },
-      result: { type: 'snapshot' }
-    }
+    const response = { id: 'event', ok: true as const, result: { type: 'snapshot' } }
     pool.subscriptions[0]!.callbacks.onResponse(response)
     expect(healthy).toHaveBeenCalledWith(response.result)
     await expect(client.sendRequest('status.get')).resolves.toMatchObject({ ok: true })
@@ -187,12 +175,9 @@ describe('account Runtime independent stream recovery', () => {
     expect(pool.subscriptions).toHaveLength(6)
     await vi.advanceTimersByTimeAsync(10_001)
     expect(pool.subscriptions).toHaveLength(7)
-    pool.subscriptions.at(-1)!.callbacks.onResponse({
-      id: 'restored',
-      ok: true,
-      _meta: { runtimeId: 'runtime' },
-      result: 'restored'
-    })
+    pool.subscriptions
+      .at(-1)!
+      .callbacks.onResponse({ id: 'restored', ok: true, result: 'restored' })
     expect(listener).toHaveBeenCalledWith('restored')
     expect(listener).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'error' }))
     expect(client.getState()).toBe('connected')
@@ -358,7 +343,6 @@ describe('account Runtime independent stream recovery', () => {
       fixture.pools[0]!.subscriptions[0]!.callbacks.onResponse({
         id: 'event',
         ok: true,
-        _meta: { runtimeId: 'runtime' },
         result: {}
       })
     }
@@ -377,7 +361,6 @@ describe('account Runtime independent stream recovery', () => {
       stream.callbacks.onResponse({
         id: 'ready',
         ok: true,
-        _meta: { runtimeId: 'runtime' },
         result: { type: 'ready', subscriptionId: 'owned' }
       })
       release()
@@ -402,7 +385,6 @@ describe('account Runtime independent stream recovery', () => {
     stream.callbacks.onResponse({
       id: 'late',
       ok: true,
-      _meta: { runtimeId: 'runtime' },
       result: { type: 'ready', subscriptionId: 'late' }
     })
     open()
@@ -423,15 +405,10 @@ describe('account Runtime independent stream recovery', () => {
       const stream = pool.subscriptions[0]!
       stream.callbacks.onResponse(
         kind === 'end'
-          ? { id: 'done', ok: true, _meta: { runtimeId: 'runtime' }, result: { type: 'end' } }
+          ? { id: 'done', ok: true, result: { type: 'end' } }
           : { id: 'done', ok: false, error: { code: 'FORBIDDEN', message: 'Access denied' } }
       )
-      stream.callbacks.onResponse({
-        id: 'late',
-        ok: true,
-        _meta: { runtimeId: 'runtime' },
-        result: 'stale'
-      })
+      stream.callbacks.onResponse({ id: 'late', ok: true, result: 'stale' })
       stream.callbacks.onClose?.()
       release()
       await vi.runOnlyPendingTimersAsync()

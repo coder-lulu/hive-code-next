@@ -116,10 +116,18 @@ it('allows hidden terminal startup measurement without exposing input or startin
   timeout.mockRestore()
 })
 
-it('follows the current group anchor and its owner without reparenting retained content', () => {
+it('follows an explicit session anchor and its owner without reparenting retained content', () => {
+  const focus = vi.fn()
   const groupFocus = vi.fn()
   const view = render(
-    <RetainedPaneHost groupId="left" onFocusOwningGroup={groupFocus} isVisible>
+    <RetainedPaneHost
+      groupId={undefined}
+      anchorName="--session-left"
+      anchorTarget={anchors[0]}
+      onFocus={focus}
+      onFocusOwningGroup={groupFocus}
+      isVisible
+    >
       <input defaultValue="draft" />
     </RetainedPaneHost>
   )
@@ -127,7 +135,14 @@ it('follows the current group anchor and its owner without reparenting retained 
   const input = view.getByRole('textbox')
   fireEvent.change(input, { target: { value: 'retained draft' } })
   view.rerender(
-    <RetainedPaneHost groupId="right" onFocusOwningGroup={groupFocus} isVisible>
+    <RetainedPaneHost
+      groupId={undefined}
+      anchorName="--session-right"
+      anchorTarget={anchors[1]}
+      onFocus={focus}
+      onFocusOwningGroup={groupFocus}
+      isVisible
+    >
       <input defaultValue="draft" />
     </RetainedPaneHost>
   )
@@ -136,16 +151,23 @@ it('follows the current group anchor and its owner without reparenting retained 
   expect(view.getByRole('textbox')).toBe(input)
   expect((input as HTMLInputElement).value).toBe('retained draft')
   fireEvent.pointerDown(input)
-  expect(groupFocus).toHaveBeenCalledExactlyOnceWith('right')
+  expect(focus).toHaveBeenCalledOnce()
+  expect(groupFocus).not.toHaveBeenCalled()
 })
 
 function countResizeListeners(spy: ReturnType<typeof vi.spyOn>): number {
   return spy.mock.calls.filter(([type]) => type === 'resize').length
 }
 
-it('shares group anchor measurements and keeps the remaining subscriber live', () => {
+it('shares explicit session anchor measurements and keeps the remaining subscriber live', () => {
   const pane = (key: string) => (
-    <RetainedPaneHost key={key} groupId="left" isVisible>
+    <RetainedPaneHost
+      key={key}
+      groupId={undefined}
+      anchorName="--session-left"
+      anchorTarget={anchors[0]}
+      isVisible
+    >
       <span />
     </RetainedPaneHost>
   )

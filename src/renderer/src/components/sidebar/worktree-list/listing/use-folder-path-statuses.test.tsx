@@ -7,10 +7,6 @@ import type { ProjectGroup } from '../../../../../../shared/project-group-types'
 import { useFolderWorkspacePathStatusRows } from './use-folder-path-statuses'
 
 const state = vi.hoisted(() => ({
-  repos: [],
-  projectGroups: [],
-  folderWorkspaces: [],
-  sshConnectionStates: new Map(),
   folderWorkspacePathStatuses: {},
   settings: { activeRuntimeEnvironmentId: 'remote' },
   fetchFolderWorkspacePathStatus: vi.fn().mockResolvedValue(null),
@@ -43,7 +39,8 @@ it('probes and reads same-ID rows independently for local and remote hosts', () 
       allRepoIds: [],
       repoMap: new Map(),
       projectGroups,
-      folderWorkspaces
+      folderWorkspaces,
+      sshConnectionStates: new Map()
     })
     return null
   }

@@ -1,4 +1,3 @@
-import { findAllByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
@@ -124,9 +123,9 @@ async function renderSettings(): Promise<ReactTestRenderer> {
 }
 
 function pressableForText(renderer: ReactTestRenderer, text: string): ReactTestInstance {
-  const label = findAllByHostType(renderer.root, 'Text').find(
-    (node) => node.children.filter((child) => typeof child === 'string').join('') === text
-  )
+  const label = renderer.root
+    .findAllByType('Text')
+    .find((node) => node.children.filter((child) => typeof child === 'string').join('') === text)
   if (!label) {
     throw new Error(`Missing settings label: ${text}`)
   }
@@ -204,7 +203,7 @@ describe('settings screen behavior', () => {
       accessibilityRole: 'radio'
     })
     const dark = options.find((option) =>
-      findAllByHostType(option, 'Text').some((text) => text.children.includes('深色'))
+      option.findAllByType('Text').some((text) => text.children.includes('深色'))
     )
     expect(dark).toBeDefined()
 

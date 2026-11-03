@@ -77,16 +77,6 @@ async function verifyPairingCode(
     if (!statusVerification.ok) {
       return statusVerification
     }
-    if (
-      parsed.value.pairing.runtimeRecordId !== undefined &&
-      parsed.value.pairing.runtimeRecordId !== statusVerification.runtimeStatus.runtimeRecordId
-    ) {
-      return {
-        ok: false,
-        kind: 'host-identity-mismatch',
-        message: 'The authenticated Runtime record does not match this pairing link.'
-      }
-    }
     return {
       ok: true,
       link: parsed.value,
@@ -113,7 +103,6 @@ export async function verifyAndAddRuntimeEnvironmentFromPairingCode(
       ...args,
       // Only a verified key match permits updating an existing server identity.
       runtimeId: runtimeStatus.runtimeId,
-      authenticatedRuntimeRecordId: runtimeStatus.runtimeRecordId,
       ...(usesSshTunnel ? { connectionDependency: 'ssh-tunnel' as const } : {})
     })
   } catch (error) {
@@ -157,8 +146,7 @@ export async function verifyAndRepairRuntimeEnvironmentFromPairingCode(
     environment = updateEnvironmentFromPairingCode(userDataPath, existing.id, {
       pairingCode: args.pairingCode,
       // The verified same host may have restarted with a new runtimeId.
-      runtimeId: verified.runtimeStatus.runtimeId,
-      authenticatedRuntimeRecordId: verified.runtimeStatus.runtimeRecordId
+      runtimeId: verified.runtimeStatus.runtimeId
     })
   } catch (error) {
     return pairingSaveFailure(error, 'repairSaveFailed')

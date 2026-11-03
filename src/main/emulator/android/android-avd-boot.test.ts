@@ -112,7 +112,7 @@ describe('bootAndroidDevice recovery', () => {
         if (devicePolls === 1) {
           return adbDevices()
         }
-        if (devicePolls === 3) {
+        if (devicePolls <= 3) {
           return adbDevicesWithState(['emulator-5554', 'offline'])
         }
         return adbDevices('emulator-5554')
@@ -120,13 +120,7 @@ describe('bootAndroidDevice recovery', () => {
       if (binary === SDK.emulator && joinedArgs === '-list-avds') {
         return ok('Pixel_7')
       }
-      if (joinedArgs === '-s emulator-5554 emu avd name' && devicePolls === 2) {
-        return ok('Pixel_7\nOK')
-      }
       if (joinedArgs === '-s emulator-5554 shell getprop sys.boot_completed') {
-        if (devicePolls === 2) {
-          return ok('0')
-        }
         if (devicePolls <= 3) {
           return { stdout: '', stderr: 'device offline', code: 1 }
         }
@@ -158,12 +152,12 @@ describe('bootAndroidDevice recovery', () => {
       terminateTree
     )
     const sleep = vi.fn(async () => {})
-    const launched = managed.launch(SDK.emulator, 'Pixel_7')
-    managed.bindSerial(launched, 'emulator-5554')
+    let devicePolls = 0
     const runner = vi.fn(async (binary: string, args: readonly string[]) => {
       const joinedArgs = args.join(' ')
       if (binary === SDK.adb && joinedArgs === 'devices -l') {
-        return adbDevicesWithState(['emulator-5554', 'offline'])
+        devicePolls += 1
+        return devicePolls === 1 ? adbDevices() : adbDevicesWithState(['emulator-5554', 'offline'])
       }
       if (binary === SDK.emulator && joinedArgs === '-list-avds') {
         return ok('Pixel_7')
@@ -231,9 +225,6 @@ describe('bootAndroidDevice recovery', () => {
       }
       if (joinedArgs === '-s emulator-5556 shell getprop sys.boot_completed') {
         return ok('1')
-      }
-      if (joinedArgs === '-s emulator-5556 emu avd name') {
-        return ok('Pixel_7\nOK')
       }
       return ok()
     })

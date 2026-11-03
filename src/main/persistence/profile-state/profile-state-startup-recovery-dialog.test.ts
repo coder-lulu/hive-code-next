@@ -1,5 +1,6 @@
 import { APP_DISPLAY_NAME } from '../../../shared/brand'
 import { describe, expect, it, vi } from 'vitest'
+import ja from '../../../renderer/src/i18n/locales/ja.json'
 import {
   chooseProfileStateCopy,
   chooseProfileStateRepair,
@@ -12,6 +13,28 @@ const english: ProfileStateDialogTranslate = (_key, fallback, options) =>
   fallback.replace(/\{\{(\w+)\}\}/g, (placeholder, name: string) => options?.[name] ?? placeholder)
 
 describe('profile state startup recovery dialog', () => {
+  it('explains preserved history in the selected language', async () => {
+    const showMessageBox = vi.fn().mockResolvedValue({ response: 1 })
+    await chooseProfileStateRepair({
+      sections: [{ domain: 'automationRuns', source: 'current' }],
+      showMessageBox,
+      translate: (key, fallback, options) => {
+        if (key === 'profileState.section.automationHistory') {
+          return ja.profileState.section.automationHistory
+        }
+        if (key === 'profileState.repairChoice.sectionKeptCurrent') {
+          return ja.profileState.repairChoice.sectionKeptCurrent.replace(
+            '{{section}}',
+            options?.section ?? ''
+          )
+        }
+        return english(key, fallback, options)
+      }
+    })
+    expect(showMessageBox.mock.calls[0][0].detail).toContain(
+      `${ja.profileState.section.automationHistory}：現在の実行履歴は保持されます`
+    )
+  })
   it('offers a copyable offline export command and does not mutate state', async () => {
     const showMessageBox = vi.fn().mockResolvedValue({ response: 0 })
     const copyToClipboard = vi.fn()
@@ -122,7 +145,8 @@ Quit ${APP_DISPLAY_NAME} and resolve the profile-state authority before retrying
         chooseProfileStateRepair({
           sections: [
             { domain: 'repos', backupId: '1-a', backupCreatedAtMs: 5 },
-            { domain: 'settings', backupId: null }
+            { domain: 'settings', backupId: null },
+            { domain: 'automationRuns', source: 'current' }
           ],
           formatTime: (time) => `t${time.getTime()}`,
           showMessageBox,
@@ -140,6 +164,7 @@ Quit ${APP_DISPLAY_NAME} and resolve the profile-state authority before retrying
         detail: [
           'Projects: restored from the backup saved t5.',
           'Settings: no readable backup, so it will start empty.',
+          'Automation history: your current runs will be kept',
           '',
           'Everything else stays as it is now.',
           '',

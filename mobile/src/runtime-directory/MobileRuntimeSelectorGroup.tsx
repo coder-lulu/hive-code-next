@@ -1,4 +1,3 @@
-import { useMobileTranslation } from '../i18n/use-mobile-translation'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { Check, Monitor, Trash2 } from 'lucide-react-native'
 import type { MobileTheme } from '../theme/mobile-theme'
@@ -15,8 +14,6 @@ export function RuntimeGroup(props: {
   readonly styles: ReturnType<typeof createStyles>
   readonly theme: MobileTheme
 }) {
-  const t = useMobileTranslation()
-
   if (props.entries.length === 0) {
     return null
   }
@@ -40,11 +37,7 @@ export function RuntimeGroup(props: {
             />
             {deletableIds.has(entry.id) ? (
               <Pressable
-                accessibilityLabel={t(
-                  'auto.mobile.src.runtime.directory.MobileRuntimeSelectorGroup.fb52ba9ae4',
-                  'Delete Runtime: {{value0}}',
-                  { value0: entry.name }
-                )}
+                accessibilityLabel={`删除 Runtime：${entry.name}`}
                 accessibilityRole="button"
                 onPress={() => props.onDelete?.(entry)}
                 style={({ pressed }) => [
@@ -54,10 +47,7 @@ export function RuntimeGroup(props: {
               >
                 <Trash2 color={props.theme.color.status.dangerText} size={20} strokeWidth={2} />
                 <Text maxFontSizeMultiplier={1.3} style={props.styles.deleteText}>
-                  {t(
-                    'auto.mobile.src.runtime.directory.MobileRuntimeSelectorGroup.230fdbc32a',
-                    'Delete Runtime'
-                  )}
+                  删除 Runtime
                 </Text>
               </Pressable>
             ) : null}

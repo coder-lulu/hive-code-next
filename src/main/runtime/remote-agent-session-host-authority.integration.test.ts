@@ -1,4 +1,3 @@
-import { pairedRuntimeConnectionFromOffer } from '../../shared/paired-runtime-connection'
 
 import '../daemon/mock-descendant-sweep'
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -11,7 +10,7 @@ import { RemoteRuntimeRequestConnection } from '../../shared/remote-runtime/requ
 import type {
   RuntimeEnsureAgentSessionResult,
   RuntimeEnsureAgentSessionRequest
-} from '../../shared/agent-session-host-authority'
+} from '../../shared/agent-session/agent-session-host-authority'
 import type { RuntimeMobileSessionTabsResult } from '../../shared/runtime-types'
 import type { SubprocessHandle } from '../daemon/session-subprocess-handle'
 import { TerminalHost } from '../daemon/terminal-host'
@@ -150,13 +149,13 @@ describe('remote agent-session host authority integration', () => {
       cleanups.push(() => server.stop())
 
       const firstClient = new RemoteRuntimeRequestConnection(
-        pairedRuntimeConnectionFromOffer(requirePairing(server, 'client-one'))
+        requirePairing(server, 'client-one')
       )
       const secondClient = new RemoteRuntimeRequestConnection(
-        pairedRuntimeConnectionFromOffer(requirePairing(server, 'client-two'))
+        requirePairing(server, 'client-two')
       )
       const retryClient = new RemoteRuntimeRequestConnection(
-        pairedRuntimeConnectionFromOffer(requirePairing(server, 'retry-client'))
+        requirePairing(server, 'retry-client')
       )
       cleanups.push(() => firstClient.close())
       cleanups.push(() => secondClient.close())

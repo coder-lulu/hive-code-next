@@ -436,6 +436,29 @@ describe('orca cli worktree awareness', () => {
     expect(JSON.stringify(callMock.mock.calls[0]?.[1])).not.toContain('isUnread')
   })
 
+  it.each([[['--comment', '']], [['--comment=']]])(
+    'sends an explicit empty comment for %j so worktree.set clears it',
+    async (flags) => {
+      queueFixtures(
+        callMock,
+        okFixture('req_clear_comment', {
+          worktree: buildWorktree('/tmp/repo/child', 'feature/child')
+        })
+      )
+      vi.spyOn(console, 'log').mockImplementation(() => {})
+
+      await main(
+        ['worktree', 'set', '--worktree', 'id:repo::/tmp/repo/child', ...flags, '--json'],
+        '/tmp/repo'
+      )
+
+      expect(callMock).toHaveBeenCalledExactlyOnceWith(
+        'worktree.set',
+        expect.objectContaining({ worktree: 'id:repo::/tmp/repo/child', comment: '' })
+      )
+    }
+  )
+
   it.each([
     [['--unread', '--read'], 'Choose either --unread or --read'],
     [['--read', '--unread'], 'Choose either --unread or --read'],

@@ -101,7 +101,7 @@ export function DesktopHomeProjectList({
           <span>
             {translate(
               'components.desktopHome.noProjectsDescription',
-              'Add a code repository to see workspaces here.'
+              'Add a repository or folder to get started.'
             )}
           </span>
           <button

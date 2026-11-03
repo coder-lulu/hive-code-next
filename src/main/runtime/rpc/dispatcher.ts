@@ -99,6 +99,7 @@ export class RpcDispatcher {
       if (featureWait) {
         await featureWait
       }
+      options?.beforeInvoke?.()
       return successResponse(request.id, meta, await this.invokeUnary(admission, options))
     } catch (error) {
       if (probeEmulator) {

@@ -1,4 +1,3 @@
-import { getAuthoritativelyRemovedWorktreeIds } from './authoritative-worktree-removal-memory'
 import { getEnvironmentSshStateGeneration } from '../../runtime-environment-ssh'
 import { getRuntimeEnvironmentConnectionGeneration } from '../../runtime-status'
 import type { AppState } from '../../../types'
@@ -43,11 +42,6 @@ export function worktreeListingRefusal(
   ownerMayBeMissing: boolean
 ): WorktreeListingRefusal | null {
   if (
-    (ownerMayBeMissing &&
-      !state.repos.some((repo) => repo.id === repoId) &&
-      refresh.result.worktrees.some((row) =>
-        getAuthoritativelyRemovedWorktreeIds(hostId)?.has(row.id)
-      )) ||
     !isCurrentDetectedWorktreeRefresh(state, refresh) ||
     !repoHasExactlyOneExecutionHostOwner(state, repoId, hostId, ownerMayBeMissing)
   ) {

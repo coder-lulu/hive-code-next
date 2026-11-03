@@ -1,4 +1,3 @@
-import { findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement } from 'react'
 import { act, create, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -93,9 +92,9 @@ describe('device page layout and controls', () => {
   it('renders current connection details and grouped other devices, with live filter counts', () => {
     mount()
     expect(
-      findByHostType(renderer!.root, 'List').props.sections.map(
-        (section: { title: string }) => section.title
-      )
+      renderer!.root
+        .findByType('List')
+        .props.sections.map((section: { title: string }) => section.title)
     ).toEqual(['当前使用', '其他设备'])
     expect(renderer!.root.findByProps({ children: '设备管理' })).toBeTruthy()
     expect(renderer!.root.findByProps({ children: '连接方式：直连' })).toBeTruthy()
@@ -104,9 +103,9 @@ describe('device page layout and controls', () => {
     }
     press('未连接，2 台设备')
     expect(renderer!.root.findAllByProps({ children: '打开会话' })).toHaveLength(0)
-    expect(findByHostType(renderer!.root, 'List').props.sections[0].data).toHaveLength(2)
+    expect(renderer!.root.findByType('List').props.sections[0].data).toHaveLength(2)
     press('已连接，1 台设备')
-    expect(findByHostType(renderer!.root, 'List').props.sections[0].data).toHaveLength(1)
+    expect(renderer!.root.findByType('List').props.sections[0].data).toHaveLength(1)
   })
   it('wires actions, retry, help, add and current connection details to their actual callbacks', () => {
     const props = mount()

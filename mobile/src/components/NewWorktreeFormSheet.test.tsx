@@ -1,11 +1,10 @@
-import { findAllByHostType, findByHostType } from '../test-support/react-test-renderer-host-nodes'
 import { createElement, type ComponentProps } from 'react'
 import { act, create, type ReactTestInstance, type ReactTestRenderer } from 'react-test-renderer'
 import { afterEach, expect, it, vi } from 'vitest'
 import { darkTheme, lightTheme, type MobileTheme } from '../theme/mobile-theme'
 import { NewWorktreeFormSheet } from './NewWorktreeFormSheet'
 
-let currentTheme: MobileTheme = lightTheme
+let currentTheme = lightTheme
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   Pressable: 'Pressable',
@@ -60,7 +59,7 @@ it.each([lightTheme, darkTheme])(
     act(() => {
       renderer = create(createElement(NewWorktreeFormSheet, props))
     })
-    const texts = findAllByHostType(renderer!.root, 'Text')
+    const texts = renderer!.root.findAllByType('Text')
     const title = texts.find((node) => node.props.children === 'Create worktree')!
     expect(style(title).color).toBe(theme.color.text.primary)
     const agent = renderer!.root.findByProps({ accessibilityLabel: 'Select agent' })
@@ -68,18 +67,18 @@ it.each([lightTheme, darkTheme])(
     expect(style(texts.find((node) => node.props.children === 'Codex')!).color).toBe(
       theme.color.text.primary
     )
-    const submit = findAllByHostType(renderer!.root, 'Pressable').find(
-      (node) => node.props.accessibilityState?.busy === false
-    )!
+    const submit = renderer!.root
+      .findAllByType('Pressable')
+      .find((node) => node.props.accessibilityState?.busy === false)!
     expect(style(submit).backgroundColor).toBe(theme.color.bg.selected)
-    expect(style(findByHostType(submit, 'Text')).color).toBe(theme.color.text.inverse)
+    expect(style(submit.findByType('Text')).color).toBe(theme.color.text.inverse)
     expect(style(agent).minHeight).toBeGreaterThanOrEqual(theme.size.minimumTouchTarget)
     act(() => {
       renderer!.update(
         createElement(NewWorktreeFormSheet, { ...props, creating: true, canCreate: false })
       )
     })
-    expect(findByHostType(renderer!.root, 'ActivityIndicator').props.color).toBe(
+    expect(renderer!.root.findByType('ActivityIndicator').props.color).toBe(
       theme.color.text.inverse
     )
   }

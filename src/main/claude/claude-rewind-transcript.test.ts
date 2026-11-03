@@ -1,11 +1,10 @@
-import { launchRecordStore } from '../runtime/structured-agent-launch-composition.test-support'
 import { randomUUID } from 'node:crypto'
 import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { claudeProviderHandle } from '../../shared/agent-session-provider-handle-encoding'
-import { AgentSessionRewindRecordSchema } from '../../shared/agent-session-rewind'
+import { claudeProviderHandle } from '../../shared/agent-session/lifecycle/agent-session-provider-handle-encoding'
+import { AgentSessionRewindRecordSchema } from '../../shared/agent-session/lifecycle/agent-session-rewind'
 import { agentSessionRecordFixture } from '../native-chat/agent-session-record-test-fixture'
 import { createClaudeStructuredLaunchResolver } from '../runtime/structured-agent-launch-composition.test-support'
 import { resolveClaudeRewindFork } from './claude-rewind-fork'
@@ -142,7 +141,7 @@ describe('durable Claude rewind transcripts', () => {
           )
         })
         const resolve = createClaudeStructuredLaunchResolver({
-          store: launchRecordStore(() => record, vi.fn()),
+          store: { getRecord: () => record, pinLaunchDirectory: vi.fn() },
           resolveLaunchArgs: () => [],
           resolveWorkspacePath: async () => project,
           resolveCommand: () => ({ command: '/usr/local/bin/claude', prefixArgs: [] }),

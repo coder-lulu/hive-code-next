@@ -42,14 +42,14 @@ describe('plugin system default-on migration', () => {
   it('turns plugins on for new profiles', async () => {
     const store = await createStore()
     expect(store.getSettings().pluginSystemEnabled).toBe(true)
-    expect(store.getSettings()).not.toHaveProperty('pluginSystemDefaultedOn')
+    expect(store.getSettings().pluginSystemDefaultedOn).toBe(true)
   })
 
-  it('preserves a saved explicit false', async () => {
+  it('flips a saved pre-rollout false on once', async () => {
     writeSettings({ pluginSystemEnabled: false })
     const store = await createStore()
-    expect(store.getSettings().pluginSystemEnabled).toBe(false)
-    expect(store.getSettings()).not.toHaveProperty('pluginSystemDefaultedOn')
+    expect(store.getSettings().pluginSystemEnabled).toBe(true)
+    expect(store.getSettings().pluginSystemDefaultedOn).toBe(true)
   })
 
   it('keeps a deliberate false saved after the migration', async () => {
@@ -58,16 +58,13 @@ describe('plugin system default-on migration', () => {
     expect(store.getSettings().pluginSystemEnabled).toBe(false)
   })
 
-  it('persists explicit writes without accepting retired migration guards', async () => {
+  it('stamps the guard on explicit writes so they survive reload', async () => {
     const store = await createStore()
-    const updates = {
+    const updated = store.updateSettings({
       pluginSystemEnabled: false,
       pluginSystemDefaultedOn: false
-    }
-    const updated = store.updateSettings(updates)
+    })
     expect(updated.pluginSystemEnabled).toBe(false)
-    expect(updated).not.toHaveProperty('pluginSystemDefaultedOn')
-    store.flush()
-    expect((await createStore()).getSettings().pluginSystemEnabled).toBe(false)
+    expect(updated.pluginSystemDefaultedOn).toBe(true)
   })
 })

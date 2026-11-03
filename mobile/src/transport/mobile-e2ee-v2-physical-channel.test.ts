@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import nacl from 'tweetnacl'
-import { createHash } from 'node:crypto'
 import { setFlagsFromString } from 'node:v8'
 import { runInNewContext } from 'node:vm'
+import { gzipSync } from 'node:zlib'
 import {
   encodeMobileE2EEV2Transcript,
   validateMobileE2EEV2Handshake,
@@ -12,6 +12,7 @@ import {
   openMobileE2EEV2Frame,
   sealMobileE2EEV2Frame
 } from '../../../src/shared/mobile-e2ee-v2-framing'
+import { encodeCompressedFrame } from '../../../src/shared/paired-e2ee-compressed-frame'
 
 vi.mock('expo-crypto', () => ({
   getRandomBytes: (length: number) => new Uint8Array(length).fill(9)
@@ -25,6 +26,8 @@ import {
   MobileE2EEV2PhysicalChannel,
   type MobileE2EEV2Socket
 } from './mobile-e2ee-v2-physical-channel'
+import { MobileRelayE2eeLink } from './mobile-relay-e2ee-link'
+import { connectMobileRelayForPairing } from './mobile-relay-physical-client'
 
 const desktop = nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(1))
 const client = nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(2))
@@ -32,7 +35,8 @@ const client = nacl.box.keyPair.fromSecretKey(new Uint8Array(32).fill(2))
 function setup(decodeBinary: (raw: unknown) => Promise<Uint8Array | null>) {
   const session = MobileE2EEV2ClientSession.create({
     desktopPublicKeyB64: Buffer.from(desktop.publicKey).toString('base64'),
-    transport: 'direct',
+    transport: 'relay',
+    relayHostId: 'AbCdEf0123_-xyZ9',
     clientNonce: new Uint8Array(32).fill(3),
     clientKeyPair: client
   })
@@ -138,11 +142,7 @@ describe('mobile E2EE v2 physical channel', () => {
     expect(JSON.parse(new TextDecoder().decode(plaintext))).toEqual({
       type: 'e2ee_auth',
       v: 2,
-      transcriptHashB64: createHash('sha256')
-        .update(
-          encodeMobileE2EEV2Transcript(validateMobileE2EEV2Handshake(ctx.session.hello, ctx.ready)!)
-        )
-        .digest('base64'),
+      transcriptHashB64: '0MsOjvXsuyjwleiCNSASug/uFkz8+rYlIfG2h2p5OPk=',
       deviceToken: 'valid-token'
     })
     expect(ctx.onAuthenticated).toHaveBeenCalledOnce()
@@ -155,14 +155,7 @@ describe('mobile E2EE v2 physical channel', () => {
         JSON.stringify({
           type: 'e2ee_authenticated',
           v: 2,
-          transcriptHashB64: createHash('sha256')
-            .update(
-              encodeMobileE2EEV2Transcript(
-                validateMobileE2EEV2Handshake(ctx.session.hello, ctx.ready)!
-              )
-            )
-            .digest('base64')
-            .repeat(44)
+          transcriptHashB64: 'A'.repeat(44)
         })
       ),
       'text',
@@ -211,6 +204,32 @@ describe('mobile E2EE v2 physical channel', () => {
     releaseBinary(binary)
     await Promise.all([first, second])
     expect(ctx.events).toEqual(['binary:7', 'text:later'])
+    expect(ctx.onError).not.toHaveBeenCalled()
+  })
+
+  it('delivers compressed frames as what they carry, in counter order with plain frames', async () => {
+    const ctx = setup(async (raw) => (raw instanceof Uint8Array ? raw : null))
+    await authenticate(ctx)
+    ctx.events.length = 0
+
+    const reply = JSON.stringify({ id: 'rpc-1', ok: true, result: { note: 'é'.repeat(4096) } })
+    const utf8 = Buffer.from(reply, 'utf8')
+    const text = encodeCompressedFrame({
+      payloadKind: 'text',
+      inflatedByteLength: utf8.byteLength,
+      gzipped: gzipSync(utf8)
+    })
+    const terminal = new Uint8Array(2048).fill(0x74)
+    const binary = encodeCompressedFrame({
+      payloadKind: 'binary',
+      inflatedByteLength: terminal.byteLength,
+      gzipped: gzipSync(terminal)
+    })
+    await ctx.channel.handleMessage(serverFrame(text, 'binary', 1n, ctx.schedule))
+    await ctx.channel.handleMessage(serverFrame(binary, 'binary', 2n, ctx.schedule))
+    await ctx.channel.handleMessage(serverFrame(new Uint8Array([7]), 'binary', 3n, ctx.schedule))
+
+    expect(ctx.events).toEqual([`text:${reply}`, 'binary:116', 'binary:7'])
     expect(ctx.onError).not.toHaveBeenCalled()
   })
 
@@ -336,6 +355,29 @@ describe('mobile E2EE v2 physical channel', () => {
   })
 })
 
+class RetentionSocket {
+  readonly OPEN = 1
+  readyState = 1
+  bufferedAmount = 0
+  sent: (string | Uint8Array)[] = []
+  onopen: (() => void) | null = null
+  onmessage: ((event: { data: unknown }) => void) | null = null
+  onclose: ((event: { code: number }) => void) | null = null
+  onerror: (() => void) | null = null
+
+  send(frame: string | Uint8Array): void {
+    this.sent.push(frame)
+  }
+
+  close(): void {
+    this.readyState = 3
+  }
+
+  receive(data: unknown): void {
+    this.onmessage?.({ data })
+  }
+}
+
 function nextInboundTurn(): Promise<void> {
   return new Promise((resolve) => setImmediate(resolve))
 }
@@ -354,36 +396,133 @@ async function collectInboundPayloads(): Promise<void> {
   }
 }
 
-function receiveRetainedPayload(channel: MobileE2EEV2PhysicalChannel): WeakRef<Uint8Array> {
+function receiveRetainedPayload(socket: RetentionSocket): WeakRef<Uint8Array> {
   const payload = new Uint8Array(1024 * 1024)
-  void channel.handleMessage(payload)
+  socket.receive(payload)
   return new WeakRef(payload)
 }
 
-describe('authenticated direct inbound payload disposal', () => {
-  it('releases queued payloads on disposal while binary conversion remains blocked', async () => {
-    let release: (bytes: ArrayBuffer) => void = () => {
-      throw new Error('Expected pending binary conversion')
+describe('relay inbound payload disposal', () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it.each([
+    ['link', 'close'],
+    ['link', 'failure'],
+    ['pairing', 'close'],
+    ['pairing', 'failure']
+  ] as const)(
+    'releases queued %s payloads on %s while conversion is blocked',
+    async (owner, mode) => {
+      const ctx = setup(async () => null)
+      const socket = new RetentionSocket()
+      const relay = {
+        v: 1 as const,
+        directorUrl: 'https://relay.onorca.dev',
+        cellUrl: 'https://relay-c1.onorca.dev',
+        assignmentEpoch: 7,
+        relayHostId: 'AbCdEf0123_-xyZ9',
+        inviteToken: 'abcdefghijklmnopqrstuvwxyzABCDEFGH012345678',
+        inviteExpiresAt: Date.now() + 300_000,
+        e2eeFraming: 2 as const
+      }
+      const createSession = vi
+        .spyOn(MobileE2EEV2ClientSession, 'create')
+        .mockReturnValueOnce(ctx.session)
+      const createSocket = (): WebSocket => {
+        // oxlint-disable-next-line typescript/consistent-type-assertions -- SAFETY: Both real transports only send/close and assign event handlers on this socket.
+        return socket as unknown as WebSocket
+      }
+      const onAuthenticated = vi.fn()
+      const transport =
+        owner === 'link'
+          ? new MobileRelayE2eeLink({
+              endpoint: relay,
+              credential: relay.inviteToken,
+              expectedCredentialKind: 'invite',
+              deviceToken: 'valid-token',
+              desktopPublicKeyB64: Buffer.from(desktop.publicKey).toString('base64'),
+              onAuthenticated,
+              onText: vi.fn(),
+              onBinary: vi.fn(),
+              onError: vi.fn(),
+              createSocket
+            })
+          : connectMobileRelayForPairing({
+              relay,
+              deviceToken: 'valid-token',
+              desktopPublicKeyB64: Buffer.from(desktop.publicKey).toString('base64'),
+              createSocket
+            })
+      createSession.mockRestore()
+      socket.onopen?.()
+      socket.receive(
+        JSON.stringify({
+          type: 'relay-hello',
+          ok: true,
+          credentialKind: 'invite',
+          leaseExpiresAt: Date.now() + 60_000
+        })
+      )
+      await nextInboundTurn()
+      socket.receive(JSON.stringify(ctx.ready))
+      await nextInboundTurn()
+      const authenticated = serverFrame(
+        new TextEncoder().encode(
+          JSON.stringify({
+            type: 'e2ee_authenticated',
+            v: 2,
+            transcriptHashB64: ctx.session.transcriptHashB64
+          })
+        ),
+        'text',
+        0n,
+        ctx.schedule
+      )
+      socket.receive(Buffer.from(authenticated).toString('base64'))
+      await nextInboundTurn()
+      if (transport instanceof MobileRelayE2eeLink) {
+        expect(onAuthenticated).toHaveBeenCalledOnce()
+      } else {
+        const reply = transport.sendRequest('status.get')
+        await nextInboundTurn()
+        const response = serverFrame(
+          new TextEncoder().encode(
+            JSON.stringify({
+              id: 'relay-pair-1',
+              ok: true,
+              result: { path: 'relay' },
+              _meta: { runtimeId: 'retention' }
+            })
+          ),
+          'text',
+          1n,
+          ctx.schedule
+        )
+        socket.receive(Buffer.from(response).toString('base64'))
+        await expect(reply).resolves.toMatchObject({ ok: true, result: { path: 'relay' } })
+      }
+      let release = (_buffer: ArrayBuffer): void => {}
+      const blocked = new Promise<ArrayBuffer>((resolve) => {
+        release = resolve
+      })
+      socket.receive({ arrayBuffer: () => blocked })
+      await nextInboundTurn()
+      const refs = Array.from({ length: 8 }, () => receiveRetainedPayload(socket))
+      try {
+        await collectInboundPayloads()
+        expect(refs.filter((ref) => ref.deref() !== undefined)).toHaveLength(8)
+        if (mode === 'close') {
+          transport.close()
+        } else {
+          socket.onclose?.({ code: 1006 })
+        }
+        await collectInboundPayloads()
+        expect(refs.filter((ref) => ref.deref() !== undefined)).toHaveLength(0)
+      } finally {
+        release(new ArrayBuffer(0))
+        await nextInboundTurn()
+        transport.close()
+      }
     }
-    const blocked = new Promise<ArrayBuffer>((resolve) => {
-      release = resolve
-    })
-    const ctx = setup(async () => new Uint8Array(await blocked))
-    await authenticate(ctx)
-    const inbound = ctx.channel.handleMessage({ arrayBuffer: () => blocked })
-    await nextInboundTurn()
-    const refs = Array.from({ length: 8 }, () => receiveRetainedPayload(ctx.channel))
-    try {
-      await collectInboundPayloads()
-      expect(refs.filter((ref) => ref.deref() !== undefined)).toHaveLength(8)
-      ctx.channel.dispose()
-      await collectInboundPayloads()
-      expect(refs.filter((ref) => ref.deref() !== undefined)).toHaveLength(0)
-      expect(ctx.onError).not.toHaveBeenCalled()
-    } finally {
-      release(new ArrayBuffer(0))
-      await inbound
-      ctx.channel.dispose()
-    }
-  })
+  )
 })

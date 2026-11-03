@@ -5,7 +5,7 @@ import {
 } from '../../../shared/terminal-surface-id'
 import type { AgentStartupPlan } from '@/lib/tui-agent-startup'
 import { makePaneKey } from '../../../shared/stable-pane-id'
-import { runtimeEnvironmentIdOrLocalUnlessTwin } from './worktree-runtime-owner'
+import { getRuntimeEnvironmentIdForWorktree } from './worktree-runtime-owner'
 
 type AppStoreSnapshot = ReturnType<typeof useAppStore.getState>
 
@@ -32,7 +32,7 @@ export function bindHostAgentStartupLaunch(args: {
   // synchronous pass. Re-read the store for each bind so the first token's
   // registration is authoritative before a competing token is considered.
   const state = useAppStore.getState()
-  const runtimeEnvironmentId = runtimeEnvironmentIdOrLocalUnlessTwin(state, args.worktreeId)
+  const runtimeEnvironmentId = getRuntimeEnvironmentIdForWorktree(state, args.worktreeId)
   const expectedTabId =
     runtimeEnvironmentId && !isWebTerminalSurfaceTabId(hostPane.tabId)
       ? toWebTerminalSurfaceTabId(hostPane.tabId)
